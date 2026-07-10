@@ -1480,6 +1480,100 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 </div>
               </TabsContent>
 
+              <TabsContent value="laudo" className="space-y-4 pt-4 pb-16">
+                <div className="space-y-3">
+                  <div>
+                    <Label>REPASSE LAUDO TERCEIRO</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Use quando este cadastro representa uma <b>agenda de exame</b> (ex.: ELETROCARDIOGRAMA) e o laudo é feito por <b>outro médico</b>.
+                      Liste abaixo os cardiologistas ativos da clínica e defina o repasse (percentual ou valor fixo por exame) que cada um recebe pelo laudo.
+                      O financeiro lança este repasse manualmente em <b>Financeiro → Laudos ECG</b> por período.
+                    </p>
+                  </div>
+                  {!editingMedicoId ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">Salve o médico antes de configurar o repasse de laudo.</p>
+                  ) : laudadoresCatalog.length === 0 ? (
+                    <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center">
+                      Nenhum cardiologista ativo encontrado nesta clínica. Cadastre médicos com a especialidade <b>Cardiologia</b> para poder configurar o laudo.
+                    </div>
+                  ) : (
+                    <div className="border rounded-md overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/50">
+                          <tr className="text-left">
+                            <th className="px-2 py-2 font-medium">Laudador (Cardiologia)</th>
+                            <th className="px-2 py-2 font-medium w-40">Tipo</th>
+                            <th className="px-2 py-2 font-medium w-36">Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {laudadoresCatalog.map((cardio) => {
+                            const row = laudadores.find((l) => l.laudador_medico_id === cardio.id);
+                            const setRow = (patch: Partial<LaudadorRow>) => {
+                              setLaudadores((rows) => {
+                                const idx = rows.findIndex((l) => l.laudador_medico_id === cardio.id);
+                                if (idx === -1) {
+                                  return [...rows, {
+                                    laudador_medico_id: cardio.id,
+                                    tipo_repasse: "percentual",
+                                    percentual: "",
+                                    valor: "",
+                                    ...patch,
+                                  }];
+                                }
+                                return rows.map((r, j) => j === idx ? { ...r, ...patch } : r);
+                              });
+                            };
+                            const tipo = row?.tipo_repasse ?? "percentual";
+                            const value = tipo === "percentual" ? (row?.percentual ?? "") : (row?.valor ?? "");
+                            return (
+                              <tr key={cardio.id} className="border-t align-middle">
+                                <td className="px-2 py-1.5">
+                                  <div className="text-sm text-foreground/90">
+                                    {cardio.nome}
+                                    {cardio.crm && (
+                                      <span className="ml-2 text-xs text-muted-foreground">
+                                        CRM {cardio.crm}{cardio.crm_uf ? `/${cardio.crm_uf}` : ""}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-2 py-1">
+                                  <select
+                                    className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                    value={tipo}
+                                    onChange={(e) => setRow({ tipo_repasse: e.target.value as "percentual" | "valor" })}
+                                  >
+                                    <option value="percentual">% Percentual</option>
+                                    <option value="valor">R$ Valor</option>
+                                  </select>
+                                </td>
+                                <td className="px-2 py-1">
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min={0}
+                                    max={tipo === "percentual" ? 100 : undefined}
+                                    placeholder={tipo === "percentual" ? "% do faturado" : "R$ por exame"}
+                                    value={value}
+                                    onChange={(e) => setRow(tipo === "percentual"
+                                      ? { percentual: e.target.value }
+                                      : { valor: e.target.value })}
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Deixe o valor em branco / 0 para o médico que <b>não recebe laudo</b>. Este cadastro não gera lançamento automático — o financeiro decide quando lançar.
+                  </p>
+                </div>
+              </TabsContent>
+
               <TabsContent value="acesso" className="space-y-4 pt-4 pb-16">
                 {hasLogin ? (
                   <div className="space-y-4 py-2 text-sm">
