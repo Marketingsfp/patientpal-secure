@@ -976,6 +976,98 @@ function Page() {
       .reduce((acc, m) => acc + Number(m.valor || 0), 0);
   }, [todosMovs]);
 
+  // ============ Agrupamento por operador × dia ============
+  // Um mesmo turno pode atravessar a meia-noite; a listagem mostra uma linha
+  // por dia, com os movimentos, sangrias, informado e diferença daquele dia
+  // específico. Cada dia = "um caixa" com abertura e fechamento próprios.
+  type LinhaDia = {
+    key: string; user_id: string; user_nome: string; data: string;
+    primeiraAbertura: string | null; ultimoFechamento: string | null;
+    statusDia: "aberto" | "fechado";
+    valorAbertura: number; calculado: number; informado: number;
+    sangria: number; estorno: number; diferenca: number;
+    sessoes: Sessao[]; sessaoAbertaId: string | null;
+  };
+  const localDate = (iso: string | null | undefined): string | null => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const fmtDia = (data: string) => {
+    const [y, m, d] = data.split("-");
+    return `${d}/${m}/${y}`;
+  };
+  const fmtHora = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
+
+  const agruparPorDia = useCallback((sessoes: Sessao[], movs: Mov[]): LinhaDia[] => {
+    const buckets = new Map<string, LinhaDia>();
+    const sessById = new Map(sessoes.map((s) => [s.id, s]));
+    const get = (uid: string, nome: string, data: string) => {
+      const k = `${uid}__${data}`;
+      let b = buckets.get(k);
+      if (!b) {
+        b = {
+          key: k, user_id: uid, user_nome: nome, data,
+          primeiraAbertura: null, ultimoFechamento: null,
+          statusDia: "fechado",
+          valorAbertura: 0, calculado: 0, informado: 0,
+          sangria: 0, estorno: 0, diferenca: 0,
+          sessoes: [], sessaoAbertaId: null,
+        };
+        buckets.set(k, b);
+      }
+      return b;
+    };
+    for (const s of sessoes) {
+      const nome = (s.user_nome || s.user_id.slice(0, 8)).toString();
+      const dAb = localDate(s.aberto_em);
+      if (dAb) {
+        const b = get(s.user_id, nome, dAb);
+        b.sessoes.push(s);
+        b.valorAbertura += Number(s.valor_abertura || 0);
+        if (!b.primeiraAbertura || s.aberto_em < b.primeiraAbertura) b.primeiraAbertura = s.aberto_em;
+        if (s.status === "aberto") {
+          b.statusDia = "aberto";
+          if (!b.sessaoAbertaId) b.sessaoAbertaId = s.id;
+        }
+      }
+      const dFe = localDate(s.fechado_em);
+      if (dFe && s.fechado_em) {
+        const b = get(s.user_id, nome, dFe);
+        if (!b.sessoes.some((x) => x.id === s.id)) b.sessoes.push(s);
+        b.informado += Number(s.valor_fechamento_informado || 0);
+        b.diferenca += Number(s.diferenca || 0);
+        if (!b.ultimoFechamento || s.fechado_em > b.ultimoFechamento) b.ultimoFechamento = s.fechado_em;
+      }
+    }
+    for (const m of movs) {
+      const d = localDate(m.created_at);
+      if (!d) continue;
+      const s = sessById.get(m.sessao_id);
+      if (!s) continue;
+      const nome = (s.user_nome || s.user_id.slice(0, 8)).toString();
+      const b = get(s.user_id, nome, d);
+      b.calculado += TIPO_SINAL[m.tipo] * Number(m.valor || 0);
+      if (m.tipo === "sangria") b.sangria += Number(m.valor || 0);
+      if ((m.descricao ?? "").toLowerCase().includes("estorno")) b.estorno += Number(m.valor || 0);
+    }
+    return Array.from(buckets.values()).sort((a, b) => {
+      if (a.data !== b.data) return b.data.localeCompare(a.data);
+      return a.user_nome.localeCompare(b.user_nome, "pt-BR");
+    });
+  }, []);
+
+  const linhasTodosPorDia = useMemo(
+    () => agruparPorDia(todasSessoes, todosMovs),
+    [agruparPorDia, todasSessoes, todosMovs],
+  );
+  const linhasMinhasPorDia = useMemo(
+    () => agruparPorDia(minhasSessoes, minhasMovs),
+    [agruparPorDia, minhasSessoes, minhasMovs],
+  );
+
   // Total recebido/suprido por forma de pagamento em uma sessão qualquer
   // (usa `todosMovs`). Decompõe pagamentos "misto" quando as observações do
   // lançamento já foram carregadas via `mistoObs`.
@@ -1327,17 +1419,18 @@ function Page() {
   };
 
   const exportarTodos = () => {
-    const rows = todasSessoes.map((s) => ({
-      Operador: s.user_nome || s.user_id.slice(0, 8),
-      Abertura: fmtDT(s.aberto_em),
-      Fechamento: fmtDT(s.fechado_em),
-      Status: s.status,
-      "Valor abertura": Number(s.valor_abertura || 0),
-      "Saldo calculado": calcSaldoSessao(s.id),
-      "Valor informado": Number(s.valor_fechamento_informado || 0),
-      Sangria: calcSangriaSessao(s.id),
-      Estorno: calcEstornoSessao(s.id),
-      Diferenca: Number(s.diferenca || 0),
+    const rows = linhasTodosPorDia.map((l) => ({
+      Operador: l.user_nome,
+      Dia: fmtDia(l.data),
+      "Abertura (hora)": fmtHora(l.primeiraAbertura),
+      "Fechamento (hora)": fmtHora(l.ultimoFechamento),
+      Status: l.statusDia,
+      "Valor abertura": l.valorAbertura,
+      "Saldo calculado": l.calculado,
+      "Valor informado": l.informado,
+      Sangria: l.sangria,
+      Estorno: l.estorno,
+      Diferenca: l.diferenca,
     }));
     exportToExcel(rows, `caixas_${fIni}_a_${fFim}`);
   };
@@ -1838,6 +1931,7 @@ function Page() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Dia</TableHead>
                       <TableHead>Abertura</TableHead>
                       <TableHead>Fechamento</TableHead>
                       <TableHead>Status</TableHead>
@@ -1848,21 +1942,29 @@ function Page() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {minhasSessoes.map((s) => (
-                      <TableRow key={s.id}>
-                        <TableCell>{fmtDT(s.aberto_em)}</TableCell>
-                        <TableCell>{fmtDT(s.fechado_em)}</TableCell>
-                        <TableCell>
-                          <Badge variant={s.status === "aberto" ? "default" : "secondary"}>{s.status}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">{fmt(s.valor_abertura)}</TableCell>
-                        <TableCell className="text-right">{fmt(s.valor_fechamento_informado)}</TableCell>
-                        <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
-                          {fmt(s.diferenca)}
-                        </TableCell>
-                        <TableCell><Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}><Eye className="h-4 w-4" /></Button></TableCell>
-                      </TableRow>
-                    ))}
+                    {linhasMinhasPorDia.map((l) => {
+                      const sPrincipal = l.sessoes[0];
+                      return (
+                        <TableRow key={l.key}>
+                          <TableCell className="font-medium">{fmtDia(l.data)}</TableCell>
+                          <TableCell>{fmtHora(l.primeiraAbertura)}</TableCell>
+                          <TableCell>{fmtHora(l.ultimoFechamento)}</TableCell>
+                          <TableCell>
+                            <Badge variant={l.statusDia === "aberto" ? "default" : "secondary"}>{l.statusDia}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">{fmt(l.valorAbertura)}</TableCell>
+                          <TableCell className="text-right">{fmt(l.informado)}</TableCell>
+                          <TableCell className={`text-right ${l.diferenca < 0 ? "text-rose-600" : l.diferenca > 0 ? "text-amber-600" : ""}`}>
+                            {fmt(l.diferenca)}
+                          </TableCell>
+                          <TableCell>
+                            {sPrincipal && (
+                              <Button size="sm" variant="ghost" onClick={() => verDetalhe(sPrincipal)}><Eye className="h-4 w-4" /></Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -1940,6 +2042,7 @@ function Page() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Operador</TableHead>
+                      <TableHead>Dia</TableHead>
                       <TableHead>Abertura</TableHead>
                       <TableHead>Fechamento</TableHead>
                       <TableHead>Status</TableHead>
@@ -1953,40 +2056,44 @@ function Page() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {todasSessoes.length === 0 && (
-                      <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">Sem sessões no período</TableCell></TableRow>
+                    {linhasTodosPorDia.length === 0 && (
+                      <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">Sem sessões no período</TableCell></TableRow>
                     )}
-                    {todasSessoes.map((s) => {
-                      const calc = calcSaldoSessao(s.id);
-                      const sangria = calcSangriaSessao(s.id);
-                      const estorno = calcEstornoSessao(s.id);
+                    {linhasTodosPorDia.map((l) => {
+                      const sAberta = l.sessaoAbertaId
+                        ? l.sessoes.find((x) => x.id === l.sessaoAbertaId)
+                        : null;
+                      const sPrincipal = sAberta ?? l.sessoes[0];
                       return (
-                        <TableRow key={s.id}>
-                          <TableCell className="font-medium uppercase">{(s.user_nome || s.user_id.slice(0, 8)).toUpperCase()}</TableCell>
-                          <TableCell>{fmtDT(s.aberto_em)}</TableCell>
-                          <TableCell>{fmtDT(s.fechado_em)}</TableCell>
-                          <TableCell><Badge variant={s.status === "aberto" ? "default" : "secondary"}>{s.status}</Badge></TableCell>
-                          <TableCell className="text-right">{fmt(s.valor_abertura)}</TableCell>
-                          <TableCell className="text-right">{fmt(calc)}</TableCell>
-                          <TableCell className="text-right">{fmt(s.valor_fechamento_informado)}</TableCell>
-                          <TableCell className={`text-right ${sangria > 0 ? "text-amber-700" : "text-muted-foreground"}`}>{fmt(sangria)}</TableCell>
-                          <TableCell className={`text-right ${estorno > 0 ? "text-rose-700" : "text-muted-foreground"}`}>{fmt(estorno)}</TableCell>
-                          <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
-                            {fmt(s.diferenca)}
+                        <TableRow key={l.key}>
+                          <TableCell className="font-medium uppercase">{l.user_nome.toUpperCase()}</TableCell>
+                          <TableCell className="whitespace-nowrap">{fmtDia(l.data)}</TableCell>
+                          <TableCell>{fmtHora(l.primeiraAbertura)}</TableCell>
+                          <TableCell>{fmtHora(l.ultimoFechamento)}</TableCell>
+                          <TableCell><Badge variant={l.statusDia === "aberto" ? "default" : "secondary"}>{l.statusDia}</Badge></TableCell>
+                          <TableCell className="text-right">{fmt(l.valorAbertura)}</TableCell>
+                          <TableCell className="text-right">{fmt(l.calculado)}</TableCell>
+                          <TableCell className="text-right">{fmt(l.informado)}</TableCell>
+                          <TableCell className={`text-right ${l.sangria > 0 ? "text-amber-700" : "text-muted-foreground"}`}>{fmt(l.sangria)}</TableCell>
+                          <TableCell className={`text-right ${l.estorno > 0 ? "text-rose-700" : "text-muted-foreground"}`}>{fmt(l.estorno)}</TableCell>
+                          <TableCell className={`text-right ${l.diferenca < 0 ? "text-rose-600" : l.diferenca > 0 ? "text-amber-600" : ""}`}>
+                            {fmt(l.diferenca)}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
-                            <Button size="sm" variant="ghost" onClick={() => verDetalhe(s)} title="Ver detalhes">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {s.status === "aberto" && (
+                            {sPrincipal && (
+                              <Button size="sm" variant="ghost" onClick={() => verDetalhe(sPrincipal)} title="Ver detalhes">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {sAberta && (
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 title="Fechar este caixa"
                                 onClick={() => {
-                                  setOpenFecharTerceiro(s);
+                                  setOpenFecharTerceiro(sAberta);
                                   setObsTerceiro("");
-                                  const porForma = entradasPorFormaSessao(s.id);
+                                  const porForma = entradasPorFormaSessao(sAberta.id);
                                   const inicial: Record<string, string> = {};
                                   let soma = 0;
                                   for (const k of Object.keys(porForma)) {
