@@ -1443,18 +1443,6 @@ function Page() {
     for (const m of movs) {
       if (m.tipo === "abertura" || m.tipo === "fechamento") continue;
       const bucket = normalizarForma(m.forma_pagamento) || "—";
-      if (bucket === "misto" && m.lancamento_id) {
-        const linhas = mistoObs.get(m.lancamento_id) ?? [];
-        for (const l of linhas) {
-          const lb = (l.forma || "—").toUpperCase();
-          const ff = formas.get(lb) ?? { label: lb, pagamento: 0, recebimento: 0 };
-          const lv = Number(l.valor || 0);
-          if (TIPO_SINAL[m.tipo] < 0) ff.pagamento += lv;
-          else if (TIPO_SINAL[m.tipo] > 0) ff.recebimento += lv;
-          formas.set(lb, ff);
-        }
-        continue;
-      }
       const label = bucket.toUpperCase();
       const f = formas.get(label) ?? { label, pagamento: 0, recebimento: 0 };
       const v = Number(m.valor || 0);
