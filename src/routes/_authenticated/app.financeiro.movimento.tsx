@@ -67,7 +67,7 @@ function Page() {
   const [editing, setEditing] = useState<Lanc | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [filterTipo, setFilterTipo] = useState<"todos" | "receita" | "despesa" | "transferencia">("todos");
-  const [fromDate, setFromDate] = useState(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
+  const [fromDate, setFromDate] = useState(new Date().toISOString().slice(0, 10));
   const [toDate, setToDate] = useState(new Date().toISOString().slice(0, 10));
   const [detalhe, setDetalhe] = useState<null | "receita" | "despesa" | "saldo">(null);
   const [resumo, setResumo] = useState<{ r: number; d: number; saldo: number; totalRows: number }>({ r: 0, d: 0, saldo: 0, totalRows: 0 });
