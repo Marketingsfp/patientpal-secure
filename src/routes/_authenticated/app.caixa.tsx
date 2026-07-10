@@ -421,6 +421,7 @@ function Page() {
   const [membrosClinica, setMembrosClinica] = useState<Array<{ user_id: string; nome: string }>>([]);
   const [valorInformado, setValorInformado] = useState("");
   const [obsFechamento, setObsFechamento] = useState("");
+  const [dataFechamento, setDataFechamento] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
   // Conferência por forma de pagamento no fechamento do próprio caixa.
   const [conferidoOwn, setConferidoOwn] = useState<Record<string, string>>({});
@@ -429,6 +430,7 @@ function Page() {
   const [openFecharTerceiro, setOpenFecharTerceiro] = useState<Sessao | null>(null);
   const [informadoTerceiro, setInformadoTerceiro] = useState("");
   const [obsTerceiro, setObsTerceiro] = useState("");
+  const [dataFechamentoTerceiro, setDataFechamentoTerceiro] = useState<string>(() => new Date().toISOString().slice(0, 10));
   // Conferência por forma de pagamento no fechamento de terceiros.
   const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
   // Fechamento em lote (por dia) — gestor
@@ -1215,12 +1217,17 @@ function Page() {
     if (!minhaSessao || !clinicaAtual || !user) return;
     const informado = Number(valorInformado) || 0;
     const diff = informado - saldoAtual;
+    // Data escolhida pelo operador — usa 23:59:59 local desse dia para preservar o dia contábil.
+    const hoje = new Date().toISOString().slice(0, 10);
+    const fechadoEmISO = dataFechamento && dataFechamento !== hoje
+      ? new Date(`${dataFechamento}T23:59:59`).toISOString()
+      : new Date().toISOString();
     setSaving(true);
     const { error } = await supabase
       .from("caixa_sessoes")
       .update({
         status: "fechado",
-        fechado_em: new Date().toISOString(),
+        fechado_em: fechadoEmISO,
         valor_fechamento_informado: informado,
         valor_fechamento_calculado: saldoAtual,
         diferenca: diff,
@@ -1236,6 +1243,7 @@ function Page() {
         user_id: user.id,
         tipo: "fechamento",
         valor: informado,
+        created_at: fechadoEmISO,
         descricao: `Fechamento. Calculado: ${fmt(saldoAtual)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}`,
       });
     }
@@ -1244,6 +1252,7 @@ function Page() {
     setOpenFechar(false);
     const obsFinal = obsFechamento;
     setValorInformado(""); setObsFechamento(""); setConferidoOwn({});
+    setDataFechamento(new Date().toISOString().slice(0, 10));
     toast.success("Caixa fechado");
     // Total recebido por forma de pagamento na sessão — normaliza aliases e
     // decompõe "misto" consultando observacoes do lançamento.
@@ -1311,12 +1320,16 @@ function Page() {
     const breakdownStr = Object.entries(conferidoNum)
       .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k}: ${fmt(v)}`)
       .join("; ");
+    const hoje = new Date().toISOString().slice(0, 10);
+    const fechadoEmISO = dataFechamentoTerceiro && dataFechamentoTerceiro !== hoje
+      ? new Date(`${dataFechamentoTerceiro}T23:59:59`).toISOString()
+      : new Date().toISOString();
     setSaving(true);
     const { error } = await supabase
       .from("caixa_sessoes")
       .update({
         status: "fechado",
-        fechado_em: new Date().toISOString(),
+        fechado_em: fechadoEmISO,
         valor_fechamento_informado: informado,
         valor_fechamento_calculado: calc,
         diferenca: diff,
@@ -1332,6 +1345,7 @@ function Page() {
         user_id: user.id,
         tipo: "fechamento",
         valor: informado,
+        created_at: fechadoEmISO,
         descricao: `Fechamento pelo gestor. Operador original: ${alvo.user_nome || alvo.user_id.slice(0, 8)} | Calculado: ${fmt(calc)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}${breakdownStr ? " | " + breakdownStr : ""}`,
       });
     }
@@ -1341,6 +1355,7 @@ function Page() {
     setInformadoTerceiro("");
     setObsTerceiro("");
     setConferidoTerceiro({});
+    setDataFechamentoTerceiro(new Date().toISOString().slice(0, 10));
     toast.success(`Caixa de ${alvo.user_nome || "operador"} fechado`);
     printComprovanteCaixa({
       tipo: "fechamento",
@@ -2449,6 +2464,18 @@ function Page() {
               <CurrencyInput value={valorInformado} onChange={setValorInformado} />
             </div>
             <div>
+              <Label>Data do fechamento</Label>
+              <Input
+                type="date"
+                value={dataFechamento}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setDataFechamento(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Escolha o dia a que este fechamento se refere. Use uma data anterior se está fechando o caixa de um dia passado.
+              </p>
+            </div>
+            <div>
               <Label>Observações</Label>
               <Textarea value={obsFechamento} onChange={(e) => setObsFechamento(e.target.value)} />
             </div>
@@ -2519,6 +2546,18 @@ function Page() {
                 </div>
               );
             })()}
+            <div>
+              <Label>Data do fechamento</Label>
+              <Input
+                type="date"
+                value={dataFechamentoTerceiro}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setDataFechamentoTerceiro(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Dia a que este fechamento se refere.
+              </p>
+            </div>
             <div>
               <Label>Observações</Label>
               <Textarea
