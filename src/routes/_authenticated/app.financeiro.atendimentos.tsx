@@ -564,6 +564,99 @@ function Page() {
     await load();
   };
 
+  const abrirLaudoLote = () => {
+    if (selectedLaudoElegiveis.length === 0) {
+      toast.info("Selecione atendimentos que exijam laudo e ainda não vinculados.");
+      return;
+    }
+    setLaudoLoteLaudadorId("");
+    setLaudoLoteOpen(true);
+  };
+
+  const vincularLaudoLote = async () => {
+    if (!clinicaAtual) return;
+    if (!laudoLoteLaudadorId) {
+      toast.error("Selecione o médico laudador");
+      return;
+    }
+    const alvos = selectedLaudoElegiveis;
+    if (alvos.length === 0) {
+      toast.info("Nenhum atendimento elegível.");
+      return;
+    }
+    setLaudoLoteSaving(true);
+    // Busca todas as regras para o laudador escolhido nesta clínica,
+    // indexadas por agenda_medico_id → (tipo, percentual, valor).
+    const { data: regrasData } = await supabase
+      .from("medico_repasse_laudo")
+      .select("agenda_medico_id, tipo_repasse, percentual, valor")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("laudador_medico_id", laudoLoteLaudadorId)
+      .eq("ativo", true);
+    const regraPorAgenda = new Map<string, LaudoRegra>();
+    for (const r of (regrasData as unknown as {
+      agenda_medico_id: string;
+      tipo_repasse: "valor" | "percentual";
+      percentual: number | null;
+      valor: number | null;
+    }[]) ?? []) {
+      regraPorAgenda.set(r.agenda_medico_id, {
+        laudador_medico_id: laudoLoteLaudadorId,
+        laudador_nome: "",
+        tipo_repasse: r.tipo_repasse,
+        percentual: r.percentual != null ? Number(r.percentual) : null,
+        valor: r.valor != null ? Number(r.valor) : null,
+      });
+    }
+    let ok = 0;
+    const semRegra: string[] = [];
+    const erros: string[] = [];
+    const nowIso = new Date().toISOString();
+    await Promise.all(
+      alvos.map(async (a) => {
+        if (!a.medico_id) {
+          semRegra.push(a.paciente_nome_extra ?? a.procedimento ?? a.id);
+          return;
+        }
+        const regra = regraPorAgenda.get(a.medico_id);
+        if (!regra) {
+          semRegra.push(a.paciente_nome_extra ?? a.procedimento ?? a.id);
+          return;
+        }
+        const valor = calcularSugestao(regra, Number(a.valor_total ?? 0));
+        if (!valor || valor <= 0) {
+          semRegra.push(a.paciente_nome_extra ?? a.procedimento ?? a.id);
+          return;
+        }
+        const tabela = a.origem === "agenda" ? "fin_lancamentos" : "fin_atendimentos";
+        const { error } = await supabase
+          .from(tabela)
+          .update({
+            medico_laudador_id: laudoLoteLaudadorId,
+            valor_laudo: valor,
+            laudo_status: "emitido",
+            laudo_emitido_em: nowIso,
+          })
+          .eq("id", a.id);
+        if (error) erros.push(error.message);
+        else ok += 1;
+      }),
+    );
+    setLaudoLoteSaving(false);
+    setLaudoLoteOpen(false);
+    if (ok > 0) {
+      const partes = [`${ok} laudo(s) vinculado(s)`];
+      if (semRegra.length) partes.push(`${semRegra.length} sem regra de repasse`);
+      if (erros.length) partes.push(`${erros.length} com erro`);
+      toast.success(partes.join(" • "));
+    } else if (semRegra.length) {
+      toast.error(`Nenhum vinculado — ${semRegra.length} sem regra de repasse cadastrada para este laudador.`);
+    } else if (erros.length) {
+      toast.error(`Falha ao vincular: ${erros[0]}`);
+    }
+    await load();
+  };
+
   // Perfil médico: trava o filtro no próprio profissional
   useEffect(() => {
     if (isMedicoOnly && medicoLogadoId) setFMedico(medicoLogadoId);
