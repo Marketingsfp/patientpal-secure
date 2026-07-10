@@ -51,6 +51,9 @@ function traduzirPostgres(msg: string, code?: string, details?: string): string 
     case "23503":
       return "Este item está sendo usado em outro cadastro e não pode ser removido ou alterado.";
     case "23514":
+      if ((detalhe ?? "").includes("cb_convenio_regras_limite_ck")) {
+        return "Configuração de limite inválida nesta regra. Revise período, escopo e o que fazer ao exceder.";
+      }
       return "Um dos valores informados está fora do intervalo permitido.";
     case "23502":
       return campo
