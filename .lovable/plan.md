@@ -1,48 +1,41 @@
 ## Objetivo
-Permitir que o perfil **ADM** (role `admin` da clínica) edite todos os campos do contrato de Cartão Convênio já existente — hoje só valor mensal, dia de vencimento e ações de dependentes/parcelas estão liberados; os demais campos são somente-leitura.
 
-## Onde
-`src/components/pages/contratos-page.tsx` — bloco do detalhe do contrato (`TabsContent value="dados"` linhas ~1985‑2098) e tabela de Mensalidades (linhas ~1921‑1983).
+Ao alterar a **Data início** de um contrato de cartão benefício para uma data no passado, o sistema pergunta quantas mensalidades já foram pagas nesse intervalo e regenera as 12 parcelas do contrato: as **N primeiras** ficam **pagas** e as **restantes pendentes**.
 
-## Detecção do perfil
-Usar o hook já existente:
-```ts
-import { useClinica } from "@/hooks/use-clinica";
-const { clinicaAtual } = useClinica();
-const isAdmin = clinicaAtual?.role === "admin";
-```
-Todos os campos novos ficam por trás de `isAdmin`. Perfis não-admin continuam vendo exatamente a tela atual (nada muda para eles).
+## Fluxo
 
-## Campos que passam a ser editáveis (apenas ADM)
+1. Na aba **Dados** do contrato (perfil ADM/Caixa), ao clicar em **"Atualizar contrato"**, comparar `admDataInicio` com `contrato.data_inicio`.
+2. Se a nova data é **anterior** à atual e **anterior** ao mês vigente:
+   - Salva os campos do contrato como já faz hoje.
+   - Abre um diálogo `AlertDialog`:
+     - Título: "A data de início foi movida para o passado"
+     - Texto: "Já existem parcelas pagas nesse intervalo? Informe quantas para o sistema marcar como pagas e gerar apenas as restantes."
+     - Campo numérico "Parcelas já pagas" (default = meses cheios entre `admDataInicio` e hoje, limitado a 12).
+     - Botões: **Confirmar e regenerar** / **Cancelar** (só salva o contrato, não mexe em parcelas).
+3. Ao confirmar:
+   - Apaga todas as mensalidades **pendentes** do contrato.
+   - Gera **12 parcelas mensais** a partir do mês de `admDataInicio`, usando `valor_mensal` e `dia_vencimento` atuais.
+   - As **N primeiras** parcelas ficam com `status = 'pago'`, `pago_em = vencimento` e `valor_pago = valor`. As demais, `status = 'pendente'`.
+   - Toast de sucesso.
+4. Se a data mudou mas **não** é passada (mesma ou futura), fluxo atual permanece — nenhum diálogo, nenhuma regeneração automática.
 
-Aba **Dados** — trocar cada `DadosField` correspondente por um controle editável:
+Nenhum lançamento em `fin_lancamentos` é criado para as parcelas retroativas — só a mensalidade é marcada como paga.
 
-| Campo | Controle | Coluna em `contratos_assinatura` |
-|---|---|---|
-| Convênio | `<select>` populado por `cb_convenios` da clínica (ativos) | `convenio_id` |
-| Nº de pessoas no contrato | `<select>` das faixas do convênio escolhido (recarrega `cb_convenio_faixas` ao trocar) | `faixa_id`, `total_vidas`, `valor_mensal` (sincroniza com a faixa) |
-| Paciente titular | Combobox de pacientes da clínica (mesmo padrão do modal "Incluir dependente") | `paciente_id`, `paciente_nome` |
-| Data início | `<input type="date">` | `data_inicio` |
-| Dia de vencimento | (já existe) | `dia_vencimento` |
-| Valor mensal | (já existe) | `valor_mensal` |
-| Taxa de adesão | `<input type="number">` | `taxa_adesao` |
-| Forma de pagamento | `<select>` (Dinheiro/Pix/Débito/Crédito/Boleto — mesma lista `formasPag` já usada) | `forma_pagamento` |
-| Observações | `<textarea>` | `observacoes` |
+## Detalhes técnicos
 
-Ação: um único botão **"Salvar alterações do contrato"** (visível só para admin) que faz `update contratos_assinatura` com os campos alterados. Botão atual "Salvar valor e vencimento" + checkbox "Regerar 12 parcelas futuras" permanece.
+Arquivo: `src/components/pages/contratos-page.tsx` (componente `ContratoDetail`).
 
-Trocar convênio/faixa não regenera parcelas automaticamente — para evitar sobrescrever histórico. Se o admin quiser propagar o novo valor, usa o checkbox "Regerar 12 parcelas futuras" que já existe. Isso vai no texto de ajuda ao lado do salvar.
+- Novo state: `retroDialog: { open, parcelasPagas: string } | null`.
+- Refatorar `salvarContratoAdmin`:
+  - Antes de gravar, capturar `dataInicioAntiga = contrato.data_inicio`.
+  - Após o `update` bem-sucedido, se `admDataInicio < dataInicioAntiga` e `admDataInicio` está em mês anterior ao atual, calcular `mesesCheios = clamp(monthsBetween(admDataInicio, hoje), 0, 12)` e abrir o diálogo com `parcelasPagas = mesesCheios`.
+- Nova função `regerarComPagas(n: number)`:
+  - `DELETE FROM contrato_mensalidades WHERE contrato_id = X AND status = 'pendente'`.
+  - Loop `i = 0..11`: monta `vencimento = addMonths(admDataInicio, i)` ajustado para `dia_vencimento` (com clamp para último dia do mês). `numero_parcela` = próximo disponível.
+  - Para `i < n`: `status='pago'`, `pago_em=vencimento`, `valor_pago=valor`.
+  - Para `i >= n`: `status='pendente'`.
+  - `INSERT` em lote.
+  - `await load()` para recarregar a tabela de mensalidades da aba Mensalidades.
+- Diálogo usa componentes já disponíveis (`Dialog`, `Input type=number`, `Button`).
 
-## Aba Mensalidades — edição por parcela (apenas ADM)
-
-Na tabela de Mensalidades, para admin:
-- **Vencimento** e **Valor** de cada linha viram inputs editáveis (`date` e `number`) com auto-save on blur (`update contrato_mensalidades set vencimento/valor where id`).
-- Botão **Reverter** (marcar como pendente) e **Pagar** ficam habilitados mesmo quando o contrato está `cancelado` (hoje `disabled={cancelado}` bloqueia). Assim o ADM ajusta "número de mensalidades pagas" livremente.
-- Novo botão **"+ Adicionar parcela"** (rodapé da tabela) que insere uma nova linha em `contrato_mensalidades` com número sequencial, vencimento default = hoje, valor = valor mensal atual, status = pendente.
-- Ícone lixeira por linha para **excluir parcela** (com confirm), removendo a linha de `contrato_mensalidades`.
-
-## Considerações
-- Nenhuma mudança de schema, RLS ou migration — as políticas atuais de `contratos_assinatura` e `contrato_mensalidades` já permitem update/insert/delete pelo admin da clínica.
-- Nenhuma alteração para perfis que não são admin — a UI original permanece intocada por trás do `isAdmin ? <editor/> : <DadosField/>`.
-- Sem cascatas silenciosas: mudar convênio/faixa/paciente NÃO reescreve parcelas nem dependentes; a regeração continua sendo opt‑in via checkbox existente.
-- Reaproveitar utilitário `mostrarErro` e padrão `toast.success` já usados no arquivo.
+Observação: o botão existente **"Regerar 12 parcelas futuras com este valor e dia"** (`salvarDadosFinanceiros`) permanece intacto e continua servindo para propagar valor/dia sem alterar data de início.
