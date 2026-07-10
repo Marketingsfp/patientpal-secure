@@ -1497,6 +1497,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     </div>
                   )}
                 </div>
+                {form.nome.trim().toUpperCase() === "ELETROCARDIOGRAMA" && (
                 <div className="space-y-3 pt-4 border-t mt-4">
                   <div>
                     <Label>REPASSE LAUDO TERCEIRO</Label>
