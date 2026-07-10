@@ -1419,17 +1419,18 @@ function Page() {
   };
 
   const exportarTodos = () => {
-    const rows = todasSessoes.map((s) => ({
-      Operador: s.user_nome || s.user_id.slice(0, 8),
-      Abertura: fmtDT(s.aberto_em),
-      Fechamento: fmtDT(s.fechado_em),
-      Status: s.status,
-      "Valor abertura": Number(s.valor_abertura || 0),
-      "Saldo calculado": calcSaldoSessao(s.id),
-      "Valor informado": Number(s.valor_fechamento_informado || 0),
-      Sangria: calcSangriaSessao(s.id),
-      Estorno: calcEstornoSessao(s.id),
-      Diferenca: Number(s.diferenca || 0),
+    const rows = linhasTodosPorDia.map((l) => ({
+      Operador: l.user_nome,
+      Dia: fmtDia(l.data),
+      "Abertura (hora)": fmtHora(l.primeiraAbertura),
+      "Fechamento (hora)": fmtHora(l.ultimoFechamento),
+      Status: l.statusDia,
+      "Valor abertura": l.valorAbertura,
+      "Saldo calculado": l.calculado,
+      "Valor informado": l.informado,
+      Sangria: l.sangria,
+      Estorno: l.estorno,
+      Diferenca: l.diferenca,
     }));
     exportToExcel(rows, `caixas_${fIni}_a_${fFim}`);
   };
