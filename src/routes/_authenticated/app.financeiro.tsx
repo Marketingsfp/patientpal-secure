@@ -2,8 +2,11 @@ import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-rout
 import {
   LayoutDashboard, ArrowLeftRight, BarChart3, LineChart, Stethoscope,
   Building, FileText, FileBarChart, PieChart, Bell, Tag, Wallet,
-  Sparkles, AlertTriangle, Undo2,
+  Sparkles, AlertTriangle, Undo2, ChevronLeft, ChevronRight,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro")({
@@ -35,17 +38,59 @@ function FinLayout() {
   const visibleSubnav = isMedicoOnly
     ? subnav.filter((i) => i.to === "/app/financeiro/atendimentos").map((i) => ({ ...i, label: "Repasse" }))
     : subnav;
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("fin-subnav:collapsed") === "1";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("fin-subnav:collapsed", collapsed ? "1" : "0");
+  }, [collapsed]);
   return (
+    <TooltipProvider delayDuration={300}>
     <div className="flex gap-3 -m-4 h-[calc(100vh-4rem)]">
-      <aside className="w-48 bg-card border-r border-border p-3 shrink-0 overflow-y-auto h-full">
-        <p className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Financeiro
-        </p>
+      <aside className={`${collapsed ? "w-12" : "w-48"} bg-card border-r border-border p-2 shrink-0 overflow-y-auto h-full transition-all duration-200`}>
+        <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} mb-1`}>
+          {!collapsed && (
+            <p className="px-1 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Financeiro
+            </p>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => setCollapsed((v) => !v)}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </Button>
+        </div>
         <nav className="space-y-0.5">
           {visibleSubnav.map((item) => {
             const active = "exact" in item && item.exact
               ? location.pathname === item.to
               : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
+            if (collapsed) {
+              return (
+                <Tooltip key={item.to}>
+                  <TooltipTrigger asChild>
+                    <Link
+                      to={item.to}
+                      className={`flex items-center justify-center rounded-md h-9 w-9 mx-auto transition-colors ${
+                        active
+                          ? "bg-primary/10 text-primary"
+                          : "text-foreground/70 hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      <item.icon className="h-4 w-4" />
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{item.label}</TooltipContent>
+                </Tooltip>
+              );
+            }
             return (
               <Link
                 key={item.to}
@@ -67,5 +112,6 @@ function FinLayout() {
         <Outlet />
       </div>
     </div>
+    </TooltipProvider>
   );
 }
