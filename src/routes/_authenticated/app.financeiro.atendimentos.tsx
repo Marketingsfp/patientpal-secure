@@ -1159,14 +1159,15 @@ function Page() {
     }
     if (
       !confirm(
-        "Desfazer a baixa deste atendimento?\n\nO atendimento volta para 'Confirmado' e deixa de constar como pago. Lançamentos-sombra de R$ 0,00 serão removidos automaticamente.",
+        "Desfazer a baixa deste atendimento?\n\nO atendimento volta para 'Confirmado'. O pagamento do paciente (se houver) permanece intacto no caixa — só o lançamento-sombra de R$ 0,00 é removido.",
       )
     )
       return;
     try {
       // Verifica lançamento(s) em caixa vinculados. Só apagamos os R$ 0,00
-      // (lançamento-sombra "SEM COBRANÇA"). Valores > 0 precisam ser
-      // estornados no Mov. Caixa antes, para preservar a trilha financeira.
+      // (lançamento-sombra "SEM COBRANÇA"). Lançamentos pagos (valor > 0)
+      // permanecem — o pagamento do paciente é trilha independente do
+      // status médico do atendimento.
       let sombraIds: string[] = [];
       if (a.origem === "agenda" && a.agendamento_id) {
         const { data: lancs } = await supabase
@@ -1174,13 +1175,6 @@ function Page() {
           .select("id, valor")
           .eq("agendamento_id", a.agendamento_id);
         const rows = (lancs ?? []) as Array<{ id: string; valor: number | string | null }>;
-        const naoZero = rows.filter((l) => Number(l.valor) > 0);
-        if (naoZero.length > 0) {
-          toast.error(
-            "Há lançamento pago no caixa vinculado. Estorne pelo Mov. Caixa antes de desfazer a baixa.",
-          );
-          return;
-        }
         sombraIds = rows.filter((l) => Number(l.valor) === 0).map((l) => l.id);
       } else if (a.origem !== "agenda") {
         const { data: fa } = await supabase
@@ -1196,15 +1190,7 @@ function Page() {
             .eq("id", lancId)
             .maybeSingle();
           const row = l as { id: string; valor: number | string | null } | null;
-          if (row) {
-            if (Number(row.valor) > 0) {
-              toast.error(
-                "Há lançamento pago no caixa vinculado. Estorne pelo Mov. Caixa antes de desfazer a baixa.",
-              );
-              return;
-            }
-            sombraIds = [row.id];
-          }
+          if (row && Number(row.valor) === 0) sombraIds = [row.id];
         }
       }
 
