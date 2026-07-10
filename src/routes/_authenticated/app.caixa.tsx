@@ -409,9 +409,67 @@ function Page() {
         .select(MOV_FIELDS)
         .eq("sessao_id", (aberta as Sessao).id)
         .order("created_at", { ascending: true });
-      setMinhasMovs((movs ?? []) as Mov[]);
+      const movsList = (movs ?? []) as Mov[];
+      setMinhasMovs(movsList);
+      // Enriquecer com nome do serviço e médico
+      const lancIds = Array.from(new Set(movsList.map((m) => m.lancamento_id).filter((x): x is string => !!x)));
+      const enrich = new Map<string, { servico: string | null; medico: string | null }>();
+      if (lancIds.length > 0) {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("id, medico_id, agendamento_id, descricao")
+          .in("id", lancIds);
+        const lancRows = (lancs ?? []) as Array<{ id: string; medico_id: string | null; agendamento_id: string | null; descricao: string | null }>;
+        const medIds = Array.from(new Set(lancRows.map((l) => l.medico_id).filter((x): x is string => !!x)));
+        const agIds = Array.from(new Set(lancRows.map((l) => l.agendamento_id).filter((x): x is string => !!x)));
+        const [medRes, agRes] = await Promise.all([
+          medIds.length > 0
+            ? supabase.from("medicos").select("id, nome").in("id", medIds)
+            : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
+          agIds.length > 0
+            ? supabase.from("agendamentos").select("id, procedimento_id").in("id", agIds)
+            : Promise.resolve({ data: [] as Array<{ id: string; procedimento_id: string | null }> }),
+        ]);
+        const medMap = new Map<string, string>();
+        for (const m of (medRes.data ?? []) as Array<{ id: string; nome: string | null }>) {
+          if (m.nome) medMap.set(m.id, m.nome);
+        }
+        const agMap = new Map<string, string | null>();
+        const procIds = new Set<string>();
+        for (const a of (agRes.data ?? []) as Array<{ id: string; procedimento_id: string | null }>) {
+          agMap.set(a.id, a.procedimento_id);
+          if (a.procedimento_id) procIds.add(a.procedimento_id);
+        }
+        const procMap = new Map<string, string>();
+        if (procIds.size > 0) {
+          const { data: procs } = await supabase
+            .from("procedimentos")
+            .select("id, nome")
+            .in("id", Array.from(procIds));
+          for (const p of (procs ?? []) as Array<{ id: string; nome: string | null }>) {
+            if (p.nome) procMap.set(p.id, p.nome);
+          }
+        }
+        for (const l of lancRows) {
+          const procId = l.agendamento_id ? agMap.get(l.agendamento_id) ?? null : null;
+          const servicoFromProc = procId ? procMap.get(procId) ?? null : null;
+          // fallback: extrai serviço da descrição do lançamento após " — " ou " · "
+          let servico = servicoFromProc;
+          if (!servico && l.descricao) {
+            const desc = l.descricao;
+            const idx = Math.max(desc.lastIndexOf(" — "), desc.lastIndexOf(" · "));
+            if (idx > 0) servico = desc.slice(idx + 3).replace(/\s*\(.*\)\s*$/, "").trim() || null;
+          }
+          enrich.set(l.id, {
+            servico,
+            medico: l.medico_id ? medMap.get(l.medico_id) ?? null : null,
+          });
+        }
+      }
+      setEnrichPorLanc(enrich);
     } else {
       setMinhasMovs([]);
+      setEnrichPorLanc(new Map());
     }
 
     setMinhasSessoes((histRes.data ?? []) as Sessao[]);
