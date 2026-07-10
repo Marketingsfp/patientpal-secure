@@ -1504,6 +1504,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                             <th className="px-2 py-2 font-medium">Laudador (Cardiologia)</th>
                             <th className="px-2 py-2 font-medium w-40">Tipo</th>
                             <th className="px-2 py-2 font-medium w-36">Valor</th>
+                            <th className="px-2 py-2 font-medium w-12"></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1560,6 +1561,19 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                       ? { percentual: e.target.value }
                                       : { valor: e.target.value })}
                                   />
+                                </td>
+                                <td className="px-2 py-1 text-right">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    title="Remover configuração de repasse deste laudador"
+                                    disabled={!row}
+                                    onClick={() => setLaudadores((rows) => rows.filter((l) => l.laudador_medico_id !== cardio.id))}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
                                 </td>
                               </tr>
                             );
