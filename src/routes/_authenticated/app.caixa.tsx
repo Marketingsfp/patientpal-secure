@@ -419,6 +419,12 @@ function Page() {
   const [obsFechamento, setObsFechamento] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Fechamento de sessão de outro operador (admin/gestor)
+  const [fecharAlheia, setFecharAlheia] = useState<Sessao | null>(null);
+  const [valorInformadoAlheia, setValorInformadoAlheia] = useState("");
+  const [obsFecharAlheia, setObsFecharAlheia] = useState("");
+  const [savingAlheia, setSavingAlheia] = useState(false);
+
   // Atalho: 1..5 na modal de cobrança seleciona a forma da última linha
   useEffect(() => {
     if (!openCobranca) return;
