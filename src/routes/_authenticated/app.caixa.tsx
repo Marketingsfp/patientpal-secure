@@ -427,6 +427,8 @@ function Page() {
   const [openFecharTerceiro, setOpenFecharTerceiro] = useState<Sessao | null>(null);
   const [informadoTerceiro, setInformadoTerceiro] = useState("");
   const [obsTerceiro, setObsTerceiro] = useState("");
+  // Conferência por forma de pagamento no fechamento de terceiros.
+  const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
 
   // Atalho: 1..5 na modal de cobrança seleciona a forma da última linha
   useEffect(() => {
