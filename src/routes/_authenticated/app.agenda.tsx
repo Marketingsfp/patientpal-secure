@@ -3114,17 +3114,19 @@ function AgendaPage() {
       const procIds = Array.from(
         new Set(its.map((i) => i.procedimento_id).filter((x): x is string => !!x)),
       );
-      let procs: { id: string; grupo: string | null; tipo: string | null }[] = [];
+      let procs: { id: string; grupo: string | null; tipo: string | null; tipo_procedimento: string | null }[] = [];
       if (procIds.length) {
         const { data: pdata, error: e3 } = await supabase
           .from("procedimentos")
-          .select("id, grupo, tipo")
+          .select("id, grupo, tipo, tipo_procedimento")
           .in("id", procIds);
         if (e3) {
           mostrarErro(e3);
           return;
         }
-        procs = (pdata ?? []) as { id: string; grupo: string | null; tipo: string | null }[];
+        procs = (pdata ?? []) as {
+          id: string; grupo: string | null; tipo: string | null; tipo_procedimento: string | null;
+        }[];
       }
       const norm = (g: string | null | undefined) =>
         (g ?? "")
@@ -3139,7 +3141,8 @@ function AgendaPage() {
         if (!p) return false;
         const g = norm(p.grupo);
         const t = norm(p.tipo);
-        return g === "LABORATORIO" || t === "EXAME" || t === "LABORATORIO";
+        const tp = norm(p.tipo_procedimento);
+        return tp === "LABORATORIO" || g === "LABORATORIO" || t === "EXAME" || t === "LABORATORIO";
       };
       const todosLab = its.every((i) => isLab(i.procedimento_id));
       // (Bloqueio antigo removido: agora permitimos agendamentos parciais,
@@ -3176,16 +3179,20 @@ function AgendaPage() {
           pacNome = pac[0].nome;
         }
       }
-      // Agrupa por "grupo" (mais específico) ou tipo. Se houver mais de um grupo
-      // distinto, abre o painel de divisão em vez de criar um único agendamento.
+      // Agrupa por categoria de laboratório (prioritária) → depois por
+      // "grupo" ou tipo. Se houver mais de um grupo distinto, abre o painel
+      // de divisão em vez de criar um único agendamento.
       const grupoDe = (pid: string | null): string => {
         if (!pid) return "OUTROS";
+        if (isLab(pid)) return "LABORATORIO";
         const p = procPorId.get(pid);
         if (!p) return "OUTROS";
         return norm(p.grupo) || norm(p.tipo) || "OUTROS";
       };
       const gruposDistintos = new Set(its.map((i) => grupoDe(i.procedimento_id)));
-      if (gruposDistintos.size > 1) {
+      // Quando TODOS os itens são de laboratório, nunca dividir: 1 único
+      // agendamento no profissional "Laboratório".
+      if (!todosLab && gruposDistintos.size > 1) {
         // Constrói lista de itens enriquecidos para o dialog
         const itensRicos: DividirItem[] = its.map((i) => {
           const p = i.procedimento_id ? procPorId.get(i.procedimento_id) : null;
@@ -3195,6 +3202,7 @@ function AgendaPage() {
             procedimento_id: i.procedimento_id,
             grupo: p?.grupo ?? null,
             tipo: p?.tipo ?? null,
+            tipo_procedimento: p?.tipo_procedimento ?? null,
           };
         });
         const inicioPadrao =
@@ -3216,6 +3224,26 @@ function AgendaPage() {
       // Fluxo de 1 grupo: registra os IDs restantes para gravar o vínculo
       // após o save do agendamento.
       setPendingOrcItemIds(its.map((i) => i.id));
+      // Quando o orçamento é 100% laboratório, tenta pré-selecionar o
+      // profissional "Laboratório" da clínica (evita agendar em médicos
+      // clínicos por engano). Fallback silencioso: se não existir cadastro,
+      // o usuário escolhe manualmente.
+      let medicoLabId: string | null = null;
+      if (todosLab) {
+        const acha = medicos.find((m) => {
+          const n = (m.nome ?? "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toUpperCase();
+          return n.includes("LABORATORIO");
+        });
+        medicoLabId = acha?.id ?? null;
+        if (!medicoLabId) {
+          toast.info(
+            "Orçamento de laboratório: cadastre um profissional 'Laboratório' para agendar automaticamente.",
+          );
+        }
+      }
       setForm((f) => ({
         ...f,
         orcamento_id: orc.id,
@@ -3223,6 +3251,7 @@ function AgendaPage() {
         orcamento_itens: nomes,
         paciente_id: pacId ?? f.paciente_id,
         paciente_nome: pacNome ?? f.paciente_nome,
+        medico_id: medicoLabId ?? f.medico_id,
         procedimento: procStr,
         procedimentos: procStr ? [procStr] : [],
       }));
