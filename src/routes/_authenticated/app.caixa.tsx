@@ -550,7 +550,22 @@ function Page() {
       }
       setEnrichPorLanc(enrich);
     } else {
-      setMinhasMovs([]);
+      // Sem sessão aberta: mostrar movimentos das sessões recentes do próprio usuário
+      // (assim mensalidades pagas numa sessão já encerrada continuam visíveis
+      // em "Meu caixa"). O filtro por período/paciente/médico continua sendo
+      // aplicado no useMemo abaixo.
+      const histSessoes = (histRes.data ?? []) as Sessao[];
+      const histIds = histSessoes.map((s) => s.id);
+      if (histIds.length > 0) {
+        const { data: movs } = await supabase
+          .from("caixa_movimentos")
+          .select(MOV_FIELDS)
+          .in("sessao_id", histIds)
+          .order("created_at", { ascending: false });
+        setMinhasMovs((movs ?? []) as Mov[]);
+      } else {
+        setMinhasMovs([]);
+      }
       setEnrichPorLanc(new Map());
     }
 
