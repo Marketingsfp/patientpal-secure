@@ -1,32 +1,31 @@
-## Objetivo
-Organizar o conteúdo da aba "Meu caixa" (rota `/app/caixa`) em 4 sub-abas para reduzir a poluição visual. Nenhuma regra de negócio, cálculo, permissão, filtro ou fluxo (recebimento, estorno, cobrança) é alterada — apenas o agrupamento visual.
+## Diagnóstico
 
-## Sub-abas propostas (dentro de "Meu caixa")
+Na rotina que vincula um orçamento a um agendamento (`src/routes/_authenticated/app.agenda.tsx`, ~linha 2409-2444), o código decide se abre o diálogo "Dividir orçamento" baseado em **grupos distintos** dos itens:
 
-1. **Saldo** (padrão ao entrar)
-   - 4 cards: Saldo atual, Abertura, Entradas, Saídas
-   - Card "Entradas por forma de pagamento" (Dinheiro/PIX/Débito/Crédito/etc.)
-   - Barra de ações: Suprimento · Sangria · Recebimento · Despesa · Fechar caixa
+```ts
+const grupoDe = (pid) => norm(proc.grupo) || norm(proc.tipo) || "OUTROS";
+const gruposDistintos = new Set(its.map(i => grupoDe(i.procedimento_id)));
+if (gruposDistintos.size > 1) { /* abre split */ }
+```
 
-2. **Movimentos**
-   - Card "Movimentos da sessão / Movimentos de hoje" com o seletor de período (para gestor), tabela completa e todas as colunas atuais (Data, Hora, Tipo, Descrição, Serviço, Médico, Forma, Valor, Ação de estorno).
+Já existe, poucas linhas acima, a variável `todosLab` que verifica se **todos** os itens são de laboratório (por `grupo=LABORATORIO`, `tipo=EXAME` ou `tipo=LABORATORIO`).
 
-3. **Histórico**
-   - Card "Meu histórico" (tabela de sessões anteriores do próprio operador com abertura/fechamento/diferença/detalhe).
+No orçamento da foto, os exames de laboratório estão cadastrados com `grupo`/`tipo` inconsistentes entre si (ex.: uns com `tipo=EXAME`, outros com `grupo=LABORATORIO`, outros sem `grupo` mas com nome de lab). Como o agrupador só olha o texto bruto, cria 2-3 buckets → abre a divisão → o operador acaba distribuindo entre médicos diferentes.
 
-4. **Aguardando**
-   - Card "Cobrança de pacientes (N aguardando)" com o grid de fichas e botão "Cobrar".
-   - Manter o mesmo comportamento do atalho `?receber=...` (abrir diálogo de cobrança).
+## Correção
 
-## Detalhes técnicos
-- Arquivo único: `src/routes/_authenticated/app.caixa.tsx`.
-- Envolver o conteúdo atual de `<TabsContent value="meu">` em um segundo `<Tabs>` interno com `defaultValue="saldo"` e `TabsList` com os 4 gatilhos.
-- Preservar o guard `!minhaSessao` (mostrando o card "Abrir caixa") acima das sub-abas — sem caixa aberto, as sub-abas ficam ocultas.
-- Preservar `loading`, estados, handlers, `enrichPorLanc`, `estornosPorLanc`, atalho `?receber=…`, exports e diálogos existentes.
-- Nenhum novo estado persistido; a sub-aba selecionada é apenas UI local (`useState`).
-- Sem mudanças nas abas "Todos (Financeiro)" e "Repasse médico".
+### 1. `src/routes/_authenticated/app.agenda.tsx` (bloqueio na origem)
+Antes de comparar `gruposDistintos.size > 1`, se `todosLab === true` **não abrir o split**: cai direto no fluxo de 1 grupo (linha 2447+), que gera **um único agendamento** com descrição `LABORATÓRIO (N EXAMES): ...`. Isso já é o comportamento correto.
 
-## Fora de escopo
-- Cálculos, RLS, schema, permissões, fluxo de estorno, impressão, KPIs.
-- Aba "Todos (Financeiro)" e "Repasse médico".
-- Feature flag `caixa_v2` / `CaixaShellV2` (essas telas não são tocadas).
+### 2. `src/components/agenda/dividir-orcamento-dialog.tsx` (defesa em profundidade)
+Ajustar `agruparItens` para que, quando **todos** os itens tiverem categoria laboratório (via `categoriaDoProcedimento`/`buildCategoriaResolver` do helper existente em `src/lib/procedimento/categoria.ts`), sejam colapsados em um único grupo `LABORATÓRIO` — assim, mesmo que o dialog seja aberto por outro caminho, ele não permitirá dividir laboratório entre profissionais.
+
+Se o dialog receber somente itens de laboratório e existir um profissional cujo nome normalizado contenha `LABORATORIO`/`LABORATÓRIO` (médico ou recurso de enfermagem), pré-selecionar automaticamente esse profissional no grupo.
+
+### 3. Sem migração
+Apenas mudança de lógica no frontend; nada muda no banco.
+
+## Verificação
+- Criar/recuperar orçamento com N itens de laboratório com `grupo/tipo` diferentes → botão de vincular na Agenda gera **um único** agendamento "LABORATÓRIO (N EXAMES)" e não abre a tela de divisão.
+- Orçamento misto (lab + imagem) continua abrindo a divisão normalmente.
+- Orçamento 100% imagem ou consulta continua abrindo a divisão como hoje.

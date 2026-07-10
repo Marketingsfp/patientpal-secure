@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +40,39 @@ export function SolicitarEstornoDialog({
   const [dataPagamentoOriginal, setDataPagamentoOriginal] = useState<string>(hoje);
   const [dataEstorno, setDataEstorno] = useState<string>(hoje);
   const [saving, setSaving] = useState(false);
+  const [caixaFechadoAviso, setCaixaFechadoAviso] = useState<string | null>(null);
+
+  // Quando for devolução, verifica se o caixa da data do pagamento original
+  // ainda está aberto. Se não houver caixa aberto naquele dia, avisa que a
+  // devolução será lançada na data de hoje (caixa atual / banco).
+  useEffect(() => {
+    if (!open || tipo !== "devolucao" || !clinicaAtual || !dataPagamentoOriginal) {
+      setCaixaFechadoAviso(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const inicio = `${dataPagamentoOriginal}T00:00:00`;
+      const fim = `${dataPagamentoOriginal}T23:59:59`;
+      const { data } = await supabase
+        .from("caixa_sessoes")
+        .select("id, status")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("status", "aberto")
+        .gte("aberto_em", inicio)
+        .lte("aberto_em", fim)
+        .limit(1);
+      if (cancelled) return;
+      if (!data || data.length === 0) {
+        setCaixaFechadoAviso(
+          "O caixa do dia do pagamento original já está fechado. A devolução será lançada como saída na data informada abaixo (caixa/banco atual), sem alterar o fechamento anterior.",
+        );
+      } else {
+        setCaixaFechadoAviso(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, tipo, clinicaAtual, dataPagamentoOriginal]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -48,25 +81,28 @@ export function SolicitarEstornoDialog({
     if (txt.length < 5) { toast.error("Descreva o motivo (mínimo 5 caracteres)"); return; }
     setSaving(true);
     // Evita duplicidade: se já existe uma solicitação pendente ou aprovada
-    // para o mesmo lançamento, não cria outra.
-    if (lancamentoId) {
-      const { data: exist } = await supabase
+    // para o mesmo lançamento ou agendamento, não cria outra.
+    if (lancamentoId || agendamentoId) {
+      let q = supabase
         .from("estorno_solicitacoes")
         .select("id, status")
         .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("lancamento_id", lancamentoId)
-        .in("status", ["pendente", "aprovado"])
-        .limit(1);
+        .in("status", ["pendente", "aprovado"]);
+      if (lancamentoId && agendamentoId) {
+        q = q.or(`lancamento_id.eq.${lancamentoId},agendamento_id.eq.${agendamentoId}`);
+      } else if (lancamentoId) {
+        q = q.eq("lancamento_id", lancamentoId);
+      } else if (agendamentoId) {
+        q = q.eq("agendamento_id", agendamentoId);
+      }
+      const { data: exist } = await q.limit(1);
       if (exist && exist.length > 0) {
         setSaving(false);
         toast.error(
           exist[0].status === "pendente"
-            ? "Já existe uma solicitação pendente para este lançamento."
-            : "Este lançamento já foi estornado.",
+            ? "Já existe uma solicitação de estorno pendente para este item."
+            : "Este item já foi estornado.",
         );
-        // Sincroniza a UI: fecha o diálogo e força o pai a recarregar o
-        // estado das solicitações para que o botão exiba corretamente
-        // "Aguardando aprovação" ou "Estornado".
         onOpenChange(false);
         onCreated?.();
         return;
@@ -152,6 +188,12 @@ export function SolicitarEstornoDialog({
               </RadioGroup>
             </div>
             {tipo === "devolucao" && (
+              <>
+              {caixaFechadoAviso && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-amber-900 dark:text-amber-200">
+                  {caixaFechadoAviso}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label htmlFor="data-pg-orig">Data do pagamento original</Label>
@@ -172,6 +214,7 @@ export function SolicitarEstornoDialog({
                   />
                 </div>
               </div>
+              </>
             )}
             <div>
               <Label htmlFor="motivo">Motivo / observação (obrigatório)</Label>

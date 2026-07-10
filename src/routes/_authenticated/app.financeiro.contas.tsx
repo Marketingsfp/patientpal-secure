@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, Wallet, Pencil, Trash2 } from "lucide-react";
+import { Plus, Wallet, Pencil, Trash2, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,8 +24,24 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/contas")({
 interface Conta {
   id: string; nome: string; tipo: string; banco: string | null;
   agencia: string | null; conta: string | null; saldo_inicial: number; ativo: boolean;
+  bandeira: string | null;
 }
-const EMPTY = { nome: "", tipo: "banco", banco: "", agencia: "", conta: "", saldo_inicial: "0" };
+const EMPTY = { nome: "", tipo: "banco", banco: "", agencia: "", conta: "", saldo_inicial: "0", bandeira: "" };
+const BANDEIRAS = [
+  { value: "visa", label: "Visa", icon: "https://cdn.simpleicons.org/visa" },
+  { value: "mastercard", label: "Mastercard", icon: "https://cdn.simpleicons.org/mastercard" },
+  { value: "elo", label: "Elo", icon: "https://cdn.simpleicons.org/elo" },
+  { value: "amex", label: "American Express", icon: "https://cdn.simpleicons.org/americanexpress" },
+  { value: "hipercard", label: "Hipercard", icon: null },
+  { value: "diners", label: "Diners", icon: "https://cdn.simpleicons.org/dinersclub" },
+  { value: "outra", label: "Outra", icon: null },
+];
+function BandeiraIcon({ value, className = "h-4 w-6" }: { value: string | null | undefined; className?: string }) {
+  const b = BANDEIRAS.find((x) => x.value === value);
+  if (!b?.icon) return <CreditCard className={className} />;
+  return <img src={b.icon} alt={b.label} className={`${className} object-contain`} />;
+}
+const tipoUsaBandeira = (t: string) => t === "cartao" || t === "maquininha";
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function Page() {
@@ -41,7 +57,7 @@ function Page() {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
     setLoading(true);
     const { data, error } = await supabase
-      .from("fin_contas").select("id, nome, tipo, banco, agencia, conta, saldo_inicial, ativo")
+      .from("fin_contas").select("id, nome, tipo, banco, agencia, conta, saldo_inicial, ativo, bandeira")
       .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome");
     if (error) mostrarErro(error); else setItems((data ?? []) as Conta[]);
     setLoading(false);
@@ -51,7 +67,7 @@ function Page() {
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (c: Conta) => { setEditing(c); setForm({
     nome: c.nome, tipo: c.tipo, banco: c.banco ?? "", agencia: c.agencia ?? "",
-    conta: c.conta ?? "", saldo_inicial: String(c.saldo_inicial),
+    conta: c.conta ?? "", saldo_inicial: String(c.saldo_inicial), bandeira: c.bandeira ?? "",
   }); setOpen(true); };
 
   const submit = async (e: FormEvent) => {
@@ -62,6 +78,7 @@ function Page() {
       clinica_id: clinicaAtual.clinica_id, nome: form.nome.trim(), tipo: form.tipo as "banco" | "caixa" | "cartao" | "maquininha" | "outro",
       banco: form.banco.trim() || null, agencia: form.agencia.trim() || null,
       conta: form.conta.trim() || null, saldo_inicial: Number(form.saldo_inicial || 0),
+      bandeira: tipoUsaBandeira(form.tipo) ? (form.bandeira || null) : null,
     };
     const { error } = editing
       ? await supabase.from("fin_contas").update(payload).eq("id", editing.id)
@@ -91,18 +108,37 @@ function Page() {
                 <Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Tipo</Label>
-                  <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v })}>
+                  <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v, bandeira: tipoUsaBandeira(v) ? form.bandeira : "" })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="banco">Banco</SelectItem>
                       <SelectItem value="caixa">Caixa</SelectItem>
                       <SelectItem value="cartao">Cartão</SelectItem>
+                      <SelectItem value="maquininha">Maquininha</SelectItem>
                       <SelectItem value="outro">Outro</SelectItem>
                     </SelectContent>
                   </Select></div>
                 <div className="space-y-2"><Label>Saldo inicial</Label>
                   <CurrencyInput value={form.saldo_inicial} onChange={(v) => setForm({ ...form, saldo_inicial: v })} /></div>
               </div>
+              {tipoUsaBandeira(form.tipo) && (
+                <div className="space-y-2">
+                  <Label>Bandeira *</Label>
+                  <Select value={form.bandeira} onValueChange={(v) => setForm({ ...form, bandeira: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione a bandeira" /></SelectTrigger>
+                    <SelectContent>
+                      {BANDEIRAS.map((b) => (
+                        <SelectItem key={b.value} value={b.value}>
+                          <span className="flex items-center gap-2">
+                            <BandeiraIcon value={b.value} />
+                            {b.label}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-2"><Label>Banco</Label>
                   <Input value={form.banco} onChange={(e) => setForm({ ...form, banco: e.target.value })} /></div>
@@ -130,6 +166,12 @@ function Page() {
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold truncate">{c.nome}</h3>
                     <Badge variant="secondary" className="mt-1">{c.tipo}</Badge>
+                    {c.bandeira && (
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                        <BandeiraIcon value={c.bandeira} />
+                        {BANDEIRAS.find((b) => b.value === c.bandeira)?.label ?? c.bandeira}
+                      </p>
+                    )}
                     {c.banco && <p className="text-sm text-muted-foreground mt-2">{c.banco} {c.agencia && `Ag. ${c.agencia}`} {c.conta && `Cc. ${c.conta}`}</p>}
                     <p className="text-sm mt-2">Saldo inicial: <strong>{fmt(Number(c.saldo_inicial))}</strong></p>
                     <div className="mt-3 flex justify-end gap-1">

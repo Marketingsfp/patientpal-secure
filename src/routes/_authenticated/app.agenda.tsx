@@ -2415,7 +2415,7 @@ function AgendaPage() {
         return norm(p.grupo) || norm(p.tipo) || "OUTROS";
       };
       const gruposDistintos = new Set(its.map(i => grupoDe(i.procedimento_id)));
-      if (gruposDistintos.size > 1) {
+      if (!todosLab && gruposDistintos.size > 1) {
         // Constrói lista de itens enriquecidos para o dialog
         const itensRicos: DividirItem[] = its.map(i => {
           const p = i.procedimento_id ? procPorId.get(i.procedimento_id) : null;

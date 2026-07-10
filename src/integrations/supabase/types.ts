@@ -3401,6 +3401,7 @@ export type Database = {
           agencia: string | null
           ativo: boolean
           banco: string | null
+          bandeira: string | null
           clinica_id: string
           conta: string | null
           created_at: string
@@ -3414,6 +3415,7 @@ export type Database = {
           agencia?: string | null
           ativo?: boolean
           banco?: string | null
+          bandeira?: string | null
           clinica_id: string
           conta?: string | null
           created_at?: string
@@ -3427,6 +3429,7 @@ export type Database = {
           agencia?: string | null
           ativo?: boolean
           banco?: string | null
+          bandeira?: string | null
           clinica_id?: string
           conta?: string | null
           created_at?: string
