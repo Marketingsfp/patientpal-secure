@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, User } from "lucide-react";
+import { Search, User, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,11 @@ interface PatientSearchInputProps {
   clinicaIdsOverride?: string[];
   /** Mostra um botão de microfone para ditar a busca por voz. */
   enableVoice?: boolean;
+  /**
+   * Se informado, exibe um botão "Cadastrar novo paciente" quando a busca
+   * não retorna resultados. O callback recebe o texto atualmente digitado.
+   */
+  onRequestCreate?: (query: string) => void;
 }
 
 /**
@@ -83,6 +88,7 @@ export function PatientSearchInput({
   autoFocus,
   clinicaIdsOverride,
   enableVoice = false,
+  onRequestCreate,
 }: PatientSearchInputProps) {
   const { clinicaIds } = useClinica();
   const scope = useMemo(
@@ -220,8 +226,21 @@ export function PatientSearchInput({
             <div className="px-3 py-2 text-sm text-muted-foreground">Buscando…</div>
           )}
           {!loading && options.length === 0 && (
-            <div className="px-3 py-2 text-sm text-muted-foreground">
-              Nenhum paciente encontrado.
+            <div className="px-3 py-2 text-sm text-muted-foreground space-y-2">
+              <div>Nenhum paciente encontrado.</div>
+              {onRequestCreate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onRequestCreate(query.trim());
+                    setOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md border border-dashed border-primary/40 text-primary hover:bg-primary/5 text-sm font-medium"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Cadastrar novo paciente{query.trim() ? `: "${query.trim()}"` : ""}
+                </button>
+              )}
             </div>
           )}
           {!loading && options.map((p) => (

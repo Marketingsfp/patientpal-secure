@@ -58,6 +58,7 @@ import { Barcode, FileText } from "lucide-react";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { EditarPacienteRapidoDialog } from "@/components/contratos/editar-paciente-rapido-dialog";
+import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) =>
@@ -153,16 +154,36 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
   const [detail, setDetail] = useState<Contrato | null>(null);
   const [sortPaciente, setSortPaciente] = useState<null | "asc" | "desc">(null);
 
-  const load = async () => {
+  // Termo com debounce para acionar busca server-side sem bater a cada tecla.
+  const [qDebounced, setQDebounced] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setQDebounced(q.trim()), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const load = async (termo = "") => {
     if (!clinicaAtual) return;
     setLoading(true);
+    let contratosQuery = supabase
+      .from("contratos_assinatura")
+      .select("*")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .order("created_at", { ascending: false });
+    const s = termo.trim();
+    if (s.length >= 2) {
+      // Busca no servidor: por nome do paciente (ilike) e, quando o termo for
+      // numérico, também pelo número do contrato. Isso evita perder registros
+      // fora dos 500 mais recentes (clínicas com >500 contratos).
+      const soDigitos = /^\d+$/.test(s);
+      const orExpr = soDigitos
+        ? `paciente_nome.ilike.%${s}%,numero.eq.${s}`
+        : `paciente_nome.ilike.%${s}%`;
+      contratosQuery = contratosQuery.or(orExpr).limit(200);
+    } else {
+      contratosQuery = contratosQuery.limit(500);
+    }
     const [cs, cv] = await Promise.all([
-      supabase
-        .from("contratos_assinatura")
-        .select("*")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .order("created_at", { ascending: false })
-        .limit(500),
+      contratosQuery,
       supabase
         .from("cb_convenios")
         .select("*")
@@ -176,8 +197,8 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
     setLoading(false);
   };
   useEffect(() => {
-    load(); /* eslint-disable-next-line */
-  }, [clinicaAtual?.clinica_id]);
+    load(qDebounced); /* eslint-disable-next-line */
+  }, [clinicaAtual?.clinica_id, qDebounced]);
 
   // Deep-link: abrir automaticamente um contrato específico (ex.: vindo da aba Convênio no cadastro do cliente)
   useEffect(() => {
@@ -376,6 +397,10 @@ function NovoContratoForm({
   const [editarPaciente, setEditarPaciente] = useState<null | {
     alvo: "titular" | number;
     focus?: "email" | "telefone";
+  }>(null);
+  const [quickCreate, setQuickCreate] = useState<null | {
+    alvo: "titular" | "dependente";
+    nome: string;
   }>(null);
   const gerarBoletosFn = useServerFn(gerarBoletosContrato);
   // Duplicidade: verifica se titular já tem contrato ativo nesta clínica
@@ -789,6 +814,7 @@ function NovoContratoForm({
                     const full = await carregarPacienteCompleto(p);
                     setTitular(full);
                   }}
+                  onRequestCreate={(q) => setQuickCreate({ alvo: "titular", nome: q })}
                 />
               )}
             </div>
@@ -938,6 +964,7 @@ function NovoContratoForm({
                       const full = await carregarPacienteCompleto(p);
                       addDep(full);
                     }}
+                    onRequestCreate={(q) => setQuickCreate({ alvo: "dependente", nome: q })}
                   />
                 </div>
               )}
@@ -1092,6 +1119,34 @@ function NovoContratoForm({
               }
             }}
           />
+          <QuickPatientDialog
+            open={quickCreate !== null}
+            onOpenChange={(v) => { if (!v) setQuickCreate(null); }}
+            clinicaId={clinicaId}
+            nomeInicial={quickCreate?.nome}
+            onCreated={async (p) => {
+              if (!quickCreate) return;
+              const full = await carregarPacienteCompleto(p);
+              if (quickCreate.alvo === "titular") {
+                if (deps.find((d) => d.id === p.id)) {
+                  toast.error("Esse paciente já está como dependente.");
+                  return;
+                }
+                setTitular(full);
+              } else {
+                if (p.id === titular?.id) {
+                  toast.error("Esse paciente já é o titular.");
+                  return;
+                }
+                if (deps.find((d) => d.id === p.id)) {
+                  toast.error("Dependente já adicionado.");
+                  return;
+                }
+                addDep(full);
+              }
+              setQuickCreate(null);
+            }}
+          />
         </CardContent>
       </Card>
     </div>
@@ -1153,6 +1208,148 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setEditValor(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
     setEditDia(String(contrato.dia_vencimento ?? 10));
   }, [contrato.id]);
+
+  // ---- Edição avançada (ADM) ----
+  const isAdmin = clinicaAtual?.role === "admin";
+  const [conveniosAdm, setConveniosAdm] = useState<Array<{ id: string; nome: string }>>([]);
+  const [admConvenioId, setAdmConvenioId] = useState<string>(contrato.convenio_id ?? "");
+  const [admPaciente, setAdmPaciente] = useState<PatientOption | null>(null);
+  const [admDataInicio, setAdmDataInicio] = useState<string>(contrato.data_inicio ?? "");
+  const [admTaxaAdesao, setAdmTaxaAdesao] = useState<string>(String(Number(contrato.taxa_adesao ?? 0).toFixed(2)));
+  const [admForma, setAdmForma] = useState<string>(contrato.forma_pagamento ?? "");
+  const [admObs, setAdmObs] = useState<string>(contrato.observacoes ?? "");
+  const [savingAdm, setSavingAdm] = useState(false);
+  useEffect(() => {
+    setAdmConvenioId(contrato.convenio_id ?? "");
+    setAdmDataInicio(contrato.data_inicio ?? "");
+    setAdmTaxaAdesao(String(Number(contrato.taxa_adesao ?? 0).toFixed(2)));
+    setAdmForma(contrato.forma_pagamento ?? "");
+    setAdmObs(contrato.observacoes ?? "");
+  }, [contrato.id]);
+
+  // Carrega lista de convênios ativos (ADM)
+  useEffect(() => {
+    if (!isAdmin || !clinicaAtual?.clinica_id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("cb_convenios")
+        .select("id, nome")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .order("nome");
+      if (!cancelled) setConveniosAdm(((data as any[]) ?? []).map((c) => ({ id: c.id, nome: c.nome })));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, clinicaAtual?.clinica_id]);
+  // Preenche paciente titular no combobox (ADM)
+  useEffect(() => {
+    if (!isAdmin) return;
+    const pid = (contrato as any).paciente_id as string | null | undefined;
+    if (!pid) {
+      setAdmPaciente(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("pacientes")
+        .select("id, nome, cpf, telefone, data_nascimento, clinica_id")
+        .eq("id", pid)
+        .maybeSingle();
+      if (!cancelled && data) setAdmPaciente(data as PatientOption);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, contrato.id]);
+
+  const salvarContratoAdmin = async () => {
+    const taxa = Number(String(admTaxaAdesao).replace(",", "."));
+    if (!admConvenioId) {
+      toast.error("Selecione um convênio");
+      return;
+    }
+    if (!admPaciente?.id) {
+      toast.error("Selecione o paciente titular");
+      return;
+    }
+    if (!admDataInicio) {
+      toast.error("Informe a data de início");
+      return;
+    }
+    if (!Number.isFinite(taxa) || taxa < 0) {
+      toast.error("Taxa de adesão inválida");
+      return;
+    }
+    setSavingAdm(true);
+    const { error } = await supabase
+      .from("contratos_assinatura")
+      .update({
+        convenio_id: admConvenioId,
+        paciente_id: admPaciente.id,
+        paciente_nome: admPaciente.nome,
+        data_inicio: admDataInicio,
+        taxa_adesao: taxa,
+        forma_pagamento: admForma || null,
+        observacoes: admObs || null,
+      } as any)
+      .eq("id", contrato.id);
+    setSavingAdm(false);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    (contrato as any).convenio_id = admConvenioId;
+    (contrato as any).paciente_id = admPaciente.id;
+    (contrato as any).paciente_nome = admPaciente.nome;
+    (contrato as any).data_inicio = admDataInicio;
+    (contrato as any).taxa_adesao = taxa;
+    (contrato as any).forma_pagamento = admForma || null;
+    (contrato as any).observacoes = admObs || null;
+    toast.success("Contrato atualizado.");
+    await load();
+  };
+
+  // Edição de parcelas (ADM)
+  const atualizarParcela = async (
+    id: string,
+    patch: Partial<{ vencimento: string; valor: number | string }>,
+  ) => {
+    const payload: any = { ...patch };
+    if (payload.valor !== undefined) payload.valor = Number(String(payload.valor).replace(",", "."));
+    const { error } = await supabase.from("contrato_mensalidades").update(payload).eq("id", id);
+    if (error) return mostrarErro(error);
+    setMens((rows) =>
+      rows.map((r) =>
+        r.id === id ? ({ ...r, ...(patch as any), valor: payload.valor ?? r.valor } as Mens) : r,
+      ),
+    );
+  };
+  const adicionarParcela = async () => {
+    const prox = mens.reduce((mx, m) => Math.max(mx, Number(m.numero_parcela) || 0), 0) + 1;
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { error } = await supabase.from("contrato_mensalidades").insert({
+      contrato_id: contrato.id,
+      clinica_id: (contrato as any).clinica_id,
+      numero_parcela: prox,
+      vencimento: hoje,
+      valor: Number(valorMensalAtual) || 0,
+      status: "pendente",
+    } as any);
+    if (error) return mostrarErro(error);
+    toast.success("Parcela adicionada.");
+    await load();
+  };
+  const excluirParcela = async (id: string) => {
+    if (!confirm("Excluir esta parcela? Essa ação não pode ser desfeita.")) return;
+    const { error } = await supabase.from("contrato_mensalidades").delete().eq("id", id);
+    if (error) return mostrarErro(error);
+    toast.success("Parcela removida.");
+    await load();
+  };
 
   const salvarDadosFinanceiros = async () => {
     const v = Number(String(editValor).replace(",", "."));
@@ -1864,7 +2061,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
               ) : null}
 
               <div>
-                <h3 className="font-semibold text-sm mb-1">Mensalidades</h3>
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="font-semibold text-sm">Mensalidades</h3>
+                  {isAdmin ? (
+                    <Button size="sm" variant="outline" onClick={adicionarParcela}>
+                      <Plus className="h-3 w-3 mr-1" /> Adicionar parcela
+                    </Button>
+                  ) : null}
+                </div>
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader>
@@ -1888,8 +2092,38 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       {mens.map((m) => (
                         <TableRow key={m.id}>
                           <TableCell>{m.numero_parcela}</TableCell>
-                          <TableCell>{fmtD(m.vencimento)}</TableCell>
-                          <TableCell>{BRL(m.valor)}</TableCell>
+                          <TableCell>
+                            {isAdmin ? (
+                              <Input
+                                type="date"
+                                className="h-8 w-40"
+                                defaultValue={m.vencimento}
+                                onBlur={(e) => {
+                                  const v = e.target.value;
+                                  if (v && v !== m.vencimento) atualizarParcela(m.id, { vencimento: v });
+                                }}
+                              />
+                            ) : (
+                              fmtD(m.vencimento)
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {isAdmin ? (
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                className="h-8 w-28"
+                                defaultValue={Number(m.valor ?? 0).toFixed(2)}
+                                onBlur={(e) => {
+                                  const v = Number(String(e.target.value).replace(",", "."));
+                                  if (Number.isFinite(v) && v !== Number(m.valor)) atualizarParcela(m.id, { valor: v });
+                                }}
+                              />
+                            ) : (
+                              BRL(m.valor)
+                            )}
+                          </TableCell>
                           <TableCell>
                             <Badge
                               variant={
@@ -1909,16 +2143,28 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           </TableCell>
                           <TableCell>{fmtD(m.pago_em)}</TableCell>
                           <TableCell>
-                            {m.status === "pago" ? (
-                              <Button size="sm" variant="outline" onClick={() => marcarPago(m.id, false)}>
-                                Reverter
-                              </Button>
-                            ) : (
-                              <Button size="sm" disabled={cancelado} onClick={() => abrirFormaPag(m)}>
-                                <Check className="h-3 w-3 mr-1" />
-                                Pagar
-                              </Button>
-                            )}
+                            <div className="flex items-center gap-1 justify-end">
+                              {m.status === "pago" ? (
+                                <Button size="sm" variant="outline" onClick={() => marcarPago(m.id, false)}>
+                                  Reverter
+                                </Button>
+                              ) : (
+                                <Button size="sm" disabled={cancelado && !isAdmin} onClick={() => abrirFormaPag(m)}>
+                                  <Check className="h-3 w-3 mr-1" />
+                                  Pagar
+                                </Button>
+                              )}
+                              {isAdmin ? (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Excluir parcela"
+                                  onClick={() => excluirParcela(m.id)}
+                                >
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                                </Button>
+                              ) : null}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1928,14 +2174,60 @@ h1, h2, h3 { margin: 0 0 6mm; }
               </div>
             </TabsContent>
             <TabsContent value="dados" className="mt-4 space-y-4">
-              <DadosField label="Convênio" value={convenio?.nome ?? "—"} />
+              {isAdmin ? (
+                <div className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-primary">
+                  Modo administrador — você pode alterar todos os campos deste contrato. Alterações não regeram parcelas
+                  automaticamente; use a opção “Regerar 12 parcelas futuras” abaixo quando quiser propagar o novo valor.
+                </div>
+              ) : null}
+              {isAdmin ? (
+                <div className="space-y-1">
+                  <Label>Convênio</Label>
+                  <Select value={admConvenioId} onValueChange={setAdmConvenioId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o convênio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {conveniosAdm.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <DadosField label="Convênio" value={convenio?.nome ?? "—"} />
+              )}
               <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
-              <DadosField
-                label="Paciente titular"
-                value={`${contrato.paciente_nome}${pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}`}
-              />
+              {isAdmin ? (
+                <div className="space-y-1">
+                  <Label>Paciente titular</Label>
+                  <PatientSearchInput
+                    value={admPaciente}
+                    onSelect={(p) => setAdmPaciente(p)}
+                    placeholder="Buscar paciente por nome ou CPF…"
+                  />
+                </div>
+              ) : (
+                <DadosField
+                  label="Paciente titular"
+                  value={`${contrato.paciente_nome}${pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}`}
+                />
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <DadosField label="Data início" value={fmtD(contrato.data_inicio)} />
+                {isAdmin ? (
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">Data início</div>
+                    <Input
+                      type="date"
+                      value={admDataInicio}
+                      onChange={(e) => setAdmDataInicio(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <DadosField label="Data início" value={fmtD(contrato.data_inicio)} />
+                )}
                 <div className="space-y-1">
                   <div className="text-xs text-muted-foreground">Dia de vencimento</div>
                   <Input
@@ -1944,7 +2236,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     max={31}
                     value={editDia}
                     onChange={(e) => setEditDia(e.target.value)}
-                    disabled={cancelado || savingDados}
+                    disabled={(cancelado && !isAdmin) || savingDados}
                   />
                 </div>
                 <div className="space-y-1">
@@ -1955,10 +2247,23 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     min={0}
                     value={editValor}
                     onChange={(e) => setEditValor(e.target.value)}
-                    disabled={cancelado || savingDados}
+                    disabled={(cancelado && !isAdmin) || savingDados}
                   />
                 </div>
-                <DadosField label="Taxa de adesão" value={BRL(Number(contrato.taxa_adesao ?? 0))} />
+                {isAdmin ? (
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">Taxa de adesão (R$)</div>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      value={admTaxaAdesao}
+                      onChange={(e) => setAdmTaxaAdesao(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <DadosField label="Taxa de adesão" value={BRL(Number(contrato.taxa_adesao ?? 0))} />
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
                 <label className="flex items-center gap-2 text-sm">
@@ -1972,13 +2277,33 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <Button
                   size="sm"
                   onClick={salvarDadosFinanceiros}
-                  disabled={cancelado || savingDados}
+                  disabled={(cancelado && !isAdmin) || savingDados}
                   className="ml-auto"
                 >
                   {savingDados ? "Salvando…" : "Salvar valor e vencimento"}
                 </Button>
               </div>
-              <DadosField label="Forma de pagamento" value={formaLabel} />
+              {isAdmin ? (
+                <div className="space-y-1">
+                  <Label>Forma de pagamento</Label>
+                  <Select value={admForma || "__none__"} onValueChange={(v) => setAdmForma(v === "__none__" ? "" : v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a forma de pagamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Não definido</SelectItem>
+                      {formaOpcoes.map((f) => (
+                        <SelectItem key={f.forma} value={f.forma}>
+                          {f.label}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="carne">Carnê interno</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <DadosField label="Forma de pagamento" value={formaLabel} />
+              )}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-medium">
@@ -2039,7 +2364,32 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   )}
                 </div>
               </div>
-              {contrato.observacoes ? <DadosField label="Observações" value={contrato.observacoes} /> : null}
+              {isAdmin ? (
+                <div className="space-y-1">
+                  <Label>Observações</Label>
+                  <Textarea
+                    rows={3}
+                    value={admObs}
+                    onChange={(e) => setAdmObs(e.target.value)}
+                    placeholder="Observações internas do contrato"
+                  />
+                </div>
+              ) : contrato.observacoes ? (
+                <DadosField label="Observações" value={contrato.observacoes} />
+              ) : null}
+              {isAdmin ? (
+                <div className="flex justify-end pt-2">
+                  <Button onClick={salvarContratoAdmin} disabled={savingAdm}>
+                    {savingAdm ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Salvando…
+                      </>
+                    ) : (
+                      "Salvar alterações do contrato"
+                    )}
+                  </Button>
+                </div>
+              ) : null}
             </TabsContent>
             <TabsContent value="contrato" className="mt-4">
               <div className="flex items-center justify-between mb-2">

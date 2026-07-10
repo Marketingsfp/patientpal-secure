@@ -422,6 +422,19 @@ function Page() {
   const [valorInformado, setValorInformado] = useState("");
   const [obsFechamento, setObsFechamento] = useState("");
   const [saving, setSaving] = useState(false);
+  // Conferência por forma de pagamento no fechamento do próprio caixa.
+  const [conferidoOwn, setConferidoOwn] = useState<Record<string, string>>({});
+
+  // Fechamento de caixa de OUTRO usuário (gestor/admin no tab "Todos").
+  const [openFecharTerceiro, setOpenFecharTerceiro] = useState<Sessao | null>(null);
+  const [informadoTerceiro, setInformadoTerceiro] = useState("");
+  const [obsTerceiro, setObsTerceiro] = useState("");
+  // Conferência por forma de pagamento no fechamento de terceiros.
+  const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
+  // Fechamento em lote (por dia) — gestor
+  const [openLote, setOpenLote] = useState(false);
+  const [loteSelecionados, setLoteSelecionados] = useState<Record<string, boolean>>({});
+  const [obsLote, setObsLote] = useState("");
 
   // Atalho: 1..5 na modal de cobrança seleciona a forma da última linha
   useEffect(() => {
@@ -890,8 +903,9 @@ function Page() {
     });
     scan(minhasMovs);
     scan(detalheMovs);
+    scan(todosMovs);
     return Array.from(ids);
-  }, [minhasMovs, detalheMovs]);
+  }, [minhasMovs, detalheMovs, todosMovs]);
   useEffect(() => {
     let alive = true;
     const pendentes = mistoLancIds.filter((id) => !(id in mistoObs));
@@ -961,6 +975,128 @@ function Page() {
       .filter((m) => m.sessao_id === sid && (m.descricao ?? "").toLowerCase().includes("estorno"))
       .reduce((acc, m) => acc + Number(m.valor || 0), 0);
   }, [todosMovs]);
+
+  // ============ Agrupamento por operador × dia ============
+  // Um mesmo turno pode atravessar a meia-noite; a listagem mostra uma linha
+  // por dia, com os movimentos, sangrias, informado e diferença daquele dia
+  // específico. Cada dia = "um caixa" com abertura e fechamento próprios.
+  type LinhaDia = {
+    key: string; user_id: string; user_nome: string; data: string;
+    primeiraAbertura: string | null; ultimoFechamento: string | null;
+    statusDia: "aberto" | "fechado";
+    valorAbertura: number; calculado: number; informado: number;
+    sangria: number; estorno: number; diferenca: number;
+    sessoes: Sessao[]; sessaoAbertaId: string | null;
+  };
+  const localDate = (iso: string | null | undefined): string | null => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const fmtDia = (data: string) => {
+    const [y, m, d] = data.split("-");
+    return `${d}/${m}/${y}`;
+  };
+  const fmtHora = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
+
+  const agruparPorDia = useCallback((sessoes: Sessao[], movs: Mov[]): LinhaDia[] => {
+    const buckets = new Map<string, LinhaDia>();
+    const sessById = new Map(sessoes.map((s) => [s.id, s]));
+    const get = (uid: string, nome: string, data: string) => {
+      const k = `${uid}__${data}`;
+      let b = buckets.get(k);
+      if (!b) {
+        b = {
+          key: k, user_id: uid, user_nome: nome, data,
+          primeiraAbertura: null, ultimoFechamento: null,
+          statusDia: "fechado",
+          valorAbertura: 0, calculado: 0, informado: 0,
+          sangria: 0, estorno: 0, diferenca: 0,
+          sessoes: [], sessaoAbertaId: null,
+        };
+        buckets.set(k, b);
+      }
+      return b;
+    };
+    for (const s of sessoes) {
+      const nome = (s.user_nome || s.user_id.slice(0, 8)).toString();
+      const dAb = localDate(s.aberto_em);
+      if (dAb) {
+        const b = get(s.user_id, nome, dAb);
+        b.sessoes.push(s);
+        b.valorAbertura += Number(s.valor_abertura || 0);
+        if (!b.primeiraAbertura || s.aberto_em < b.primeiraAbertura) b.primeiraAbertura = s.aberto_em;
+        if (s.status === "aberto") {
+          b.statusDia = "aberto";
+          if (!b.sessaoAbertaId) b.sessaoAbertaId = s.id;
+        }
+      }
+      const dFe = localDate(s.fechado_em);
+      if (dFe && s.fechado_em) {
+        const b = get(s.user_id, nome, dFe);
+        if (!b.sessoes.some((x) => x.id === s.id)) b.sessoes.push(s);
+        b.informado += Number(s.valor_fechamento_informado || 0);
+        b.diferenca += Number(s.diferenca || 0);
+        if (!b.ultimoFechamento || s.fechado_em > b.ultimoFechamento) b.ultimoFechamento = s.fechado_em;
+      }
+    }
+    for (const m of movs) {
+      const d = localDate(m.created_at);
+      if (!d) continue;
+      const s = sessById.get(m.sessao_id);
+      if (!s) continue;
+      const nome = (s.user_nome || s.user_id.slice(0, 8)).toString();
+      const b = get(s.user_id, nome, d);
+      b.calculado += TIPO_SINAL[m.tipo] * Number(m.valor || 0);
+      if (m.tipo === "sangria") b.sangria += Number(m.valor || 0);
+      if ((m.descricao ?? "").toLowerCase().includes("estorno")) b.estorno += Number(m.valor || 0);
+    }
+    return Array.from(buckets.values()).sort((a, b) => {
+      if (a.data !== b.data) return b.data.localeCompare(a.data);
+      return a.user_nome.localeCompare(b.user_nome, "pt-BR");
+    });
+  }, []);
+
+  const linhasTodosPorDia = useMemo(
+    () => agruparPorDia(todasSessoes, todosMovs),
+    [agruparPorDia, todasSessoes, todosMovs],
+  );
+  const linhasMinhasPorDia = useMemo(
+    () => agruparPorDia(minhasSessoes, minhasMovs),
+    [agruparPorDia, minhasSessoes, minhasMovs],
+  );
+
+  // Total recebido/suprido por forma de pagamento em uma sessão qualquer
+  // (usa `todosMovs`). Decompõe pagamentos "misto" quando as observações do
+  // lançamento já foram carregadas via `mistoObs`.
+  const entradasPorFormaSessao = useCallback((sid: string) => {
+    const r: Record<string, number> = {
+      dinheiro: 0, pix: 0, debito: 0, credito: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0,
+    };
+    todosMovs.forEach((m) => {
+      if (m.sessao_id !== sid) return;
+      if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
+      const v = Number(m.valor || 0);
+      const bucket = normalizarForma(m.forma_pagamento);
+      if (bucket === "misto") {
+        const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+        const partes = decomporMistoObs(obs);
+        let somado = 0;
+        for (const [k, val] of Object.entries(partes)) {
+          r[k] = (r[k] ?? 0) + (val ?? 0);
+          somado += val ?? 0;
+        }
+        const resto = v - somado;
+        if (Math.abs(resto) > 0.005) r.outros += resto;
+      } else {
+        r[bucket] = (r[bucket] ?? 0) + v;
+      }
+    });
+    return r;
+  }, [todosMovs, mistoObs]);
 
   // Acoes
   const abrirCaixa = async (e: FormEvent) => {
@@ -1107,7 +1243,7 @@ function Page() {
     if (error) { mostrarErro(error); return; }
     setOpenFechar(false);
     const obsFinal = obsFechamento;
-    setValorInformado(""); setObsFechamento("");
+    setValorInformado(""); setObsFechamento(""); setConferidoOwn({});
     toast.success("Caixa fechado");
     // Total recebido por forma de pagamento na sessão — normaliza aliases e
     // decompõe "misto" consultando observacoes do lançamento.
@@ -1158,7 +1294,121 @@ function Page() {
     void load();
   };
 
+  // Fechamento pelo gestor de um caixa aberto por outro usuário.
+  const fecharSessaoTerceiro = async (e: FormEvent) => {
+    e.preventDefault();
+    const alvo = openFecharTerceiro;
+    if (!alvo || !clinicaAtual || !user) return;
+    const calc = calcSaldoSessao(alvo.id);
+    const conferidoNum: Record<string, number> = {};
+    for (const [k, v] of Object.entries(conferidoTerceiro)) {
+      const n = Number(v) || 0;
+      if (Math.abs(n) > 0.005) conferidoNum[k] = n;
+    }
+    const informado = Object.values(conferidoNum).reduce((a, x) => a + x, 0)
+      || (Number(informadoTerceiro) || 0);
+    const diff = informado - calc;
+    const breakdownStr = Object.entries(conferidoNum)
+      .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k}: ${fmt(v)}`)
+      .join("; ");
+    setSaving(true);
+    const { error } = await supabase
+      .from("caixa_sessoes")
+      .update({
+        status: "fechado",
+        fechado_em: new Date().toISOString(),
+        valor_fechamento_informado: informado,
+        valor_fechamento_calculado: calc,
+        diferenca: diff,
+        observacoes: obsTerceiro
+          ? `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}] ${obsTerceiro}${breakdownStr ? " | Conferência: " + breakdownStr : ""}`
+          : `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}]${breakdownStr ? " | Conferência: " + breakdownStr : ""}`,
+      })
+      .eq("id", alvo.id);
+    if (!error) {
+      await supabase.from("caixa_movimentos").insert({
+        sessao_id: alvo.id,
+        clinica_id: clinicaAtual.clinica_id,
+        user_id: user.id,
+        tipo: "fechamento",
+        valor: informado,
+        descricao: `Fechamento pelo gestor. Operador original: ${alvo.user_nome || alvo.user_id.slice(0, 8)} | Calculado: ${fmt(calc)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}${breakdownStr ? " | " + breakdownStr : ""}`,
+      });
+    }
+    setSaving(false);
+    if (error) { mostrarErro(error); return; }
+    setOpenFecharTerceiro(null);
+    setInformadoTerceiro("");
+    setObsTerceiro("");
+    setConferidoTerceiro({});
+    toast.success(`Caixa de ${alvo.user_nome || "operador"} fechado`);
+    printComprovanteCaixa({
+      tipo: "fechamento",
+      clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
+      operadorNome: alvo.user_nome || "Atendente",
+      valor: informado,
+      saldoCalculado: calc,
+      valorInformado: informado,
+      diferenca: diff,
+      descricao: obsTerceiro ? `Fechado pelo gestor. ${obsTerceiro}` : "Fechado pelo gestor.",
+      porForma: conferidoNum,
+    });
+    void loadTodos();
+    void load();
+  };
+
+  // Fecha em lote todas as sessões marcadas — usa o saldo calculado como
+  // valor informado (diferença = 0). Uma observação global identifica o
+  // fechamento como feito pelo gestor.
+  const fecharLote = async () => {
+    if (!clinicaAtual || !user) return;
+    const alvos = todasSessoes.filter(
+      (s) => s.status === "aberto" && loteSelecionados[s.id],
+    );
+    if (alvos.length === 0) {
+      toast.error("Selecione ao menos um caixa aberto para fechar.");
+      return;
+    }
+    setSaving(true);
+    let ok = 0;
+    let fail = 0;
+    const gestorNome = user.user_metadata?.nome || user.email || "gestor";
+    for (const alvo of alvos) {
+      const calc = calcSaldoSessao(alvo.id);
+      const { error } = await supabase
+        .from("caixa_sessoes")
+        .update({
+          status: "fechado",
+          fechado_em: new Date().toISOString(),
+          valor_fechamento_informado: calc,
+          valor_fechamento_calculado: calc,
+          diferenca: 0,
+          observacoes: `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado em lote por ${gestorNome}]${obsLote ? " " + obsLote : ""}`,
+        })
+        .eq("id", alvo.id);
+      if (error) { fail += 1; continue; }
+      await supabase.from("caixa_movimentos").insert({
+        sessao_id: alvo.id,
+        clinica_id: clinicaAtual.clinica_id,
+        user_id: user.id,
+        tipo: "fechamento",
+        valor: calc,
+        descricao: `Fechamento em lote pelo gestor. Operador original: ${alvo.user_nome || alvo.user_id.slice(0, 8)} | Calculado: ${fmt(calc)}${obsLote ? " | " + obsLote : ""}`,
+      });
+      ok += 1;
+    }
+    setSaving(false);
+    setOpenLote(false);
+    setLoteSelecionados({});
+    setObsLote("");
+    if (ok > 0) toast.success(`${ok} caixa(s) fechado(s)${fail ? ` — ${fail} falha(s)` : ""}`);
+    else if (fail > 0) toast.error(`Falha ao fechar ${fail} caixa(s)`);
+    void loadTodos();
+    void load();
+  };
+
   const verDetalhe = async (s: Sessao) => {
+    // (marcador para localizar próxima função)
     setOpenDetalhe(s);
     const { data } = await supabase
       .from("caixa_movimentos")
@@ -1169,17 +1419,18 @@ function Page() {
   };
 
   const exportarTodos = () => {
-    const rows = todasSessoes.map((s) => ({
-      Operador: s.user_nome || s.user_id.slice(0, 8),
-      Abertura: fmtDT(s.aberto_em),
-      Fechamento: fmtDT(s.fechado_em),
-      Status: s.status,
-      "Valor abertura": Number(s.valor_abertura || 0),
-      "Saldo calculado": calcSaldoSessao(s.id),
-      "Valor informado": Number(s.valor_fechamento_informado || 0),
-      Sangria: calcSangriaSessao(s.id),
-      Estorno: calcEstornoSessao(s.id),
-      Diferenca: Number(s.diferenca || 0),
+    const rows = linhasTodosPorDia.map((l) => ({
+      Operador: l.user_nome,
+      Dia: fmtDia(l.data),
+      "Abertura (hora)": fmtHora(l.primeiraAbertura),
+      "Fechamento (hora)": fmtHora(l.ultimoFechamento),
+      Status: l.statusDia,
+      "Valor abertura": l.valorAbertura,
+      "Saldo calculado": l.calculado,
+      "Valor informado": l.informado,
+      Sangria: l.sangria,
+      Estorno: l.estorno,
+      Diferenca: l.diferenca,
     }));
     exportToExcel(rows, `caixas_${fIni}_a_${fFim}`);
   };
@@ -1362,7 +1613,19 @@ function Page() {
                   </>
                 )}
                 <div className="flex-1" />
-                <Button variant="destructive" onClick={() => { setValorInformado(saldoAtual.toFixed(2)); setOpenFechar(true); }}>
+                <Button variant="destructive" onClick={() => {
+                  setValorInformado(saldoAtual.toFixed(2));
+                  if (minhaSessao) {
+                    const porForma = entradasPorFormaSessao(minhaSessao.id);
+                    const inicial: Record<string, string> = {};
+                    for (const [k, v] of Object.entries(porForma)) {
+                      if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
+                    }
+                    if (!inicial.dinheiro) inicial.dinheiro = "0.00";
+                    setConferidoOwn(inicial);
+                  }
+                  setOpenFechar(true);
+                }}>
                   <Lock className="h-4 w-4 mr-2" /> Fechar caixa
                 </Button>
               </div>
@@ -1668,6 +1931,7 @@ function Page() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Dia</TableHead>
                       <TableHead>Abertura</TableHead>
                       <TableHead>Fechamento</TableHead>
                       <TableHead>Status</TableHead>
@@ -1678,21 +1942,29 @@ function Page() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {minhasSessoes.map((s) => (
-                      <TableRow key={s.id}>
-                        <TableCell>{fmtDT(s.aberto_em)}</TableCell>
-                        <TableCell>{fmtDT(s.fechado_em)}</TableCell>
-                        <TableCell>
-                          <Badge variant={s.status === "aberto" ? "default" : "secondary"}>{s.status}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">{fmt(s.valor_abertura)}</TableCell>
-                        <TableCell className="text-right">{fmt(s.valor_fechamento_informado)}</TableCell>
-                        <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
-                          {fmt(s.diferenca)}
-                        </TableCell>
-                        <TableCell><Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}><Eye className="h-4 w-4" /></Button></TableCell>
-                      </TableRow>
-                    ))}
+                    {linhasMinhasPorDia.map((l) => {
+                      const sPrincipal = l.sessoes[0];
+                      return (
+                        <TableRow key={l.key}>
+                          <TableCell className="font-medium">{fmtDia(l.data)}</TableCell>
+                          <TableCell>{fmtHora(l.primeiraAbertura)}</TableCell>
+                          <TableCell>{fmtHora(l.ultimoFechamento)}</TableCell>
+                          <TableCell>
+                            <Badge variant={l.statusDia === "aberto" ? "default" : "secondary"}>{l.statusDia}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">{fmt(l.valorAbertura)}</TableCell>
+                          <TableCell className="text-right">{fmt(l.informado)}</TableCell>
+                          <TableCell className={`text-right ${l.diferenca < 0 ? "text-rose-600" : l.diferenca > 0 ? "text-amber-600" : ""}`}>
+                            {fmt(l.diferenca)}
+                          </TableCell>
+                          <TableCell>
+                            {sPrincipal && (
+                              <Button size="sm" variant="ghost" onClick={() => verDetalhe(sPrincipal)}><Eye className="h-4 w-4" /></Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -1729,7 +2001,38 @@ function Page() {
                   </Select>
                 </div>
                 <Button onClick={() => void loadTodos()}>Filtrar</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const hoje = new Date().toISOString().slice(0, 10);
+                    setFIni(hoje);
+                    setFFim(hoje);
+                  }}
+                  title="Filtrar apenas o dia de hoje"
+                >
+                  Hoje
+                </Button>
                 <Button variant="outline" onClick={exportarTodos}><FileDown className="h-4 w-4 mr-2" /> Excel</Button>
+                {(() => {
+                  const abertos = todasSessoes.filter((s) => s.status === "aberto").length;
+                  if (abertos === 0) return null;
+                  return (
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        const inicial: Record<string, boolean> = {};
+                        todasSessoes.forEach((s) => {
+                          if (s.status === "aberto") inicial[s.id] = true;
+                        });
+                        setLoteSelecionados(inicial);
+                        setObsLote("");
+                        setOpenLote(true);
+                      }}
+                    >
+                      <Lock className="h-4 w-4 mr-2" /> Fechar caixas abertos ({abertos})
+                    </Button>
+                  );
+                })()}
               </CardContent>
             </Card>
 
@@ -1739,6 +2042,7 @@ function Page() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Operador</TableHead>
+                      <TableHead>Dia</TableHead>
                       <TableHead>Abertura</TableHead>
                       <TableHead>Fechamento</TableHead>
                       <TableHead>Status</TableHead>
@@ -1752,28 +2056,61 @@ function Page() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {todasSessoes.length === 0 && (
-                      <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">Sem sessões no período</TableCell></TableRow>
+                    {linhasTodosPorDia.length === 0 && (
+                      <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">Sem sessões no período</TableCell></TableRow>
                     )}
-                    {todasSessoes.map((s) => {
-                      const calc = calcSaldoSessao(s.id);
-                      const sangria = calcSangriaSessao(s.id);
-                      const estorno = calcEstornoSessao(s.id);
+                    {linhasTodosPorDia.map((l) => {
+                      const sAberta = l.sessaoAbertaId
+                        ? l.sessoes.find((x) => x.id === l.sessaoAbertaId)
+                        : null;
+                      const sPrincipal = sAberta ?? l.sessoes[0];
                       return (
-                        <TableRow key={s.id}>
-                          <TableCell className="font-medium uppercase">{(s.user_nome || s.user_id.slice(0, 8)).toUpperCase()}</TableCell>
-                          <TableCell>{fmtDT(s.aberto_em)}</TableCell>
-                          <TableCell>{fmtDT(s.fechado_em)}</TableCell>
-                          <TableCell><Badge variant={s.status === "aberto" ? "default" : "secondary"}>{s.status}</Badge></TableCell>
-                          <TableCell className="text-right">{fmt(s.valor_abertura)}</TableCell>
-                          <TableCell className="text-right">{fmt(calc)}</TableCell>
-                          <TableCell className="text-right">{fmt(s.valor_fechamento_informado)}</TableCell>
-                          <TableCell className={`text-right ${sangria > 0 ? "text-amber-700" : "text-muted-foreground"}`}>{fmt(sangria)}</TableCell>
-                          <TableCell className={`text-right ${estorno > 0 ? "text-rose-700" : "text-muted-foreground"}`}>{fmt(estorno)}</TableCell>
-                          <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
-                            {fmt(s.diferenca)}
+                        <TableRow key={l.key}>
+                          <TableCell className="font-medium uppercase">{l.user_nome.toUpperCase()}</TableCell>
+                          <TableCell className="whitespace-nowrap">{fmtDia(l.data)}</TableCell>
+                          <TableCell>{fmtHora(l.primeiraAbertura)}</TableCell>
+                          <TableCell>{fmtHora(l.ultimoFechamento)}</TableCell>
+                          <TableCell><Badge variant={l.statusDia === "aberto" ? "default" : "secondary"}>{l.statusDia}</Badge></TableCell>
+                          <TableCell className="text-right">{fmt(l.valorAbertura)}</TableCell>
+                          <TableCell className="text-right">{fmt(l.calculado)}</TableCell>
+                          <TableCell className="text-right">{fmt(l.informado)}</TableCell>
+                          <TableCell className={`text-right ${l.sangria > 0 ? "text-amber-700" : "text-muted-foreground"}`}>{fmt(l.sangria)}</TableCell>
+                          <TableCell className={`text-right ${l.estorno > 0 ? "text-rose-700" : "text-muted-foreground"}`}>{fmt(l.estorno)}</TableCell>
+                          <TableCell className={`text-right ${l.diferenca < 0 ? "text-rose-600" : l.diferenca > 0 ? "text-amber-600" : ""}`}>
+                            {fmt(l.diferenca)}
                           </TableCell>
-                          <TableCell><Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}><Eye className="h-4 w-4" /></Button></TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {sPrincipal && (
+                              <Button size="sm" variant="ghost" onClick={() => verDetalhe(sPrincipal)} title="Ver detalhes">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {sAberta && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Fechar este caixa"
+                                onClick={() => {
+                                  setOpenFecharTerceiro(sAberta);
+                                  setObsTerceiro("");
+                                  const porForma = entradasPorFormaSessao(sAberta.id);
+                                  const inicial: Record<string, string> = {};
+                                  let soma = 0;
+                                  for (const k of Object.keys(porForma)) {
+                                    const v = porForma[k] ?? 0;
+                                    if (Math.abs(v) > 0.005 || k === "dinheiro") {
+                                      inicial[k] = v.toFixed(2);
+                                      soma += v;
+                                    }
+                                  }
+                                  setConferidoTerceiro(inicial);
+                                  setInformadoTerceiro(soma.toFixed(2));
+                                }}
+                              >
+                                <Lock className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                       );
                     })}
@@ -1991,6 +2328,51 @@ function Page() {
             <DialogDescription>Saldo calculado: <strong>{fmt(saldoAtual)}</strong></DialogDescription>
           </DialogHeader>
           <form onSubmit={fecharCaixa} className="space-y-3">
+            {minhaSessao && (() => {
+              const porForma = entradasPorFormaSessao(minhaSessao.id);
+              const chaves = Array.from(new Set<string>([
+                ...Object.keys(conferidoOwn),
+                ...Object.keys(porForma).filter((k) => Math.abs(porForma[k] ?? 0) > 0.005),
+                "dinheiro",
+              ]));
+              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
+              chaves.sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b));
+              const totalConferido = Object.values(conferidoOwn)
+                .reduce((acc, v) => acc + (Number(v) || 0), 0);
+              return (
+                <div className="space-y-2">
+                  <Label>Conferência por forma de pagamento</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {chaves.map((k) => {
+                      const esperado = porForma[k] ?? 0;
+                      return (
+                        <div key={k} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-medium">{FORMA_LABEL[k as FormaBucket] ?? k}</span>
+                            <span className="text-muted-foreground">Esperado: {fmt(esperado)}</span>
+                          </div>
+                          <CurrencyInput
+                            value={conferidoOwn[k] ?? ""}
+                            onChange={(v) => {
+                              setConferidoOwn((prev) => {
+                                const next = { ...prev, [k]: v };
+                                const soma = Object.values(next).reduce((a, x) => a + (Number(x) || 0), 0);
+                                setValorInformado(soma.toFixed(2));
+                                return next;
+                              });
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-between text-sm pt-1 border-t">
+                    <span className="text-muted-foreground">Total conferido</span>
+                    <strong>{fmt(totalConferido)}</strong>
+                  </div>
+                </div>
+              );
+            })()}
             <div>
               <Label>Valor conferido em caixa</Label>
               <CurrencyInput value={valorInformado} onChange={setValorInformado} />
@@ -2004,6 +2386,156 @@ function Page() {
               <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* === Modal Fechar caixa de OUTRO usuário (gestor/admin) === */}
+      <Dialog open={!!openFecharTerceiro} onOpenChange={(o) => { if (!o) setOpenFecharTerceiro(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Fechar caixa de outro operador</DialogTitle>
+            {openFecharTerceiro && (
+              <DialogDescription>
+                Operador: <strong className="uppercase">{openFecharTerceiro.user_nome || openFecharTerceiro.user_id.slice(0, 8)}</strong>
+                <br />
+                Saldo calculado: <strong>{fmt(calcSaldoSessao(openFecharTerceiro.id))}</strong>
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <form onSubmit={fecharSessaoTerceiro} className="space-y-3">
+            {openFecharTerceiro && (() => {
+              const porForma = entradasPorFormaSessao(openFecharTerceiro.id);
+              const chaves = Array.from(new Set<string>([
+                ...Object.keys(conferidoTerceiro),
+                ...Object.keys(porForma).filter((k) => Math.abs(porForma[k] ?? 0) > 0.005),
+                "dinheiro",
+              ]));
+              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
+              chaves.sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b));
+              const totalConferido = Object.values(conferidoTerceiro)
+                .reduce((acc, v) => acc + (Number(v) || 0), 0);
+              return (
+                <div className="space-y-2">
+                  <Label>Conferência por forma de pagamento</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {chaves.map((k) => {
+                      const esperado = porForma[k] ?? 0;
+                      return (
+                        <div key={k} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-medium">{FORMA_LABEL[k as FormaBucket] ?? k}</span>
+                            <span className="text-muted-foreground">Esperado: {fmt(esperado)}</span>
+                          </div>
+                          <CurrencyInput
+                            value={conferidoTerceiro[k] ?? ""}
+                            onChange={(v) => {
+                              setConferidoTerceiro((prev) => {
+                                const next = { ...prev, [k]: v };
+                                const soma = Object.values(next).reduce((a, x) => a + (Number(x) || 0), 0);
+                                setInformadoTerceiro(soma.toFixed(2));
+                                return next;
+                              });
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-between text-sm pt-1 border-t">
+                    <span className="text-muted-foreground">Total conferido</span>
+                    <strong>{fmt(totalConferido)}</strong>
+                  </div>
+                </div>
+              );
+            })()}
+            <div>
+              <Label>Observações</Label>
+              <Textarea
+                value={obsTerceiro}
+                onChange={(e) => setObsTerceiro(e.target.value)}
+                placeholder="Motivo do fechamento pelo gestor (ex.: operador ausente, fim de turno etc.)"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setOpenFecharTerceiro(null)}>Cancelar</Button>
+              <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* === Modal Fechamento em lote (por dia/período) === */}
+      <Dialog open={openLote} onOpenChange={setOpenLote}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Fechar caixas abertos no período</DialogTitle>
+            <DialogDescription>
+              Cada caixa selecionado será fechado com o valor <strong>calculado</strong> (diferença = 0). Use quando os operadores esquecem de fechar o próprio caixa ao fim do dia.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="max-h-80 overflow-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10"></TableHead>
+                    <TableHead>Operador</TableHead>
+                    <TableHead>Abertura</TableHead>
+                    <TableHead className="text-right">Calculado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {todasSessoes.filter((s) => s.status === "aberto").length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        Nenhum caixa aberto no período.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {todasSessoes.filter((s) => s.status === "aberto").map((s) => {
+                    const calc = calcSaldoSessao(s.id);
+                    const checked = !!loteSelecionados[s.id];
+                    return (
+                      <TableRow key={s.id}>
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => setLoteSelecionados((prev) => ({ ...prev, [s.id]: e.target.checked }))}
+                            className="h-4 w-4"
+                          />
+                        </TableCell>
+                        <TableCell className="uppercase font-medium">{(s.user_nome || s.user_id.slice(0, 8)).toUpperCase()}</TableCell>
+                        <TableCell>{fmtDT(s.aberto_em)}</TableCell>
+                        <TableCell className="text-right">{fmt(calc)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            <div>
+              <Label>Observação (aplicada a todos)</Label>
+              <Textarea
+                value={obsLote}
+                onChange={(e) => setObsLote(e.target.value)}
+                placeholder="Ex.: Fechamento de fim de dia — operadores não fecharam o caixa."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setOpenLote(false)}>Cancelar</Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={saving}
+              onClick={() => void fecharLote()}
+              data-primary
+            >
+              <Lock className="h-4 w-4 mr-2" />
+              Confirmar fechamento em lote
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
