@@ -1263,6 +1263,56 @@ function Page() {
     void load();
   };
 
+  // Fecha em lote todas as sessões marcadas — usa o saldo calculado como
+  // valor informado (diferença = 0). Uma observação global identifica o
+  // fechamento como feito pelo gestor.
+  const fecharLote = async () => {
+    if (!clinicaAtual || !user) return;
+    const alvos = todasSessoes.filter(
+      (s) => s.status === "aberto" && loteSelecionados[s.id],
+    );
+    if (alvos.length === 0) {
+      toast.error("Selecione ao menos um caixa aberto para fechar.");
+      return;
+    }
+    setSaving(true);
+    let ok = 0;
+    let fail = 0;
+    const gestorNome = user.user_metadata?.nome || user.email || "gestor";
+    for (const alvo of alvos) {
+      const calc = calcSaldoSessao(alvo.id);
+      const { error } = await supabase
+        .from("caixa_sessoes")
+        .update({
+          status: "fechado",
+          fechado_em: new Date().toISOString(),
+          valor_fechamento_informado: calc,
+          valor_fechamento_calculado: calc,
+          diferenca: 0,
+          observacoes: `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado em lote por ${gestorNome}]${obsLote ? " " + obsLote : ""}`,
+        })
+        .eq("id", alvo.id);
+      if (error) { fail += 1; continue; }
+      await supabase.from("caixa_movimentos").insert({
+        sessao_id: alvo.id,
+        clinica_id: clinicaAtual.clinica_id,
+        user_id: user.id,
+        tipo: "fechamento",
+        valor: calc,
+        descricao: `Fechamento em lote pelo gestor. Operador original: ${alvo.user_nome || alvo.user_id.slice(0, 8)} | Calculado: ${fmt(calc)}${obsLote ? " | " + obsLote : ""}`,
+      });
+      ok += 1;
+    }
+    setSaving(false);
+    setOpenLote(false);
+    setLoteSelecionados({});
+    setObsLote("");
+    if (ok > 0) toast.success(`${ok} caixa(s) fechado(s)${fail ? ` — ${fail} falha(s)` : ""}`);
+    else if (fail > 0) toast.error(`Falha ao fechar ${fail} caixa(s)`);
+    void loadTodos();
+    void load();
+  };
+
   const verDetalhe = async (s: Sessao) => {
     // (marcador para localizar próxima função)
     setOpenDetalhe(s);
