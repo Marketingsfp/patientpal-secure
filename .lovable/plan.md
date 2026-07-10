@@ -1,31 +1,60 @@
-## Diagnóstico
+## Alterar ordem no campo SERVIÇO da Guia de Atendimento
 
-Na rotina que vincula um orçamento a um agendamento (`src/routes/_authenticated/app.agenda.tsx`, ~linha 2409-2444), o código decide se abre o diálogo "Dividir orçamento" baseado em **grupos distintos** dos itens:
+### O que muda
 
-```ts
-const grupoDe = (pid) => norm(proc.grupo) || norm(proc.tipo) || "OUTROS";
-const gruposDistintos = new Set(its.map(i => grupoDe(i.procedimento_id)));
-if (gruposDistintos.size > 1) { /* abre split */ }
+Na Guia (GR) impressa, o serviço hoje sai como:
+
+```
+1  GERIATRIA - CONSULTA (CARDIOLOGIA)
 ```
 
-Já existe, poucas linhas acima, a variável `todosLab` que verifica se **todos** os itens são de laboratório (por `grupo=LABORATORIO`, `tipo=EXAME` ou `tipo=LABORATORIO`).
+onde `GERIATRIA` é a especialidade principal do médico e `(CARDIOLOGIA)` é a especialidade do procedimento que já vem "colada" no nome (ex.: `CONSULTA (CARDIOLOGIA)`).
 
-No orçamento da foto, os exames de laboratório estão cadastrados com `grupo`/`tipo` inconsistentes entre si (ex.: uns com `tipo=EXAME`, outros com `grupo=LABORATORIO`, outros sem `grupo` mas com nome de lab). Como o agrupador só olha o texto bruto, cria 2-3 buckets → abre a divisão → o operador acaba distribuindo entre médicos diferentes.
+Passa a sair invertido — a especialidade do procedimento vai para frente, e a especialidade do médico vai entre parênteses no fim:
 
-## Correção
+```
+1  CARDIOLOGIA - CONSULTA (GERIATRIA)
+```
 
-### 1. `src/routes/_authenticated/app.agenda.tsx` (bloqueio na origem)
-Antes de comparar `gruposDistintos.size > 1`, se `todosLab === true` **não abrir o split**: cai direto no fluxo de 1 grupo (linha 2447+), que gera **um único agendamento** com descrição `LABORATÓRIO (N EXAMES): ...`. Isso já é o comportamento correto.
+Outros exemplos:
 
-### 2. `src/components/agenda/dividir-orcamento-dialog.tsx` (defesa em profundidade)
-Ajustar `agruparItens` para que, quando **todos** os itens tiverem categoria laboratório (via `categoriaDoProcedimento`/`buildCategoriaResolver` do helper existente em `src/lib/procedimento/categoria.ts`), sejam colapsados em um único grupo `LABORATÓRIO` — assim, mesmo que o dialog seja aberto por outro caminho, ele não permitirá dividir laboratório entre profissionais.
+- `GERIATRIA - ECOCARDIOGRAMA (ADULTO) (CARDIOLOGIA)` → `CARDIOLOGIA - ECOCARDIOGRAMA (ADULTO) (GERIATRIA)`
+- Sem `(...)` no procedimento: `GERIATRIA - CONSULTA` (fallback mantém como hoje).
+- Especialidade do médico igual à do procedimento: sai apenas `CARDIOLOGIA - CONSULTA` (sem parênteses redundante).
 
-Se o dialog receber somente itens de laboratório e existir um profissional cujo nome normalizado contenha `LABORATORIO`/`LABORATÓRIO` (médico ou recurso de enfermagem), pré-selecionar automaticamente esse profissional no grupo.
+### Onde alterar
 
-### 3. Sem migração
-Apenas mudança de lógica no frontend; nada muda no banco.
+- `src/lib/print-gr.ts`
+  - Linha 437-438 (impressão da GR de um agendamento): trocar a composição atual `${espNome} - ${procNomeBase}` pela nova ordem.
+  - Linha 846-850 (relatório de GRs em lote): aplicar a mesma regra para manter consistência.
 
-## Verificação
-- Criar/recuperar orçamento com N itens de laboratório com `grupo/tipo` diferentes → botão de vincular na Agenda gera **um único** agendamento "LABORATÓRIO (N EXAMES)" e não abre a tela de divisão.
-- Orçamento misto (lab + imagem) continua abrindo a divisão normalmente.
-- Orçamento 100% imagem ou consulta continua abrindo a divisão como hoje.
+### Lógica
+
+```text
+procNomeBase = "CONSULTA (CARDIOLOGIA)"
+espMedico    = "GERIATRIA"
+
+# extrair último "(...)" do procNomeBase
+match trailing /\s*\(([^()]+)\)\s*$/ em procNomeBase
+  → espServico = "CARDIOLOGIA"
+  → procLimpo  = "CONSULTA"
+
+if espServico && espMedico && espServico !== espMedico:
+  saida = `${espServico} - ${procLimpo} (${espMedico})`
+elif espMedico && !procNomeBase.includes(espMedico):
+  saida = `${espMedico} - ${procNomeBase}`   # fallback atual
+else:
+  saida = procNomeBase
+```
+
+### Fora do escopo
+
+- Não muda o cálculo de valores, repasse, ficha, prontuário ou qualquer outro campo — apenas a string que aparece na linha `SERVIÇO`.
+- Não altera o cadastro de procedimentos nem o nome no banco.
+
+### Governança (4 eixos)
+
+- 💰 Financeiro: neutro.
+- ⏱️ Operacional: recepção e médico leem primeiro a especialidade do procedimento (o que o paciente está fazendo hoje), evitando confusão com a especialidade principal do médico.
+- 😊 Experiência: guia mais clara para o paciente — bate com o que ele veio fazer.
+- 🛡️ Segurança/Auditoria: nenhuma mudança em dados persistidos, só formatação de impressão.
