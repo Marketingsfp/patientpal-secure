@@ -2492,11 +2492,60 @@ function Page() {
       <Dialog open={openFechar} onOpenChange={setOpenFechar}>
         <DialogContent>
           <DialogHeader><DialogTitle>Fechar caixa</DialogTitle>
-            <DialogDescription>Saldo calculado: <strong>{fmt(saldoAtual)}</strong></DialogDescription>
+            <DialogDescription>
+              Fechando o dia <strong>{dataFechamento ? new Date(`${dataFechamento}T00:00:00`).toLocaleDateString("pt-BR") : "—"}</strong>
+              {" · "}Saldo calculado do dia: <strong>{fmt(saldoDoDiaFechamento)}</strong>
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={fecharCaixa} className="space-y-3">
+            <div>
+              <Label>Dia a fechar</Label>
+              <Input
+                type="date"
+                value={dataFechamento}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => {
+                  const novo = e.target.value;
+                  setDataFechamento(novo);
+                  // Ao trocar o dia, pré-preenche a conferência com os valores
+                  // esperados daquele dia (o operador ajusta em seguida).
+                  const filtrados = novo
+                    ? minhasMovs.filter((m) => localYMD(m.created_at) === novo)
+                    : minhasMovs;
+                  const pf: Record<string, number> = {};
+                  filtrados.forEach((m) => {
+                    if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
+                    const v = Number(m.valor || 0);
+                    const bucket = normalizarForma(m.forma_pagamento);
+                    if (bucket === "misto") {
+                      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+                      const partes = decomporMistoObs(obs);
+                      let somado = 0;
+                      for (const [k, val] of Object.entries(partes)) {
+                        pf[k] = (pf[k] ?? 0) + (val ?? 0); somado += val ?? 0;
+                      }
+                      const resto = v - somado;
+                      if (Math.abs(resto) > 0.005) pf.outros = (pf.outros ?? 0) + resto;
+                    } else {
+                      pf[bucket] = (pf[bucket] ?? 0) + v;
+                    }
+                  });
+                  const inicial: Record<string, string> = {};
+                  for (const [k, v] of Object.entries(pf)) {
+                    if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
+                  }
+                  if (!inicial.dinheiro) inicial.dinheiro = "0.00";
+                  setConferidoOwn(inicial);
+                  const soma = Object.values(inicial).reduce((a, x) => a + (Number(x) || 0), 0);
+                  setValorInformado(soma.toFixed(2));
+                }}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Só os movimentos deste dia serão considerados no fechamento.
+              </p>
+            </div>
             {minhaSessao && (() => {
-              const porForma = entradasPorFormaSessao(minhaSessao.id);
+              const porForma = porFormaDoDiaFechamento;
               const chaves = Array.from(new Set<string>([
                 ...Object.keys(conferidoOwn),
                 ...Object.keys(porForma).filter((k) => Math.abs(porForma[k] ?? 0) > 0.005),
@@ -2543,18 +2592,6 @@ function Page() {
             <div>
               <Label>Valor conferido em caixa</Label>
               <CurrencyInput value={valorInformado} onChange={setValorInformado} />
-            </div>
-            <div>
-              <Label>Data do fechamento</Label>
-              <Input
-                type="date"
-                value={dataFechamento}
-                max={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => setDataFechamento(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Escolha o dia a que este fechamento se refere. Use uma data anterior se está fechando o caixa de um dia passado.
-              </p>
             </div>
             <div>
               <Label>Observações</Label>
