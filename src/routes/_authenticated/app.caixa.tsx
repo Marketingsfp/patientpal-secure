@@ -2546,13 +2546,8 @@ function Page() {
             </div>
             {minhaSessao && (() => {
               const porForma = porFormaDoDiaFechamento;
-              const chaves = Array.from(new Set<string>([
-                ...Object.keys(conferidoOwn),
-                ...Object.keys(porForma).filter((k) => Math.abs(porForma[k] ?? 0) > 0.005),
-                "dinheiro",
-              ]));
               const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
-              chaves.sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b));
+              const chaves = ordem;
               const totalConferido = Object.values(conferidoOwn)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
@@ -2621,13 +2616,8 @@ function Page() {
           <form onSubmit={fecharSessaoTerceiro} className="space-y-3">
             {openFecharTerceiro && (() => {
               const porForma = entradasPorFormaSessao(openFecharTerceiro.id);
-              const chaves = Array.from(new Set<string>([
-                ...Object.keys(conferidoTerceiro),
-                ...Object.keys(porForma).filter((k) => Math.abs(porForma[k] ?? 0) > 0.005),
-                "dinheiro",
-              ]));
               const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
-              chaves.sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b));
+              const chaves = ordem;
               const totalConferido = Object.values(conferidoTerceiro)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
