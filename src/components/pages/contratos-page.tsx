@@ -1119,6 +1119,34 @@ function NovoContratoForm({
               }
             }}
           />
+          <QuickPatientDialog
+            open={quickCreate !== null}
+            onOpenChange={(v) => { if (!v) setQuickCreate(null); }}
+            clinicaId={clinicaId}
+            nomeInicial={quickCreate?.nome}
+            onCreated={async (p) => {
+              if (!quickCreate) return;
+              const full = await carregarPacienteCompleto(p);
+              if (quickCreate.alvo === "titular") {
+                if (deps.find((d) => d.id === p.id)) {
+                  toast.error("Esse paciente já está como dependente.");
+                  return;
+                }
+                setTitular(full);
+              } else {
+                if (p.id === titular?.id) {
+                  toast.error("Esse paciente já é o titular.");
+                  return;
+                }
+                if (deps.find((d) => d.id === p.id)) {
+                  toast.error("Dependente já adicionado.");
+                  return;
+                }
+                addDep(full);
+              }
+              setQuickCreate(null);
+            }}
+          />
         </CardContent>
       </Card>
     </div>
