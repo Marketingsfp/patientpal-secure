@@ -323,6 +323,18 @@ function Page() {
   const [laudoTarget, setLaudoTarget] = useState<Atend | null>(null);
   const [laudoForm, setLaudoForm] = useState({ medico_laudador_id: "", valor_laudo: "" });
   const [laudoSaving, setLaudoSaving] = useState(false);
+  // Regras de repasse cadastradas para a agenda do atendimento em edição.
+  // Alimenta o dropdown (só laudadores cadastrados) e o auto-preenchimento
+  // do "Valor do laudo" ao trocar o médico.
+  type LaudoRegra = {
+    laudador_medico_id: string;
+    laudador_nome: string;
+    tipo_repasse: "valor" | "percentual";
+    percentual: number | null;
+    valor: number | null;
+  };
+  const [laudoRegras, setLaudoRegras] = useState<LaudoRegra[]>([]);
+  const [laudoSemRegra, setLaudoSemRegra] = useState(false);
 
   // NFS-e
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
@@ -419,13 +431,66 @@ function Page() {
     }
   };
 
-  const openLaudo = (a: Atend) => {
+  const calcularSugestao = (r: LaudoRegra, valorTotal: number): number => {
+    if (r.tipo_repasse === "percentual") {
+      return Number((valorTotal * ((r.percentual ?? 0) / 100)).toFixed(2));
+    }
+    return Number(r.valor ?? 0);
+  };
+
+  const openLaudo = async (a: Atend) => {
     setLaudoTarget(a);
     setLaudoForm({
       medico_laudador_id: a.medico_laudador_id ?? "",
       valor_laudo: a.valor_laudo ? String(a.valor_laudo) : "",
     });
+    setLaudoSemRegra(false);
+    setLaudoRegras([]);
     setLaudoOpen(true);
+    if (!clinicaAtual || !a.medico_id) return;
+    const { data } = await supabase
+      .from("medico_repasse_laudo")
+      .select(
+        "laudador_medico_id, tipo_repasse, percentual, valor, laudador:medicos!medico_repasse_laudo_laudador_medico_id_fkey(nome)",
+      )
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("agenda_medico_id", a.medico_id)
+      .eq("ativo", true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const regras: LaudoRegra[] = ((data as any[]) ?? []).map((r) => ({
+      laudador_medico_id: r.laudador_medico_id,
+      laudador_nome: r.laudador?.nome ?? "?",
+      tipo_repasse: r.tipo_repasse,
+      percentual: r.percentual != null ? Number(r.percentual) : null,
+      valor: r.valor != null ? Number(r.valor) : null,
+    }));
+    regras.sort((x, y) => x.laudador_nome.localeCompare(y.laudador_nome));
+    setLaudoRegras(regras);
+    // Auto-sugerir se já vier laudador escolhido e sem valor.
+    if (a.medico_laudador_id && !a.valor_laudo) {
+      const regra = regras.find((r) => r.laudador_medico_id === a.medico_laudador_id);
+      if (regra) {
+        const sug = calcularSugestao(regra, Number(a.valor_total ?? 0));
+        setLaudoForm((f) => ({ ...f, valor_laudo: sug > 0 ? String(sug) : "" }));
+      }
+    }
+  };
+
+  const onChangeLaudador = (id: string) => {
+    setLaudoForm((f) => ({ ...f, medico_laudador_id: id }));
+    const regra = laudoRegras.find((r) => r.laudador_medico_id === id);
+    if (!regra) {
+      setLaudoSemRegra(true);
+      setLaudoForm((f) => ({ ...f, medico_laudador_id: id, valor_laudo: "" }));
+      return;
+    }
+    setLaudoSemRegra(false);
+    const sug = calcularSugestao(regra, Number(laudoTarget?.valor_total ?? 0));
+    setLaudoForm((f) => ({
+      ...f,
+      medico_laudador_id: id,
+      valor_laudo: sug > 0 ? String(sug) : "",
+    }));
   };
 
   const emitirLaudo = async () => {
@@ -2440,19 +2505,27 @@ function Page() {
               <Label>Médico laudador</Label>
               <Select
                 value={laudoForm.medico_laudador_id || undefined}
-                onValueChange={(v) => setLaudoForm({ ...laudoForm, medico_laudador_id: v })}
+                onValueChange={onChangeLaudador}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o médico..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {medicos.map((m) => (
+                  {(laudoRegras.length > 0
+                    ? laudoRegras.map((r) => ({ id: r.laudador_medico_id, nome: r.laudador_nome }))
+                    : medicos
+                  ).map((m) => (
                     <SelectItem key={m.id} value={m.id}>
                       {m.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {laudoRegras.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Nenhum laudador cadastrado na aba Repasse desta agenda — informe o valor manualmente.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Valor do laudo (R$)</Label>
@@ -2460,6 +2533,11 @@ function Page() {
                 value={laudoForm.valor_laudo}
                 onChange={(v) => setLaudoForm({ ...laudoForm, valor_laudo: v })}
               />
+              {laudoSemRegra && (
+                <p className="text-xs text-muted-foreground">
+                  Sem regra cadastrada para este laudador — informe o valor manualmente.
+                </p>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">
               Ao confirmar, o sistema gera automaticamente um lançamento de repasse para o laudador no valor informado.
