@@ -2762,7 +2762,7 @@ function Page() {
       <Dialog open={laudoOpen} onOpenChange={setLaudoOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Marcar laudo emitido</DialogTitle>
+            <DialogTitle>Vincular laudo</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             {laudoTarget && (
