@@ -310,6 +310,11 @@ function PainelExecutivoPage() {
   const [carregando, setCarregando] = useState(false);
   const [atual, setAtual] = useState<Bloco>(emptyBloco());
   const [anterior, setAnterior] = useState<Bloco>(emptyBloco());
+  const [estornoFiltro, setEstornoFiltro] = useState<
+    | { tipo: "medico"; medicoId: string; label: string }
+    | { tipo: "procedimento"; procedimento: string; label: string }
+    | null
+  >(null);
 
   const periodoAnterior = useMemo<Periodo>(() => {
     const ms = new Date(`${periodo.ate}T00:00:00`).getTime() - new Date(`${periodo.de}T00:00:00`).getTime();
@@ -422,7 +427,15 @@ function PainelExecutivoPage() {
           </HhpKpiRow>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <RankCard title="Receita por médico" rows={f.porMedico.map(m => ({ nome: m.nome, valor: money(m.valor) }))} />
+            <RankCard
+              title="Receita por médico"
+              rows={f.porMedico.map(m => ({
+                nome: m.nome,
+                valor: money(m.valor),
+                actionLabel: "Estornar",
+                onAction: () => setEstornoFiltro({ tipo: "medico", medicoId: m.medicoId, label: m.nome }),
+              }))}
+            />
             <Card>
               <CardHeader className="pb-3"><CardTitle className="text-sm">Procedimentos mais lucrativos</CardTitle></CardHeader>
               <CardContent>
@@ -433,11 +446,12 @@ function PainelExecutivoPage() {
                       <TableHead className="text-right">Receita</TableHead>
                       <TableHead className="text-right">Custo</TableHead>
                       <TableHead className="text-right">Margem</TableHead>
+                      <TableHead className="w-[1%]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {f.porProcedimento.length === 0 && (
-                      <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground text-sm py-6">Sem dados no período.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground text-sm py-6">Sem dados no período.</TableCell></TableRow>
                     )}
                     {f.porProcedimento.map(pr => (
                       <TableRow key={pr.nome}>
@@ -445,6 +459,16 @@ function PainelExecutivoPage() {
                         <TableCell className="text-right tabular-nums">{money(pr.receita)}</TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">{money(pr.custo)}</TableCell>
                         <TableCell className="text-right tabular-nums font-semibold">{money(pr.margem)}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+                            onClick={() => setEstornoFiltro({ tipo: "procedimento", procedimento: pr.nome, label: pr.nome })}
+                          >
+                            <Undo2 className="h-3 w-3 mr-1" /> Estornar
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -488,6 +512,16 @@ function PainelExecutivoPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {podeFin && clinicaAtual && estornoFiltro && (
+        <EstornoDrawer
+          clinicaId={clinicaAtual.clinica_id}
+          periodo={periodo}
+          filtro={estornoFiltro}
+          onClose={() => setEstornoFiltro(null)}
+          onDone={() => { setEstornoFiltro(null); void load(); }}
+        />
+      )}
     </div>
   );
 }
