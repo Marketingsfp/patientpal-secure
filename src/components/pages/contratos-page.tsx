@@ -1210,7 +1210,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   }, [contrato.id]);
 
   // ---- Edição avançada (ADM) ----
-  const isAdmin = clinicaAtual?.role === "admin";
+  const isAdmin = clinicaAtual?.role === "admin" || clinicaAtual?.role === "caixa";
   const [conveniosAdm, setConveniosAdm] = useState<Array<{ id: string; nome: string }>>([]);
   const [admConvenioId, setAdmConvenioId] = useState<string>(contrato.convenio_id ?? "");
   const [admPaciente, setAdmPaciente] = useState<PatientOption | null>(null);
