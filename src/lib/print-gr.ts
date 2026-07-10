@@ -437,29 +437,26 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
   const procNome = espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
 
-  // Ficha = POSIÇÃO da linha na agenda do dia (mesma regra da lista da agenda —
-  // app.agenda.tsx > fichaPorId): conta TODOS os slots por dia/PROFISSIONAL na
-  // ordem do horário, inclusive livres. Agrupa por médico (não por agenda_id)
-  // porque um mesmo profissional pode ter vários agenda_id no mesmo dia — agrupar
-  // por agenda_id duplicava números (ex.: duas linhas "001" no mesmo dia). O
-  // chamador (a agenda) passa o número já calculado em `fichaNumero` — assim a
-  // guia bate EXATAMENTE com a lista. Sem ele, recalcula aqui como fallback.
+  // Ficha = POSIÇÃO da linha na fila geral da CLÍNICA no dia (mesma regra da
+  // lista da agenda — app.agenda.tsx > fichaPorId): conta TODOS os agendamentos
+  // da clínica no dia, de TODOS os profissionais, na ordem do horário, como uma
+  // senha única (não particiona por médico nem por agenda). O chamador (a
+  // agenda) passa o número já calculado em `fichaNumero` — assim a guia bate
+  // EXATAMENTE com a lista. Sem ele, recalcula aqui como fallback.
   const inicioDt = new Date(a.inicio);
   const diaIni = new Date(inicioDt); diaIni.setHours(0, 0, 0, 0);
   const diaFim = new Date(inicioDt); diaFim.setHours(23, 59, 59, 999);
   let fichaNum = typeof fichaNumero === "number" && fichaNumero > 0 ? fichaNumero : 0;
   if (fichaNum === 0) {
     try {
-      let qFicha = supabase
+      const { data: lista } = await supabase
         .from("agendamentos")
         .select("id, inicio")
+        .eq("clinica_id", clinicaId)
         .gte("inicio", diaIni.toISOString())
         .lte("inicio", diaFim.toISOString())
         .order("inicio", { ascending: true })
         .order("id", { ascending: true });
-      if (medicoIdEfetivo) qFicha = qFicha.eq("medico_id", medicoIdEfetivo);
-      else if (a.agenda_id) qFicha = qFicha.eq("agenda_id", a.agenda_id);
-      const { data: lista } = await qFicha;
       const idx = (lista ?? []).findIndex((r: any) => r.id === a.id);
       fichaNum = idx >= 0 ? idx + 1 : 0;
     } catch { fichaNum = 0; }
@@ -920,25 +917,22 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     grupos.set(key, g);
   }
 
-  // Calcula a ficha (posição no dia) para cada grupo
+  // Calcula a ficha (posição na fila geral da clínica no dia) para cada grupo —
+  // mesma regra de app.agenda.tsx > fichaPorId e da GR individual: senha única
+  // por dia/clínica, sem particionar por médico nem por agenda.
   const fichaByGrupo = new Map<string, number>();
   await Promise.all(Array.from(grupos.entries()).map(async ([key, g]) => {
     try {
       const dt = new Date(g.inicioRef);
       const ini = new Date(dt); ini.setHours(0,0,0,0);
       const fim = new Date(dt); fim.setHours(23,59,59,999);
-      let q = supabase.from("agendamentos")
-        .select("id, paciente_id, paciente_nome, inicio")
+      const { data } = await supabase.from("agendamentos")
+        .select("id, inicio")
+        .eq("clinica_id", clinicaId)
         .gte("inicio", ini.toISOString())
         .lte("inicio", fim.toISOString())
         .order("inicio", { ascending: true })
         .order("id", { ascending: true });
-      // Agrupa por profissional (medico_id), nao por agenda_id: mesma regra da
-      // lista da agenda e da GR individual. Um mesmo profissional pode ter
-      // varios agenda_id no mesmo dia, e agrupar por agenda_id duplicava numeros.
-      if (g.medicoId) q = q.eq("medico_id", g.medicoId);
-      else if (g.agendaId) q = q.eq("agenda_id", g.agendaId);
-      const { data } = await q;
       const idx = (data ?? []).findIndex((r: any) => r.id === g.agIdRef);
       fichaByGrupo.set(key, idx >= 0 ? idx + 1 : 0);
     } catch { fichaByGrupo.set(key, 0); }
