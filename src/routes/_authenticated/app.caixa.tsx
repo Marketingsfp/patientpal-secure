@@ -515,12 +515,16 @@ function Page() {
       // Enriquecer com nome do serviço e médico
       const lancIds = Array.from(new Set(movsList.map((m) => m.lancamento_id).filter((x): x is string => !!x)));
       const enrich = new Map<string, { servico: string | null; medico: string | null }>();
+      const cancelados = new Set<string>();
       if (lancIds.length > 0) {
         const { data: lancs } = await supabase
           .from("fin_lancamentos")
-          .select("id, medico_id, agendamento_id, descricao")
+          .select("id, medico_id, agendamento_id, descricao, status")
           .in("id", lancIds);
-        const lancRows = (lancs ?? []) as Array<{ id: string; medico_id: string | null; agendamento_id: string | null; descricao: string | null }>;
+        const lancRows = (lancs ?? []) as Array<{ id: string; medico_id: string | null; agendamento_id: string | null; descricao: string | null; status: string | null }>;
+        for (const l of lancRows) {
+          if (l.status === "cancelado") cancelados.add(l.id);
+        }
         const medIds = Array.from(new Set(lancRows.map((l) => l.medico_id).filter((x): x is string => !!x)));
         const agIds = Array.from(new Set(lancRows.map((l) => l.agendamento_id).filter((x): x is string => !!x)));
         const [medRes, agRes] = await Promise.all([
@@ -568,6 +572,7 @@ function Page() {
         }
       }
       setEnrichPorLanc(enrich);
+      setLancsCancelados(cancelados);
     } else {
       // Sem sessão aberta: mostrar movimentos das sessões recentes do próprio usuário
       // (assim mensalidades pagas numa sessão já encerrada continuam visíveis
@@ -586,6 +591,7 @@ function Page() {
         setMinhasMovs([]);
       }
       setEnrichPorLanc(new Map());
+      setLancsCancelados(new Set());
     }
 
     setMinhasSessoes((histRes.data ?? []) as Sessao[]);
