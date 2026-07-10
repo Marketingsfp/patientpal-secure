@@ -48,6 +48,7 @@ import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
+import { usePickTomador } from "@/components/nfse/use-pick-tomador";
 import { useAuth } from "@/hooks/use-auth";
 import {
   getProcedimentosAgenda,
@@ -584,6 +585,7 @@ function AgendaPage() {
   const bordaClinica = { borderColor: corClinica, borderWidth: 2 } as const;
   const { user } = useAuth();
   const { pick: pickEmitenteNfse, dialog: emitenteNfseDialog } = usePickEmitente();
+  const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
   const [dataRef, setDataRef] = useState(() => {
     const d = new Date();
     // se hoje for sáb/dom, avança para o próximo dia útil (funcionamento)
@@ -3231,13 +3233,8 @@ function AgendaPage() {
         return;
       }
       const valor = pagoInfoMap.get(a.id)?.valor ?? 0;
-      const res = await emitirNfseFn({ data: {
-        emitenteId: emitenteIdEscolhido,
-        pacienteId: pac.id,
-        agendamentoId: a.id,
-        valorServicos: Number(valor) || 0,
-        descricaoServicos: a.procedimento || "Serviços prestados",
-        tomador: {
+      const tomador = await pickTomadorNfse({
+        paciente: {
           nome: pac.nome,
           cpfCnpj: pac.cpf ?? undefined,
           email: pac.email ?? undefined,
@@ -3248,6 +3245,15 @@ function AgendaPage() {
           municipio: pac.cidade ?? undefined,
           uf: pac.estado ?? undefined,
         },
+      });
+      if (!tomador) { toast.error("Emissão cancelada."); return; }
+      const res = await emitirNfseFn({ data: {
+        emitenteId: emitenteIdEscolhido,
+        pacienteId: pac.id,
+        agendamentoId: a.id,
+        valorServicos: Number(valor) || 0,
+        descricaoServicos: a.procedimento || "Serviços prestados",
+        tomador,
       } });
       const nfseId = (res as { id?: string })?.id;
       if (nfseId) {
@@ -3397,6 +3403,7 @@ function AgendaPage() {
   return (
     <div className="space-y-3">
       {emitenteNfseDialog}
+      {tomadorNfseDialog}
       {reagendandoAg && (
         <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
           <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -4262,13 +4269,8 @@ function AgendaPage() {
                   if (!pac) {
                     toast.error("Paciente não encontrado para emissão da NFS-e.");
                   } else {
-                    const res = await emitirNfseFn({ data: {
-                      emitenteId: emitenteIdEscolhido,
-                      pacienteId: pac.id,
-                      agendamentoId: agId,
-                      valorServicos: Number(dados.valor) || 0,
-                      descricaoServicos: ag.procedimento || pagamentoDesc || "Serviços prestados",
-                      tomador: {
+                    const tomador = await pickTomadorNfse({
+                      paciente: {
                         nome: pac.nome,
                         cpfCnpj: pac.cpf ?? undefined,
                         email: pac.email ?? undefined,
@@ -4279,6 +4281,15 @@ function AgendaPage() {
                         municipio: pac.cidade ?? undefined,
                         uf: pac.estado ?? undefined,
                       },
+                    });
+                    if (!tomador) { toast.error("Emissão cancelada."); return; }
+                    const res = await emitirNfseFn({ data: {
+                      emitenteId: emitenteIdEscolhido,
+                      pacienteId: pac.id,
+                      agendamentoId: agId,
+                      valorServicos: Number(dados.valor) || 0,
+                      descricaoServicos: ag.procedimento || pagamentoDesc || "Serviços prestados",
+                      tomador,
                     } });
                     const nfseId = (res as { id?: string })?.id;
                     if (nfseId) {
