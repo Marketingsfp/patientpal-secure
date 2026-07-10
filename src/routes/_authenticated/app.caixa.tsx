@@ -1320,12 +1320,16 @@ function Page() {
     const breakdownStr = Object.entries(conferidoNum)
       .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k}: ${fmt(v)}`)
       .join("; ");
+    const hoje = new Date().toISOString().slice(0, 10);
+    const fechadoEmISO = dataFechamentoTerceiro && dataFechamentoTerceiro !== hoje
+      ? new Date(`${dataFechamentoTerceiro}T23:59:59`).toISOString()
+      : new Date().toISOString();
     setSaving(true);
     const { error } = await supabase
       .from("caixa_sessoes")
       .update({
         status: "fechado",
-        fechado_em: new Date().toISOString(),
+        fechado_em: fechadoEmISO,
         valor_fechamento_informado: informado,
         valor_fechamento_calculado: calc,
         diferenca: diff,
@@ -1341,6 +1345,7 @@ function Page() {
         user_id: user.id,
         tipo: "fechamento",
         valor: informado,
+        created_at: fechadoEmISO,
         descricao: `Fechamento pelo gestor. Operador original: ${alvo.user_nome || alvo.user_id.slice(0, 8)} | Calculado: ${fmt(calc)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}${breakdownStr ? " | " + breakdownStr : ""}`,
       });
     }
@@ -1350,6 +1355,7 @@ function Page() {
     setInformadoTerceiro("");
     setObsTerceiro("");
     setConferidoTerceiro({});
+    setDataFechamentoTerceiro(new Date().toISOString().slice(0, 10));
     toast.success(`Caixa de ${alvo.user_nome || "operador"} fechado`);
     printComprovanteCaixa({
       tipo: "fechamento",
