@@ -2795,6 +2795,14 @@ function Page() {
               .comprovante-bloco table, .comprovante-bloco thead, .comprovante-bloco tbody, .comprovante-bloco tr, .comprovante-bloco td, .comprovante-bloco th { page-break-inside: auto; break-inside: auto; }
               .comprovante-bloco tr { page-break-inside: avoid; break-inside: avoid; }
             }
+            @media print {
+              body.print-resumo-only .print-area .comprovante-bloco > *:not(.comprovante-resumo) {
+                display: none !important;
+              }
+              body.print-resumo-only .print-area .comprovante-resumo {
+                margin-top: 0 !important;
+              }
+            }
           `}</style>
         </DialogContent>
       </Dialog>
