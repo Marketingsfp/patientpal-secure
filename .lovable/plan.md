@@ -1,34 +1,24 @@
-Em **Caixa → Meu caixa → Movimentos**, adicionar filtros por médico e paciente e trocar o "Período" por um seletor com calendário (data inicial/final).
+## Problema
 
-## O que muda na UI
+Hoje, no botão azul de nota fiscal na Agenda:
+- **Caixa** vê `nfse: "read"` no preset → não consegue emitir.
+- **Recepção** não tem `nfse` no preset → sem acesso ao módulo.
 
-Barra de filtros acima da tabela de movimentos (uma linha, com wrap em telas menores):
+Como o botão da agenda usa o mesmo módulo `nfse`, os dois perfis não conseguem emitir a NFS-e diretamente pelo botão.
 
-```text
-[ Período ▾  01/07/2026 → 10/07/2026 ]   [ Médico ▾ ]   [ Paciente 🔍 ______ ]   [ Limpar ]
-```
+## Correção
 
-- **Período** — botão que abre um `Popover` com um `Calendar` de intervalo (react-day-picker `mode="range"`), já usado em `src/components/date-range-filter.tsx`. Presets rápidos ao lado: Hoje, Última semana, Última quinzena, Último mês, Todos. Fim das opções "Intervalo personalizado" separado — o intervalo agora é o próprio botão.
-- **Médico** — `Select` com a lista distinta de médicos presentes nos movimentos carregados ("Todos" + nomes de `enrichPorLanc`).
-- **Paciente** — `Input` de busca livre; casa com o nome extraído da descrição (o padrão é `"NOME PACIENTE — SERVICO"`), case-insensitive.
-- **Limpar** — aparece quando algum filtro está ativo; volta a Hoje / Todos / vazio.
+Ajustar apenas o preset de perfis em `src/lib/permissoes-presets.ts`:
 
-Comportamento:
-- Filtros são combinados (AND). Contador "N de M movimentos" ao lado do título quando há filtro ativo.
-- Vazio filtrado: mensagem "Nenhum movimento corresponde aos filtros" com botão "Limpar filtros".
-- Para não-gestor (visão "Movimentos de hoje") os filtros de médico e paciente também aparecem, mas o período permanece fixo em "Hoje" (regra atual mantida).
+- `caixa`: mudar `nfse: "read"` → `nfse: "write"`.
+- `recepcao`: adicionar `nfse: "write"`.
 
-## Onde mudar
+Nada mais é alterado:
+- RLS da tabela `nfse` já libera INSERT/UPDATE para qualquer membro da clínica (`is_member`), então não precisa mexer em migrations.
+- O botão "Emitir nota fiscal" na Agenda continua igual — ele já aparece para quem enxerga a agenda; a mudança no preset só garante que caixa e recepção continuem enxergando o módulo `nfse` como "write" e não fiquem restringidos pelo menu/rotas.
+- A regra de negócio dos CNPJs alvo (consulta → Casa de Saúde, exame → MA Imagens) permanece inalterada no server function.
 
-Arquivo único: `src/routes/_authenticated/app.caixa.tsx`
+## Impacto
 
-1. Estender o estado do filtro (`meuPeriodo`, `meuDataIni`, `meuDataFim`) com `meuMedico: string` e `meuPaciente: string`.
-2. Ajustar `minhasMovsFiltrados` (useMemo) para aplicar médico (via `enrichPorLanc.get(lancamento_id)?.medico`) e paciente (extraído de `m.descricao` antes do `—`).
-3. Substituir o bloco atual do "Período" (linhas 1362–1402) pelo novo trio de controles usando `Popover` + `Calendar` do design system. Manter os presets como pequenos botões dentro do popover.
-4. Derivar `medicosDisponiveis` (Set ordenado a partir de `enrichPorLanc`) para popular o Select.
-
-## Fora de escopo
-
-- Nenhuma mudança na aba "Todos (Financeiro)" ou "Repasse médico" — só "Meu caixa → Movimentos".
-- Sem alteração de schema, RLS ou queries — filtragem 100% client-side sobre o que já é carregado.
-- Sem novo componente compartilhado; se `date-range-filter.tsx` servir direto, reutilizo; senão faço inline com `Popover + Calendar` já existentes no projeto.
+- Caixa e recepção passam a poder clicar no botão e concluir a emissão da NFS-e a partir da Agenda, além de acessar `/app/nfse` para acompanhar.
+- Sem alterações em RLS, migrations ou lógica de emissão.
