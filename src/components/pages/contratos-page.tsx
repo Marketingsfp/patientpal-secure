@@ -1658,25 +1658,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setAdmFaixaId(match?.id ?? "");
   }, [faixas, valorMensalAtual]);
 
-  // Carrega lista de pacientes da clínica do contrato ao abrir o diálogo
-  useEffect(() => {
-    if (!incOpen) return;
-    let cancelled = false;
-    (async () => {
-      setIncLoadingPac(true);
-      const { data } = await supabase
-        .from("pacientes")
-        .select("id, nome, cpf, telefone, data_nascimento, clinica_id")
-        .eq("clinica_id", (contrato as any).clinica_id)
-        .order("nome");
-      if (cancelled) return;
-      setIncPacientes((data ?? []) as PatientOption[]);
-      setIncLoadingPac(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [incOpen, contrato]);
+  // Busca de pacientes agora é feita sob demanda pelo PatientSearchInput.
 
   const marcarPago = async (id: string, paga: boolean, forma?: string | null) => {
     const patch = paga
