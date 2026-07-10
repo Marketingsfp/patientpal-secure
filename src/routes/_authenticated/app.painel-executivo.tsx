@@ -3,15 +3,21 @@ import { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays, CheckCircle2, UserCheck, UserX, Ban, Percent, Clock, Timer,
   Stethoscope, Building2, Wallet, TrendingUp, Receipt, BadgeDollarSign,
-  Users, UserPlus, Repeat, Handshake, AlertTriangle, Activity, RefreshCw,
+  Users, UserPlus, Repeat, Handshake, AlertTriangle, Activity, RefreshCw, Undo2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { logAction } from "@/hooks/use-crud";
+import { mostrarErro } from "@/lib/traduzir-erro";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { HhpKpiCard, HhpKpiRow } from "@/design-system/hhp/kpi-card";
 import type { HhpTone } from "@/design-system/hhp/tokens";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -43,7 +49,7 @@ type Bloco = {
   financeiro: {
     receitaPrevista: number; receitaRealizada: number; ticketMedio: number;
     despesaPrevista: number; despesaRealizada: number; resultado: number;
-    porMedico: { nome: string; valor: number }[];
+    porMedico: { nome: string; valor: number; medicoId: string }[];
     porProcedimento: { nome: string; receita: number; custo: number; margem: number }[];
     receitaParticular: number; receitaConvenio: number;
   };
@@ -200,7 +206,7 @@ async function carregarBloco(cid: string, periodo: Periodo): Promise<Bloco & { p
     finPorMedicoMap.set(a.medico_id, (finPorMedicoMap.get(a.medico_id) ?? 0) + Number(a.valor_total || 0));
   }
   const finPorMedico = [...finPorMedicoMap.entries()]
-    .map(([id, valor]) => ({ nome: medNome.get(id) ?? "—", valor }))
+    .map(([id, valor]) => ({ nome: medNome.get(id) ?? "—", valor, medicoId: id }))
     .sort((a, b) => b.valor - a.valor).slice(0, 12);
 
   const procMap = new Map<string, { receita: number; custo: number }>();
