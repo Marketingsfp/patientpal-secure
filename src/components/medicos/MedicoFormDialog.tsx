@@ -697,6 +697,28 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         if (e3) { setSaving(false); mostrarErro(e3); return; }
       }
     }
+    // Laudo terceiro — replace-all
+    if (medicoId) {
+      await supabase.from("medico_repasse_laudo").delete().eq("agenda_medico_id", medicoId);
+      const laudoRows = laudadores
+        .filter((l) => l.laudador_medico_id && (
+          (l.tipo_repasse === "percentual" && l.percentual.trim() !== "" && Number(l.percentual) > 0) ||
+          (l.tipo_repasse === "valor" && l.valor.trim() !== "" && Number(l.valor) > 0)
+        ))
+        .map((l) => ({
+          clinica_id: activeClinicaId,
+          agenda_medico_id: medicoId!,
+          laudador_medico_id: l.laudador_medico_id,
+          tipo_repasse: l.tipo_repasse,
+          percentual: l.tipo_repasse === "percentual" ? Number(l.percentual) : null,
+          valor: l.tipo_repasse === "valor" ? Number(l.valor) : null,
+          ativo: true,
+        }));
+      if (laudoRows.length) {
+        const { error: eLaudo } = await supabase.from("medico_repasse_laudo").insert(laudoRows);
+        if (eLaudo) { setSaving(false); mostrarErro(eLaudo); return; }
+      }
+    }
     toast.success(editId ? "Médico atualizado!" : "Médico cadastrado!");
 
     // Auto-create paciente on new medico
