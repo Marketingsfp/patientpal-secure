@@ -1207,8 +1207,9 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setEditDia(String(contrato.dia_vencimento ?? 10));
   }, [contrato.id]);
 
-  // ---- Edição avançada (ADM) ----
-  const isAdmin = clinicaAtual?.role === "admin" || clinicaAtual?.role === "caixa";
+  // ---- Edição avançada ----
+  // Liberado para todos os perfis: qualquer usuário com acesso ao contrato pode editar seus dados.
+  const isAdmin = true;
   const [conveniosAdm, setConveniosAdm] = useState<Array<{ id: string; nome: string }>>([]);
   const [admConvenioId, setAdmConvenioId] = useState<string>(contrato.convenio_id ?? "");
   const [admPaciente, setAdmPaciente] = useState<PatientOption | null>(null);
