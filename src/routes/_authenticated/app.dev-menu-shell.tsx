@@ -4,11 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { MenuV2 } from "@/components/menu-v2/menu-v2";
 import { useMenuV2Flag, useMenuPrefs } from "@/hooks/use-menu-prefs";
@@ -44,9 +40,7 @@ function DevMenuShell() {
           <div className="border rounded-lg p-4 space-y-4 bg-card">
             <div className="flex items-center justify-between">
               <div>
-                <Label className="text-base">
-                  Feature flag <code className="text-xs bg-muted px-1 rounded">menu_v2</code>
-                </Label>
+                <Label className="text-base">Feature flag <code className="text-xs bg-muted px-1 rounded">menu_v2</code></Label>
                 <p className="text-xs text-muted-foreground mt-1">
                   Persistida em <code>profiles.preferencias_ui.flags.menu_v2</code>.
                 </p>
@@ -67,9 +61,7 @@ function DevMenuShell() {
                 </p>
               </div>
               <Select value={perfil} onValueChange={(v) => setPerfil(v as PerfilKey)}>
-                <SelectTrigger className="w-48">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="recepcao">Recepção</SelectItem>
                   <SelectItem value="medico">Médico</SelectItem>
@@ -85,25 +77,13 @@ function DevMenuShell() {
           <div className="border rounded-lg p-4 space-y-3 bg-card">
             <h2 className="font-semibold">Testes rápidos</h2>
             <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => pushRecent({ path: "/app/agenda", label: "Agenda" })}
-              >
+              <Button size="sm" variant="outline" onClick={() => pushRecent({ path: "/app/agenda", label: "Agenda" })}>
                 Simular visita: Agenda
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => pushRecent({ path: "/app/caixa", label: "Caixa" })}
-              >
+              <Button size="sm" variant="outline" onClick={() => pushRecent({ path: "/app/caixa", label: "Caixa" })}>
                 Simular visita: Caixa
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => pushRecent({ path: "/app/clientes", label: "Clientes" })}
-              >
+              <Button size="sm" variant="outline" onClick={() => pushRecent({ path: "/app/clientes", label: "Clientes" })}>
                 Simular visita: Clientes
               </Button>
             </div>
@@ -115,20 +95,10 @@ function DevMenuShell() {
           <div className="border rounded-lg p-4 space-y-2 bg-card text-sm">
             <h2 className="font-semibold">Status</h2>
             <ul className="text-muted-foreground space-y-1">
-              <li>
-                • Flag <code>menu_v2</code>: <b>{enabled ? "ligada" : "desligada"}</b>
-              </li>
-              <li>
-                • Perfil simulado: <b>{perfil}</b>
-              </li>
-              <li>
-                • Nomenclatura: apenas Cartão de Benefícios / Associados / Empresas Associadas — sem
-                "Convênio".
-              </li>
-              <li>
-                • Menu de produção: <b>intocado</b> (renderizado apenas nesta rota quando a flag
-                está on).
-              </li>
+              <li>• Flag <code>menu_v2</code>: <b>{enabled ? "ligada" : "desligada"}</b></li>
+              <li>• Perfil simulado: <b>{perfil}</b></li>
+              <li>• Nomenclatura: apenas Cartão de Benefícios / Associados / Empresas Associadas — sem "Convênio".</li>
+              <li>• Menu de produção: <b>intocado</b> (renderizado apenas nesta rota quando a flag está on).</li>
             </ul>
           </div>
         </div>

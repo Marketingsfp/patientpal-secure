@@ -18,8 +18,7 @@ interface Check {
 }
 
 function StatusIcon({ status }: { status: Status }) {
-  if (status === "pending")
-    return <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />;
+  if (status === "pending") return <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />;
   if (status === "ok") return <CheckCircle2 className="h-5 w-5 text-green-600" />;
   if (status === "warn") return <AlertTriangle className="h-5 w-5 text-yellow-600" />;
   return <XCircle className="h-5 w-5 text-destructive" />;
@@ -27,11 +26,7 @@ function StatusIcon({ status }: { status: Status }) {
 
 function DiagnosticoPage() {
   const [checks, setChecks] = useState<Record<string, Check>>({
-    frontend: {
-      label: "Frontend (React + TanStack Router)",
-      status: "ok",
-      detail: "Página renderizada com sucesso.",
-    },
+    frontend: { label: "Frontend (React + TanStack Router)", status: "ok", detail: "Página renderizada com sucesso." },
     env: { label: "Variáveis de ambiente (Supabase URL/Key)", status: "pending" },
     session: { label: "Sessão Supabase Auth (getSession)", status: "pending" },
     user: { label: "Usuário autenticado (getUser)", status: "pending" },
@@ -57,10 +52,7 @@ function DiagnosticoPage() {
     if (url && key) {
       update("env", { status: "ok", detail: `URL: ${url}` });
     } else {
-      update("env", {
-        status: "error",
-        detail: "VITE_SUPABASE_URL ou VITE_SUPABASE_PUBLISHABLE_KEY ausente.",
-      });
+      update("env", { status: "error", detail: "VITE_SUPABASE_URL ou VITE_SUPABASE_PUBLISHABLE_KEY ausente." });
       return;
     }
 
@@ -73,10 +65,7 @@ function DiagnosticoPage() {
       } else if (!data.session) {
         update("session", { status: "warn", detail: "Nenhuma sessão ativa (usuário não logado)." });
       } else {
-        update("session", {
-          status: "ok",
-          detail: `Token válido. Expira em ${new Date((data.session.expires_at ?? 0) * 1000).toLocaleString()}`,
-        });
+        update("session", { status: "ok", detail: `Token válido. Expira em ${new Date((data.session.expires_at ?? 0) * 1000).toLocaleString()}` });
       }
     } catch (e) {
       update("session", { status: "error", detail: (e as Error).message });
@@ -91,10 +80,7 @@ function DiagnosticoPage() {
         update("user", { status: "warn", detail: "Sem usuário autenticado." });
       } else {
         userId = data.user.id;
-        update("user", {
-          status: "ok",
-          detail: `${data.user.email} (id: ${data.user.id.slice(0, 8)}…)`,
-        });
+        update("user", { status: "ok", detail: `${data.user.email} (id: ${data.user.id.slice(0, 8)}…)` });
       }
     } catch (e) {
       update("user", { status: "error", detail: (e as Error).message });
@@ -158,9 +144,7 @@ function DiagnosticoPage() {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-foreground">{c.label}</div>
                   {c.detail && (
-                    <div className="text-sm text-muted-foreground mt-0.5 break-words">
-                      {c.detail}
-                    </div>
+                    <div className="text-sm text-muted-foreground mt-0.5 break-words">{c.detail}</div>
                   )}
                 </div>
               </div>

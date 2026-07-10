@@ -15,13 +15,11 @@ async function assertManager(userId: string, clinicaId: string) {
 export const salvarVinculosAgendas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z
-      .object({
-        clinicaId: z.string().uuid(),
-        userId: z.string().uuid(),
-        recursoIds: z.array(z.string().uuid()).max(200),
-      })
-      .parse(input),
+    z.object({
+      clinicaId: z.string().uuid(),
+      userId: z.string().uuid(),
+      recursoIds: z.array(z.string().uuid()).max(200),
+    }).parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
@@ -65,12 +63,10 @@ export const salvarVinculosAgendas = createServerFn({ method: "POST" })
 export const listarVinculosAgendas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z
-      .object({
-        clinicaId: z.string().uuid(),
-        userId: z.string().uuid(),
-      })
-      .parse(input),
+    z.object({
+      clinicaId: z.string().uuid(),
+      userId: z.string().uuid(),
+    }).parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);

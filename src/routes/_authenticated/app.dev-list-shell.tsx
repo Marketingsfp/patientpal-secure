@@ -38,21 +38,9 @@ interface DemoRow {
 }
 
 const NOMES = [
-  "Ana Souza",
-  "Bruno Lima",
-  "Carla Dias",
-  "Diego Alves",
-  "Elis Rocha",
-  "Fábio Nunes",
-  "Gabi Prado",
-  "Hugo Ramos",
-  "Iris Melo",
-  "João Pires",
-  "Kátia Fonseca",
-  "Léo Barros",
-  "Marta Silva",
-  "Nina Costa",
-  "Otávio Reis",
+  "Ana Souza", "Bruno Lima", "Carla Dias", "Diego Alves", "Elis Rocha",
+  "Fábio Nunes", "Gabi Prado", "Hugo Ramos", "Iris Melo", "João Pires",
+  "Kátia Fonseca", "Léo Barros", "Marta Silva", "Nina Costa", "Otávio Reis",
 ];
 
 function seedRows(n: number): DemoRow[] {
@@ -93,9 +81,7 @@ function DevListShellPreview() {
   );
   const searcher = useUniversalSearcher({
     clinicaIds,
-    navigate: (to) => {
-      void navigate({ to: to as never });
-    },
+    navigate: (to) => { void navigate({ to: to as never }); },
   });
 
   const filtered = useMemo(() => {
@@ -114,26 +100,10 @@ function DevListShellPreview() {
 
   const tabs: StatusTab<Status>[] = [
     { value: "todos", label: "Todos", count: ALL_ROWS.length },
-    {
-      value: "aberto",
-      label: "Abertos",
-      count: ALL_ROWS.filter((r) => r.status === "aberto").length,
-    },
-    {
-      value: "pendente",
-      label: "Pendentes",
-      count: ALL_ROWS.filter((r) => r.status === "pendente").length,
-    },
-    {
-      value: "concluido",
-      label: "Concluídos",
-      count: ALL_ROWS.filter((r) => r.status === "concluido").length,
-    },
-    {
-      value: "cancelado",
-      label: "Cancelados",
-      count: ALL_ROWS.filter((r) => r.status === "cancelado").length,
-    },
+    { value: "aberto", label: "Abertos", count: ALL_ROWS.filter((r) => r.status === "aberto").length },
+    { value: "pendente", label: "Pendentes", count: ALL_ROWS.filter((r) => r.status === "pendente").length },
+    { value: "concluido", label: "Concluídos", count: ALL_ROWS.filter((r) => r.status === "concluido").length },
+    { value: "cancelado", label: "Cancelados", count: ALL_ROWS.filter((r) => r.status === "cancelado").length },
   ];
 
   const chipOptions: QuickFilterOption<ChipKey>[] = [
@@ -156,11 +126,9 @@ function DevListShellPreview() {
   return (
     <div className="h-[calc(100vh-4rem)] p-4 flex flex-col gap-3">
       <div className="text-xs text-muted-foreground border border-dashed rounded-md p-2">
-        <strong>Preview A1 — List Shell (não é tela de produção).</strong> Componentes:{" "}
-        <code>ListShell</code>, <code>VirtualList</code>, <code>QuickFilters</code>,{" "}
-        <code>CommandPalette</code>. Pressione{" "}
-        <kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Ctrl/⌘+K</kbd> para abrir a Busca
-        Universal.
+        <strong>Preview A1 — List Shell (não é tela de produção).</strong>{" "}
+        Componentes: <code>ListShell</code>, <code>VirtualList</code>, <code>QuickFilters</code>, <code>CommandPalette</code>.
+        Pressione <kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Ctrl/⌘+K</kbd> para abrir a Busca Universal.
       </div>
 
       <div className="text-xs border rounded-md p-2 flex items-center gap-3">
@@ -170,9 +138,7 @@ function DevListShellPreview() {
             type="checkbox"
             checked={ubEnabled}
             disabled={ubLoading}
-            onChange={(e) => {
-              void setUbEnabled(e.target.checked);
-            }}
+            onChange={(e) => { void setUbEnabled(e.target.checked); }}
           />
           <span>{ubEnabled ? "Ativa" : "Desativada"} (flag ub_v1)</span>
         </label>
@@ -187,8 +153,7 @@ function DevListShellPreview() {
           <div>
             <h1 className="text-xl font-semibold">Demo — Lista virtualizada</h1>
             <p className="text-xs text-muted-foreground">
-              {filtered.length.toLocaleString("pt-BR")} registros filtrados · exibindo{" "}
-              {Math.min(limit, filtered.length)}
+              {filtered.length.toLocaleString("pt-BR")} registros filtrados · exibindo {Math.min(limit, filtered.length)}
             </p>
           </div>
         }
@@ -253,11 +218,6 @@ function StatusBadge({ value }: { value: Status }) {
 }
 
 function ModalidadeBadge({ value }: { value: DemoRow["modalidade"] }) {
-  const label =
-    value === "particular" ? "Particular" : value === "associado" ? "Associado" : "Cartão";
-  return (
-    <span className="px-2 py-0.5 rounded-full text-[10px] border border-border text-muted-foreground">
-      {label}
-    </span>
-  );
+  const label = value === "particular" ? "Particular" : value === "associado" ? "Associado" : "Cartão";
+  return <span className="px-2 py-0.5 rounded-full text-[10px] border border-border text-muted-foreground">{label}</span>;
 }

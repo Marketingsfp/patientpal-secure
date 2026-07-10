@@ -8,11 +8,8 @@ import type { AlertaBadge } from "./alertas-fila";
 export type StatusFila = "paid" | "waiting" | "in-service" | "canceled" | "refunded";
 
 const STATUS_LABEL: Record<StatusFila, string> = {
-  paid: "Pago",
-  waiting: "Aguardando",
-  "in-service": "Em atendimento",
-  canceled: "Cancelado",
-  refunded: "Estornado",
+  paid: "Pago", waiting: "Aguardando", "in-service": "Em atendimento",
+  canceled: "Cancelado", refunded: "Estornado",
 };
 
 const STATUS_DOT: Record<StatusFila, string> = {
@@ -29,11 +26,7 @@ export function StatusDot({ status, pulse }: { status: StatusFila; pulse?: boole
       role="img"
       aria-label={`Status: ${STATUS_LABEL[status]}`}
       title={STATUS_LABEL[status]}
-      className={cn(
-        "inline-block h-2 w-2 rounded-full shrink-0",
-        STATUS_DOT[status],
-        pulse && "animate-pulse",
-      )}
+      className={cn("inline-block h-2 w-2 rounded-full shrink-0", STATUS_DOT[status], pulse && "animate-pulse")}
     />
   );
 }
@@ -52,20 +45,14 @@ export interface FilaCardData {
 }
 
 export function FilaCard({
-  data,
-  compact,
-  onReceber,
-  onOpenTimeline,
+  data, compact, onReceber, onOpenTimeline,
 }: {
   data: FilaCardData;
   compact?: boolean;
   onReceber: () => void;
   onOpenTimeline: () => void;
 }) {
-  const hora = new Date(data.inicio).toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const hora = new Date(data.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   return (
     <div
       className={cn(
@@ -98,9 +85,7 @@ export function FilaCard({
             </div>
           )}
           <div className={cn("mt-1 flex items-center gap-2 text-xs", compact && "flex-wrap")}>
-            <Badge variant="outline" className="h-5 text-[10px] font-normal">
-              {data.tipoCobranca}
-            </Badge>
+            <Badge variant="outline" className="h-5 text-[10px] font-normal">{data.tipoCobranca}</Badge>
             <span className="text-muted-foreground tabular-nums">{hora}</span>
             <span className="font-semibold tabular-nums text-foreground">{brl(data.valor)}</span>
           </div>
@@ -117,8 +102,7 @@ export function FilaCard({
                   )}
                   data-testid={`alerta-${a.tipo}`}
                 >
-                  <span aria-hidden>{a.emoji}</span>
-                  {a.label}
+                  <span aria-hidden>{a.emoji}</span>{a.label}
                 </span>
               ))}
             </div>

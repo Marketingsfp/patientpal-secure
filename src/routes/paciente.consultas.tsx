@@ -12,27 +12,16 @@ export const Route = createFileRoute("/paciente/consultas")({
   head: () => ({
     meta: [
       { title: "Minhas consultas — ClinicaOS" },
-      {
-        name: "description",
-        content:
-          "Veja suas consultas marcadas, preencha anamneses e entre na sala de telemedicina.",
-      },
+      { name: "description", content: "Veja suas consultas marcadas, preencha anamneses e entre na sala de telemedicina." },
     ],
   }),
 });
 
 interface Consulta {
-  id: string;
-  inicio: string;
-  fim: string;
-  status: string;
-  teleconsulta: boolean;
-  token_publico: string;
-  procedimento: string | null;
-  paciente_nome: string;
-  medico_nome: string | null;
-  medico_especialidade: string | null;
-  clinica_nome: string | null;
+  id: string; inicio: string; fim: string; status: string;
+  teleconsulta: boolean; token_publico: string; procedimento: string | null;
+  paciente_nome: string; medico_nome: string | null;
+  medico_especialidade: string | null; clinica_nome: string | null;
 }
 
 function MinhasConsultasPage() {
@@ -43,9 +32,7 @@ function MinhasConsultasPage() {
 
   useEffect(() => {
     (async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         navigate({ to: "/login", search: { redirect: "/paciente/consultas" } as any });
         return;
@@ -76,33 +63,11 @@ function MinhasConsultasPage() {
           </Button>
         </div>
         <nav className="mx-auto max-w-2xl px-4 pb-2 flex gap-2 text-sm overflow-x-auto">
-          <Link to="/paciente" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">
-            Início
-          </Link>
-          <Link
-            to="/paciente/consultas"
-            className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground whitespace-nowrap"
-          >
-            Consultas
-          </Link>
-          <Link
-            to="/paciente/cartoes"
-            className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap"
-          >
-            Cartões
-          </Link>
-          <Link
-            to="/paciente/financeiro"
-            className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap"
-          >
-            Financeiro
-          </Link>
-          <Link
-            to="/paciente/perfil"
-            className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap"
-          >
-            Perfil
-          </Link>
+          <Link to="/paciente" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Início</Link>
+          <Link to="/paciente/consultas" className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground whitespace-nowrap">Consultas</Link>
+          <Link to="/paciente/cartoes" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Cartões</Link>
+          <Link to="/paciente/financeiro" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Financeiro</Link>
+          <Link to="/paciente/perfil" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Perfil</Link>
         </nav>
       </header>
 
@@ -123,17 +88,12 @@ function MinhasConsultasPage() {
             {consultas.map((c) => {
               const dt = new Date(c.inicio);
               const dataFmt = dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
-              const horaFmt = dt.toLocaleTimeString("pt-BR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              });
+              const horaFmt = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
               return (
                 <Card key={c.id} className="p-4">
                   <div className="flex items-start gap-3">
                     <div className="text-center bg-primary/10 rounded-lg px-3 py-2 min-w-16">
-                      <p className="text-xs uppercase text-muted-foreground">
-                        {dataFmt.split(" ")[1]}
-                      </p>
+                      <p className="text-xs uppercase text-muted-foreground">{dataFmt.split(" ")[1]}</p>
                       <p className="font-bold text-lg leading-tight">{dataFmt.split(" ")[0]}</p>
                       <p className="text-xs text-primary font-medium">{horaFmt}</p>
                     </div>
@@ -178,10 +138,7 @@ function MinhasConsultasPage() {
 
         <Card className="mt-6 p-4 text-xs text-muted-foreground flex items-start gap-2">
           <Calendar className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>
-            Você recebe um <strong>link único</strong> da clínica por SMS/WhatsApp. Esse portal
-            mostra todas as suas consultas cadastradas com este e-mail.
-          </span>
+          <span>Você recebe um <strong>link único</strong> da clínica por SMS/WhatsApp. Esse portal mostra todas as suas consultas cadastradas com este e-mail.</span>
         </Card>
       </main>
     </div>

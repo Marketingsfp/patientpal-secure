@@ -10,10 +10,7 @@ export const Route = createFileRoute("/paciente/")({
   head: () => ({
     meta: [
       { title: "Portal do Paciente — ClinicaOS" },
-      {
-        name: "description",
-        content: "Acesse suas consultas, cartões, pendências financeiras e perfil.",
-      },
+      { name: "description", content: "Acesse suas consultas, cartões, pendências financeiras e perfil." },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
@@ -26,9 +23,7 @@ function PortalHomePage() {
 
   useEffect(() => {
     (async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         navigate({ to: "/login", search: { redirect: "/paciente" } as never });
         return;
@@ -45,18 +40,8 @@ function PortalHomePage() {
 
   const cards = [
     { to: "/paciente/consultas", icon: Calendar, label: "Consultas", desc: "Próximas e passadas" },
-    {
-      to: "/paciente/cartoes",
-      icon: CreditCard,
-      label: "Cartões",
-      desc: "Benefícios e mensalidades",
-    },
-    {
-      to: "/paciente/financeiro",
-      icon: DollarSign,
-      label: "Financeiro",
-      desc: "Pendências em aberto",
-    },
+    { to: "/paciente/cartoes", icon: CreditCard, label: "Cartões", desc: "Benefícios e mensalidades" },
+    { to: "/paciente/financeiro", icon: DollarSign, label: "Financeiro", desc: "Pendências em aberto" },
     { to: "/paciente/perfil", icon: User, label: "Perfil", desc: "Seus dados de contato" },
   ] as const;
 
@@ -80,7 +65,7 @@ function PortalHomePage() {
           <p className="mt-6 text-sm text-muted-foreground">Carregando…</p>
         ) : (
           <div className="mt-6 grid grid-cols-2 gap-3">
-            {cards.map((c) => (
+            {cards.map(c => (
               <Link key={c.to} to={c.to} className="contents">
                 <Card className="p-4 hover:shadow-md hover:border-primary/40 transition-all cursor-pointer">
                   <c.icon className="h-6 w-6 text-primary mb-2" />

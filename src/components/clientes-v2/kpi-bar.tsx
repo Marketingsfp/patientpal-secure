@@ -14,9 +14,7 @@ export interface ClientesKpi {
 export function ClientesKpiBar({ k, modoBusca }: { k: ClientesKpi; modoBusca: boolean }) {
   const Item = ({ label, v, tone }: { label: string; v: number; tone?: string }) => (
     <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-      <span className={cn("tabular-nums font-semibold text-sm", tone)}>
-        {v.toLocaleString("pt-BR")}
-      </span>
+      <span className={cn("tabular-nums font-semibold text-sm", tone)}>{v.toLocaleString("pt-BR")}</span>
       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
     </div>
   );

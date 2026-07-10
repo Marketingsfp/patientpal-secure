@@ -2,16 +2,8 @@ import { AlertTriangle, Cake, Copy, Phone, PhoneOff, User, IdCard } from "lucide
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
-  cadastroIncompleto,
-  calcularIdade,
-  fmtCPF,
-  fmtNasc,
-  fmtTel,
-  isAniversarianteHoje,
-  pagadorLabel,
-  semCpf,
-  semTelefone,
-  type PacienteV2,
+  cadastroIncompleto, calcularIdade, fmtCPF, fmtNasc, fmtTel,
+  isAniversarianteHoje, pagadorLabel, semCpf, semTelefone, type PacienteV2,
 } from "./status-utils";
 
 interface Props {
@@ -27,15 +19,12 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
   const sTel = semTelefone(p);
   const sCpf = semCpf(p);
   const idade = calcularIdade(p.data_nascimento);
-  const borderClass = !p.ativo
-    ? "border-l-slate-400"
-    : aniversariante
-      ? "border-l-fuchsia-500"
-      : incompleto
-        ? "border-l-amber-500"
-        : p.duplicado_hint
-          ? "border-l-rose-500"
-          : "border-l-emerald-500";
+  const borderClass =
+    !p.ativo ? "border-l-slate-400"
+      : aniversariante ? "border-l-fuchsia-500"
+      : incompleto ? "border-l-amber-500"
+      : p.duplicado_hint ? "border-l-rose-500"
+      : "border-l-emerald-500";
 
   return (
     <button
@@ -43,23 +32,18 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
       onClick={() => onOpen(p)}
       className={cn(
         "w-full text-left rounded-lg border bg-card hover:bg-accent/40 transition-colors",
-        "border-l-4",
-        borderClass,
+        "border-l-4", borderClass,
         compact ? "px-3 py-2" : "px-3 py-3",
       )}
     >
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3 items-center">
-        <div
-          className={cn(
-            "shrink-0 rounded-full bg-muted grid place-items-center overflow-hidden",
-            compact ? "h-8 w-8" : "h-10 w-10",
-          )}
-        >
-          {p.foto_url ? (
-            <img src={p.foto_url} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <User className="h-4 w-4 text-muted-foreground" />
-          )}
+        <div className={cn(
+          "shrink-0 rounded-full bg-muted grid place-items-center overflow-hidden",
+          compact ? "h-8 w-8" : "h-10 w-10",
+        )}>
+          {p.foto_url
+            ? <img src={p.foto_url} alt="" className="h-full w-full object-cover" />
+            : <User className="h-4 w-4 text-muted-foreground" />}
         </div>
 
         <div className="min-w-0">
@@ -88,9 +72,7 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
               {label}
             </Badge>
             {!p.ativo && (
-              <Badge variant="secondary" className="text-[10px]">
-                Inativo
-              </Badge>
+              <Badge variant="secondary" className="text-[10px]">Inativo</Badge>
             )}
             {incompleto && (
               <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400">
@@ -124,10 +106,7 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
               <span className="inline-flex items-center gap-1">
                 <Phone className="h-3 w-3" /> {fmtTel(p.telefone)}
               </span>
-              <span>
-                Nasc.: {fmtNasc(p.data_nascimento)}
-                {idade !== null ? ` · ${idade}a` : ""}
-              </span>
+              <span>Nasc.: {fmtNasc(p.data_nascimento)}{idade !== null ? ` · ${idade}a` : ""}</span>
               {(p.cidade || p.estado) && (
                 <span className="truncate">{[p.cidade, p.estado].filter(Boolean).join("/")}</span>
               )}

@@ -10,21 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/dependentes")({
@@ -81,10 +68,7 @@ function DependentesPage() {
         .neq("status", "cancelado")
         .order("paciente_nome")
         .range(from, from + PAGE - 1);
-      if (error) {
-        mostrarErro(error);
-        break;
-      }
+      if (error) { mostrarErro(error); break; }
       const batch = (data ?? []) as Contrato[];
       cList.push(...batch);
       if (batch.length < PAGE) break;
@@ -94,16 +78,11 @@ function DependentesPage() {
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabase
         .from("contrato_dependentes")
-        .select(
-          "id, contrato_id, paciente_id, paciente_nome, parentesco, contratos_assinatura!inner(clinica_id)",
-        )
+        .select("id, contrato_id, paciente_id, paciente_nome, parentesco, contratos_assinatura!inner(clinica_id)")
         .eq("contratos_assinatura.clinica_id", cid)
         .eq("ativo", true)
         .range(from, from + PAGE - 1);
-      if (error) {
-        mostrarErro(error);
-        break;
-      }
+      if (error) { mostrarErro(error); break; }
       const batch = (data ?? []) as Dep[];
       dList.push(...batch);
       if (batch.length < PAGE) break;
@@ -113,9 +92,7 @@ function DependentesPage() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    void load(); /* eslint-disable-next-line */
-  }, [clinicaAtual?.clinica_id]);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id]);
 
   const depsPorContrato = useMemo(() => {
     const m = new Map<string, Dep[]>();
@@ -133,8 +110,7 @@ function DependentesPage() {
       const has = (depsPorContrato.get(c.id)?.length ?? 0) > 0;
       if (filter === "sem" && has) return false;
       if (filter === "com" && !has) return false;
-      if (q && !c.paciente_nome.toLowerCase().includes(q) && !String(c.numero).includes(q))
-        return false;
+      if (q && !c.paciente_nome.toLowerCase().includes(q) && !String(c.numero).includes(q)) return false;
       return true;
     });
   }, [contratos, depsPorContrato, search, filter]);
@@ -156,10 +132,7 @@ function DependentesPage() {
       ativo: true,
     });
     setSaving(false);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     toast.success("Dependente adicionado.");
     setNovoDep(null);
     setParentesco("");
@@ -178,10 +151,7 @@ function DependentesPage() {
       .from("contrato_dependentes")
       .update({ ativo: false, excluido_em: new Date().toISOString().slice(0, 10) })
       .eq("id", depId);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     toast.success("Dependente removido.");
     await load();
   };
@@ -194,30 +164,10 @@ function DependentesPage() {
     <div className="space-y-4">
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KPI
-          onClick={() => setDrill("total")}
-          label="Titulares (contratos)"
-          value={stats.total}
-          icon={<Users className="h-4 w-4" />}
-        />
-        <KPI
-          onClick={() => setDrill("com")}
-          label="Com dependentes"
-          value={stats.com}
-          icon={<CheckCircle2 className="h-4 w-4 text-green-600" />}
-        />
-        <KPI
-          onClick={() => setDrill("sem")}
-          label="Sem dependentes"
-          value={stats.sem}
-          icon={<AlertCircle className="h-4 w-4 text-orange-600" />}
-        />
-        <KPI
-          onClick={() => setDrill("totalDeps")}
-          label="Total de dependentes"
-          value={stats.totalDeps}
-          icon={<Users className="h-4 w-4 text-primary" />}
-        />
+        <KPI onClick={() => setDrill("total")} label="Titulares (contratos)" value={stats.total} icon={<Users className="h-4 w-4" />} />
+        <KPI onClick={() => setDrill("com")} label="Com dependentes" value={stats.com} icon={<CheckCircle2 className="h-4 w-4 text-green-600" />} />
+        <KPI onClick={() => setDrill("sem")} label="Sem dependentes" value={stats.sem} icon={<AlertCircle className="h-4 w-4 text-orange-600" />} />
+        <KPI onClick={() => setDrill("totalDeps")} label="Total de dependentes" value={stats.totalDeps} icon={<Users className="h-4 w-4 text-primary" />} />
       </div>
 
       {/* Filtros */}
@@ -239,32 +189,19 @@ function DependentesPage() {
               />
             </div>
             <div className="flex gap-1">
-              <Button
-                size="sm"
-                variant={filter === "sem" ? "default" : "outline"}
-                onClick={() => setFilter("sem")}
-              >
+              <Button size="sm" variant={filter === "sem" ? "default" : "outline"} onClick={() => setFilter("sem")}>
                 Sem dependentes ({stats.sem})
               </Button>
-              <Button
-                size="sm"
-                variant={filter === "com" ? "default" : "outline"}
-                onClick={() => setFilter("com")}
-              >
+              <Button size="sm" variant={filter === "com" ? "default" : "outline"} onClick={() => setFilter("com")}>
                 Com dependentes ({stats.com})
               </Button>
-              <Button
-                size="sm"
-                variant={filter === "todos" ? "default" : "outline"}
-                onClick={() => setFilter("todos")}
-              >
+              <Button size="sm" variant={filter === "todos" ? "default" : "outline"} onClick={() => setFilter("todos")}>
                 Todos ({stats.total})
               </Button>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Dica: use o filtro <b>Sem dependentes</b> para fazer o mutirão de cadastro família por
-            família.
+            Dica: use o filtro <b>Sem dependentes</b> para fazer o mutirão de cadastro família por família.
           </p>
         </CardContent>
       </Card>
@@ -278,42 +215,28 @@ function DependentesPage() {
         </CardHeader>
         <CardContent className="p-0">
           {filtered.length === 0 && !loading ? (
-            <p className="text-sm text-muted-foreground p-6 text-center">
-              Nenhum titular encontrado com este filtro.
-            </p>
+            <p className="text-sm text-muted-foreground p-6 text-center">Nenhum titular encontrado com este filtro.</p>
           ) : (
             <ul className="divide-y">
               {filtered.slice(0, 200).map((c) => {
                 const dList = depsPorContrato.get(c.id) ?? [];
                 return (
-                  <li
-                    key={c.id}
-                    className="p-3 flex flex-wrap items-center gap-3 hover:bg-muted/30"
-                  >
+                  <li key={c.id} className="p-3 flex flex-wrap items-center gap-3 hover:bg-muted/30">
                     <div className="flex-1 min-w-[240px]">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium">{c.paciente_nome}</span>
-                        <Badge variant="outline" className="text-xs">
-                          #{c.numero}
-                        </Badge>
+                        <Badge variant="outline" className="text-xs">#{c.numero}</Badge>
                         {dList.length === 0 ? (
                           <Badge variant="secondary" className="text-xs gap-1">
                             <AlertCircle className="h-3 w-3" /> sem dependentes
                           </Badge>
                         ) : (
-                          <Badge className="text-xs bg-green-600 text-white">
-                            {dList.length} dep.
-                          </Badge>
+                          <Badge className="text-xs bg-green-600 text-white">{dList.length} dep.</Badge>
                         )}
                       </div>
                       {dList.length > 0 && (
                         <div className="text-xs text-muted-foreground mt-1">
-                          {dList
-                            .map(
-                              (d) =>
-                                `${d.paciente_nome}${d.parentesco ? ` (${d.parentesco})` : ""}`,
-                            )
-                            .join(" · ")}
+                          {dList.map((d) => `${d.paciente_nome}${d.parentesco ? ` (${d.parentesco})` : ""}`).join(" · ")}
                         </div>
                       )}
                     </div>
@@ -334,12 +257,7 @@ function DependentesPage() {
       </Card>
 
       {/* Modal */}
-      <Dialog
-        open={openTitular !== null}
-        onOpenChange={(o) => {
-          if (!o) fecharModal();
-        }}
-      >
+      <Dialog open={openTitular !== null} onOpenChange={(o) => { if (!o) fecharModal(); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Dependentes de {openTitular?.paciente_nome}</DialogTitle>
@@ -351,22 +269,12 @@ function DependentesPage() {
                 Já cadastrados ({depsDoModal.length})
               </p>
               {depsDoModal.map((d) => (
-                <div
-                  key={d.id}
-                  className="flex items-center justify-between text-sm bg-background rounded px-2 py-1"
-                >
+                <div key={d.id} className="flex items-center justify-between text-sm bg-background rounded px-2 py-1">
                   <span>
                     {d.paciente_nome}
-                    {d.parentesco && (
-                      <span className="text-xs text-muted-foreground ml-2">({d.parentesco})</span>
-                    )}
+                    {d.parentesco && <span className="text-xs text-muted-foreground ml-2">({d.parentesco})</span>}
                   </span>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6"
-                    onClick={() => remover(d.id)}
-                  >
+                  <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => remover(d.id)}>
                     <Trash2 className="h-3 w-3 text-destructive" />
                   </Button>
                 </div>
@@ -379,9 +287,7 @@ function DependentesPage() {
             <div className="space-y-1.5">
               <Label>Paciente</Label>
               <PatientSearchInput value={novoDep} onSelect={setNovoDep} />
-              <p className="text-xs text-muted-foreground">
-                Se ainda não estiver cadastrado, abra Clientes → Novo paciente primeiro.
-              </p>
+              <p className="text-xs text-muted-foreground">Se ainda não estiver cadastrado, abra Clientes → Novo paciente primeiro.</p>
             </div>
             <div className="space-y-1.5">
               <Label>Parentesco</Label>
@@ -405,12 +311,7 @@ function DependentesPage() {
       </Dialog>
 
       {/* Drill-down KPIs */}
-      <Dialog
-        open={drill !== null}
-        onOpenChange={(o) => {
-          if (!o) setDrill(null);
-        }}
-      >
+      <Dialog open={drill !== null} onOpenChange={(o) => { if (!o) setDrill(null); }}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
@@ -423,21 +324,9 @@ function DependentesPage() {
           <div className="overflow-auto flex-1">
             {drill === "totalDeps" ? (
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Dependente</TableHead>
-                    <TableHead>Titular</TableHead>
-                    <TableHead>Parentesco</TableHead>
-                  </TableRow>
-                </TableHeader>
+                <TableHeader><TableRow><TableHead>Dependente</TableHead><TableHead>Titular</TableHead><TableHead>Parentesco</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {deps.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center text-muted-foreground py-6">
-                        Nenhum registro.
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
+                  {deps.length === 0 ? <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">Nenhum registro.</TableCell></TableRow> : null}
                   {deps.map((d) => {
                     const titular = contratos.find((c) => c.id === d.contrato_id);
                     return (
@@ -452,14 +341,7 @@ function DependentesPage() {
               </Table>
             ) : drill ? (
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Titular</TableHead>
-                    <TableHead>Nº</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Dependentes</TableHead>
-                  </TableRow>
-                </TableHeader>
+                <TableHeader><TableRow><TableHead>Titular</TableHead><TableHead>Nº</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Dependentes</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {(() => {
                     const lista = contratos.filter((c) => {
@@ -468,24 +350,13 @@ function DependentesPage() {
                       if (drill === "sem") return !has;
                       return true;
                     });
-                    if (lista.length === 0)
-                      return (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
-                            Nenhum registro.
-                          </TableCell>
-                        </TableRow>
-                      );
+                    if (lista.length === 0) return <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum registro.</TableCell></TableRow>;
                     return lista.map((c) => (
                       <TableRow key={c.id}>
                         <TableCell>{c.paciente_nome}</TableCell>
                         <TableCell>#{c.numero}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{c.status}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {depsPorContrato.get(c.id)?.length ?? 0}
-                        </TableCell>
+                        <TableCell><Badge variant="outline">{c.status}</Badge></TableCell>
+                        <TableCell className="text-right font-semibold">{depsPorContrato.get(c.id)?.length ?? 0}</TableCell>
                       </TableRow>
                     ));
                   })()}
@@ -499,27 +370,11 @@ function DependentesPage() {
   );
 }
 
-function KPI({
-  label,
-  value,
-  icon,
-  onClick,
-}: {
-  label: string;
-  value: number | string;
-  icon: React.ReactNode;
-  onClick?: () => void;
-}) {
+function KPI({ label, value, icon, onClick }: { label: string; value: number | string; icon: React.ReactNode; onClick?: () => void }) {
   return (
-    <Card
-      onClick={onClick}
-      className={onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
-    >
+    <Card onClick={onClick} className={onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}>
       <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {icon}
-          {label}
-        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">{icon}{label}</div>
         <div className="text-2xl font-bold mt-1">{value}</div>
       </CardContent>
     </Card>

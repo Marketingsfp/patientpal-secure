@@ -11,17 +11,8 @@ export const Route = createFileRoute("/_authenticated/app/mkt-segmentos")({
   head: () => ({ meta: [{ title: "Segmentos — ClinicaOS" }] }),
 });
 
-interface Row {
-  id: string;
-  nome: string;
-  descricao: string | null;
-  filtros: Record<string, unknown>;
-}
-interface Form {
-  nome: string;
-  descricao: string;
-  filtros: string;
-}
+interface Row { id: string; nome: string; descricao: string | null; filtros: Record<string, unknown> }
+interface Form { nome: string; descricao: string; filtros: string; }
 
 function SegmentosPage() {
   return (
@@ -33,41 +24,17 @@ function SegmentosPage() {
       icon={<Filter className="h-6 w-6 text-primary" />}
       searchFields={["nome"]}
       columns={[
-        {
-          key: "nome",
-          header: "Nome",
-          render: (r) => <span className="font-medium">{r.nome}</span>,
-        },
-        {
-          key: "desc",
-          header: "Descrição",
-          render: (r) => (
-            <span className="text-sm text-muted-foreground">{r.descricao ?? "—"}</span>
-          ),
-        },
-        {
-          key: "filt",
-          header: "Filtros",
-          render: (r) => (
-            <code className="text-[11px] text-muted-foreground line-clamp-1">
-              {JSON.stringify(r.filtros)}
-            </code>
-          ),
-        },
+        { key: "nome", header: "Nome", render: r => <span className="font-medium">{r.nome}</span> },
+        { key: "desc", header: "Descrição", render: r => <span className="text-sm text-muted-foreground">{r.descricao ?? "—"}</span> },
+        { key: "filt", header: "Filtros", render: r => (
+          <code className="text-[11px] text-muted-foreground line-clamp-1">{JSON.stringify(r.filtros)}</code>
+        ) },
       ]}
       emptyForm={{ nome: "", descricao: "", filtros: "{}" }}
-      toForm={(r) => ({
-        nome: r.nome,
-        descricao: r.descricao ?? "",
-        filtros: JSON.stringify(r.filtros ?? {}, null, 2),
-      })}
-      toPayload={(f) => {
+      toForm={r => ({ nome: r.nome, descricao: r.descricao ?? "", filtros: JSON.stringify(r.filtros ?? {}, null, 2) })}
+      toPayload={f => {
         let filtros: Record<string, unknown> = {};
-        try {
-          filtros = JSON.parse(f.filtros || "{}");
-        } catch {
-          filtros = {};
-        }
+        try { filtros = JSON.parse(f.filtros || "{}"); } catch { filtros = {}; }
         return {
           nome: f.nome.trim(),
           descricao: f.descricao || null,
@@ -76,23 +43,11 @@ function SegmentosPage() {
       }}
       renderForm={(f, set) => (
         <div className="space-y-3">
-          <div className="space-y-1">
-            <Label>Nome *</Label>
-            <Input required value={f.nome} onChange={(e) => set({ ...f, nome: e.target.value })} />
-          </div>
-          <div className="space-y-1">
-            <Label>Descrição</Label>
-            <Input value={f.descricao} onChange={(e) => set({ ...f, descricao: e.target.value })} />
-          </div>
+          <div className="space-y-1"><Label>Nome *</Label><Input required value={f.nome} onChange={e => set({ ...f, nome: e.target.value })} /></div>
+          <div className="space-y-1"><Label>Descrição</Label><Input value={f.descricao} onChange={e => set({ ...f, descricao: e.target.value })} /></div>
           <div className="space-y-1">
             <Label>Filtros (JSON)</Label>
-            <Textarea
-              rows={6}
-              className="font-mono text-xs"
-              value={f.filtros}
-              onChange={(e) => set({ ...f, filtros: e.target.value })}
-              placeholder='{"convenio":"unimed","cidade":"São Paulo"}'
-            />
+            <Textarea rows={6} className="font-mono text-xs" value={f.filtros} onChange={e => set({ ...f, filtros: e.target.value })} placeholder='{"convenio":"unimed","cidade":"São Paulo"}' />
           </div>
         </div>
       )}

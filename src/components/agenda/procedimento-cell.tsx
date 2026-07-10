@@ -5,10 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Search, Pencil } from "lucide-react";
 
 const norm = (s: string) =>
-  (s ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+  (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 interface Props {
   valor: string | null;
@@ -19,14 +16,7 @@ interface Props {
   onChange: (novoNome: string) => void | Promise<void>;
 }
 
-export function ProcedimentoCell({
-  valor,
-  opcoes,
-  padrao,
-  semFallback,
-  disabled,
-  onChange,
-}: Props) {
+export function ProcedimentoCell({ valor, opcoes, padrao, semFallback, disabled, onChange }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -90,11 +80,7 @@ export function ProcedimentoCell({
   const textoAtual = valor || fallback || "—";
 
   if (disabled || lista.length === 0) {
-    return (
-      <Badge variant="outline" className="text-xs">
-        {textoAtual}
-      </Badge>
-    );
+    return <Badge variant="outline" className="text-xs">{textoAtual}</Badge>;
   }
 
   return (
@@ -167,9 +153,7 @@ export function ProcedimentoCell({
                   )}
                   <span className="flex-1 truncate">{p.nome}</span>
                   {norm(p.nome) === norm(textoAtual) && (
-                    <Badge variant="secondary" className="text-[10px]">
-                      atual
-                    </Badge>
+                    <Badge variant="secondary" className="text-[10px]">atual</Badge>
                   )}
                 </button>
               );

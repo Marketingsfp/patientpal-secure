@@ -23,17 +23,9 @@ export interface HhpWizardShellProps {
 }
 
 export function HhpWizardShell({
-  open,
-  onOpenChange,
-  title,
-  description,
-  stepLabel,
-  stepIndex,
-  stepsCount,
-  heading,
-  children,
-  footer,
-  maxWidth = "720px",
+  open, onOpenChange, title, description,
+  stepLabel, stepIndex, stepsCount,
+  heading, children, footer, maxWidth = "720px",
 }: HhpWizardShellProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -69,7 +61,9 @@ export function HhpWizardShell({
           </div>
         </div>
 
-        <div className="px-5 md:px-8 py-6 min-h-[320px] md:min-h-[380px]">{children}</div>
+        <div className="px-5 md:px-8 py-6 min-h-[320px] md:min-h-[380px]">
+          {children}
+        </div>
 
         <div className="px-5 md:px-8 py-4 md:py-5 border-t border-slate-100 flex items-center justify-between bg-slate-50/40">
           {footer}

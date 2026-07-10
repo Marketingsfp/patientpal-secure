@@ -127,13 +127,7 @@ function combinaComBusca(item: Item, termo: string): boolean {
 // ============ COMPONENTES ============
 
 // 1. DateSelector - Componente de seleção de data (Corrigido o texto cortado)
-function DateSelector({
-  data,
-  onDataChange,
-}: {
-  data: string;
-  onDataChange: (value: string) => void;
-}) {
+function DateSelector({ data, onDataChange }: { data: string; onDataChange: (value: string) => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const hoje = new Date();
   const dataObj = new Date(`${data}T00:00:00`);
@@ -327,10 +321,7 @@ function SearchBar({
         </div>
 
         <div className="flex gap-2">
-          <Button
-            onClick={onSearch}
-            className="bg-primary text-primary-foreground h-9 whitespace-nowrap"
-          >
+          <Button onClick={onSearch} className="bg-primary text-primary-foreground h-9 whitespace-nowrap">
             <Search className="h-4 w-4 mr-2" />
             Buscar
           </Button>
@@ -378,11 +369,7 @@ function PatientCard({
       )}
 
       {item.paciente?.foto_url ? (
-        <img
-          src={item.paciente.foto_url}
-          alt=""
-          className="h-12 w-12 rounded-full object-cover border"
-        />
+        <img src={item.paciente.foto_url} alt="" className="h-12 w-12 rounded-full object-cover border" />
       ) : (
         <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center font-semibold text-muted-foreground">
           {item.paciente_nome.slice(0, 1).toUpperCase()}
@@ -422,11 +409,7 @@ function PatientCard({
           disabled={isConfirming}
           className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[180px] h-9"
         >
-          {isConfirming ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <BadgeCheck className="h-4 w-4 mr-2" />
-          )}
+          {isConfirming ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BadgeCheck className="h-4 w-4 mr-2" />}
           Confirmar presença
         </Button>
       ) : (
@@ -489,7 +472,7 @@ function CheckinPage() {
       const inicio = new Date(`${data}T00:00:00`).toISOString();
       const fim = new Date(`${data}T23:59:59`).toISOString();
 
-      const query = supabase
+      let query = supabase
         .from("agendamentos")
         .select("id, paciente_nome, paciente_id, inicio, procedimento, fluxo_etapa, medicos(nome)")
         .eq("clinica_id", clinicaAtual.clinica_id)
@@ -527,9 +510,7 @@ function CheckinPage() {
       if (lancamentosError) {
         console.error("Erro ao buscar pagamentos:", lancamentosError);
       } else {
-        pagos = new Set(
-          (lancamentos ?? []).map((r) => r.agendamento_id).filter((x): x is string => !!x),
-        );
+        pagos = new Set((lancamentos ?? []).map((r) => r.agendamento_id).filter((x): x is string => !!x));
       }
 
       const candidatos = ags.filter((a) => pagos.has(a.id));
@@ -540,9 +521,7 @@ function CheckinPage() {
         return;
       }
 
-      const pacIds = Array.from(
-        new Set(candidatos.map((a) => a.paciente_id).filter((x): x is string => !!x)),
-      );
+      const pacIds = Array.from(new Set(candidatos.map((a) => a.paciente_id).filter((x): x is string => !!x)));
 
       const pacMap = new Map<string, PacienteRow>();
 
@@ -574,9 +553,7 @@ function CheckinPage() {
 
       const termoAplicado = buscaAplicada.trim();
       const itemsFiltrados =
-        termoAplicado.length > 0
-          ? resultado.filter((item) => combinaComBusca(item, termoAplicado))
-          : resultado;
+        termoAplicado.length > 0 ? resultado.filter((item) => combinaComBusca(item, termoAplicado)) : resultado;
 
       setItems(itemsFiltrados);
     } catch (err) {
@@ -634,13 +611,10 @@ function CheckinPage() {
 
     try {
       if (item.paciente_id && clinicaAtual) {
-        const { data: bloqueio, error: bloqueioError } = await supabase.rpc(
-          "paciente_cartao_inadimplente",
-          {
-            _paciente_id: item.paciente_id,
-            _clinica_id: clinicaAtual.clinica_id,
-          },
-        );
+        const { data: bloqueio, error: bloqueioError } = await supabase.rpc("paciente_cartao_inadimplente", {
+          _paciente_id: item.paciente_id,
+          _clinica_id: clinicaAtual.clinica_id,
+        });
 
         if (bloqueioError) {
           console.error("Erro ao verificar inadimplência:", bloqueioError);

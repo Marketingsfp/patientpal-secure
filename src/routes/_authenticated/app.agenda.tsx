@@ -10,19 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
@@ -30,20 +21,11 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -55,34 +37,11 @@ import { FichaEmUsoAlert } from "@/components/agenda/ficha-em-uso-alert";
 import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
 import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
 import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
-import {
-  DividirOrcamentoDialog,
-  type DividirItem,
-} from "@/components/agenda/dividir-orcamento-dialog";
+import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/dividir-orcamento-dialog";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
-  CalendarDays,
-  Plus,
-  Pencil,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  X,
-  MoreHorizontal,
-  Star,
-  Flag,
-  Printer,
-  Download,
-  Video,
-  UserPlus,
-  Clock,
-  DollarSign,
-  ShieldCheck,
-  BadgeCheck,
-  IdCard,
-  Play,
-  FileText,
+  CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, UserMinus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
@@ -131,34 +90,16 @@ type Agendamento = {
   ficha_numero?: number | null;
   forma_pagamento_prevista?: string | null;
 };
-type Medico = {
-  id: string;
-  nome: string;
-  sexo?: string | null;
-  usa_sistema?: boolean;
-  especialidade_id?: string | null;
-  procedimento_padrao_id?: string | null;
-  procedimento_padrao_em_branco?: boolean | null;
-  procedimento_padrao_nome?: string | null;
-  especialidade_nome?: string | null;
-};
+type Medico = { id: string; nome: string; sexo?: string | null; usa_sistema?: boolean; especialidade_id?: string | null; procedimento_padrao_id?: string | null; procedimento_padrao_em_branco?: boolean | null; procedimento_padrao_nome?: string | null; especialidade_nome?: string | null };
 type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
-type ProcedimentoRef = { id: string; nome: string; tipo: string | null; grupo?: string | null };
-type MedicoProcedimentoRef = {
-  medico_id: string | null;
-  procedimento_id: string;
-  especialidade_id?: string | null;
-  created_at?: string | null;
-};
+type ProcedimentoRef = { id: string; nome: string; tipo: string | null; grupo?: string | null; tipo_procedimento?: string | null };
+type MedicoProcedimentoRef = { medico_id: string | null; procedimento_id: string; especialidade_id?: string | null; created_at?: string | null };
 
 const STATUS_LABEL: Record<Status, string> = {
-  agendado: "Agendado",
-  confirmado: "Confirmado",
-  realizado: "Realizado",
-  cancelado: "Cancelado",
-  faltou: "Faltou",
+  agendado: "Agendado", confirmado: "Confirmado", realizado: "Realizado",
+  cancelado: "Cancelado", faltou: "Faltou",
 };
 const STATUS_COR: Record<Status, string> = {
   agendado: "bg-[#dbe7fb] text-slate-800 border border-[#b6cdf5]",
@@ -171,10 +112,7 @@ const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const PAGE_SIZE = 50;
 
 const normalizar = (s: string) =>
-  (s ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
+  (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 const isSlotLivre = (pacienteNome: string | null | undefined) => {
   const nome = normalizar(pacienteNome ?? "").trim();
@@ -187,12 +125,7 @@ const primeiroValorValido = (...valores: unknown[]) => {
 };
 
 const valorCartaoProcedimento = (proc: any) =>
-  primeiroValorValido(
-    proc?.valor_cartao_credito,
-    proc?.valor_cartao_debito,
-    proc?.valor_cartao,
-    proc?.valor_padrao,
-  );
+  primeiroValorValido(proc?.valor_cartao_credito, proc?.valor_cartao_debito, proc?.valor_cartao, proc?.valor_padrao);
 
 // Busca robusta de procedimento por nome. Usa lista pré-carregada (lookup local)
 // e, se não achar OU vier sem valores, faz fallback direto no banco com ilike.
@@ -203,48 +136,26 @@ async function buscarProcedimentoPorNome(
 ): Promise<any | null> {
   // Remove sufixo de disambiguação " (ESPECIALIDADE)" antes de pesquisar.
   const nomeBase = (nome ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim();
-  const alvo = nomeBase
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-  const norm = (s: string) =>
-    (s ?? "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .trim();
+  const alvo = nomeBase.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const norm = (s: string) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   // 1) Sempre tentar primeiro uma busca FRESCA no banco pelo nome exato
   //    (case-insensitive). Isso garante que o valor venha do cadastro atual
   //    e não de um cache em memória que pode estar desatualizado.
   const temValor = (p: any) =>
-    p &&
-    [
-      p.valor_dinheiro,
-      p.valor_pix,
-      p.valor_padrao,
-      p.valor_cartao,
-      p.valor_cartao_credito,
-      p.valor_cartao_debito,
-      p.valor_dinheiro_pix,
-    ].some((v) => Number(v) > 0);
+    p && [p.valor_dinheiro, p.valor_pix, p.valor_padrao, p.valor_cartao, p.valor_cartao_credito, p.valor_cartao_debito, p.valor_dinheiro_pix]
+      .some((v) => Number(v) > 0);
   try {
     const { data: exatoDb } = await supabase
       .from("procedimentos")
-      .select(
-        "nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix",
-      )
+      .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
       .eq("clinica_id", clinicaId)
       .eq("ativo", true)
       .ilike("nome", nomeBase)
       .limit(5);
-    const exatoComValor =
-      (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvo && temValor(p)) ??
-      (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvo);
+    const exatoComValor = (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvo && temValor(p))
+      ?? (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvo);
     if (exatoComValor) return exatoComValor;
-  } catch {
-    /* segue para fallback */
-  }
+  } catch { /* segue para fallback */ }
   const arr = lista ?? [];
   // Prioriza matches que TÊM valores cadastrados, para evitar pegar linhas
   // placeholder (ex.: "CONSULTA 110 E 130" com tudo zerado) na frente da
@@ -252,13 +163,10 @@ async function buscarProcedimentoPorNome(
   const exatos = arr.filter((p) => norm(p.nome ?? "") === alvo);
   const includes = arr.filter((p) => norm(p.nome ?? "").includes(alvo));
   const reverso = arr.filter((p) => alvo.includes(norm(p.nome ?? "")));
-  const proc: any =
-    exatos.find(temValor) ??
-    exatos[0] ??
-    includes.find(temValor) ??
-    includes[0] ??
-    reverso.find(temValor) ??
-    reverso[0];
+  let proc: any =
+    exatos.find(temValor) ?? exatos[0]
+    ?? includes.find(temValor) ?? includes[0]
+    ?? reverso.find(temValor) ?? reverso[0];
   if (temValor(proc)) return proc;
   // Se a lista pré-carregada já contém os valores (formato completo) e
   // achamos o procedimento, mesmo sem valor não vale a pena bater no banco
@@ -271,9 +179,7 @@ async function buscarProcedimentoPorNome(
   const padrao = `%${nomeBase}%`;
   const { data } = await supabase
     .from("procedimentos")
-    .select(
-      "nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix",
-    )
+    .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
     .eq("clinica_id", clinicaId)
     .ilike("nome", padrao)
     .limit(10);
@@ -285,58 +191,10 @@ async function buscarProcedimentoPorNome(
   return proc ?? escolhido ?? null;
 }
 
-// Cache em memória de procedimentos da clínica (com valores) para acelerar
-// o diálogo de pagamento. TTL curto: 60s. Invalida automaticamente.
-type ProcComValor = {
-  nome: string;
-  valor_dinheiro: number | null;
-  valor_pix: number | null;
-  valor_padrao: number | null;
-  valor_cartao: number | null;
-  valor_cartao_credito: number | null;
-  valor_cartao_debito: number | null;
-  valor_dinheiro_pix: number | null;
-};
-async function fetchProcedimentosAgenda(clinicaId: string): Promise<ProcedimentoRef[]> {
-  const pageSize = 1000;
-  const rows: ProcedimentoRef[] = [];
-
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
-      .from("procedimentos")
-      .select("id,nome,tipo,grupo")
-      .eq("clinica_id", clinicaId)
-      .eq("ativo", true)
-      .order("nome")
-      .range(from, from + pageSize - 1);
-
-    if (error) throw error;
-    const page = (data ?? []) as ProcedimentoRef[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
-
-  return rows;
-}
-
-async function fetchMedicoProcedimentosAgenda(clinicaId: string): Promise<MedicoProcedimentoRef[]> {
-  // Filtra por clínica via inner join em medicos (evita carregar dados de
-  // outras clínicas e usa o índice idx_medicos_clinica_ativo).
-  const pageSize = 5000;
-  const rows: MedicoProcedimentoRef[] = [];
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
-      .from("medico_procedimentos")
-      .select("medico_id,procedimento_id,especialidade_id,created_at,medicos!inner(clinica_id)")
-      .eq("medicos.clinica_id", clinicaId)
-      .range(from, from + pageSize - 1);
-    if (error) throw error;
-    const page = (data ?? []) as unknown as MedicoProcedimentoRef[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
-  return rows;
-}
+// Fetchers com cache in-memory (60s / 300s) vivem em src/lib/agenda/refs-cache.ts.
+// Adaptadores locais para preservar o restante do arquivo sem renomeações.
+const fetchProcedimentosAgenda = getProcedimentosAgenda;
+const fetchMedicoProcedimentosAgenda = getMedicoProcedimentosAgenda;
 
 type DescontoConvenio =
   | { tipo: "percentual"; valor: number }
@@ -389,18 +247,13 @@ async function obterInfoConvenioPaciente(params: {
     .eq("status", "ativo")
     .eq("paciente_id", pacienteId)
     .limit(5);
-  let contrato: {
-    id: string;
-    convenio_id: string | null;
-    cb_convenios: { nome: string } | null;
-  } | null = ((titularContratos ?? [])[0] as any) ?? null;
+  let contrato: { id: string; convenio_id: string | null; cb_convenios: { nome: string } | null } | null =
+    (titularContratos ?? [])[0] as any ?? null;
 
   if (!contrato) {
     const { data: deps } = await supabase
       .from("contrato_dependentes")
-      .select(
-        "contrato_id,ativo,contratos_assinatura!inner(id,clinica_id,status,convenio_id,cb_convenios(nome))",
-      )
+      .select("contrato_id,ativo,contratos_assinatura!inner(id,clinica_id,status,convenio_id,cb_convenios(nome))")
       .eq("paciente_id", pacienteId)
       .eq("ativo", true)
       .limit(5);
@@ -433,33 +286,18 @@ async function obterInfoConvenioPaciente(params: {
   const mensalidadesPagas = pagasCount ?? 0;
 
   // 3) Busca procedimento_id e especialidade do médico
-  const procNorm = (procedimentoNome ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
+  const procNorm = (procedimentoNome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const { data: procs } = await supabase
     .from("procedimentos")
     .select("id,nome,tipo")
     .eq("clinica_id", clinicaId)
     .eq("ativo", true)
     .limit(5000);
-  const procRow =
-    (procs ?? []).find(
-      (p: any) =>
-        (p.nome ?? "")
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toLowerCase()
-          .trim() === procNorm,
-    ) ??
-    (procs ?? []).find((p: any) =>
-      (p.nome ?? "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .includes(procNorm),
-    );
+  const procRow = (procs ?? []).find(
+    (p: any) => (p.nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() === procNorm,
+  ) ?? (procs ?? []).find(
+    (p: any) => (p.nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(procNorm),
+  );
   const procedimentoId = (procRow as any)?.id ?? null;
   const procedimentoTipo = ((procRow as any)?.tipo ?? "").toString().toLowerCase() || null;
 
@@ -494,9 +332,7 @@ async function obterInfoConvenioPaciente(params: {
   // 4) Benefícios aplicáveis para o convênio
   const { data: beneficios } = await supabase
     .from("cb_beneficios")
-    .select(
-      "escopo,procedimento_id,especialidade_id,tipo_desconto,valor_desconto,valor_outros,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor",
-    )
+    .select("escopo,procedimento_id,especialidade_id,tipo_desconto,valor_desconto,valor_outros,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor")
     .eq("clinica_id", clinicaId)
     .eq("convenio_id", contrato.convenio_id)
     .eq("ativo", true);
@@ -525,17 +361,17 @@ async function obterInfoConvenioPaciente(params: {
       };
       beneficioEscolhido = fixo;
     } else {
-      const perc = aplicaveis.filter((b) => b.tipo_desconto === "percentual");
-      const vals = aplicaveis.filter((b) => b.tipo_desconto === "valor");
-      const maiorPerc = perc.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
-      const maiorVal = vals.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
-      if (maiorPerc > 0) {
-        desconto = { tipo: "percentual", valor: maiorPerc };
-        beneficioEscolhido = perc.find((b) => Number(b.valor_desconto) === maiorPerc) ?? null;
-      } else if (maiorVal > 0) {
-        desconto = { tipo: "valor", valor: maiorVal };
-        beneficioEscolhido = vals.find((b) => Number(b.valor_desconto) === maiorVal) ?? null;
-      }
+    const perc = aplicaveis.filter((b) => b.tipo_desconto === "percentual");
+    const vals = aplicaveis.filter((b) => b.tipo_desconto === "valor");
+    const maiorPerc = perc.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
+    const maiorVal = vals.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
+    if (maiorPerc > 0) {
+      desconto = { tipo: "percentual", valor: maiorPerc };
+      beneficioEscolhido = perc.find((b) => Number(b.valor_desconto) === maiorPerc) ?? null;
+    } else if (maiorVal > 0) {
+      desconto = { tipo: "valor", valor: maiorVal };
+      beneficioEscolhido = vals.find((b) => Number(b.valor_desconto) === maiorVal) ?? null;
+    }
     }
   }
 
@@ -551,23 +387,16 @@ async function obterInfoConvenioPaciente(params: {
     if (periodo === "semana") {
       const d = new Date(dataBase);
       const dow = (d.getDay() + 6) % 7; // 0 = segunda
-      janelaInicio = new Date(d);
-      janelaInicio.setDate(d.getDate() - dow);
-      janelaInicio.setHours(0, 0, 0, 0);
-      janelaFim = new Date(janelaInicio);
-      janelaFim.setDate(janelaInicio.getDate() + 6);
-      janelaFim.setHours(23, 59, 59, 999);
+      janelaInicio = new Date(d); janelaInicio.setDate(d.getDate() - dow); janelaInicio.setHours(0, 0, 0, 0);
+      janelaFim = new Date(janelaInicio); janelaFim.setDate(janelaInicio.getDate() + 6); janelaFim.setHours(23, 59, 59, 999);
     } else if (periodo === "mes") {
       janelaInicio = new Date(dataBase.getFullYear(), dataBase.getMonth(), 1, 0, 0, 0, 0);
       janelaFim = new Date(dataBase.getFullYear(), dataBase.getMonth() + 1, 0, 23, 59, 59, 999);
     } else if (periodo === "contrato") {
-      janelaInicio = null;
-      janelaFim = null;
+      janelaInicio = null; janelaFim = null;
     } else {
-      janelaInicio = new Date(dataBase);
-      janelaInicio.setHours(0, 0, 0, 0);
-      janelaFim = new Date(dataBase);
-      janelaFim.setHours(23, 59, 59, 999);
+      janelaInicio = new Date(dataBase); janelaInicio.setHours(0, 0, 0, 0);
+      janelaFim = new Date(dataBase); janelaFim.setHours(23, 59, 59, 999);
     }
 
     // Pacientes que compartilham a cota do contrato
@@ -588,12 +417,10 @@ async function obterInfoConvenioPaciente(params: {
         .select("paciente_id")
         .eq("contrato_id", contrato.id)
         .eq("ativo", true);
-      pacientesCota = Array.from(
-        new Set([
-          ...((tit as any)?.paciente_id ? [(tit as any).paciente_id as string] : []),
-          ...((depsCota ?? []) as Array<{ paciente_id: string }>).map((d) => d.paciente_id),
-        ]),
-      );
+      pacientesCota = Array.from(new Set([
+        ...((tit as any)?.paciente_id ? [(tit as any).paciente_id as string] : []),
+        ...((depsCota ?? []) as Array<{ paciente_id: string }>).map((d) => d.paciente_id),
+      ]));
     }
 
     if (pacientesCota.length > 0) {
@@ -613,13 +440,7 @@ async function obterInfoConvenioPaciente(params: {
       let usados = 0;
       let agsFiltrados: Array<{ medico_id: string | null; paciente_id?: string | null }> = [];
       if (beneficioEscolhido.escopo === "especialidade" && beneficioEscolhido.especialidade_id) {
-        const medicoIds = Array.from(
-          new Set(
-            ((agsDia ?? []) as Array<{ medico_id: string | null }>)
-              .map((a) => a.medico_id)
-              .filter((x): x is string => !!x),
-          ),
-        );
+        const medicoIds = Array.from(new Set(((agsDia ?? []) as Array<{ medico_id: string | null }>).map((a) => a.medico_id).filter((x): x is string => !!x)));
         if (medicoIds.length) {
           const { data: meds } = await supabase
             .from("medicos")
@@ -635,16 +456,12 @@ async function obterInfoConvenioPaciente(params: {
             if (m.especialidade_id) s.add(m.especialidade_id);
             espByMed.set(m.id, s);
           });
-          (
-            (medEspN ?? []) as Array<{ medico_id: string; especialidade_id: string | null }>
-          ).forEach((m) => {
+          ((medEspN ?? []) as Array<{ medico_id: string; especialidade_id: string | null }>).forEach((m) => {
             const s = espByMed.get(m.medico_id) ?? new Set<string>();
             if (m.especialidade_id) s.add(m.especialidade_id);
             espByMed.set(m.medico_id, s);
           });
-          agsFiltrados = (
-            (agsDia ?? []) as Array<{ medico_id: string | null; paciente_id?: string | null }>
-          ).filter((a) => {
+          agsFiltrados = ((agsDia ?? []) as Array<{ medico_id: string | null; paciente_id?: string | null }>).filter((a) => {
             if (!a.medico_id) return false;
             const s = espByMed.get(a.medico_id);
             return s ? s.has(beneficioEscolhido.especialidade_id) : false;
@@ -652,10 +469,7 @@ async function obterInfoConvenioPaciente(params: {
           usados = agsFiltrados.length;
         }
       } else {
-        agsFiltrados = (agsDia ?? []) as Array<{
-          medico_id: string | null;
-          paciente_id?: string | null;
-        }>;
+        agsFiltrados = (agsDia ?? []) as Array<{ medico_id: string | null; paciente_id?: string | null }>;
         usados = agsFiltrados.length;
       }
 
@@ -668,20 +482,12 @@ async function obterInfoConvenioPaciente(params: {
 
       if (usados >= Number(beneficioEscolhido.limite_qtd) || esgotadoExclusivo) {
         const modo = beneficioEscolhido.excedente_modo;
-        const escopoTxt =
-          escopoLim === "paciente"
-            ? "paciente"
-            : escopoLim === "titular_ou_dependente"
-              ? "titular-ou-dependente"
-              : "contrato";
-        const periodoTxt =
-          periodo === "semana"
-            ? "semana"
-            : periodo === "mes"
-              ? "mês"
-              : periodo === "contrato"
-                ? "contrato"
-                : "dia";
+        const escopoTxt = escopoLim === "paciente"
+          ? "paciente"
+          : escopoLim === "titular_ou_dependente"
+            ? "titular-ou-dependente"
+            : "contrato";
+        const periodoTxt = periodo === "semana" ? "semana" : periodo === "mes" ? "mês" : periodo === "contrato" ? "contrato" : "dia";
         if (modo === "bloquear") {
           bloquear = true;
           desconto = null;
@@ -713,9 +519,7 @@ async function obterInfoConvenioPaciente(params: {
   try {
     const { data: regrasRaw } = await (supabase as any)
       .from("cb_convenio_regras")
-      .select(
-        "id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo,carencia_mensalidades,gratuito",
-      )
+      .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo,carencia_mensalidades,gratuito")
       .eq("convenio_id", contrato.convenio_id)
       .eq("ativo", true);
     const regrasCb = (regrasRaw ?? []) as any[];
@@ -728,10 +532,7 @@ async function obterInfoConvenioPaciente(params: {
       let regraMatch: any = null;
       for (const eid of espsTentativa) {
         const r = findR(regrasCb, eid, procedimentoTipo);
-        if (r) {
-          regraMatch = r;
-          break;
-        }
+        if (r) { regraMatch = r; break; }
       }
       if (regraMatch) {
         if (!carenciaCumprida(regraMatch, mensalidadesPagas)) {
@@ -758,14 +559,10 @@ const toLocalInput = (iso: string) => {
 };
 
 const EMPTY = {
-  paciente_nome: "",
-  paciente_id: "",
-  medico_id: "",
-  inicio: "",
-  fim: "",
-  procedimento: "",
-  status: "agendado" as Status,
-  observacoes: "",
+  paciente_nome: "", paciente_id: "", medico_id: "",
+  inicio: "", fim: "", procedimento: "",
+  procedimentos: [] as string[],
+  status: "agendado" as Status, observacoes: "",
   data_pagamento: "",
   orcamento_id: "",
   orcamento_numero: "",
@@ -801,9 +598,7 @@ function AgendaPage() {
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
-  const [agendasPorMedico, setAgendasPorMedico] = useState<
-    Map<string, { id: string; nome: string }[]>
-  >(new Map());
+  const [agendasPorMedico, setAgendasPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
   const [procIdsPorAgenda, setProcIdsPorAgenda] = useState<Map<string, Set<string>>>(new Map());
   // Solicitações de estorno pendentes por agendamento — a linha correspondente
   // fica em vermelho e, para o médico, o paciente é ocultado até o financeiro
@@ -818,16 +613,9 @@ function AgendaPage() {
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<Agendamento[]>([]);
   const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
-  const [pagoInfoMap, setPagoInfoMap] = useState<
-    Map<string, { valor: number; forma: string | null }>
-  >(new Map());
+  const [pagoInfoMap, setPagoInfoMap] = useState<Map<string, { valor: number; forma: string | null }>>(new Map());
   // Mapa agendamento_id → NFS-e mais recente (id/status/url_pdf).
-  const [nfseMap, setNfseMap] = useState<
-    Map<
-      string,
-      { id: string; status: string | null; url_pdf: string | null; numero: string | null }
-    >
-  >(new Map());
+  const [nfseMap, setNfseMap] = useState<Map<string, { id: string; status: string | null; url_pdf: string | null; numero: string | null }>>(new Map());
   const [nascMap, setNascMap] = useState<Map<string, string | null>>(new Map());
   const [convenioMap, setConvenioMap] = useState<Map<string, string>>(new Map());
   const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
@@ -836,9 +624,7 @@ function AgendaPage() {
   const [exames, setExames] = useState<{ id: string; nome: string }[]>([]);
   const [procedimentosList, setProcedimentosList] = useState<{ id: string; nome: string; tipo_procedimento?: string | null }[]>([]);
   const [procPorMedico, setProcPorMedico] = useState<Map<string, Set<string>>>(new Map());
-  const [procOpcoesPorMedico, setProcOpcoesPorMedico] = useState<
-    Map<string, { id: string; nome: string }[]>
-  >(new Map());
+  const [procOpcoesPorMedico, setProcOpcoesPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
   const [procNomesPorMedico, setProcNomesPorMedico] = useState<Map<string, Set<string>>>(new Map());
   // Contagem histórica de uso de cada procedimento na clínica (últimos 365 dias).
   // Chave: normalizar(nome). Usado para ordenar as opções no agendamento
@@ -856,12 +642,7 @@ function AgendaPage() {
   // Dialog de divisão de orçamento (vários grupos de procedimentos → vários agendamentos vinculados)
   const [dividirOpen, setDividirOpen] = useState(false);
   const [dividirCtx, setDividirCtx] = useState<{
-    orcamento: {
-      id: string;
-      numero: number;
-      paciente_id: string | null;
-      paciente_nome: string | null;
-    };
+    orcamento: { id: string; numero: number; paciente_id: string | null; paciente_nome: string | null };
     itens: DividirItem[];
     inicioPadrao: string;
   } | null>(null);
@@ -872,11 +653,9 @@ function AgendaPage() {
   const [quickCompleteOpen, setQuickCompleteOpen] = useState(false);
   // Informações do contrato ativo de cartão benefícios do paciente selecionado no modal.
   // Usado para mostrar o seletor "Tipo de atendimento" (Convênio × Particular) e alertar sobre mensalidade em atraso.
-  const [contratoPacienteInfo, setContratoPacienteInfo] = useState<{
-    convenioNome: string;
-    totalAberto: number;
-    qtdAtrasadas: number;
-  } | null>(null);
+  const [contratoPacienteInfo, setContratoPacienteInfo] = useState<
+    { convenioNome: string; totalAberto: number; qtdAtrasadas: number } | null
+  >(null);
   const contratoPacienteReqId = useRef(0);
   useEffect(() => {
     if (!open || !clinicaAtual || !form.paciente_id) {
@@ -911,10 +690,7 @@ function AgendaPage() {
         if (cand) contrato = { id: cand.id, convenioNome: cand.cb_convenios?.nome ?? "Convênio" };
       }
       if (reqId !== contratoPacienteReqId.current) return;
-      if (!contrato) {
-        setContratoPacienteInfo(null);
-        return;
-      }
+      if (!contrato) { setContratoPacienteInfo(null); return; }
       // 2) Mensalidades vencidas
       const hojeStr = new Date().toISOString().slice(0, 10);
       const { data: mens } = await supabase
@@ -998,9 +774,7 @@ function AgendaPage() {
 
   const iniciarReagendamento = (a: Agendamento) => {
     if (a.status === "realizado") {
-      toast.error(
-        "Atendimento já realizado — peça ao financeiro para estornar antes de reagendar.",
-      );
+      toast.error("Atendimento já realizado — peça ao financeiro para estornar antes de reagendar.");
       return;
     }
     setReagendandoAg(a);
@@ -1011,10 +785,7 @@ function AgendaPage() {
   const confirmarReagendamentoNoSlot = async (slot: Agendamento) => {
     const origem = reagendandoAg;
     if (!origem || reagSalvando) return;
-    if (slot.id === origem.id) {
-      toast.info("Esse já é o horário atual.");
-      return;
-    }
+    if (slot.id === origem.id) { toast.info("Esse já é o horário atual."); return; }
     if (!isSlotLivre(slot.paciente_nome)) {
       toast.error("Esse horário não está disponível. Escolha um slot DISPONÍVEL.");
       return;
@@ -1024,43 +795,28 @@ function AgendaPage() {
     const trilha = `[Reagendado em ${new Date().toLocaleString("pt-BR")}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(slot.inicio).toLocaleString("pt-BR")}`;
     const novasObs = obsAnt ? `${obsAnt}\n${trilha}` : trilha;
     // 1) Libera a ficha de origem (vira DISPONÍVEL no horário atual)
-    const { error: e1 } = await supabase
-      .from("agendamentos")
-      .update({
-        paciente_id: null,
-        paciente_nome: "DISPONÍVEL",
-        status: "agendado",
-        procedimento: null,
-        observacoes: null,
-        data_pagamento: null,
-      } as never)
-      .eq("id", origem.id);
-    if (e1) {
-      setReagSalvando(false);
-      mostrarErro(e1);
-      return;
-    }
+    const { error: e1 } = await supabase.from("agendamentos").update({
+      paciente_id: null,
+      paciente_nome: "DISPONÍVEL",
+      status: "agendado",
+      procedimento: null,
+      observacoes: null,
+      data_pagamento: null,
+    } as never).eq("id", origem.id);
+    if (e1) { setReagSalvando(false); mostrarErro(e1); return; }
     // 2) Coloca a paciente na ficha de destino (slot escolhido), preservando o horário do slot
-    const { error: e2 } = await supabase
-      .from("agendamentos")
-      .update({
-        paciente_id: origem.paciente_id ?? null,
-        paciente_nome: origem.paciente_nome,
-        procedimento: origem.procedimento ?? null,
-        status: "agendado",
-        observacoes: novasObs,
-        data_pagamento: origem.data_pagamento ?? null,
-      } as never)
-      .eq("id", slot.id);
-    if (e2) {
-      setReagSalvando(false);
-      mostrarErro(e2);
-      return;
-    }
+    const { error: e2 } = await supabase.from("agendamentos").update({
+      paciente_id: origem.paciente_id ?? null,
+      paciente_nome: origem.paciente_nome,
+      procedimento: origem.procedimento ?? null,
+      status: "agendado",
+      observacoes: novasObs,
+      data_pagamento: origem.data_pagamento ?? null,
+    } as never).eq("id", slot.id);
+    if (e2) { setReagSalvando(false); mostrarErro(e2); return; }
     // 3) Transfere lançamentos financeiros (pagamento) da ficha de origem para a de destino,
     //    para que o ícone de "pago" continue aparecendo na nova ficha.
-    await supabase
-      .from("fin_lancamentos")
+    await supabase.from("fin_lancamentos")
       .update({ agendamento_id: slot.id } as never)
       .eq("agendamento_id", origem.id);
     setReagSalvando(false);
@@ -1086,31 +842,20 @@ function AgendaPage() {
   const emitenteNotaAposRef = useRef<string | null>(null);
   const navigate = useNavigate();
   // ── Desconto aplicado ANTES de "Salvar e Pagar" (com autorização da supervisão).
-  type DescontoPendente = {
-    tipo: "valor" | "percentual";
-    input: string;
-    autorizadoPor: string;
-    motivo: string;
-  };
+  type DescontoPendente = { tipo: "valor" | "percentual"; input: string; autorizadoPor: string; motivo: string };
   const [descontoPendente, setDescontoPendente] = useState<DescontoPendente | null>(null);
   const [descontoDlgOpen, setDescontoDlgOpen] = useState(false);
   const [supervisorOpen, setSupervisorOpen] = useState(false);
-  const [descForm, setDescForm] = useState<{
-    tipo: "valor" | "percentual";
-    input: string;
-    motivo: string;
-    autorizadoPor: string;
-  }>({ tipo: "valor", input: "", motivo: "", autorizadoPor: "" });
+  const [descForm, setDescForm] = useState<{ tipo: "valor" | "percentual"; input: string; motivo: string; autorizadoPor: string }>({ tipo: "valor", input: "", motivo: "", autorizadoPor: "" });
   const ehSupervisorDesc = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
   // Aplica desconto pendente a um valor (R$).
   const aplicarDescontoPendente = (valor: number): number => {
     if (!descontoPendente) return valor;
     const n = Number(String(descontoPendente.input).replace(",", ".")) || 0;
     if (n <= 0) return valor;
-    const d =
-      descontoPendente.tipo === "percentual"
-        ? valor * (Math.min(100, n) / 100)
-        : Math.min(valor, n);
+    const d = descontoPendente.tipo === "percentual"
+      ? valor * (Math.min(100, n) / 100)
+      : Math.min(valor, n);
     return Math.max(0, valor - d);
   };
   const descricaoComDesconto = (desc: string): string => {
@@ -1121,9 +866,7 @@ function AgendaPage() {
       `Desconto: ${txt}`,
       `Autorizado por: ${descontoPendente.autorizadoPor}`,
       descontoPendente.motivo ? `Motivo: ${descontoPendente.motivo}` : null,
-    ]
-      .filter(Boolean)
-      .join(" — ");
+    ].filter(Boolean).join(" — ");
     return desc ? `${desc}\n${partes}` : partes;
   };
   const [pacInfoOpen, setPacInfoOpen] = useState(false);
@@ -1137,33 +880,19 @@ function AgendaPage() {
     setPacInfoLoading(true);
     const { data } = await supabase
       .from("pacientes")
-      .select(
-        "id,nome,cpf,telefone,email,data_nascimento,numero_pasta,cidade,estado,bairro,logradouro,numero,foto_url",
-      )
+      .select("id,nome,cpf,telefone,email,data_nascimento,numero_pasta,cidade,estado,bairro,logradouro,numero,foto_url")
       .eq("id", pacienteId)
       .maybeSingle();
     if (data) {
       const base: any = { ...data };
-      const camposComplementares = [
-        "telefone",
-        "email",
-        "cep",
-        "logradouro",
-        "numero",
-        "bairro",
-        "cidade",
-        "estado",
-        "foto_url",
-      ];
+      const camposComplementares = ["telefone","email","cep","logradouro","numero","bairro","cidade","estado","foto_url"];
       const faltando = camposComplementares.filter((k) => !base[k]);
       if (faltando.length > 0 && clinicaAtual) {
         try {
           const cpfDigits = String(base.cpf ?? "").replace(/\D/g, "");
           let q = supabase
             .from("pacientes")
-            .select(
-              "id,cpf,nome,data_nascimento,telefone,email,cep,logradouro,numero,bairro,cidade,estado,foto_url",
-            )
+            .select("id,cpf,nome,data_nascimento,telefone,email,cep,logradouro,numero,bairro,cidade,estado,foto_url")
             .eq("clinica_id", clinicaAtual.clinica_id)
             .neq("id", base.id);
           if (base.data_nascimento) q = q.eq("data_nascimento", base.data_nascimento);
@@ -1173,19 +902,10 @@ function AgendaPage() {
             if (cpfDigits.length >= 11) {
               return String(p.cpf ?? "").replace(/\D/g, "") === cpfDigits;
             }
-            return (
-              String(p.nome ?? "")
-                .trim()
-                .toUpperCase() ===
-              String(base.nome ?? "")
-                .trim()
-                .toUpperCase()
-            );
+            return String(p.nome ?? "").trim().toUpperCase() === String(base.nome ?? "").trim().toUpperCase();
           });
           for (const k of faltando) {
-            const v = match
-              .map((p: any) => p[k])
-              .find((x: any) => x !== null && x !== undefined && String(x).length > 0);
+            const v = match.map((p: any) => p[k]).find((x: any) => x !== null && x !== undefined && String(x).length > 0);
             if (v) base[k] = v;
           }
         } catch (e) {
@@ -1199,35 +919,12 @@ function AgendaPage() {
   type FormaOpcao = { forma: string; label: string; valor: number };
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [formaPagOpcoes, setFormaPagOpcoes] = useState<FormaOpcao[]>([]);
-  const [formaPagCtx, setFormaPagCtx] = useState<{
-    agId: string;
-    desc: string;
-    paciente?: string;
-    procedimento?: string;
-    medico?: string;
-    especialidade?: string;
-  } | null>(null);
+  const [formaPagCtx, setFormaPagCtx] = useState<{ agId: string; desc: string; paciente?: string; procedimento?: string; medico?: string; especialidade?: string } | null>(null);
   const [novoPacOpen, setNovoPacOpen] = useState(false);
-  const [novoPac, setNovoPac] = useState({
-    nome: "",
-    cpf: "",
-    telefone: "",
-    data_nascimento: "",
-    email: "",
-  });
+  const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
-  const [equipeList, setEquipeList] = useState<
-    Array<{ nome: string | null; email: string | null }>
-  >([]);
-  type AuditRow = {
-    id: string;
-    action: string;
-    table_name: string;
-    user_email: string | null;
-    created_at: string;
-    dados_antes: Record<string, unknown> | null;
-    dados_depois: Record<string, unknown> | null;
-  };
+  const [equipeList, setEquipeList] = useState<Array<{ nome: string | null; email: string | null }>>([]);
+  type AuditRow = { id: string; action: string; table_name: string; user_email: string | null; created_at: string; dados_antes: Record<string, unknown> | null; dados_depois: Record<string, unknown> | null };
   const [auditAg, setAuditAg] = useState<Agendamento | null>(null);
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -1244,9 +941,7 @@ function AgendaPage() {
     try {
       const data = await fnListarEquipe({ data: { clinicaId: clinicaAtual.clinica_id } });
       setEquipeList((data as any[]).map((m) => ({ nome: m.nome, email: m.email })));
-    } catch (_) {
-      /* silencioso */
-    }
+    } catch (_) { /* silencioso */ }
   };
 
   const abrirAuditoria = async (a: Agendamento) => {
@@ -1261,11 +956,7 @@ function AgendaPage() {
       .eq("record_id", a.id)
       .order("created_at", { ascending: false })
       .limit(200);
-    if (error) {
-      setAuditLoading(false);
-      mostrarErro(error);
-      return;
-    }
+    if (error) { setAuditLoading(false); mostrarErro(error); return; }
     // 2) lançamentos financeiros vinculados ao agendamento (para status do repasse médico)
     const { data: lancs } = await supabase
       .from("fin_lancamentos")
@@ -1283,9 +974,8 @@ function AgendaPage() {
         .limit(200);
       lancAudit = (la as unknown as AuditRow[]) ?? [];
     }
-    const todos = [...((agAudit as unknown as AuditRow[]) ?? []), ...lancAudit].sort((x, y) =>
-      x.created_at < y.created_at ? 1 : -1,
-    );
+    const todos = [...((agAudit as unknown as AuditRow[]) ?? []), ...lancAudit]
+      .sort((x, y) => (x.created_at < y.created_at ? 1 : -1));
     setAuditLoading(false);
     setAuditRows(todos);
   };
@@ -1293,21 +983,11 @@ function AgendaPage() {
   const cadastrarPacienteRapido = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
-    if (!novoPac.nome.trim()) {
-      toast.error("Informe o nome");
-      return;
-    }
-    if (!novoPac.data_nascimento) {
-      toast.error("Informe a data de nascimento");
-      return;
-    }
-    if (!novoPac.telefone.trim()) {
-      toast.error("Informe o telefone");
-      return;
-    }
+    if (!novoPac.nome.trim()) { toast.error("Informe o nome"); return; }
+    if (!novoPac.data_nascimento) { toast.error("Informe a data de nascimento"); return; }
+    if (!novoPac.telefone.trim()) { toast.error("Informe o telefone"); return; }
     if (novoPac.cpf.trim() && !isCPFValido(novoPac.cpf)) {
-      toast.error("CPF inválido");
-      return;
+      toast.error("CPF inválido"); return;
     }
     setSavingPac(true);
     const { data, error } = await supabase
@@ -1323,14 +1003,9 @@ function AgendaPage() {
       .select("id,nome")
       .single();
     setSavingPac(false);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
-    setPacientes((prev) =>
-      [...prev, { id: data.id, nome: data.nome }].sort((a, b) => a.nome.localeCompare(b.nome)),
-    );
-    setForm((f) => ({ ...f, paciente_nome: data.nome, paciente_id: data.id }));
+    if (error) { mostrarErro(error); return; }
+    setPacientes(prev => [...prev, { id: data.id, nome: data.nome }].sort((a, b) => a.nome.localeCompare(b.nome)));
+    setForm(f => ({ ...f, paciente_nome: data.nome, paciente_id: data.id }));
     setNovoPac({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
     setNovoPacOpen(false);
     toast.success("Paciente cadastrado");
@@ -1341,18 +1016,13 @@ function AgendaPage() {
     setLoading(true);
     let q = supabase
       .from("agendamentos")
-      .select(
-        "id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never,
-      )
+      .select("id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: false });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
     // então não restringe por status no servidor — filtra em memória.
     const statusEspecifico =
-      filtroStatus !== "todos" &&
-      filtroStatus !== "livres" &&
-      filtroStatus !== "agendado" &&
-      filtroStatus !== "pago";
+      filtroStatus !== "todos" && filtroStatus !== "livres" && filtroStatus !== "agendado" && filtroStatus !== "pago";
     if (statusEspecifico) {
       q = q.eq("status", filtroStatus as Status).limit(1000);
     }
@@ -1400,7 +1070,7 @@ function AgendaPage() {
       q = q.gte("inicio", inicio).lte("inicio", fim);
     } else if (!statusEspecifico) {
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
-      const f = new Date(`${dataFim ?? dataRef}T00:00:00`);
+      const f = new Date(`${(dataFim ?? dataRef)}T00:00:00`);
       if (!dataFim) {
         // Quando há busca por cliente, ampliamos a janela (o ILIKE no
         // servidor já reduz o volume). Sem filtro, mantemos 30 dias.
@@ -1418,21 +1088,10 @@ function AgendaPage() {
     }
     const { data, error } = await q;
     setLoading(false);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     // Recursos de enfermagem aparecem como "médicos virtuais": mapeamos o
     // enfermagem_recurso_id no campo medico_id para reuso de toda a UI.
-    const mapped = (
-      (data ?? []) as unknown as Array<
-        Agendamento & {
-          enfermagem_recurso_id?: string | null;
-          medico?: { nome: string | null; sexo: string | null } | null;
-          orcamento?: { numero: number | null } | null;
-        }
-      >
-    ).map((a) => ({
+    const mapped = (((data ?? []) as unknown) as Array<Agendamento & { enfermagem_recurso_id?: string | null; medico?: { nome: string | null; sexo: string | null } | null; orcamento?: { numero: number | null } | null }>).map((a) => ({
       ...a,
       paciente_nome: isSlotLivre(a.paciente_nome) ? "DISPONÍVEL" : a.paciente_nome,
       medico_id: a.medico_id ?? a.enfermagem_recurso_id ?? null,
@@ -1443,23 +1102,21 @@ function AgendaPage() {
     setItems(mapped as Agendamento[]);
     setPage(1);
     setSelecionados(new Set());
-    const agendaRows = (mapped ?? []) as unknown as Array<
-      Agendamento & { fluxo_etapa?: string | null }
-    >;
-    setEtapaMap(
-      new Map(
-        agendaRows.map((r) => [r.id, r.fluxo_etapa ?? "aguardando_recepcao"] as [string, string]),
-      ),
-    );
+    const agendaRows = (((mapped ?? []) as unknown) as Array<Agendamento & { fluxo_etapa?: string | null }>);
+    setEtapaMap(new Map(agendaRows
+      .map((r) => [r.id, r.fluxo_etapa ?? "aguardando_recepcao"] as [string, string])));
     // Busca dados auxiliares dos pacientes em paralelo para não atrasar a agenda.
-    const pacIds = Array.from(
-      new Set(
-        agendaRows.map((a) => a.paciente_id as string | null).filter((x): x is string => !!x),
-      ),
-    );
+    const pacIds = Array.from(new Set(
+      agendaRows
+        .map((a) => a.paciente_id as string | null)
+        .filter((x): x is string => !!x),
+    ));
     if (pacIds.length) {
       const [{ data: nasc }, { data: contratos }, { data: deps }] = await Promise.all([
-        supabase.from("pacientes").select("id,data_nascimento").in("id", pacIds),
+        supabase
+          .from("pacientes")
+          .select("id,data_nascimento")
+          .in("id", pacIds),
         supabase
           .from("contratos_assinatura")
           .select("paciente_id,status,cb_convenios(nome)")
@@ -1468,9 +1125,7 @@ function AgendaPage() {
           .in("paciente_id", pacIds),
         supabase
           .from("contrato_dependentes")
-          .select(
-            "paciente_id,ativo,contratos_assinatura!inner(clinica_id,status,cb_convenios(nome))",
-          )
+          .select("paciente_id,ativo,contratos_assinatura!inner(clinica_id,status,cb_convenios(nome))")
           .in("paciente_id", pacIds)
           .eq("ativo", true)
           .eq("contratos_assinatura.clinica_id", clinicaAtual.clinica_id)
@@ -1480,23 +1135,18 @@ function AgendaPage() {
       (nasc ?? []).forEach((p: any) => map.set(p.id, p.data_nascimento ?? null));
       setNascMap(map);
       const cmap = new Map<string, string>();
-      (
-        (contratos ?? []) as Array<{ paciente_id: string; cb_convenios: { nome: string } | null }>
-      ).forEach((c) => {
-        if (c.paciente_id && !cmap.has(c.paciente_id)) {
-          cmap.set(c.paciente_id, c.cb_convenios?.nome ?? "Convênio");
-        }
-      });
-      (
-        (deps ?? []) as Array<{
-          paciente_id: string | null;
-          contratos_assinatura: { cb_convenios: { nome: string } | null } | null;
-        }>
-      ).forEach((d) => {
-        if (d.paciente_id && !cmap.has(d.paciente_id)) {
-          cmap.set(d.paciente_id, d.contratos_assinatura?.cb_convenios?.nome ?? "Convênio");
-        }
-      });
+      ((contratos ?? []) as Array<{ paciente_id: string; cb_convenios: { nome: string } | null }>)
+        .forEach((c) => {
+          if (c.paciente_id && !cmap.has(c.paciente_id)) {
+            cmap.set(c.paciente_id, c.cb_convenios?.nome ?? "Convênio");
+          }
+        });
+      ((deps ?? []) as Array<{ paciente_id: string | null; contratos_assinatura: { cb_convenios: { nome: string } | null } | null }>)
+        .forEach((d) => {
+          if (d.paciente_id && !cmap.has(d.paciente_id)) {
+            cmap.set(d.paciente_id, d.contratos_assinatura?.cb_convenios?.nome ?? "Convênio");
+          }
+        });
       setConvenioMap(cmap);
     } else {
       setNascMap(new Map());
@@ -1508,7 +1158,9 @@ function AgendaPage() {
     // qualquer lançamento órfão que tenha ficado vinculado a uma ficha
     // que foi posteriormente liberada por um reagendamento.
     const idsComPaciente = new Set(
-      agendaRows.filter((a) => !isSlotLivre(a.paciente_nome)).map((a) => a.id),
+      agendaRows
+        .filter((a) => !isSlotLivre(a.paciente_nome))
+        .map((a) => a.id),
     );
     const idsParaPagamento = Array.from(idsComPaciente);
     if (idsParaPagamento.length) {
@@ -1527,13 +1179,7 @@ function AgendaPage() {
           .eq("status", "confirmado")
           .in("agendamento_id", slice);
         if (pgErr) continue;
-        (
-          (pg ?? []) as Array<{
-            agendamento_id: string | null;
-            valor: number | string | null;
-            forma_pagamento: string | null;
-          }>
-        ).forEach((r) => {
+        ((pg ?? []) as Array<{ agendamento_id: string | null; valor: number | string | null; forma_pagamento: string | null }>).forEach((r) => {
           if (!r.agendamento_id) return;
           pagosIds.push(r.agendamento_id);
           const prev = infoMap.get(r.agendamento_id);
@@ -1548,10 +1194,7 @@ function AgendaPage() {
       setPagoInfoMap(infoMap);
       // Carrega NFS-e existentes para os agendamentos do dia (uma por agendamento, a mais recente).
       try {
-        const nMap = new Map<
-          string,
-          { id: string; status: string | null; url_pdf: string | null; numero: string | null }
-        >();
+        const nMap = new Map<string, { id: string; status: string | null; url_pdf: string | null; numero: string | null }>();
         for (let i = 0; i < idsParaPagamento.length; i += CHUNK) {
           const slice = idsParaPagamento.slice(i, i + CHUNK);
           const { data: ns } = await supabase
@@ -1560,23 +1203,10 @@ function AgendaPage() {
             .eq("clinica_id", clinicaAtual.clinica_id)
             .in("agendamento_id", slice)
             .order("created_at", { ascending: false });
-          (
-            (ns ?? []) as Array<{
-              id: string;
-              agendamento_id: string | null;
-              status: string | null;
-              url_pdf: string | null;
-              numero: string | null;
-            }>
-          ).forEach((r) => {
+          ((ns ?? []) as Array<{ id: string; agendamento_id: string | null; status: string | null; url_pdf: string | null; numero: string | null }>).forEach((r) => {
             if (!r.agendamento_id) return;
             if (!nMap.has(r.agendamento_id)) {
-              nMap.set(r.agendamento_id, {
-                id: r.id,
-                status: r.status,
-                url_pdf: r.url_pdf,
-                numero: r.numero,
-              });
+              nMap.set(r.agendamento_id, { id: r.id, status: r.status, url_pdf: r.url_pdf, numero: r.numero });
             }
           });
         }
@@ -1593,42 +1223,16 @@ function AgendaPage() {
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
-    const [m, e, me, pr, sr, mc, mp, er, erp, agendasRes] = await Promise.all([
-      supabase
-        .from("medicos")
-        .select(
-          "id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco",
-        )
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true)
-        .order("nome"),
-      supabase.from("especialidades").select("id,nome").order("nome"),
-      supabase
-        .from("medico_especialidades")
-        .select("medico_id,especialidade_id,medicos!inner(clinica_id)")
-        .eq("medicos.clinica_id", clinicaAtual.clinica_id),
+    const [m, e, me, pr, sr, mcRows, mp, er, erp, agendasRes] = await Promise.all([
+      supabase.from("medicos").select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
+      supabase.from("medico_especialidades").select("medico_id,especialidade_id,medicos!inner(clinica_id)").eq("medicos.clinica_id", clinicaAtual.clinica_id),
       fetchProcedimentosAgenda(clinicaAtual.clinica_id),
-      supabase
-        .from("procedimento_split_regras")
-        .select("medico_id,procedimento_id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .not("medico_id", "is", null),
-      supabase
-        .from("medico_convenios")
-        .select("medico_id,nome,ativo,medicos!inner(clinica_id)")
-        .eq("ativo", true)
-        .eq("medicos.clinica_id", clinicaAtual.clinica_id),
+      supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
+      getMedicoConveniosAgenda(clinicaAtual.clinica_id),
       fetchMedicoProcedimentosAgenda(clinicaAtual.clinica_id),
-      supabase
-        .from("enfermagem_recursos")
-        .select("id,nome")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true)
-        .order("nome"),
-      supabase
-        .from("enfermagem_recurso_procedimentos")
-        .select("recurso_id,procedimento_id,enfermagem_recursos!inner(clinica_id)")
-        .eq("enfermagem_recursos.clinica_id", clinicaAtual.clinica_id),
+      supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+      supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id,enfermagem_recursos!inner(clinica_id)").eq("enfermagem_recursos.clinica_id", clinicaAtual.clinica_id),
       supabase
         .from("medico_agendas")
         .select("id,nome,medico_id,ativo,ordem")
@@ -1639,11 +1243,7 @@ function AgendaPage() {
     ]);
     const agendasData = agendasRes.data;
     const ag = new Map<string, { id: string; nome: string }[]>();
-    for (const a of (agendasData ?? []) as Array<{
-      id: string;
-      nome: string;
-      medico_id: string | null;
-    }>) {
+    for (const a of (agendasData ?? []) as Array<{ id: string; nome: string; medico_id: string | null }>) {
       if (!a.medico_id) continue;
       const arr = ag.get(a.medico_id) ?? [];
       arr.push({ id: a.id, nome: a.nome });
@@ -1672,17 +1272,13 @@ function AgendaPage() {
       ((e.data ?? []) as Especialidade[]).map((x) => [x.id, x.nome]),
     );
     type RawMedicoAgenda = Medico;
-    const medicosBase = ((m.data ?? []) as unknown as RawMedicoAgenda[]).map((x) => ({
+    const medicosBase = (((m.data ?? []) as unknown) as RawMedicoAgenda[]).map((x) => ({
       ...x,
-      procedimento_padrao_nome: x.procedimento_padrao_id
-        ? (procedimentosPorId.get(x.procedimento_padrao_id)?.nome ?? null)
-        : null,
-      especialidade_nome: x.especialidade_id
-        ? (especialidadesPorId.get(x.especialidade_id) ?? null)
-        : null,
+      procedimento_padrao_nome: x.procedimento_padrao_id ? procedimentosPorId.get(x.procedimento_padrao_id)?.nome ?? null : null,
+      especialidade_nome: x.especialidade_id ? especialidadesPorId.get(x.especialidade_id) ?? null : null,
       __recurso: false,
     }));
-    let recursosArr = (er.data ?? []) as RecursoEnf[];
+    let recursosArr = ((er.data ?? []) as RecursoEnf[]);
     // Se o usuário logado é enfermeiro, restringe agendas àquelas em que foi liberado
     if (clinicaAtual.role === "enfermeiro" && user?.id) {
       const { data: vinc } = await supabase
@@ -1690,9 +1286,7 @@ function AgendaPage() {
         .select("recurso_id")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("user_id", user.id);
-      const allowed = new Set(
-        ((vinc ?? []) as Array<{ recurso_id: string }>).map((r) => r.recurso_id),
-      );
+      const allowed = new Set(((vinc ?? []) as Array<{ recurso_id: string }>).map((r) => r.recurso_id));
       recursosArr = recursosArr.filter((r) => allowed.has(r.id));
     }
     const recursosComoMedicos: Medico[] = recursosArr.map((r) => ({
@@ -1740,10 +1334,7 @@ function AgendaPage() {
       if (set.size > 1) medicoMultiEsp.add(mid);
     }
     const pm = new Map<string, Set<string>>();
-    for (const r of (sr.data ?? []) as Array<{
-      medico_id: string | null;
-      procedimento_id: string;
-    }>) {
+    for (const r of (sr.data ?? []) as Array<{ medico_id: string | null; procedimento_id: string }>) {
       if (!r.medico_id) continue;
       if (!pm.has(r.medico_id)) pm.set(r.medico_id, new Set());
       pm.get(r.medico_id)!.add(r.procedimento_id);
@@ -1765,7 +1356,7 @@ function AgendaPage() {
       // Fallback (legado, sem especialidade gravada): só decora com o grupo
       // quando o médico tem mais de uma especialidade.
       const espNomeExplicito = r.especialidade_id
-        ? (especialidadesPorId.get(r.especialidade_id) ?? null)
+        ? especialidadesPorId.get(r.especialidade_id) ?? null
         : null;
       const grupo = (proc.grupo ?? "").trim();
       const decorado = espNomeExplicito
@@ -1780,9 +1371,8 @@ function AgendaPage() {
     }
     setProcPorMedico(pm);
     // Vínculos de procedimentos por recurso de enfermagem
-    const recursoProcsValidos = (
-      (erp.data ?? []) as Array<{ recurso_id: string; procedimento_id: string }>
-    ).filter((r) => new Set(recursosArr.map((x) => x.id)).has(r.recurso_id));
+    const recursoProcsValidos = ((erp.data ?? []) as Array<{ recurso_id: string; procedimento_id: string }>)
+      .filter((r) => new Set(recursosArr.map((x) => x.id)).has(r.recurso_id));
     for (const r of recursoProcsValidos) {
       if (!pm.has(r.recurso_id)) pm.set(r.recurso_id, new Set());
       pm.get(r.recurso_id)!.add(r.procedimento_id);
@@ -1797,7 +1387,7 @@ function AgendaPage() {
       procOpcoesMap.get(r.recurso_id)!.push(proc);
     }
     setProcOpcoesPorMedico(procOpcoesMap);
-    const medicosIds = new Set(((m.data ?? []) as unknown as Medico[]).map((x) => x.id));
+    const medicosIds = new Set((((m.data ?? []) as unknown) as Medico[]).map((x) => x.id));
     const nm = new Map<string, Set<string>>();
     for (const r of (mcRows ?? []) as Array<{ medico_id: string; nome: string }>) {
       if (!r.medico_id || !medicosIds.has(r.medico_id)) continue;
@@ -1805,11 +1395,10 @@ function AgendaPage() {
       nm.get(r.medico_id)!.add(normalizar(r.nome));
     }
     setProcNomesPorMedico(nm);
+
   };
 
-  useEffect(() => {
-    loadRef();
-  }, [clinicaAtual?.clinica_id]);
+  useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
 
   // Sincroniza cadastros (serviços do médico, vínculos serviço↔agenda,
   // especialidades, recursos de enfermagem) sempre que o diálogo de
@@ -1838,15 +1427,7 @@ function AgendaPage() {
       const opcoes: { id: string; nome: string }[] = [];
       const vistos = new Set<string>();
       const ids = new Set<string>();
-      for (const r of data as Array<{
-        procedimento_id: string;
-        procedimentos: {
-          id: string;
-          nome: string;
-          grupo: string | null;
-          ativo: boolean | null;
-        } | null;
-      }>) {
+      for (const r of data as Array<{ procedimento_id: string; procedimentos: { id: string; nome: string; grupo: string | null; ativo: boolean | null } | null }>) {
         const p = r.procedimentos;
         if (!p || p.ativo === false) continue;
         const k = normalizar(p.nome);
@@ -1880,9 +1461,7 @@ function AgendaPage() {
         return [...prev, ...adicionar];
       });
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [form.medico_id, clinicaAtual?.clinica_id, procOpcoesPorMedico]);
 
   // Carrega contagem histórica de procedimentos (últimos 365 dias) para
@@ -1893,14 +1472,9 @@ function AgendaPage() {
     (async () => {
       // Usa RPC `procedimentos_popularidade` (GROUP BY no banco) em vez de
       // baixar até 20.000 agendamentos para contar no navegador.
-      const { data, error } = await (
-        supabase as unknown as {
-          rpc: (
-            fn: string,
-            args: Record<string, unknown>,
-          ) => Promise<{ data: unknown; error: unknown }>;
-        }
-      ).rpc("procedimentos_popularidade", { p_clinica_id: clinicaAtual.clinica_id });
+      const { data, error } = await (supabase as unknown as {
+        rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+      }).rpc("procedimentos_popularidade", { p_clinica_id: clinicaAtual.clinica_id });
       const counts = new Map<string, number>();
       if (!error && Array.isArray(data)) {
         for (const row of data as Array<{ procedimento: string | null; total: number | string }>) {
@@ -1910,22 +1484,10 @@ function AgendaPage() {
       }
       if (!cancelled) setProcedimentoUsoMap(counts);
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [clinicaAtual?.clinica_id]);
 
-  useEffect(() => {
-    load();
-  }, [
-    clinicaAtual?.clinica_id,
-    dataRef,
-    dataFim,
-    apenasData,
-    filtroStatus,
-    filtroMedico,
-    filtroCliente,
-  ]);
+  useEffect(() => { load(); }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData, filtroStatus, filtroMedico, filtroCliente]);
 
   // Realtime: recarrega quando agendamentos mudam (outro recepcionista,
   // pagamento no caixa, etc.). Debounce simples para evitar refetch em rajada.
@@ -1934,22 +1496,13 @@ function AgendaPage() {
     let t: ReturnType<typeof setTimeout> | null = null;
     const schedule = () => {
       if (t) clearTimeout(t);
-      t = setTimeout(() => {
-        void load();
-      }, 400);
+      t = setTimeout(() => { void load(); }, 400);
     };
     const ch = supabase
       .channel(`agenda-rt-${clinicaAtual.clinica_id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "agendamentos",
-          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
-        },
-        schedule,
-      )
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "agendamentos", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
+        schedule)
       .subscribe();
     return () => {
       if (t) clearTimeout(t);
@@ -2008,10 +1561,7 @@ function AgendaPage() {
   // Verifica se o usuário logado é médico da clínica atual (para liberar status "Realizado")
   useEffect(() => {
     (async () => {
-      if (!user?.id || !clinicaAtual) {
-        setUsuarioEhMedico(false);
-        return;
-      }
+      if (!user?.id || !clinicaAtual) { setUsuarioEhMedico(false); return; }
       const { data } = await supabase
         .from("medicos")
         .select("id")
@@ -2067,9 +1617,7 @@ function AgendaPage() {
       for (const p of procedimentosList) {
         if (idsAgenda.has(p.id)) nomesAgenda.add(normalizar(p.nome));
       }
-      const filtrada = lista.filter(
-        (p) => idsAgenda.has(p.id) || nomesAgenda.has(normalizar(p.nome)),
-      );
+      const filtrada = lista.filter((p) => idsAgenda.has(p.id) || nomesAgenda.has(normalizar(p.nome)));
       // Fallback: se o filtro zerar a lista mas o médico tem serviços
       // cadastrados, mostra todos eles para não bloquear o agendamento.
       return filtrada.length > 0 ? filtrada : lista;
@@ -2094,37 +1642,36 @@ function AgendaPage() {
     if (!med) return "";
     if (med.procedimento_padrao_em_branco) return "";
     if (!med.procedimento_padrao_id) return "";
-    return (
-      med.procedimento_padrao_nome ??
-      procedimentosList.find((p) => p.id === med.procedimento_padrao_id)?.nome ??
-      ""
-    );
+    return med.procedimento_padrao_nome
+      ?? procedimentosList.find((p) => p.id === med.procedimento_padrao_id)?.nome
+      ?? "";
   };
 
-  const procedimentoEfetivo = (
-    medicoId: string | null | undefined,
-    procedimento: string | null | undefined,
-  ) => {
+  const procedimentoEfetivo = (medicoId: string | null | undefined, procedimento: string | null | undefined) => {
     const atual = (procedimento ?? "").trim();
     const med = medicoId ? medicos.find((m) => m.id === medicoId) : null;
     const padrao = procedimentoPadraoDoMedico(medicoId);
-    if (padrao && (!atual || normalizar(atual) === normalizar(med?.especialidade_nome ?? "")))
-      return padrao;
+    if (padrao && (!atual || normalizar(atual) === normalizar(med?.especialidade_nome ?? ""))) return padrao;
     return atual;
   };
 
-  const procedimentoFormulario = (
-    medicoId: string | null | undefined,
-    procedimento: string | null | undefined,
-  ) => {
+  const procedimentoFormulario = (medicoId: string | null | undefined, procedimento: string | null | undefined) => {
     const atual = procedimentoEfetivo(medicoId, procedimento);
     const med = medicoId ? medicos.find((m) => m.id === medicoId) : null;
-    if (
-      atual &&
-      med?.especialidade_nome &&
-      normalizar(atual) === normalizar(med.especialidade_nome)
-    )
-      return "";
+    if (atual && med?.especialidade_nome && normalizar(atual) === normalizar(med.especialidade_nome)) {
+      // Só zera se for realmente a especialidade sintética — se o texto
+      // corresponder a um procedimento cadastrado para o médico/recurso
+      // (ex.: recurso "TESTE ERGOMETRICO" que executa o exame homônimo),
+      // mantém o valor para não perder o serviço no submit.
+      const opts = opcoesProcedimentoMedico(
+        medicoId ?? null,
+        editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
+      );
+      const alvo = normalizar(atual);
+      const ehProcedimentoReal = opts.some((o) => normalizar(o.nome) === alvo)
+        || normalizar(procedimentoPadraoDoMedico(medicoId) ?? "") === alvo;
+      if (!ehProcedimentoReal) return "";
+    }
     return atual;
   };
 
@@ -2269,9 +1816,7 @@ function AgendaPage() {
     const limpar = nomeFinal === "";
     if (!limpar && nomeFinal === (ag.procedimento ?? "")) return;
     const anterior = ag.procedimento;
-    setItems((prev) =>
-      prev.map((x) => (x.id === ag.id ? { ...x, procedimento: limpar ? null : nomeFinal } : x)),
-    );
+    setItems((prev) => prev.map((x) => (x.id === ag.id ? { ...x, procedimento: limpar ? null : nomeFinal } : x)));
     const { error } = await supabase
       .from("agendamentos")
       .update({ procedimento: limpar ? null : nomeFinal })
@@ -2319,8 +1864,7 @@ function AgendaPage() {
         if (ehLivre) return false;
         if (a.status !== filtroStatus) return false;
       }
-      if (filtroCliente && !normalizar(a.paciente_nome).includes(normalizar(filtroCliente)))
-        return false;
+      if (filtroCliente && !normalizar(a.paciente_nome).includes(normalizar(filtroCliente))) return false;
       if (filtroFicha) {
         const f = fichaPorId.get(a.id) ?? "";
         if (!f.includes(filtroFicha.padStart(Math.min(filtroFicha.length, 3), "0"))) return false;
@@ -2343,147 +1887,116 @@ function AgendaPage() {
       if (filtroApenasMultiplo && !a.atendimento_grupo_id) return false;
       return true;
     });
-  }, [
-    items,
-    mostrarLivres,
-    filtroMedico,
-    filtroStatus,
-    filtroCliente,
-    filtroFicha,
-    filtroDiaSemana,
-    filtroEspecialidade,
-    filtroAgenda,
-    medicoEspec,
-    fichaPorId,
-  ]);
+  }, [items, mostrarLivres, filtroMedico, filtroStatus, filtroCliente, filtroFicha, filtroDiaSemana, filtroEspecialidade, filtroAgenda, filtroApenasMultiplo, medicoEspec, fichaPorId]);
 
-  const totais = useMemo(
-    () => ({
-      total: filtrados.length,
-      confirmados: filtrados.filter((i) => i.status === "confirmado").length,
-      realizados: filtrados.filter((i) => i.status === "realizado").length,
-    }),
-    [filtrados],
-  );
+  const totais = useMemo(() => ({
+    total: filtrados.length,
+    confirmados: filtrados.filter(i => i.status === "confirmado").length,
+    realizados: filtrados.filter(i => i.status === "realizado").length,
+  }), [filtrados]);
 
   const totalPages = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE));
   const filtradosOrdenados = useMemo(
     () => [...filtrados].sort((a, b) => a.inicio.localeCompare(b.inicio)),
-    [filtrados],
+    [filtrados]
   );
   const paginados = filtradosOrdenados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const limparFiltros = () => {
-    setFiltroMedico("todos");
-    setFiltroEspecialidade("todos");
-    setFiltroDiaSemana("todos");
-    setFiltroAgenda("todos");
-    setFiltroStatus("todos");
-    setFiltroCliente("");
-    setFiltroFicha("");
+    setFiltroMedico("todos"); setFiltroEspecialidade("todos"); setFiltroDiaSemana("todos"); setFiltroAgenda("todos");
+    setFiltroStatus("todos"); setFiltroCliente(""); setFiltroFicha("");
   };
 
   const toggleSel = (id: string) => {
     const s = new Set(selecionados);
-    if (s.has(id)) s.delete(id);
-    else s.add(id);
+    if (s.has(id)) s.delete(id); else s.add(id);
     setSelecionados(s);
   };
   const toggleAll = () => {
     if (selecionados.size === paginados.length) setSelecionados(new Set());
-    else setSelecionados(new Set(paginados.map((p) => p.id)));
+    else setSelecionados(new Set(paginados.map(p => p.id)));
   };
 
   const cobrarSelecionados = async () => {
     if (!clinicaAtual) return;
     const ids = Array.from(selecionados);
-    const itens = items.filter((a) => ids.includes(a.id));
-    if (itens.length === 0) {
-      toast.info("Selecione ao menos um atendimento.");
-      return;
-    }
-    const pacientes = new Set(itens.map((i) => i.paciente_nome));
+    const itens = items.filter(a => ids.includes(a.id));
+    if (itens.length === 0) { toast.info("Selecione ao menos um atendimento."); return; }
+    const pacientes = new Set(itens.map(i => i.paciente_nome));
     if (pacientes.size > 1) {
       toast.error("Selecione atendimentos do mesmo paciente para cobrar em uma única vez.");
       return;
     }
-    const algumPago = itens.some((i) => pagosSet.has(i.id));
+    const algumPago = itens.some(i => pagosSet.has(i.id));
     if (algumPago) {
       toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
       return;
     }
     try {
-      // Verificação fresca + carga de procedimentos em PARALELO (cache 60s)
-      const [{ data: jaPagosLote }, procs] = await Promise.all([
-        supabase
-          .from("fin_lancamentos")
-          .select("agendamento_id")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .eq("tipo", "receita")
-          .eq("status", "confirmado")
-          .in("agendamento_id", ids),
-        getProcedimentosComValor(clinicaAtual.clinica_id),
-      ]);
-      if ((jaPagosLote ?? []).length > 0) {
-        const pagos = new Set(
-          ((jaPagosLote ?? []) as Array<{ agendamento_id: string | null }>)
-            .map((r) => r.agendamento_id)
-            .filter((x): x is string => !!x),
-        );
-        setPagosSet((prev) => {
-          const n = new Set(prev);
-          pagos.forEach((id) => n.add(id));
-          return n;
-        });
-        toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
-        return;
-      }
-      let totalDinheiro = 0,
-        totalPix = 0,
-        totalDebito = 0,
-        totalCredito = 0;
-      // Resolve todos os procedimentos em paralelo (cada um pode cair em
-      // fallback no banco; em paralelo o tempo total fica ~= 1 chamada).
-      const procsResolvidos = await Promise.all(
-        itens.map((it) =>
-          buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? "CONSULTA", procs),
-        ),
-      );
-      for (const p of procsResolvidos as any[]) {
-        const valorCartao = valorCartaoProcedimento(p);
-        totalDinheiro += primeiroValorValido(
-          p?.valor_dinheiro,
-          p?.valor_dinheiro_pix,
-          p?.valor_padrao,
-        );
-        totalPix += valorCartao;
-        totalDebito += valorCartao;
-        totalCredito += valorCartao;
-      }
-      const paciente = itens[0].paciente_nome;
-      const desc = `${paciente} — ${itens.map((i) => i.procedimento ?? "CONSULTA").join(" + ")} (${itens.length} serviços)`;
-      const opcoes: FormaOpcao[] = [
-        { forma: "dinheiro", label: "Dinheiro", valor: totalDinheiro },
-        { forma: "pix", label: "Pix", valor: totalPix },
-        { forma: "cartao_debito", label: "Cartão de Débito", valor: totalDebito },
-        { forma: "cartao_credito", label: "Cartão de Crédito", valor: totalCredito },
-      ];
-      setFormaPagOpcoes(opcoes);
-      setFormaPagCtx({
-        agId: itens.map((i) => i.id).join(","),
-        desc,
-        paciente,
-        procedimento: `${itens.map((i) => i.procedimento ?? "CONSULTA").join(" + ")} (${itens.length} serviços)`,
-        medico: (() => {
-          const m = medicos.find((mm) => mm.id === itens[0].medico_id);
-          return m?.nome ?? undefined;
-        })(),
-        especialidade: (() => {
-          const m = medicos.find((mm) => mm.id === itens[0].medico_id);
-          return m?.especialidade_nome ?? undefined;
-        })(),
-      });
-      setFormaPagOpen(true);
+    // Verificação fresca + carga de procedimentos em PARALELO (cache 60s)
+    const [{ data: jaPagosLote }, procs] = await Promise.all([
+      supabase
+        .from("fin_lancamentos")
+        .select("agendamento_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .in("agendamento_id", ids),
+      getProcedimentosComValor(clinicaAtual.clinica_id),
+    ]);
+    if ((jaPagosLote ?? []).length > 0) {
+      const pagos = new Set(((jaPagosLote ?? []) as Array<{ agendamento_id: string | null }>)
+        .map((r) => r.agendamento_id).filter((x): x is string => !!x));
+      setPagosSet((prev) => { const n = new Set(prev); pagos.forEach((id) => n.add(id)); return n; });
+      toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
+      return;
+    }
+    let totalDinheiro = 0, totalPix = 0, totalDebito = 0, totalCredito = 0;
+    // Resolve todos os procedimentos em paralelo (cada um pode cair em
+    // fallback no banco; em paralelo o tempo total fica ~= 1 chamada).
+    const procsResolvidos = await Promise.all(
+      itens.map((it) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? rotuloFallbackProc(it.medico_id), procs)),
+    );
+    const pesos: Record<string, number> = {};
+    const rotulos: Record<string, string> = {};
+    (procsResolvidos as any[]).forEach((p, idx) => {
+      const valorCartao = valorCartaoProcedimento(p);
+      const valorDin = primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+      totalDinheiro += valorDin;
+      totalPix      += valorCartao;
+      totalDebito   += valorCartao;
+      totalCredito  += valorCartao;
+      // Peso p/ rateio: prioriza valor de cartão (cheio); se 0, usa dinheiro.
+      pesos[itens[idx].id] = valorCartao > 0 ? valorCartao : valorDin;
+      rotulos[itens[idx].id] = itens[idx].procedimento ?? rotuloFallbackProc(itens[idx].medico_id);
+    });
+    setPagamentoPesos(pesos);
+    setPagamentoRotulos(rotulos);
+    const paciente = itens[0].paciente_nome;
+    setPagamentoPacienteNome(paciente);
+    const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? rotuloFallbackProc(i.medico_id))).join(" + ")} (${itens.length} serviços)`;
+    const opcoes: FormaOpcao[] = [
+      { forma: "dinheiro", label: "Dinheiro", valor: totalDinheiro },
+      { forma: "pix", label: "Pix", valor: totalPix },
+      { forma: "cartao_debito", label: "Cartão de Débito", valor: totalDebito },
+      { forma: "cartao_credito", label: "Cartão de Crédito", valor: totalCredito },
+    ];
+    setFormaPagOpcoes(opcoes);
+    setFormaPagCtx({
+      agId: itens.map(i => i.id).join(","),
+      desc,
+      paciente,
+      procedimento: `${itens.map(i => (i.procedimento ?? rotuloFallbackProc(i.medico_id))).join(" + ")} (${itens.length} serviços)`,
+      medico: (() => {
+        const m = medicos.find((mm) => mm.id === itens[0].medico_id);
+        return m?.nome ?? undefined;
+      })(),
+      especialidade: (() => {
+        const m = medicos.find((mm) => mm.id === itens[0].medico_id);
+        return m?.especialidade_nome ?? undefined;
+      })(),
+    });
+    setFormaPagOpen(true);
     } catch (e: any) {
       console.error("[cobrarSelecionados]", e);
       mostrarErro(e);
@@ -2494,40 +2007,25 @@ function AgendaPage() {
 
   const baixarLoteRealizado = async () => {
     if (!clinicaAtual) return;
-    const roleOk =
-      usuarioEhMedico ||
-      ["admin", "gestor", "financeiro", "recepcao"].includes(
-        (clinicaAtual?.role ?? "").toLowerCase(),
-      );
-    if (!roleOk) {
-      toast.error("Sem permissão para marcar como 'Realizado'.");
-      return;
-    }
+    const roleOk = usuarioEhMedico || ["admin", "gestor", "financeiro", "recepcao"].includes(
+      (clinicaAtual?.role ?? "").toLowerCase(),
+    );
+    if (!roleOk) { toast.error("Sem permissão para marcar como 'Realizado'."); return; }
     const ids = Array.from(selecionados);
-    const itens = items.filter((a) => ids.includes(a.id));
-    if (itens.length === 0) {
-      toast.info("Selecione ao menos um atendimento.");
-      return;
-    }
-    const hojeFim = new Date();
-    hojeFim.setHours(23, 59, 59, 999);
-    const futuros = itens.filter((i) => new Date(i.inicio).getTime() > hojeFim.getTime());
-    const validos = itens.filter(
-      (i) =>
-        !isSlotLivre(i.paciente_nome) &&
-        i.status !== "realizado" &&
-        i.status !== "cancelado" &&
-        new Date(i.inicio).getTime() <= hojeFim.getTime(),
+    const itens = items.filter(a => ids.includes(a.id));
+    if (itens.length === 0) { toast.info("Selecione ao menos um atendimento."); return; }
+    const hojeFim = new Date(); hojeFim.setHours(23, 59, 59, 999);
+    const futuros = itens.filter(i => new Date(i.inicio).getTime() > hojeFim.getTime());
+    const validos = itens.filter(i =>
+      !isSlotLivre(i.paciente_nome) &&
+      i.status !== "realizado" &&
+      i.status !== "cancelado" &&
+      new Date(i.inicio).getTime() <= hojeFim.getTime()
     );
     if (futuros.length > 0) {
-      toast.error(
-        `${futuros.length} atendimento(s) de data futura ignorado(s) — só é possível baixar atendimentos de hoje ou datas passadas.`,
-      );
+      toast.error(`${futuros.length} atendimento(s) de data futura ignorado(s) — só é possível baixar atendimentos de hoje ou datas passadas.`);
     }
-    if (validos.length === 0) {
-      toast.info("Nenhum atendimento elegível na seleção.");
-      return;
-    }
+    if (validos.length === 0) { toast.info("Nenhum atendimento elegível na seleção."); return; }
     if (!confirm(`Baixar ${validos.length} atendimento(s) como Realizado?`)) return;
     const uid = (await supabase.auth.getUser()).data.user?.id;
     const nowIso = new Date().toISOString();
@@ -2540,14 +2038,8 @@ function AgendaPage() {
         executado_por: uid,
         executado_em: nowIso,
       } as never)
-      .in(
-        "id",
-        validos.map((v) => v.id),
-      );
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+      .in("id", validos.map(v => v.id));
+    if (error) { mostrarErro(error); return; }
     toast.success(`${validos.length} atendimento(s) baixado(s) como Realizado.`);
     setSelecionados(new Set());
     await load();
@@ -2555,17 +2047,9 @@ function AgendaPage() {
 
   const reabrirAtendimento = async (a: Agendamento) => {
     if (!clinicaAtual) return;
-    const roleOk = ["admin", "gestor", "financeiro"].includes(
-      (clinicaAtual?.role ?? "").toLowerCase(),
-    );
-    if (!roleOk) {
-      toast.error("Apenas admin/gestor/financeiro pode reabrir um atendimento.");
-      return;
-    }
-    if (a.status !== "realizado") {
-      toast.info("Este atendimento não está marcado como realizado.");
-      return;
-    }
+    const roleOk = ["admin", "gestor", "financeiro"].includes((clinicaAtual?.role ?? "").toLowerCase());
+    if (!roleOk) { toast.error("Apenas admin/gestor/financeiro pode reabrir um atendimento."); return; }
+    if (a.status !== "realizado") { toast.info("Este atendimento não está marcado como realizado."); return; }
     // Verifica se há repasse pago vinculado
     const { data: lanc } = await supabase
       .from("fin_lancamentos")
@@ -2602,9 +2086,7 @@ function AgendaPage() {
         .update({ status: "confirmado" } as never)
         .eq("id", a.id);
       if (eAg) throw eAg;
-      toast.success(
-        temRepassePago ? "Atendimento reaberto e repasse estornado." : "Atendimento reaberto.",
-      );
+      toast.success(temRepassePago ? "Atendimento reaberto e repasse estornado." : "Atendimento reaberto.");
       await load();
     } catch (err: any) {
       mostrarErro(err);
@@ -2613,31 +2095,18 @@ function AgendaPage() {
 
   const excluirSelecionados = async () => {
     if (!clinicaAtual) return;
-    if (!isManager) {
-      toast.error("Você não tem permissão para excluir horários.");
-      return;
-    }
+    if (!isManager) { toast.error("Você não tem permissão para excluir horários."); return; }
     const ids = Array.from(selecionados);
-    const itens = items.filter((a) => ids.includes(a.id));
-    if (itens.length === 0) {
-      toast.info("Selecione ao menos um horário.");
-      return;
-    }
-    const bloqueados = itens.filter(
-      (i) => pagosSet.has(i.id) || (!isSlotLivre(i.paciente_nome) && i.status !== "agendado"),
-    );
+    const itens = items.filter(a => ids.includes(a.id));
+    if (itens.length === 0) { toast.info("Selecione ao menos um horário."); return; }
+    const bloqueados = itens.filter(i => pagosSet.has(i.id) || (!isSlotLivre(i.paciente_nome) && i.status !== "agendado"));
     if (bloqueados.length > 0) {
-      toast.error(
-        `${bloqueados.length} agendamento(s) não podem ser excluídos (já pagos ou em atendimento). Desmarque-os.`,
-      );
+      toast.error(`${bloqueados.length} agendamento(s) não podem ser excluídos (já pagos ou em atendimento). Desmarque-os.`);
       return;
     }
     if (!confirm(`Excluir ${ids.length} horário(s)? Esta ação não pode ser desfeita.`)) return;
     const { error } = await supabase.from("agendamentos").delete().in("id", ids);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     toast.success(`${ids.length} horário(s) excluído(s).`);
     setSelecionados(new Set());
     await load();
@@ -2646,41 +2115,29 @@ function AgendaPage() {
   // === Reagendamento em lote: move vários agendamentos para outra agenda já aberta ===
   const abrirReagLote = () => {
     if (!clinicaAtual) return;
-    if (!isManager) {
-      toast.error("Apenas gestores podem reagendar em lote.");
-      return;
-    }
+    if (!isManager) { toast.error("Apenas gestores podem reagendar em lote."); return; }
     const ids = Array.from(selecionados);
-    const itens = items.filter((a) => ids.includes(a.id));
-    if (itens.length === 0) {
-      toast.info("Selecione ao menos um paciente para reagendar.");
-      return;
-    }
+    const itens = items.filter(a => ids.includes(a.id));
+    if (itens.length === 0) { toast.info("Selecione ao menos um paciente para reagendar."); return; }
     // Ignora silenciosamente fichas vazias; bloqueia apenas pacientes já atendidos
-    const atendidos = itens.filter((i) => i.status === "realizado");
+    const atendidos = itens.filter(i => i.status === "realizado");
     if (atendidos.length > 0) {
-      toast.error(
-        `${atendidos.length} paciente(s) já atendido(s) não podem ser reagendados. Desmarque-os.`,
-      );
+      toast.error(`${atendidos.length} paciente(s) já atendido(s) não podem ser reagendados. Desmarque-os.`);
       return;
     }
-    const validos = itens.filter((i) => !isSlotLivre(i.paciente_nome));
+    const validos = itens.filter(i => !isSlotLivre(i.paciente_nome));
     if (validos.length === 0) {
-      toast.info(
-        "Nenhum paciente válido para reagendar (todas as fichas selecionadas estão vazias).",
-      );
+      toast.info("Nenhum paciente válido para reagendar (todas as fichas selecionadas estão vazias).");
       return;
     }
     // Mesmo fluxo do reagendamento individual: ativa modo lote e aguarda o clique num slot DISPONÍVEL
     const idsOrdenados = validos
       .slice()
       .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())
-      .map((i) => i.id);
+      .map(i => i.id);
     setReagendandoAg(null);
     setReagLoteIds(idsOrdenados);
-    toast.info(
-      `Selecione um horário disponível na agenda para reagendar os ${idsOrdenados.length} paciente(s) selecionado(s).`,
-    );
+    toast.info(`Selecione um horário disponível na agenda para reagendar os ${idsOrdenados.length} paciente(s) selecionado(s).`);
   };
 
   const cancelarReagLote = () => setReagLoteIds(null);
@@ -2690,10 +2147,7 @@ function AgendaPage() {
     if (!clinicaAtual) return;
     const ids = reagLoteIds ?? [];
     if (ids.length === 0 || reagLoteSalvando) return;
-    if (!slot.medico_id) {
-      toast.error("Slot sem médico definido.");
-      return;
-    }
+    if (!slot.medico_id) { toast.error("Slot sem médico definido."); return; }
     if (!isSlotLivre(slot.paciente_nome)) {
       toast.error("Esse horário não está disponível. Escolha um slot DISPONÍVEL.");
       return;
@@ -2702,29 +2156,19 @@ function AgendaPage() {
     // se o usuário trocou os filtros da tela depois de selecionar).
     const { data: fontesRaw, error: eFontes } = await supabase
       .from("agendamentos")
-      .select(
-        "id,paciente_id,paciente_nome,inicio,fim,medico_id,status,procedimento,observacoes,data_pagamento",
-      )
+      .select("id,paciente_id,paciente_nome,inicio,fim,medico_id,status,procedimento,observacoes,data_pagamento")
       .in("id", ids)
       .limit(1000);
-    if (eFontes) {
-      mostrarErro(eFontes);
-      return;
-    }
+    if (eFontes) { mostrarErro(eFontes); return; }
     const fontes = ((fontesRaw ?? []) as Array<Agendamento>)
-      .filter((a) => a.status !== "realizado" && !isSlotLivre(a.paciente_nome))
+      .filter(a => a.status !== "realizado" && !isSlotLivre(a.paciente_nome))
       .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime());
-    if (fontes.length === 0) {
-      toast.error("Nenhum paciente selecionado.");
-      return;
-    }
+    if (fontes.length === 0) { toast.error("Nenhum paciente selecionado."); return; }
 
     // Carrega a agenda de destino (mesmo médico/dia do slot clicado)
     const dataAlvo = new Date(slot.inicio);
-    const di = new Date(dataAlvo);
-    di.setHours(0, 0, 0, 0);
-    const df = new Date(dataAlvo);
-    df.setHours(23, 59, 59, 999);
+    const di = new Date(dataAlvo); di.setHours(0, 0, 0, 0);
+    const df = new Date(dataAlvo); df.setHours(23, 59, 59, 999);
     const { data: destinoRaw, error: eDest } = await supabase
       .from("agendamentos")
       .select("id,paciente_id,paciente_nome,inicio,fim,medico_id,status")
@@ -2734,33 +2178,24 @@ function AgendaPage() {
       .lte("inicio", df.toISOString())
       .order("inicio", { ascending: true })
       .limit(1000);
-    if (eDest) {
-      mostrarErro(eDest);
-      return;
-    }
+    if (eDest) { mostrarErro(eDest); return; }
     const destino = (destinoRaw ?? []) as Array<{
-      id: string;
-      paciente_id: string | null;
-      paciente_nome: string;
-      inicio: string;
-      fim: string;
-      medico_id: string | null;
-      status: string;
+      id: string; paciente_id: string | null; paciente_nome: string;
+      inicio: string; fim: string; medico_id: string | null; status: string;
     }>;
-    const fichaInicial = destino.findIndex((s) => s.id === slot.id) + 1;
-    if (fichaInicial <= 0) {
-      toast.error("Não foi possível localizar a ficha do slot escolhido.");
-      return;
-    }
+    const fichaInicial = destino.findIndex(s => s.id === slot.id) + 1;
+    if (fichaInicial <= 0) { toast.error("Não foi possível localizar a ficha do slot escolhido."); return; }
 
     // Slots disponíveis a partir da ficha inicial, excluindo as próprias fontes
-    const idsFonte = new Set(fontes.map((f) => f.id));
-    const candidatos = destino.slice(fichaInicial - 1).filter((s) => !idsFonte.has(s.id));
-    const livres = candidatos.filter((s) => isSlotLivre(s.paciente_nome));
+    const idsFonte = new Set(fontes.map(f => f.id));
+    const candidatos = destino
+      .slice(fichaInicial - 1)
+      .filter(s => !idsFonte.has(s.id));
+    const livres = candidatos.filter(s => isSlotLivre(s.paciente_nome));
     if (livres.length < fontes.length) {
       toast.error(
-        `Não há horários livres suficientes a partir da ficha ${String(fichaInicial).padStart(3, "0")} ` +
-          `(precisa de ${fontes.length}, encontrou ${livres.length}).`,
+        `Não há horários livres suficientes a partir da ficha ${String(fichaInicial).padStart(3, "0")} `
+        + `(precisa de ${fontes.length}, encontrou ${livres.length}).`,
       );
       return;
     }
@@ -2770,59 +2205,42 @@ function AgendaPage() {
     const agora = new Date().toLocaleString("pt-BR");
     // H3 — Processa todos os pares (origem → alvo) em paralelo (cada par é
     // independente). Reduz N×3 chamadas seriais a 3 ondas paralelas.
-    const resultados = await Promise.all(
-      fontes.map(async (origem, i) => {
-        const alvo = alvos[i];
-        const trilha = `[Reagendado em lote em ${agora}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(alvo.inicio).toLocaleString("pt-BR")}`;
-        const novasObs = origem.observacoes ? `${origem.observacoes}\n${trilha}` : trilha;
-        // 1+2) Libera origem e ocupa destino em paralelo
-        const [{ error: e1 }, { error: e2 }] = await Promise.all([
-          supabase
-            .from("agendamentos")
-            .update({
-              paciente_id: null,
-              paciente_nome: "DISPONÍVEL",
-              status: "agendado",
-              procedimento: null,
-              observacoes: null,
-              data_pagamento: null,
-            } as never)
-            .eq("id", origem.id),
-          supabase
-            .from("agendamentos")
-            .update({
-              paciente_id: origem.paciente_id ?? null,
-              paciente_nome: origem.paciente_nome,
-              procedimento: origem.procedimento ?? null,
-              status: "agendado",
-              observacoes: novasObs,
-              data_pagamento: origem.data_pagamento ?? null,
-            } as never)
-            .eq("id", alvo.id),
-        ]);
-        if (e1) {
-          mostrarErro(e1, `mover ${origem.paciente_nome}`);
-          return false;
-        }
-        if (e2) {
-          mostrarErro(e2, "falha ao mover para destino");
-          return false;
-        }
-        // 3) Transfere lançamentos financeiros
-        await supabase
-          .from("fin_lancamentos")
-          .update({ agendamento_id: alvo.id } as never)
-          .eq("agendamento_id", origem.id);
-        return true;
-      }),
-    );
+    const resultados = await Promise.all(fontes.map(async (origem, i) => {
+      const alvo = alvos[i];
+      const trilha = `[Reagendado em lote em ${agora}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(alvo.inicio).toLocaleString("pt-BR")}`;
+      const novasObs = origem.observacoes ? `${origem.observacoes}\n${trilha}` : trilha;
+      // 1+2) Libera origem e ocupa destino em paralelo
+      const [{ error: e1 }, { error: e2 }] = await Promise.all([
+        supabase.from("agendamentos").update({
+          paciente_id: null,
+          paciente_nome: "DISPONÍVEL",
+          status: "agendado",
+          procedimento: null,
+          observacoes: null,
+          data_pagamento: null,
+        } as never).eq("id", origem.id),
+        supabase.from("agendamentos").update({
+          paciente_id: origem.paciente_id ?? null,
+          paciente_nome: origem.paciente_nome,
+          procedimento: origem.procedimento ?? null,
+          status: "agendado",
+          observacoes: novasObs,
+          data_pagamento: origem.data_pagamento ?? null,
+        } as never).eq("id", alvo.id),
+      ]);
+      if (e1) { mostrarErro(e1, `mover ${origem.paciente_nome}`); return false; }
+      if (e2) { mostrarErro(e2, "falha ao mover para destino"); return false; }
+      // 3) Transfere lançamentos financeiros
+      await supabase.from("fin_lancamentos")
+        .update({ agendamento_id: alvo.id } as never)
+        .eq("agendamento_id", origem.id);
+      return true;
+    }));
     const okCount = resultados.filter(Boolean).length;
     setReagLoteSalvando(false);
     setReagLoteIds(null);
     setSelecionados(new Set());
-    toast.success(
-      `${okCount} paciente(s) reagendado(s) a partir da ficha ${String(fichaInicial).padStart(3, "0")}.`,
-    );
+    toast.success(`${okCount} paciente(s) reagendado(s) a partir da ficha ${String(fichaInicial).padStart(3, "0")}.`);
     await load();
   };
 
@@ -2843,9 +2261,7 @@ function AgendaPage() {
     }
     setPacienteCopia({ id: ag.paciente_id, nome: ag.paciente_nome });
     setSelecionados(new Set());
-    toast.success(
-      `Paciente copiado: ${ag.paciente_nome}. Clique em um horário livre para agendar.`,
-    );
+    toast.success(`Paciente copiado: ${ag.paciente_nome}. Clique em um horário livre para agendar.`);
   };
 
   const openNew = () => {
@@ -2854,7 +2270,9 @@ function AgendaPage() {
     const end = new Date(base.getTime() + 30 * 60000);
     // Pré-preenche a partir dos filtros ativos da agenda.
     const medicoFiltro =
-      filtroMedico !== "todos" && medicos.some((m) => m.id === filtroMedico) ? filtroMedico : "";
+      filtroMedico !== "todos" && medicos.some((m) => m.id === filtroMedico)
+        ? filtroMedico
+        : "";
     let pacienteId = "";
     let pacienteNome = "";
     const termoCli = filtroCliente.trim();
@@ -2891,10 +2309,7 @@ function AgendaPage() {
   const buscarOrcamento = async (numeroOverride?: number) => {
     if (!clinicaAtual) return;
     const num = numeroOverride ?? parseInt(form.orcamento_numero.replace(/\D/g, ""), 10);
-    if (!num || num <= 0) {
-      toast.error("Informe o nº do orçamento.");
-      return;
-    }
+    if (!num || num <= 0) { toast.error("Informe o nº do orçamento."); return; }
     setBuscandoOrc(true);
     try {
       const { data: orc, error } = await supabase
@@ -2903,36 +2318,17 @@ function AgendaPage() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("numero", num)
         .maybeSingle();
-      if (error) {
-        mostrarErro(error);
-        return;
-      }
-      if (!orc) {
-        toast.error(`Orçamento nº ${num} não encontrado.`);
-        return;
-      }
-      if (orc.status === "cancelado") {
-        toast.error("Orçamento cancelado.");
-        return;
-      }
+      if (error) { mostrarErro(error); return; }
+      if (!orc) { toast.error(`Orçamento nº ${num} não encontrado.`); return; }
+      if (orc.status === "cancelado") { toast.error("Orçamento cancelado."); return; }
       const { data: itens, error: e2 } = await supabase
         .from("orcamento_itens")
         .select("id, descricao, procedimento_id")
         .eq("orcamento_id", orc.id)
         .order("ordem");
-      if (e2) {
-        mostrarErro(e2);
-        return;
-      }
-      const itsAll = (itens ?? []) as {
-        id: string;
-        descricao: string;
-        procedimento_id: string | null;
-      }[];
-      if (itsAll.length === 0) {
-        toast.error("Orçamento sem itens.");
-        return;
-      }
+      if (e2) { mostrarErro(e2); return; }
+      const itsAll = (itens ?? []) as { id: string; descricao: string; procedimento_id: string | null }[];
+      if (itsAll.length === 0) { toast.error("Orçamento sem itens."); return; }
       // Filtra itens já consumidos por agendamentos ativos. Permite agendar
       // o restante quando o orçamento foi aproveitado em partes.
       const { data: consumidosRows } = await supabase
@@ -2940,12 +2336,7 @@ function AgendaPage() {
         .select("orcamento_item_id, agendamento_id, agendamentos!inner(status)")
         .eq("orcamento_id", orc.id);
       const consumidos = new Set<string>(
-        (
-          (consumidosRows ?? []) as Array<{
-            orcamento_item_id: string;
-            agendamentos: { status: string } | null;
-          }>
-        )
+        ((consumidosRows ?? []) as Array<{ orcamento_item_id: string; agendamentos: { status: string } | null }>)
           .filter((r) => r.agendamentos?.status !== "cancelado")
           .map((r) => r.orcamento_item_id),
       );
@@ -2963,63 +2354,43 @@ function AgendaPage() {
       }
       const totalConsumidos = itsAll.length - its.length;
       if (totalConsumidos > 0) {
-        toast.info(
-          `${totalConsumidos} de ${itsAll.length} itens já agendados. Restam ${its.length} para agendar.`,
-        );
+        toast.info(`${totalConsumidos} de ${itsAll.length} itens já agendados. Restam ${its.length} para agendar.`);
       }
-      const procIds = Array.from(
-        new Set(its.map((i) => i.procedimento_id).filter((x): x is string => !!x)),
-      );
-      let procs: { id: string; grupo: string | null; tipo: string | null; tipo_procedimento: string | null }[] = [];
+      const procIds = Array.from(new Set(its.map(i => i.procedimento_id).filter((x): x is string => !!x)));
+      let procs: { id: string; grupo: string | null; tipo: string | null }[] = [];
       if (procIds.length) {
         const { data: pdata, error: e3 } = await supabase
           .from("procedimentos")
-          .select("id, grupo, tipo, tipo_procedimento")
+          .select("id, grupo, tipo")
           .in("id", procIds);
-        if (e3) {
-          mostrarErro(e3);
-          return;
-        }
-        procs = (pdata ?? []) as {
-          id: string; grupo: string | null; tipo: string | null; tipo_procedimento: string | null;
-        }[];
+        if (e3) { mostrarErro(e3); return; }
+        procs = (pdata ?? []) as { id: string; grupo: string | null; tipo: string | null }[];
       }
       const norm = (g: string | null | undefined) =>
-        (g ?? "")
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toUpperCase()
-          .trim();
-      const procPorId = new Map(procs.map((p) => [p.id, p]));
+        (g ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+      const procPorId = new Map(procs.map(p => [p.id, p]));
       const isLab = (pid: string | null) => {
         if (!pid) return false;
         const p = procPorId.get(pid);
         if (!p) return false;
         const g = norm(p.grupo);
         const t = norm(p.tipo);
-        const tp = norm(p.tipo_procedimento);
-        return tp === "LABORATORIO" || g === "LABORATORIO" || t === "EXAME" || t === "LABORATORIO";
+        return g === "LABORATORIO" || t === "EXAME" || t === "LABORATORIO";
       };
-      const todosLab = its.every((i) => isLab(i.procedimento_id));
+      const todosLab = its.every(i => isLab(i.procedimento_id));
       // (Bloqueio antigo removido: agora permitimos agendamentos parciais,
       // controlados via `agendamento_orcamento_itens`.)
-      const nomes = its.map((i) => i.descricao);
+      const nomes = its.map(i => i.descricao);
       const procStr = todosLab
         ? `LABORATÓRIO (${nomes.length} EXAMES): ${nomes.join(", ")}`
-        : nomes.length === 1
-          ? nomes[0]
-          : `${nomes.length} ITENS: ${nomes.join(", ")}`;
+        : (nomes.length === 1 ? nomes[0] : `${nomes.length} ITENS: ${nomes.join(", ")}`);
       // Resolve paciente: se o orçamento não tiver paciente_id, tenta achar
       // por nome/cpf na clínica para preencher automaticamente (e mantém
       // o campo editável caso o usuário queira trocar).
       let pacId: string | null = orc.paciente_id ?? null;
       let pacNome: string | null = orc.paciente_nome ?? null;
       if (!pacId && pacNome) {
-        const nomeNorm = pacNome
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toUpperCase()
-          .trim();
+        const nomeNorm = pacNome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
         const { data: pac } = await supabase
           .from("pacientes")
           .select("id, nome")
@@ -3035,22 +2406,18 @@ function AgendaPage() {
           pacNome = pac[0].nome;
         }
       }
-      // Agrupa por categoria de laboratório (prioritária) → depois por
-      // "grupo" ou tipo. Se houver mais de um grupo distinto, abre o painel
-      // de divisão em vez de criar um único agendamento.
+      // Agrupa por "grupo" (mais específico) ou tipo. Se houver mais de um grupo
+      // distinto, abre o painel de divisão em vez de criar um único agendamento.
       const grupoDe = (pid: string | null): string => {
         if (!pid) return "OUTROS";
-        if (isLab(pid)) return "LABORATORIO";
         const p = procPorId.get(pid);
         if (!p) return "OUTROS";
         return norm(p.grupo) || norm(p.tipo) || "OUTROS";
       };
-      const gruposDistintos = new Set(its.map((i) => grupoDe(i.procedimento_id)));
-      // Quando TODOS os itens são de laboratório, nunca dividir: 1 único
-      // agendamento no profissional "Laboratório".
-      if (!todosLab && gruposDistintos.size > 1) {
+      const gruposDistintos = new Set(its.map(i => grupoDe(i.procedimento_id)));
+      if (gruposDistintos.size > 1) {
         // Constrói lista de itens enriquecidos para o dialog
-        const itensRicos: DividirItem[] = its.map((i) => {
+        const itensRicos: DividirItem[] = its.map(i => {
           const p = i.procedimento_id ? procPorId.get(i.procedimento_id) : null;
           return {
             id: i.id,
@@ -3058,11 +2425,9 @@ function AgendaPage() {
             procedimento_id: i.procedimento_id,
             grupo: p?.grupo ?? null,
             tipo: p?.tipo ?? null,
-            tipo_procedimento: p?.tipo_procedimento ?? null,
           };
         });
-        const inicioPadrao =
-          form.inicio || toLocalInput(new Date(`${dataRef}T09:00:00`).toISOString());
+        const inicioPadrao = form.inicio || toLocalInput(new Date(`${dataRef}T09:00:00`).toISOString());
         setDividirCtx({
           orcamento: {
             id: orc.id,
@@ -3080,34 +2445,13 @@ function AgendaPage() {
       // Fluxo de 1 grupo: registra os IDs restantes para gravar o vínculo
       // após o save do agendamento.
       setPendingOrcItemIds(its.map((i) => i.id));
-      // Quando o orçamento é 100% laboratório, tenta pré-selecionar o
-      // profissional "Laboratório" da clínica (evita agendar em médicos
-      // clínicos por engano). Fallback silencioso: se não existir cadastro,
-      // o usuário escolhe manualmente.
-      let medicoLabId: string | null = null;
-      if (todosLab) {
-        const acha = medicos.find((m) => {
-          const n = (m.nome ?? "")
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .toUpperCase();
-          return n.includes("LABORATORIO");
-        });
-        medicoLabId = acha?.id ?? null;
-        if (!medicoLabId) {
-          toast.info(
-            "Orçamento de laboratório: cadastre um profissional 'Laboratório' para agendar automaticamente.",
-          );
-        }
-      }
-      setForm((f) => ({
+      setForm(f => ({
         ...f,
         orcamento_id: orc.id,
         orcamento_numero: String(orc.numero),
         orcamento_itens: nomes,
         paciente_id: pacId ?? f.paciente_id,
         paciente_nome: pacNome ?? f.paciente_nome,
-        medico_id: medicoLabId ?? f.medico_id,
         procedimento: procStr,
         procedimentos: procStr ? [procStr] : [],
       }));
@@ -3118,7 +2462,7 @@ function AgendaPage() {
   };
 
   const limparOrcamento = () => {
-    setForm((f) => ({ ...f, orcamento_id: "", orcamento_numero: "", orcamento_itens: [] }));
+    setForm(f => ({ ...f, orcamento_id: "", orcamento_numero: "", orcamento_itens: [] }));
     setPendingOrcItemIds([]);
   };
 
@@ -3151,9 +2495,7 @@ function AgendaPage() {
           window.history.replaceState(null, "", novo);
         }
       }
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
     const onMsg = (ev: MessageEvent) => {
       const d = ev.data;
       if (!d || typeof d !== "object") return;
@@ -3167,22 +2509,16 @@ function AgendaPage() {
   }, [clinicaAtual?.clinica_id]);
 
   const openSlot = (a: Agendamento) => {
-    if (reagendandoAg) {
-      void confirmarReagendamentoNoSlot(a);
-      return;
-    }
-    if (reagLoteIds) {
-      void confirmarReagLoteNoSlot(a);
-      return;
-    }
+    if (reagendandoAg) { void confirmarReagendamentoNoSlot(a); return; }
+    if (reagLoteIds) { void confirmarReagLoteNoSlot(a); return; }
     setEditing(a);
     setForm({
       paciente_nome: pacienteCopia?.nome ?? "",
       paciente_id: pacienteCopia?.id ?? "",
       medico_id: a.medico_id ?? "",
-      inicio: toLocalInput(a.inicio),
-      fim: toLocalInput(a.fim),
+      inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
       procedimento: procedimentoFormulario(a.medico_id, a.procedimento),
+      procedimentos: procedimentosFormulario(a.medico_id, a.procedimento),
       status: "agendado",
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
@@ -3197,14 +2533,8 @@ function AgendaPage() {
   };
 
   const openEdit = async (a: Agendamento) => {
-    if (reagendandoAg) {
-      toast.error("Esse horário já está ocupado. Escolha um slot disponível.");
-      return;
-    }
-    if (reagLoteIds) {
-      toast.error("Esse horário já está ocupado. Escolha um slot DISPONÍVEL.");
-      return;
-    }
+    if (reagendandoAg) { toast.error("Esse horário já está ocupado. Escolha um slot disponível."); return; }
+    if (reagLoteIds) { toast.error("Esse horário já está ocupado. Escolha um slot DISPONÍVEL."); return; }
     setEditing(a);
     // Recarrega itens do orçamento vinculado para exibir a lista de exames no diálogo
     let itensOrc: string[] = [];
@@ -3239,27 +2569,16 @@ function AgendaPage() {
         .eq("nome", nomeBusca)
         .limit(5);
       const lista = (cands ?? []) as { id: string; nome: string }[];
-      const norm = (s: string) =>
-        s
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toUpperCase()
-          .trim()
-          .replace(/\s+/g, " ");
+      const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim().replace(/\s+/g, " ");
       const alvo = norm(nomeBusca);
-      const exato =
-        lista.find((p) => norm(p.nome) === alvo) ?? (lista.length === 1 ? lista[0] : null);
+      const exato = lista.find((p) => norm(p.nome) === alvo) ?? (lista.length === 1 ? lista[0] : null);
       if (exato) {
         resolvedPacId = exato.id;
         resolvedPacNome = exato.nome;
         // Backfill silencioso (não bloqueia a abertura do diálogo se falhar)
         void supabase.from("agendamentos").update({ paciente_id: exato.id }).eq("id", a.id);
         if (a.orcamento_id) {
-          void supabase
-            .from("orcamentos")
-            .update({ paciente_id: exato.id })
-            .eq("id", a.orcamento_id)
-            .is("paciente_id", null);
+          void supabase.from("orcamentos").update({ paciente_id: exato.id }).eq("id", a.orcamento_id).is("paciente_id", null);
         }
       }
     }
@@ -3267,9 +2586,9 @@ function AgendaPage() {
       paciente_nome: resolvedPacNome,
       paciente_id: resolvedPacId,
       medico_id: a.medico_id ?? "",
-      inicio: toLocalInput(a.inicio),
-      fim: toLocalInput(a.fim),
+      inicio: toLocalInput(a.inicio), fim: toLocalInput(a.fim),
       procedimento: procedimentoFormulario(a.medico_id, a.procedimento),
+      procedimentos: procedimentosFormulario(a.medico_id, a.procedimento),
       status: a.status,
       observacoes: a.observacoes ?? "",
       data_pagamento: a.data_pagamento ?? "",
@@ -3289,143 +2608,35 @@ function AgendaPage() {
       toast.error("Agendamento já pago — somente visualização.");
       return;
     }
-    if (!form.paciente_nome.trim()) {
-      toast.error("Informe o paciente");
-      return;
-    }
+    if (!form.paciente_nome.trim()) { toast.error("Informe o paciente"); return; }
     if (!form.paciente_id) {
-      toast.error(
-        'Selecione um paciente cadastrado na lista ou clique em "Cadastrar agora" para criar o cadastro antes de salvar.',
-      );
+      toast.error("Selecione um paciente cadastrado na lista ou clique em \"Cadastrar agora\" para criar o cadastro antes de salvar.");
       return;
     }
-    // Bloqueia agendamento sem telefone e data de nascimento no cadastro do paciente
-    {
-      const { data: pacCheck } = await supabase
-        .from("pacientes")
-        .select("telefone,data_nascimento")
-        .eq("id", form.paciente_id)
-        .maybeSingle();
-      const semTel = !pacCheck?.telefone || !String(pacCheck.telefone).trim();
-      const semNasc = !pacCheck?.data_nascimento;
-      if (semTel || semNasc) {
-        const faltando = [semTel && "telefone", semNasc && "data de nascimento"]
-          .filter(Boolean)
-          .join(" e ");
-        toast.error(
-          `Preencha ${faltando} do paciente (campos abaixo do nome) e clique em "Confirmar dados" antes de salvar.`,
-        );
-        return;
-      }
-    }
-    if (!form.inicio || !form.fim) {
-      toast.error("Defina início e fim");
-      return;
-    }
-    if (new Date(form.fim) <= new Date(form.inicio)) {
-      toast.error("O horário final deve ser após o inicial");
-      return;
-    }
-    if (!form.procedimento.trim()) {
-      toast.error("Selecione o serviço");
-      return;
-    }
-    // Bloqueia criação/movimentação para um médico sem agenda aberta naquele dia
-    const mudouHorarioOuMedico =
-      !editing ||
-      editing.medico_id !== form.medico_id ||
-      new Date(editing.inicio).getTime() !== new Date(form.inicio).getTime() ||
-      new Date(editing.fim).getTime() !== new Date(form.fim).getTime();
-    if (form.medico_id && mudouHorarioOuMedico && !recursoIds.has(form.medico_id)) {
-      const di = new Date(form.inicio);
-      const df = new Date(form.fim);
-      const inicioDia = new Date(
-        di.getFullYear(),
-        di.getMonth(),
-        di.getDate(),
-        0,
-        0,
-        0,
-      ).toISOString();
-      const fimDia = new Date(
-        di.getFullYear(),
-        di.getMonth(),
-        di.getDate(),
-        23,
-        59,
-        59,
-      ).toISOString();
-      const q = supabase
-        .from("agendamentos")
-        .select("id,paciente_nome,inicio,fim", { count: "exact", head: false })
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("medico_id", form.medico_id)
-        .gte("inicio", inicioDia)
-        .lte("inicio", fimDia)
-        .limit(500);
-      const { data: slotsDia } = await q;
-      const lista = (slotsDia ?? []) as {
-        id: string;
-        paciente_nome: string;
-        inicio: string;
-        fim: string;
-      }[];
-      const excluindoEditing = editing ? lista.filter((x) => x.id !== editing.id) : lista;
-      if (excluindoEditing.length === 0) {
-        toast.error(
-          "Este médico não tem agenda aberta nessa data. Gere os horários em Disponibilidades antes de agendar.",
-        );
-        return;
-      }
-      // Precisa existir um slot livre que cubra o horário escolhido (ou conflito com o próprio agendamento em edição)
-      const inicioMs = di.getTime();
-      const fimMs = df.getTime();
-      const cobre = excluindoEditing.some((s) => {
-        if (!isSlotLivre(s.paciente_nome)) return false;
-        const sIni = new Date(s.inicio).getTime();
-        const sFim = new Date(s.fim).getTime();
-        return sIni <= inicioMs && sFim >= fimMs;
-      });
-      if (!cobre) {
-        toast.error(
-          "Não há horário livre desse médico cobrindo o intervalo escolhido. Escolha um slot DISPONÍVEL na agenda ou gere mais horários em Disponibilidades.",
-        );
-        return;
-      }
-    }
-    if (
-      editing &&
-      pagosSet.has(editing.id) &&
-      form.paciente_nome.trim() !== editing.paciente_nome
-    ) {
+    if (!form.inicio || !form.fim) { toast.error("Defina início e fim"); return; }
+    if (new Date(form.fim) <= new Date(form.inicio)) { toast.error("O horário final deve ser após o inicial"); return; }
+    const multiPermitido = !!form.medico_id && (
+      medicoEhLaboratorioFormulario(form.medico_id)
+      || opcoesServicoFormulario().some((o) => procedimentoEhImagem(o.label))
+    );
+    const procedimentosParaSalvar = Array.from(new Set(
+      (multiPermitido && form.procedimentos.length > 0 ? form.procedimentos : [form.procedimento])
+        .map((p) => procedimentoFormulario(form.medico_id, p).trim())
+        .filter(Boolean),
+    ));
+    // Serviço é opcional — quando não informado, o agendamento é salvo sem
+    // procedimento e a cobrança pode ser feita via "Valor manual".
+    const procedimentoTexto = procedimentosParaSalvar.join(" + ");
+    const multiExamesModo = procedimentosParaSalvar.length > 1
+      ? (medicoEhLaboratorioFormulario(form.medico_id) ? "laboratorio" : "imagem")
+      : null;
+    const mudouHorarioOuMedico = !editing
+      || editing.medico_id !== form.medico_id
+      || new Date(editing.inicio).getTime() !== new Date(form.inicio).getTime()
+      || new Date(editing.fim).getTime() !== new Date(form.fim).getTime();
+    if (editing && pagosSet.has(editing.id) && form.paciente_nome.trim() !== editing.paciente_nome) {
       toast.error("Não é permitido alterar o nome do paciente em agendamento já pago.");
       return;
-    }
-    // Bloqueio por mensalidade vencida em contrato de cartão benefícios (titular ou dependente).
-    // Só aplica quando o paciente vai usar o CONVÊNIO neste atendimento.
-    // Se escolheu Particular, o débito do cartão não bloqueia o agendamento.
-    if (form.paciente_id && form.tipo_atendimento === "convenio") {
-      const { data: blk } = await supabase.rpc("paciente_cartao_inadimplente", {
-        _paciente_id: form.paciente_id,
-        _clinica_id: clinicaAtual.clinica_id,
-      });
-      const info = (blk ?? {}) as {
-        bloqueado?: boolean;
-        total_aberto?: number;
-        mensalidades?: Array<{ vencimento: string; valor: number; convenio_nome?: string }>;
-      };
-      if (info.bloqueado) {
-        const linhas = (info.mensalidades ?? [])
-          .slice(0, 5)
-          .map(
-            (m) =>
-              `• ${m.convenio_nome ?? "Cartão"} — venc. ${m.vencimento?.split("-").reverse().join("/")} R$ ${Number(m.valor).toFixed(2)}`,
-          )
-          .join("\n");
-        const msg = `Paciente com mensalidade(s) vencida(s) no cartão benefícios.\nTotal em aberto: R$ ${Number(info.total_aberto ?? 0).toFixed(2)}\n\n${linhas}\n\nAgendamento bloqueado até a regularização — ou troque o Tipo de atendimento para "Particular".`;
-        toast.error(msg, { duration: 10000 });
-        return;
-      }
     }
     setSaving(true);
     const ehRecurso = !!form.medico_id && recursoIds.has(form.medico_id);
@@ -3433,11 +2644,11 @@ function AgendaPage() {
       clinica_id: clinicaAtual.clinica_id,
       paciente_nome: form.paciente_nome.trim(),
       paciente_id: form.paciente_id || null,
-      medico_id: ehRecurso ? null : form.medico_id || null,
+      medico_id: ehRecurso ? null : (form.medico_id || null),
       enfermagem_recurso_id: ehRecurso ? form.medico_id : null,
       inicio: new Date(form.inicio).toISOString(),
       fim: new Date(form.fim).toISOString(),
-      procedimento: form.procedimento?.trim() || null,
+      procedimento: procedimentoTexto || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
       data_pagamento: form.data_pagamento ? form.data_pagamento : null,
@@ -3445,10 +2656,10 @@ function AgendaPage() {
       tipo_atendimento: form.tipo_atendimento,
       forma_pagamento_prevista: form.forma_pagamento_prevista ? form.forma_pagamento_prevista : null,
     };
-    // Delegação canônica: toda criação/edição de agendamento passa por
-    // `criarAgendamento` (ver docs/agenda/criar-agendamento-shared.md).
-    const procedimentosParaSalvar = payload.procedimento ? [payload.procedimento] : [];
-    const multiExamesModo: "laboratorio" | "imagem" | null = null;
+    // Miolo server-side (validação de paciente completo, agenda aberta + slot livre,
+    // inadimplência de cartão, INSERT/UPDATE do agendamento e vínculos com
+    // agendamento_orcamento_itens) foi extraído para `criarAgendamento`
+    // (src/lib/agenda/criar-agendamento.functions.ts) — cópia 1:1 da lógica original.
     const result = await fnCriarAgendamento({
       data: {
         clinica_id: clinicaAtual.clinica_id,
@@ -3456,10 +2667,8 @@ function AgendaPage() {
         payload: payload as never,
         checagens: {
           validar_paciente_completo: true,
-          validar_agenda_aberta:
-            !!form.medico_id && mudouHorarioOuMedico && !recursoIds.has(form.medico_id),
-          validar_inadimplencia:
-            !!form.paciente_id && form.tipo_atendimento === "convenio",
+          validar_agenda_aberta: !!form.medico_id && mudouHorarioOuMedico && !recursoIds.has(form.medico_id),
+          validar_inadimplencia: !!form.paciente_id && form.tipo_atendimento === "convenio",
         },
         procedimentos: procedimentosParaSalvar,
         multi_exames_modo: multiExamesModo,
@@ -3484,9 +2693,7 @@ function AgendaPage() {
     const novoId: string | null = result.id;
     setPendingOrcItemIds([]);
     setSaving(false);
-    toast.success("Salvo");
-    setOpen(false);
-    await load();
+    toast.success("Salvo"); setOpen(false); await load();
     if (irParaPagamento && novoId) {
       const [lista, info] = await Promise.all([
         getProcedimentosComValor(clinicaAtual.clinica_id),
@@ -3499,20 +2706,23 @@ function AgendaPage() {
           dataRef: payload.inicio ?? null,
         }),
       ]);
-      const proc: any = await buscarProcedimentoPorNome(
-        clinicaAtual.clinica_id,
-        payload.procedimento ?? "CONSULTA",
-        lista,
+      // Multi-exame: quando há mais de um procedimento (imagem ou laboratório),
+      // o payload.procedimento vem concatenado ("A + B + C") e não encontra match
+      // no cadastro. Resolvemos cada procedimento individualmente e somamos.
+      const nomesParaValorar = procedimentosParaSalvar.length > 0
+        ? procedimentosParaSalvar
+        : [payload.procedimento ?? rotuloFallbackProc(payload.medico_id)];
+      const procsIndividuais = await Promise.all(
+        nomesParaValorar.map((nome) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista)),
       );
-      const valorCartao = valorCartaoProcedimento(proc);
-      const vDinheiro = primeiroValorValido(
-        proc?.valor_dinheiro,
-        proc?.valor_dinheiro_pix,
-        proc?.valor_padrao,
-      );
-      const vPix = valorCartao;
-      const vDebito = valorCartao;
-      const vCredito = valorCartao;
+      let vDinheiro = 0, vPix = 0, vDebito = 0, vCredito = 0;
+      for (const p of procsIndividuais as any[]) {
+        const valorCartao = valorCartaoProcedimento(p);
+        vDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+        vPix      += valorCartao;
+        vDebito   += valorCartao;
+        vCredito  += valorCartao;
+      }
       let opcoes: FormaOpcao[] = [
         { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
         { forma: "pix", label: "Pix", valor: vPix },
@@ -3520,25 +2730,18 @@ function AgendaPage() {
         { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
       ];
       let descSuffix = "";
-      const opcoesOrc = payload.orcamento_id
-        ? await opcoesPagamentoDeOrcamento(payload.orcamento_id)
-        : null;
+      const opcoesOrc = payload.orcamento_id ? await opcoesPagamentoDeOrcamento(payload.orcamento_id) : null;
       if (opcoesOrc) {
         opcoes = opcoesOrc;
       } else if (info) {
         if (!info.emDia) {
-          toast.error(
-            `Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`,
-          );
+          toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
           descSuffix = ` — ${info.convenioNome} EM ATRASO`;
         } else if (info.bloquear) {
           toast.error(info.avisoLimite ?? "Limite do convênio atingido — agendamento bloqueado.");
           descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
         } else if (info.desconto) {
-          opcoes = opcoes.map((o) => ({
-            ...o,
-            valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
-          }));
+          opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
           const rotulo =
             info.desconto.tipo === "gratuidade"
               ? "GRATUIDADE"
@@ -3554,9 +2757,7 @@ function AgendaPage() {
           toast.warning(info.avisoLimite);
           descSuffix = ` — ${info.convenioNome} (limite atingido)`;
         } else {
-          toast.info(
-            `Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`,
-          );
+          toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
         }
       }
       setFormaPagOpcoes(opcoes);
@@ -3568,8 +2769,7 @@ function AgendaPage() {
         paciente: payload.paciente_nome ?? "",
         procedimento: `${payload.procedimento ?? rotuloFallbackProc(payload.medico_id)}${descSuffix}`,
         medico: medicos.find((m) => m.id === payload.medico_id)?.nome ?? undefined,
-        especialidade:
-          medicos.find((m) => m.id === payload.medico_id)?.especialidade_nome ?? undefined,
+        especialidade: medicos.find((m) => m.id === payload.medico_id)?.especialidade_nome ?? undefined,
       });
       setFormaPagOpen(true);
     }
@@ -3583,12 +2783,7 @@ function AgendaPage() {
       toast.error("Este agendamento já foi pago. Estorne no Financeiro antes de liberar.");
       return;
     }
-    if (
-      !confirm(
-        `Liberar este horário? O cliente ${a.paciente_nome} será removido, mas a ficha continuará disponível.`,
-      )
-    )
-      return;
+    if (!confirm(`Liberar este horário? O cliente ${a.paciente_nome} será removido, mas a ficha continuará disponível.`)) return;
     const { error } = await supabase
       .from("agendamentos")
       .update({
@@ -3602,10 +2797,7 @@ function AgendaPage() {
       } as never)
       .eq("id", a.id);
     if (error) mostrarErro(error);
-    else {
-      toast.success("Horário liberado.");
-      await load();
-    }
+    else { toast.success("Horário liberado."); await load(); }
   };
 
   const mudarStatus = async (a: Agendamento, status: Status) => {
@@ -3623,8 +2815,7 @@ function AgendaPage() {
     }
     if (status === "realizado") {
       const inicio = new Date(a.inicio);
-      const hojeFim = new Date();
-      hojeFim.setHours(23, 59, 59, 999);
+      const hojeFim = new Date(); hojeFim.setHours(23, 59, 59, 999);
       if (inicio.getTime() > hojeFim.getTime()) {
         toast.error("Não é possível baixar como Realizado um atendimento de data futura.");
         return;
@@ -3643,38 +2834,26 @@ function AgendaPage() {
         .select("id,inicio,procedimento,status")
         .eq("pacote_id", a.pacote_id)
         .neq("status", "cancelado");
-      const outros = (
-        (irmaos ?? []) as Array<{ id: string; inicio: string; procedimento: string | null }>
-      ).filter((x) => x.id !== a.id);
+      const outros = ((irmaos ?? []) as Array<{ id: string; inicio: string; procedimento: string | null }>).filter(x => x.id !== a.id);
       if (outros.length > 0) {
         const lista = outros
           .sort((x, y) => new Date(x.inicio).getTime() - new Date(y.inicio).getTime())
-          .map((x) => `• ${new Date(x.inicio).toLocaleString("pt-BR")} — ${x.procedimento ?? ""}`)
+          .map(x => `• ${new Date(x.inicio).toLocaleString("pt-BR")} — ${x.procedimento ?? ""}`)
           .join("\n");
-        const ok = confirm(
-          `Este agendamento faz parte de um pacote do orçamento, com mais ${outros.length} item(ns) vinculado(s):\n\n${lista}\n\nClique OK para cancelar TODOS do pacote.\nClique Cancelar para cancelar APENAS este.`,
-        );
-        if (ok) idsParaAtualizar = [a.id, ...outros.map((x) => x.id)];
+        const ok = confirm(`Este agendamento faz parte de um pacote do orçamento, com mais ${outros.length} item(ns) vinculado(s):\n\n${lista}\n\nClique OK para cancelar TODOS do pacote.\nClique Cancelar para cancelar APENAS este.`);
+        if (ok) idsParaAtualizar = [a.id, ...outros.map(x => x.id)];
       }
     }
-    const { error } = await supabase
-      .from("agendamentos")
-      .update(payload)
-      .in("id", idsParaAtualizar);
-    if (error) mostrarErro(error);
-    else {
-      if (idsParaAtualizar.length > 1)
-        toast.success(`${idsParaAtualizar.length} agendamentos do pacote cancelados.`);
+    const { error } = await supabase.from("agendamentos").update(payload).in("id", idsParaAtualizar);
+    if (error) mostrarErro(error); else {
+      if (idsParaAtualizar.length > 1) toast.success(`${idsParaAtualizar.length} agendamentos do pacote cancelados.`);
       await load();
     }
   };
 
   const iniciarAtendimentoEnf = async (a: Agendamento) => {
     const uid = (await supabase.auth.getUser()).data.user?.id;
-    if (!uid) {
-      toast.error("Sessão expirada");
-      return;
-    }
+    if (!uid) { toast.error("Sessão expirada"); return; }
     const { error } = await supabase
       .from("agendamentos")
       .update({
@@ -3683,30 +2862,16 @@ function AgendaPage() {
         executado_em: new Date().toISOString(),
       } as never)
       .eq("id", a.id);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     toast.success("Atendimento iniciado e registrado");
     await load();
   };
 
   const concluirAtendimentoManual = async (a: Agendamento) => {
-    if (a.status === "realizado") {
-      toast.info("Atendimento já concluído.");
-      return;
-    }
-    if (
-      !confirm(
-        `Concluir atendimento de ${a.paciente_nome}?\n\nO médico fará o prontuário em papel. O sistema registra a consulta como realizada e libera o repasse.`,
-      )
-    )
-      return;
+    if (a.status === "realizado") { toast.info("Atendimento já concluído."); return; }
+    if (!confirm(`Concluir atendimento de ${a.paciente_nome}?\n\nO médico fará o prontuário em papel. O sistema registra a consulta como realizada e libera o repasse.`)) return;
     const uid = (await supabase.auth.getUser()).data.user?.id;
-    if (!uid) {
-      toast.error("Sessão expirada");
-      return;
-    }
+    if (!uid) { toast.error("Sessão expirada"); return; }
     const { error } = await supabase
       .from("agendamentos")
       .update({
@@ -3717,10 +2882,7 @@ function AgendaPage() {
         executado_em: new Date().toISOString(),
       } as never)
       .eq("id", a.id);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     toast.success("Atendimento concluído");
     await load();
   };
@@ -3759,113 +2921,156 @@ function AgendaPage() {
       return;
     }
     try {
-      // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
-      // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
-      // que não bate com a tabela de procedimentos e zeraria as opções).
-      const opcoesOrc = a.orcamento_id ? await opcoesPagamentoDeOrcamento(a.orcamento_id) : null;
-      // Verificação fresca no banco: impede faturar duas vezes mesmo se o cache
-      // local estiver desatualizado (ex.: outro usuário pagou em outra aba, ou
-      // o pagamento foi transferido de uma ficha reagendada).
-      // Roda em paralelo: checagem de pago + lista de procedimentos (cache)
-      // + info de convênio do paciente. Antes era serial (3-5s); agora ~= a
-      // chamada mais lenta.
-      const [{ data: jaPagos }, lista, info] = await Promise.all([
-        supabase
-          .from("fin_lancamentos")
-          .select("id")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .eq("tipo", "receita")
-          .eq("status", "confirmado")
-          .eq("agendamento_id", a.id)
-          .limit(1),
-        getProcedimentosComValor(clinicaAtual.clinica_id),
-        obterInfoConvenioPaciente({
-          clinicaId: clinicaAtual.clinica_id,
-          pacienteId: a.paciente_id,
-          medicoId: a.medico_id,
-          procedimentoNome: a.procedimento ?? "",
-          agendamentoId: a.id,
-          dataRef: a.inicio ?? null,
-        }),
-      ]);
-      if ((jaPagos ?? []).length > 0) {
-        toast.info("Este agendamento já foi pago.");
-        setPagosSet((prev) => {
-          const n = new Set(prev);
-          n.add(a.id);
-          return n;
-        });
+    // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
+    // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
+    // que não bate com a tabela de procedimentos e zeraria as opções).
+    const opcoesOrc = a.orcamento_id ? await opcoesPagamentoDeOrcamento(a.orcamento_id) : null;
+    // Verificação fresca no banco: impede faturar duas vezes mesmo se o cache
+    // local estiver desatualizado (ex.: outro usuário pagou em outra aba, ou
+    // o pagamento foi transferido de uma ficha reagendada).
+    // Roda em paralelo: checagem de pago + lista de procedimentos (cache)
+    // + info de convênio do paciente. Antes era serial (3-5s); agora ~= a
+    // chamada mais lenta.
+    const [{ data: jaPagos }, lista, info] = await Promise.all([
+      supabase
+        .from("fin_lancamentos")
+        .select("id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .eq("agendamento_id", a.id)
+        .limit(1),
+      getProcedimentosComValor(clinicaAtual.clinica_id),
+      obterInfoConvenioPaciente({
+        clinicaId: clinicaAtual.clinica_id,
+        pacienteId: a.paciente_id,
+        medicoId: a.medico_id,
+        procedimentoNome: a.procedimento ?? "",
+        agendamentoId: a.id,
+        dataRef: a.inicio ?? null,
+      }),
+    ]);
+    if ((jaPagos ?? []).length > 0) {
+      toast.info("Este agendamento já foi pago.");
+      setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
+      return;
+    }
+    // Multi-exame (laboratório/imagem): quando o nome vem concatenado com " + ",
+    // resolvemos cada item individualmente e somamos. Para agendamento simples,
+    // o split retorna apenas um item e o comportamento permanece igual.
+    const nomesParaValorar = (a.procedimento ?? rotuloFallbackProc(a.medico_id))
+      .split(/\s+\+\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const procsIndividuais = await Promise.all(
+      (nomesParaValorar.length > 0 ? nomesParaValorar : [rotuloFallbackProc(a.medico_id)]).map((nome) =>
+        buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista),
+      ),
+    );
+    let vDinheiro = 0, vPix = 0, vDebito = 0, vCredito = 0;
+    for (const p of procsIndividuais as any[]) {
+      const valorCartao = valorCartaoProcedimento(p);
+      vDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+      vPix      += valorCartao;
+      vDebito   += valorCartao;
+      vCredito  += valorCartao;
+    }
+    let opcoes: FormaOpcao[] = [
+      { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
+      { forma: "pix", label: "Pix", valor: vPix },
+      { forma: "cartao_debito", label: "Cartão de Débito", valor: vDebito },
+      { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
+    ];
+    let descSuffix = "";
+    if (opcoesOrc) {
+      // Valores do orçamento já consideram desconto/convênio definidos na hora
+      // de gerar o orçamento — não aplicamos nada por cima.
+      opcoes = opcoesOrc;
+    } else if (info) {
+      if (!info.emDia) {
+        toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
+        descSuffix = ` — ${info.convenioNome} EM ATRASO`;
+      } else if (info.bloquear) {
+        toast.error(info.avisoLimite ?? "Limite do convênio atingido — cobrança bloqueada.");
+        descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
+      } else if (info.desconto) {
+        opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
+        const rotulo =
+          info.desconto.tipo === "gratuidade"
+            ? "GRATUIDADE"
+            : info.desconto.tipo === "percentual"
+              ? `-${info.desconto.valor}%`
+              : info.desconto.tipo === "valor_fixo"
+                ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
+                : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+        descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
+        if (info.avisoLimite) toast.warning(info.avisoLimite);
+        else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+      } else if (info.avisoLimite) {
+        toast.warning(info.avisoLimite);
+        descSuffix = ` — ${info.convenioNome} (limite atingido)`;
+      } else {
+        toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
+      }
+    }
+    // Procedimento sem valor (ex.: REVISÃO / retorno gratuito). Não abre o
+    // fluxo de cobrança — registra um lançamento de valor 0 (linha-sombra),
+    // marca como pago e avança o fluxo, do mesmo modo que um pagamento normal.
+    const totalOpcoes = opcoes.reduce((s, o) => s + (Number(o.valor) || 0), 0);
+    // Só auto-registra "SEM COBRANÇA" quando o procedimento foi encontrado
+    // no cadastro E realmente está com valor zero. Se nenhum procedimento
+    // casou (ex.: laboratório com nome genérico "EXAMES LABORATORIAIS" ou
+    // agendamento com procedimento em branco), abrimos o diálogo de forma
+    // de pagamento normalmente para o operador digitar o valor.
+    const algumProcCasou = (procsIndividuais as any[]).some((p) => p != null);
+    const ehLab = medicoEhLaboratorioFormulario(a.medico_id);
+    if (!opcoesOrc && totalOpcoes <= 0 && algumProcCasou && !ehLab) {
+      const desc = `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix} — SEM COBRANÇA`;
+      const { error: errSC } = await supabase.from("fin_lancamentos").insert({
+        clinica_id: clinicaAtual.clinica_id,
+        tipo: "receita" as const,
+        descricao: desc,
+        valor: 0,
+        data: new Date().toISOString().slice(0, 10),
+        status: "confirmado" as const,
+        agendamento_id: a.id,
+        observacoes: "Atendimento sem cobrança (procedimento sem valor).",
+      });
+      if (errSC) {
+        mostrarErro(errSC, "falha ao registrar atendimento sem cobrança");
         return;
       }
-      const proc = await buscarProcedimentoPorNome(
-        clinicaAtual.clinica_id,
-        a.procedimento ?? "CONSULTA",
-        lista,
-      );
-      const valorCartao = valorCartaoProcedimento(proc);
-      const vDinheiro = primeiroValorValido(
-        proc?.valor_dinheiro,
-        proc?.valor_dinheiro_pix,
-        proc?.valor_padrao,
-      );
-      const vPix = valorCartao;
-      const vDebito = valorCartao;
-      const vCredito = valorCartao;
-      let opcoes: FormaOpcao[] = [
-        { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
-        { forma: "pix", label: "Pix", valor: vPix },
-        { forma: "cartao_debito", label: "Cartão de Débito", valor: vDebito },
-        { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
-      ];
-      let descSuffix = "";
-      if (opcoesOrc) {
-        // Valores do orçamento já consideram desconto/convênio definidos na hora
-        // de gerar o orçamento — não aplicamos nada por cima.
-        opcoes = opcoesOrc;
-      } else if (info) {
-        if (!info.emDia) {
-          toast.error(
-            `Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`,
-          );
-          descSuffix = ` — ${info.convenioNome} EM ATRASO`;
-        } else if (info.bloquear) {
-          toast.error(info.avisoLimite ?? "Limite do convênio atingido — cobrança bloqueada.");
-          descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
-        } else if (info.desconto) {
-          opcoes = opcoes.map((o) => ({
-            ...o,
-            valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
-          }));
-          const rotulo =
-            info.desconto.tipo === "gratuidade"
-              ? "GRATUIDADE"
-              : info.desconto.tipo === "percentual"
-                ? `-${info.desconto.valor}%`
-                : info.desconto.tipo === "valor_fixo"
-                  ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
-                  : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-          descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
-          if (info.avisoLimite) toast.warning(info.avisoLimite);
-          else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
-        } else if (info.avisoLimite) {
-          toast.warning(info.avisoLimite);
-          descSuffix = ` — ${info.convenioNome} (limite atingido)`;
-        } else {
-          toast.info(
-            `Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`,
-          );
+      setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
+      // Auto check-in apenas se o atendimento for do mesmo dia.
+      try {
+        const hoje = new Date().toISOString().slice(0, 10);
+        if (a.inicio && new Date(a.inicio).toISOString().slice(0, 10) === hoje) {
+          const { error: errFluxo } = await supabase
+            .from("agendamentos")
+            .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
+            .eq("id", a.id);
+          if (errFluxo) {
+            mostrarErro(errFluxo, "registro salvo, mas falhou ao avançar o fluxo");
+          } else {
+            setEtapaMap((m) => { const n = new Map(m); n.set(a.id, "triagem"); return n; });
+          }
         }
+      } catch (err) {
+        mostrarErro(err);
       }
-      setFormaPagOpcoes(opcoes);
-      setFormaPagCtx({
-        agId: a.id,
-        desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix}`,
-        paciente: a.paciente_nome ?? "",
-        procedimento: `${a.procedimento ?? "CONSULTA"}${descSuffix}`,
-        medico: medicos.find((m) => m.id === a.medico_id)?.nome ?? undefined,
-        especialidade: medicos.find((m) => m.id === a.medico_id)?.especialidade_nome ?? undefined,
-      });
-      setFormaPagOpen(true);
+      toast.success("Atendimento sem cobrança registrado.");
+      return;
+    }
+    setFormaPagOpcoes(opcoes);
+    setFormaPagCtx({
+      agId: a.id,
+      desc: `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`,
+      paciente: a.paciente_nome ?? "",
+      procedimento: `${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`,
+      medico: medicos.find((m) => m.id === a.medico_id)?.nome ?? undefined,
+      especialidade: medicos.find((m) => m.id === a.medico_id)?.especialidade_nome ?? undefined,
+    });
+    setFormaPagOpen(true);
     } catch (e: any) {
       console.error("[cobrarAgendamento]", e);
       mostrarErro(e);
@@ -3877,16 +3082,9 @@ function AgendaPage() {
       .from("agendamentos")
       .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
       .eq("id", a.id);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     toast.success("Presença confirmada — paciente liberado para a triagem");
-    setEtapaMap((m) => {
-      const n = new Map(m);
-      n.set(a.id, "triagem");
-      return n;
-    });
+    setEtapaMap((m) => { const n = new Map(m); n.set(a.id, "triagem"); return n; });
   };
 
   const escolherForma = (op: FormaOpcao) => {
@@ -3947,8 +3145,7 @@ function AgendaPage() {
     if (!formaPagOpen) return;
     const onKey = (e: KeyboardEvent) => {
       const tgt = e.target as HTMLElement | null;
-      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable))
-        return;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) return;
       if (e.key >= "1" && e.key <= "9") {
         const idx = Number(e.key) - 1;
         if (idx < formaPagOpcoes.length) {
@@ -3974,10 +3171,8 @@ function AgendaPage() {
       const tgt = e.target as HTMLElement | null;
       if (tgt) {
         const tag = tgt.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tgt.isContentEditable)
-          return;
-        if (tgt.closest('[role="dialog"], [role="listbox"], [role="menu"], [role="combobox"]'))
-          return;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tgt.isContentEditable) return;
+        if (tgt.closest('[role="dialog"], [role="listbox"], [role="menu"], [role="combobox"]')) return;
       }
       if (e.altKey || e.ctrlKey || e.metaKey) return;
       const k = e.key.toLowerCase();
@@ -3986,10 +3181,7 @@ function AgendaPage() {
         openNew();
       } else if (k === "f") {
         const el = document.querySelector<HTMLElement>("[data-agenda-filtro-prof]");
-        if (el) {
-          e.preventDefault();
-          el.focus();
-        }
+        if (el) { e.preventDefault(); el.focus(); }
       } else if (k === "r") {
         e.preventDefault();
         void load();
@@ -4008,9 +3200,7 @@ function AgendaPage() {
       if (ex.url_pdf) {
         window.open(ex.url_pdf, "_blank", "noopener,noreferrer");
       } else {
-        toast.info(
-          `NFS-e ${ex.numero ?? ""} — status: ${ex.status ?? "—"}. PDF ainda não disponível.`,
-        );
+        toast.info(`NFS-e ${ex.numero ?? ""} — status: ${ex.status ?? "—"}. PDF ainda não disponível.`);
         navigate({ to: "/app/nfse" });
       }
       return;
@@ -4029,36 +3219,40 @@ function AgendaPage() {
         toast.error("Selecione a empresa emitente para emitir a NFS-e.");
         return;
       }
-      const { data: pac } = await supabase
-        .from("pacientes")
+      const { data: pac } = await supabase.from("pacientes")
         .select("id, nome, cpf, email, cep, logradouro, numero, bairro, cidade, estado")
-        .eq("id", a.paciente_id)
-        .maybeSingle();
+        .eq("id", a.paciente_id).maybeSingle();
       if (!pac) {
         toast.error("Paciente não encontrado para emissão da NFS-e.");
         return;
       }
       const valor = pagoInfoMap.get(a.id)?.valor ?? 0;
-      const res = await emitirNfseFn({
-        data: {
-          emitenteId: emitenteIdEscolhido,
-          pacienteId: pac.id,
-          agendamentoId: a.id,
-          valorServicos: Number(valor) || 0,
-          descricaoServicos: a.procedimento || "Serviços prestados",
-          tomador: {
-            nome: pac.nome,
-            cpfCnpj: pac.cpf ?? undefined,
-            email: pac.email ?? undefined,
-            cep: pac.cep ?? undefined,
-            logradouro: pac.logradouro ?? undefined,
-            numero: pac.numero ?? undefined,
-            bairro: pac.bairro ?? undefined,
-            municipio: pac.cidade ?? undefined,
-            uf: pac.estado ?? undefined,
-          },
+      const tomador = await pickTomadorNfse({
+        paciente: {
+          nome: pac.nome,
+          cpfCnpj: pac.cpf ?? undefined,
+          email: pac.email ?? undefined,
+          cep: pac.cep ?? undefined,
+          logradouro: pac.logradouro ?? undefined,
+          numero: pac.numero ?? undefined,
+          bairro: pac.bairro ?? undefined,
+          municipio: pac.cidade ?? undefined,
+          uf: pac.estado ?? undefined,
         },
       });
+      if (!tomador) { toast.error("Emissão cancelada."); return; }
+      const descBase = a.procedimento || "Serviços prestados";
+      const descFinal = tomador.dependenteAtendido
+        ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
+        : descBase;
+      const res = await emitirNfseFn({ data: {
+        emitenteId: emitenteIdEscolhido,
+        pacienteId: pac.id,
+        agendamentoId: a.id,
+        valorServicos: Number(valor) || 0,
+        descricaoServicos: descFinal,
+        tomador,
+      } });
       const nfseId = (res as { id?: string })?.id;
       if (nfseId) {
         toast.success("NFS-e enviada. Consultando status...");
@@ -4177,21 +3371,13 @@ function AgendaPage() {
     return "Dr(a).";
   };
   const NOMES_EXAME_SEM_PREFIXO = new Set<string>([
-    "ECG",
-    "EEG",
-    "MAPA",
-    "HOLTER",
-    "ITB",
-    "ELETROCARDIOGRAMA",
-    "ELETROENCEFALOGRAMA",
-    "TESTE ERGOMETRICO",
-    "TESTE ERGOMÉTRICO",
-    "ERGOMETRIA",
-    "SAO FRANCISCO DE PAULA",
-    "SÃO FRANCISCO DE PAULA",
+    "ECG", "EEG", "MAPA", "HOLTER", "ITB",
+    "ELETROCARDIOGRAMA", "ELETROENCEFALOGRAMA",
+    "TESTE ERGOMETRICO", "TESTE ERGOMÉTRICO", "ERGOMETRIA",
+    "SAO FRANCISCO DE PAULA", "SÃO FRANCISCO DE PAULA",
   ]);
   const medicoNome = (id: string | null) => {
-    const m = medicos.find((x) => x.id === id);
+    const m = medicos.find(x => x.id === id);
     if (!m) return "—";
     const s = m.nome.trim().toUpperCase();
     if (m.nome.startsWith("🩺") || NOMES_EXAME_SEM_PREFIXO.has(s)) return m.nome;
@@ -4199,8 +3385,7 @@ function AgendaPage() {
   };
   const medicoNomeAgendamento = (a: Agendamento) => {
     const m = medicos.find((x) => x.id === a.medico_id);
-    const isExame = (n?: string | null) =>
-      NOMES_EXAME_SEM_PREFIXO.has((n ?? "").trim().toUpperCase());
+    const isExame = (n?: string | null) => NOMES_EXAME_SEM_PREFIXO.has((n ?? "").trim().toUpperCase());
     if (m) {
       if (m.nome.startsWith("🩺") || isExame(m.nome)) return m.nome;
       return `${prefixoMedico(m.sexo)} ${m.nome}`;
@@ -4209,8 +3394,7 @@ function AgendaPage() {
     if (isExame(a.medico_nome)) return a.medico_nome;
     return `${prefixoMedico(a.medico_sexo)} ${a.medico_nome}`;
   };
-  const fmtHora = (iso: string) =>
-    new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const fmtHora = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const fmtData = (iso: string) => {
     const d = new Date(iso);
     return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(-2)}`;
@@ -4226,16 +3410,12 @@ function AgendaPage() {
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <CalendarDays className="h-4 w-4 shrink-0" />
             <div className="flex-1 min-w-0">
-              <span className="font-semibold uppercase">
-                Reagendando · {reagendandoAg.paciente_nome}
-              </span>
+              <span className="font-semibold uppercase">Reagendando · {reagendandoAg.paciente_nome}</span>
               <span className="ml-2 opacity-90">
                 Atual: {new Date(reagendandoAg.inicio).toLocaleString("pt-BR")}
                 {reagendandoAg.procedimento ? ` — ${reagendandoAg.procedimento}` : ""}
               </span>
-              <span className="ml-2 opacity-90 italic">
-                Clique em um horário disponível na agenda para confirmar.
-              </span>
+              <span className="ml-2 opacity-90 italic">Clique em um horário disponível na agenda para confirmar.</span>
             </div>
             <Button
               size="sm"
@@ -4253,12 +3433,9 @@ function AgendaPage() {
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <CalendarDays className="h-4 w-4 shrink-0" />
             <div className="flex-1 min-w-0">
-              <span className="font-semibold uppercase">
-                Reagendando · {reagLoteIds.length} paciente(s) selecionado(s)
-              </span>
+              <span className="font-semibold uppercase">Reagendando · {reagLoteIds.length} paciente(s) selecionado(s)</span>
               <span className="ml-2 opacity-90 italic">
-                Clique em um horário DISPONÍVEL na agenda. Os pacientes serão alocados em sequência
-                a partir dessa ficha.
+                Clique em um horário DISPONÍVEL na agenda. Os pacientes serão alocados em sequência a partir dessa ficha.
               </span>
             </div>
             <Button
@@ -4277,9 +3454,7 @@ function AgendaPage() {
           <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
             <CalendarDays className="h-6 w-6" /> Agendas
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Filtre e gerencie os agendamentos da clínica.
-          </p>
+          <p className="text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
         </div>
         <div className="flex gap-1.5">
           <TurboModeToggle />
@@ -4300,36 +3475,19 @@ function AgendaPage() {
             </button>
           </div>
           <EncerrarExpedienteButton />
-          <Button
-            asChild
-            variant="default"
-            size="sm"
-            className="h-7 text-[11px] px-2"
-            title="Agendamento rápido em 4 passos"
-          >
+          <Button asChild variant="default" size="sm" className="h-7 text-[11px] px-2" title="Agendamento rápido em 4 passos">
             <Link to="/app/agenda/express">
               <Clock className="h-3 w-3 mr-1.5" /> Agenda Express
             </Link>
           </Button>
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="h-7 text-[11px] px-2"
-            title="Cadastrar horários semanais e gerar slots da agenda"
-          >
+          <Button asChild variant="outline" size="sm" className="h-7 text-[11px] px-2" title="Cadastrar horários semanais e gerar slots da agenda">
             <Link to="/app/disponibilidades">
               <Clock className="h-3 w-3 mr-1.5" /> Criar/gerar horários
             </Link>
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-[11px] px-2"
-                disabled={selecionados.size === 0}
-              >
+              <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" disabled={selecionados.size === 0}>
                 Opções ({selecionados.size})
               </Button>
             </DropdownMenuTrigger>
@@ -4370,10 +3528,7 @@ function AgendaPage() {
             size="sm"
             className="h-7 text-[11px] px-2"
             onClick={() => {
-              if (!filtrados.length) {
-                toast.info("Sem dados para exportar.");
-                return;
-              }
+              if (!filtrados.length) { toast.info("Sem dados para exportar."); return; }
               exportToExcel(
                 filtrados.map((a) => ({
                   data: new Date(a.inicio).toLocaleDateString("pt-BR"),
@@ -4404,616 +3559,395 @@ function AgendaPage() {
             <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button
-                size="sm"
-                data-turbo-novo
-                onClick={openNew}
-                disabled={!clinicaAtual}
-                className="h-7 text-[11px] px-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+          <DialogTrigger asChild>
+            <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-7 text-[11px] px-2 bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
+            <DialogHeader className="space-y-1 px-6 pt-5 pb-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
+              <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900">
+                {editing
+                  ? (pagosSet.has(editing.id) ? "Visualizar agendamento" : "Editar agendamento")
+                  : "Novo agendamento"}
+              </DialogTitle>
+              <p className="text-xs text-slate-500">
+                {editing && pagosSet.has(editing.id)
+                  ? "Este agendamento já foi pago. Alterações exigem estorno."
+                  : "Preencha os dados abaixo. Campos com * são obrigatórios."}
+              </p>
+            </DialogHeader>
+            <form onSubmit={submit} className="space-y-4 px-6 py-5">
+              {editing && open && (
+                <FichaEmUsoAlert agendamentoId={editing.id} />
+              )}
+              {editing && pagosSet.has(editing.id) && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 px-3 py-2 text-xs">
+                  <span className="mt-0.5">⚠️</span>
+                  Este agendamento já foi pago. Para alterações, estorne o pagamento no Financeiro.
+                </div>
+              )}
+              <fieldset
+                disabled={editing ? pagosSet.has(editing.id) : false}
+                className="space-y-4 contents disabled:opacity-90"
               >
-                <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[95vh] overflow-y-auto p-4 gap-2">
-              <DialogHeader className="space-y-0">
-                <DialogTitle>
-                  {editing
-                    ? pagosSet.has(editing.id)
-                      ? "Visualizar agendamento (pago)"
-                      : "Editar agendamento"
-                    : "Novo agendamento"}
-                </DialogTitle>
-              </DialogHeader>
-              <form onSubmit={submit} className="space-y-2">
-                {editing && pagosSet.has(editing.id) && (
-                  <div className="rounded-md border border-amber-300 bg-amber-50 text-amber-800 px-3 py-2 text-xs">
-                    Este agendamento já foi pago. Para alterações, estorne o pagamento no
-                    Financeiro.
-                  </div>
-                )}
-                <fieldset
-                  disabled={editing ? pagosSet.has(editing.id) : false}
-                  className="space-y-2 contents disabled:opacity-90"
-                >
-                  <div className="space-y-1 rounded-md border border-dashed border-primary/40 bg-primary/5 p-2 text-xs">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs uppercase whitespace-nowrap">Nº do orçamento</Label>
-                      <Input
-                        inputMode="numeric"
-                        placeholder="Ex.: 123"
-                        value={form.orcamento_numero}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            orcamento_numero: e.target.value.replace(/\D/g, ""),
-                          }))
-                        }
-                        disabled={
-                          !!form.orcamento_id || (editing ? pagosSet.has(editing.id) : false)
-                        }
-                        className="max-w-[120px] h-8"
-                      />
-                      {form.orcamento_id ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={limparOrcamento}
-                          disabled={editing ? pagosSet.has(editing.id) : false}
-                        >
-                          Limpar
-                        </Button>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void buscarOrcamento()}
-                          disabled={buscandoOrc}
-                        >
-                          {buscandoOrc ? "Buscando…" : "Buscar"}
-                        </Button>
-                      )}
-                      {!form.orcamento_id && (
-                        <span className="text-[10px] text-muted-foreground leading-tight flex-1">
-                          Opcional — vincula qualquer orçamento (exames, consultas, procedimentos)
-                          em uma única ficha.
-                        </span>
-                      )}
-                    </div>
-                    {form.orcamento_id && (
-                      <div className="text-xs text-muted-foreground space-y-1 pt-1">
-                        <p className="font-medium text-foreground">
-                          Marcando {form.orcamento_itens.length} exame(s) em uma única ficha.
-                          Pagamento continua pelo orçamento.
-                        </p>
-                        {form.orcamento_itens.length > 0 && (
-                          <ul className="list-disc list-inside max-h-24 overflow-y-auto">
-                            {form.orcamento_itens.map((n, i) => (
-                              <li key={i}>{n}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Paciente</Label>
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <PatientSearchInput
-                          clinicaIdsOverride={clinicaAtual ? [clinicaAtual.clinica_id] : undefined}
-                          value={
-                            form.paciente_id
-                              ? {
-                                  id: form.paciente_id,
-                                  nome: form.paciente_nome,
-                                  cpf: null,
-                                  telefone: null,
-                                  data_nascimento: null,
-                                  clinica_id: clinicaAtual?.clinica_id ?? "",
-                                }
-                              : form.paciente_nome
-                                ? {
-                                    id: "__pendente__",
-                                    nome: form.paciente_nome,
-                                    cpf: null,
-                                    telefone: null,
-                                    data_nascimento: null,
-                                    clinica_id: clinicaAtual?.clinica_id ?? "",
-                                  }
-                                : null
-                          }
-                          onSelect={(p) => {
-                            setForm((f) => ({
-                              ...f,
-                              paciente_nome: p?.nome ?? "",
-                              paciente_id: p?.id ?? "",
-                            }));
-                          }}
-                          placeholder="Nome, CPF, nascimento (DD/MM/AAAA) ou prontuário…"
-                          autoFocus
-                          enableVoice
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        title="Cadastrar novo paciente"
-                        disabled={editing ? pagosSet.has(editing.id) : false}
-                        onClick={() => {
-                          setNovoPac((p) => ({ ...p, nome: form.paciente_nome }));
-                          setNovoPacOpen(true);
-                        }}
-                      >
-                        <UserPlus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {editing && pagosSet.has(editing.id) && (
-                      <p className="text-xs text-amber-600">
-                        Este agendamento já está pago — o nome do paciente não pode ser alterado.
-                      </p>
-                    )}
-                    {form.paciente_nome && !form.paciente_id && (
-                      <p className="text-xs text-amber-600 font-medium">
-                        Paciente não cadastrado — use o botão ao lado para cadastrar antes de
-                        salvar.
-                      </p>
-                    )}
-                    {form.paciente_id && clinicaAtual && (
-                      <>
-                        <PacienteResumoBar
-                          key={`resumo-${form.paciente_id}`}
-                          pacienteId={form.paciente_id}
-                          clinicaId={clinicaAtual.clinica_id}
-                          onCompletarCadastro={() => setQuickCompleteOpen(true)}
-                        />
-                        <PacienteQuickActions
-                          key={form.paciente_id}
-                          pacienteId={form.paciente_id}
-                          clinicaId={clinicaAtual.clinica_id}
-                        />
-                      </>
-                    )}
-                  </div>
-                  {contratoPacienteInfo && (
-                    <div className="space-y-1">
-                      <Label>Tipo de atendimento</Label>
-                      <Select
-                        value={form.tipo_atendimento}
-                        onValueChange={(v) =>
-                          setForm((f) => ({ ...f, tipo_atendimento: v as TipoAtendimento }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="convenio">
-                            Convênio — {contratoPacienteInfo.convenioNome}
-                          </SelectItem>
-                          <SelectItem value="particular">Particular (paga valor cheio)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {contratoPacienteInfo.qtdAtrasadas > 0 &&
-                        form.tipo_atendimento === "particular" && (
-                          <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
-                            Paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em
-                            aberto no cartão ({contratoPacienteInfo.qtdAtrasadas} parcela(s)
-                            vencida(s)). Este atendimento será cobrado como Particular.
-                          </p>
-                        )}
-                      {contratoPacienteInfo.qtdAtrasadas > 0 &&
-                        form.tipo_atendimento === "convenio" && (
-                          <p className="text-xs rounded-md border border-destructive/40 bg-destructive/5 text-destructive px-2 py-1.5">
-                            Convênio bloqueado: paciente tem{" "}
-                            <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em atraso. Para
-                            agendar, mude para <b>Particular</b> ou regularize o débito.
-                          </p>
-                        )}
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    <Label>Médico ou Exame</Label>
-                    <SearchableSelect
-                      value={form.medico_id || "none"}
-                      disabled={!!editing}
-                      onChange={(v) => {
-                        if (v.startsWith("exame:")) {
-                          const nome = v.slice(6);
-                          setForm((f) => ({ ...f, medico_id: "", procedimento: nome }));
-                        } else {
-                          setForm((f) => {
-                            const medico_id = v === "none" ? "" : v;
-                            const fim = f.inicio ? calcFimAuto(f.inicio, medico_id) : f.fim;
-                            // Pré-preenche o serviço com o procedimento padrão do médico (se houver)
-                            // e substitui apenas serviço vazio ou herdado da especialidade antiga.
-                            let procedimento = f.procedimento;
-                            if (medico_id) {
-                              const med = medicos.find((m) => m.id === medico_id);
-                              const padrao = procedimentoPadraoDoMedico(medico_id);
-                              const deveAplicarPadrao =
-                                !procedimento ||
-                                normalizar(procedimento) ===
-                                  normalizar(med?.especialidade_nome ?? "");
-                              if (padrao && deveAplicarPadrao) {
-                                procedimento = padrao;
-                              }
-                            }
-                            return { ...f, medico_id, fim, procedimento };
-                          });
-                        }
-                      }}
-                      placeholder="Selecione médico ou exame"
-                      searchPlaceholder="Buscar médico ou exame..."
-                      options={[
-                        { value: "none", label: "— Sem médico —" },
-                        ...medicos.map((m) => ({ value: m.id, label: `👨‍⚕️ ${m.nome}` })),
-                        ...exames.map((e) => ({ value: `exame:${e.nome}`, label: `🧪 ${e.nome}` })),
-                      ]}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Data consulta/exame</Label>
-                        <Input
-                          type="datetime-local"
-                          value={form.inicio}
-                          onChange={(e) =>
-                            setForm((f) => ({
-                              ...f,
-                              inicio: e.target.value,
-                              fim: calcFimAuto(e.target.value, f.medico_id),
-                            }))
-                          }
-                          required
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Data de pagamento</Label>
-                        <Input
-                          type="text"
-                          value={
-                            form.data_pagamento
-                              ? new Date(form.data_pagamento + "T00:00:00").toLocaleDateString(
-                                  "pt-BR",
-                                )
-                              : "—"
-                          }
-                          readOnly
-                          disabled
-                          tabIndex={-1}
-                          className="bg-muted/40 cursor-not-allowed"
-                        />
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Preenchida automaticamente pelo sistema quando o pagamento for registrado.
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Serviço</Label>
-                    {form.medico_id ? (
-                      procOpcoesPorMedico.get(form.medico_id)?.length ||
-                      procPorMedico.get(form.medico_id)?.size ||
-                      procNomesPorMedico.get(form.medico_id)?.size ? (
-                        <p className="text-xs text-muted-foreground">
-                          Mostrando apenas serviços configurados para este médico.
-                        </p>
-                      ) : procedimentoPadraoDoMedico(form.medico_id) ? (
-                        <p className="text-xs text-muted-foreground">
-                          Mostrando o serviço principal do médico. Cadastre mais serviços no
-                          cadastro do médico, se necessário.
-                        </p>
-                      ) : (
-                        <p className="text-xs text-amber-600">
-                          Este médico não possui serviços cadastrados. Configure-os no cadastro do
-                          médico.
-                        </p>
-                      )
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Selecione um médico para ver os serviços disponíveis.
-                      </p>
-                    )}
-                    <SearchableSelect
-                      value={form.procedimento || "none"}
-                      onChange={(v) =>
-                        setForm((f) => ({ ...f, procedimento: v === "none" ? "" : v }))
-                      }
-                      placeholder="Selecione o serviço"
-                      searchPlaceholder="Buscar serviço..."
-                      options={(() => {
-                        const base: { value: string; label: string }[] = [
-                          { value: "none", label: "— Selecione —" },
-                        ];
-                        if (!form.medico_id) return base;
-                        const opts = opcoesProcedimentoMedico(
-                          form.medico_id,
-                          editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
-                        ).map((p) => ({ value: p.nome, label: p.nome }));
-                        // Sempre garantir que o serviço principal do médico apareça como opção,
-                        // mesmo quando ele não tem serviços vinculados no cadastro.
-                        const padrao = procedimentoPadraoDoMedico(form.medico_id);
-                        if (
-                          padrao &&
-                          !opts.some((o) => normalizar(o.value) === normalizar(padrao))
-                        ) {
-                          opts.unshift({ value: padrao, label: `${padrao} (principal)` });
-                        }
-                        // Se o valor atual não estiver na lista (ex.: procedimento legado), inclui também.
-                        // Exceção: não recria a especialidade do médico como se fosse serviço real
-                        // (ex.: agenda ENFERMAGEM gerando opção "ENFERMAGEM" sem existir no cadastro de serviços).
-                        const atual = (form.procedimento ?? "").trim();
-                        const especialidadeMedico =
-                          medicos.find((m) => m.id === form.medico_id)?.especialidade_nome ?? "";
-                        const atualEhEspecialidadeSintetica =
-                          especialidadeMedico &&
-                          normalizar(atual) === normalizar(especialidadeMedico);
-                        if (
-                          atual &&
-                          !atualEhEspecialidadeSintetica &&
-                          !opts.some((o) => normalizar(o.value) === normalizar(atual))
-                        ) {
-                          opts.push({ value: atual, label: atual });
-                        }
-                        // ── Top 10 por modalidade (USG/RX/TC/RM) com base no
-                        // histórico de uso da clínica nos últimos 365 dias.
-                        // Quando não houver histórico, usa uma lista curada
-                        // dos exames mais solicitados no Brasil.
-                        const detectModalidade = (
-                          label: string,
-                        ): "us" | "rx" | "tc" | "rm" | null => {
-                          const u = label.toUpperCase();
-                          if (u.includes("ULTRASS") || /\bUSG\b|\bUS\b/.test(u)) return "us";
-                          if (u.includes("TOMOGRAF") || /\bTC\b/.test(u)) return "tc";
-                          if (u.includes("RESSON") || /\bRM\b|\bRNM\b|\bMRI\b/.test(u)) return "rm";
-                          if (
-                            u.includes("RAIO") ||
-                            u.includes("RADIOGRAF") ||
-                            /\bRX\b|\bR-X\b/.test(u)
-                          )
-                            return "rx";
-                          return null;
-                        };
-                        // Lista curada (peso de popularidade) — usada como fallback
-                        // quando ainda não há histórico para o exame.
-                        // Cada item do top 10 pode exigir 1+ palavras-chave (todas presentes)
-                        // e opcionalmente excluir labels que contenham certas palavras.
-                        type Curado = { all: string[]; not?: string[] };
-                        const curadosPorModalidade: Record<"us" | "rx" | "tc" | "rm", Curado[]> = {
-                          // Top 10 oficial de USG (ordem = ranking). 1º = maior peso.
-                          us: [
-                            { all: ["OBSTETRIC", "1"], not: ["MORFOLOG", "DOPPLER"] }, // 1. Obstétrico 1º Trim.
-                            { all: ["MORFOLOG", "1"], not: ["GEMELAR", "DOPPLER"] }, // 2. Morfológico 1º Trim.
-                            { all: ["MORFOLOG", "2"], not: ["GEMELAR", "DOPPLER"] }, // 3. Morfológico 2º Trim.
-                            { all: ["OBSTETRIC", "DOPPLER"], not: ["MORFOLOG"] }, // 4. Obstétrico c/ Doppler
-                            { all: ["TRANSVAGINAL"] }, // 5. Transvaginal
-                            { all: ["MAMA"] }, // 6. Mamas
-                            { all: ["ABDOME TOTAL"] }, // 7. Abdome Total
-                            { all: ["PELV"], not: ["TRANSVAGINAL"] }, // 8. Pélvica
-                            { all: ["VIAS URINARIAS"] }, // 9. Vias Urinárias
-                            { all: ["TIREOIDE"] }, // 10. Tireoide
-                            { all: ["PROSTATA"] },
-                            { all: ["RINS"] },
-                          ],
-                          rx: [
-                            { all: ["TORAX"] },
-                            { all: ["COLUNA LOMBAR"] },
-                            { all: ["COLUNA CERVICAL"] },
-                            { all: ["JOELHO"] },
-                            { all: ["MAO"] },
-                            { all: ["PE"] },
-                            { all: ["PUNHO"] },
-                            { all: ["BACIA"] },
-                            { all: ["CRANIO"] },
-                            { all: ["ABDOME"] },
-                          ],
-                          tc: [
-                            { all: ["CRANIO"] },
-                            { all: ["TORAX"], not: ["CONTRASTE"] },
-                            { all: ["ABDOME TOTAL"] },
-                            { all: ["COLUNA LOMBAR"] },
-                            { all: ["SEIOS DA FACE"] },
-                            { all: ["COLUNA CERVICAL"] },
-                            { all: ["ABDOME SUPERIOR"] },
-                            { all: ["PESCOCO"] },
-                            { all: ["TORAX", "CONTRASTE"] },
-                            { all: ["PELVE"] },
-                          ],
-                          rm: [
-                            { all: ["CRANIO"] },
-                            { all: ["COLUNA LOMBAR"] },
-                            { all: ["COLUNA CERVICAL"] },
-                            { all: ["JOELHO"] },
-                            { all: ["OMBRO"] },
-                            { all: ["ABDOME"] },
-                            { all: ["COLUNA TORACICA"] },
-                            { all: ["PELVE"] },
-                            { all: ["QUADRIL"] },
-                            { all: ["TORNOZELO"] },
-                          ],
-                        };
-                        const scoreCurado = (label: string, mod: "us" | "rx" | "tc" | "rm") => {
-                          const L = normalizar(label).toUpperCase();
-                          const lista = curadosPorModalidade[mod];
-                          for (let i = 0; i < lista.length; i++) {
-                            const c = lista[i];
-                            if (c.not && c.not.some((n) => L.includes(n))) continue;
-                            if (c.all.every((k) => L.includes(k))) return lista.length - i;
-                          }
-                          return 0;
-                        };
-                        // Anexa "score" a cada opção (uso real + bônus do curado)
-                        type ScoredOpt = {
-                          value: string;
-                          label: string;
-                          mod: ReturnType<typeof detectModalidade>;
-                          score: number;
-                          curado: number;
-                        };
-                        const scored: ScoredOpt[] = opts.map((o) => {
-                          const mod = detectModalidade(o.label);
-                          const uso = procedimentoUsoMap.get(normalizar(o.value)) ?? 0;
-                          const curado = mod ? scoreCurado(o.label, mod) : 0;
-                          // curado define quem entra no top; uso só desempata dentro da lista curada
-                          return { ...o, mod, curado, score: curado * 1000 + uso };
-                        });
-                        // Para cada modalidade alvo, seleciona top 10 (por score desc)
-                        // e atribui a posição global 1..N na ordem em que aparecerão.
-                        const rankByValue = new Map<string, number>();
-                        const topOrdenado: ScoredOpt[] = [];
-                        (["us", "rx", "tc", "rm"] as const).forEach((mod) => {
-                          const lista = scored
-                            .filter((s) => s.mod === mod && s.curado > 0)
-                            .sort((a, b) => b.score - a.score)
-                            .slice(0, 10);
-                          lista.forEach((s) => topOrdenado.push(s));
-                        });
-                        topOrdenado.forEach((s, i) => rankByValue.set(s.value, i + 1));
-                        const topOpts = topOrdenado.map((s) => ({
-                          value: s.value,
-                          label: `${rankByValue.get(s.value)}. ${s.label}`,
-                        }));
-                        const restoOpts = scored
-                          .filter((s) => !rankByValue.has(s.value))
-                          .map((s) => ({ value: s.value, label: s.label }))
-                          .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
-                        return [...base, ...topOpts, ...restoOpts];
-                      })()}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Status</Label>
-                    {editing && !isSlotLivre(editing.paciente_nome) ? (
-                      <Select
-                        value={form.status}
-                        onValueChange={(v) => setForm((f) => ({ ...f, status: v as Status }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
-                            <SelectItem key={s} value={s}>
-                              {STATUS_LABEL[s]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input value={STATUS_LABEL[form.status]} disabled readOnly />
-                    )}
-                    {(!editing || isSlotLivre(editing.paciente_nome)) && (
-                      <p className="text-xs text-muted-foreground">
-                        Status definido automaticamente. Pode ser alterado depois pelo menu de
-                        ações.
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <Label>Observações</Label>
-                      <VoiceInput
-                        size="sm"
-                        currentValue={form.observacoes}
-                        onTranscript={(t) => setForm((f) => ({ ...f, observacoes: t }))}
-                        title="Ditar observações"
-                      />
-                    </div>
-                    <Textarea
-                      value={form.observacoes}
-                      onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))}
-                      rows={2}
-                    />
-                  </div>
-                </fieldset>
-                <DialogFooter className="sticky bottom-0 bg-background pt-2 -mx-4 px-4 border-t mt-2">
-                  {editing && pagosSet.has(editing.id) ? (
-                    <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                      Fechar
+              <div className="space-y-1.5 rounded-xl border border-primary/25 bg-primary/[0.04] p-3 text-xs">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Label className="text-[10px] font-semibold uppercase tracking-widest text-primary whitespace-nowrap">Nº do orçamento</Label>
+                  <Input
+                    inputMode="numeric"
+                    placeholder="Ex.: 123"
+                    value={form.orcamento_numero}
+                    onChange={(e) => setForm(f => ({ ...f, orcamento_numero: e.target.value.replace(/\D/g, "") }))}
+                    disabled={!!form.orcamento_id || (editing ? pagosSet.has(editing.id) : false)}
+                    className="max-w-[110px] h-8 bg-white"
+                  />
+                  {form.orcamento_id ? (
+                    <Button type="button" variant="outline" size="sm" onClick={limparOrcamento}
+                      disabled={editing ? pagosSet.has(editing.id) : false}>
+                      Limpar
                     </Button>
                   ) : (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setDescForm({
-                            tipo: descontoPendente?.tipo ?? "valor",
-                            input: descontoPendente?.input ?? "",
-                            motivo: descontoPendente?.motivo ?? "",
-                            autorizadoPor: descontoPendente?.autorizadoPor ?? "",
-                          });
-                          setDescontoDlgOpen(true);
-                        }}
-                        className={
-                          descontoPendente
-                            ? "border-amber-500 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
-                            : ""
-                        }
-                        title="Aplicar desconto (exige autorização da supervisão)"
-                      >
-                        {descontoPendente
-                          ? `Desconto: ${descontoPendente.tipo === "percentual" ? `${descontoPendente.input}%` : `R$ ${descontoPendente.input}`}`
-                          : "Desconto"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={saving || !form.paciente_id}
-                        onClick={(e) => {
-                          emitirNotaAposRef.current = false;
-                          submit(e as unknown as FormEvent, true);
-                        }}
-                        className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-                        title="Salva, registra pagamento e imprime a GR em A4"
-                      >
-                        Pagar/Imprimir
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={saving || !form.paciente_id}
-                        onClick={async (e) => {
-                          e.preventDefault();
-                          const escolhido = await pickEmitenteNfse();
-                          if (!escolhido) {
-                            toast.error(
-                              "Nenhum emitente NFS-e ativo. Cadastre em Configurações › NFS-e antes de emitir notas.",
-                            );
-                            return;
-                          }
-                          emitenteNotaAposRef.current = escolhido;
-                          emitirNotaAposRef.current = true;
-                          submit(e as unknown as FormEvent, true);
-                        }}
-                        className="border-sky-600 text-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/30"
-                        title="Salva, registra pagamento, imprime a GR e abre a emissão da NFS-e (a nota é salva ao imprimir o A4)"
-                      >
-                        Pagar/Imprimir/Nota
-                      </Button>
-                      <Button
-                        type="submit"
-                        data-primary
-                        disabled={saving || !form.paciente_id}
-                        title={
-                          !form.paciente_id
-                            ? "Selecione um paciente cadastrado antes de salvar"
-                            : undefined
-                        }
-                      >
-                        {saving ? "Salvando…" : "Salvar"}
-                      </Button>
-                    </>
+                    <Button type="button" variant="outline" size="sm" onClick={() => void buscarOrcamento()} disabled={buscandoOrc}>
+                      {buscandoOrc ? "Buscando…" : "Buscar"}
+                    </Button>
                   )}
-                </DialogFooter>
-              </form>
-            </DialogContent>
+                  {!form.orcamento_id && (
+                    <span className="text-[11px] text-slate-500 leading-snug flex-1 min-w-[140px]">
+                      Opcional — vincula qualquer orçamento (exames, consultas, procedimentos) em uma única ficha.
+                    </span>
+                  )}
+                </div>
+                {form.orcamento_id && (
+                  <div className="text-xs text-slate-600 space-y-1 pt-1 border-t border-primary/15">
+                    <p className="font-medium text-slate-900">
+                      Marcando {form.orcamento_itens.length} exame(s) em uma única ficha. Pagamento continua pelo orçamento.
+                    </p>
+                    {form.orcamento_itens.length > 0 && (
+                      <ul className="list-disc list-inside max-h-24 overflow-y-auto pl-1">
+                        {form.orcamento_itens.map((n, i) => <li key={i}>{n}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Paciente <span className="text-rose-500">*</span></Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <PatientSearchInput
+                      clinicaIdsOverride={clinicaAtual ? [clinicaAtual.clinica_id] : undefined}
+                      value={
+                        form.paciente_id
+                          ? { id: form.paciente_id, nome: form.paciente_nome, cpf: null, telefone: null, data_nascimento: null, clinica_id: clinicaAtual?.clinica_id ?? "" }
+                          : form.paciente_nome
+                            ? { id: "__pendente__", nome: form.paciente_nome, cpf: null, telefone: null, data_nascimento: null, clinica_id: clinicaAtual?.clinica_id ?? "" }
+                            : null
+                      }
+                      onSelect={(p) => {
+                        setForm(f => ({
+                          ...f,
+                          paciente_nome: p?.nome ?? "",
+                          paciente_id: p?.id ?? "",
+                        }));
+                      }}
+                      placeholder="Nome, CPF, nascimento (DD/MM/AAAA) ou prontuário…"
+                      autoFocus
+                      enableVoice
+                    />
+                  </div>
+                  <Button type="button" variant="outline" size="icon" title="Cadastrar novo paciente"
+                    disabled={editing ? pagosSet.has(editing.id) : false}
+                    onClick={() => { setNovoPac(p => ({ ...p, nome: form.paciente_nome })); setNovoPacOpen(true); }}>
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {editing && pagosSet.has(editing.id) && (
+                  <p className="text-xs text-amber-600">
+                    Este agendamento já está pago — o nome do paciente não pode ser alterado.
+                  </p>
+                )}
+                {form.paciente_nome && !form.paciente_id && (
+                  <p className="text-xs text-amber-600 font-medium">
+                    Paciente não cadastrado — use o botão ao lado para cadastrar antes de salvar.
+                  </p>
+                )}
+                {form.paciente_id && clinicaAtual && (
+                  <>
+                    <PacienteResumoBar
+                      key={`resumo-${form.paciente_id}`}
+                      pacienteId={form.paciente_id}
+                      clinicaId={clinicaAtual.clinica_id}
+                      onCompletarCadastro={() => setQuickCompleteOpen(true)}
+                    />
+                    <PacienteQuickActions
+                      key={form.paciente_id}
+                      pacienteId={form.paciente_id}
+                      clinicaId={clinicaAtual.clinica_id}
+                    />
+                  </>
+                )}
+              </div>
+              {contratoPacienteInfo && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Tipo de atendimento</Label>
+                  <Select
+                    value={form.tipo_atendimento}
+                    onValueChange={(v) => setForm((f) => ({ ...f, tipo_atendimento: v as TipoAtendimento }))}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="convenio">
+                        Convênio — {contratoPacienteInfo.convenioNome}
+                      </SelectItem>
+                      <SelectItem value="particular">Particular (paga valor cheio)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {contratoPacienteInfo.qtdAtrasadas > 0 && form.tipo_atendimento === "particular" && (
+                    <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
+                      Paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em aberto no cartão
+                      ({contratoPacienteInfo.qtdAtrasadas} parcela(s) vencida(s)). Este atendimento será cobrado como Particular.
+                    </p>
+                  )}
+                  {contratoPacienteInfo.qtdAtrasadas > 0 && form.tipo_atendimento === "convenio" && (
+                    <p className="text-xs rounded-md border border-destructive/40 bg-destructive/5 text-destructive px-2 py-1.5">
+                      Convênio bloqueado: paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em atraso.
+                      Para agendar, mude para <b>Particular</b> ou regularize o débito.
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Forma de pagamento prevista</Label>
+                <Select
+                  value={form.forma_pagamento_prevista || "nao_informado"}
+                  onValueChange={(v) => setForm((f) => ({ ...f, forma_pagamento_prevista: v === "nao_informado" ? "" : v }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nao_informado">Não informada (definir na cobrança)</SelectItem>
+                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
+                    <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-slate-500">
+                  Registra como o paciente pretende pagar. A forma real ainda é definida na cobrança.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Médico ou Exame <span className="text-rose-500">*</span></Label>
+                <SearchableSelect
+                  value={form.medico_id || "none"}
+                  disabled={!!editing}
+                  onChange={(v) => {
+                    if (v.startsWith("exame:")) {
+                      const nome = v.slice(6);
+                      setForm(f => ({ ...f, medico_id: "", procedimento: nome, procedimentos: nome ? [nome] : [] }));
+                    } else {
+                       setForm(f => {
+                         const medico_id = v === "none" ? "" : v;
+                         const fim = f.inicio ? calcFimAuto(f.inicio, medico_id) : f.fim;
+                         // Pré-preenche o serviço com o procedimento padrão do médico (se houver)
+                         // e substitui apenas serviço vazio ou herdado da especialidade antiga.
+                         let procedimento = f.procedimento;
+                         if (medico_id) {
+                           const med = medicos.find((m) => m.id === medico_id);
+                           const padrao = procedimentoPadraoDoMedico(medico_id);
+                           const deveAplicarPadrao = !procedimento || normalizar(procedimento) === normalizar(med?.especialidade_nome ?? "");
+                           if (padrao && deveAplicarPadrao) {
+                             procedimento = padrao;
+                           }
+                         }
+                          return { ...f, medico_id, fim, procedimento, procedimentos: procedimento ? [procedimento] : [] };
+                       });
+                    }
+                  }}
+                  placeholder="Selecione médico ou exame"
+                  searchPlaceholder="Buscar médico ou exame..."
+                  options={[
+                    { value: "none", label: "— Sem médico —" },
+                    ...medicos.map(m => ({ value: m.id, label: `👨‍⚕️ ${m.nome}` })),
+                    ...exames.map(e => ({ value: `exame:${e.nome}`, label: `🧪 ${e.nome}` })),
+                  ]}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Data consulta/exame <span className="text-rose-500">*</span></Label>
+                    <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Data de pagamento</Label>
+                    <Input
+                      type="text"
+                      value={form.data_pagamento
+                        ? new Date(form.data_pagamento + "T00:00:00").toLocaleDateString("pt-BR")
+                        : "—"}
+                      readOnly
+                      disabled
+                      tabIndex={-1}
+                      className="bg-slate-50 cursor-not-allowed text-slate-500"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-500 pt-0.5">
+                  Preenchida automaticamente pelo sistema quando o pagamento for registrado.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Serviço</Label>
+                {form.medico_id ? (
+                  (procOpcoesPorMedico.get(form.medico_id)?.length || procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
+                    <p className="text-[11px] text-slate-500">Mostrando apenas serviços configurados para este médico.</p>
+                  ) : procedimentoPadraoDoMedico(form.medico_id) ? (
+                    <p className="text-[11px] text-slate-500">
+                      Mostrando o serviço principal do médico. Cadastre mais serviços no cadastro do médico, se necessário.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-600">
+                      Este médico não possui serviços cadastrados. Configure-os no cadastro do médico.
+                    </p>
+                  )
+                ) : (
+                  <p className="text-[11px] text-slate-500">Selecione um médico para ver os serviços disponíveis.</p>
+                )}
+                {(() => {
+                  const opts = opcoesServicoFormulario();
+                  const permiteMulti = !!form.medico_id
+                    && (medicoEhLaboratorioFormulario(form.medico_id) || opts.some((o) => procedimentoEhImagem(o.label)));
+                  return permiteMulti ? (
+                    <>
+                      <SearchableMultiSelect
+                        value={form.procedimentos.length > 0 ? form.procedimentos : (form.procedimento ? [form.procedimento] : [])}
+                        onChange={(values) => setForm((f) => ({
+                          ...f,
+                          procedimentos: values,
+                          procedimento: values.join(" + "),
+                        }))}
+                        placeholder="Selecione um ou mais serviços"
+                        searchPlaceholder="Buscar serviço..."
+                        options={opts.filter((o) => o.value !== "none")}
+                      />
+                      {form.procedimentos.length > 1 && (
+                        <p className="text-[11px] text-emerald-700">
+                          {form.procedimentos.length} exames selecionados.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <SearchableSelect
+                      value={form.procedimento || "none"}
+                      onChange={(v) => setForm(f => ({
+                        ...f,
+                        procedimento: v === "none" ? "" : v,
+                        procedimentos: v === "none" ? [] : [v],
+                      }))}
+                      placeholder="Selecione o serviço"
+                      searchPlaceholder="Buscar serviço..."
+                      options={opts}
+                    />
+                  );
+                })()}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Status</Label>
+                {editing && !isSlotLivre(editing.paciente_nome) ? (
+                  <Select value={form.status} onValueChange={(v) => setForm(f => ({ ...f, status: v as Status }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
+                        <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input value={STATUS_LABEL[form.status]} disabled readOnly className="bg-slate-50 text-slate-500" />
+                )}
+                {(!editing || isSlotLivre(editing.paciente_nome)) && (
+                  <p className="text-[11px] text-slate-500">Status definido automaticamente. Pode ser alterado depois pelo menu de ações.</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-slate-700">Observações</Label>
+                  <VoiceInput
+                    size="sm"
+                    currentValue={form.observacoes}
+                    onTranscript={(t) => setForm(f => ({ ...f, observacoes: t }))}
+                    title="Ditar observações"
+                  />
+                </div>
+                <Textarea value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} className="resize-none" placeholder="Anotações internas (opcional)…" />
+              </div>
+              </fieldset>
+              <DialogFooter className="sticky bottom-0 bg-white pt-3 pb-2 -mx-6 px-6 border-t border-slate-200 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] mt-4 flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
+                {editing && pagosSet.has(editing.id) ? (
+                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>Fechar</Button>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDescForm({
+                          tipo: descontoPendente?.tipo ?? "valor",
+                          input: descontoPendente?.input ?? "",
+                          motivo: descontoPendente?.motivo ?? "",
+                          autorizadoPor: descontoPendente?.autorizadoPor ?? "",
+                        });
+                        setDescontoDlgOpen(true);
+                      }}
+                      className={"sm:self-center " + (descontoPendente ? "border-amber-500 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30" : "")}
+                      title="Aplicar desconto (exige autorização da supervisão)"
+                    >
+                      {descontoPendente
+                        ? `Desconto: ${descontoPendente.tipo === "percentual" ? `${descontoPendente.input}%` : `R$ ${descontoPendente.input}`}`
+                        : "Desconto"}
+                    </Button>
+                    <div className="flex flex-nowrap gap-2 sm:justify-end">
+                    <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="button"
+                      disabled={saving || !form.paciente_id}
+                      onClick={(e) => { emitirNotaAposRef.current = false; submit(e as unknown as FormEvent, true); }}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                      title="Salva, registra pagamento e imprime a GR em A4"
+                    >
+                      Pagar/Imprimir
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={saving || !form.paciente_id}
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        const escolhido = await pickEmitenteNfse();
+                        if (!escolhido) {
+                          toast.error("Nenhum emitente NFS-e ativo. Cadastre em Configurações › NFS-e antes de emitir notas.");
+                          return;
+                        }
+                        emitenteNotaAposRef.current = escolhido;
+                        emitirNotaAposRef.current = true;
+                        submit(e as unknown as FormEvent, true);
+                      }}
+                      className="border-sky-600 text-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/30"
+                      title="Salva, registra pagamento, imprime a GR e abre a emissão da NFS-e (a nota é salva ao imprimir o A4)"
+                    >
+                      Pagar + NFS-e
+                    </Button>
+                    <Button type="submit" variant="secondary" data-primary disabled={saving || !form.paciente_id} title={!form.paciente_id ? "Selecione um paciente cadastrado antes de salvar" : undefined}>{saving ? "Salvando…" : "Salvar"}</Button>
+                    </div>
+                  </>
+                )}
+              </DialogFooter>
+            </form>
+          </DialogContent>
           </Dialog>
         </div>
       </div>
@@ -5035,24 +3969,18 @@ function AgendaPage() {
               <div className="font-semibold text-primary leading-tight">{formaPagCtx.paciente}</div>
             ) : null}
             {formaPagCtx?.procedimento ? (
-              <div className="font-medium text-emerald-600 dark:text-emerald-400 leading-tight">
-                {formaPagCtx.procedimento}
-              </div>
+              <div className="font-medium text-emerald-600 dark:text-emerald-400 leading-tight">{formaPagCtx.procedimento}</div>
             ) : (
               <div className="text-muted-foreground">{formaPagCtx?.desc}</div>
             )}
-            {formaPagCtx?.medico || formaPagCtx?.especialidade ? (
+            {(formaPagCtx?.medico || formaPagCtx?.especialidade) ? (
               <div className="text-xs text-muted-foreground leading-tight">
-                {formaPagCtx?.medico ? (
-                  <span className="font-medium text-foreground/80">{formaPagCtx.medico}</span>
-                ) : null}
+                {formaPagCtx?.medico ? <span className="font-medium text-foreground/80">{formaPagCtx.medico}</span> : null}
                 {formaPagCtx?.medico && formaPagCtx?.especialidade ? " · " : ""}
                 {formaPagCtx?.especialidade ? <span>{formaPagCtx.especialidade}</span> : null}
               </div>
             ) : null}
-            <span className="block text-xs mt-1 text-muted-foreground opacity-80">
-              Dica: use as teclas 1–5 para escolher rapidamente.
-            </span>
+            <span className="block text-xs mt-1 text-muted-foreground opacity-80">Dica: use as teclas 1–5 para escolher rapidamente.</span>
           </div>
           <div className="grid gap-2 mt-2">
             {formaPagOpcoes.map((op, idx) => (
@@ -5063,9 +3991,7 @@ function AgendaPage() {
                 onClick={() => escolherForma(op)}
               >
                 <span className="flex items-center gap-2">
-                  <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border bg-muted text-xs font-mono">
-                    {idx + 1}
-                  </kbd>
+                  <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border bg-muted text-xs font-mono">{idx + 1}</kbd>
                   {op.label}
                 </span>
                 <span className="font-semibold">
@@ -5078,9 +4004,7 @@ function AgendaPage() {
               className="justify-center h-12 mt-1 bg-primary"
               onClick={escolherMisto}
             >
-              <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border border-primary-foreground/40 bg-primary-foreground/10 text-xs font-mono mr-2">
-                {formaPagOpcoes.length + 1}
-              </kbd>
+              <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border border-primary-foreground/40 bg-primary-foreground/10 text-xs font-mono mr-2">{formaPagOpcoes.length + 1}</kbd>
               💰 Mais de uma forma de pagamento
             </Button>
             <Button
@@ -5102,6 +4026,9 @@ function AgendaPage() {
           if (!v) {
             setPagamentoAgId(null);
             setPagamentoExtraIds([]);
+            setPagamentoPesos({});
+            setPagamentoRotulos({});
+            setPagamentoPacienteNome("");
             setDescontoPendente(null);
           }
         }}
@@ -5282,10 +4209,7 @@ function AgendaPage() {
             if (mesmoDia.length > 0) {
               const { error: errFluxo } = await supabase
                 .from("agendamentos")
-                .update({
-                  fluxo_etapa: "triagem",
-                  fluxo_atualizado_em: new Date().toISOString(),
-                } as never)
+                .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
                 .in("id", mesmoDia);
               if (errFluxo) {
                 mostrarErro(errFluxo, "pagamento salvo, mas falhou ao avançar o fluxo");
@@ -5340,34 +4264,38 @@ function AgendaPage() {
                 if (!ag?.paciente_id) {
                   toast.error("Agendamento sem paciente vinculado — NFS-e não emitida.");
                 } else {
-                  const { data: pac } = await supabase
-                    .from("pacientes")
+                  const { data: pac } = await supabase.from("pacientes")
                     .select("id, nome, cpf, email, cep, logradouro, numero, bairro, cidade, estado")
-                    .eq("id", ag.paciente_id)
-                    .maybeSingle();
+                    .eq("id", ag.paciente_id).maybeSingle();
                   if (!pac) {
                     toast.error("Paciente não encontrado para emissão da NFS-e.");
                   } else {
-                    const res = await emitirNfseFn({
-                      data: {
-                        emitenteId: emitenteIdEscolhido,
-                        pacienteId: pac.id,
-                        agendamentoId: agId,
-                        valorServicos: Number(dados.valor) || 0,
-                        descricaoServicos: ag.procedimento || pagamentoDesc || "Serviços prestados",
-                        tomador: {
-                          nome: pac.nome,
-                          cpfCnpj: pac.cpf ?? undefined,
-                          email: pac.email ?? undefined,
-                          cep: pac.cep ?? undefined,
-                          logradouro: pac.logradouro ?? undefined,
-                          numero: pac.numero ?? undefined,
-                          bairro: pac.bairro ?? undefined,
-                          municipio: pac.cidade ?? undefined,
-                          uf: pac.estado ?? undefined,
-                        },
+                    const tomador = await pickTomadorNfse({
+                      paciente: {
+                        nome: pac.nome,
+                        cpfCnpj: pac.cpf ?? undefined,
+                        email: pac.email ?? undefined,
+                        cep: pac.cep ?? undefined,
+                        logradouro: pac.logradouro ?? undefined,
+                        numero: pac.numero ?? undefined,
+                        bairro: pac.bairro ?? undefined,
+                        municipio: pac.cidade ?? undefined,
+                        uf: pac.estado ?? undefined,
                       },
                     });
+                    if (!tomador) { toast.error("Emissão cancelada."); return; }
+                    const descBase = ag.procedimento || pagamentoDesc || "Serviços prestados";
+                    const descFinal = tomador.dependenteAtendido
+                      ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
+                      : descBase;
+                    const res = await emitirNfseFn({ data: {
+                      emitenteId: emitenteIdEscolhido,
+                      pacienteId: pac.id,
+                      agendamentoId: agId,
+                      valorServicos: Number(dados.valor) || 0,
+                      descricaoServicos: descFinal,
+                      tomador,
+                    } });
                     const nfseId = (res as { id?: string })?.id;
                     if (nfseId) {
                       toast.success("NFS-e enviada. Consultando status...");
@@ -5375,9 +4303,7 @@ function AgendaPage() {
                       await consultarNfseFn({ data: { id: nfseId } });
                       toast.success("NFS-e emitida com sucesso.");
                     } else {
-                      toast.warning(
-                        "NFS-e enviada — acompanhe o status em Financeiro › Atendimentos.",
-                      );
+                      toast.warning("NFS-e enviada — acompanhe o status em Financeiro › Atendimentos.");
                     }
                   }
                 }
@@ -5400,15 +4326,8 @@ function AgendaPage() {
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label>Tipo</Label>
-                <Select
-                  value={descForm.tipo}
-                  onValueChange={(v) =>
-                    setDescForm((f) => ({ ...f, tipo: v as "valor" | "percentual" }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                <Select value={descForm.tipo} onValueChange={(v) => setDescForm((f) => ({ ...f, tipo: v as "valor" | "percentual" }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="valor">R$ (fixo)</SelectItem>
                     <SelectItem value="percentual">% (percentual)</SelectItem>
@@ -5420,9 +4339,7 @@ function AgendaPage() {
                 <Input
                   inputMode="decimal"
                   value={descForm.input}
-                  onChange={(e) =>
-                    setDescForm((f) => ({ ...f, input: e.target.value.replace(/[^\d.,]/g, "") }))
-                  }
+                  onChange={(e) => setDescForm((f) => ({ ...f, input: e.target.value.replace(/[^\d.,]/g, "") }))}
                   placeholder={descForm.tipo === "percentual" ? "10" : "20,00"}
                 />
               </div>
@@ -5433,9 +4350,7 @@ function AgendaPage() {
                 value={descForm.autorizadoPor}
                 readOnly={!ehSupervisorDesc}
                 onChange={(e) => setDescForm((f) => ({ ...f, autorizadoPor: e.target.value }))}
-                placeholder={
-                  ehSupervisorDesc ? "Você (supervisor)" : "Será preenchido após autorização"
-                }
+                placeholder={ehSupervisorDesc ? "Você (supervisor)" : "Será preenchido após autorização"}
               />
             </div>
             <div className="space-y-1">
@@ -5449,8 +4364,7 @@ function AgendaPage() {
             </div>
             {!ehSupervisorDesc && (
               <p className="text-xs text-amber-700 dark:text-amber-400">
-                Exige autorização do supervisor (admin, gestor ou financeiro). Ao confirmar, será
-                solicitada a senha.
+                Exige autorização do supervisor (admin, gestor ou financeiro). Ao confirmar, será solicitada a senha.
               </p>
             )}
           </div>
@@ -5459,39 +4373,21 @@ function AgendaPage() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => {
-                  setDescontoPendente(null);
-                  setDescontoDlgOpen(false);
-                  toast.success("Desconto removido.");
-                }}
+                onClick={() => { setDescontoPendente(null); setDescontoDlgOpen(false); toast.success("Desconto removido."); }}
               >
                 Remover
               </Button>
             )}
-            <Button type="button" variant="ghost" onClick={() => setDescontoDlgOpen(false)}>
-              Cancelar
-            </Button>
+            <Button type="button" variant="ghost" onClick={() => setDescontoDlgOpen(false)}>Cancelar</Button>
             <Button
               type="button"
               onClick={() => {
                 const n = Number(String(descForm.input).replace(",", ".")) || 0;
-                if (n <= 0) {
-                  toast.error("Informe um valor de desconto maior que zero.");
-                  return;
-                }
-                if (descForm.tipo === "percentual" && n > 100) {
-                  toast.error("Percentual não pode passar de 100%.");
-                  return;
-                }
+                if (n <= 0) { toast.error("Informe um valor de desconto maior que zero."); return; }
+                if (descForm.tipo === "percentual" && n > 100) { toast.error("Percentual não pode passar de 100%."); return; }
                 if (ehSupervisorDesc) {
-                  const autor =
-                    descForm.autorizadoPor.trim() || (clinicaAtual?.role ?? "supervisor");
-                  setDescontoPendente({
-                    tipo: descForm.tipo,
-                    input: descForm.input,
-                    autorizadoPor: autor,
-                    motivo: descForm.motivo.trim(),
-                  });
+                  const autor = descForm.autorizadoPor.trim() || (clinicaAtual?.role ?? "supervisor");
+                  setDescontoPendente({ tipo: descForm.tipo, input: descForm.input, autorizadoPor: autor, motivo: descForm.motivo.trim() });
                   setDescontoDlgOpen(false);
                   toast.success("Desconto aplicado.");
                 } else {
@@ -5524,18 +4420,14 @@ function AgendaPage() {
 
       <Dialog open={novoPacOpen} onOpenChange={setNovoPacOpen}>
         <DialogContent className="max-w-md">
+
           <DialogHeader>
             <DialogTitle>Cadastro rápido de paciente</DialogTitle>
           </DialogHeader>
           <form onSubmit={cadastrarPacienteRapido} className="space-y-3">
             <div className="space-y-1">
               <Label>Nome *</Label>
-              <Input
-                value={novoPac.nome}
-                onChange={(e) => setNovoPac((p) => ({ ...p, nome: e.target.value }))}
-                required
-                autoFocus
-              />
+              <Input value={novoPac.nome} onChange={(e) => setNovoPac(p => ({ ...p, nome: e.target.value }))} required autoFocus />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
@@ -5545,37 +4437,23 @@ function AgendaPage() {
                   onChange={(e) => {
                     const d = e.target.value.replace(/\D/g, "").slice(0, 11);
                     let v = d;
-                    if (d.length > 9)
-                      v = `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
-                    else if (d.length > 6) v = `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
-                    else if (d.length > 3) v = `${d.slice(0, 3)}.${d.slice(3)}`;
-                    setNovoPac((p) => ({ ...p, cpf: v }));
+                    if (d.length > 9) v = `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+                    else if (d.length > 6) v = `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`;
+                    else if (d.length > 3) v = `${d.slice(0,3)}.${d.slice(3)}`;
+                    setNovoPac(p => ({ ...p, cpf: v }));
                   }}
                   inputMode="numeric"
                   maxLength={14}
                   placeholder="000.000.000-00"
-                  className={
-                    novoPac.cpf &&
-                    somenteDigitos(novoPac.cpf).length === 11 &&
-                    !isCPFValido(novoPac.cpf)
-                      ? "border-rose-500 focus-visible:ring-rose-500"
-                      : ""
-                  }
+                  className={novoPac.cpf && somenteDigitos(novoPac.cpf).length === 11 && !isCPFValido(novoPac.cpf) ? "border-rose-500 focus-visible:ring-rose-500" : ""}
                 />
-                {novoPac.cpf &&
-                  somenteDigitos(novoPac.cpf).length === 11 &&
-                  !isCPFValido(novoPac.cpf) && (
-                    <p className="text-[11px] text-rose-600">CPF inválido</p>
-                  )}
+                {novoPac.cpf && somenteDigitos(novoPac.cpf).length === 11 && !isCPFValido(novoPac.cpf) && (
+                  <p className="text-[11px] text-rose-600">CPF inválido</p>
+                )}
               </div>
               <div className="space-y-1">
                 <Label>Nascimento *</Label>
-                <Input
-                  type="date"
-                  required
-                  value={novoPac.data_nascimento}
-                  onChange={(e) => setNovoPac((p) => ({ ...p, data_nascimento: e.target.value }))}
-                />
+                <Input type="date" required value={novoPac.data_nascimento} onChange={(e) => setNovoPac(p => ({ ...p, data_nascimento: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1">
@@ -5586,11 +4464,11 @@ function AgendaPage() {
                 onChange={(e) => {
                   const d = e.target.value.replace(/\D/g, "").slice(0, 11);
                   let v = d;
-                  if (d.length > 10) v = `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-                  else if (d.length > 6) v = `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-                  else if (d.length > 2) v = `(${d.slice(0, 2)}) ${d.slice(2)}`;
+                  if (d.length > 10) v = `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+                  else if (d.length > 6) v = `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+                  else if (d.length > 2) v = `(${d.slice(0,2)}) ${d.slice(2)}`;
                   else if (d.length > 0) v = `(${d}`;
-                  setNovoPac((p) => ({ ...p, telefone: v }));
+                  setNovoPac(p => ({ ...p, telefone: v }));
                 }}
                 inputMode="tel"
                 maxLength={15}
@@ -5599,21 +4477,11 @@ function AgendaPage() {
             </div>
             <div className="space-y-1">
               <Label>E-mail</Label>
-              <Input
-                type="email"
-                value={novoPac.email}
-                onChange={(e) => setNovoPac((p) => ({ ...p, email: e.target.value }))}
-              />
+              <Input type="email" value={novoPac.email} onChange={(e) => setNovoPac(p => ({ ...p, email: e.target.value }))} />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setNovoPacOpen(false)}>
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                disabled={savingPac}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
+              <Button type="button" variant="outline" onClick={() => setNovoPacOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={savingPac} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                 {savingPac ? "Salvando..." : "Cadastrar"}
               </Button>
             </DialogFooter>
@@ -5621,15 +4489,7 @@ function AgendaPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={!!auditAg}
-        onOpenChange={(o) => {
-          if (!o) {
-            setAuditAg(null);
-            setAuditRows([]);
-          }
-        }}
-      >
+      <Dialog open={!!auditAg} onOpenChange={(o) => { if (!o) { setAuditAg(null); setAuditRows([]); } }}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -5658,106 +4518,85 @@ function AgendaPage() {
                       .map((m) => [m.email as string, m.nome as string]),
                   );
                   return auditRows.map((r) => {
-                    const acaoLabel: Record<string, string> = {
-                      INSERT: "Criou",
-                      UPDATE: "Alterou",
-                      DELETE: "Excluiu",
-                    };
-                    const acaoCor: Record<string, string> = {
-                      INSERT: "bg-emerald-100 text-emerald-700",
-                      UPDATE: "bg-amber-100 text-amber-700",
-                      DELETE: "bg-rose-100 text-rose-700",
-                    };
-                    const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
-                    const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
-                    const isLanc = r.table_name === "fin_lancamentos";
-                    const repasseLabel: Record<string, string> = {
-                      repasse_pago: "Repasse ao médico",
-                      repasse_pago_em: "Data do repasse",
-                      repasse_forma_pagamento: "Forma do repasse",
-                    };
-                    const allowedLanc = new Set(Object.keys(repasseLabel));
-                    const fmtVal = (k: string, v: unknown) => {
-                      if (k === "repasse_pago") return v ? "Pago" : "Pendente";
-                      if (k === "repasse_pago_em" && typeof v === "string" && v) {
-                        return new Date(v + "T00:00:00").toLocaleDateString("pt-BR");
-                      }
-                      return v == null || v === "" ? "—" : String(v);
-                    };
-                    const chaves = Array.from(
-                      new Set([...Object.keys(antes), ...Object.keys(depois)]),
-                    )
-                      .filter(
-                        (k) => !["updated_at", "created_at", "fluxo_atualizado_em"].includes(k),
-                      )
-                      .filter((k) => (isLanc ? allowedLanc.has(k) : true))
-                      .filter((k) => JSON.stringify(antes[k]) !== JSON.stringify(depois[k]));
-                    const quem =
-                      (r.user_email && nomePorEmail.get(r.user_email)) || r.user_email || "—";
-                    // Para lançamentos: ignorar entradas que não envolvem campos de repasse
-                    if (isLanc && r.action === "UPDATE" && chaves.length === 0) return null;
-                    return (
-                      <div key={r.id} className="rounded-md border p-3 bg-card">
-                        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                          <div className="flex items-center gap-2">
-                            <Badge className={acaoCor[r.action] ?? ""}>
-                              {acaoLabel[r.action] ?? r.action}
-                            </Badge>
-                            <span className="text-xs font-mono text-muted-foreground">
-                              {isLanc ? "pagamento" : r.table_name}
-                            </span>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(r.created_at).toLocaleString("pt-BR")} · {quem}
-                          </div>
+                  const acaoLabel: Record<string, string> = { INSERT: "Criou", UPDATE: "Alterou", DELETE: "Excluiu" };
+                  const acaoCor: Record<string, string> = {
+                    INSERT: "bg-emerald-100 text-emerald-700",
+                    UPDATE: "bg-amber-100 text-amber-700",
+                    DELETE: "bg-rose-100 text-rose-700",
+                  };
+                  const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
+                  const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
+                  const isLanc = r.table_name === "fin_lancamentos";
+                  const repasseLabel: Record<string, string> = {
+                    repasse_pago: "Repasse ao médico",
+                    repasse_pago_em: "Data do repasse",
+                    repasse_forma_pagamento: "Forma do repasse",
+                  };
+                  const allowedLanc = new Set(Object.keys(repasseLabel));
+                  const fmtVal = (k: string, v: unknown) => {
+                    if (k === "repasse_pago") return v ? "Pago" : "Pendente";
+                    if (k === "repasse_pago_em" && typeof v === "string" && v) {
+                      return new Date(v + "T00:00:00").toLocaleDateString("pt-BR");
+                    }
+                    return v == null || v === "" ? "—" : String(v);
+                  };
+                  const chaves = Array.from(new Set([...Object.keys(antes), ...Object.keys(depois)]))
+                    .filter((k) => !["updated_at", "created_at", "fluxo_atualizado_em"].includes(k))
+                    .filter((k) => (isLanc ? allowedLanc.has(k) : true))
+                    .filter((k) => JSON.stringify(antes[k]) !== JSON.stringify(depois[k]));
+                  const quem = (r.user_email && nomePorEmail.get(r.user_email)) || r.user_email || "—";
+                  // Para lançamentos: ignorar entradas que não envolvem campos de repasse
+                  if (isLanc && r.action === "UPDATE" && chaves.length === 0) return null;
+                  return (
+                    <div key={r.id} className="rounded-md border p-3 bg-card">
+                      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <Badge className={acaoCor[r.action] ?? ""}>{acaoLabel[r.action] ?? r.action}</Badge>
+                          <span className="text-xs font-mono text-muted-foreground">
+                            {isLanc ? "pagamento" : r.table_name}
+                          </span>
                         </div>
-                        {r.action === "UPDATE" && chaves.length > 0 && (
-                          <div className="text-xs space-y-1">
-                            {chaves.map((k) => (
-                              <div key={k} className="grid grid-cols-[120px_1fr] gap-2">
-                                <span className="font-medium text-muted-foreground">
-                                  {isLanc ? (repasseLabel[k] ?? k) : k}:
-                                </span>
-                                <span>
-                                  <span className="line-through text-rose-600">
-                                    {fmtVal(k, antes[k])}
-                                  </span>
-                                  {" → "}
-                                  <span className="text-emerald-700">{fmtVal(k, depois[k])}</span>
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {r.action === "INSERT" && (
-                          <p className="text-xs text-muted-foreground">
-                            {isLanc
-                              ? `Pagamento da consulta registrado${depois.repasse_pago ? " — repasse já pago" : " — repasse pendente"}.`
-                              : "Registro criado."}
-                          </p>
-                        )}
-                        {r.action === "DELETE" && (
-                          <p className="text-xs text-muted-foreground">
-                            {isLanc ? "Pagamento removido." : "Registro excluído."}
-                          </p>
-                        )}
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(r.created_at).toLocaleString("pt-BR")} · {quem}
+                        </div>
                       </div>
-                    );
+                      {r.action === "UPDATE" && chaves.length > 0 && (
+                        <div className="text-xs space-y-1">
+                          {chaves.map((k) => (
+                            <div key={k} className="grid grid-cols-[120px_1fr] gap-2">
+                              <span className="font-medium text-muted-foreground">
+                                {isLanc ? (repasseLabel[k] ?? k) : k}:
+                              </span>
+                              <span>
+                                <span className="line-through text-rose-600">{fmtVal(k, antes[k])}</span>
+                                {" → "}
+                                <span className="text-emerald-700">{fmtVal(k, depois[k])}</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {r.action === "INSERT" && (
+                        <p className="text-xs text-muted-foreground">
+                          {isLanc
+                            ? `Pagamento da consulta registrado${depois.repasse_pago ? " — repasse já pago" : " — repasse pendente"}.`
+                            : "Registro criado."}
+                        </p>
+                      )}
+                      {r.action === "DELETE" && (
+                        <p className="text-xs text-muted-foreground">
+                          {isLanc ? "Pagamento removido." : "Registro excluído."}
+                        </p>
+                      )}
+                    </div>
+                  );
                   });
                 })()}
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setAuditAg(null);
-                setAuditRows([]);
-              }}
-            >
-              Fechar
-            </Button>
+            <Button variant="outline" onClick={() => { setAuditAg(null); setAuditRows([]); }}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -5769,18 +4608,11 @@ function AgendaPage() {
       >
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Profissional
-            </Label>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
               value={filtroMedico}
-              onChange={(v) => {
-                if (!isMedicoOnly) {
-                  setFiltroMedico(v);
-                  setFiltroAgenda("todos");
-                }
-              }}
+              onChange={(v) => { if (!isMedicoOnly) { setFiltroMedico(v); setFiltroAgenda("todos"); } }}
               disabled={isMedicoOnly}
               onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
             />
@@ -5794,10 +4626,7 @@ function AgendaPage() {
               ags = [];
               for (const lista of agendasPorMedico.values()) {
                 for (const a of lista) {
-                  if (!seen.has(a.id)) {
-                    seen.add(a.id);
-                    ags.push(a);
-                  }
+                  if (!seen.has(a.id)) { seen.add(a.id); ags.push(a); }
                 }
               }
               ags.sort((a, b) => a.nome.localeCompare(b.nome));
@@ -5806,27 +4635,19 @@ function AgendaPage() {
             const semProfissional = filtroMedico === "todos";
             return (
               <div className="space-y-0.5">
-                <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  Agenda
-                </Label>
+                <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Agenda</Label>
                 <Select
                   value={filtroAgenda}
                   onValueChange={setFiltroAgenda}
                   disabled={unica || semProfissional}
                 >
                   <SelectTrigger>
-                    <SelectValue
-                      placeholder={
-                        semProfissional ? "Selecione um profissional" : (ags[0]?.nome ?? "—")
-                      }
-                    />
+                    <SelectValue placeholder={semProfissional ? "Selecione um profissional" : (ags[0]?.nome ?? "—")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">TODAS</SelectItem>
-                    {ags.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.nome}
-                      </SelectItem>
+                    {ags.map(a => (
+                      <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -5834,9 +4655,7 @@ function AgendaPage() {
             );
           })()}
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Data Ref.
-            </Label>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
             <DataRefField
               dataRef={dataRef}
               dataFim={dataFim}
@@ -5846,47 +4665,26 @@ function AgendaPage() {
             />
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Dia Semana
-            </Label>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Dia Semana</Label>
             <Select value={filtroDiaSemana} onValueChange={setFiltroDiaSemana}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">TODOS</SelectItem>
-                {DIAS_SEMANA.map((d, i) => (
-                  <SelectItem key={d} value={String(i)}>
-                    {d}
-                  </SelectItem>
-                ))}
+                {DIAS_SEMANA.map((d, i) => <SelectItem key={d} value={String(i)}>{d}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Cliente
-            </Label>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Cliente</Label>
             <div className="flex gap-1">
-              <Input
-                data-quick-search
-                value={filtroCliente}
-                onChange={(e) => setFiltroCliente(e.target.value)}
-                placeholder="Nome ou CPF…"
-              />
+              <Input data-quick-search value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Nome ou CPF…" />
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
                 title="Cadastrar paciente rápido"
                 onClick={() => {
-                  setNovoPac({
-                    nome: filtroCliente.trim(),
-                    cpf: "",
-                    telefone: "",
-                    data_nascimento: "",
-                    email: "",
-                  });
+                  setNovoPac({ nome: filtroCliente.trim(), cpf: "", telefone: "", data_nascimento: "", email: "" });
                   setNovoPacOpen(true);
                 }}
                 className="h-7 w-7"
@@ -5896,66 +4694,53 @@ function AgendaPage() {
             </div>
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Nº Ficha
-            </Label>
-            <Input
-              value={filtroFicha}
-              onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))}
-              placeholder="Ex.: 001"
-              inputMode="numeric"
-            />
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Nº Ficha</Label>
+            <Input value={filtroFicha} onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 001" inputMode="numeric" />
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Especialidade
-            </Label>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Atend. Múltiplo</Label>
+            <button
+              type="button"
+              onClick={() => setFiltroApenasMultiplo((v) => !v)}
+              aria-pressed={filtroApenasMultiplo}
+              className={
+                "h-9 w-full rounded-md border px-3 text-xs font-medium transition-colors " +
+                (filtroApenasMultiplo
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-input bg-background text-muted-foreground hover:text-foreground")
+              }
+              title="Mostrar apenas agendamentos criados em Atendimento Múltiplo"
+            >
+              {filtroApenasMultiplo ? "Somente múltiplos" : "Todos"}
+            </button>
+          </div>
+          <div className="space-y-0.5">
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">TODOS</SelectItem>
-                {especialidades.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.nome}
-                  </SelectItem>
-                ))}
+                {especialidades.map(e => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Situação
-            </Label>
+            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">TODOS</SelectItem>
                 <SelectItem value="livres">Livres</SelectItem>
                 <SelectItem value="pago">Pago</SelectItem>
-                {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {STATUS_LABEL[s]}
-                  </SelectItem>
+                {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
+                  <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="flex items-end gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={limparFiltros}
-              className="h-7 text-xs flex-1"
-            >
-              <X className="h-3.5 w-3.5 mr-1.5" /> Limpar
-            </Button>
-            <Button size="sm" onClick={load} className="h-7 text-xs flex-1">
-              <Search className="h-3.5 w-3.5 mr-1.5" /> Exibir
-            </Button>
+            <Button variant="outline" size="sm" onClick={limparFiltros} className="h-7 text-xs flex-1"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
+            <Button size="sm" onClick={load} className="h-7 text-xs flex-1"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-1.5">
@@ -5969,509 +4754,450 @@ function AgendaPage() {
       </div>
 
       {viewMode === "dia" && (
-        <>
-          {pacienteCopia && (
-            <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
-              <div className="flex flex-wrap items-center gap-3 text-sm">
-                <CalendarDays className="h-4 w-4 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <span className="font-semibold uppercase">
-                    Copiando paciente · {pacienteCopia.nome}
-                  </span>
-                  <span className="ml-2 opacity-90 italic">
-                    Clique em um horário livre na agenda para agendar.
-                  </span>
-                </div>
-                <Button size="sm" variant="secondary" onClick={() => setPacienteCopia(null)}>
-                  Cancelar
-                </Button>
-              </div>
+      <>
+      {pacienteCopia && (
+        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <CalendarDays className="h-4 w-4 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="font-semibold uppercase">Copiando paciente · {pacienteCopia.nome}</span>
+              <span className="ml-2 opacity-90 italic">Clique em um horário livre na agenda para agendar.</span>
             </div>
-          )}
-          {/* Totais + paginação topo */}
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-            <div className="flex gap-4">
-              <span>
-                Total: <b className="text-foreground">{totais.total}</b>
-              </span>
-              <span>
-                Confirmados: <b className="text-foreground">{totais.confirmados}</b>
-              </span>
-              <span>
-                Realizados: <b className="text-foreground">{totais.realizados}</b>
-              </span>
-            </div>
-            <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
+            <Button size="sm" variant="secondary" onClick={() => setPacienteCopia(null)}>
+              Cancelar
+            </Button>
           </div>
+        </div>
+      )}
+      {/* Totais + paginação topo */}
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+        <div className="flex gap-4">
+          <span>Total: <b className="text-foreground">{totais.total}</b></span>
+          <span>Confirmados: <b className="text-foreground">{totais.confirmados}</b></span>
+          <span>Realizados: <b className="text-foreground">{totais.realizados}</b></span>
+        </div>
+        <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
+      </div>
 
-          {/* Tabela */}
-          <div className="rounded-lg border border-border bg-card overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40">
-                  <TableHead
-                    className="w-10"
-                    title="Selecione vários atendimentos do mesmo paciente para cobrar em um único pagamento (use o botão Opções acima)"
+      {/* Tabela */}
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40">
+              <TableHead
+                className="w-10"
+                title="Selecione vários atendimentos do mesmo paciente para cobrar em um único pagamento (use o botão Opções acima)"
+              >
+                <Checkbox
+                  checked={paginados.length > 0 && selecionados.size === paginados.length}
+                  onCheckedChange={toggleAll}
+                />
+              </TableHead>
+              <TableHead className="w-16">Ficha</TableHead>
+              <TableHead className="w-14">Dia</TableHead>
+              <TableHead className="w-24">Data</TableHead>
+              <TableHead className="w-24">Intervalo</TableHead>
+              <TableHead className="w-[220px] max-w-[220px]">Profissional</TableHead>
+              <TableHead className="w-[220px] max-w-[220px]">Cliente</TableHead>
+              <TableHead className="w-40">Serviço</TableHead>
+              <TableHead className="w-28 text-center">Alertas</TableHead>
+              <TableHead className="w-32 text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow><TableCell colSpan={10} className="text-center py-6 text-muted-foreground">Carregando…</TableCell></TableRow>
+            ) : !clinicaAtual ? (
+              <TableRow><TableCell colSpan={10} className="text-center py-6 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+            ) : paginados.length === 0 ? (
+              <TableRow><TableCell colSpan={10} className="text-center py-6 text-muted-foreground">Nenhum agendamento encontrado.</TableCell></TableRow>
+            ) : paginados.map((a) => {
+              const fichaNum = fichaPorId.get(a.id) ?? "";
+              const realizado = a.status === "realizado";
+                const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
+                const hojeIsoLocal = new Date().toISOString().slice(0, 10);
+                const ehHoje = (a.inicio ?? "").slice(0, 10) === hojeIsoLocal;
+                const pagoHoje = pagosSet.has(a.id) && ehHoje;
+                const presente =
+                  !realizado &&
+                  (pagoHoje || !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow));
+                const estornoPend = estornoPendAgs.has(a.id);
+                // Para o médico, oculta a identidade do paciente enquanto a
+                // solicitação de estorno estiver pendente.
+                const ocultarPaciente = estornoPend && isMedicoOnly;
+              return (
+                  <TableRow
+                    key={a.id}
+                    className={
+                      estornoPend
+                        ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-rose-100 hover:[&>td]:bg-rose-100"
+                        : realizado
+                        ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#d1f0d6] hover:[&>td]:bg-[#d1f0d6]"
+                        : presente
+                          ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#a8c8ed] hover:[&>td]:bg-[#a8c8ed]"
+                          : "[&>td]:py-1 [&>td]:h-9 text-xs"
+                    }
+                    style={
+                      estornoPend
+                        ? { backgroundColor: "#fee2e2", borderLeft: "3px solid #dc2626" }
+                        : realizado
+                        ? { backgroundColor: "#d1f0d6", borderLeft: "3px solid #8fd49a" }
+                        : presente
+                          ? { backgroundColor: "#a8c8ed", borderLeft: "3px solid #7aa9d8" }
+                          : undefined
+                    }
+                    title={
+                      estornoPend
+                        ? "Estorno solicitado — aguardando decisão do financeiro"
+                        : presente
+                          ? "Cliente presente na clínica"
+                          : undefined
+                    }
                   >
-                    <Checkbox
-                      checked={paginados.length > 0 && selecionados.size === paginados.length}
-                      onCheckedChange={toggleAll}
-                    />
-                  </TableHead>
-                  <TableHead className="w-16">Ficha</TableHead>
-                  <TableHead className="w-14">Dia</TableHead>
-                  <TableHead className="w-24">Data</TableHead>
-                  <TableHead className="w-24">Intervalo</TableHead>
-                  <TableHead className="w-[220px] max-w-[220px]">Profissional</TableHead>
-                  <TableHead className="w-[220px] max-w-[220px]">Cliente</TableHead>
-                  <TableHead className="w-40">Serviço</TableHead>
-                  <TableHead className="w-28 text-center">Alertas</TableHead>
-                  <TableHead className="w-32 text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
-                      Carregando…
-                    </TableCell>
-                  </TableRow>
-                ) : !clinicaAtual ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
-                      Selecione uma clínica.
-                    </TableCell>
-                  </TableRow>
-                ) : paginados.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
-                      Nenhum agendamento encontrado.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginados.map((a) => {
-                    const fichaNum = fichaPorId.get(a.id) ?? "";
-                    const realizado = a.status === "realizado";
-                    const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
-                    const hojeIsoLocal = new Date().toISOString().slice(0, 10);
-                    const ehHoje = (a.inicio ?? "").slice(0, 10) === hojeIsoLocal;
-                    const pagoHoje = pagosSet.has(a.id) && ehHoje;
-                    const presente =
-                      !realizado &&
-                      (pagoHoje ||
-                        !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow));
-                    return (
-                      <TableRow
-                        key={a.id}
-                        className={
-                          realizado
-                            ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#d1f0d6] hover:[&>td]:bg-[#d1f0d6]"
-                            : presente
-                              ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#a8c8ed] hover:[&>td]:bg-[#a8c8ed]"
-                              : "[&>td]:py-1 [&>td]:h-9 text-xs"
-                        }
-                        style={
-                          realizado
-                            ? { backgroundColor: "#d1f0d6", borderLeft: "3px solid #8fd49a" }
-                            : presente
-                              ? { backgroundColor: "#a8c8ed", borderLeft: "3px solid #7aa9d8" }
-                              : undefined
-                        }
-                        title={presente ? "Cliente presente na clínica" : undefined}
-                      >
-                        <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
-                          <Checkbox
-                            checked={selecionados.has(a.id)}
-                            onCheckedChange={() => toggleSel(a.id)}
-                          />
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">{fichaNum}</TableCell>
-                        <TableCell className="text-sm">{fmtDiaSemana(a.inicio)}</TableCell>
-                        <TableCell className="text-sm">{fmtData(a.inicio)}</TableCell>
-                        <TableCell>
-                          <span className="text-emerald-600 font-medium">
-                            {fmtHora(a.inicio)} - {fmtHora(a.fim)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="pr-1 align-middle max-w-[220px]">
-                          {(() => {
-                            const m = medicos.find((x) => x.id === a.medico_id);
-                            const label = medicoNomeAgendamento(a);
-                            const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
-                            return (
-                              <div className="flex items-center gap-1 min-w-0">
-                                <div
-                                  className="text-xs uppercase font-medium text-foreground truncate"
-                                  title={manual ? `${label} (prontuário em papel)` : label}
-                                >
-                                  {label}
-                                </div>
-                                {manual && (
-                                  <span
-                                    title="Médico faz prontuário em papel"
-                                    className="shrink-0 inline-flex items-center rounded border border-amber-500/60 bg-amber-50 px-1 py-0 text-[9px] font-bold uppercase text-amber-700"
-                                  >
-                                    Papel
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </TableCell>
-                        <TableCell className="pr-1 align-middle max-w-[220px]">
-                          {isSlotLivre(a.paciente_nome) ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openSlot(a)}
-                              title="Agendar paciente neste horário"
-                              className="h-6 px-2 text-primary hover:text-primary/80 font-medium"
-                            >
-                              <UserPlus className="h-3.5 w-3.5 mr-1" />
-                              Agendar cliente
-                            </Button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
-                              title="Ver informações do cliente"
-                              className="inline-flex items-center gap-1 text-xs uppercase font-medium text-foreground hover:text-primary hover:underline max-w-full overflow-hidden"
-                            >
-                              {a.status === "confirmado" && (
-                                <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-                              )}
-                              {a.paciente_id && (
-                                <IdadeIcon
-                                  nascimento={nascMap.get(a.paciente_id) ?? null}
-                                  size={18}
-                                />
-                              )}
-                              {a.paciente_id && convenioMap.has(a.paciente_id) && (
-                                <span
-                                  title={`Convênio: ${convenioMap.get(a.paciente_id)}`}
-                                  className="inline-flex items-center justify-center rounded-[3px] border border-sky-500/50 bg-sky-50 p-0.5 text-sky-700"
-                                >
-                                  <IdCard className="h-3.5 w-3.5" strokeWidth={2} />
-                                </span>
-                              )}
-                              <span className="truncate min-w-0">{a.paciente_nome}</span>
-                              {a.orcamento_numero ? (
-                                <span
-                                  title="Vinculado a um orçamento de laboratório"
-                                  className="ml-1 inline-flex items-center rounded px-1 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300"
-                                >
-                                  ORÇ #{String(a.orcamento_numero).padStart(5, "0")}
-                                </span>
-                              ) : null}
-                              {a.pacote_id
-                                ? (() => {
-                                    const irmaos = items.filter((x) => x.pacote_id === a.pacote_id);
-                                    const total = irmaos.length;
-                                    const indice =
-                                      irmaos
-                                        .slice()
-                                        .sort(
-                                          (x, y) =>
-                                            new Date(x.inicio).getTime() -
-                                            new Date(y.inicio).getTime(),
-                                        )
-                                        .findIndex((x) => x.id === a.id) + 1;
-                                    const tooltip = irmaos
-                                      .slice()
-                                      .sort(
-                                        (x, y) =>
-                                          new Date(x.inicio).getTime() -
-                                          new Date(y.inicio).getTime(),
-                                      )
-                                      .map(
-                                        (x) =>
-                                          `• ${new Date(x.inicio).toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit" })} — ${x.procedimento ?? ""}`,
-                                      )
-                                      .join("\n");
-                                    return (
-                                      <span
-                                        title={`Pacote do orçamento (${total} agendamentos):\n${tooltip}`}
-                                        className="ml-1 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold bg-violet-100 text-violet-800 border border-violet-300"
-                                      >
-                                        📦 {indice}/{total > 0 ? total : "?"}
-                                      </span>
-                                    );
-                                  })()
-                                : null}
-                            </button>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <ProcedimentoCell
-                            valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
-                            opcoes={opcoesProcedimentoMedico(a.medico_id)}
-                            padrao={procedimentoPadraoDoMedico(a.medico_id)}
-                            semFallback={
-                              !!medicos.find((m) => m.id === a.medico_id)
-                                ?.procedimento_padrao_em_branco
-                            }
-                            disabled={isSlotLivre(a.paciente_nome)}
-                            onChange={(novo) => atualizarProcedimento(a, novo)}
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex flex-col items-center gap-0.5">
-                            {isSlotLivre(a.paciente_nome) ? (
-                              <Badge className="bg-slate-100 text-slate-600 border border-slate-300">
-                                Livre
-                              </Badge>
-                            ) : (
-                              <Badge className={STATUS_COR[a.status]}>
-                                {STATUS_LABEL[a.status]}
-                              </Badge>
-                            )}
-                            {/* Badge "Pago" removida — destaque fica apenas no ícone $ na coluna Ações */}
+                  <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
+                    <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
+                  </TableCell>
+                  <TableCell className="font-mono text-sm">{fichaNum}</TableCell>
+                  <TableCell className="text-sm">{fmtDiaSemana(a.inicio)}</TableCell>
+                  <TableCell className="text-sm">{fmtData(a.inicio)}</TableCell>
+                  <TableCell>
+                     <span className="text-emerald-600 font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
+                  </TableCell>
+                  <TableCell className="pr-1 align-middle max-w-[220px]">
+                    {(() => {
+                      const m = medicos.find((x) => x.id === a.medico_id);
+                      const label = medicoNomeAgendamento(a);
+                      const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
+                      return (
+                        <div className="flex items-center gap-1 min-w-0">
+                          <div
+                            className="text-xs uppercase font-medium text-foreground truncate"
+                            title={manual ? `${label} (prontuário em papel)` : label}
+                          >
+                            {label}
                           </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {(() => {
-                              const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
-                              const pendenteCheckin = ["aguardando_recepcao", "recepcao"].includes(
-                                etapa,
-                              );
-                              if (pagosSet.has(a.id) && pendenteCheckin) {
-                                return (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    title="Confirmar presença (check-in)"
-                                    onClick={() => confirmarPresenca(a)}
-                                    className="h-5 w-5 border rounded-md text-emerald-700 border-emerald-600 hover:bg-emerald-50"
-                                  >
-                                    <BadgeCheck className="h-2.5 w-2.5" />
-                                  </Button>
-                                );
-                              }
-                              if (!pendenteCheckin && !isSlotLivre(a.paciente_nome)) {
-                                return (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    disabled
-                                    title="Check-in já realizado"
-                                    className="h-5 w-5 border rounded-md bg-emerald-500 text-white border-emerald-600 disabled:opacity-100"
-                                  >
-                                    <BadgeCheck className="h-2.5 w-2.5" />
-                                  </Button>
-                                );
-                              }
-                              return null;
-                            })()}
+                          {manual && (
+                            <span
+                              title="Médico faz prontuário em papel"
+                              className="shrink-0 inline-flex items-center rounded border border-amber-500/60 bg-amber-50 px-1 py-0 text-[9px] font-bold uppercase text-amber-700"
+                            >
+                              Papel
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </TableCell>
+                  <TableCell className="pr-1 align-middle max-w-[220px]">
+                    {ocultarPaciente ? (
+                      <span
+                        className="inline-flex items-center gap-1 text-xs uppercase font-medium text-rose-700 italic"
+                        title="Paciente oculto — estorno solicitado, aguardando aprovação"
+                      >
+                        — aguardando estorno —
+                      </span>
+                    ) : isSlotLivre(a.paciente_nome) ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openSlot(a)}
+                        title="Agendar paciente neste horário"
+                        className="h-6 px-2 text-primary hover:text-primary/80 font-medium"
+                      >
+                        <UserPlus className="h-3.5 w-3.5 mr-1" />
+                        Agendar cliente
+                      </Button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
+                        title="Ver informações do cliente"
+                        className="inline-flex items-center gap-1 text-xs uppercase font-medium text-foreground hover:text-primary hover:underline max-w-full overflow-hidden"
+                      >
+                        {a.status === "confirmado" && <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />}
+                        {a.paciente_id && <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={18} />}
+                        {a.paciente_id && convenioMap.has(a.paciente_id) && (
+                          <span
+                            title={`Convênio: ${convenioMap.get(a.paciente_id)}`}
+                            className="inline-flex items-center justify-center rounded-[3px] border border-sky-500/50 bg-sky-50 p-0.5 text-sky-700"
+                          >
+                            <IdCard className="h-3.5 w-3.5" strokeWidth={2} />
+                          </span>
+                        )}
+                        <span className="truncate min-w-0">{a.paciente_nome}</span>
+                        {a.orcamento_numero ? (
+                          <span
+                            title="Vinculado a um orçamento de laboratório"
+                            className="ml-1 inline-flex items-center rounded px-1 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300"
+                          >
+                            ORÇ #{String(a.orcamento_numero).padStart(5, "0")}
+                          </span>
+                        ) : null}
+                        {a.pacote_id ? (() => {
+                          const irmaos = items.filter(x => x.pacote_id === a.pacote_id);
+                          const total = irmaos.length;
+                          const indice = irmaos
+                            .slice()
+                            .sort((x, y) => new Date(x.inicio).getTime() - new Date(y.inicio).getTime())
+                            .findIndex(x => x.id === a.id) + 1;
+                          const tooltip = irmaos
+                            .slice()
+                            .sort((x, y) => new Date(x.inicio).getTime() - new Date(y.inicio).getTime())
+                            .map(x => `• ${new Date(x.inicio).toLocaleString("pt-BR", { hour: "2-digit", minute: "2-digit" })} — ${x.procedimento ?? ""}`)
+                            .join("\n");
+                          return (
+                            <span
+                              title={`Pacote do orçamento (${total} agendamentos):\n${tooltip}`}
+                              className="ml-1 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold bg-violet-100 text-violet-800 border border-violet-300"
+                            >
+                              📦 {indice}/{total > 0 ? total : "?"}
+                            </span>
+                          );
+                        })() : null}
+                      </button>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <ProcedimentoCell
+                      valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
+                      opcoes={opcoesProcedimentoMedico(a.medico_id)}
+                      padrao={
+                        procedimentoPadraoDoMedico(a.medico_id)
+                        || (medicoEhLaboratorioFormulario(a.medico_id) ? "EXAMES LABORATORIAIS" : "")
+                      }
+                      semFallback={!!medicos.find((m) => m.id === a.medico_id)?.procedimento_padrao_em_branco}
+                      disabled={isSlotLivre(a.paciente_nome)}
+                      onChange={(novo) => atualizarProcedimento(a, novo)}
+                    />
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex flex-col items-center gap-0.5">
+                      {isSlotLivre(a.paciente_nome) ? (
+                        <Badge className="bg-slate-100 text-slate-600 border border-slate-300">Livre</Badge>
+                      ) : estornoPend ? (
+                        <Badge className="bg-rose-100 text-rose-800 border border-rose-300">Estorno solicitado</Badge>
+                      ) : (
+                        <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
+                      )}
+                      {/* Badge "Pago" removida — destaque fica apenas no ícone $ na coluna Ações */}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {(() => {
+                        const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
+                        const pendenteCheckin = ["aguardando_recepcao","recepcao"].includes(etapa);
+                        if (pagosSet.has(a.id) && pendenteCheckin) {
+                          return (
                             <Button
                               variant="ghost"
                               size="icon"
-                              title={(() => {
-                                if (!pagosSet.has(a.id)) return "Pagamento pendente";
-                                const info = pagoInfoMap.get(a.id);
-                                if (!info) return "Pago";
-                                const v = info.valor.toLocaleString("pt-BR", {
-                                  style: "currency",
-                                  currency: "BRL",
-                                });
-                                const f = info.forma
-                                  ? info.forma.replace(/_/g, " ").toUpperCase()
-                                  : "—";
-                                return `Pago • ${f} • ${v}`;
-                              })()}
-                              onClick={() => cobrarAgendamento(a)}
-                              className={`h-7 w-7 border-2 rounded-md shadow-sm ${
-                                pagosSet.has(a.id)
-                                  ? "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 hover:text-white ring-2 ring-emerald-300"
-                                  : "text-rose-600 border-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                              }`}
+                              title="Confirmar presença (check-in)"
+                              onClick={() => confirmarPresenca(a)}
+                              className="h-5 w-5 border rounded-md text-emerald-700 border-emerald-600 hover:bg-emerald-50"
                             >
-                              <DollarSign
-                                className="h-4 w-4"
-                                strokeWidth={pagosSet.has(a.id) ? 3 : 2.5}
-                              />
+                              <BadgeCheck className="h-2.5 w-2.5" />
                             </Button>
-                            {(() => {
-                              if (isSlotLivre(a.paciente_nome)) return null;
-                              const nf = nfseMap.get(a.id);
-                              const emitida = !!nf;
-                              const podeEmitir = pagosSet.has(a.id);
-                              if (!emitida && !podeEmitir) return null;
-                              const title = emitida
-                                ? `NFS-e ${nf?.numero ?? ""} • ${nf?.status ?? "—"} — clique para ver`
-                                : "Emitir nota fiscal (NFS-e)";
-                              return (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  title={title}
-                                  onClick={() => verOuEmitirNota(a)}
-                                  className={`h-7 w-7 border-2 rounded-md shadow-sm ${
-                                    emitida
-                                      ? "bg-sky-600 text-white border-sky-700 hover:bg-sky-700 hover:text-white"
-                                      : "text-sky-700 border-sky-600 hover:bg-sky-50"
-                                  }`}
-                                >
-                                  <FileText className="h-4 w-4" strokeWidth={emitida ? 3 : 2.5} />
-                                </Button>
-                              );
-                            })()}
-                            {(() => {
-                              const m = medicos.find((x) => x.id === a.medico_id);
-                              const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
-                              if (!manual) return null;
-                              if (isSlotLivre(a.paciente_nome)) return null;
-                              const concluido = a.status === "realizado";
-                              return (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  title={
-                                    concluido
-                                      ? "Atendimento concluído (prontuário em papel)"
-                                      : "Concluir atendimento (médico faz prontuário em papel)"
-                                  }
-                                  disabled={concluido}
-                                  onClick={() => concluirAtendimentoManual(a)}
-                                  className={`h-7 w-7 border-2 rounded-md shadow-sm ${
-                                    concluido
-                                      ? "bg-emerald-600 text-white border-emerald-700 disabled:opacity-100"
-                                      : "text-amber-700 border-amber-600 hover:bg-amber-50"
-                                  }`}
-                                >
-                                  <FileText className="h-4 w-4" strokeWidth={2.5} />
-                                </Button>
-                              );
-                            })()}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEdit(a)}>
-                                  <Pencil className="h-4 w-4 mr-2" /> Editar
-                                </DropdownMenuItem>
-                                {a.medico_id &&
-                                  recursoIds.has(a.medico_id) &&
-                                  !isSlotLivre(a.paciente_nome) && (
-                                    <DropdownMenuItem
-                                      onClick={() => iniciarAtendimentoEnf(a)}
-                                      disabled={a.status === "realizado"}
-                                    >
-                                      <Play className="h-4 w-4 mr-2" /> Iniciar atendimento
-                                    </DropdownMenuItem>
-                                  )}
-                                <DropdownMenuItem
-                                  onClick={() => iniciarReagendamento(a)}
-                                  disabled={a.status === "realizado"}
-                                >
-                                  <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => cobrarAgendamento(a)}>
-                                  <DollarSign className="h-4 w-4 mr-2" /> Pagamento
-                                </DropdownMenuItem>
-                                {!isSlotLivre(a.paciente_nome) && a.status !== "realizado" && (
-                                  <DropdownMenuItem onClick={() => confirmarPresenca(a)}>
-                                    <BadgeCheck className="h-4 w-4 mr-2 text-emerald-600" />{" "}
-                                    Presente na clínica
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem
-                                  onClick={() => imprimirGR(a)}
-                                  disabled={!pagosSet.has(a.id)}
-                                >
-                                  <Printer className="h-4 w-4 mr-2" /> Imprimir GR
-                                  {!pagosSet.has(a.id) && (
-                                    <span className="ml-2 text-xs text-muted-foreground">
-                                      (pagar primeiro)
-                                    </span>
-                                  )}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    const url = `${window.location.origin}/p/${(a as any).token_publico}`;
-                                    navigator.clipboard.writeText(url);
-                                    toast.success("Link do paciente copiado");
-                                  }}
-                                >
-                                  <Video className="h-4 w-4 mr-2" /> Copiar link do paciente
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => verOuEmitirNota(a)}
-                                  disabled={!nfseMap.has(a.id) && !pagosSet.has(a.id)}
-                                >
-                                  <FileText className="h-4 w-4 mr-2" />
-                                  {nfseMap.has(a.id) ? "Ver nota emitida" : "Emitir nota fiscal"}
-                                  {!nfseMap.has(a.id) && !pagosSet.has(a.id) && (
-                                    <span className="ml-2 text-xs text-muted-foreground">
-                                      (pagar primeiro)
-                                    </span>
-                                  )}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
-                                  <ShieldCheck className="h-4 w-4 mr-2" /> Auditoria
-                                </DropdownMenuItem>
-                                {a.status === "realizado" && (
-                                  <DropdownMenuItem onClick={() => reabrirAtendimento(a)}>
-                                    <Flag className="h-4 w-4 mr-2" /> Reabrir atendimento
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
-                                  <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
-                                    <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}
-                                  </DropdownMenuItem>
-                                ))}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => remove(a)}
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" /> Excluir
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                          );
+                        }
+                        if (!pendenteCheckin && !isSlotLivre(a.paciente_nome)) {
+                          return (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled
+                              title="Check-in já realizado"
+                              className="h-5 w-5 border rounded-md bg-emerald-500 text-white border-emerald-600 disabled:opacity-100"
+                            >
+                              <BadgeCheck className="h-2.5 w-2.5" />
+                            </Button>
+                          );
+                        }
+                        return null;
+                      })()}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title={(() => {
+                          if (!pagosSet.has(a.id)) return "Pagamento pendente";
+                          const info = pagoInfoMap.get(a.id);
+                          if (!info) return "Pago";
+                          const v = info.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+                          const f = info.forma ? info.forma.replace(/_/g, " ").toUpperCase() : "—";
+                          return `Pago • ${f} • ${v}`;
+                        })()}
+                        onClick={() => cobrarAgendamento(a)}
+                        className={`h-7 w-7 border-2 rounded-md shadow-sm ${pagosSet.has(a.id)
+                          ? "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 hover:text-white ring-2 ring-emerald-300"
+                          : "text-rose-600 border-rose-600 hover:text-rose-700 hover:bg-rose-50"}`}
+                      >
+                        <DollarSign className="h-4 w-4" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
+                      </Button>
+                      {(() => {
+                        if (isSlotLivre(a.paciente_nome)) return null;
+                        const nf = nfseMap.get(a.id);
+                        const emitida = !!nf;
+                        const podeEmitir = pagosSet.has(a.id);
+                        if (!emitida && !podeEmitir) return null;
+                        const title = emitida
+                          ? `NFS-e ${nf?.numero ?? ""} • ${nf?.status ?? "—"} — clique para ver`
+                          : "Emitir nota fiscal (NFS-e)";
+                        return (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title={title}
+                            onClick={() => verOuEmitirNota(a)}
+                            className={`h-7 w-7 border-2 rounded-md shadow-sm ${emitida
+                              ? "bg-sky-600 text-white border-sky-700 hover:bg-sky-700 hover:text-white"
+                              : "text-sky-700 border-sky-600 hover:bg-sky-50"}`}
+                          >
+                            <FileText className="h-4 w-4" strokeWidth={emitida ? 3 : 2.5} />
+                          </Button>
+                        );
+                      })()}
+                      {(() => {
+                        const m = medicos.find((x) => x.id === a.medico_id);
+                        const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
+                        if (!manual) return null;
+                        if (isSlotLivre(a.paciente_nome)) return null;
+                        const concluido = a.status === "realizado";
+                        return (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title={concluido ? "Atendimento concluído (prontuário em papel)" : "Concluir atendimento (médico faz prontuário em papel)"}
+                            disabled={concluido}
+                            onClick={() => concluirAtendimentoManual(a)}
+                            className={`h-7 w-7 border-2 rounded-md shadow-sm ${concluido
+                              ? "bg-emerald-600 text-white border-emerald-700 disabled:opacity-100"
+                              : "text-amber-700 border-amber-600 hover:bg-amber-50"}`}
+                          >
+                            <FileText className="h-4 w-4" strokeWidth={2.5} />
+                          </Button>
+                        );
+                      })()}
+                      <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
+                        {a.medico_id && recursoIds.has(a.medico_id) && !isSlotLivre(a.paciente_nome) && (
+                          <DropdownMenuItem
+                            onClick={() => iniciarAtendimentoEnf(a)}
+                            disabled={a.status === "realizado"}
+                          >
+                            <Play className="h-4 w-4 mr-2" /> Iniciar atendimento
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          onClick={() => iniciarReagendamento(a)}
+                          disabled={a.status === "realizado"}
+                        >
+                          <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => cobrarAgendamento(a)}>
+                          <DollarSign className="h-4 w-4 mr-2" /> Pagamento
+                        </DropdownMenuItem>
+                        {!isSlotLivre(a.paciente_nome) && a.status !== "realizado" && (
+                          <DropdownMenuItem onClick={() => confirmarPresenca(a)}>
+                            <BadgeCheck className="h-4 w-4 mr-2 text-emerald-600" /> Presente na clínica
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          onClick={() => imprimirGR(a)}
+                          disabled={!pagosSet.has(a.id)}
+                        >
+                          <Printer className="h-4 w-4 mr-2" /> Imprimir GR
+                          {!pagosSet.has(a.id) && (
+                            <span className="ml-2 text-xs text-muted-foreground">(pagar primeiro)</span>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
+                          <Printer className="h-4 w-4 mr-2" /> Comprovante de agendamento
+                        </DropdownMenuItem>
+                        {!isSlotLivre(a.paciente_nome) && a.status !== "realizado" && (
+                          <DropdownMenuItem onClick={() => remove(a)}>
+                            <UserMinus className="h-4 w-4 mr-2 text-amber-600" /> Desmarcar paciente
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => {
+                          const url = `${window.location.origin}/p/${(a as any).token_publico}`;
+                          navigator.clipboard.writeText(url);
+                          toast.success("Link do paciente copiado");
+                        }}>
+                          <Video className="h-4 w-4 mr-2" /> Copiar link do paciente
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => verOuEmitirNota(a)}
+                          disabled={!nfseMap.has(a.id) && !pagosSet.has(a.id)}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          {nfseMap.has(a.id) ? "Ver nota emitida" : "Emitir nota fiscal"}
+                          {!nfseMap.has(a.id) && !pagosSet.has(a.id) && (
+                            <span className="ml-2 text-xs text-muted-foreground">(pagar primeiro)</span>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
+                          <ShieldCheck className="h-4 w-4 mr-2" /> Auditoria
+                        </DropdownMenuItem>
+                        {a.status === "realizado" && (
+                          <DropdownMenuItem onClick={() => reabrirAtendimento(a)}>
+                            <Flag className="h-4 w-4 mr-2" /> Reabrir atendimento
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
+                          <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
+                            <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => remove(a)} className="text-destructive">
+                          <Trash2 className="h-4 w-4 mr-2" /> Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
 
-          <div className="flex justify-center">
-            <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
-          </div>
+      <div className="flex justify-center">
+        <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
+      </div>
 
-          <div className="rounded-lg border bg-muted/30 p-4">
-            <h3 className="text-center font-semibold mb-3">Legenda</h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {[
-                { cor: "#cfe3fb", borda: "#9fc3f3", label: "Confirmado pelo cliente" },
-                { cor: "#a8c8ed", borda: "#7aa9d8", label: "Presente na clínica" },
-                { cor: "#7fbfc2", borda: "#5a9ea1", label: "Em atendimento" },
-                { cor: "#d1f0d6", borda: "#8fd49a", label: "Atendido com sucesso" },
-                { cor: "#fde2c4", borda: "#f5c890", label: "Agenda de telemedicina" },
-                { cor: "#f8d2d6", borda: "#eea1a8", label: "Cancelado pelo cliente" },
-                { cor: "#fef3b6", borda: "#f0dc7a", label: "Atrasado para consulta" },
-                { cor: "#e0cdf0", borda: "#bea4d8", label: "Agendamento on-line" },
-                { cor: "#f7b6c0", borda: "#e88594", label: "Não comparecimento" },
-              ].map((s) => (
-                <div key={s.label} className="flex items-center gap-2 text-sm">
-                  <span
-                    className="inline-block h-6 w-10 rounded border"
-                    style={{ background: s.cor, borderColor: s.borda }}
-                  />
-                  <span>{s.label}</span>
-                </div>
-              ))}
+      <div className="rounded-lg border bg-muted/30 p-4">
+        <h3 className="text-center font-semibold mb-3">Legenda</h3>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { cor: "#cfe3fb", borda: "#9fc3f3", label: "Confirmado pelo cliente" },
+            { cor: "#a8c8ed", borda: "#7aa9d8", label: "Presente na clínica" },
+            { cor: "#7fbfc2", borda: "#5a9ea1", label: "Em atendimento" },
+            { cor: "#d1f0d6", borda: "#8fd49a", label: "Atendido com sucesso" },
+            { cor: "#fde2c4", borda: "#f5c890", label: "Agenda de telemedicina" },
+            { cor: "#f8d2d6", borda: "#eea1a8", label: "Cancelado pelo cliente" },
+            { cor: "#fef3b6", borda: "#f0dc7a", label: "Atrasado para consulta" },
+            { cor: "#e0cdf0", borda: "#bea4d8", label: "Agendamento on-line" },
+            { cor: "#f7b6c0", borda: "#e88594", label: "Não comparecimento" },
+            { cor: "#fee2e2", borda: "#dc2626", label: "Estorno solicitado" },
+          ].map((s) => (
+            <div key={s.label} className="flex items-center gap-2 text-sm">
+              <span
+                className="inline-block h-6 w-10 rounded border"
+                style={{ background: s.cor, borderColor: s.borda }}
+              />
+              <span>{s.label}</span>
             </div>
-          </div>
-        </>
+          ))}
+        </div>
+      </div>
+      </>
       )}
 
       {viewMode === "medico" && (
@@ -6505,60 +5231,27 @@ function AgendaPage() {
             <div className="rounded-lg border p-4 space-y-2 text-sm">
               <div className="flex items-center gap-3">
                 {pacInfo.foto_url ? (
-                  <img
-                    src={pacInfo.foto_url}
-                    alt={pacInfo.nome}
-                    className="h-14 w-14 rounded-full object-cover border"
-                  />
+                  <img src={pacInfo.foto_url} alt={pacInfo.nome} className="h-14 w-14 rounded-full object-cover border" />
                 ) : null}
                 <div>
                   <div className="font-semibold uppercase">{pacInfo.nome}</div>
                   {pacInfo.numero_pasta && (
-                    <div className="text-xs text-muted-foreground">
-                      Serviço nº {pacInfo.numero_pasta}
-                    </div>
+                    <div className="text-xs text-muted-foreground">Serviço nº {pacInfo.numero_pasta}</div>
                   )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 pt-2 border-t">
-                <div>
-                  <span className="text-muted-foreground">CPF: </span>
-                  {pacInfo.cpf || "—"}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Nasc.: </span>
-                  {pacInfo.data_nascimento
-                    ? new Date(pacInfo.data_nascimento + "T00:00:00").toLocaleDateString("pt-BR")
-                    : "—"}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Telefone: </span>
-                  {pacInfo.telefone || "—"}
-                </div>
-                <div className="truncate">
-                  <span className="text-muted-foreground">Email: </span>
-                  {pacInfo.email || "—"}
-                </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Endereço: </span>
-                  {[
-                    pacInfo.logradouro,
-                    pacInfo.numero,
-                    pacInfo.bairro,
-                    pacInfo.cidade,
-                    pacInfo.estado,
-                  ]
-                    .filter(Boolean)
-                    .join(", ") || "—"}
-                </div>
+                <div><span className="text-muted-foreground">CPF: </span>{pacInfo.cpf || "—"}</div>
+                <div><span className="text-muted-foreground">Nasc.: </span>{pacInfo.data_nascimento ? new Date(pacInfo.data_nascimento + "T00:00:00").toLocaleDateString("pt-BR") : "—"}</div>
+                <div><span className="text-muted-foreground">Telefone: </span>{pacInfo.telefone || "—"}</div>
+                <div className="truncate"><span className="text-muted-foreground">Email: </span>{pacInfo.email || "—"}</div>
+                <div className="col-span-2"><span className="text-muted-foreground">Endereço: </span>{[pacInfo.logradouro, pacInfo.numero, pacInfo.bairro, pacInfo.cidade, pacInfo.estado].filter(Boolean).join(", ") || "—"}</div>
               </div>
               {pacInfo.id && (
                 <div className="pt-2">
                   <Button
                     size="sm"
-                    onClick={() => {
-                      window.location.href = `/app/clientes/${pacInfo.id}/editar`;
-                    }}
+                    onClick={() => { window.location.href = `/app/clientes/${pacInfo.id}/editar`; }}
                   >
                     Editar
                   </Button>
@@ -6571,10 +5264,7 @@ function AgendaPage() {
       {dividirCtx && (
         <DividirOrcamentoDialog
           open={dividirOpen}
-          onOpenChange={(v) => {
-            setDividirOpen(v);
-            if (!v) setDividirCtx(null);
-          }}
+          onOpenChange={(v) => { setDividirOpen(v); if (!v) setDividirCtx(null); }}
           clinicaId={clinicaAtual?.clinica_id ?? ""}
           orcamento={dividirCtx.orcamento}
           itens={dividirCtx.itens}
@@ -6582,24 +5272,14 @@ function AgendaPage() {
           medicos={[
             ...medicos.map((m) => ({ id: m.id, nome: m.nome, isRecurso: recursoIds.has(m.id) })),
           ]}
-          onCreated={() => {
-            void load();
-          }}
+          onCreated={() => { void load(); }}
         />
       )}
     </div>
   );
 }
 
-function Paginacao({
-  page,
-  totalPages,
-  onChange,
-}: {
-  page: number;
-  totalPages: number;
-  onChange: (p: number) => void;
-}) {
+function Paginacao({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
   const nums = useMemo(() => {
     const arr: number[] = [];
     const start = Math.max(1, page - 2);
@@ -6609,48 +5289,19 @@ function Paginacao({
   }, [page, totalPages]);
   return (
     <div className="flex items-center gap-1">
-      <Button variant="outline" size="sm" disabled={page === 1} onClick={() => onChange(1)}>
-        «
-      </Button>
-      <Button variant="outline" size="sm" disabled={page === 1} onClick={() => onChange(page - 1)}>
-        ‹
-      </Button>
-      {nums.map((n) => (
-        <Button
-          key={n}
-          variant={n === page ? "default" : "outline"}
-          size="sm"
-          onClick={() => onChange(n)}
-        >
-          {n}
-        </Button>
+      <Button variant="outline" size="sm" disabled={page === 1} onClick={() => onChange(1)}>«</Button>
+      <Button variant="outline" size="sm" disabled={page === 1} onClick={() => onChange(page - 1)}>‹</Button>
+      {nums.map(n => (
+        <Button key={n} variant={n === page ? "default" : "outline"} size="sm" onClick={() => onChange(n)}>{n}</Button>
       ))}
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={page === totalPages}
-        onClick={() => onChange(page + 1)}
-      >
-        ›
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={page === totalPages}
-        onClick={() => onChange(totalPages)}
-      >
-        »
-      </Button>
+      <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => onChange(page + 1)}>›</Button>
+      <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => onChange(totalPages)}>»</Button>
     </div>
   );
 }
 
 function MedicoFiltroInput({
-  medicos,
-  value,
-  onChange,
-  disabled,
-  onlyMedicoId,
+  medicos, value, onChange, disabled, onlyMedicoId,
 }: {
   medicos: Medico[];
   value: string;
@@ -6658,17 +5309,20 @@ function MedicoFiltroInput({
   disabled?: boolean;
   onlyMedicoId?: string | null;
 }) {
-  const lista = useMemo(() => {
-    const arr = medicos.filter((m) => !onlyMedicoId || m.id === onlyMedicoId);
-    // Recursos de enfermagem (prefixados com "🩺 ") aparecem primeiro
-    const isRec = (n: string) => n.startsWith("🩺");
-    return [...arr].sort((a, b) => {
-      const ra = isRec(a.nome) ? 0 : 1;
-      const rb = isRec(b.nome) ? 0 : 1;
-      if (ra !== rb) return ra - rb;
-      return a.nome.localeCompare(b.nome, "pt-BR");
-    });
-  }, [medicos, onlyMedicoId]);
+  const lista = useMemo(
+    () => {
+      const arr = medicos.filter((m) => !onlyMedicoId || m.id === onlyMedicoId);
+      // Recursos de enfermagem (prefixados com "🩺 ") aparecem primeiro
+      const isRec = (n: string) => n.startsWith("🩺");
+      return [...arr].sort((a, b) => {
+        const ra = isRec(a.nome) ? 0 : 1;
+        const rb = isRec(b.nome) ? 0 : 1;
+        if (ra !== rb) return ra - rb;
+        return a.nome.localeCompare(b.nome, "pt-BR");
+      });
+    },
+    [medicos, onlyMedicoId],
+  );
   const selecionadoNome = useMemo(
     () => (value === "todos" ? "" : (medicos.find((m) => m.id === value)?.nome ?? "")),
     [medicos, value],
@@ -6676,9 +5330,7 @@ function MedicoFiltroInput({
   const [texto, setTexto] = useState(selecionadoNome);
   const [aberto, setAberto] = useState(false);
   const [highlight, setHighlight] = useState(0);
-  useEffect(() => {
-    setTexto(selecionadoNome);
-  }, [selecionadoNome]);
+  useEffect(() => { setTexto(selecionadoNome); }, [selecionadoNome]);
 
   const norm = (s: string) => normalizar(s);
   const sugestoes = useMemo(() => {
@@ -6686,9 +5338,7 @@ function MedicoFiltroInput({
     if (!t) return lista.slice(0, 100);
     return lista.filter((m) => norm(m.nome).includes(t)).slice(0, 100);
   }, [lista, texto]);
-  useEffect(() => {
-    setHighlight(0);
-  }, [texto, aberto]);
+  useEffect(() => { setHighlight(0); }, [texto, aberto]);
 
   const selecionar = (m: Medico) => {
     onChange(m.id);
@@ -6704,10 +5354,7 @@ function MedicoFiltroInput({
           disabled={disabled}
           placeholder="TODOS — digite para buscar"
           value={texto}
-          onChange={(e) => {
-            setTexto(e.target.value);
-            setAberto(true);
-          }}
+          onChange={(e) => { setTexto(e.target.value); setAberto(true); }}
           onFocus={() => setAberto(true)}
           onBlur={() => setTimeout(() => setAberto(false), 150)}
           onKeyDown={(e) => {
@@ -6734,10 +5381,7 @@ function MedicoFiltroInput({
             variant="outline"
             size="icon"
             title="Limpar"
-            onClick={() => {
-              onChange("todos");
-              setTexto("");
-            }}
+            onClick={() => { onChange("todos"); setTexto(""); }}
           >
             <X className="h-4 w-4" />
           </Button>
@@ -6751,10 +5395,7 @@ function MedicoFiltroInput({
               type="button"
               className={`block w-full text-left px-2 py-1.5 text-sm hover:bg-accent ${idx === highlight ? "bg-accent" : ""}`}
               onMouseEnter={() => setHighlight(idx)}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                selecionar(m);
-              }}
+              onMouseDown={(e) => { e.preventDefault(); selecionar(m); }}
             >
               {m.nome}
             </button>
@@ -6766,13 +5407,7 @@ function MedicoFiltroInput({
 }
 
 function AgendaPorMedicoGrid({
-  medicoId,
-  dias,
-  dataRef,
-  items,
-  onSlotClick,
-  onAgClick,
-  fmtHora,
+  medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora, estornoPendAgs, ocultarPacienteMedico, ehLaboratorio,
 }: {
   medicoId: string;
   dias: number;
@@ -6819,9 +5454,7 @@ function AgendaPorMedicoGrid({
     for (const arr of porDia.values()) {
       for (const a of arr) {
         const d = new Date(a.inicio);
-        set.add(
-          `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
-        );
+        set.add(`${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
       }
     }
     if (set.size === 0) {
@@ -6853,13 +5486,8 @@ function AgendaPorMedicoGrid({
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-muted/40">
-                <th
-                  className="sticky left-0 z-10 bg-muted/60 px-3 py-2 text-xs font-semibold text-muted-foreground border-r"
-                  style={{ minWidth: 88 }}
-                >
-                  Hora
-                  <br />
-                  Início
+                <th className="sticky left-0 z-10 bg-muted/60 px-3 py-2 text-xs font-semibold text-muted-foreground border-r" style={{ minWidth: 88 }}>
+                  Hora<br />Início
                 </th>
                 {intervaloDias.map((dia) => (
                   <FragmentDayHeader key={dia} dia={dia} fmtCabecalho={fmtCabecalho} />
@@ -6869,9 +5497,7 @@ function AgendaPorMedicoGrid({
             <tbody>
               {horasInicio.map((hi) => (
                 <tr key={hi} className="border-t">
-                  <td className="sticky left-0 z-10 bg-muted/30 px-3 py-1.5 text-xs font-mono text-muted-foreground border-r">
-                    {hi}
-                  </td>
+                  <td className="sticky left-0 z-10 bg-muted/30 px-3 py-1.5 text-xs font-mono text-muted-foreground border-r">{hi}</td>
                   {intervaloDias.map((dia) => {
                     const ag = (porDia.get(dia) ?? []).find((a) => {
                       const d = new Date(a.inicio);
@@ -6904,27 +5530,13 @@ function AgendaPorMedicoGrid({
   );
 }
 
-function FragmentDayHeader({
-  dia,
-  fmtCabecalho,
-}: {
-  dia: string;
-  fmtCabecalho: (d: string) => string;
-}) {
+function FragmentDayHeader({ dia, fmtCabecalho }: { dia: string; fmtCabecalho: (d: string) => string }) {
   return (
     <>
-      <th
-        className="px-2 py-2 text-xs font-semibold text-muted-foreground border-r bg-muted/40"
-        style={{ minWidth: 70 }}
-      >
-        Hora
-        <br />
-        Fim
+      <th className="px-2 py-2 text-xs font-semibold text-muted-foreground border-r bg-muted/40" style={{ minWidth: 70 }}>
+        Hora<br />Fim
       </th>
-      <th
-        className="px-3 py-2 text-xs font-semibold text-foreground border-r bg-muted/40 text-left"
-        style={{ minWidth: 180 }}
-      >
+      <th className="px-3 py-2 text-xs font-semibold text-foreground border-r bg-muted/40 text-left" style={{ minWidth: 180 }}>
         {fmtCabecalho(dia)}
       </th>
     </>
@@ -6932,13 +5544,7 @@ function FragmentDayHeader({
 }
 
 function FragmentDayCell({
-  ag,
-  dia,
-  hi,
-  onSlotClick,
-  onAgClick,
-  fmtHora,
-  corStatus,
+  ag, dia, hi, onSlotClick, onAgClick, fmtHora, corStatus, estornoPend, ocultarPaciente, procedimentoFallback,
 }: {
   ag: Agendamento | undefined;
   dia: string;
@@ -6954,10 +5560,7 @@ function FragmentDayCell({
   const ehLivre = ag && isSlotLivre(ag.paciente_nome);
   return (
     <>
-      <td
-        className="px-2 py-1 text-xs font-mono text-muted-foreground border-r align-middle text-center"
-        style={{ minWidth: 70 }}
-      >
+      <td className="px-2 py-1 text-xs font-mono text-muted-foreground border-r align-middle text-center" style={{ minWidth: 70 }}>
         {ag ? fmtHora(ag.fim) : ""}
       </td>
       <td className="px-1 py-1 border-r align-middle" style={{ minWidth: 180 }}>
@@ -7000,11 +5603,7 @@ function FragmentDayCell({
 }
 
 function DataRefField({
-  dataRef,
-  dataFim,
-  setDataRef,
-  setDataFim,
-  shiftData,
+  dataRef, dataFim, setDataRef, setDataFim, shiftData,
 }: {
   dataRef: string;
   dataFim: string | null;
@@ -7031,14 +5630,7 @@ function DataRefField({
 
   return (
     <div className="flex gap-1">
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={() => {
-          setDataFim(null);
-          shiftData(-1);
-        }}
-      >
+      <Button variant="outline" size="icon" onClick={() => { setDataFim(null); shiftData(-1); }}>
         <ChevronLeft className="h-4 w-4" />
       </Button>
       <Popover open={open} onOpenChange={setOpen}>
@@ -7118,14 +5710,7 @@ function DataRefField({
           )}
         </PopoverContent>
       </Popover>
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={() => {
-          setDataFim(null);
-          shiftData(1);
-        }}
-      >
+      <Button variant="outline" size="icon" onClick={() => { setDataFim(null); shiftData(1); }}>
         <ChevronRight className="h-4 w-4" />
       </Button>
     </div>

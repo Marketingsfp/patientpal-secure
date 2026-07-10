@@ -38,10 +38,7 @@ export async function detectDescriptor(
   await ensureFaceModels();
   const faceapi = await getFaceApi();
   const result = await faceapi
-    .detectSingleFace(
-      input,
-      new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }),
-    )
+    .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
     .withFaceLandmarks(true)
     .withFaceDescriptor();
   return result?.descriptor ?? null;

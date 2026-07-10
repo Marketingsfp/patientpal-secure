@@ -12,9 +12,7 @@ function hasSupabaseSession(): boolean {
         if (v && v.length > 2) return true;
       }
     }
-  } catch {
-    /* ignore */
-  }
+  } catch { /* ignore */ }
   return false;
 }
 
@@ -61,9 +59,7 @@ function LandingPage() {
         </div>
         <div>
           <h1 className="text-xl font-semibold text-foreground">Abrindo ClinicaOS…</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Aguarde enquanto direcionamos para o sistema.
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">Aguarde enquanto direcionamos para o sistema.</p>
         </div>
       </div>
     </div>

@@ -6,14 +6,8 @@ import { HHP_SHORTCUTS } from "./tokens";
  * HhpShortcutsDialog — Painel de atalhos padrão Health Hub Pro.
  * Consome HHP_SHORTCUTS por padrão; pode receber overrides do módulo.
  */
-export interface HhpShortcut {
-  k: string;
-  label: string;
-}
-export interface HhpShortcutGroup {
-  group: string;
-  items: ReadonlyArray<HhpShortcut>;
-}
+export interface HhpShortcut { k: string; label: string }
+export interface HhpShortcutGroup { group: string; items: ReadonlyArray<HhpShortcut> }
 
 export interface HhpShortcutsDialogProps {
   open: boolean;
@@ -23,10 +17,7 @@ export interface HhpShortcutsDialogProps {
 }
 
 export function HhpShortcutsDialog({
-  open,
-  onOpenChange,
-  groups = HHP_SHORTCUTS,
-  moduleName,
+  open, onOpenChange, groups = HHP_SHORTCUTS, moduleName,
 }: HhpShortcutsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

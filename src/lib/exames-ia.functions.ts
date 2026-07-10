@@ -24,11 +24,7 @@ async function callAI(body: Record<string, unknown>) {
 }
 
 function extractJson(text: string): unknown {
-  const cleaned = text
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/```\s*$/i, "")
-    .trim();
+  const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
   if (start < 0 || end < 0) throw new Error("Resposta IA não é JSON");
@@ -65,10 +61,7 @@ Não invente valores. Se não conseguir ler, devolva "texto" vazio.`;
 
     const isPdf = data.mime.includes("pdf");
     const userContent: Array<Record<string, unknown>> = [
-      {
-        type: "text",
-        text: `Extraia o texto do laudo a seguir${data.nome_arquivo ? ` (arquivo: ${data.nome_arquivo})` : ""}.`,
-      },
+      { type: "text", text: `Extraia o texto do laudo a seguir${data.nome_arquivo ? ` (arquivo: ${data.nome_arquivo})` : ""}.` },
       isPdf
         ? { type: "file", file: { filename: data.nome_arquivo ?? "laudo.pdf", file_data: dataUrl } }
         : { type: "image_url", image_url: { url: dataUrl } },
@@ -148,20 +141,12 @@ ${data.resultado_texto}`;
     const content = json.choices?.[0]?.message?.content ?? "{}";
     const parsed = extractJson(content) as Partial<ClassificacaoExame>;
 
-    const status = (
-      ["normal", "alterado", "critico"].includes(parsed.status as string)
-        ? parsed.status
-        : "alterado"
-    ) as ClassificacaoExame["status"];
-    const severidade = (
-      ["baixa", "media", "alta"].includes(parsed.severidade as string)
-        ? parsed.severidade
-        : status === "critico"
-          ? "alta"
-          : status === "alterado"
-            ? "media"
-            : "baixa"
-    ) as ClassificacaoExame["severidade"];
+    const status = (["normal", "alterado", "critico"].includes(parsed.status as string)
+      ? parsed.status
+      : "alterado") as ClassificacaoExame["status"];
+    const severidade = (["baixa", "media", "alta"].includes(parsed.severidade as string)
+      ? parsed.severidade
+      : status === "critico" ? "alta" : status === "alterado" ? "media" : "baixa") as ClassificacaoExame["severidade"];
 
     return {
       status,
@@ -171,25 +156,14 @@ ${data.resultado_texto}`;
         : [],
       resumo: typeof parsed.resumo === "string" ? parsed.resumo : "",
       recomendacao: typeof parsed.recomendacao === "string" ? parsed.recomendacao : "",
-      mensagem_paciente:
-        typeof parsed.mensagem_paciente === "string" ? parsed.mensagem_paciente : "",
+      mensagem_paciente: typeof parsed.mensagem_paciente === "string" ? parsed.mensagem_paciente : "",
       precisa_contato: status !== "normal" || Boolean(parsed.precisa_contato),
-      especialidade_indicada:
-        typeof parsed.especialidade_indicada === "string" && parsed.especialidade_indicada.trim()
-          ? parsed.especialidade_indicada.trim()
-          : "Clínica Geral",
-      justificativa_especialidade:
-        typeof parsed.justificativa_especialidade === "string"
-          ? parsed.justificativa_especialidade
-          : "",
-      urgencia_encaminhamento: (["rotina", "prioritario", "urgente"].includes(
-        parsed.urgencia_encaminhamento as string,
-      )
+      especialidade_indicada: typeof parsed.especialidade_indicada === "string" && parsed.especialidade_indicada.trim()
+        ? parsed.especialidade_indicada.trim()
+        : "Clínica Geral",
+      justificativa_especialidade: typeof parsed.justificativa_especialidade === "string" ? parsed.justificativa_especialidade : "",
+      urgencia_encaminhamento: (["rotina", "prioritario", "urgente"].includes(parsed.urgencia_encaminhamento as string)
         ? parsed.urgencia_encaminhamento
-        : status === "critico"
-          ? "urgente"
-          : status === "alterado"
-            ? "prioritario"
-            : "rotina") as ClassificacaoExame["urgencia_encaminhamento"],
+        : status === "critico" ? "urgente" : status === "alterado" ? "prioritario" : "rotina") as ClassificacaoExame["urgencia_encaminhamento"],
     };
   });

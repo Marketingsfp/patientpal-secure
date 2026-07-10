@@ -13,19 +13,11 @@ const browser = await openBrowser("chrome", {
   chromiumOptions: { args: ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"] },
   chromeMode: "chrome-for-testing",
 });
-const composition = await selectComposition({
-  serveUrl: bundled,
-  id: "enfermagem",
-  puppeteerInstance: browser,
-});
+const composition = await selectComposition({ serveUrl: bundled, id: "enfermagem", puppeteerInstance: browser });
 await renderMedia({
-  composition,
-  serveUrl: bundled,
-  codec: "h264",
+  composition, serveUrl: bundled, codec: "h264",
   outputLocation: "/mnt/documents/clinicaos-enfermagem.mp4",
-  puppeteerInstance: browser,
-  muted: true,
-  concurrency: 1,
+  puppeteerInstance: browser, muted: true, concurrency: 1,
 });
 await browser.close({ silent: false });
 console.log("done");

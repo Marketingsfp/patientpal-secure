@@ -12,12 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/empresas")({
@@ -47,11 +42,7 @@ function FinEmpresasPage() {
   const [form, setForm] = useState(EMPTY);
 
   const load = async () => {
-    if (!clinicaAtual) {
-      setEmpresas([]);
-      setLoading(false);
-      return;
-    }
+    if (!clinicaAtual) { setEmpresas([]); setLoading(false); return; }
     setLoading(true);
     const { data, error } = await supabase
       .from("fin_empresas")
@@ -64,15 +55,9 @@ function FinEmpresasPage() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [clinicaAtual?.clinica_id]);
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
 
-  const openNew = () => {
-    setEditing(null);
-    setForm(EMPTY);
-    setOpen(true);
-  };
+  const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (e: Empresa) => {
     setEditing(e);
     setForm({
@@ -87,10 +72,7 @@ function FinEmpresasPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!clinicaAtual) {
-      toast.error("Selecione uma clínica");
-      return;
-    }
+    if (!clinicaAtual) { toast.error("Selecione uma clínica"); return; }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
@@ -104,10 +86,7 @@ function FinEmpresasPage() {
       ? await supabase.from("fin_empresas").update(payload).eq("id", editing.id)
       : await supabase.from("fin_empresas").insert(payload);
     setSaving(false);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     toast.success(editing ? "Empresa atualizada" : "Empresa criada");
     setOpen(false);
     setForm(EMPTY);
@@ -118,10 +97,7 @@ function FinEmpresasPage() {
   const handleDelete = async (e: Empresa) => {
     if (!confirm(`Excluir empresa "${e.nome}"?`)) return;
     const { error } = await supabase.from("fin_empresas").update({ ativo: false }).eq("id", e.id);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     toast.success("Empresa removida");
     await load();
   };
@@ -132,8 +108,7 @@ function FinEmpresasPage() {
         <div>
           <h1 className="text-2xl font-semibold">Empresas</h1>
           <p className="text-sm text-muted-foreground">
-            Fornecedores, prestadores e parceiros{" "}
-            {clinicaAtual ? `de ${clinicaAtual.clinica.nome}` : ""}
+            Fornecedores, prestadores e parceiros {clinicaAtual ? `de ${clinicaAtual.clinica.nome}` : ""}
           </p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -149,43 +124,30 @@ function FinEmpresasPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label>Nome *</Label>
-                <Input
-                  required
-                  value={form.nome}
-                  onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                />
+                <Input required value={form.nome}
+                  onChange={(e) => setForm({ ...form, nome: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>CNPJ</Label>
-                  <Input
-                    value={form.cnpj}
-                    onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
-                  />
+                  <Input value={form.cnpj}
+                    onChange={(e) => setForm({ ...form, cnpj: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Telefone</Label>
-                  <Input
-                    value={form.telefone}
-                    onChange={(e) => setForm({ ...form, telefone: e.target.value })}
-                  />
+                  <Input value={form.telefone}
+                    onChange={(e) => setForm({ ...form, telefone: e.target.value })} />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>E-mail</Label>
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                />
+                <Input type="email" value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Observações</Label>
-                <Textarea
-                  rows={3}
-                  value={form.observacoes}
-                  onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
-                />
+                <Textarea rows={3} value={form.observacoes}
+                  onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
               </div>
               <DialogFooter>
                 <Button type="submit" disabled={saving}>
@@ -198,17 +160,11 @@ function FinEmpresasPage() {
       </div>
 
       {loading ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Carregando...
-          </CardContent>
-        </Card>
+        <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando...</CardContent></Card>
       ) : empresas.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Nenhuma empresa cadastrada. Clique em <strong>Nova empresa</strong> para começar.
-          </CardContent>
-        </Card>
+        <Card><CardContent className="py-12 text-center text-muted-foreground">
+          Nenhuma empresa cadastrada. Clique em <strong>Nova empresa</strong> para começar.
+        </CardContent></Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {empresas.map((e) => (
@@ -220,12 +176,8 @@ function FinEmpresasPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-semibold truncate">{e.nome}</h3>
-                    {e.cnpj && (
-                      <p className="text-sm text-muted-foreground truncate">CNPJ {e.cnpj}</p>
-                    )}
-                    {e.telefone && (
-                      <p className="text-sm text-muted-foreground truncate">{e.telefone}</p>
-                    )}
+                    {e.cnpj && <p className="text-sm text-muted-foreground truncate">CNPJ {e.cnpj}</p>}
+                    {e.telefone && <p className="text-sm text-muted-foreground truncate">{e.telefone}</p>}
                     {e.email && <p className="text-sm text-muted-foreground truncate">{e.email}</p>}
                     <div className="mt-3 flex items-center gap-2">
                       <Badge variant="secondary">Ativa</Badge>

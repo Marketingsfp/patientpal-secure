@@ -2,17 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  AlertTriangle,
-  CalendarClock,
-  Copy,
-  FileText,
-  MessageCircle,
-  Phone,
-  Stethoscope,
-  User,
-  Wallet,
-} from "lucide-react";
+import { AlertTriangle, CalendarClock, Copy, FileText, MessageCircle, Phone, Stethoscope, User, Wallet } from "lucide-react";
 import { brl } from "@/lib/financeiro/format";
 import { toast } from "sonner";
 
@@ -39,11 +29,7 @@ type Resumo = {
 function fmtData(d: string | null | undefined) {
   if (!d) return "—";
   try {
-    return new Date(d).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "2-digit",
-    });
+    return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
   } catch {
     return "—";
   }
@@ -68,9 +54,7 @@ export function PacienteResumoBar({
         _clinica_id: clinicaId,
       });
       if (error) throw error;
-      const row = Array.isArray(data)
-        ? (data[0] as Resumo | undefined)
-        : (data as Resumo | undefined);
+      const row = Array.isArray(data) ? (data[0] as Resumo | undefined) : (data as Resumo | undefined);
       return row ?? null;
     },
   });
@@ -89,10 +73,7 @@ export function PacienteResumoBar({
 
   const copiar = (v: string | null | undefined) => {
     if (!v) return;
-    navigator.clipboard
-      .writeText(v)
-      .then(() => toast.success("Copiado"))
-      .catch(() => {});
+    navigator.clipboard.writeText(v).then(() => toast.success("Copiado")).catch(() => {});
   };
 
   return (
@@ -108,41 +89,25 @@ export function PacienteResumoBar({
       </Badge>
 
       {data.convenio_nome && (
-        <span className="text-muted-foreground">
-          Convênio: <span className="text-foreground">{data.convenio_nome}</span>
-        </span>
+        <span className="text-muted-foreground">Convênio: <span className="text-foreground">{data.convenio_nome}</span></span>
       )}
       {data.empresa_nome && (
-        <span className="text-muted-foreground">
-          Empresa: <span className="text-foreground">{data.empresa_nome}</span>
-        </span>
+        <span className="text-muted-foreground">Empresa: <span className="text-foreground">{data.empresa_nome}</span></span>
       )}
 
       {data.ultima_consulta_data && (
-        <span
-          className="inline-flex items-center gap-1 text-muted-foreground"
-          title={`${data.ultima_consulta_medico ?? ""} ${data.ultima_consulta_especialidade ?? ""}`.trim()}
-        >
+        <span className="inline-flex items-center gap-1 text-muted-foreground" title={`${data.ultima_consulta_medico ?? ""} ${data.ultima_consulta_especialidade ?? ""}`.trim()}>
           <Stethoscope className="h-3 w-3" />
           Últ. consulta {fmtData(data.ultima_consulta_data)}
-          {data.ultima_consulta_medico && (
-            <span className="text-foreground">· {data.ultima_consulta_medico}</span>
-          )}
-          {data.ultima_consulta_especialidade && (
-            <span>· {data.ultima_consulta_especialidade}</span>
-          )}
+          {data.ultima_consulta_medico && <span className="text-foreground">· {data.ultima_consulta_medico}</span>}
+          {data.ultima_consulta_especialidade && <span>· {data.ultima_consulta_especialidade}</span>}
         </span>
       )}
 
       {data.ultimo_exame_data && (
-        <span
-          className="inline-flex items-center gap-1 text-muted-foreground"
-          title={data.ultimo_exame_nome ?? ""}
-        >
+        <span className="inline-flex items-center gap-1 text-muted-foreground" title={data.ultimo_exame_nome ?? ""}>
           <FileText className="h-3 w-3" /> Últ. exame {fmtData(data.ultimo_exame_data)}
-          {data.ultimo_exame_nome && (
-            <span className="text-foreground">· {data.ultimo_exame_nome}</span>
-          )}
+          {data.ultimo_exame_nome && <span className="text-foreground">· {data.ultimo_exame_nome}</span>}
         </span>
       )}
 

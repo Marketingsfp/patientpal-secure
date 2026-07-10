@@ -47,8 +47,8 @@ export function HhpChip({
         size === "xs"
           ? "text-[10px] px-1.5 py-0.5 gap-1"
           : size === "sm"
-            ? "text-[11px] px-2 py-0.5 gap-1.5"
-            : "text-xs px-2.5 py-1 gap-1.5",
+          ? "text-[11px] px-2 py-0.5 gap-1.5"
+          : "text-xs px-2.5 py-1 gap-1.5",
         variant === "outline" ? OUTLINE_BG[tone] : HHP_TONE_BG[tone],
         className,
       )}
@@ -59,17 +59,11 @@ export function HhpChip({
           aria-hidden
           className={cn(
             "h-1.5 w-1.5 rounded-full",
-            tone === "default"
-              ? "bg-slate-400"
-              : tone === "info"
-                ? "bg-blue-500"
-                : tone === "ok"
-                  ? "bg-emerald-500"
-                  : tone === "warn"
-                    ? "bg-amber-500"
-                    : tone === "danger"
-                      ? "bg-rose-500"
-                      : "bg-indigo-500",
+            tone === "default" ? "bg-slate-400" :
+            tone === "info" ? "bg-blue-500" :
+            tone === "ok" ? "bg-emerald-500" :
+            tone === "warn" ? "bg-amber-500" :
+            tone === "danger" ? "bg-rose-500" : "bg-indigo-500",
           )}
         />
       )}

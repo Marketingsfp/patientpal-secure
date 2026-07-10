@@ -12,19 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { SectionTabs, SERVICOS_TABS, SERVICOS_META } from "@/components/section-tabs";
@@ -125,14 +116,10 @@ function EnfermagemRecursosPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
-    if (!form.nome.trim()) {
-      toast.error("Informe o nome");
-      return;
-    }
+    if (!form.nome.trim()) { toast.error("Informe o nome"); return; }
     const dur = parseInt(form.duracao_padrao_min || "30", 10);
     if (!Number.isFinite(dur) || dur <= 0 || dur > 480) {
-      toast.error("Duração inválida (1–480 min)");
-      return;
+      toast.error("Duração inválida (1–480 min)"); return;
     }
     setSaving(true);
     const payload = {
@@ -145,37 +132,22 @@ function EnfermagemRecursosPage() {
     let recursoId = editingId;
     if (editingId) {
       const { error } = await supabase
-        .from("enfermagem_recursos")
-        .update(payload)
-        .eq("id", editingId);
-      if (error) {
-        setSaving(false);
-        mostrarErro(error);
-        return;
-      }
-      await supabase.from("enfermagem_recurso_procedimentos").delete().eq("recurso_id", editingId);
+        .from("enfermagem_recursos").update(payload).eq("id", editingId);
+      if (error) { setSaving(false); mostrarErro(error); return; }
+      await supabase
+        .from("enfermagem_recurso_procedimentos").delete().eq("recurso_id", editingId);
     } else {
       const { data: novo, error } = await supabase
-        .from("enfermagem_recursos")
-        .insert(payload)
-        .select("id")
-        .single();
-      if (error || !novo) {
-        setSaving(false);
-        mostrarErro(error);
-        return;
-      }
+        .from("enfermagem_recursos").insert(payload).select("id").single();
+      if (error || !novo) { setSaving(false); mostrarErro(error); return; }
       recursoId = novo.id;
     }
     const procs = Array.from(new Set(form.procedimentos.filter(Boolean)));
     if (recursoId && procs.length) {
       const rows = procs.map((pid) => ({ recurso_id: recursoId!, procedimento_id: pid }));
-      const { error: e2 } = await supabase.from("enfermagem_recurso_procedimentos").insert(rows);
-      if (e2) {
-        setSaving(false);
-        mostrarErro(e2);
-        return;
-      }
+      const { error: e2 } = await supabase
+        .from("enfermagem_recurso_procedimentos").insert(rows);
+      if (e2) { setSaving(false); mostrarErro(e2); return; }
     }
     setSaving(false);
     toast.success(editingId ? "Recurso atualizado" : "Recurso criado");
@@ -184,13 +156,9 @@ function EnfermagemRecursosPage() {
   };
 
   const remover = async (r: Recurso) => {
-    if (!confirm(`Excluir "${r.nome}"? Agendamentos existentes ficarão sem recurso vinculado.`))
-      return;
+    if (!confirm(`Excluir "${r.nome}"? Agendamentos existentes ficarão sem recurso vinculado.`)) return;
     const { error } = await supabase.from("enfermagem_recursos").delete().eq("id", r.id);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     toast.success("Removido");
     await load();
   };
@@ -214,8 +182,7 @@ function EnfermagemRecursosPage() {
             <HeartPulse className="h-6 w-6" /> Recursos de Enfermagem
           </h1>
           <p className="text-sm text-muted-foreground">
-            Salas e exames realizados pela equipe de enfermagem — agendas compartilhadas entre todos
-            os enfermeiros.
+            Salas e exames realizados pela equipe de enfermagem — agendas compartilhadas entre todos os enfermeiros.
           </p>
         </div>
         <Button onClick={openNovo}>
@@ -224,21 +191,14 @@ function EnfermagemRecursosPage() {
       </div>
 
       {recursos.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <HeartPulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            Nenhum recurso cadastrado.
-          </CardContent>
-        </Card>
+        <Card><CardContent className="py-12 text-center text-muted-foreground">
+          <HeartPulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          Nenhum recurso cadastrado.
+        </CardContent></Card>
       ) : (
         <Card>
           <div className="p-3 border-b">
-            <Input
-              placeholder="Buscar..."
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              className="max-w-md"
-            />
+            <Input placeholder="Buscar..." value={busca} onChange={(e) => setBusca(e.target.value)} className="max-w-md" />
           </div>
           <Table>
             <TableHeader>
@@ -256,20 +216,10 @@ function EnfermagemRecursosPage() {
                   <TableCell>{r.duracao_padrao_min} min</TableCell>
                   <TableCell>{r.ativo ? "Sim" : "Não"}</TableCell>
                   <TableCell className="text-right space-x-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => void openEdit(r)}
-                      aria-label="Editar"
-                    >
+                    <Button size="icon" variant="ghost" onClick={() => void openEdit(r)} aria-label="Editar">
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => void remover(r)}
-                      aria-label="Excluir"
-                    >
+                    <Button size="icon" variant="ghost" onClick={() => void remover(r)} aria-label="Excluir">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </TableCell>
@@ -289,11 +239,7 @@ function EnfermagemRecursosPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="sm:col-span-2 space-y-1">
                 <Label>Nome *</Label>
-                <Input
-                  value={form.nome}
-                  onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                  required
-                />
+                <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required />
               </div>
               <div className="space-y-1">
                 <Label>Duração padrão (min)</Label>
@@ -308,27 +254,17 @@ function EnfermagemRecursosPage() {
             </div>
             <div className="space-y-1">
               <Label>Descrição</Label>
-              <Textarea
-                value={form.descricao}
-                onChange={(e) => setForm({ ...form, descricao: e.target.value })}
-                rows={2}
-              />
+              <Textarea value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} rows={2} />
             </div>
             <div className="flex items-center gap-2">
-              <Switch
-                checked={form.ativo}
-                onCheckedChange={(v) => setForm({ ...form, ativo: v })}
-                id="ativo"
-              />
+              <Switch checked={form.ativo} onCheckedChange={(v) => setForm({ ...form, ativo: v })} id="ativo" />
               <Label htmlFor="ativo">Recurso ativo (aparece na agenda)</Label>
             </div>
             <div className="border rounded-md p-3 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <Label className="text-sm font-medium">Serviços que este recurso realiza</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Adicione os serviços/exames realizados por este recurso.
-                  </p>
+                  <p className="text-xs text-muted-foreground">Adicione os serviços/exames realizados por este recurso.</p>
                 </div>
                 <Button
                   type="button"
@@ -341,9 +277,7 @@ function EnfermagemRecursosPage() {
                 </Button>
               </div>
               {procedimentos.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Nenhum serviço cadastrado na clínica.
-                </p>
+                <p className="text-xs text-muted-foreground">Nenhum serviço cadastrado na clínica.</p>
               ) : form.procedimentos.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Nenhum serviço selecionado.</p>
               ) : (
@@ -353,9 +287,7 @@ function EnfermagemRecursosPage() {
                       const p = procedimentos.find((pp) => pp.id === pid);
                       return { pid, idx, label: p?.nome ?? "" };
                     })
-                    .sort((a, b) =>
-                      a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }),
-                    )
+                    .sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }))
                     .map(({ pid, idx }) => (
                       <div key={idx} className="grid grid-cols-[1fr_auto] gap-2 items-center">
                         <SearchableSelect
@@ -394,12 +326,8 @@ function EnfermagemRecursosPage() {
               )}
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={saving}>
-                {saving ? "Salvando..." : "Salvar"}
-              </Button>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -1,23 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ElementType } from "react";
 import {
-  Building2,
-  Bell,
-  CalendarDays,
-  Users,
-  RotateCcw,
-  MessageCircle,
-  CheckCircle2,
-  Handshake,
-  CreditCard,
-  Banknote,
-  Receipt,
-  BadgeDollarSign,
-  Stethoscope,
-  BookOpen,
-  Brain,
-  Filter,
-  X,
+  Building2, Bell, CalendarDays, Users, RotateCcw, MessageCircle,
+  CheckCircle2, Handshake, CreditCard, Banknote, Receipt, BadgeDollarSign, Stethoscope, BookOpen, Brain, Filter, X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -29,22 +14,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { buildCategoriaResolver } from "@/lib/procedimento/categoria";
 
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardPage,
   head: () => ({ meta: [{ title: "Painel — ClinicaOS" }] }),
 });
 
-const fmtMoney = (n: number) =>
-  n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtMoney = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtInt = (n: number) => n.toLocaleString("pt-BR");
 const pct = (num: number, den: number) => (den > 0 ? `${((num / den) * 100).toFixed(1)}%` : "0%");
 
@@ -57,28 +35,9 @@ type DrillSpec = {
   columns: { key: string; label: string; align?: "left" | "right" }[];
   rows: Array<Record<string, string | number>>;
 };
-type RawAg = {
-  id: string;
-  status: string;
-  medico_id: string | null;
-  paciente_id: string | null;
-  procedimento: string | null;
-  inicio: string | null;
-};
-type RawLanc = {
-  id: string;
-  tipo: string;
-  status: string;
-  valor: number;
-  medico_id: string | null;
-};
-type RawAtend = {
-  id: string;
-  valor_total: number;
-  valor_medico: number;
-  medico_id: string | null;
-  status: string;
-};
+type RawAg = { id: string; status: string; medico_id: string | null; paciente_id: string | null; procedimento: string | null; inicio: string | null };
+type RawLanc = { id: string; tipo: string; status: string; valor: number; medico_id: string | null };
+type RawAtend = { id: string; valor_total: number; valor_medico: number; medico_id: string | null; status: string };
 
 function DashboardPage() {
   const { memberships, clinicaAtual, loading } = useClinica();
@@ -86,9 +45,7 @@ function DashboardPage() {
   const [periodo, setPeriodo] = useState<Periodo>({ de: hojeISO(), ate: hojeISO() });
   const [carregando, setCarregando] = useState(false);
   const [medicosLista, setMedicosLista] = useState<{ id: string; nome: string }[]>([]);
-  const [especialidadesLista, setEspecialidadesLista] = useState<{ id: string; nome: string }[]>(
-    [],
-  );
+  const [especialidadesLista, setEspecialidadesLista] = useState<{ id: string; nome: string }[]>([]);
   const [medEspMap, setMedEspMap] = useState<Record<string, string[]>>({}); // medico_id -> [esp_id]
   const [medicosSel, setMedicosSel] = useState<string[]>([]);
   const [especialidadesSel, setEspecialidadesSel] = useState<string[]>([]);
@@ -96,17 +53,7 @@ function DashboardPage() {
   const [buscaEsp, setBuscaEsp] = useState("");
   const [data, setData] = useState({
     alertas: [] as { id: string; mensagem: string }[],
-    agend: {
-      total: 0,
-      atendidos: 0,
-      faltas: 0,
-      pagos: 0,
-      naoPagos: 0,
-      novos: 0,
-      regulares: 0,
-      retornos: 0,
-      semAgenda: 0,
-    },
+    agend: { total: 0, atendidos: 0, faltas: 0, pagos: 0, naoPagos: 0, novos: 0, regulares: 0, retornos: 0, semAgenda: 0 },
     msgs: { enviadas: 0, respostas: 0, total: 0 },
     conf: { presencas: 0, ausencias: 0 },
     vendas: { total: 0, orcamentos: 0 },
@@ -125,10 +72,10 @@ function DashboardPage() {
 
   // Conjunto efetivo de medico_ids após filtros (intersecção médicos x especialidades)
   const medicosFiltradosIds = useMemo(() => {
-    let ids = medicosLista.map((m) => m.id);
-    if (medicosSel.length > 0) ids = ids.filter((id) => medicosSel.includes(id));
+    let ids = medicosLista.map(m => m.id);
+    if (medicosSel.length > 0) ids = ids.filter(id => medicosSel.includes(id));
     if (especialidadesSel.length > 0) {
-      ids = ids.filter((id) => (medEspMap[id] ?? []).some((e) => especialidadesSel.includes(e)));
+      ids = ids.filter(id => (medEspMap[id] ?? []).some(e => especialidadesSel.includes(e)));
     }
     return ids;
   }, [medicosLista, medicosSel, especialidadesSel, medEspMap]);
@@ -141,32 +88,11 @@ function DashboardPage() {
     const ini = new Date(`${periodo.de}T00:00:00`).toISOString();
     const fim = new Date(`${periodo.ate}T23:59:59`).toISOString();
 
-    const [alertasR, agendR, lancR, atendR, medicosR, espR, medEspR] = await Promise.all([
-      supabase
-        .from("fin_alertas")
-        .select("id,mensagem")
-        .eq("clinica_id", cid)
-        .eq("lido", false)
-        .order("created_at", { ascending: false })
-        .limit(5),
-      supabase
-        .from("agendamentos")
-        .select("id,status,medico_id,paciente_id,procedimento,inicio")
-        .eq("clinica_id", cid)
-        .gte("inicio", ini)
-        .lte("inicio", fim),
-      supabase
-        .from("fin_lancamentos")
-        .select("id,tipo,status,valor,medico_id")
-        .eq("clinica_id", cid)
-        .gte("data", periodo.de)
-        .lte("data", periodo.ate),
-      supabase
-        .from("fin_atendimentos")
-        .select("id,valor_total,valor_medico,medico_id,status")
-        .eq("clinica_id", cid)
-        .gte("data", periodo.de)
-        .lte("data", periodo.ate),
+    const [alertasR, agendR, lancR, atendR, medicosR, espR, medEspR, procR] = await Promise.all([
+      supabase.from("fin_alertas").select("id,mensagem").eq("clinica_id", cid).eq("lido", false).order("created_at", { ascending: false }).limit(5),
+      supabase.from("agendamentos").select("id,status,medico_id,paciente_id,procedimento,inicio").eq("clinica_id", cid).gte("inicio", ini).lte("inicio", fim),
+      supabase.from("fin_lancamentos").select("id,tipo,status,valor,medico_id").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
+      supabase.from("fin_atendimentos").select("id,valor_total,valor_medico,medico_id,status").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
       supabase.from("medicos").select("id,nome").eq("clinica_id", cid).eq("ativo", true),
       supabase.from("especialidades").select("id,nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
@@ -175,10 +101,7 @@ function DashboardPage() {
 
     const medsAll = (medicosR.data ?? []) as { id: string; nome: string }[];
     const espAll = (espR.data ?? []) as { id: string; nome: string }[];
-    const medEspAll = (medEspR.data ?? []) as Array<{
-      medico_id: string;
-      especialidade_id: string;
-    }>;
+    const medEspAll = (medEspR.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>;
 
     // Atualiza listas para os filtros
     setMedicosLista(medsAll.slice().sort((a, b) => a.nome.localeCompare(b.nome)));
@@ -192,46 +115,44 @@ function DashboardPage() {
     // Aplica filtros de médico / especialidade
     let medsFiltrados = medsAll;
     if (medicosSel.length > 0) {
-      medsFiltrados = medsFiltrados.filter((m) => medicosSel.includes(m.id));
+      medsFiltrados = medsFiltrados.filter(m => medicosSel.includes(m.id));
     }
     if (especialidadesSel.length > 0) {
-      medsFiltrados = medsFiltrados.filter((m) =>
-        (mapTmp[m.id] ?? []).some((e) => especialidadesSel.includes(e)),
+      medsFiltrados = medsFiltrados.filter(m =>
+        (mapTmp[m.id] ?? []).some(e => especialidadesSel.includes(e)),
       );
     }
     const filtroAtivo = medicosSel.length > 0 || especialidadesSel.length > 0;
-    const medIdsPermitidos = new Set(medsFiltrados.map((m) => m.id));
-    const passaFiltro = (mid: string | null) =>
-      !filtroAtivo || (!!mid && medIdsPermitidos.has(mid));
+    const medIdsPermitidos = new Set(medsFiltrados.map(m => m.id));
+    const passaFiltro = (mid: string | null) => !filtroAtivo || (!!mid && medIdsPermitidos.has(mid));
 
-    const ags = (agendR.data ?? []).filter((a) => passaFiltro(a.medico_id));
-    const lancs = (lancR.data ?? []).filter((l) => !filtroAtivo || passaFiltro(l.medico_id));
-    const atends = (atendR.data ?? []).filter((a) => passaFiltro(a.medico_id));
+    const ags = (agendR.data ?? []).filter(a => passaFiltro(a.medico_id));
+    const lancs = (lancR.data ?? []).filter(l => !filtroAtivo || passaFiltro(l.medico_id));
+    const atends = (atendR.data ?? []).filter(a => passaFiltro(a.medico_id));
     const meds = medsFiltrados;
 
     // Identifica médicos cuja especialidade é "Laboratório"
     // Regra de contagem: 1 paciente por GR/procedimento, exceto laboratório
     // (vários exames do mesmo paciente no mesmo dia contam como 1).
     const espLabIds = new Set(
-      espAll.filter((e) => (e.nome ?? "").toLowerCase().includes("laborat")).map((e) => e.id),
+      espAll
+        .filter(e => (e.nome ?? "").toLowerCase().includes("laborat"))
+        .map(e => e.id),
     );
     const labMedicoIds = new Set<string>();
     for (const me of medEspAll) {
       if (espLabIds.has(me.especialidade_id)) labMedicoIds.add(me.medico_id);
     }
-    const isLab = (a: { medico_id: string | null }) =>
-      !!a.medico_id && labMedicoIds.has(a.medico_id);
-    const contarGRs = <
-      T extends {
-        medico_id: string | null;
-        paciente_id?: string | null;
-        inicio?: string | null;
-        id: string;
-      },
-    >(
-      arr: T[],
-    ) => {
-      const naoLab = arr.filter((x) => !isLab(x)).length;
+    // Categoria por procedimento (fonte da verdade); fallback = especialidade do médico.
+    const catResolver = buildCategoriaResolver(
+      (procR.data ?? []) as { nome: string; tipo_procedimento: string | null }[],
+    );
+    const isLabAg = (a: { medico_id: string | null; procedimento?: string | null }) => {
+      if (a.procedimento) return catResolver.categoriaDoTexto(a.procedimento) === "laboratorio";
+      return !!a.medico_id && labMedicoIds.has(a.medico_id);
+    };
+    const contarGRs = <T extends { medico_id: string | null; paciente_id?: string | null; inicio?: string | null; procedimento?: string | null; id: string }>(arr: T[]) => {
+      const naoLab = arr.filter(x => !isLabAg(x)).length;
       const grupos = new Set<string>();
       for (const x of arr.filter(isLabAg)) {
         const dia = (x.inicio ?? "").slice(0, 10);
@@ -242,70 +163,52 @@ function DashboardPage() {
 
     // Agendamentos (contagem por GR/procedimento, com regra de laboratório)
     const total = contarGRs(ags);
-    const atendidos = contarGRs(ags.filter((a) => a.status === "realizado"));
-    const faltas = contarGRs(ags.filter((a) => a.status === "faltou"));
-    const retornos = contarGRs(
-      ags.filter((a) => (a.procedimento ?? "").toLowerCase().includes("retorno")),
-    );
-    const semAgenda = ags.filter((a) => !a.medico_id).length;
+    const atendidos = contarGRs(ags.filter(a => a.status === "realizado"));
+    const faltas = contarGRs(ags.filter(a => a.status === "faltou"));
+    const retornos = contarGRs(ags.filter(a => (a.procedimento ?? "").toLowerCase().includes("retorno")));
+    const semAgenda = ags.filter(a => !a.medico_id).length;
 
     // Novos x regulares (a partir de paciente_id em agendamentos do período vs histórico)
-    const pacIds = Array.from(new Set(ags.map((a) => a.paciente_id).filter(Boolean) as string[]));
-    let novos = 0,
-      regulares = 0;
+    const pacIds = Array.from(new Set(ags.map(a => a.paciente_id).filter(Boolean) as string[]));
+    let novos = 0, regulares = 0;
     let setExistentes = new Set<string>();
     if (pacIds.length > 0) {
       const { data: hist } = await supabase
-        .from("agendamentos")
-        .select("paciente_id,inicio")
-        .eq("clinica_id", cid)
-        .in("paciente_id", pacIds)
-        .lt("inicio", ini);
-      setExistentes = new Set((hist ?? []).map((h) => h.paciente_id) as string[]);
-      novos = pacIds.filter((p) => !setExistentes.has(p)).length;
+        .from("agendamentos").select("paciente_id,inicio")
+        .eq("clinica_id", cid).in("paciente_id", pacIds).lt("inicio", ini);
+      setExistentes = new Set((hist ?? []).map(h => h.paciente_id) as string[]);
+      novos = pacIds.filter(p => !setExistentes.has(p)).length;
       regulares = pacIds.length - novos;
     }
 
     // Financeiro
-    const receitas = lancs.filter((l) => l.tipo === "receita");
-    const despesas = lancs.filter((l) => l.tipo === "despesa");
-    const recebRealizado = receitas
-      .filter((l) => l.status === "confirmado")
-      .reduce((s, l) => s + Number(l.valor || 0), 0);
-    const recebAReceber = receitas
-      .filter((l) => l.status === "pendente")
-      .reduce((s, l) => s + Number(l.valor || 0), 0);
-    const qtdReceb = receitas.filter((l) => l.status === "confirmado").length;
-    const qtdAReceber = receitas.filter((l) => l.status === "pendente").length;
-    const pagRealizado = despesas
-      .filter((l) => l.status === "confirmado")
-      .reduce((s, l) => s + Number(l.valor || 0), 0);
-    const pagAPagar = despesas
-      .filter((l) => l.status === "pendente")
-      .reduce((s, l) => s + Number(l.valor || 0), 0);
+    const receitas = lancs.filter(l => l.tipo === "receita");
+    const despesas = lancs.filter(l => l.tipo === "despesa");
+    const recebRealizado = receitas.filter(l => l.status === "confirmado").reduce((s, l) => s + Number(l.valor || 0), 0);
+    const recebAReceber = receitas.filter(l => l.status === "pendente").reduce((s, l) => s + Number(l.valor || 0), 0);
+    const qtdReceb = receitas.filter(l => l.status === "confirmado").length;
+    const qtdAReceber = receitas.filter(l => l.status === "pendente").length;
+    const pagRealizado = despesas.filter(l => l.status === "confirmado").reduce((s, l) => s + Number(l.valor || 0), 0);
+    const pagAPagar = despesas.filter(l => l.status === "pendente").reduce((s, l) => s + Number(l.valor || 0), 0);
 
     const vendasTotal = atends.reduce((s, a) => s + Number(a.valor_total || 0), 0);
     const comissoesPagas = atends.reduce((s, a) => s + Number(a.valor_medico || 0), 0);
 
     // Pagamentos das senhas (pagos/não pagos): a partir de atendimentos status
-    const pagos = atends.filter((a) => a.status === "pago" || a.status === "realizado").length;
+    const pagos = atends.filter(a => a.status === "pago" || a.status === "realizado").length;
     const naoPagos = Math.max(0, total - pagos);
 
     // Por médico
-    const porMedico = meds
-      .map((m) => {
-        const agendados = ags.filter((a) => a.medico_id === m.id);
-        const pacIdsM = Array.from(
-          new Set(agendados.map((a) => a.paciente_id).filter(Boolean) as string[]),
-        );
-        return {
-          nome: m.nome,
-          total: contarGRs(agendados),
-          pagos: contarGRs(agendados.filter((a) => a.status === "realizado")),
-          novos: pacIdsM.filter((p) => !setExistentes.has(p)).length,
-        };
-      })
-      .sort((a, b) => b.total - a.total);
+    const porMedico = meds.map(m => {
+      const agendados = ags.filter(a => a.medico_id === m.id);
+      const pacIdsM = Array.from(new Set(agendados.map(a => a.paciente_id).filter(Boolean) as string[]));
+      return {
+        nome: m.nome,
+        total: contarGRs(agendados),
+        pagos: contarGRs(agendados.filter(a => a.status === "realizado")),
+        novos: pacIdsM.filter(p => !setExistentes.has(p)).length,
+      };
+    }).sort((a, b) => b.total - a.total);
 
     setData({
       alertas: alertasR.data ?? [],
@@ -314,46 +217,27 @@ function DashboardPage() {
       conf: { presencas: atendidos, ausencias: faltas },
       vendas: { total: vendasTotal, orcamentos: 0 },
       pagamentos: { realizado: pagRealizado, aPagar: pagAPagar },
-      recebimentos: {
-        realizado: recebRealizado,
-        aReceber: recebAReceber,
-        qtdRealizado: qtdReceb,
-        qtdAReceber,
-      },
-      comissoes: {
-        pagas: comissoesPagas,
-        pendentes: 0,
-        percentReceita: recebRealizado > 0 ? (comissoesPagas / recebRealizado) * 100 : 0,
-      },
+      recebimentos: { realizado: recebRealizado, aReceber: recebAReceber, qtdRealizado: qtdReceb, qtdAReceber },
+      comissoes: { pagas: comissoesPagas, pendentes: 0, percentReceita: recebRealizado > 0 ? (comissoesPagas / recebRealizado) * 100 : 0 },
       porMedico,
     });
     setRawAgs(ags as RawAg[]);
     setRawLancs(lancs as RawLanc[]);
     setRawAtends(atends as RawAtend[]);
-    const novosSet = new Set(pacIds.filter((p) => !setExistentes.has(p)));
+    const novosSet = new Set(pacIds.filter(p => !setExistentes.has(p)));
     setNovosIds(novosSet);
-    setMedNomes(new Map(medsAll.map((m) => [m.id, m.nome] as const)));
+    setMedNomes(new Map(medsAll.map(m => [m.id, m.nome] as const)));
     // Buscar nomes de pacientes
     if (pacIds.length > 0) {
-      const { data: pacs } = await supabase
-        .from("pacientes")
-        .select("id,nome")
-        .in("id", pacIds)
-        .limit(5000);
-      setPacNomes(
-        new Map(
-          ((pacs ?? []) as { id: string; nome: string }[]).map((p) => [p.id, p.nome] as const),
-        ),
-      );
+      const { data: pacs } = await supabase.from("pacientes").select("id,nome").in("id", pacIds).limit(5000);
+      setPacNomes(new Map(((pacs ?? []) as { id: string; nome: string }[]).map(p => [p.id, p.nome] as const)));
     } else {
       setPacNomes(new Map());
     }
     setCarregando(false);
   };
 
-  useEffect(() => {
-    load(); /* eslint-disable-next-line */
-  }, [clinicaAtual?.clinica_id, periodo.de, periodo.ate, medicosSel, especialidadesSel]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id, periodo.de, periodo.ate, medicosSel, especialidadesSel]);
 
   if (loading) return <p className="text-muted-foreground">Carregando...</p>;
 
@@ -365,9 +249,7 @@ function DashboardPage() {
         </div>
         <h1 className="text-2xl font-semibold">Bem-vindo ao ClinicaOS!</h1>
         <p className="mt-2 text-muted-foreground">Para começar, crie sua primeira clínica.</p>
-        <Button asChild className="mt-6" size="lg">
-          <Link to="/app/unidades">Criar minha primeira clínica</Link>
-        </Button>
+        <Button asChild className="mt-6" size="lg"><Link to="/app/unidades">Criar minha primeira clínica</Link></Button>
       </div>
     );
   }
@@ -377,13 +259,7 @@ function DashboardPage() {
   const fmtDt = (iso: string | null) => {
     if (!iso) return "—";
     const d = new Date(iso);
-    return d.toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   };
   const pacNome = (id: string | null) => (id ? (pacNomes.get(id) ?? "—") : "—");
   const medNome = (id: string | null) => (id ? (medNomes.get(id) ?? "—") : "Sem profissional");
@@ -394,7 +270,7 @@ function DashboardPage() {
       setDrill({
         title: `Central de alertas (${data.alertas.length})`,
         columns: [{ key: "mensagem", label: "Mensagem" }],
-        rows: data.alertas.map((al) => ({ mensagem: al.mensagem })),
+        rows: data.alertas.map(al => ({ mensagem: al.mensagem })),
       });
     } else if (kind.startsWith("agend")) {
       const filtroFn = (g: RawAg) => {
@@ -402,11 +278,7 @@ function DashboardPage() {
         if (kind === "agend_atendidos") return g.status === "realizado";
         if (kind === "agend_faltas") return g.status === "faltou";
         if (kind === "agend_pagos") {
-          const atIds = new Set(
-            rawAtends
-              .filter((at) => at.status === "pago" || at.status === "realizado")
-              .map((at) => at.id),
-          );
+          const atIds = new Set(rawAtends.filter(at => at.status === "pago" || at.status === "realizado").map(at => at.id));
           // approximate: agendamentos com status realizado/pago
           return g.status === "realizado" || atIds.has(g.id);
         }
@@ -424,185 +296,77 @@ function DashboardPage() {
       setDrill({
         title: `${titulos[kind] ?? "Agendamentos"} (${lista.length})`,
         columns: [
-          { key: "data", label: "Quando" },
-          { key: "paciente", label: "Paciente" },
-          { key: "medico", label: "Profissional" },
-          { key: "proc", label: "Procedimento" },
+          { key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" },
+          { key: "medico", label: "Profissional" }, { key: "proc", label: "Procedimento" },
           { key: "status", label: "Status" },
         ],
-        rows: lista.map((g) => ({
-          data: fmtDt(g.inicio),
-          paciente: pacNome(g.paciente_id),
-          medico: medNome(g.medico_id),
-          proc: g.procedimento ?? "—",
-          status: g.status,
-        })),
+        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), medico: medNome(g.medico_id), proc: g.procedimento ?? "—", status: g.status })),
       });
-    } else if (
-      kind === "clientes_novos" ||
-      kind === "clientes_regulares" ||
-      kind === "clientes_total"
-    ) {
-      const pacsAg = Array.from(
-        new Set(rawAgs.map((g) => g.paciente_id).filter(Boolean) as string[]),
-      );
-      const lista = pacsAg.filter((p) =>
-        kind === "clientes_total"
-          ? true
-          : kind === "clientes_novos"
-            ? novosIds.has(p)
-            : !novosIds.has(p),
-      );
-      const titulos: Record<string, string> = {
-        clientes_total: "Clientes agendados",
-        clientes_novos: "Clientes novos",
-        clientes_regulares: "Clientes regulares",
-      };
+    } else if (kind === "clientes_novos" || kind === "clientes_regulares" || kind === "clientes_total") {
+      const pacsAg = Array.from(new Set(rawAgs.map(g => g.paciente_id).filter(Boolean) as string[]));
+      const lista = pacsAg.filter(p => kind === "clientes_total" ? true : (kind === "clientes_novos" ? novosIds.has(p) : !novosIds.has(p)));
+      const titulos: Record<string, string> = { clientes_total: "Clientes agendados", clientes_novos: "Clientes novos", clientes_regulares: "Clientes regulares" };
       setDrill({
         title: `${titulos[kind]} (${lista.length})`,
-        columns: [
-          { key: "paciente", label: "Paciente" },
-          { key: "tipo", label: "Tipo" },
-        ],
-        rows: lista.map((p) => ({
-          paciente: pacNome(p),
-          tipo: novosIds.has(p) ? "Novo" : "Regular",
-        })),
+        columns: [{ key: "paciente", label: "Paciente" }, { key: "tipo", label: "Tipo" }],
+        rows: lista.map(p => ({ paciente: pacNome(p), tipo: novosIds.has(p) ? "Novo" : "Regular" })),
       });
     } else if (kind === "retornos") {
-      const lista = rawAgs.filter((g) => (g.procedimento ?? "").toLowerCase().includes("retorno"));
+      const lista = rawAgs.filter(g => (g.procedimento ?? "").toLowerCase().includes("retorno"));
       setDrill({
         title: `Retornos agendados (${lista.length})`,
-        columns: [
-          { key: "data", label: "Quando" },
-          { key: "paciente", label: "Paciente" },
-          { key: "medico", label: "Profissional" },
-          { key: "status", label: "Status" },
-        ],
-        rows: lista.map((g) => ({
-          data: fmtDt(g.inicio),
-          paciente: pacNome(g.paciente_id),
-          medico: medNome(g.medico_id),
-          status: g.status,
-        })),
+        columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "medico", label: "Profissional" }, { key: "status", label: "Status" }],
+        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), medico: medNome(g.medico_id), status: g.status })),
       });
     } else if (kind === "retornos_sem") {
-      const lista = rawAgs.filter((g) => !g.medico_id);
+      const lista = rawAgs.filter(g => !g.medico_id);
       setDrill({
         title: `Sem profissional definido (${lista.length})`,
-        columns: [
-          { key: "data", label: "Quando" },
-          { key: "paciente", label: "Paciente" },
-          { key: "proc", label: "Procedimento" },
-        ],
-        rows: lista.map((g) => ({
-          data: fmtDt(g.inicio),
-          paciente: pacNome(g.paciente_id),
-          proc: g.procedimento ?? "—",
-        })),
+        columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "proc", label: "Procedimento" }],
+        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), proc: g.procedimento ?? "—" })),
       });
     } else if (kind === "conf_pres" || kind === "conf_aus" || kind === "conf_total") {
-      const lista = rawAgs.filter((g) =>
-        kind === "conf_total"
-          ? g.status === "realizado" || g.status === "faltou"
-          : kind === "conf_pres"
-            ? g.status === "realizado"
-            : g.status === "faltou",
-      );
-      const titulos: Record<string, string> = {
-        conf_total: "Confirmações",
-        conf_pres: "Presenças",
-        conf_aus: "Ausências",
-      };
+      const lista = rawAgs.filter(g => kind === "conf_total" ? (g.status === "realizado" || g.status === "faltou") : kind === "conf_pres" ? g.status === "realizado" : g.status === "faltou");
+      const titulos: Record<string, string> = { conf_total: "Confirmações", conf_pres: "Presenças", conf_aus: "Ausências" };
       setDrill({
         title: `${titulos[kind]} (${lista.length})`,
-        columns: [
-          { key: "data", label: "Quando" },
-          { key: "paciente", label: "Paciente" },
-          { key: "medico", label: "Profissional" },
-          { key: "status", label: "Status" },
-        ],
-        rows: lista.map((g) => ({
-          data: fmtDt(g.inicio),
-          paciente: pacNome(g.paciente_id),
-          medico: medNome(g.medico_id),
-          status: g.status,
-        })),
+        columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "medico", label: "Profissional" }, { key: "status", label: "Status" }],
+        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), medico: medNome(g.medico_id), status: g.status })),
       });
     } else if (kind === "vendas") {
       setDrill({
         title: `Vendas / atendimentos (${rawAtends.length})`,
-        columns: [
-          { key: "medico", label: "Profissional" },
-          { key: "status", label: "Status" },
-          { key: "valor", label: "Valor", align: "right" },
-          { key: "comissao", label: "Comissão médico", align: "right" },
-        ],
-        rows: rawAtends.map((at) => ({
-          medico: medNome(at.medico_id),
-          status: at.status,
-          valor: moneyBRL(at.valor_total),
-          comissao: moneyBRL(at.valor_medico),
-        })),
+        columns: [{ key: "medico", label: "Profissional" }, { key: "status", label: "Status" }, { key: "valor", label: "Valor", align: "right" }, { key: "comissao", label: "Comissão médico", align: "right" }],
+        rows: rawAtends.map(at => ({ medico: medNome(at.medico_id), status: at.status, valor: moneyBRL(at.valor_total), comissao: moneyBRL(at.valor_medico) })),
       });
     } else if (kind.startsWith("pag_") || kind.startsWith("rec_")) {
       const isRec = kind.startsWith("rec_");
       const tipo = isRec ? "receita" : "despesa";
       const status = kind.endsWith("real") ? "confirmado" : "pendente";
-      const lista = rawLancs.filter((l) => l.tipo === tipo && l.status === status);
+      const lista = rawLancs.filter(l => l.tipo === tipo && l.status === status);
       const tot = lista.reduce((s, l) => s + Number(l.valor || 0), 0);
       const titulos: Record<string, string> = {
-        pag_real: "Pagamentos realizados",
-        pag_apagar: "Pagamentos a pagar",
-        rec_real: "Recebimentos realizados",
-        rec_areceber: "Recebimentos a receber",
+        pag_real: "Pagamentos realizados", pag_apagar: "Pagamentos a pagar",
+        rec_real: "Recebimentos realizados", rec_areceber: "Recebimentos a receber",
       };
       setDrill({
         title: `${titulos[kind] ?? "Lançamentos"} — ${moneyBRL(tot)} (${lista.length})`,
-        columns: [
-          { key: "medico", label: "Profissional" },
-          { key: "status", label: "Status" },
-          { key: "valor", label: "Valor", align: "right" },
-        ],
-        rows: lista.map((l) => ({
-          medico: medNome(l.medico_id),
-          status: l.status,
-          valor: moneyBRL(l.valor),
-        })),
+        columns: [{ key: "medico", label: "Profissional" }, { key: "status", label: "Status" }, { key: "valor", label: "Valor", align: "right" }],
+        rows: lista.map(l => ({ medico: medNome(l.medico_id), status: l.status, valor: moneyBRL(l.valor) })),
       });
     } else if (kind === "comissoes") {
-      const lista = rawAtends.filter((at) => Number(at.valor_medico || 0) > 0);
+      const lista = rawAtends.filter(at => Number(at.valor_medico || 0) > 0);
       setDrill({
         title: `Comissões (${lista.length})`,
-        columns: [
-          { key: "medico", label: "Profissional" },
-          { key: "status", label: "Status" },
-          { key: "valor", label: "Atendimento", align: "right" },
-          { key: "comissao", label: "Comissão", align: "right" },
-        ],
-        rows: lista.map((at) => ({
-          medico: medNome(at.medico_id),
-          status: at.status,
-          valor: moneyBRL(at.valor_total),
-          comissao: moneyBRL(at.valor_medico),
-        })),
+        columns: [{ key: "medico", label: "Profissional" }, { key: "status", label: "Status" }, { key: "valor", label: "Atendimento", align: "right" }, { key: "comissao", label: "Comissão", align: "right" }],
+        rows: lista.map(at => ({ medico: medNome(at.medico_id), status: at.status, valor: moneyBRL(at.valor_total), comissao: moneyBRL(at.valor_medico) })),
       });
     } else if (kind === "medico" && ctx?.nome) {
-      const lista = rawAgs.filter((g) => medNome(g.medico_id) === ctx.nome);
+      const lista = rawAgs.filter(g => medNome(g.medico_id) === ctx.nome);
       setDrill({
         title: `Agendamentos — ${ctx.nome} (${lista.length})`,
-        columns: [
-          { key: "data", label: "Quando" },
-          { key: "paciente", label: "Paciente" },
-          { key: "proc", label: "Procedimento" },
-          { key: "status", label: "Status" },
-        ],
-        rows: lista.map((g) => ({
-          data: fmtDt(g.inicio),
-          paciente: pacNome(g.paciente_id),
-          proc: g.procedimento ?? "—",
-          status: g.status,
-        })),
+        columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "proc", label: "Procedimento" }, { key: "status", label: "Status" }],
+        rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), proc: g.procedimento ?? "—", status: g.status })),
       });
     }
   };
@@ -612,21 +376,16 @@ function DashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Painel</h1>
-          <p className="text-sm text-muted-foreground">
-            {clinicaAtual?.clinica.nome} {carregando && "• atualizando…"}
-          </p>
+          <p className="text-sm text-muted-foreground">{clinicaAtual?.clinica.nome} {carregando && "• atualizando…"}</p>
         </div>
         <div className="flex items-end gap-2">
           <MultiSelectFiltro
             label="Profissional"
             placeholder="Todos os profissionais"
-            options={medicosLista
-              .filter(
-                (m) =>
-                  especialidadesSel.length === 0 ||
-                  (medEspMap[m.id] ?? []).some((e) => especialidadesSel.includes(e)),
-              )
-              .map((m) => ({ value: m.id, label: m.nome }))}
+            options={medicosLista.filter(m =>
+              especialidadesSel.length === 0 ||
+              (medEspMap[m.id] ?? []).some(e => especialidadesSel.includes(e))
+            ).map(m => ({ value: m.id, label: m.nome }))}
             selected={medicosSel}
             onChange={setMedicosSel}
             busca={buscaMed}
@@ -635,7 +394,7 @@ function DashboardPage() {
           <MultiSelectFiltro
             label="Especialidade"
             placeholder="Todas as especialidades"
-            options={especialidadesLista.map((e) => ({ value: e.id, label: e.nome }))}
+            options={especialidadesLista.map(e => ({ value: e.id, label: e.nome }))}
             selected={especialidadesSel}
             onChange={setEspecialidadesSel}
             busca={buscaEsp}
@@ -643,56 +402,38 @@ function DashboardPage() {
           />
           <div className="space-y-1">
             <Label className="text-xs">Período</Label>
-            <Input
-              type="date"
-              value={periodo.de}
-              onChange={(e) => setPeriodo((p) => ({ ...p, de: e.target.value }))}
-              className="w-40"
-            />
+            <Input type="date" value={periodo.de} onChange={(e) => setPeriodo(p => ({ ...p, de: e.target.value }))} className="w-40" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">até</Label>
-            <Input
-              type="date"
-              value={periodo.ate}
-              onChange={(e) => setPeriodo((p) => ({ ...p, ate: e.target.value }))}
-              className="w-40"
-            />
+            <Input type="date" value={periodo.ate} onChange={(e) => setPeriodo(p => ({ ...p, ate: e.target.value }))} className="w-40" />
           </div>
-          <Button variant="outline" onClick={load}>
-            Atualizar
-          </Button>
+          <Button variant="outline" onClick={load}>Atualizar</Button>
         </div>
       </div>
 
       {filtrosAtivos && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">Filtros ativos:</span>
-          {medicosSel.map((id) => {
-            const m = medicosLista.find((x) => x.id === id);
+          {medicosSel.map(id => {
+            const m = medicosLista.find(x => x.id === id);
             if (!m) return null;
             return (
               <Badge key={`m-${id}`} variant="secondary" className="gap-1">
                 {m.nome}
-                <button
-                  onClick={() => setMedicosSel((s) => s.filter((x) => x !== id))}
-                  className="hover:text-destructive"
-                >
+                <button onClick={() => setMedicosSel(s => s.filter(x => x !== id))} className="hover:text-destructive">
                   <X className="h-3 w-3" />
                 </button>
               </Badge>
             );
           })}
-          {especialidadesSel.map((id) => {
-            const e = especialidadesLista.find((x) => x.id === id);
+          {especialidadesSel.map(id => {
+            const e = especialidadesLista.find(x => x.id === id);
             if (!e) return null;
             return (
               <Badge key={`e-${id}`} variant="outline" className="gap-1">
                 {e.nome}
-                <button
-                  onClick={() => setEspecialidadesSel((s) => s.filter((x) => x !== id))}
-                  className="hover:text-destructive"
-                >
+                <button onClick={() => setEspecialidadesSel(s => s.filter(x => x !== id))} className="hover:text-destructive">
                   <X className="h-3 w-3" />
                 </button>
               </Badge>
@@ -702,16 +443,12 @@ function DashboardPage() {
             variant="ghost"
             size="sm"
             className="h-6 px-2 text-xs"
-            onClick={() => {
-              setMedicosSel([]);
-              setEspecialidadesSel([]);
-            }}
+            onClick={() => { setMedicosSel([]); setEspecialidadesSel([]); }}
           >
             Limpar
           </Button>
           <span className="text-xs text-muted-foreground">
-            ({medicosFiltradosIds.length}{" "}
-            {medicosFiltradosIds.length === 1 ? "profissional" : "profissionais"})
+            ({medicosFiltradosIds.length} {medicosFiltradosIds.length === 1 ? "profissional" : "profissionais"})
           </span>
         </div>
       )}
@@ -729,14 +466,10 @@ function DashboardPage() {
             </p>
             <div className="flex flex-col gap-2">
               <Button asChild size="sm" variant="default" className="w-full justify-start">
-                <Link to="/app/consulta-rapida">
-                  <BookOpen className="h-4 w-4 mr-1 shrink-0" /> Abrir tabela
-                </Link>
+                <Link to="/app/consulta-rapida"><BookOpen className="h-4 w-4 mr-1 shrink-0" /> Abrir tabela</Link>
               </Button>
               <Button asChild size="sm" variant="outline" className="w-full justify-start">
-                <Link to="/app/nina">
-                  <Brain className="h-4 w-4 mr-1 shrink-0" /> Perguntar à Nina
-                </Link>
+                <Link to="/app/nina"><Brain className="h-4 w-4 mr-1 shrink-0" /> Perguntar à Nina</Link>
               </Button>
             </div>
           </CardContent>
@@ -744,276 +477,113 @@ function DashboardPage() {
 
         {/* Alertas */}
         <KpiCard icon={Bell} title="Central de Alertas" onClick={() => openDrill("alertas")}>
-          {data.alertas.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Oba! Nenhum alerta.</p>
-          ) : (
-            <ul className="space-y-1 text-sm">
-              {data.alertas.map((al) => (
-                <li key={al.id} className="truncate">
-                  • {al.mensagem}
-                </li>
-              ))}
-            </ul>
-          )}
+          {data.alertas.length === 0
+            ? <p className="text-sm text-muted-foreground">Oba! Nenhum alerta.</p>
+            : <ul className="space-y-1 text-sm">{data.alertas.map(al => <li key={al.id} className="truncate">• {al.mensagem}</li>)}</ul>}
         </KpiCard>
 
-        <KpiCard
-          icon={CalendarDays}
-          title="Agendamentos"
-          big={fmtInt(a.total)}
-          onClick={() => openDrill("agend_total")}
-        >
-          <SubGrid
-            items={[
-              {
-                label: "Atendidos",
-                value: fmtInt(a.atendidos),
-                pct: pct(a.atendidos, a.total),
-                onClick: () => openDrill("agend_atendidos"),
-              },
-              {
-                label: "Faltas",
-                value: fmtInt(a.faltas),
-                pct: pct(a.faltas, a.total),
-                onClick: () => openDrill("agend_faltas"),
-              },
-              {
-                label: "Pagos",
-                value: fmtInt(a.pagos),
-                pct: pct(a.pagos, a.total),
-                onClick: () => openDrill("agend_pagos"),
-              },
-              {
-                label: "Não Pagos",
-                value: fmtInt(a.naoPagos),
-                pct: pct(a.naoPagos, a.total),
-                onClick: () => openDrill("agend_naopagos"),
-              },
-            ]}
-          />
+        <KpiCard icon={CalendarDays} title="Agendamentos" big={fmtInt(a.total)} onClick={() => openDrill("agend_total")}>
+          <SubGrid items={[
+            { label: "Atendidos", value: fmtInt(a.atendidos), pct: pct(a.atendidos, a.total), onClick: () => openDrill("agend_atendidos") },
+            { label: "Faltas", value: fmtInt(a.faltas), pct: pct(a.faltas, a.total), onClick: () => openDrill("agend_faltas") },
+            { label: "Pagos", value: fmtInt(a.pagos), pct: pct(a.pagos, a.total), onClick: () => openDrill("agend_pagos") },
+            { label: "Não Pagos", value: fmtInt(a.naoPagos), pct: pct(a.naoPagos, a.total), onClick: () => openDrill("agend_naopagos") },
+          ]} />
         </KpiCard>
 
-        <KpiCard
-          icon={Users}
-          title="Clientes Agendados"
-          big={fmtInt(a.novos + a.regulares)}
-          onClick={() => openDrill("clientes_total")}
-        >
-          <SubGrid
-            items={[
-              {
-                label: "Novos",
-                value: fmtInt(a.novos),
-                pct: pct(a.novos, a.novos + a.regulares),
-                onClick: () => openDrill("clientes_novos"),
-              },
-              {
-                label: "Regulares",
-                value: fmtInt(a.regulares),
-                pct: pct(a.regulares, a.novos + a.regulares),
-                onClick: () => openDrill("clientes_regulares"),
-              },
-            ]}
-          />
+        <KpiCard icon={Users} title="Clientes Agendados" big={fmtInt(a.novos + a.regulares)} onClick={() => openDrill("clientes_total")}>
+          <SubGrid items={[
+            { label: "Novos", value: fmtInt(a.novos), pct: pct(a.novos, a.novos + a.regulares), onClick: () => openDrill("clientes_novos") },
+            { label: "Regulares", value: fmtInt(a.regulares), pct: pct(a.regulares, a.novos + a.regulares), onClick: () => openDrill("clientes_regulares") },
+          ]} />
         </KpiCard>
 
-        <KpiCard
-          icon={RotateCcw}
-          title="Retornos"
-          big={fmtInt(a.retornos)}
-          onClick={() => openDrill("retornos")}
-        >
-          <SubGrid
-            items={[
-              {
-                label: "Sem Agenda",
-                value: fmtInt(a.semAgenda),
-                onClick: () => openDrill("retornos_sem"),
-              },
-              {
-                label: "Agendados",
-                value: fmtInt(a.retornos),
-                onClick: () => openDrill("retornos"),
-              },
-            ]}
-          />
+        <KpiCard icon={RotateCcw} title="Retornos" big={fmtInt(a.retornos)} onClick={() => openDrill("retornos")}>
+          <SubGrid items={[
+            { label: "Sem Agenda", value: fmtInt(a.semAgenda), onClick: () => openDrill("retornos_sem") },
+            { label: "Agendados", value: fmtInt(a.retornos), onClick: () => openDrill("retornos") },
+          ]} />
         </KpiCard>
 
         <KpiCard icon={MessageCircle} title="Mensagens Enviadas" big={fmtInt(data.msgs.enviadas)}>
-          <SubGrid
-            items={[
-              { label: "Respostas", value: fmtInt(data.msgs.respostas) },
-              { label: "Total", value: fmtInt(data.msgs.total) },
-            ]}
-          />
+          <SubGrid items={[
+            { label: "Respostas", value: fmtInt(data.msgs.respostas) },
+            { label: "Total", value: fmtInt(data.msgs.total) },
+          ]} />
         </KpiCard>
 
-        <KpiCard
-          icon={CheckCircle2}
-          title="Confirmações das Agendas"
-          big={fmtInt(data.conf.presencas + data.conf.ausencias)}
-          onClick={() => openDrill("conf_total")}
-        >
-          <SubGrid
-            items={[
-              {
-                label: "Presenças",
-                value: fmtInt(data.conf.presencas),
-                pct: pct(data.conf.presencas, data.conf.presencas + data.conf.ausencias),
-                onClick: () => openDrill("conf_pres"),
-              },
-              {
-                label: "Ausências",
-                value: fmtInt(data.conf.ausencias),
-                pct: pct(data.conf.ausencias, data.conf.presencas + data.conf.ausencias),
-                onClick: () => openDrill("conf_aus"),
-              },
-            ]}
-          />
+        <KpiCard icon={CheckCircle2} title="Confirmações das Agendas" big={fmtInt(data.conf.presencas + data.conf.ausencias)} onClick={() => openDrill("conf_total")}>
+          <SubGrid items={[
+            { label: "Presenças", value: fmtInt(data.conf.presencas), pct: pct(data.conf.presencas, data.conf.presencas + data.conf.ausencias), onClick: () => openDrill("conf_pres") },
+            { label: "Ausências", value: fmtInt(data.conf.ausencias), pct: pct(data.conf.ausencias, data.conf.presencas + data.conf.ausencias), onClick: () => openDrill("conf_aus") },
+          ]} />
         </KpiCard>
 
         {podeVerFinanceiro && (
-          <KpiCard
-            icon={Handshake}
-            title="Vendas"
-            big={fmtMoney(data.vendas.total)}
-            onClick={() => openDrill("vendas")}
-          >
-            <SubGrid
-              items={[
-                { label: "Conversão", value: "—" },
-                { label: "Orçamentos", value: fmtMoney(data.vendas.orcamentos) },
-              ]}
-            />
-          </KpiCard>
+        <KpiCard icon={Handshake} title="Vendas" big={fmtMoney(data.vendas.total)} onClick={() => openDrill("vendas")}>
+          <SubGrid items={[
+            { label: "Conversão", value: "—" },
+            { label: "Orçamentos", value: fmtMoney(data.vendas.orcamentos) },
+          ]} />
+        </KpiCard>
         )}
 
         {podeVerFinanceiro && (
-          <KpiCard
-            icon={CreditCard}
-            title="Pagamentos"
-            big={fmtMoney(data.pagamentos.realizado + data.pagamentos.aPagar)}
-            onClick={() => openDrill("pag_real")}
-          >
-            <SubGrid
-              items={[
-                {
-                  label: "Realizado",
-                  value: fmtMoney(data.pagamentos.realizado),
-                  onClick: () => openDrill("pag_real"),
-                },
-                {
-                  label: "À pagar",
-                  value: fmtMoney(data.pagamentos.aPagar),
-                  onClick: () => openDrill("pag_apagar"),
-                },
-              ]}
-            />
-          </KpiCard>
+        <KpiCard icon={CreditCard} title="Pagamentos" big={fmtMoney(data.pagamentos.realizado + data.pagamentos.aPagar)} onClick={() => openDrill("pag_real")}>
+          <SubGrid items={[
+            { label: "Realizado", value: fmtMoney(data.pagamentos.realizado), onClick: () => openDrill("pag_real") },
+            { label: "À pagar", value: fmtMoney(data.pagamentos.aPagar), onClick: () => openDrill("pag_apagar") },
+          ]} />
+        </KpiCard>
         )}
 
         {podeVerFinanceiro && (
-          <KpiCard
-            icon={Banknote}
-            title="Recebimentos"
-            big={fmtMoney(data.recebimentos.realizado + data.recebimentos.aReceber)}
-            onClick={() => openDrill("rec_real")}
-          >
-            <SubGrid
-              items={[
-                {
-                  label: "Realizado",
-                  value: fmtMoney(data.recebimentos.realizado),
-                  onClick: () => openDrill("rec_real"),
-                },
-                {
-                  label: "À receber",
-                  value: fmtMoney(data.recebimentos.aReceber),
-                  onClick: () => openDrill("rec_areceber"),
-                },
-              ]}
-            />
-          </KpiCard>
+        <KpiCard icon={Banknote} title="Recebimentos" big={fmtMoney(data.recebimentos.realizado + data.recebimentos.aReceber)} onClick={() => openDrill("rec_real")}>
+          <SubGrid items={[
+            { label: "Realizado", value: fmtMoney(data.recebimentos.realizado), onClick: () => openDrill("rec_real") },
+            { label: "À receber", value: fmtMoney(data.recebimentos.aReceber), onClick: () => openDrill("rec_areceber") },
+          ]} />
+        </KpiCard>
         )}
 
         {podeVerFinanceiro && (
-          <KpiCard
-            icon={Receipt}
-            title="Recebimentos Qtd."
-            big={fmtInt(data.recebimentos.qtdRealizado + data.recebimentos.qtdAReceber)}
-            onClick={() => openDrill("rec_real")}
-          >
-            <SubGrid
-              items={[
-                {
-                  label: "Realizado",
-                  value: fmtInt(data.recebimentos.qtdRealizado),
-                  onClick: () => openDrill("rec_real"),
-                },
-                {
-                  label: "À receber",
-                  value: fmtInt(data.recebimentos.qtdAReceber),
-                  onClick: () => openDrill("rec_areceber"),
-                },
-              ]}
-            />
-          </KpiCard>
+        <KpiCard icon={Receipt} title="Recebimentos Qtd." big={fmtInt(data.recebimentos.qtdRealizado + data.recebimentos.qtdAReceber)} onClick={() => openDrill("rec_real")}>
+          <SubGrid items={[
+            { label: "Realizado", value: fmtInt(data.recebimentos.qtdRealizado), onClick: () => openDrill("rec_real") },
+            { label: "À receber", value: fmtInt(data.recebimentos.qtdAReceber), onClick: () => openDrill("rec_areceber") },
+          ]} />
+        </KpiCard>
         )}
 
         {podeVerFinanceiro && (
-          <KpiCard
-            icon={BadgeDollarSign}
-            title="Comissões Pagas"
-            big={fmtMoney(data.comissoes.pagas)}
-            onClick={() => openDrill("comissoes")}
-          >
-            <SubGrid
-              items={[
-                { label: "% da Receita", value: `${data.comissoes.percentReceita.toFixed(1)}%` },
-                { label: "Pendentes", value: fmtMoney(data.comissoes.pendentes) },
-              ]}
-            />
-          </KpiCard>
+        <KpiCard icon={BadgeDollarSign} title="Comissões Pagas" big={fmtMoney(data.comissoes.pagas)} onClick={() => openDrill("comissoes")}>
+          <SubGrid items={[
+            { label: "% da Receita", value: `${data.comissoes.percentReceita.toFixed(1)}%` },
+            { label: "Pendentes", value: fmtMoney(data.comissoes.pendentes) },
+          ]} />
+        </KpiCard>
         )}
       </div>
 
       {data.porMedico.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase mb-3">
-            Total de Agendamentos por médico
-          </h2>
+          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase mb-3">Total de Agendamentos por médico</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {data.porMedico.map((m) => (
-              <KpiCard
-                key={m.nome}
-                icon={Stethoscope}
-                title={m.nome}
-                big={fmtInt(m.total)}
-                small
-                onClick={() => openDrill("medico", { nome: m.nome })}
-              >
-                <SubGrid
-                  items={[
-                    { label: "Pagos", value: fmtInt(m.pagos), pct: pct(m.pagos, m.total) },
-                    { label: "Clientes Novos", value: fmtInt(m.novos), pct: pct(m.novos, m.total) },
-                  ]}
-                />
+              <KpiCard key={m.nome} icon={Stethoscope} title={m.nome} big={fmtInt(m.total)} small onClick={() => openDrill("medico", { nome: m.nome })}>
+                <SubGrid items={[
+                  { label: "Pagos", value: fmtInt(m.pagos), pct: pct(m.pagos, m.total) },
+                  { label: "Clientes Novos", value: fmtInt(m.novos), pct: pct(m.novos, m.total) },
+                ]} />
               </KpiCard>
             ))}
           </div>
         </div>
       )}
 
-      <Dialog
-        open={drill !== null}
-        onOpenChange={(o) => {
-          if (!o) setDrill(null);
-        }}
-      >
+      <Dialog open={drill !== null} onOpenChange={(o) => { if (!o) setDrill(null); }}>
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{drill?.title}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{drill?.title}</DialogTitle></DialogHeader>
           <div className="overflow-auto flex-1">
             {drill && drill.rows.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">Nenhum registro.</p>
@@ -1022,9 +592,7 @@ function DashboardPage() {
                 <TableHeader>
                   <TableRow>
                     {drill.columns.map((c) => (
-                      <TableHead key={c.key} className={c.align === "right" ? "text-right" : ""}>
-                        {c.label}
-                      </TableHead>
+                      <TableHead key={c.key} className={c.align === "right" ? "text-right" : ""}>{c.label}</TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
@@ -1032,9 +600,7 @@ function DashboardPage() {
                   {drill.rows.map((r, i) => (
                     <TableRow key={i}>
                       {drill.columns.map((c) => (
-                        <TableCell key={c.key} className={c.align === "right" ? "text-right" : ""}>
-                          {r[c.key]}
-                        </TableCell>
+                        <TableCell key={c.key} className={c.align === "right" ? "text-right" : ""}>{r[c.key]}</TableCell>
                       ))}
                     </TableRow>
                   ))}
@@ -1048,37 +614,18 @@ function DashboardPage() {
   );
 }
 
-function KpiCard({
-  icon: Icon,
-  title,
-  big,
-  small,
-  children,
-  onClick,
-}: {
-  icon: ElementType;
-  title: string;
-  big?: string;
-  small?: boolean;
-  children?: React.ReactNode;
-  onClick?: () => void;
+function KpiCard({ icon: Icon, title, big, small, children, onClick }: {
+  icon: ElementType; title: string; big?: string; small?: boolean; children?: React.ReactNode; onClick?: () => void;
 }) {
   return (
-    <Card
-      className={`overflow-hidden ${onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`}
-      onClick={onClick}
-    >
+    <Card className={`overflow-hidden ${onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`} onClick={onClick}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0 flex-1">
             <Icon className="h-4 w-4 text-primary shrink-0" />
-            <span className="truncate" title={title}>
-              {title}
-            </span>
+            <span className="truncate" title={title}>{title}</span>
           </div>
-          {big !== undefined && (
-            <div className="text-2xl font-semibold tabular-nums shrink-0">{big}</div>
-          )}
+          {big !== undefined && <div className="text-2xl font-semibold tabular-nums shrink-0">{big}</div>}
         </div>
         {children && <div className="mt-4 pt-3 border-t border-border">{children}</div>}
       </CardContent>
@@ -1086,30 +633,18 @@ function KpiCard({
   );
 }
 
-function SubGrid({
-  items,
-}: {
-  items: { label: string; value: string; pct?: string; onClick?: () => void }[];
-}) {
+function SubGrid({ items }: { items: { label: string; value: string; pct?: string; onClick?: () => void }[] }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       {items.map((it) => (
         <div
           key={it.label}
-          onClick={
-            it.onClick
-              ? (e) => {
-                  e.stopPropagation();
-                  it.onClick!();
-                }
-              : undefined
-          }
+          onClick={it.onClick ? (e) => { e.stopPropagation(); it.onClick!(); } : undefined}
           className={it.onClick ? "cursor-pointer rounded px-1 -mx-1 hover:bg-accent" : ""}
         >
           <div className="text-xs text-muted-foreground">{it.label}</div>
           <div className="text-sm font-medium tabular-nums">
-            {it.value}
-            {it.pct && <span className="ml-1 text-xs text-muted-foreground">{it.pct}</span>}
+            {it.value}{it.pct && <span className="ml-1 text-xs text-muted-foreground">{it.pct}</span>}
           </div>
         </div>
       ))}
@@ -1118,13 +653,7 @@ function SubGrid({
 }
 
 function MultiSelectFiltro({
-  label,
-  placeholder,
-  options,
-  selected,
-  onChange,
-  busca,
-  setBusca,
+  label, placeholder, options, selected, onChange, busca, setBusca,
 }: {
   label: string;
   placeholder: string;
@@ -1135,17 +664,16 @@ function MultiSelectFiltro({
   setBusca: (v: string) => void;
 }) {
   const filtradas = busca.trim()
-    ? options.filter((o) => o.label.toLowerCase().includes(busca.toLowerCase()))
+    ? options.filter(o => o.label.toLowerCase().includes(busca.toLowerCase()))
     : options;
   const toggle = (v: string) => {
-    onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
+    onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v]);
   };
-  const resumo =
-    selected.length === 0
-      ? placeholder
-      : selected.length === 1
-        ? (options.find((o) => o.value === selected[0])?.label ?? "1 selecionado")
-        : `${selected.length} selecionados`;
+  const resumo = selected.length === 0
+    ? placeholder
+    : selected.length === 1
+      ? options.find(o => o.value === selected[0])?.label ?? "1 selecionado"
+      : `${selected.length} selecionados`;
   return (
     <div className="space-y-1">
       <Label className="text-xs">{label}</Label>
@@ -1157,9 +685,7 @@ function MultiSelectFiltro({
               <span className="truncate">{resumo}</span>
             </span>
             {selected.length > 0 && (
-              <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">
-                {selected.length}
-              </Badge>
+              <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">{selected.length}</Badge>
             )}
           </Button>
         </PopoverTrigger>
@@ -1176,7 +702,7 @@ function MultiSelectFiltro({
             {filtradas.length === 0 ? (
               <p className="p-3 text-sm text-muted-foreground text-center">Nada encontrado.</p>
             ) : (
-              filtradas.map((o) => {
+              filtradas.map(o => {
                 const checked = selected.includes(o.value);
                 return (
                   <label
@@ -1192,12 +718,7 @@ function MultiSelectFiltro({
           </div>
           {selected.length > 0 && (
             <div className="p-2 border-t flex justify-end">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => onChange([])}
-              >
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onChange([])}>
                 Limpar seleção
               </Button>
             </div>

@@ -6,13 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { BellRing, Phone, CheckCircle2, MessageCircle, Clock, Loader2 } from "lucide-react";
@@ -60,56 +54,42 @@ function AlertasEnfermagemPage() {
   const load = async () => {
     if (!clinicaId) return;
     setLoading(true);
-    let q = supabase
-      .from("alertas_enfermagem")
-      .select("*")
-      .eq("clinica_id", clinicaId)
+    let q = supabase.from("alertas_enfermagem")
+      .select("*").eq("clinica_id", clinicaId)
       .order("severidade", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(100);
+      .order("created_at", { ascending: false }).limit(100);
     if (filtro === "aberto") q = q.in("status", ["aberto", "em_contato"]);
     const { data } = await q;
     setAlertas((data as Alerta[]) ?? []);
     setLoading(false);
   };
 
-  useEffect(() => {
-    load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [clinicaId, filtro]);
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaId, filtro]);
 
   const updateStatus = async (a: Alerta, novo: Status) => {
     const observacao = obs[a.id] ?? a.observacao_contato ?? null;
     const patch: Partial<Alerta> = { status: novo, observacao_contato: observacao };
     if (novo === "em_contato") patch.contatado_em = new Date().toISOString();
     if (novo === "resolvido") patch.resolvido_em = new Date().toISOString();
-    const { error } = await supabase
-      .from("alertas_enfermagem")
-      .update(patch as never)
-      .eq("id", a.id);
+    const { error } = await supabase.from("alertas_enfermagem").update(patch as never).eq("id", a.id);
     if (error) return mostrarErro(error);
     toast.success("Alerta atualizado");
     load();
   };
 
   const abertos = alertas.filter((a) => a.status === "aberto").length;
-  const criticos = alertas.filter(
-    (a) => a.severidade === "critico" && a.status !== "resolvido",
-  ).length;
+  const criticos = alertas.filter((a) => a.severidade === "critico" && a.status !== "resolvido").length;
 
   return (
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-center gap-2 flex-wrap">
         <BellRing className="h-6 w-6 text-red-500" />
         <h1 className="text-2xl font-bold">Enfermeira IA — Alertas</h1>
-        <Badge variant="destructive" className="ml-2">
-          {criticos} críticos
-        </Badge>
+        <Badge variant="destructive" className="ml-2">{criticos} críticos</Badge>
         <Badge variant="secondary">{abertos} abertos</Badge>
         <div className="ml-auto">
           <Select value={filtro} onValueChange={(v) => setFiltro(v as typeof filtro)}>
-            <SelectTrigger className="w-44">
-              <SelectValue />
-            </SelectTrigger>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="aberto">Em aberto</SelectItem>
               <SelectItem value="todos">Todos</SelectItem>
@@ -120,25 +100,13 @@ function AlertasEnfermagemPage() {
 
       {loading && <Loader2 className="h-5 w-5 animate-spin" />}
       {!loading && alertas.length === 0 && (
-        <Card className="p-6 text-center text-muted-foreground">
-          Nenhum alerta {filtro === "aberto" ? "aberto" : ""}.
-        </Card>
+        <Card className="p-6 text-center text-muted-foreground">Nenhum alerta {filtro === "aberto" ? "aberto" : ""}.</Card>
       )}
 
       <div className="space-y-3">
         {alertas.map((a) => (
-          <Card
-            key={a.id}
-            className="p-4 border-l-4"
-            style={{
-              borderLeftColor:
-                a.severidade === "critico"
-                  ? "#dc2626"
-                  : a.severidade === "alterado"
-                    ? "#d97706"
-                    : "#16a34a",
-            }}
-          >
+          <Card key={a.id} className="p-4 border-l-4"
+            style={{ borderLeftColor: a.severidade === "critico" ? "#dc2626" : a.severidade === "alterado" ? "#d97706" : "#16a34a" }}>
             <div className="flex items-start gap-3 flex-wrap">
               <div className="flex-1 min-w-[260px]">
                 <div className="flex items-center gap-2 flex-wrap">

@@ -6,13 +6,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { printOrcamento } from "@/lib/print-orcamento";
 import { Button } from "@/components/ui/button";
-import {
-  ListShell,
-  VirtualList,
-  QuickFilters,
-  type StatusTab,
-  type QuickFilterOption,
-} from "@/components/list-shell";
+import { ListShell, VirtualList, QuickFilters, type StatusTab, type QuickFilterOption } from "@/components/list-shell";
 import { ConversaoOrcamentoDialog } from "@/components/orcamentos/conversao-orcamento-dialog";
 import { OrcamentoCard, pagadorLabel, type OrcV2 } from "./orcamento-card";
 import { OrcamentoDrawer } from "./orcamento-drawer";
@@ -61,35 +55,19 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
     setLoading(true);
     const { data, error } = await supabase
       .from("orcamentos")
-      .select(
-        "id, numero, paciente_id, paciente_nome, paciente_telefone, medico_nome, forma_pagamento, valor_total, status, created_at, categoria, validade_dias",
-      )
+      .select("id, numero, paciente_id, paciente_nome, paciente_telefone, medico_nome, forma_pagamento, valor_total, status, created_at, categoria, validade_dias")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("created_at", { ascending: false })
       .limit(500);
-    if (error) {
-      mostrarErro(error);
-      setLoading(false);
-      return;
-    }
+    if (error) { mostrarErro(error); setLoading(false); return; }
     const orcs = (data ?? []) as unknown as OrcV2[];
     const ids = orcs.map((o) => o.id);
     const pacIds = Array.from(new Set(orcs.map((o) => o.paciente_id).filter(Boolean))) as string[];
     if (ids.length > 0) {
       const [{ data: ags }, { data: itens }, { data: links }, pacRes] = await Promise.all([
-        supabase
-          .from("agendamentos")
-          .select("orcamento_id, status")
-          .in("orcamento_id", ids)
-          .neq("status", "cancelado"),
-        supabase
-          .from("orcamento_itens")
-          .select("orcamento_id, quantidade, descricao")
-          .in("orcamento_id", ids),
-        supabase
-          .from("agendamento_orcamento_itens")
-          .select("orcamento_id, orcamento_item_id")
-          .in("orcamento_id", ids),
+        supabase.from("agendamentos").select("orcamento_id, status").in("orcamento_id", ids).neq("status", "cancelado"),
+        supabase.from("orcamento_itens").select("orcamento_id, quantidade, descricao").in("orcamento_id", ids),
+        supabase.from("agendamento_orcamento_itens").select("orcamento_id, orcamento_item_id").in("orcamento_id", ids),
         pacIds.length > 0
           ? supabase.from("pacientes").select("id, cpf").in("id", pacIds)
           : Promise.resolve({ data: [] as { id: string; cpf: string | null }[] }),
@@ -102,15 +80,8 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
       }
       const totItens = new Map<string, number>();
       const procsTxt = new Map<string, string[]>();
-      for (const it of (itens ?? []) as {
-        orcamento_id: string;
-        quantidade: number;
-        descricao: string;
-      }[]) {
-        totItens.set(
-          it.orcamento_id,
-          (totItens.get(it.orcamento_id) ?? 0) + Number(it.quantidade || 1),
-        );
+      for (const it of (itens ?? []) as { orcamento_id: string; quantidade: number; descricao: string }[]) {
+        totItens.set(it.orcamento_id, (totItens.get(it.orcamento_id) ?? 0) + Number(it.quantidade || 1));
         if (!procsTxt.has(it.orcamento_id)) procsTxt.set(it.orcamento_id, []);
         procsTxt.get(it.orcamento_id)!.push(it.descricao ?? "");
       }
@@ -120,8 +91,7 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
         consumidos.get(l.orcamento_id)!.add(l.orcamento_item_id);
       }
       const cpfMap = new Map<string, string>();
-      for (const p of (pacRes as { data: { id: string; cpf: string | null }[] | null }).data ??
-        []) {
+      for (const p of ((pacRes as { data: { id: string; cpf: string | null }[] | null }).data ?? [])) {
         if (p.cpf) cpfMap.set(p.id, p.cpf);
       }
       for (const o of orcs) {
@@ -137,9 +107,7 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
     setLoading(false);
   }, [clinicaAtual]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   // Ctrl+Shift+C -> compacto
   useEffect(() => {
@@ -153,115 +121,78 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [compactPref, onToggleCompact]);
 
-  const inPeriodo = useCallback(
-    (iso: string): boolean => {
-      if (periodo.length === 0) return true;
-      const d = new Date(iso).getTime();
-      const now = Date.now();
-      return periodo.some((p) => {
-        const days = p === "hoje" ? 1 : p === "7d" ? 7 : 30;
-        return now - d <= days * 86400_000;
-      });
-    },
-    [periodo],
-  );
+  const inPeriodo = useCallback((iso: string): boolean => {
+    if (periodo.length === 0) return true;
+    const d = new Date(iso).getTime();
+    const now = Date.now();
+    return periodo.some((p) => {
+      const days = p === "hoje" ? 1 : p === "7d" ? 7 : 30;
+      return now - d <= days * 86400_000;
+    });
+  }, [periodo]);
 
-  const applyBase = useCallback(
-    (o: OrcV2) => {
-      const qq = q.trim().toLowerCase();
-      if (qq) {
-        const digits = qq.replace(/\D/g, "");
-        const hit =
-          o.paciente_nome.toLowerCase().includes(qq) ||
-          String(o.numero).includes(qq) ||
-          (o.medico_nome ?? "").toLowerCase().includes(qq) ||
-          (o.procedimentos_txt ?? "").includes(qq) ||
-          (digits.length >= 3 &&
-            ((o.paciente_cpf ?? "").replace(/\D/g, "").includes(digits) ||
-              (o.paciente_telefone ?? "").replace(/\D/g, "").includes(digits)));
-        if (!hit) return false;
-      }
-      if (!inPeriodo(o.created_at)) return false;
-      if (tipo.length > 0) {
-        const pag = pagadorLabel(o.forma_pagamento);
-        const map: Record<TipoV, string> = {
-          particular: "Particular",
-          associado: "Associado",
-          cartao: "Cartão de Benefícios",
-        };
-        if (!tipo.some((t) => map[t] === pag)) return false;
-      }
-      return true;
-    },
-    [q, tipo, inPeriodo],
-  );
+  const applyBase = useCallback((o: OrcV2) => {
+    const qq = q.trim().toLowerCase();
+    if (qq) {
+      const digits = qq.replace(/\D/g, "");
+      const hit =
+        o.paciente_nome.toLowerCase().includes(qq) ||
+        String(o.numero).includes(qq) ||
+        (o.medico_nome ?? "").toLowerCase().includes(qq) ||
+        (o.procedimentos_txt ?? "").includes(qq) ||
+        (digits.length >= 3 && (
+          (o.paciente_cpf ?? "").replace(/\D/g, "").includes(digits) ||
+          (o.paciente_telefone ?? "").replace(/\D/g, "").includes(digits)
+        ));
+      if (!hit) return false;
+    }
+    if (!inPeriodo(o.created_at)) return false;
+    if (tipo.length > 0) {
+      const pag = pagadorLabel(o.forma_pagamento);
+      const map: Record<TipoV, string> = { particular: "Particular", associado: "Associado", cartao: "Cartão de Benefícios" };
+      if (!tipo.some((t) => map[t] === pag)) return false;
+    }
+    return true;
+  }, [q, tipo, inPeriodo]);
 
   const matchTab = (o: OrcV2, t: TabV): boolean => {
     if (t === "todos") return true;
     const st = deriveStatus(o);
-    if (t === "pendencia")
-      return st === "convertido" && (o.itens_consumidos ?? 0) < (o.itens_total ?? 0);
+    if (t === "pendencia") return st === "convertido" && (o.itens_consumidos ?? 0) < (o.itens_total ?? 0);
     const map: Record<Exclude<TabV, "todos" | "pendencia">, DerivedStatus> = {
-      abertos: "aberto",
-      convertidos: "convertido",
-      expirados: "expirado",
-      cancelados: "cancelado",
+      abertos: "aberto", convertidos: "convertido",
+      expirados: "expirado", cancelados: "cancelado",
     };
     return st === map[t as Exclude<TabV, "todos" | "pendencia">];
   };
 
   const { counts, resumo, kpi } = useMemo(() => {
     const base = list.filter(applyBase);
-    const c = {
-      todos: base.length,
-      abertos: 0,
-      convertidos: 0,
-      expirados: 0,
-      cancelados: 0,
-      pendencia: 0,
-    };
-    let valorAberto = 0,
-      valorConvPeriodo = 0,
-      valorConvHoje = 0,
-      conversoesHoje = 0;
-    const startHoje = new Date();
-    startHoje.setHours(0, 0, 0, 0);
+    const c = { todos: base.length, abertos: 0, convertidos: 0, expirados: 0, cancelados: 0, pendencia: 0 };
+    let valorAberto = 0, valorConvPeriodo = 0, valorConvHoje = 0, conversoesHoje = 0;
+    const startHoje = new Date(); startHoje.setHours(0, 0, 0, 0);
     for (const o of base) {
       const st = deriveStatus(o);
-      if (st === "aberto") {
-        c.abertos++;
-        valorAberto += Number(o.valor_total);
-      } else if (st === "convertido") {
+      if (st === "aberto") { c.abertos++; valorAberto += Number(o.valor_total); }
+      else if (st === "convertido") {
         c.convertidos++;
         valorConvPeriodo += Number(o.valor_total);
         if (new Date(o.created_at).getTime() >= startHoje.getTime()) {
-          valorConvHoje += Number(o.valor_total);
-          conversoesHoje++;
+          valorConvHoje += Number(o.valor_total); conversoesHoje++;
         }
         if ((o.itens_consumidos ?? 0) < (o.itens_total ?? 0)) c.pendencia++;
-      } else if (st === "expirado") c.expirados++;
+      }
+      else if (st === "expirado") c.expirados++;
       else if (st === "cancelado") c.cancelados++;
     }
-    const ticketMedio = base.length
-      ? base.reduce((s, o) => s + Number(o.valor_total), 0) / base.length
-      : 0;
+    const ticketMedio = base.length ? base.reduce((s, o) => s + Number(o.valor_total), 0) / base.length : 0;
     const conversaoPct = c.todos ? (c.convertidos / c.todos) * 100 : 0;
     const r: ResumoData = {
-      total: c.todos,
-      abertos: c.abertos,
-      convertidos: c.convertidos,
-      expirados: c.expirados,
-      valorAberto,
-      valorConvertidoPeriodo: valorConvPeriodo,
-      ticketMedio,
+      total: c.todos, abertos: c.abertos,
+      convertidos: c.convertidos, expirados: c.expirados,
+      valorAberto, valorConvertidoPeriodo: valorConvPeriodo, ticketMedio,
     };
-    const k: OrcKpi = {
-      valorAberto,
-      valorConvertidoHoje: valorConvHoje,
-      conversoesHoje,
-      conversaoPct,
-      ticketMedio,
-    };
+    const k: OrcKpi = { valorAberto, valorConvertidoHoje: valorConvHoje, conversoesHoje, conversaoPct, ticketMedio };
     return { counts: c, resumo: r, kpi: k };
   }, [list, applyBase]);
 
@@ -283,11 +214,8 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
 
   const imprimir = async (id: string) => {
     if (!clinicaAtual) return;
-    try {
-      await printOrcamento(id, clinicaAtual.clinica_id);
-    } catch (e) {
-      toast.error((e as Error).message);
-    }
+    try { await printOrcamento(id, clinicaAtual.clinica_id); }
+    catch (e) { toast.error((e as Error).message); }
   };
 
   return (
@@ -312,9 +240,7 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
               Compacto
             </Button>
             <Button size="sm" asChild>
-              <a href="/app/orcamentos">
-                <Plus className="h-4 w-4" /> Novo
-              </a>
+              <a href="/app/orcamentos"><Plus className="h-4 w-4" /> Novo</a>
             </Button>
           </>
         }
@@ -326,19 +252,8 @@ export function OrcamentosShellV2({ compactPref, onToggleCompact }: Props) {
         onTabChange={setTab}
         chips={
           <div className="flex flex-wrap gap-3">
-            <QuickFilters<TipoV>
-              options={TIPO_OPTS}
-              value={tipo}
-              onChange={setTipo}
-              multi
-              ariaLabel="Tipo de pagador"
-            />
-            <QuickFilters<PeriodoV>
-              options={PERIODO_OPTS}
-              value={periodo}
-              onChange={setPeriodo}
-              ariaLabel="Período"
-            />
+            <QuickFilters<TipoV> options={TIPO_OPTS} value={tipo} onChange={setTipo} multi ariaLabel="Tipo de pagador" />
+            <QuickFilters<PeriodoV> options={PERIODO_OPTS} value={periodo} onChange={setPeriodo} ariaLabel="Período" />
           </div>
         }
         loading={loading}

@@ -30,10 +30,7 @@ export const CID10: Cid10[] = [
   { codigo: "B08.4", descricao: "Estomatite vesicular enteroviral com exantema" },
   { codigo: "B19.9", descricao: "Hepatite viral não especificada, sem coma" },
   { codigo: "B20", descricao: "Doença pelo HIV resultando em doenças infecciosas e parasitárias" },
-  {
-    codigo: "B24",
-    descricao: "Doença pelo vírus da imunodeficiência humana [HIV] não especificada",
-  },
+  { codigo: "B24", descricao: "Doença pelo vírus da imunodeficiência humana [HIV] não especificada" },
   { codigo: "B27.9", descricao: "Mononucleose infecciosa não especificada" },
   { codigo: "B34.2", descricao: "Infecção por coronavírus de localização não especificada" },
   { codigo: "B35.1", descricao: "Tinha das unhas (onicomicose)" },
@@ -42,10 +39,7 @@ export const CID10: Cid10[] = [
   { codigo: "B37.0", descricao: "Candidíase da boca" },
   { codigo: "B37.3", descricao: "Candidíase da vulva e da vagina" },
   { codigo: "B86", descricao: "Escabiose" },
-  {
-    codigo: "B96.1",
-    descricao: "Klebsiella pneumoniae como causa de doenças classificadas em outros capítulos",
-  },
+  { codigo: "B96.1", descricao: "Klebsiella pneumoniae como causa de doenças classificadas em outros capítulos" },
 
   // C / D — Neoplasias
   { codigo: "C50.9", descricao: "Neoplasia maligna da mama, não especificada" },
@@ -149,10 +143,7 @@ export const CID10: Cid10[] = [
   { codigo: "I50.0", descricao: "Insuficiência cardíaca congestiva" },
   { codigo: "I50.9", descricao: "Insuficiência cardíaca não especificada" },
   { codigo: "I63.9", descricao: "Acidente vascular cerebral isquêmico" },
-  {
-    codigo: "I64",
-    descricao: "Acidente vascular cerebral não especificado como hemorrágico ou isquêmico",
-  },
+  { codigo: "I64", descricao: "Acidente vascular cerebral não especificado como hemorrágico ou isquêmico" },
   { codigo: "I80.2", descricao: "Tromboflebite de outros vasos profundos dos MMII" },
   { codigo: "I83.9", descricao: "Varizes dos MMII sem úlcera ou inflamação" },
   { codigo: "I84.9", descricao: "Hemorroidas sem complicação" },
@@ -186,23 +177,13 @@ export const CID10: Cid10[] = [
   { codigo: "K05.6", descricao: "Doença periodontal não especificada" },
   { codigo: "K21.0", descricao: "Doença de refluxo gastroesofágico com esofagite" },
   { codigo: "K21.9", descricao: "Doença do refluxo gastroesofágico sem esofagite" },
-  {
-    codigo: "K25.9",
-    descricao:
-      "Úlcera gástrica não especificada como aguda ou crônica, sem hemorragia ou perfuração",
-  },
+  { codigo: "K25.9", descricao: "Úlcera gástrica não especificada como aguda ou crônica, sem hemorragia ou perfuração" },
   { codigo: "K29.7", descricao: "Gastrite não especificada" },
   { codigo: "K30", descricao: "Dispepsia" },
   { codigo: "K35.8", descricao: "Apendicite aguda não especificada" },
-  {
-    codigo: "K40.9",
-    descricao: "Hérnia inguinal unilateral ou não especificada, sem obstrução ou gangrena",
-  },
+  { codigo: "K40.9", descricao: "Hérnia inguinal unilateral ou não especificada, sem obstrução ou gangrena" },
   { codigo: "K42.9", descricao: "Hérnia umbilical sem obstrução ou gangrena" },
-  {
-    codigo: "K57.3",
-    descricao: "Doença diverticular do intestino grosso sem perfuração ou abscesso",
-  },
+  { codigo: "K57.3", descricao: "Doença diverticular do intestino grosso sem perfuração ou abscesso" },
   { codigo: "K58.9", descricao: "Síndrome do cólon irritável sem diarreia" },
   { codigo: "K59.0", descricao: "Constipação" },
   { codigo: "K63.5", descricao: "Pólipo do cólon" },
@@ -214,18 +195,12 @@ export const CID10: Cid10[] = [
   { codigo: "K92.1", descricao: "Melena" },
 
   // L — Pele
-  {
-    codigo: "L02.9",
-    descricao: "Abscesso cutâneo, furúnculo e antraz, localização não especificada",
-  },
+  { codigo: "L02.9", descricao: "Abscesso cutâneo, furúnculo e antraz, localização não especificada" },
   { codigo: "L03.9", descricao: "Celulite não especificada" },
   { codigo: "L20.9", descricao: "Dermatite atópica não especificada" },
   { codigo: "L21.0", descricao: "Seborreia capitis" },
   { codigo: "L23.9", descricao: "Dermatite alérgica de contato, de causa não especificada" },
-  {
-    codigo: "L25.9",
-    descricao: "Dermatite de contato não especificada, de causa não especificada",
-  },
+  { codigo: "L25.9", descricao: "Dermatite de contato não especificada, de causa não especificada" },
   { codigo: "L29.9", descricao: "Prurido não especificado" },
   { codigo: "L30.9", descricao: "Dermatite não especificada" },
   { codigo: "L40.0", descricao: "Psoríase vulgar" },
@@ -269,10 +244,7 @@ export const CID10: Cid10[] = [
 
   // O — Gravidez
   { codigo: "O00.9", descricao: "Gravidez ectópica não especificada" },
-  {
-    codigo: "O03.9",
-    descricao: "Aborto espontâneo, completo ou não especificado, sem complicações",
-  },
+  { codigo: "O03.9", descricao: "Aborto espontâneo, completo ou não especificado, sem complicações" },
   { codigo: "O14.9", descricao: "Pré-eclâmpsia não especificada" },
   { codigo: "O21.9", descricao: "Vômitos da gravidez, não especificados" },
   { codigo: "O24.4", descricao: "Diabetes mellitus que surge durante a gravidez" },
@@ -323,10 +295,7 @@ export const CID10: Cid10[] = [
   { codigo: "Z01.4", descricao: "Exame ginecológico (geral) (de rotina)" },
   { codigo: "Z02.0", descricao: "Exame para admissão em instituição educacional" },
   { codigo: "Z02.7", descricao: "Emissão de atestado médico" },
-  {
-    codigo: "Z23.9",
-    descricao: "Necessidade de imunização contra doença bacteriana, não especificada",
-  },
+  { codigo: "Z23.9", descricao: "Necessidade de imunização contra doença bacteriana, não especificada" },
   { codigo: "Z30.0", descricao: "Anticoncepção - aconselhamento geral" },
   { codigo: "Z71.3", descricao: "Aconselhamento e supervisão dietéticos" },
   { codigo: "Z76.0", descricao: "Emissão de receitas repetidas" },
@@ -334,16 +303,12 @@ export const CID10: Cid10[] = [
 
 // Normaliza acentos e caixa para busca
 const norm = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+  s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 export function buscarCid10(termo: string, limite = 50): Cid10[] {
   const q = norm(termo.trim());
   if (!q) return CID10.slice(0, limite);
-  return CID10.filter((c) => norm(c.codigo).includes(q) || norm(c.descricao).includes(q)).slice(
-    0,
-    limite,
-  );
+  return CID10.filter(c =>
+    norm(c.codigo).includes(q) || norm(c.descricao).includes(q)
+  ).slice(0, limite);
 }

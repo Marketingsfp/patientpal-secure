@@ -27,11 +27,7 @@ function EditarClientePage() {
     let active = true;
     setLoading(true);
     setNotFound(false);
-    void supabase
-      .from("pacientes")
-      .select("*")
-      .eq("id", pacienteId)
-      .single()
+    void supabase.from("pacientes").select("*").eq("id", pacienteId).single()
       .then(({ data, error }) => {
         if (!active) return;
         if (error || !data) {
@@ -43,9 +39,7 @@ function EditarClientePage() {
         setPaciente(data as Paciente);
         setLoading(false);
       });
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [pacienteId]);
 
   const voltar = () => navigate({ to: "/app/clientes" });

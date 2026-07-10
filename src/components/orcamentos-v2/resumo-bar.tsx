@@ -13,20 +13,13 @@ export interface ResumoData {
 }
 
 function Card({
-  label,
-  value,
-  hint,
-  color,
-  testid,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  color?: string;
-  testid?: string;
-}) {
+  label, value, hint, color, testid,
+}: { label: string; value: string; hint?: string; color?: string; testid?: string }) {
   return (
-    <div className="rounded-md border bg-card px-3 py-2 min-w-[110px] flex-1" data-testid={testid}>
+    <div
+      className="rounded-md border bg-card px-3 py-2 min-w-[110px] flex-1"
+      data-testid={testid}
+    >
       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground uppercase tracking-wide">
         {color && <span className={cn("h-2 w-2 rounded-full", color)} aria-hidden />}
         <span className="truncate">{label}</span>
@@ -43,32 +36,13 @@ export function ResumoBar({ data }: { data: ResumoData }) {
       className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-3"
       data-testid="orcamentos-resumo"
     >
-      <Card label="Total" value={String(data.total)} testid="resumo-total" />
-      <Card
-        label="Abertos"
-        value={String(data.abertos)}
-        color={STATUS_META.aberto.dot}
-        testid="resumo-abertos"
-      />
-      <Card
-        label="Convertidos"
-        value={String(data.convertidos)}
-        color={STATUS_META.convertido.dot}
-        testid="resumo-convertidos"
-      />
-      <Card
-        label="Expirados"
-        value={String(data.expirados)}
-        color={STATUS_META.expirado.dot}
-        testid="resumo-expirados"
-      />
-      <Card label="Valor aberto" value={brl(data.valorAberto)} testid="resumo-valor-aberto" />
-      <Card
-        label="Convertido (per.)"
-        value={brl(data.valorConvertidoPeriodo)}
-        testid="resumo-valor-convertido"
-      />
-      <Card label="Ticket médio" value={brl(data.ticketMedio)} testid="resumo-ticket" />
+      <Card label="Total"       value={String(data.total)}       testid="resumo-total" />
+      <Card label="Abertos"     value={String(data.abertos)}     color={STATUS_META.aberto.dot}     testid="resumo-abertos" />
+      <Card label="Convertidos" value={String(data.convertidos)} color={STATUS_META.convertido.dot} testid="resumo-convertidos" />
+      <Card label="Expirados"   value={String(data.expirados)}   color={STATUS_META.expirado.dot}   testid="resumo-expirados" />
+      <Card label="Valor aberto"    value={brl(data.valorAberto)}    testid="resumo-valor-aberto" />
+      <Card label="Convertido (per.)" value={brl(data.valorConvertidoPeriodo)} testid="resumo-valor-convertido" />
+      <Card label="Ticket médio"    value={brl(data.ticketMedio)}    testid="resumo-ticket" />
     </div>
   );
 }

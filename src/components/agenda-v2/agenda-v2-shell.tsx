@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, LayoutList, GanttChartSquare, CalendarDays,
-  Search, Rows3, Rows2, Focus, Sparkles, Plus, Keyboard, PanelLeft,
+  Search, Rows3, Rows2, Focus, Sparkles, Plus, Keyboard, PanelLeft, UserCheck,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -21,9 +21,6 @@ import { HhpPageHeader, HhpToolbar, HhpToolbarPill } from "@/design-system/hhp";
 import { HhpShortcutsDialog } from "@/design-system/hhp";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { KpiBar, type Kpi } from "./kpi-bar";
@@ -152,6 +149,10 @@ export function AgendaV2Shell() {
   const returnSnapshot = returnSnapshotRef.current;
 
   const [dia, setDia] = useState<Date>(() => {
+    if (returnSnapshot?.diaIso) {
+      const d = new Date(returnSnapshot.diaIso);
+      if (!Number.isNaN(d.getTime())) { d.setHours(0, 0, 0, 0); return d; }
+    }
     const d = new Date(); d.setHours(0, 0, 0, 0); return d;
   });
   const [view, setView] = useState<ViewMode>(returnSnapshot?.view ?? "timeline");
@@ -173,7 +174,8 @@ export function AgendaV2Shell() {
   const [density, setDensity] = useState<SessionDensity>(() => {
     if (typeof window === "undefined") return "confortavel";
     // fallback: chave legada (sem clínica) para não perder preferência do usuário.
-    return (window.localStorage.getItem(DENSITY_KEY) as SessionDensity) ?? "confortavel";
+    return ((window.localStorage.getItem(DENSITY_KEY) as SessionDensity) ??
+      "confortavel");
   });
   // Sprint 2 · S2-C — filtro "Meus pacientes" persistido por usuário.
   // Ligado por padrão para médicos, desligado para os demais perfis.
@@ -223,9 +225,8 @@ export function AgendaV2Shell() {
     // Prefetch idle de recursos secundários (wizard/drawer) —
     // primeiro clique fica instantâneo, sem inflar o bundle crítico.
     const idle = (cb: () => void) =>
-      (
-        window as unknown as { requestIdleCallback?: (fn: () => void) => number }
-      ).requestIdleCallback?.(cb) ?? window.setTimeout(cb, 800);
+      (window as unknown as { requestIdleCallback?: (fn: () => void) => number })
+        .requestIdleCallback?.(cb) ?? window.setTimeout(cb, 800);
     idle(() => {
       void import("./novo-agendamento-wizard");
       void import("./patient-drawer");
@@ -240,10 +241,7 @@ export function AgendaV2Shell() {
     enabled: !!clinicaId,
     staleTime: 10 * 60 * 1000,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("medicos")
-        .select("id,nome")
-        .eq("clinica_id", clinicaId!);
+      const { data } = await supabase.from("medicos").select("id,nome").eq("clinica_id", clinicaId!);
       return new Map((data ?? []).map((m) => [m.id, m.nome]));
     },
   });
@@ -255,19 +253,13 @@ export function AgendaV2Shell() {
     queryFn: async () => {
       const [esps, links] = await Promise.all([
         supabase.from("especialidades").select("id,nome").order("nome"),
-        supabase
-          .from("medico_especialidades")
+        supabase.from("medico_especialidades")
           .select("medico_id,especialidade_id,medicos!inner(clinica_id)")
           .eq("medicos.clinica_id", clinicaId!),
       ]);
-      const espMap = new Map<string, string>(
-        (esps.data ?? []).map((e: { id: string; nome: string }) => [e.id, e.nome]),
-      );
+      const espMap = new Map<string, string>((esps.data ?? []).map((e: { id: string; nome: string }) => [e.id, e.nome]));
       const medToEsps = new Map<string, Set<string>>();
-      for (const l of (links.data ?? []) as Array<{
-        medico_id: string;
-        especialidade_id: string;
-      }>) {
+      for (const l of (links.data ?? []) as Array<{ medico_id: string; especialidade_id: string }>) {
         if (!l.medico_id || !l.especialidade_id) continue;
         const s = medToEsps.get(l.medico_id) ?? new Set<string>();
         s.add(l.especialidade_id);
@@ -282,10 +274,7 @@ export function AgendaV2Shell() {
     enabled: !!clinicaId,
     staleTime: 10 * 60 * 1000,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("enfermagem_recursos")
-        .select("id,nome")
-        .eq("clinica_id", clinicaId!);
+      const { data } = await supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaId!);
       return new Map((data ?? []).map((r) => [r.id, r.nome]));
     },
   });
@@ -295,10 +284,8 @@ export function AgendaV2Shell() {
     enabled: !!clinicaId,
     staleTime: 10 * 60 * 1000,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("procedimentos")
-        .select("nome,tipo,grupo")
-        .eq("clinica_id", clinicaId!);
+      const { data } = await supabase.from("procedimentos")
+        .select("nome,tipo,grupo").eq("clinica_id", clinicaId!);
       const pm = new Map<string, ProcMeta>();
       for (const p of data ?? []) {
         if (p.nome) pm.set(p.nome.toLowerCase(), { nome: p.nome, tipo: p.tipo, grupo: p.grupo });
@@ -309,9 +296,7 @@ export function AgendaV2Shell() {
 
   // Agendamentos do dia — única query que muda com a data.
   const diaKey = useMemo(() => {
-    const d = new Date(dia);
-    d.setHours(0, 0, 0, 0);
-    return d.toISOString();
+    const d = new Date(dia); d.setHours(0, 0, 0, 0); return d.toISOString();
   }, [dia]);
 
   const agsQuery = useQuery<RawAg[]>({
@@ -321,13 +306,9 @@ export function AgendaV2Shell() {
     queryFn: async () => {
       startedAtRef.current = performance.now();
       const start = new Date(diaKey);
-      const end = new Date(diaKey);
-      end.setHours(23, 59, 59, 999);
-      const { data } = await supabase
-        .from("agendamentos")
-        .select(
-          "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,pacote_id,enfermagem_recurso_id,fluxo_etapa,fluxo_atualizado_em",
-        )
+      const end = new Date(diaKey); end.setHours(23, 59, 59, 999);
+      const { data } = await supabase.from("agendamentos")
+        .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,pacote_id,enfermagem_recurso_id,fluxo_etapa,fluxo_atualizado_em")
         .eq("clinica_id", clinicaId!)
         .gte("inicio", start.toISOString())
         .lte("inicio", end.toISOString())
@@ -348,26 +329,19 @@ export function AgendaV2Shell() {
   useEffect(() => {
     if (!clinicaId || !agsQuery.isFetched) return;
     const idle = (cb: () => void) =>
-      (
-        window as unknown as { requestIdleCallback?: (fn: () => void) => number }
-      ).requestIdleCallback?.(cb) ?? window.setTimeout(cb, 300);
+      (window as unknown as { requestIdleCallback?: (fn: () => void) => number })
+        .requestIdleCallback?.(cb) ?? window.setTimeout(cb, 300);
     const prefetchDay = (delta: number) => {
-      const d = new Date(diaKey);
-      d.setDate(d.getDate() + delta);
-      d.setHours(0, 0, 0, 0);
+      const d = new Date(diaKey); d.setDate(d.getDate() + delta); d.setHours(0, 0, 0, 0);
       const key = d.toISOString();
       void queryClient.prefetchQuery({
         queryKey: ["agenda-v2", "ags", clinicaId, key],
         staleTime: 60 * 1000,
         queryFn: async () => {
           const start = new Date(key);
-          const end = new Date(key);
-          end.setHours(23, 59, 59, 999);
-          const { data } = await supabase
-            .from("agendamentos")
-            .select(
-              "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,pacote_id,enfermagem_recurso_id,fluxo_etapa,fluxo_atualizado_em",
-            )
+          const end = new Date(key); end.setHours(23, 59, 59, 999);
+          const { data } = await supabase.from("agendamentos")
+            .select("id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,pacote_id,enfermagem_recurso_id,fluxo_etapa,fluxo_atualizado_em")
             .eq("clinica_id", clinicaId)
             .gte("inicio", start.toISOString())
             .lte("inicio", end.toISOString())
@@ -376,10 +350,7 @@ export function AgendaV2Shell() {
         },
       });
     };
-    idle(() => {
-      prefetchDay(-1);
-      prefetchDay(1);
-    });
+    idle(() => { prefetchDay(-1); prefetchDay(1); });
   }, [clinicaId, diaKey, agsQuery.isFetched, queryClient]);
 
   const rows = agsQuery.data ?? null;
@@ -408,15 +379,11 @@ export function AgendaV2Shell() {
         if (meta) return meta;
         // Fallback heurístico quando o texto livre do agendamento não bate
         // com o catálogo (ex.: "GLICOSE BASAL (LABORATORIO)").
-        const grupoInf = /\bLABORAT/i.test(nome)
-          ? "Laboratório"
-          : /\bRAIO|\bTOMOG|\bRESSON|\bULTRASSOM|\bIMAGEM/i.test(nome)
-            ? "Imagem"
-            : /\bENDOSC|\bCOLONOSC/i.test(nome)
-              ? "Endoscopia"
-              : /\bCARDIO|\bECOCARDIO|\bELETROC/i.test(nome)
-                ? "Cardiologia"
-                : null;
+        const grupoInf = /\bLABORAT/i.test(nome) ? "Laboratório"
+          : /\bRAIO|\bTOMOG|\bRESSON|\bULTRASSOM|\bIMAGEM/i.test(nome) ? "Imagem"
+          : /\bENDOSC|\bCOLONOSC/i.test(nome) ? "Endoscopia"
+          : /\bCARDIO|\bECOCARDIO|\bELETROC/i.test(nome) ? "Cardiologia"
+          : null;
         return { nome, tipo: null, grupo: grupoInf };
       });
       const tipo = tipoDaSessao(items);
@@ -426,19 +393,13 @@ export function AgendaV2Shell() {
         paciente_id: primeiro.paciente_id,
         medico_id: primeiro.medico_id,
         recurso_id: primeiro.enfermagem_recurso_id,
-        medico_nome: primeiro.medico_id ? (medicos.get(primeiro.medico_id) ?? null) : null,
-        recurso_nome: primeiro.enfermagem_recurso_id
-          ? (recursos.get(primeiro.enfermagem_recurso_id) ?? null)
-          : null,
+        medico_nome: primeiro.medico_id ? medicos.get(primeiro.medico_id) ?? null : null,
+        recurso_nome: primeiro.enfermagem_recurso_id ? recursos.get(primeiro.enfermagem_recurso_id) ?? null : null,
         inicio: primeiro.inicio,
         fim: group[group.length - 1].fim,
         tipo,
         status: primeiro.status,
-        items: group.map((g) => ({
-          id: g.id,
-          procedimento_nome: g.procedimento ?? "—",
-          status: g.status,
-        })),
+        items: group.map((g) => ({ id: g.id, procedimento_nome: g.procedimento ?? "—", status: g.status })),
       });
     }
     list.sort((a, b) => a.inicio.localeCompare(b.inicio));
@@ -446,7 +407,16 @@ export function AgendaV2Shell() {
   }, [rows, procMeta, medicos, recursos]);
 
   const kpis = useMemo<Kpi[]>(() => {
-    const c = { total: sessoes.length, aguardando: 0, confirmados: 0, realizados: 0, cancelados: 0, lab: 0 };
+    // S3-D — KPIs gerenciais (Confirmação, No-show, Ocupação).
+    // 100% client-side sobre o dataset já carregado. Zero query nova,
+    // zero migration, zero alteração em regras de negócio.
+    let agendados = 0;
+    let confirmados = 0;
+    let realizados = 0;
+    let faltou = 0;
+    let cancelados = 0;
+    let ocupadoMs = 0;
+    const medicosAtivos = new Set<string>();
     for (const s of sessoes) {
       // Sessões "DISPONIVEL" não entram — são horários livres.
       if (/dispon[íi]vel/i.test(s.paciente_nome ?? "")) continue;
@@ -519,8 +489,7 @@ export function AgendaV2Shell() {
         if (!set || !set.has(filtroEspecialidade)) return false;
       }
       if (norm) {
-        const hay =
-          `${s.paciente_nome} ${s.medico_nome ?? ""} ${s.recurso_nome ?? ""} ${s.items.map((i) => i.procedimento_nome).join(" ")}`.toLowerCase();
+        const hay = `${s.paciente_nome} ${s.medico_nome ?? ""} ${s.recurso_nome ?? ""} ${s.items.map((i) => i.procedimento_nome).join(" ")}`.toLowerCase();
         if (!hay.includes(norm)) return false;
       }
       return true;
@@ -573,15 +542,9 @@ export function AgendaV2Shell() {
     const primeiro = grupo[0];
     const medicoNome = primeiro.medico_id ? medicos.get(primeiro.medico_id) : null;
     const chegada = primeiro.fluxo_atualizado_em
-      ? new Date(primeiro.fluxo_atualizado_em).toLocaleTimeString("pt-BR", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
+      ? new Date(primeiro.fluxo_atualizado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
       : null;
-    const hora = new Date(primeiro.inicio).toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const hora = new Date(primeiro.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     // Especialidade preferencial do médico (primeira do mapa).
     let especialidade: string | null = null;
     if (primeiro.medico_id && espData) {
@@ -600,12 +563,7 @@ export function AgendaV2Shell() {
       chegou_em: chegada,
       etapa_atual: primeiro.fluxo_etapa ?? "aguardando_recepcao",
       historico: primeiro.fluxo_atualizado_em
-        ? [
-            {
-              etapa: primeiro.fluxo_etapa ?? "aguardando_recepcao",
-              timestamp: primeiro.fluxo_atualizado_em,
-            },
-          ]
+        ? [{ etapa: primeiro.fluxo_etapa ?? "aguardando_recepcao", timestamp: primeiro.fluxo_atualizado_em }]
         : [],
       proc_titulo: primeiro.procedimento,
       hora,
@@ -614,12 +572,145 @@ export function AgendaV2Shell() {
   }, [drawerPacote, rows, medicos, espData]);
 
   const navDia = (delta: number) => {
-    const d = new Date(dia);
-    d.setDate(d.getDate() + delta);
-    setDia(d);
+    const d = new Date(dia); d.setDate(d.getDate() + delta); setDia(d);
   };
 
   const openDrawer = (id: string) => { setDrawerMounted(true); setDrawerPacote(id); };
+
+  // S3-C — abre o modal de reagendamento para a sessão do card
+  // (ou primeira do drawer). Só move ESTA sessão; irmãos de pacote ficam.
+  const handleOpenReagendar = (data: SessionCardData) => {
+    const primeiro = data.items[0];
+    if (!primeiro) return;
+    setReagendarSessao({
+      agendamento_id: primeiro.id,
+      paciente_nome: data.paciente_nome,
+      procedimento: primeiro.procedimento_nome,
+      inicio: data.inicio,
+      fim: data.fim,
+      medico_id: data.medico_id ?? null,
+      medico_nome: data.medico_nome ?? null,
+    });
+  };
+  const handleOpenReagendarFromDrawer = () => {
+    if (!drawerData || !drawerData.agendamento_ids || drawerData.agendamento_ids.length === 0) return;
+    const primeiroId = drawerData.agendamento_ids[0];
+    const raw = rows?.find((r) => r.id === primeiroId);
+    if (!raw) return;
+    setReagendarSessao({
+      agendamento_id: raw.id,
+      paciente_nome: raw.paciente_nome,
+      procedimento: raw.procedimento,
+      inicio: raw.inicio,
+      fim: raw.fim,
+      medico_id: raw.medico_id,
+      medico_nome: raw.medico_id ? medicos.get(raw.medico_id) ?? null : null,
+    });
+  };
+
+  // Opções de médico para o SearchableSelect do modal.
+  const medicoOptionsForReagendar = useMemo(
+    () => Array.from(medicos.entries()).map(([id, nome]) => ({ value: id, label: nome })),
+    [medicos],
+  );
+
+  // Sprint 3 · S3-A — captura o estado atual e navega para o Atendimento
+  // IA do agendamento. O snapshot é lido no próximo mount e restaura
+  // data/filtros/busca/KPI/drawer/scroll. Não altera nenhuma rota nem
+  // regra clínica; apenas navegação.
+  const handleOpenProntuario = (agendamentoId: string) => {
+    if (typeof window !== "undefined") {
+      const snap: AgendaV2ReturnSnapshot = {
+        diaIso: dia.toISOString(),
+        view,
+        q,
+        kpiFilter,
+        filtroMedico,
+        filtroEspecialidade,
+        filtroRecurso,
+        drawerPacote,
+        scrollTop: timelineScrollRef.current?.scrollTop ?? 0,
+        ts: Date.now(),
+      };
+      try {
+        window.sessionStorage.setItem(RETURN_SNAPSHOT_KEY, JSON.stringify(snap));
+      } catch {
+        /* storage cheio — segue sem snapshot */
+      }
+    }
+    void navigate({
+      to: "/app/atendimento-ia/$agendamentoId",
+      params: { agendamentoId },
+      search: { from: "agenda-v2" },
+    });
+  };
+
+  // Sprint 2 · S2-A — handler de mudança de status, compartilhado por
+  // SessionCard e PatientDrawer. Espelha o fluxo do dropdown clássico:
+  // pergunta sobre cascata de pacote no cancelamento, dispara a server fn
+  // única (`atualizarStatusAgendamento`) e invalida a query do dia.
+  const executarMudancaStatus = async (
+    agendamentoIds: string[],
+    novoStatus: StatusAgendamento,
+    pacoteContexto?: { pacote_id?: string | null; primeiro_id: string },
+  ) => {
+    if (agendamentoIds.length === 0) return;
+    let cascatear = false;
+    if (novoStatus === "cancelado" && pacoteContexto?.pacote_id) {
+      try {
+        const irmaos = await listarIrmaosFn({ data: { agendamento_id: pacoteContexto.primeiro_id } });
+        if (irmaos.length > 0) {
+          const lista = irmaos
+            .sort((a, b) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime())
+            .map((x) => `• ${new Date(x.inicio).toLocaleString("pt-BR")} — ${x.procedimento ?? ""}`)
+            .join("\n");
+          cascatear = confirm(
+            `Este agendamento faz parte de um pacote do orçamento, com mais ${irmaos.length} item(ns) vinculado(s):\n\n${lista}\n\nClique OK para cancelar TODOS do pacote.\nClique Cancelar para cancelar APENAS este.`,
+          );
+        }
+      } catch (e) {
+        console.warn("[agenda-v2] falha ao listar irmãos do pacote", e);
+      }
+    }
+    try {
+      const result = await atualizarStatusFn({
+        data: { agendamento_ids: agendamentoIds, novo_status: novoStatus, cascatear_pacote: cascatear },
+      });
+      if (cascatear && result.count > 1) {
+        toast.success(`${result.count} agendamentos do pacote cancelados.`);
+      } else {
+        const label: Record<string, string> = {
+          confirmado: "Presença confirmada",
+          em_atendimento: "Check-in registrado",
+          realizado: "Atendimento marcado como realizado",
+          cancelado: "Agendamento cancelado",
+          faltou: "Marcado como faltou",
+          agendado: "Status atualizado",
+        };
+        toast.success(label[novoStatus] ?? "Status atualizado");
+      }
+      await queryClient.invalidateQueries({ queryKey: ["agenda-v2", "ags"] });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Falha ao atualizar status.";
+      toast.error(msg);
+    }
+  };
+
+  const onChangeStatusCard = (data: SessionCardData, novoStatus: StatusAgendamento) => {
+    const ids = data.items.map((i) => i.id);
+    // O `pacote_id` do card é `pacote_id ?? id` — só cascatear quando é pacote real
+    // (mais de um item OU quando `rows` original tem `pacote_id` preenchido).
+    const primeiroReal = rows?.find((r) => ids.includes(r.id));
+    const pacoteRealId = primeiroReal?.pacote_id ?? null;
+    void executarMudancaStatus(ids, novoStatus, { pacote_id: pacoteRealId, primeiro_id: ids[0] });
+  };
+
+  const onChangeStatusDrawer = (ids: string[], novoStatus: StatusAgendamento) => {
+    const primeiroReal = rows?.find((r) => ids.includes(r.id));
+    const pacoteRealId = primeiroReal?.pacote_id ?? null;
+    void executarMudancaStatus(ids, novoStatus, { pacote_id: pacoteRealId, primeiro_id: ids[0] });
+  };
+
   const compact = density === "compacto";
   const foco = density === "foco";
 
@@ -644,18 +735,11 @@ export function AgendaV2Shell() {
       }
       // Esc fecha drawer (Dialog do drawer também trata, mas garantimos aqui)
       if (e.key === "Escape") {
-        if (drawerPacote) {
-          setDrawerPacote(null);
-          return;
-        }
+        if (drawerPacote) { setDrawerPacote(null); return; }
       }
       if (isTypingTarget(e.target)) return;
       // "?" precisa de Shift em teclados US/BR — trata antes do filtro de modificadores.
-      if (e.key === "?") {
-        e.preventDefault();
-        setShortcutsOpen((v) => !v);
-        return;
-      }
+      if (e.key === "?") { e.preventDefault(); setShortcutsOpen((v) => !v); return; }
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
 
       const k = e.key.toLowerCase();
@@ -663,9 +747,22 @@ export function AgendaV2Shell() {
       if (k === "c") { e.preventDefault(); setDensity("compacto"); return; }
       if (k === "d") { e.preventDefault(); setDensity("confortavel"); return; }
       if (k === "n") { e.preventDefault(); setWizardOpen(true); return; }
-      if (k === "j" || k === "k" || e.key === "Enter") {
+      if (k === "p") {
         if (filtradas.length === 0) return;
-        const idx = drawerPacote ? filtradas.findIndex((s) => s.pacote_id === drawerPacote) : -1;
+        const idx = drawerPacote
+          ? filtradas.findIndex((s) => s.pacote_id === drawerPacote)
+          : -1;
+        const target = idx >= 0 ? filtradas[idx] : filtradas[0];
+        const primeiroId = target?.items?.[0]?.id ?? null;
+        if (primeiroId) { e.preventDefault(); openProntuarioRef.current(primeiroId); }
+        return;
+      }
+      const isArrowNav = e.key === "ArrowUp" || e.key === "ArrowDown";
+      if (k === "j" || k === "k" || isArrowNav || e.key === "Enter") {
+        if (filtradas.length === 0) return;
+        const idx = drawerPacote
+          ? filtradas.findIndex((s) => s.pacote_id === drawerPacote)
+          : -1;
         if (e.key === "Enter") {
           e.preventDefault();
           const target = idx >= 0 ? filtradas[idx] : filtradas[0];
@@ -707,13 +804,9 @@ export function AgendaV2Shell() {
   // Recursos com ocupação (usados = sessões distintas do dia usando o recurso).
   const recursosOcup = useMemo(() => {
     const usados = new Map<string, number>();
-    for (const s of sessoes)
-      if (s.recurso_id) usados.set(s.recurso_id, (usados.get(s.recurso_id) ?? 0) + 1);
+    for (const s of sessoes) if (s.recurso_id) usados.set(s.recurso_id, (usados.get(s.recurso_id) ?? 0) + 1);
     return Array.from(recursos.entries()).map(([id, nome]) => ({
-      id,
-      nome,
-      usados: usados.get(id) ?? 0,
-      total: Math.max(usados.get(id) ?? 0, 8),
+      id, nome, usados: usados.get(id) ?? 0, total: Math.max(usados.get(id) ?? 0, 8),
     }));
   }, [recursos, sessoes]);
 
@@ -779,9 +872,7 @@ export function AgendaV2Shell() {
     <div className="agenda-v2-scope h-full flex bg-[color:var(--hhp-surface-page)] overflow-hidden">
       {/* Sidebar operacional — visível em md+, vira Sheet no mobile (botão Painel no header) */}
       {!foco && !isMobile && (
-        <Suspense
-          fallback={<div className="hidden md:block w-64 border-r border-slate-100 bg-white" />}
-        >
+        <Suspense fallback={<div className="hidden md:block w-64 border-r border-slate-100 bg-white" />}>
           <div className="hidden md:flex">
             <AgendaV2Sidebar
               clinicaNome={clinicaNome}
@@ -798,9 +889,7 @@ export function AgendaV2Shell() {
           <SheetContent side="left" className="p-0 w-[86vw] max-w-[320px] overflow-y-auto">
             <VisuallyHidden.Root>
               <SheetTitle>Painel da agenda</SheetTitle>
-              <SheetDescription>
-                Resumo do turno, sessões por tipo, recursos e equipe.
-              </SheetDescription>
+              <SheetDescription>Resumo do turno, sessões por tipo, recursos e equipe.</SheetDescription>
             </VisuallyHidden.Root>
             <Suspense fallback={<div className="w-full h-40 bg-white" />}>
               <AgendaV2Sidebar
@@ -836,7 +925,8 @@ export function AgendaV2Shell() {
             <Button
               size="sm"
               onClick={() => setWizardOpen(true)}
-              className="h-9 px-4 rounded-2xl gap-1.5 bg-slate-900 hover:bg-slate-800 text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-[1px]"
+              className="h-9 px-4 rounded-2xl gap-1.5 text-white shadow-[0_6px_18px_-6px_var(--clinic-accent-glow)] transition-all hover:shadow-[0_10px_24px_-8px_var(--clinic-accent-glow)] hover:-translate-y-[1px] border-0"
+              style={{ background: "linear-gradient(180deg, var(--clinic-accent) 0%, var(--clinic-accent-strong) 100%)" }}
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
               <span className="text-xs font-semibold hidden sm:inline">Nova sessão</span>
@@ -849,13 +939,13 @@ export function AgendaV2Shell() {
                 value={density}
                 onValueChange={(v) => v && setDensity(v as SessionDensity)}
               >
-                <ToggleGroupItem value="confortavel" aria-label="Confortável" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="confortavel" aria-label="Confortável" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]">
                   <Rows3 className="h-3.5 w-3.5" />
                 </ToggleGroupItem>
-                <ToggleGroupItem value="compacto" aria-label="Compacto" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="compacto" aria-label="Compacto" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]">
                   <Rows2 className="h-3.5 w-3.5" />
                 </ToggleGroupItem>
-                <ToggleGroupItem value="foco" aria-label="Foco" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="foco" aria-label="Foco" className="h-8 w-8 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]">
                   <Focus className="h-3.5 w-3.5" />
                 </ToggleGroupItem>
               </ToggleGroup>
@@ -867,10 +957,10 @@ export function AgendaV2Shell() {
                 value={view}
                 onValueChange={(v) => v && setView(v as ViewMode)}
               >
-                <ToggleGroupItem value="timeline" aria-label="Timeline" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="timeline" aria-label="Timeline" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]">
                   <GanttChartSquare className="h-3.5 w-3.5" /> <span className="hidden sm:inline text-xs">Timeline</span>
                 </ToggleGroupItem>
-                <ToggleGroupItem value="list" aria-label="Lista" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="list" aria-label="Lista" className="h-8 px-3 gap-1.5 rounded-xl data-[state=on]:bg-white data-[state=on]:shadow-sm data-[state=on]:text-[color:var(--clinic-accent-strong)]">
                   <LayoutList className="h-3.5 w-3.5" /> <span className="hidden sm:inline text-xs">Lista</span>
                 </ToggleGroupItem>
               </ToggleGroup>
@@ -941,6 +1031,26 @@ export function AgendaV2Shell() {
             searchPlaceholder="Buscar sala..."
             className="h-10 rounded-2xl bg-slate-100 border-transparent min-w-0 flex-1 sm:flex-none sm:min-w-40"
           />
+          {usuarioMedicoId && !medicoLoading && (
+            <Button
+              type="button"
+              variant={meusPacientes ? "default" : "outline"}
+              size="sm"
+              onClick={() => setMeusPacientes((v) => !v)}
+              className={cn(
+                "h-9 rounded-2xl gap-1.5 text-xs",
+                meusPacientes
+                  ? "border-transparent text-[color:var(--clinic-accent-fg)] shadow-sm"
+                  : "bg-slate-100 border-transparent text-slate-600 hover:bg-slate-200",
+              )}
+              style={meusPacientes ? { background: "var(--clinic-accent)" } : undefined}
+              aria-pressed={meusPacientes}
+              title="Mostrar apenas os pacientes do médico logado"
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Meus pacientes</span>
+            </Button>
+          )}
           {(filtroMedico || filtroEspecialidade || filtroRecurso || kpiFilter) && (
             <Button
               variant="ghost"
@@ -968,18 +1078,16 @@ export function AgendaV2Shell() {
 
         <KpiBar
           items={kpis}
-          activeKey={kpiFilter}
-          onSelect={(k) => setKpiFilter(kpiFilter === k ? null : k)}
           compact={compact}
         />
       </HhpPageHeader>
 
-        {/* Faixa de sugestões IA (visual) — recurso secundário, carrega depois */}
-        {rows !== null && filtradas.length > 0 && (
-          <Suspense fallback={null}>
-            <AiInsightsStrip sessoes={filtradas} livresPorHora={livresPorHora} />
-          </Suspense>
-        )}
+      {/* Faixa de sugestões IA (visual) — recurso secundário, carrega depois */}
+      {rows !== null && filtradas.length > 0 && (
+        <Suspense fallback={null}>
+          <AiInsightsStrip sessoes={filtradas} livresPorHora={livresPorHora} />
+        </Suspense>
+      )}
 
       {/* Corpo */}
       <div className="flex-1 min-h-0 overflow-hidden">
@@ -995,14 +1103,21 @@ export function AgendaV2Shell() {
             title="Nenhuma sessão para os filtros atuais."
           />
         ) : (
-          <div className={cn(
-            "h-full overflow-y-auto pb-8 transition-[padding] duration-200",
-            foco ? "px-4 md:px-10 pt-6 max-w-4xl mx-auto" : "px-3 md:px-6 pt-4",
-          )}>
+          <div
+            ref={timelineScrollRef}
+            className={cn(
+              "h-full overflow-y-auto pb-8 transition-[padding] duration-200",
+              foco ? "px-4 md:px-10 pt-6 max-w-4xl mx-auto" : "px-3 md:px-6 pt-4",
+            )}
+          >
             {porHora.map(([hora, lista]) => {
               const isNowHour = isToday && hora === nowHour;
               return (
-                <div key={hora} className="flex gap-2 md:gap-4 relative">
+                <div
+                  key={hora}
+                  ref={isNowHour ? nowHourRef : undefined}
+                  className="flex gap-2 md:gap-4 relative"
+                >
                   {/* Coluna de hora (régua) */}
                   <div className={cn("shrink-0 relative", foco ? "w-12 md:w-16" : "w-11 md:w-14")}>
                     <div className={cn(
@@ -1034,13 +1149,32 @@ export function AgendaV2Shell() {
                     )}
                     <div className={cn(compact ? "space-y-1.5" : foco ? "space-y-4" : "space-y-2.5")}>
                       {lista.map((s) => (
-                        <SessionCard key={s.pacote_id} data={s} onOpenTimeline={openDrawer} density={density} />
+                        <SessionCard
+                          key={s.pacote_id}
+                          data={s}
+                          onOpenTimeline={openDrawer}
+                          onChangeStatus={onChangeStatusCard}
+                          onOpenProntuario={handleOpenProntuario}
+                          onReagendar={handleOpenReagendar}
+                          density={density}
+                        />
                       ))}
                       {livresPorHora.get(hora) && (
-                        <div className="flex items-center gap-2 text-[11px] text-slate-400 pl-1">
-                          <span className="h-1 w-1 rounded-full bg-slate-300" />
-                          {livresPorHora.get(hora)} horário{livresPorHora.get(hora)! > 1 ? "s" : ""} livre{livresPorHora.get(hora)! > 1 ? "s" : ""} nesta hora
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openWizardForHora(hora)}
+                          className="group flex items-center gap-2 text-[11px] text-slate-400 hover:text-slate-700 pl-1 py-1 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                          aria-label={`Agendar em um dos ${livresPorHora.get(hora)} horários livres às ${String(hora).padStart(2, "0")}:00`}
+                          title="Clique para agendar neste horário"
+                        >
+                          <span className="h-1 w-1 rounded-full bg-slate-300 group-hover:bg-indigo-400" />
+                          <span>
+                            {livresPorHora.get(hora)} horário{livresPorHora.get(hora)! > 1 ? "s" : ""} livre{livresPorHora.get(hora)! > 1 ? "s" : ""} nesta hora
+                          </span>
+                          <span className="opacity-0 group-hover:opacity-100 text-[10px] font-semibold uppercase tracking-wider text-indigo-500 transition-opacity">
+                            agendar →
+                          </span>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -1056,9 +1190,7 @@ export function AgendaV2Shell() {
         <Suspense fallback={null}>
           <PatientDrawer
             open={!!drawerPacote}
-            onOpenChange={(v) => {
-              if (!v) setDrawerPacote(null);
-            }}
+            onOpenChange={(v) => { if (!v) setDrawerPacote(null); }}
             data={drawerData}
             onChangeStatus={onChangeStatusDrawer}
             onOpenProntuario={handleOpenProntuario}
@@ -1090,47 +1222,32 @@ export function AgendaV2Shell() {
         </Suspense>
       )}
 
-      <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
-        <DialogContent className="max-w-md rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-base font-semibold tracking-tight">
-              Atalhos de teclado
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 text-sm">
-            <ShortcutRow k="?" label="Abrir / fechar este painel" />
-            <div className="border-t border-slate-100" />
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Modos de visualização</div>
-            <ShortcutRow k="D" label="Confortável" />
-            <ShortcutRow k="C" label="Compacto" />
-            <ShortcutRow k="F" label="Foco" />
-            <div className="border-t border-slate-100" />
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Navegação</div>
-            <ShortcutRow k="J" label="Próxima sessão" />
-            <ShortcutRow k="K" label="Sessão anterior" />
-            <ShortcutRow k="Enter" label="Abrir sessão selecionada" />
-            <ShortcutRow k="Esc" label="Fechar drawer" />
-            <div className="border-t border-slate-100" />
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Ações</div>
-            <ShortcutRow k="N" label="Nova sessão" />
-            <ShortcutRow k="Ctrl K" label="Focar busca do módulo" />
-          </div>
-          <p className="text-[11px] text-slate-400 pt-2">
-            Padrão Health Hub Pro — reutilizado em Caixa, Clientes, Orçamentos e Prontuário.
-          </p>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-function ShortcutRow({ k, label }: { k: string; label: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-slate-600">{label}</span>
-      <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-1.5 text-[11px] font-mono text-slate-700">
-        {k}
-      </kbd>
+      <HhpShortcutsDialog
+        open={shortcutsOpen}
+        onOpenChange={setShortcutsOpen}
+        moduleName="Agenda"
+        groups={[
+          { group: "Geral", items: [
+            { k: "?", label: "Abrir / fechar este painel" },
+          ]},
+          { group: "Modos de visualização", items: [
+            { k: "D", label: "Confortável" },
+            { k: "C", label: "Compacto" },
+            { k: "F", label: "Foco" },
+          ]},
+          { group: "Navegação", items: [
+            { k: "J / ↓", label: "Próxima sessão" },
+            { k: "K / ↑", label: "Sessão anterior" },
+            { k: "Enter", label: "Abrir sessão selecionada" },
+            { k: "P", label: "Abrir prontuário da sessão" },
+            { k: "Esc", label: "Fechar drawer" },
+          ]},
+          { group: "Ações", items: [
+            { k: "N", label: "Nova sessão" },
+            { k: "Ctrl K", label: "Focar busca do módulo" },
+          ]},
+        ]}
+      />
     </div>
   );
 }

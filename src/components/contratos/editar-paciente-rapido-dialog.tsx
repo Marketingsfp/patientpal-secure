@@ -25,7 +25,11 @@ type PacienteLite = {
 };
 
 const schema = z.object({
-  email: z.string().trim().email("E-mail inválido").or(z.literal("")),
+  email: z
+    .string()
+    .trim()
+    .email("E-mail inválido")
+    .or(z.literal("")),
   telefone: z.string().trim().max(40).optional(),
 });
 
@@ -78,7 +82,10 @@ export function EditarPacienteRapidoDialog({
         onOpenChange(false);
         return;
       }
-      const { error } = await supabase.from("pacientes").update(patch).eq("id", paciente!.id);
+      const { error } = await supabase
+        .from("pacientes")
+        .update(patch)
+        .eq("id", paciente!.id);
       if (error) throw error;
       onSaved({ ...paciente!, email: novoEmail, telefone: novoTel });
       toast.success("Dados do paciente atualizados.");
@@ -104,9 +111,7 @@ export function EditarPacienteRapidoDialog({
             <Label className="text-xs text-muted-foreground">Nome</Label>
             <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-medium text-sm">
               {paciente.nome}
-              {paciente.cpf ? (
-                <span className="ml-2 text-xs text-muted-foreground">— {paciente.cpf}</span>
-              ) : null}
+              {paciente.cpf ? <span className="ml-2 text-xs text-muted-foreground">— {paciente.cpf}</span> : null}
             </div>
           </div>
           <div>

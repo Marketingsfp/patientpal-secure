@@ -15,7 +15,10 @@ function scheduleFlush() {
     if (ids.length === 0) return;
     const listeners = new Map(pending);
     pending.clear();
-    const { data } = await supabase.from("pacientes").select("id, nome").in("id", ids);
+    const { data } = await supabase
+      .from("pacientes")
+      .select("id, nome")
+      .in("id", ids);
     for (const row of (data ?? []) as Array<{ id: string; nome: string }>) {
       cache.set(row.id, row.nome);
       const ls = listeners.get(row.id);
@@ -31,17 +34,11 @@ function scheduleFlush() {
 }
 
 export function usePacienteNome(id: string | null | undefined): string {
-  const [nome, setNome] = useState<string>(() => (id ? (cache.get(id) ?? "") : "—"));
+  const [nome, setNome] = useState<string>(() => (id ? cache.get(id) ?? "" : "—"));
   useEffect(() => {
-    if (!id) {
-      setNome("—");
-      return;
-    }
+    if (!id) { setNome("—"); return; }
     const cached = cache.get(id);
-    if (cached !== undefined) {
-      setNome(cached);
-      return;
-    }
+    if (cached !== undefined) { setNome(cached); return; }
     setNome("…");
     const list = pending.get(id) ?? [];
     list.push(setNome);

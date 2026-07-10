@@ -52,11 +52,8 @@ export async function agendamentoStatusPagamento(id: string): Promise<StatusPaga
 
 export function rotuloMotivoPago(m: MotivoPago): string {
   switch (m) {
-    case "caixa":
-      return "Pago no caixa";
-    case "orcamento":
-      return "Orçamento pago";
-    default:
-      return "Pendente";
+    case "caixa": return "Pago no caixa";
+    case "orcamento": return "Orçamento pago";
+    default: return "Pendente";
   }
 }

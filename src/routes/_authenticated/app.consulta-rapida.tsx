@@ -14,19 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useClinica } from "@/hooks/use-clinica";
 import { getContextoClinica } from "@/lib/nina.functions";
@@ -111,10 +102,7 @@ function ConsultaRapidaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaAtual?.clinica_id]);
 
-  const openNovoProc = () => {
-    setProcForm(EMPTY_PROC);
-    setProcOpen(true);
-  };
+  const openNovoProc = () => { setProcForm(EMPTY_PROC); setProcOpen(true); };
   const openEditProc = (p: Procedimento) => {
     setProcForm({
       id: p.id,
@@ -131,10 +119,7 @@ function ConsultaRapidaPage() {
   const saveProc = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
-    if (!procForm.nome.trim()) {
-      toast.error("Informe o nome.");
-      return;
-    }
+    if (!procForm.nome.trim()) { toast.error("Informe o nome."); return; }
     setSavingProc(true);
     const vDin = Number(procForm.valor_dinheiro) || 0;
     const vCar = Number(procForm.valor_pix_cartao) || 0;
@@ -158,19 +143,13 @@ function ConsultaRapidaPage() {
       ? await supabase.from("procedimentos").update(payload).eq("id", procForm.id)
       : await supabase.from("procedimentos").insert(payload);
     setSavingProc(false);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     toast.success(procForm.id ? "Atualizado." : "Cadastrado.");
     setProcOpen(false);
     reload();
   };
 
-  const openNovoMed = () => {
-    setMedForm(EMPTY_MED);
-    setMedOpen(true);
-  };
+  const openNovoMed = () => { setMedForm(EMPTY_MED); setMedOpen(true); };
   const openEditMed = (m: Medico) => {
     setMedForm({
       id: m.id,
@@ -185,10 +164,7 @@ function ConsultaRapidaPage() {
   const saveMed = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
-    if (!medForm.nome.trim()) {
-      toast.error("Informe o nome.");
-      return;
-    }
+    if (!medForm.nome.trim()) { toast.error("Informe o nome."); return; }
     setSavingMed(true);
     const payload: any = {
       clinica_id: clinicaAtual.clinica_id,
@@ -202,10 +178,7 @@ function ConsultaRapidaPage() {
       ? await supabase.from("medicos").update(payload).eq("id", medForm.id)
       : await supabase.from("medicos").insert(payload);
     setSavingMed(false);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     toast.success(medForm.id ? "Atualizado." : "Cadastrado.");
     setMedOpen(false);
     reload();
@@ -226,7 +199,9 @@ function ConsultaRapidaPage() {
     const t = q.trim().toLowerCase();
     if (!t) return procs;
     return procs.filter(
-      (p) => p.nome.toLowerCase().includes(t) || p.grupo?.toLowerCase().includes(t),
+      (p) =>
+        p.nome.toLowerCase().includes(t) ||
+        p.grupo?.toLowerCase().includes(t),
     );
   }, [procs, q]);
 
@@ -265,15 +240,11 @@ function ConsultaRapidaPage() {
         <TabsList>
           <TabsTrigger value="medicos" className="gap-2">
             <Stethoscope className="h-4 w-4" /> Médicos & horários
-            <Badge variant="secondary" className="ml-1">
-              {medicosFiltrados.length}
-            </Badge>
+            <Badge variant="secondary" className="ml-1">{medicosFiltrados.length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="procs" className="gap-2">
             <ClipboardList className="h-4 w-4" /> Serviços & valores
-            <Badge variant="secondary" className="ml-1">
-              {procsFiltrados.length}
-            </Badge>
+            <Badge variant="secondary" className="ml-1">{procsFiltrados.length}</Badge>
           </TabsTrigger>
         </TabsList>
 
@@ -302,13 +273,7 @@ function ConsultaRapidaPage() {
                           CRM {m.crm}/{m.crm_uf}
                         </CardDescription>
                       </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 shrink-0"
-                        onClick={() => openEditMed(m)}
-                        title="Editar"
-                      >
+                      <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => openEditMed(m)} title="Editar">
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -377,25 +342,15 @@ function ConsultaRapidaPage() {
                           </div>
                           <div className="font-semibold">{fmtMoney(p.valor_cartao)}</div>
                         </div>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          onClick={() => openEditProc(p)}
-                          title="Editar"
-                        >
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditProc(p)} title="Editar">
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </div>
                     {p.preparo && (
                       <div className="mt-2 rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs">
-                        <span className="font-semibold text-amber-800 dark:text-amber-200">
-                          Preparo:{" "}
-                        </span>
-                        <span className="text-amber-900 dark:text-amber-100 whitespace-pre-wrap">
-                          {p.preparo}
-                        </span>
+                        <span className="font-semibold text-amber-800 dark:text-amber-200">Preparo: </span>
+                        <span className="text-amber-900 dark:text-amber-100 whitespace-pre-wrap">{p.preparo}</span>
                       </div>
                     )}
                   </div>
@@ -416,30 +371,17 @@ function ConsultaRapidaPage() {
           <form onSubmit={saveProc} className="space-y-3">
             <div className="space-y-1.5">
               <Label>Nome *</Label>
-              <Input
-                value={procForm.nome}
-                onChange={(e) => setProcForm({ ...procForm, nome: e.target.value })}
-                required
-              />
+              <Input value={procForm.nome} onChange={(e) => setProcForm({ ...procForm, nome: e.target.value })} required />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Grupo</Label>
-                <Input
-                  value={procForm.grupo}
-                  onChange={(e) => setProcForm({ ...procForm, grupo: e.target.value })}
-                  placeholder="Ex.: Ginecologia"
-                />
+                <Input value={procForm.grupo} onChange={(e) => setProcForm({ ...procForm, grupo: e.target.value })} placeholder="Ex.: Ginecologia" />
               </div>
               <div className="space-y-1.5">
                 <Label>Tipo</Label>
-                <Select
-                  value={procForm.tipo}
-                  onValueChange={(v) => setProcForm({ ...procForm, tipo: v as ProcTipo })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                <Select value={procForm.tipo} onValueChange={(v) => setProcForm({ ...procForm, tipo: v as ProcTipo })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="consulta">Consulta</SelectItem>
                     <SelectItem value="exame">Exame</SelectItem>
@@ -451,43 +393,24 @@ function ConsultaRapidaPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label>Dinheiro (R$)</Label>
-                <CurrencyInput
-                  value={procForm.valor_dinheiro}
-                  onChange={(v) => setProcForm({ ...procForm, valor_dinheiro: v })}
-                />
+                <CurrencyInput value={procForm.valor_dinheiro} onChange={(v) => setProcForm({ ...procForm, valor_dinheiro: v })} />
               </div>
               <div className="space-y-1.5">
                 <Label>PIX / Cartão (R$)</Label>
-                <CurrencyInput
-                  value={procForm.valor_pix_cartao}
-                  onChange={(v) => setProcForm({ ...procForm, valor_pix_cartao: v })}
-                />
+                <CurrencyInput value={procForm.valor_pix_cartao} onChange={(v) => setProcForm({ ...procForm, valor_pix_cartao: v })} />
               </div>
               <div className="space-y-1.5">
                 <Label>Duração (min)</Label>
-                <Input
-                  type="number"
-                  value={procForm.duracao_minutos}
-                  onChange={(e) => setProcForm({ ...procForm, duracao_minutos: e.target.value })}
-                />
+                <Input type="number" value={procForm.duracao_minutos} onChange={(e) => setProcForm({ ...procForm, duracao_minutos: e.target.value })} />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label>Preparo</Label>
-              <Textarea
-                rows={3}
-                value={procForm.preparo}
-                onChange={(e) => setProcForm({ ...procForm, preparo: e.target.value })}
-                placeholder="Instruções de preparo (opcional)"
-              />
+              <Textarea rows={3} value={procForm.preparo} onChange={(e) => setProcForm({ ...procForm, preparo: e.target.value })} placeholder="Instruções de preparo (opcional)" />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setProcOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={savingProc}>
-                {savingProc ? "Salvando…" : "Salvar"}
-              </Button>
+              <Button type="button" variant="outline" onClick={() => setProcOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={savingProc}>{savingProc ? "Salvando…" : "Salvar"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -503,53 +426,31 @@ function ConsultaRapidaPage() {
           <form onSubmit={saveMed} className="space-y-3">
             <div className="space-y-1.5">
               <Label>Nome *</Label>
-              <Input
-                value={medForm.nome}
-                onChange={(e) => setMedForm({ ...medForm, nome: e.target.value })}
-                required
-              />
+              <Input value={medForm.nome} onChange={(e) => setMedForm({ ...medForm, nome: e.target.value })} required />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>CRM</Label>
-                <Input
-                  value={medForm.crm}
-                  onChange={(e) => setMedForm({ ...medForm, crm: e.target.value })}
-                />
+                <Input value={medForm.crm} onChange={(e) => setMedForm({ ...medForm, crm: e.target.value })} />
               </div>
               <div className="space-y-1.5">
                 <Label>UF</Label>
-                <Input
-                  value={medForm.crm_uf}
-                  onChange={(e) => setMedForm({ ...medForm, crm_uf: e.target.value })}
-                  maxLength={2}
-                />
+                <Input value={medForm.crm_uf} onChange={(e) => setMedForm({ ...medForm, crm_uf: e.target.value })} maxLength={2} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Telefone</Label>
-                <Input
-                  value={medForm.telefone}
-                  onChange={(e) => setMedForm({ ...medForm, telefone: e.target.value })}
-                />
+                <Input value={medForm.telefone} onChange={(e) => setMedForm({ ...medForm, telefone: e.target.value })} />
               </div>
               <div className="space-y-1.5">
                 <Label>E-mail</Label>
-                <Input
-                  type="email"
-                  value={medForm.email}
-                  onChange={(e) => setMedForm({ ...medForm, email: e.target.value })}
-                />
+                <Input type="email" value={medForm.email} onChange={(e) => setMedForm({ ...medForm, email: e.target.value })} />
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setMedOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={savingMed}>
-                {savingMed ? "Salvando…" : "Salvar"}
-              </Button>
+              <Button type="button" variant="outline" onClick={() => setMedOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={savingMed}>{savingMed ? "Salvando…" : "Salvar"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -71,8 +71,8 @@ function DuplicadosPage() {
         <div>
           <h1 className="text-2xl font-semibold">Possíveis pacientes duplicados</h1>
           <p className="text-sm text-muted-foreground">
-            Somente alerta. O sistema não faz merge automático — abra cada cadastro para conferir e
-            ajustar manualmente.
+            Somente alerta. O sistema não faz merge automático — abra cada cadastro
+            para conferir e ajustar manualmente.
           </p>
         </div>
         <select

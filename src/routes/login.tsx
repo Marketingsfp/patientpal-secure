@@ -48,10 +48,7 @@ function LoginPage() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     toast.success("Bem-vindo!");
     navigate({ to: "/app", replace: true });
   };
@@ -72,8 +69,7 @@ function LoginPage() {
             Gerencie sua clínica com leveza.
           </h2>
           <p className="text-white/85 text-lg leading-relaxed">
-            Agenda, prontuário, financeiro e equipe em um só lugar — pensado para o dia a dia da sua
-            operação.
+            Agenda, prontuário, financeiro e equipe em um só lugar — pensado para o dia a dia da sua operação.
           </p>
           <ul className="space-y-3 pt-4">
             <li className="flex items-center gap-3">
@@ -97,9 +93,7 @@ function LoginPage() {
           </ul>
         </div>
 
-        <p className="text-xs text-white/70">
-          © {new Date().getFullYear()} ClinicaOS — todos os direitos reservados.
-        </p>
+        <p className="text-xs text-white/70">© {new Date().getFullYear()} ClinicaOS — todos os direitos reservados.</p>
       </div>
 
       {/* Form panel */}
@@ -114,24 +108,14 @@ function LoginPage() {
           <div className="rounded-2xl border border-border/70 bg-card p-8 shadow-xl shadow-primary/5">
             <div className="mb-6">
               <h1 className="text-3xl font-semibold tracking-tight">Bem-vindo de volta</h1>
-              <p className="text-sm text-muted-foreground mt-1.5">
-                Acesse sua clínica com seu e-mail e senha
-              </p>
+              <p className="text-sm text-muted-foreground mt-1.5">Acesse sua clínica com seu e-mail e senha</p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">E-mail</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="voce@clinica.com"
-                    required
-                    className="pl-9 h-11"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
+                  <Input id="email" type="email" placeholder="voce@clinica.com" required className="pl-9 h-11" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
               </div>
               <div className="space-y-2">
@@ -140,38 +124,18 @@ function LoginPage() {
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPwd ? "text" : "password"}
-                    placeholder="••••••••"
-                    required
-                    className="pl-9 pr-10 h-11"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPwd((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    aria-label="Mostrar senha"
-                  >
+                  <Input id="password" type={showPwd ? "text" : "password"} placeholder="••••••••" required className="pl-9 pr-10 h-11" value={password} onChange={(e) => setPassword(e.target.value)} />
+                  <button type="button" onClick={() => setShowPwd((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="Mostrar senha">
                     {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
-              <Button
-                type="submit"
-                className="w-full h-11 text-base font-medium"
-                disabled={loading}
-              >
+              <Button type="submit" className="w-full h-11 text-base font-medium" disabled={loading}>
                 {loading ? "Entrando..." : "Entrar"}
               </Button>
             </form>
             <p className="mt-6 text-center text-sm text-muted-foreground">
-              Não tem conta?{" "}
-              <Link to="/signup" className="text-primary font-medium hover:underline">
-                Criar conta
-              </Link>
+              Não tem conta? <Link to="/signup" className="text-primary font-medium hover:underline">Criar conta</Link>
             </p>
           </div>
         </div>

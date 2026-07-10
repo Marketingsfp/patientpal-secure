@@ -101,21 +101,26 @@ export function usePermissoes(): {
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [clinicaId, role]);
 
   return { allowed, nivel, loading };
 }
 
 /**
- * Retorna `true` quando o usuário tem acesso de escrita ao módulo informado.
- * Admin (sem filtro) sempre pode escrever.
+ * Nível de acesso do usuário atual num módulo específico.
+ * - admin (ou ainda carregando com nivel=null) → "write" (sem restrição).
+ * - Sem entrada no mapa → "none".
  */
-export function usePodeEscrever(modulo: string): boolean {
+export function useAcessoModulo(modulo: string): Acesso {
   const { nivel, allowed } = usePermissoes();
-  // Admin / carregando sem filtro: libera.
-  if (allowed === null) return true;
-  return nivel?.get(modulo) === "write";
+  if (allowed === null) return "write"; // admin
+  const n = nivel?.get(modulo);
+  if (n) return n;
+  return "none";
+}
+
+/** Atalho: usuário pode gravar/editar/excluir neste módulo? */
+export function usePodeEscrever(modulo: string): boolean {
+  return useAcessoModulo(modulo) === "write";
 }

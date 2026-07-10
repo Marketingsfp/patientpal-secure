@@ -19,14 +19,7 @@ interface Props {
   podeHistorico?: boolean;
 }
 
-export function OrcamentoDrawer({
-  orc,
-  onClose,
-  onPrint,
-  onConverter,
-  onHistorico,
-  podeHistorico,
-}: Props) {
+export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistorico, podeHistorico }: Props) {
   const [itens, setItens] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -44,9 +37,7 @@ export function OrcamentoDrawer({
       setItens((data ?? []) as Item[]);
       setLoading(false);
     })();
-    return () => {
-      cancel = true;
-    };
+    return () => { cancel = true; };
   }, [orc]);
 
   return (
@@ -55,9 +46,7 @@ export function OrcamentoDrawer({
         {orc && (
           <>
             <SheetHeader>
-              <SheetTitle>
-                #ORC-{orc.numero} · {orc.paciente_nome}
-              </SheetTitle>
+              <SheetTitle>#ORC-{orc.numero} · {orc.paciente_nome}</SheetTitle>
             </SheetHeader>
             <div className="mt-4 space-y-4 text-sm">
               <div className="flex flex-wrap gap-2">
@@ -94,12 +83,8 @@ export function OrcamentoDrawer({
                   <ul className="divide-y border rounded">
                     {itens.map((i) => (
                       <li key={i.id} className="flex justify-between px-3 py-2">
-                        <span className="truncate">
-                          {i.quantidade}× {i.descricao}
-                        </span>
-                        <span className="tabular-nums">
-                          {BRL(Number(i.quantidade) * Number(i.valor_unitario))}
-                        </span>
+                        <span className="truncate">{i.quantidade}× {i.descricao}</span>
+                        <span className="tabular-nums">{BRL(Number(i.quantidade) * Number(i.valor_unitario))}</span>
                       </li>
                     ))}
                   </ul>

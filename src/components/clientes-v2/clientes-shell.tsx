@@ -8,11 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
-  ListShell,
-  VirtualList,
-  QuickFilters,
-  type StatusTab,
-  type QuickFilterOption,
+  ListShell, VirtualList, QuickFilters,
+  type StatusTab, type QuickFilterOption,
 } from "@/components/list-shell";
 import { ClienteCard } from "./cliente-card";
 import { ClienteDrawer } from "./cliente-drawer";
@@ -20,18 +17,15 @@ import { ClientesKpiBar, type ClientesKpi } from "./kpi-bar";
 import { ResumoBar } from "./resumo-bar";
 import { useClientesKpis } from "./use-kpis";
 import {
-  cadastroIncompleto,
-  isAniversarianteHoje,
-  isNovo30d,
-  marcarDuplicados,
-  pagadorLabel,
-  semCpf,
-  semTelefone,
+  cadastroIncompleto, isAniversarianteHoje, isNovo30d,
+  marcarDuplicados, pagadorLabel, semCpf, semTelefone,
   type PacienteV2,
 } from "./status-utils";
 
 type TabV = "todos" | "ativos" | "inativos" | "incompletos" | "duplicados";
-type ChipV = "particular" | "associado" | "cartao" | "aniv" | "novos30" | "sem_tel" | "sem_cpf";
+type ChipV =
+  | "particular" | "associado" | "cartao"
+  | "aniv" | "novos30" | "sem_tel" | "sem_cpf";
 type ResumoMode = "none" | "aniv" | "inativos";
 
 const TAB_OPTS: ReadonlyArray<StatusTab<TabV>> = [
@@ -98,15 +92,10 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     if (mode === "none" && chips.includes("aniv")) mode = "aniv";
     if (mode === "aniv") {
       const { data, error } = await supabase.rpc("pacientes_aniversariantes_hoje", {
-        _clinica_id: scope[0],
-        _limite: 200,
+        _clinica_id: scope[0], _limite: 200,
       });
       if (myReq !== reqRef.current) return;
-      if (error) {
-        mostrarErro(error);
-        setLoading(false);
-        return;
-      }
+      if (error) { mostrarErro(error); setLoading(false); return; }
       setRows(marcarDuplicados((data ?? []) as PacienteV2[]));
       setLoading(false);
       return;
@@ -114,60 +103,49 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     if (mode === "inativos") query = query.eq("ativo", false);
     const { data, error } = await query.order("created_at", { ascending: false }).limit(50);
     if (myReq !== reqRef.current) return;
-    if (error) {
-      mostrarErro(error);
-      setLoading(false);
-      return;
-    }
+    if (error) { mostrarErro(error); setLoading(false); return; }
     setTotalBase(null);
     setRows(marcarDuplicados((data ?? []) as PacienteV2[]));
     setLoading(false);
   }, [clinicaAtual, scope, resumoMode, chips]);
 
-  const loadBusca = useCallback(
-    async (termo: string) => {
-      if (scope.length === 0) return;
-      const myReq = ++reqRef.current;
-      setLoading(true);
-      const { data, error } = await supabase.rpc("buscar_pacientes_global", {
-        _clinica_ids: scope,
-        _termo: termo,
-        _limite: 50,
-      });
-      if (myReq !== reqRef.current) return;
-      if (error) {
-        mostrarErro(error);
-        setLoading(false);
-        return;
+  const loadBusca = useCallback(async (termo: string) => {
+    if (scope.length === 0) return;
+    const myReq = ++reqRef.current;
+    setLoading(true);
+    const { data, error } = await supabase.rpc("buscar_pacientes_global", {
+      _clinica_ids: scope,
+      _termo: termo,
+      _limite: 50,
+    });
+    if (myReq !== reqRef.current) return;
+    if (error) { mostrarErro(error); setLoading(false); return; }
+    const base = ((data ?? []) as unknown as PacienteV2[]).map((r) => ({
+      ...r,
+      ativo: true,
+      cidade: null,
+      estado: null,
+      foto_url: null,
+      created_at: "",
+    })) as PacienteV2[];
+    const ids = base.map((r) => r.id);
+    if (ids.length > 0) {
+      const { data: extra } = await supabase
+        .from("pacientes")
+        .select("id, ativo, cidade, estado, foto_url, telefone2, created_at")
+        .in("id", ids);
+      const byId = new Map<string, Partial<PacienteV2>>(
+        (extra ?? []).map((e) => [e.id as string, e as Partial<PacienteV2>]),
+      );
+      for (const r of base) {
+        const e = byId.get(r.id);
+        if (e) Object.assign(r, e);
       }
-      const base = ((data ?? []) as unknown as PacienteV2[]).map((r) => ({
-        ...r,
-        ativo: true,
-        cidade: null,
-        estado: null,
-        foto_url: null,
-        created_at: "",
-      })) as PacienteV2[];
-      const ids = base.map((r) => r.id);
-      if (ids.length > 0) {
-        const { data: extra } = await supabase
-          .from("pacientes")
-          .select("id, ativo, cidade, estado, foto_url, telefone2, created_at")
-          .in("id", ids);
-        const byId = new Map<string, Partial<PacienteV2>>(
-          (extra ?? []).map((e) => [e.id as string, e as Partial<PacienteV2>]),
-        );
-        for (const r of base) {
-          const e = byId.get(r.id);
-          if (e) Object.assign(r, e);
-        }
-      }
-      if (myReq !== reqRef.current) return;
-      setRows(marcarDuplicados(base));
-      setLoading(false);
-    },
-    [scope],
-  );
+    }
+    if (myReq !== reqRef.current) return;
+    setRows(marcarDuplicados(base));
+    setLoading(false);
+  }, [scope]);
 
   useEffect(() => {
     if (modoBusca) void loadBusca(q.trim());
@@ -195,16 +173,10 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const visiveis = filtrados.slice(0, pageSize);
 
   const kpi: ClientesKpi = useMemo(() => {
-    let ativos = 0,
-      inativos = 0,
-      incompletos = 0,
-      duplicados = 0;
-    let associados = 0,
-      cartao = 0,
-      particular = 0;
+    let ativos = 0, inativos = 0, incompletos = 0, duplicados = 0;
+    let associados = 0, cartao = 0, particular = 0;
     for (const p of filtrados) {
-      if (p.ativo) ativos++;
-      else inativos++;
+      if (p.ativo) ativos++; else inativos++;
       if (cadastroIncompleto(p)) incompletos++;
       if (p.duplicado_hint) duplicados++;
       const t = pagadorLabel(p).tipo;
@@ -214,28 +186,19 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     }
     return {
       visiveis: filtrados.length,
-      ativos,
-      inativos,
-      incompletos,
-      duplicados,
-      associados,
-      cartao,
-      particular,
+      ativos, inativos, incompletos, duplicados,
+      associados, cartao, particular,
     };
   }, [filtrados]);
 
   const tabsWithCounts = TAB_OPTS.map((t) => ({
     ...t,
     count:
-      t.value === "todos"
-        ? rows.length
-        : t.value === "ativos"
-          ? rows.filter((p) => p.ativo).length
-          : t.value === "inativos"
-            ? rows.filter((p) => !p.ativo).length
-            : t.value === "incompletos"
-              ? rows.filter(cadastroIncompleto).length
-              : rows.filter((p) => p.duplicado_hint).length,
+      t.value === "todos" ? rows.length
+      : t.value === "ativos" ? rows.filter((p) => p.ativo).length
+      : t.value === "inativos" ? rows.filter((p) => !p.ativo).length
+      : t.value === "incompletos" ? rows.filter(cadastroIncompleto).length
+      : rows.filter((p) => p.duplicado_hint).length,
   }));
 
   return (
@@ -257,23 +220,13 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
             <div className="flex items-center gap-2">
               <div className="hidden sm:flex items-center gap-1.5">
                 <Label className="text-xs flex items-center gap-1.5">
-                  {compactPref ? (
-                    <Rows3 className="h-3.5 w-3.5" />
-                  ) : (
-                    <LayoutList className="h-3.5 w-3.5" />
-                  )}
+                  {compactPref ? <Rows3 className="h-3.5 w-3.5" /> : <LayoutList className="h-3.5 w-3.5" />}
                   Compacto
-                  <Switch
-                    checked={compactPref}
-                    onCheckedChange={onToggleCompact}
-                    data-testid="toggle-compact"
-                  />
+                  <Switch checked={compactPref} onCheckedChange={onToggleCompact} data-testid="toggle-compact" />
                 </Label>
               </div>
               <Button size="sm" asChild>
-                <Link to="/app/clientes">
-                  <Plus className="h-4 w-4 mr-1" /> Novo
-                </Link>
+                <Link to="/app/clientes"><Plus className="h-4 w-4 mr-1" /> Novo</Link>
               </Button>
             </div>
           }
@@ -286,13 +239,7 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
           onTabChange={setTab}
           chips={
             <div className="flex flex-wrap items-center gap-3">
-              <QuickFilters
-                options={CHIP_OPTS}
-                value={chips}
-                onChange={setChips}
-                multi
-                ariaLabel="Filtros rápidos"
-              />
+              <QuickFilters options={CHIP_OPTS} value={chips} onChange={setChips} multi ariaLabel="Filtros rápidos" />
               {!modoBusca && (
                 <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <Info className="h-3.5 w-3.5" />
@@ -306,13 +253,9 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
           loading={loading}
           isEmpty={!loading && filtrados.length === 0}
           empty={
-            modoBusca ? (
-              <div>
-                Nenhum paciente encontrado para <b>“{q}”</b>.
-              </div>
-            ) : (
-              <div>Sem pacientes recentes nesta clínica.</div>
-            )
+            modoBusca
+              ? <div>Nenhum paciente encontrado para <b>“{q}”</b>.</div>
+              : <div>Sem pacientes recentes nesta clínica.</div>
           }
           bodyClassName="bg-background"
         >
@@ -322,8 +265,7 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
             overscan={10}
             getKey={(p) => p.id}
             onEndReached={() => {
-              if (pageSize < filtrados.length)
-                setPageSize((s) => Math.min(s + 50, filtrados.length));
+              if (pageSize < filtrados.length) setPageSize((s) => Math.min(s + 50, filtrados.length));
             }}
             renderItem={(p) => (
               <div className="px-2 py-1">

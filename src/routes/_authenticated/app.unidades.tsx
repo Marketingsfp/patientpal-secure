@@ -8,12 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Plus, Pencil, Building2, CheckCircle2 } from "lucide-react";
@@ -52,59 +47,29 @@ function ClinicasTab() {
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
-    nome: "",
-    cnpj: "",
-    endereco: "",
-    cidade: "",
-    estado: "",
-    cep: "",
-    telefone: "",
-    latitude: "",
-    longitude: "",
-    raio_metros: "200",
-    ativo: true,
+    nome: "", cnpj: "", endereco: "", cidade: "", estado: "", cep: "", telefone: "",
+    latitude: "", longitude: "", raio_metros: "200", ativo: true,
   });
 
   const resetForm = () => {
     setEditingId(null);
     setForm({
-      nome: "",
-      cnpj: "",
-      endereco: "",
-      cidade: "",
-      estado: "",
-      cep: "",
-      telefone: "",
-      latitude: "",
-      longitude: "",
-      raio_metros: "200",
-      ativo: true,
+      nome: "", cnpj: "", endereco: "", cidade: "", estado: "", cep: "", telefone: "",
+      latitude: "", longitude: "", raio_metros: "200", ativo: true,
     });
   };
-  const openNew = () => {
-    resetForm();
-    setOpen(true);
-  };
+  const openNew = () => { resetForm(); setOpen(true); };
 
-  const selectClinica = (id: string) => {
-    setClinicaAtual(id);
-    toast.success("Clínica selecionada");
-  };
+  const selectClinica = (id: string) => { setClinicaAtual(id); toast.success("Clínica selecionada"); };
 
   const openEdit = async (id: string) => {
     setLoading(true);
     const { data, error } = await supabase
       .from("clinicas")
-      .select(
-        "nome, cnpj, endereco, cidade, estado, cep, telefone, latitude, longitude, raio_metros, ativo",
-      )
-      .eq("id", id)
-      .single();
+      .select("nome, cnpj, endereco, cidade, estado, cep, telefone, latitude, longitude, raio_metros, ativo")
+      .eq("id", id).single();
     setLoading(false);
-    if (error || !data) {
-      mostrarErro(error);
-      return;
-    }
+    if (error || !data) { mostrarErro(error); return; }
     setEditingId(id);
     setForm({
       nome: data.nome ?? "",
@@ -123,17 +88,13 @@ function ClinicasTab() {
   };
 
   async function usarMinhaLocalizacao() {
-    if (!navigator.geolocation) {
-      toast.error("Geolocalização indisponível");
-      return;
-    }
+    if (!navigator.geolocation) { toast.error("Geolocalização indisponível"); return; }
     navigator.geolocation.getCurrentPosition(
-      (p) =>
-        setForm((f) => ({
-          ...f,
-          latitude: p.coords.latitude.toString(),
-          longitude: p.coords.longitude.toString(),
-        })),
+      (p) => setForm((f) => ({
+        ...f,
+        latitude: p.coords.latitude.toString(),
+        longitude: p.coords.longitude.toString(),
+      })),
       () => toast.error("Não foi possível obter localização"),
     );
   }
@@ -152,26 +113,18 @@ function ClinicasTab() {
     if (!user) return;
     setLoading(true);
     if (editingId) {
-      const { error } = await supabase
-        .from("clinicas")
-        .update({
-          nome: form.nome.trim(),
-          cnpj: form.cnpj.trim() || null,
-          telefone: form.telefone.trim() || null,
-          cidade: form.cidade.trim() || null,
-          estado: form.estado.trim() || null,
-          ...extras(),
-        })
-        .eq("id", editingId);
+      const { error } = await supabase.from("clinicas").update({
+        nome: form.nome.trim(),
+        cnpj: form.cnpj.trim() || null,
+        telefone: form.telefone.trim() || null,
+        cidade: form.cidade.trim() || null,
+        estado: form.estado.trim() || null,
+        ...extras(),
+      }).eq("id", editingId);
       setLoading(false);
-      if (error) {
-        mostrarErro(error);
-        return;
-      }
+      if (error) { mostrarErro(error); return; }
       toast.success("Clínica atualizada!");
-      setOpen(false);
-      resetForm();
-      await refresh();
+      setOpen(false); resetForm(); await refresh();
       return;
     }
     const { data: clinicaId, error } = await supabase.rpc("criar_clinica_com_admin", {
@@ -181,101 +134,47 @@ function ClinicasTab() {
       _cidade: form.cidade.trim() || undefined,
       _estado: form.estado.trim() || undefined,
     });
-    if (error || !clinicaId) {
-      mostrarErro(error);
-      return;
-    }
+    if (error || !clinicaId) { mostrarErro(error); return; }
     // Persist extra fields (endereco, cep, geo, ativo) right after creation.
-    const { error: updErr } = await supabase
-      .from("clinicas")
-      .update(extras())
+    const { error: updErr } = await supabase.from("clinicas").update(extras())
       .eq("id", clinicaId as unknown as string);
     setLoading(false);
-    if (updErr) {
-      mostrarErro(updErr);
-      return;
-    }
+    if (updErr) { mostrarErro(updErr); return; }
     toast.success("Clínica criada!");
-    setOpen(false);
-    resetForm();
-    await refresh();
+    setOpen(false); resetForm(); await refresh();
     setClinicaAtual(clinicaId as unknown as string);
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Dialog
-          open={open}
-          onOpenChange={(n) => {
-            setOpen(n);
-            if (!n) resetForm();
-          }}
-        >
+        <Dialog open={open} onOpenChange={(n) => { setOpen(n); if (!n) resetForm(); }}>
           <DialogTrigger asChild>
-            <Button onClick={openNew}>
-              <Plus className="h-4 w-4 mr-2" /> Nova unidade
-            </Button>
+            <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Nova unidade</Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editingId ? "Editar unidade" : "Nova unidade"}</DialogTitle>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? "Editar unidade" : "Nova unidade"}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="space-y-2">
                 <Label>Nome *</Label>
-                <Input
-                  required
-                  value={form.nome}
-                  onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                />
+                <Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>CNPJ</Label>
-                  <Input
-                    value={form.cnpj}
-                    onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Telefone</Label>
-                  <Input
-                    value={form.telefone}
-                    onChange={(e) => setForm({ ...form, telefone: e.target.value })}
-                  />
-                </div>
+                <div className="space-y-2"><Label>CNPJ</Label>
+                  <Input value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Telefone</Label>
+                  <Input value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></div>
               </div>
-              <div className="space-y-2">
-                <Label>Endereço</Label>
-                <Input
-                  value={form.endereco}
-                  onChange={(e) => setForm({ ...form, endereco: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-2">
-                  <Label>Cidade</Label>
-                  <Input
-                    value={form.cidade}
-                    onChange={(e) => setForm({ ...form, cidade: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>UF</Label>
-                  <Input
-                    maxLength={2}
-                    value={form.estado}
-                    onChange={(e) => setForm({ ...form, estado: e.target.value.toUpperCase() })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>CEP</Label>
-                  <Input
-                    value={form.cep}
-                    onChange={(e) => setForm({ ...form, cep: e.target.value })}
-                  />
-                </div>
+              <div className="space-y-2"><Label>Endereço</Label>
+                <Input value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-2"><Label>Cidade</Label>
+                  <Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
+                <div className="space-y-2"><Label>UF</Label>
+                  <Input maxLength={2} value={form.estado}
+                    onChange={(e) => setForm({ ...form, estado: e.target.value.toUpperCase() })} /></div>
+                <div className="space-y-2"><Label>CEP</Label>
+                  <Input value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} /></div>
               </div>
               <div className="border-t pt-3">
                 <div className="flex items-center justify-between mb-2">
@@ -284,43 +183,23 @@ function ClinicasTab() {
                     Usar minha localização
                   </Button>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-2">
-                    <Label className="text-xs">Latitude</Label>
-                    <Input
-                      value={form.latitude}
-                      onChange={(e) => setForm({ ...form, latitude: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Longitude</Label>
-                    <Input
-                      value={form.longitude}
-                      onChange={(e) => setForm({ ...form, longitude: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Raio (m)</Label>
-                    <Input
-                      type="number"
-                      value={form.raio_metros}
-                      onChange={(e) => setForm({ ...form, raio_metros: e.target.value })}
-                    />
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-2"><Label className="text-xs">Latitude</Label>
+                    <Input value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} /></div>
+                  <div className="space-y-2"><Label className="text-xs">Longitude</Label>
+                    <Input value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} /></div>
+                  <div className="space-y-2"><Label className="text-xs">Raio (m)</Label>
+                    <Input type="number" value={form.raio_metros}
+                      onChange={(e) => setForm({ ...form, raio_metros: e.target.value })} /></div>
                 </div>
               </div>
               <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={form.ativo}
-                  onChange={(e) => setForm({ ...form, ativo: e.target.checked })}
-                />
+                <input type="checkbox" checked={form.ativo}
+                  onChange={(e) => setForm({ ...form, ativo: e.target.checked })} />
                 Ativa
               </label>
               <DialogFooter>
-                <Button type="submit" disabled={loading}>
-                  {loading ? "Salvando..." : editingId ? "Salvar" : "Criar"}
-                </Button>
+                <Button type="submit" disabled={loading}>{loading ? "Salvando..." : editingId ? "Salvar" : "Criar"}</Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -328,11 +207,9 @@ function ClinicasTab() {
       </div>
 
       {memberships.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Nenhuma unidade ainda. Clique em <strong>Nova unidade</strong> para começar.
-          </CardContent>
-        </Card>
+        <Card><CardContent className="py-12 text-center text-muted-foreground">
+          Nenhuma unidade ainda. Clique em <strong>Nova unidade</strong> para começar.
+        </CardContent></Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {memberships.map((m) => {
@@ -352,27 +229,16 @@ function ClinicasTab() {
                         </p>
                       )}
                       <div className="mt-2 flex gap-2">
-                        <Badge variant="secondary" className="capitalize">
-                          {m.role}
-                        </Badge>
+                        <Badge variant="secondary" className="capitalize">{m.role}</Badge>
                         {ativa && <Badge>Atual</Badge>}
                       </div>
                     </div>
                   </div>
                   <div className="mt-5 flex gap-2">
-                    <Button
-                      className="flex-1"
-                      variant="secondary"
-                      onClick={() => selectClinica(m.clinica_id)}
-                      disabled={ativa}
-                    >
+                    <Button className="flex-1" variant="secondary" onClick={() => selectClinica(m.clinica_id)} disabled={ativa}>
                       <CheckCircle2 className="h-4 w-4 mr-2" /> Selecionar
                     </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => openEdit(m.clinica_id)}
-                      disabled={loading}
-                    >
+                    <Button variant="outline" onClick={() => openEdit(m.clinica_id)} disabled={loading}>
                       <Pencil className="h-4 w-4 mr-2" /> Editar
                     </Button>
                   </div>

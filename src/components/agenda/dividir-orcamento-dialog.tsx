@@ -3,11 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,13 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { AlertTriangle, Package, Trash2 } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export type DividirItem = {
   id: string;
@@ -30,7 +20,6 @@ export type DividirItem = {
   procedimento_id: string | null;
   grupo: string | null;
   tipo: string | null;
-  tipo_procedimento?: string | null;
 };
 
 export type DividirMedicoOpt = {
@@ -44,8 +33,8 @@ type GrupoForm = {
   label: string;
   itens: DividirItem[];
   medico_id: string;
-  data: string; // YYYY-MM-DD
-  hora: string; // HH:MM (slot escolhido)
+  data: string;        // YYYY-MM-DD
+  hora: string;        // HH:MM (slot escolhido)
   duracao: number; // minutos
   observacoes: string;
 };
@@ -54,12 +43,7 @@ type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   clinicaId: string;
-  orcamento: {
-    id: string;
-    numero: number;
-    paciente_id: string | null;
-    paciente_nome: string | null;
-  };
+  orcamento: { id: string; numero: number; paciente_id: string | null; paciente_nome: string | null };
   itens: DividirItem[];
   medicos: DividirMedicoOpt[];
   inicioPadrao: string; // datetime-local
@@ -67,11 +51,7 @@ type Props = {
 };
 
 const norm = (s: string | null | undefined) =>
-  (s ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .trim();
+  (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 const toDateStr = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -96,16 +76,8 @@ const minToHm = (n: number) => `${pad2(Math.floor(n / 60))}:${pad2(n % 60)}`;
 function agruparItens(itens: DividirItem[]): GrupoForm[] {
   const map = new Map<string, GrupoForm>();
   for (const it of itens) {
-    // Laboratório sempre colapsa num único grupo, independentemente de
-    // "grupo"/"tipo" (evita sub-divisão de exames como HEMOGRAMA vs ACIDO URICO).
-    const tp = norm(it.tipo_procedimento);
-    const isLab =
-      tp === "LABORATORIO" ||
-      norm(it.grupo) === "LABORATORIO" ||
-      norm(it.tipo) === "LABORATORIO" ||
-      (tp === "" && norm(it.tipo) === "EXAME" && norm(it.grupo) === "");
-    const g = isLab ? "LABORATORIO" : norm(it.grupo) || norm(it.tipo) || "OUTROS";
-    const label = isLab ? "LABORATÓRIO" : (it.grupo ?? it.tipo ?? "Outros").toUpperCase();
+    const g = norm(it.grupo) || norm(it.tipo) || "OUTROS";
+    const label = (it.grupo ?? it.tipo ?? "Outros").toUpperCase();
     if (!map.has(g)) {
       map.set(g, {
         key: g,
@@ -126,14 +98,7 @@ function agruparItens(itens: DividirItem[]): GrupoForm[] {
 function montarDescricao(g: GrupoForm): string {
   const nomes = g.itens.map((i) => i.descricao);
   if (g.itens.length === 1) return nomes[0];
-  const isLab =
-    g.key === "LABORATORIO" ||
-    g.key === "LABORATÓRIO" ||
-    g.itens.every(
-      (i) =>
-        norm(i.tipo) === "EXAME" &&
-        (norm(i.grupo) === "LABORATORIO" || norm(i.grupo) === "LABORATÓRIO"),
-    );
+  const isLab = g.key === "LABORATORIO" || g.key === "LABORATÓRIO" || g.itens.every((i) => norm(i.tipo) === "EXAME" && (norm(i.grupo) === "LABORATORIO" || norm(i.grupo) === "LABORATÓRIO"));
   if (isLab) return `LABORATÓRIO (${nomes.length} EXAMES): ${nomes.join(", ")}`;
   return `${g.label} (${nomes.length} ITENS): ${nomes.join(", ")}`;
 }
@@ -193,19 +158,10 @@ async function computarSlots(
         .gte("inicio", inicioDia)
         .lte("inicio", fimDia);
 
-  type Ag = {
-    id: string;
-    inicio: string;
-    fim: string;
-    status: string | null;
-    paciente_id: string | null;
-    paciente_nome: string | null;
-  };
+  type Ag = { id: string; inicio: string; fim: string; status: string | null; paciente_id: string | null; paciente_nome: string | null };
   const todos = ((ags.data ?? []) as Ag[]).filter((a) => a.status !== "cancelado");
   const placeholdersAg = todos.filter(
-    (a) =>
-      !a.paciente_id &&
-      (a.paciente_nome === null || a.paciente_nome === "" || a.paciente_nome === "DISPONIVEL"),
+    (a) => !a.paciente_id && (a.paciente_nome === null || a.paciente_nome === "" || a.paciente_nome === "DISPONIVEL"),
   );
   const ocupados = todos
     .filter((a) => !placeholdersAg.some((p) => p.id === a.id))
@@ -247,14 +203,7 @@ async function computarSlots(
 }
 
 export function DividirOrcamentoDialog({
-  open,
-  onOpenChange,
-  clinicaId,
-  orcamento,
-  itens,
-  medicos,
-  inicioPadrao,
-  onCreated,
+  open, onOpenChange, clinicaId, orcamento, itens, medicos, inicioPadrao, onCreated,
 }: Props) {
   const [grupos, setGrupos] = useState<GrupoForm[]>([]);
   const [saving, setSaving] = useState(false);
@@ -320,9 +269,7 @@ export function DividirOrcamentoDialog({
         if (!cancel) setLoadingVinc(false);
       }
     })();
-    return () => {
-      cancel = true;
-    };
+    return () => { cancel = true; };
   }, [open, itens]);
 
   const updateGrupo = (idx: number, patch: Partial<GrupoForm>) => {
@@ -333,10 +280,7 @@ export function DividirOrcamentoDialog({
     setGrupos((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const recursoSet = useMemo(
-    () => new Set(medicos.filter((m) => m.isRecurso).map((m) => m.id)),
-    [medicos],
-  );
+  const recursoSet = useMemo(() => new Set(medicos.filter((m) => m.isRecurso).map((m) => m.id)), [medicos]);
 
   // Retorna o set de profissionais permitidos para um grupo (interseção entre todos
   // os procedimentos com procedimento_id). Itens sem procedimento_id são ignorados.
@@ -356,9 +300,7 @@ export function DividirOrcamentoDialog({
         inter = allowed;
       } else {
         const next = new Set<string>();
-        inter.forEach((x) => {
-          if (allowed.has(x)) next.add(x);
-        });
+        inter.forEach((x) => { if (allowed.has(x)) next.add(x); });
         inter = next;
       }
       if (inter.size === 0) break;
@@ -378,15 +320,13 @@ export function DividirOrcamentoDialog({
   // Limpa profissional selecionado quando ele deixar de pertencer ao set permitido
   // (ex.: após carregar vínculos, ou alteração de itens do grupo).
   useEffect(() => {
-    setGrupos((prev) =>
-      prev.map((g) => {
-        if (!g.medico_id) return g;
-        const permitidos = permitidosDoGrupo(g);
-        if (!permitidos) return g;
-        if (permitidos.has(g.medico_id)) return g;
-        return { ...g, medico_id: "" };
-      }),
-    );
+    setGrupos((prev) => prev.map((g) => {
+      if (!g.medico_id) return g;
+      const permitidos = permitidosDoGrupo(g);
+      if (!permitidos) return g;
+      if (permitidos.has(g.medico_id)) return g;
+      return { ...g, medico_id: "" };
+    }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vincMedicos, vincRecursos]);
 
@@ -407,9 +347,7 @@ export function DividirOrcamentoDialog({
       .filter((x) => !slotsCache.has(slotKey(x.profId, x.data, x.dur)));
     if (pendentes.length === 0) return;
     // Deduplica
-    const unicos = Array.from(
-      new Map(pendentes.map((p) => [slotKey(p.profId, p.data, p.dur), p])).values(),
-    );
+    const unicos = Array.from(new Map(pendentes.map((p) => [slotKey(p.profId, p.data, p.dur), p])).values());
     let cancel = false;
     (async () => {
       for (const p of unicos) {
@@ -426,14 +364,11 @@ export function DividirOrcamentoDialog({
       }
       if (!cancel) setLoadingSlotsKey(null);
     })();
-    return () => {
-      cancel = true;
-    };
+    return () => { cancel = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, grupos, recursoSet]);
 
-  const podeSalvar =
-    grupos.length > 0 && grupos.every((g) => g.medico_id && g.data && g.hora && g.duracao > 0);
+  const podeSalvar = grupos.length > 0 && grupos.every((g) => g.medico_id && g.data && g.hora && g.duracao > 0);
 
   const handleSalvar = async () => {
     if (!podeSalvar) {
@@ -445,9 +380,7 @@ export function DividirOrcamentoDialog({
       const permitidos = permitidosDoGrupo(g);
       if (permitidos && !permitidos.has(g.medico_id)) {
         const med = medicos.find((m) => m.id === g.medico_id);
-        toast.error(
-          `${med?.nome ?? "Profissional"} não realiza ${g.label}. Selecione outro profissional ou cadastre o serviço no perfil dele.`,
-        );
+        toast.error(`${med?.nome ?? "Profissional"} não realiza ${g.label}. Selecione outro profissional ou cadastre o serviço no perfil dele.`);
         return;
       }
     }
@@ -459,8 +392,7 @@ export function DividirOrcamentoDialog({
     try {
       const pacote_id = crypto.randomUUID();
       const insertPayloads: Array<{ payload: Record<string, unknown>; itens: DividirItem[] }> = [];
-      const updates: Array<{ id: string; payload: Record<string, unknown>; itens: DividirItem[] }> =
-        [];
+      const updates: Array<{ id: string; payload: Record<string, unknown>; itens: DividirItem[] }> = [];
       for (const g of grupos) {
         const inicioDate = combineLocal(g.data, g.hora);
         const fimDate = new Date(inicioDate.getTime() + g.duracao * 60_000);
@@ -497,10 +429,7 @@ export function DividirOrcamentoDialog({
           .from("agendamentos")
           .insert(insertPayloads.map((x) => x.payload) as never)
           .select("id");
-        if (error) {
-          mostrarErro(error);
-          return;
-        }
+        if (error) { mostrarErro(error); return; }
         (inseridos ?? []).forEach((r: { id: string }, i: number) => {
           agendamentoIds.push({ id: r.id, itens: insertPayloads[i].itens });
         });
@@ -510,19 +439,13 @@ export function DividirOrcamentoDialog({
           .from("agendamentos")
           .update(u.payload as never)
           .eq("id", u.id);
-        if (error) {
-          mostrarErro(error);
-          return;
-        }
+        if (error) { mostrarErro(error); return; }
         agendamentoIds.push({ id: u.id, itens: u.itens });
       }
 
       // Grava vínculo agendamento ↔ itens do orçamento (1 linha por item).
       const vinculos: Array<{
-        clinica_id: string;
-        agendamento_id: string;
-        orcamento_id: string;
-        orcamento_item_id: string;
+        clinica_id: string; agendamento_id: string; orcamento_id: string; orcamento_item_id: string;
       }> = [];
       for (const a of agendamentoIds) {
         for (const it of a.itens) {
@@ -541,9 +464,7 @@ export function DividirOrcamentoDialog({
           .insert(vinculos as never);
         if (vErr) mostrarErro(vErr, "agendamentos criados, mas vínculo com itens falhou");
       }
-      toast.success(
-        `${grupos.length} agendamentos criados (pacote do orçamento #${String(orcamento.numero).padStart(5, "0")}).`,
-      );
+      toast.success(`${grupos.length} agendamentos criados (pacote do orçamento #${String(orcamento.numero).padStart(5, "0")}).`);
       onOpenChange(false);
       onCreated();
     } finally {
@@ -562,12 +483,8 @@ export function DividirOrcamentoDialog({
         </DialogHeader>
 
         <div className="text-sm text-muted-foreground mb-2">
-          Paciente:{" "}
-          <span className="font-medium text-foreground">{orcamento.paciente_nome ?? "—"}</span>
-          <span className="ml-3">
-            Itens agrupados por tipo. Defina profissional/recurso e horário em cada bloco — os
-            agendamentos ficarão vinculados como um pacote.
-          </span>
+          Paciente: <span className="font-medium text-foreground">{orcamento.paciente_nome ?? "—"}</span>
+          <span className="ml-3">Itens agrupados por tipo. Defina profissional/recurso e horário em cada bloco — os agendamentos ficarão vinculados como um pacote.</span>
         </div>
 
         <div className="space-y-4">
@@ -576,149 +493,125 @@ export function DividirOrcamentoDialog({
             const permitidos = permitidosDoGrupo(g);
             const vazio = permitidos !== null && opts.length === 0;
             return (
-              <div key={g.key} className="border rounded-lg p-4 bg-card">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{g.label}</Badge>
-                    <span className="text-xs text-muted-foreground">{g.itens.length} item(ns)</span>
-                  </div>
-                  {grupos.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removerGrupo(idx)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+            <div key={g.key} className="border rounded-lg p-4 bg-card">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">{g.label}</Badge>
+                  <span className="text-xs text-muted-foreground">{g.itens.length} item(ns)</span>
+                </div>
+                {grupos.length > 1 && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => removerGrupo(idx)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+
+              <div className="text-xs bg-muted/50 rounded p-2 mb-3 max-h-20 overflow-y-auto">
+                {g.itens.map((i) => i.descricao).join(" · ")}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-3">
+                  <Label className="text-xs">Profissional / Recurso</Label>
+                  <SearchableSelect
+                    value={g.medico_id}
+                    onChange={(v) => updateGrupo(idx, { medico_id: v })}
+                    options={opts}
+                    placeholder={loadingVinc ? "Carregando…" : (vazio ? "Nenhum profissional cadastrado para este serviço" : "Selecione…")}
+                  />
+                  {vazio && (
+                    <div className="mt-1 flex items-start gap-1 text-xs text-amber-600">
+                      <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                      <span>Nenhum profissional cadastrado para este serviço. Vincule em Equipe → Médico → Serviços.</span>
+                    </div>
                   )}
                 </div>
-
-                <div className="text-xs bg-muted/50 rounded p-2 mb-3 max-h-20 overflow-y-auto">
-                  {g.itens.map((i) => i.descricao).join(" · ")}
+                <div>
+                  <Label className="text-xs">Data</Label>
+                  <Input
+                    type="date"
+                    value={g.data}
+                    onChange={(e) => updateGrupo(idx, { data: e.target.value, hora: "" })}
+                  />
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="md:col-span-3">
-                    <Label className="text-xs">Profissional / Recurso</Label>
-                    <SearchableSelect
-                      value={g.medico_id}
-                      onChange={(v) => updateGrupo(idx, { medico_id: v })}
-                      options={opts}
-                      placeholder={
-                        loadingVinc
-                          ? "Carregando…"
-                          : vazio
-                            ? "Nenhum profissional cadastrado para este serviço"
-                            : "Selecione…"
-                      }
-                    />
-                    {vazio && (
-                      <div className="mt-1 flex items-start gap-1 text-xs text-amber-600">
-                        <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
-                        <span>
-                          Nenhum profissional cadastrado para este serviço. Vincule em Equipe →
-                          Médico → Serviços.
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <Label className="text-xs">Data</Label>
-                    <Input
-                      type="date"
-                      value={g.data}
-                      onChange={(e) => updateGrupo(idx, { data: e.target.value, hora: "" })}
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Horário disponível</Label>
-                    {(() => {
-                      if (!g.medico_id || !g.data) {
-                        return (
-                          <Input value="" disabled placeholder="Escolha profissional e data" />
-                        );
-                      }
-                      const key = slotKey(g.medico_id, g.data, g.duracao);
-                      const entry = slotsCache.get(key);
-                      const loading = loadingSlotsKey === key || entry === undefined;
-                      if (loading) {
-                        return <Input value="" disabled placeholder="Carregando horários…" />;
-                      }
-                      const slots = entry!.slots;
-                      // slots === null → sem agenda configurada → fallback livre
-                      if (slots === null) {
-                        return (
-                          <>
-                            <Input
-                              type="time"
-                              value={g.hora}
-                              onChange={(e) => updateGrupo(idx, { hora: e.target.value })}
-                            />
-                            <div className="mt-1 flex items-start gap-1 text-xs text-amber-600">
-                              <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
-                              <span>Sem agenda configurada — horário livre.</span>
-                            </div>
-                          </>
-                        );
-                      }
-                      if (slots.length === 0) {
-                        return (
-                          <>
-                            <Input value="" disabled placeholder="Sem horários nessa data" />
-                            <div className="mt-1 flex items-start gap-1 text-xs text-amber-600">
-                              <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
-                              <span>Nenhum horário livre nessa data. Escolha outro dia.</span>
-                            </div>
-                          </>
-                        );
-                      }
+                <div>
+                  <Label className="text-xs">Horário disponível</Label>
+                  {(() => {
+                    if (!g.medico_id || !g.data) {
+                      return <Input value="" disabled placeholder="Escolha profissional e data" />;
+                    }
+                    const key = slotKey(g.medico_id, g.data, g.duracao);
+                    const entry = slotsCache.get(key);
+                    const loading = loadingSlotsKey === key || (entry === undefined);
+                    if (loading) {
+                      return <Input value="" disabled placeholder="Carregando horários…" />;
+                    }
+                    const slots = entry!.slots;
+                    // slots === null → sem agenda configurada → fallback livre
+                    if (slots === null) {
                       return (
-                        <Select value={g.hora} onValueChange={(v) => updateGrupo(idx, { hora: v })}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione…" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-64">
-                            {slots.map((h) => (
-                              <SelectItem key={h} value={h}>
-                                {h}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <>
+                          <Input
+                            type="time"
+                            value={g.hora}
+                            onChange={(e) => updateGrupo(idx, { hora: e.target.value })}
+                          />
+                          <div className="mt-1 flex items-start gap-1 text-xs text-amber-600">
+                            <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                            <span>Sem agenda configurada — horário livre.</span>
+                          </div>
+                        </>
                       );
-                    })()}
-                  </div>
-                  <div>
-                    <Label className="text-xs">Duração (min)</Label>
-                    <Input
-                      type="number"
-                      min={5}
-                      step={5}
-                      value={g.duracao}
-                      onChange={(e) =>
-                        updateGrupo(idx, { duracao: Math.max(5, Number(e.target.value) || 30) })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Observações</Label>
-                    <Textarea
-                      rows={1}
-                      value={g.observacoes}
-                      onChange={(e) => updateGrupo(idx, { observacoes: e.target.value })}
-                    />
-                  </div>
+                    }
+                    if (slots.length === 0) {
+                      return (
+                        <>
+                          <Input value="" disabled placeholder="Sem horários nessa data" />
+                          <div className="mt-1 flex items-start gap-1 text-xs text-amber-600">
+                            <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                            <span>Nenhum horário livre nessa data. Escolha outro dia.</span>
+                          </div>
+                        </>
+                      );
+                    }
+                    return (
+                      <Select value={g.hora} onValueChange={(v) => updateGrupo(idx, { hora: v })}>
+                        <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+                        <SelectContent className="max-h-64">
+                          {slots.map((h) => (
+                            <SelectItem key={h} value={h}>{h}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    );
+                  })()}
+                </div>
+                <div>
+                  <Label className="text-xs">Duração (min)</Label>
+                  <Input
+                    type="number"
+                    min={5}
+                    step={5}
+                    value={g.duracao}
+                    onChange={(e) => updateGrupo(idx, { duracao: Math.max(5, Number(e.target.value) || 30) })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Observações</Label>
+                  <Textarea
+                    rows={1}
+                    value={g.observacoes}
+                    onChange={(e) => updateGrupo(idx, { observacoes: e.target.value })}
+                  />
                 </div>
               </div>
+            </div>
             );
           })}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancelar
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
           <Button onClick={handleSalvar} disabled={!podeSalvar || saving || loadingVinc}>
             {saving ? "Criando…" : `Criar ${grupos.length} agendamentos`}
           </Button>

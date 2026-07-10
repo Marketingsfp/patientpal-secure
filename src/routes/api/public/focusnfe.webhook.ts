@@ -64,16 +64,9 @@ export const Route = createFileRoute("/api/public/focusnfe/webhook")({
           return new Response("Unauthorized", { status: 401 });
         }
 
-        const body = (await request.json().catch(() => null)) as {
-          ref?: string;
-          status?: string;
-          numero?: string;
-          serie?: string;
-          codigo_verificacao?: string;
-          caminho_xml_nota_fiscal?: string;
-          caminho_danfse?: string;
-          mensagem_sefaz?: string;
-        } | null;
+        const body = (await request.json().catch(() => null)) as
+          | { ref?: string; status?: string; numero?: string; serie?: string; codigo_verificacao?: string; caminho_xml_nota_fiscal?: string; caminho_danfse?: string; mensagem_sefaz?: string }
+          | null;
         if (!body?.ref) return new Response("missing ref", { status: 400 });
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -87,10 +80,8 @@ export const Route = createFileRoute("/api/public/focusnfe/webhook")({
           updates.numero = body.numero ?? null;
           updates.serie = body.serie ?? null;
           updates.codigo_verificacao = body.codigo_verificacao ?? null;
-          if (body.caminho_danfse)
-            updates.url_pdf = `https://api.focusnfe.com.br${body.caminho_danfse}`;
-          if (body.caminho_xml_nota_fiscal)
-            updates.url_xml = `https://api.focusnfe.com.br${body.caminho_xml_nota_fiscal}`;
+          if (body.caminho_danfse) updates.url_pdf = `https://api.focusnfe.com.br${body.caminho_danfse}`;
+          if (body.caminho_xml_nota_fiscal) updates.url_xml = `https://api.focusnfe.com.br${body.caminho_xml_nota_fiscal}`;
         } else if (body.status === "cancelado") {
           updates.status = "cancelada";
           updates.cancelada_em = new Date().toISOString();

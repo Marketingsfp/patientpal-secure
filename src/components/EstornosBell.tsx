@@ -19,7 +19,8 @@ interface Solic {
   solicitado_por: string;
 }
 
-const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const fmt = (n: number) =>
+  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export function EstornosBell() {
   const { clinicaAtual } = useClinica();
@@ -30,10 +31,7 @@ export function EstornosBell() {
   const podeAprovar = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
 
   const load = useCallback(async () => {
-    if (!clinicaAtual) {
-      setItems([]);
-      return;
-    }
+    if (!clinicaAtual) { setItems([]); return; }
     const { data } = await supabase
       .from("estorno_solicitacoes")
       .select("id, paciente_nome, descricao, valor, motivo, solicitado_em, solicitado_por")
@@ -44,9 +42,7 @@ export function EstornosBell() {
     setItems((data ?? []) as Solic[]);
   }, [clinicaAtual]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   // Realtime
   useEffect(() => {
@@ -55,12 +51,7 @@ export function EstornosBell() {
       .channel(`estornos-${clinicaAtual.clinica_id}`)
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "estorno_solicitacoes",
-          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
-        },
+        { event: "*", schema: "public", table: "estorno_solicitacoes", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
         (payload) => {
           void load();
           // Toast quando uma nova solicitação chega (e não foi eu)
@@ -77,9 +68,7 @@ export function EstornosBell() {
         },
       )
       .subscribe();
-    return () => {
-      void supabase.removeChannel(ch);
-    };
+    return () => { void supabase.removeChannel(ch); };
   }, [clinicaAtual, load, podeAprovar, user?.id]);
 
   const count = items.length;
@@ -89,11 +78,7 @@ export function EstornosBell() {
       .from("estorno_solicitacoes")
       .update({ status: "cancelado", resolvido_em: new Date().toISOString() })
       .eq("id", id);
-    if (error) mostrarErro(error);
-    else {
-      toast.success("Solicitação cancelada");
-      void load();
-    }
+    if (error) mostrarErro(error); else { toast.success("Solicitação cancelada"); void load(); }
   };
 
   const rejeitar = async (id: string) => {
@@ -108,11 +93,7 @@ export function EstornosBell() {
         resposta: resp || null,
       })
       .eq("id", id);
-    if (error) mostrarErro(error);
-    else {
-      toast.success("Recusado");
-      void load();
-    }
+    if (error) mostrarErro(error); else { toast.success("Recusado"); void load(); }
   };
 
   return (
@@ -172,22 +153,12 @@ export function EstornosBell() {
                     </Link>
                   )}
                   {podeAprovar && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs"
-                      onClick={() => rejeitar(s.id)}
-                    >
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => rejeitar(s.id)}>
                       <X className="h-3 w-3 mr-1" /> Recusar
                     </Button>
                   )}
                   {minha && !podeAprovar && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs"
-                      onClick={() => cancelar(s.id)}
-                    >
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => cancelar(s.id)}>
                       Cancelar
                     </Button>
                   )}

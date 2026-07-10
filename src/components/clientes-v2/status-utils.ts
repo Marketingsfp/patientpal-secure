@@ -30,8 +30,7 @@ export interface PacienteV2 {
 /** Nunca usar "Convênio" — apenas Particular / Associado / Cartão de Benefícios. */
 export function pagadorLabel(p: PacienteV2): { tipo: PagadorTipo; label: string } {
   if (p.tem_cartao_beneficios) return { tipo: "cartao", label: "Cartão de Benefícios" };
-  if (p.associado_convenio)
-    return { tipo: "associado", label: `Associado — ${p.associado_convenio}` };
+  if (p.associado_convenio) return { tipo: "associado", label: `Associado — ${p.associado_convenio}` };
   return { tipo: "particular", label: "Particular" };
 }
 
@@ -103,12 +102,8 @@ export function fmtNasc(v: string | null): string {
 export function marcarDuplicados<T extends PacienteV2>(rows: T[]): T[] {
   const chave = (p: T) =>
     (p.nome ?? "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toUpperCase()
-      .trim() +
-    "|" +
-    (p.data_nascimento ?? "");
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase().trim() + "|" + (p.data_nascimento ?? "");
   const contagem = new Map<string, number>();
   for (const p of rows) {
     if (!p.data_nascimento) continue;

@@ -5,12 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,17 +26,11 @@ interface Props {
   onCreated?: () => void;
 }
 
-const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const fmt = (n: number) =>
+  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export function SolicitarEstornoDialog({
-  open,
-  onOpenChange,
-  descricao,
-  valor,
-  pacienteNome,
-  lancamentoId,
-  agendamentoId,
-  onCreated,
+  open, onOpenChange, descricao, valor, pacienteNome, lancamentoId, agendamentoId, onCreated,
 }: Props) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
@@ -89,10 +78,7 @@ export function SolicitarEstornoDialog({
     e.preventDefault();
     if (!clinicaAtual || !user) return;
     const txt = motivo.trim();
-    if (txt.length < 5) {
-      toast.error("Descreva o motivo (mínimo 5 caracteres)");
-      return;
-    }
+    if (txt.length < 5) { toast.error("Descreva o motivo (mínimo 5 caracteres)"); return; }
     setSaving(true);
     // Evita duplicidade: se já existe uma solicitação pendente ou aprovada
     // para o mesmo lançamento ou agendamento, não cria outra.
@@ -144,16 +130,13 @@ export function SolicitarEstornoDialog({
       valor: valor ?? null,
       motivo: txt,
       tipo,
-      data_pagamento_original: tipo === "devolucao" ? dataPagamentoOriginal || null : null,
-      data_estorno: tipo === "devolucao" ? dataEstorno || null : null,
+      data_pagamento_original: tipo === "devolucao" ? (dataPagamentoOriginal || null) : null,
+      data_estorno: tipo === "devolucao" ? (dataEstorno || null) : null,
       status: "pendente",
       solicitado_por: user.id,
     });
     setSaving(false);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     toast.success("Solicitação enviada ao financeiro");
     setMotivo("");
     setTipo("erro_caixa");
@@ -176,23 +159,9 @@ export function SolicitarEstornoDialog({
           <div className="space-y-3 py-2">
             {(descricao || valor != null || pacienteNome) && (
               <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-0.5">
-                {pacienteNome && (
-                  <div>
-                    <span className="text-muted-foreground">Paciente:</span>{" "}
-                    <strong>{pacienteNome}</strong>
-                  </div>
-                )}
-                {descricao && (
-                  <div>
-                    <span className="text-muted-foreground">Lançamento:</span> {descricao}
-                  </div>
-                )}
-                {valor != null && (
-                  <div>
-                    <span className="text-muted-foreground">Valor:</span>{" "}
-                    <strong>{fmt(Number(valor))}</strong>
-                  </div>
-                )}
+                {pacienteNome && <div><span className="text-muted-foreground">Paciente:</span> <strong>{pacienteNome}</strong></div>}
+                {descricao && <div><span className="text-muted-foreground">Lançamento:</span> {descricao}</div>}
+                {valor != null && <div><span className="text-muted-foreground">Valor:</span> <strong>{fmt(Number(valor))}</strong></div>}
               </div>
             )}
             <div>
@@ -206,18 +175,14 @@ export function SolicitarEstornoDialog({
                   <RadioGroupItem value="erro_caixa" id="t-erro" className="mt-0.5" />
                   <div className="text-sm">
                     <div className="font-medium">Erro de caixa</div>
-                    <div className="text-xs text-muted-foreground">
-                      Cobrança errada, duplicidade, valor incorreto.
-                    </div>
+                    <div className="text-xs text-muted-foreground">Cobrança errada, duplicidade, valor incorreto.</div>
                   </div>
                 </label>
                 <label className="flex items-start gap-2 rounded-md border p-3 cursor-pointer hover:bg-muted/40">
                   <RadioGroupItem value="devolucao" id="t-dev" className="mt-0.5" />
                   <div className="text-sm">
                     <div className="font-medium">Devolução ao paciente</div>
-                    <div className="text-xs text-muted-foreground">
-                      Desistência, ocorrido, reembolso (pode ser em outro dia).
-                    </div>
+                    <div className="text-xs text-muted-foreground">Desistência, ocorrido, reembolso (pode ser em outro dia).</div>
                   </div>
                 </label>
               </RadioGroup>
@@ -266,12 +231,7 @@ export function SolicitarEstornoDialog({
             </div>
           </div>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={saving}
-            >
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               Cancelar
             </Button>
             <Button type="submit" disabled={saving}>

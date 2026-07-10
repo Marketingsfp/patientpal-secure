@@ -1,22 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { Pencil, FileText, Calendar as CalIcon, CreditCard } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
-  cadastroIncompleto,
-  calcularIdade,
-  fmtCPF,
-  fmtNasc,
-  fmtTel,
-  pagadorLabel,
-  type PacienteV2,
+  cadastroIncompleto, calcularIdade, fmtCPF, fmtNasc, fmtTel,
+  pagadorLabel, type PacienteV2,
 } from "./status-utils";
 
 interface Props {
@@ -47,10 +36,7 @@ export function ClienteDrawer({ paciente, onClose }: Props) {
 
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
               <Info k="CPF" v={fmtCPF(p.cpf)} />
-              <Info
-                k="Nascimento"
-                v={`${fmtNasc(p.data_nascimento)}${idade !== null ? ` · ${idade}a` : ""}`}
-              />
+              <Info k="Nascimento" v={`${fmtNasc(p.data_nascimento)}${idade !== null ? ` · ${idade}a` : ""}`} />
               <Info k="Telefone" v={fmtTel(p.telefone)} />
               <Info k="Telefone 2" v={fmtTel(p.telefone2 ?? null)} />
               <Info k="E-mail" v={p.email ?? "—"} />

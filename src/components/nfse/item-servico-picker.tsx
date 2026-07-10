@@ -2,14 +2,7 @@ import { useMemo, useState } from "react";
 import { Check, ChevronsUpDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { LISTA_SERVICO_NACIONAL } from "@/data/lista-servico-nacional";
 
@@ -23,7 +16,10 @@ export function ItemServicoPicker({ value, onChange, placeholder = "Buscar servi
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const selected = useMemo(() => LISTA_SERVICO_NACIONAL.find((i) => i.codigo === value), [value]);
+  const selected = useMemo(
+    () => LISTA_SERVICO_NACIONAL.find((i) => i.codigo === value),
+    [value],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -82,9 +78,7 @@ export function ItemServicoPicker({ value, onChange, placeholder = "Buscar servi
                   }}
                   className="gap-2"
                 >
-                  <Check
-                    className={cn("h-4 w-4", value === i.codigo ? "opacity-100" : "opacity-0")}
-                  />
+                  <Check className={cn("h-4 w-4", value === i.codigo ? "opacity-100" : "opacity-0")} />
                   <span className="font-mono text-xs w-16 shrink-0">{i.codigo}</span>
                   <span className="text-sm">{i.descricao}</span>
                 </CommandItem>

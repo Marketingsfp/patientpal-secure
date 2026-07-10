@@ -45,10 +45,7 @@ export async function metaCreateTemplate(
     body: JSON.stringify(payload),
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok)
-    throw new Error(
-      (json as any)?.error?.error_user_msg ?? (json as any)?.error?.message ?? `HTTP ${res.status}`,
-    );
+  if (!res.ok) throw new Error((json as any)?.error?.error_user_msg ?? (json as any)?.error?.message ?? `HTTP ${res.status}`);
   return json as { id: string; status: string; category: string };
 }
 
@@ -107,20 +104,23 @@ export async function metaSendText(
   to: string,
   text: string,
 ): Promise<{ wa_message_id: string | null }> {
-  const res = await fetch(`https://graph.facebook.com/${META_VERSION}/${phoneNumberId}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
+  const res = await fetch(
+    `https://graph.facebook.com/${META_VERSION}/${phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "text",
+        text: { body: text.slice(0, 4000) },
+      }),
     },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to,
-      type: "text",
-      text: { body: text.slice(0, 4000) },
-    }),
-  });
+  );
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     const metaErr = (json as any)?.error ?? {};
@@ -173,13 +173,10 @@ function extrairIdentificadores(mensagem: string): {
   const cpfDigits = cpfMatch ? cpfMatch[0].replace(/\D/g, "") : "";
   // Telefone: 10 ou 11 dígitos consecutivos (com ou sem máscara/DDI)
   const telMatch = texto.replace(/\D/g, "").match(/\d{10,13}/);
-  const telDigits =
-    (telMatch && telMatch[0].length !== 11) || !cpfDigits ? (telMatch?.[0] ?? "") : "";
+  const telDigits = telMatch && telMatch[0].length !== 11 || !cpfDigits ? telMatch?.[0] ?? "" : "";
   // Nome candidato: sequência de 2+ palavras alfabéticas iniciando com maiúsculas
   // (regex simples — a IA fará o resto)
-  const nomeMatch = texto.match(
-    /\b([A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]+){1,4})\b/,
-  );
+  const nomeMatch = texto.match(/\b([A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]+(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]+){1,4})\b/);
   return {
     cpf: cpfDigits.length === 11 ? cpfDigits : null,
     telefone: telDigits && telDigits.length >= 10 ? telDigits : null,
@@ -235,7 +232,11 @@ export async function gerarRespostaNina(
   const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
   const [medR, dispR, procR, cliR, pacienteInfo] = await Promise.all([
-    supabaseAdmin.from("medicos").select("id, nome").eq("clinica_id", clinicaId).eq("ativo", true),
+    supabaseAdmin
+      .from("medicos")
+      .select("id, nome")
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true),
     supabaseAdmin
       .from("medico_disponibilidades")
       .select("medico_id, agenda_id, dia_semana, hora_inicio, hora_fim, observacoes")
@@ -246,12 +247,12 @@ export async function gerarRespostaNina(
       .select("nome, grupo, valor_dinheiro_pix, valor_cartao, preparo")
       .eq("clinica_id", clinicaId)
       .eq("ativo", true),
-    supabaseAdmin.from("clinicas").select("nome, base_importada").eq("id", clinicaId).maybeSingle(),
-    identificarPaciente(
-      clinicaId,
-      mensagemPaciente,
-      normalizarTelefoneRemetente(telefoneRemetente ?? null),
-    ),
+    supabaseAdmin
+      .from("clinicas")
+      .select("nome, base_importada")
+      .eq("id", clinicaId)
+      .maybeSingle(),
+    identificarPaciente(clinicaId, mensagemPaciente, normalizarTelefoneRemetente(telefoneRemetente ?? null)),
   ]);
 
   const baseImportada = (cliR.data as any)?.base_importada === true;

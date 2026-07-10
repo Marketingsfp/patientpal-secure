@@ -21,16 +21,8 @@ interface VirtualListProps<T> {
  * `endThresholdPx` do fim (para scroll infinito).
  */
 export function VirtualList<T>({
-  items,
-  estimateSize = 44,
-  overscan = 8,
-  className,
-  itemClassName,
-  renderItem,
-  getKey,
-  onEndReached,
-  endThresholdPx = 400,
-  emptyState,
+  items, estimateSize = 44, overscan = 8, className, itemClassName,
+  renderItem, getKey, onEndReached, endThresholdPx = 400, emptyState,
 }: VirtualListProps<T>) {
   const parentRef = useRef<HTMLDivElement>(null);
   const rowVirtualizer = useVirtualizer({
@@ -52,9 +44,7 @@ export function VirtualList<T>({
   };
 
   if (items.length === 0 && emptyState) {
-    return (
-      <div className={cn("h-full flex items-center justify-center", className)}>{emptyState}</div>
-    );
+    return <div className={cn("h-full flex items-center justify-center", className)}>{emptyState}</div>;
   }
 
   return (

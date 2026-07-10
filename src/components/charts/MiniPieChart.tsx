@@ -14,14 +14,8 @@ export interface MiniPieChartProps {
 }
 
 const DEFAULT_COLORS = [
-  "#13b5a3",
-  "#3b82f6",
-  "#f59e0b",
-  "#ef4444",
-  "#a855f7",
-  "#10b981",
-  "#ec4899",
-  "#6366f1",
+  "#13b5a3", "#3b82f6", "#f59e0b", "#ef4444",
+  "#a855f7", "#10b981", "#ec4899", "#6366f1",
 ];
 
 /**
@@ -50,12 +44,11 @@ export function MiniPieChart({
       const y1 = cy - r * Math.cos(start);
       const x2 = cx + r * Math.sin(end);
       const y2 = cy - r * Math.cos(end);
-      const path =
-        total === 0
-          ? ""
-          : data.length === 1
-            ? `M ${cx - r} ${cy} A ${r} ${r} 0 1 1 ${cx + r} ${cy} A ${r} ${r} 0 1 1 ${cx - r} ${cy} Z`
-            : `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+      const path = total === 0
+        ? ""
+        : data.length === 1
+        ? `M ${cx - r} ${cy} A ${r} ${r} 0 1 1 ${cx + r} ${cy} A ${r} ${r} 0 1 1 ${cx - r} ${cy} Z`
+        : `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
       return {
         ...d,
         path,
@@ -85,10 +78,7 @@ export function MiniPieChart({
       <ul className="flex-1 min-w-0 space-y-1 text-xs overflow-auto" style={{ maxHeight: height }}>
         {slices.map((s, i) => (
           <li key={i} className="flex items-center gap-2">
-            <span
-              className="inline-block w-3 h-3 rounded-sm flex-none"
-              style={{ background: s.color }}
-            />
+            <span className="inline-block w-3 h-3 rounded-sm flex-none" style={{ background: s.color }} />
             <span className="truncate flex-1">{s.name}</span>
             <span className="tabular-nums text-muted-foreground">{s.pct.toFixed(1)}%</span>
           </li>

@@ -24,16 +24,9 @@ export function IdadeIcon({ nascimento, size = 18, className }: IdadeIconProps) 
   if (idade === null || idade < 0) return null;
   let src: string | null = null;
   let label = "";
-  if (idade <= 2) {
-    src = iconBebe;
-    label = "Bebê";
-  } else if (idade <= 10) {
-    src = iconCriancas;
-    label = "Criança";
-  } else if (idade >= 65) {
-    src = iconIdoso;
-    label = "Idoso";
-  }
+  if (idade <= 2) { src = iconBebe; label = "Bebê"; }
+  else if (idade <= 10) { src = iconCriancas; label = "Criança"; }
+  else if (idade >= 65) { src = iconIdoso; label = "Idoso"; }
   if (!src) return null;
   return (
     <img

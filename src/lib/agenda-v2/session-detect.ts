@@ -120,25 +120,14 @@ export function tipoDoProcedimento(p: ProcMeta): TipoSessao {
   const n = p.nome ?? "";
   // Nome tem prioridade (o texto livre do agendamento costuma trazer o tipo entre parênteses).
   if (has(g, "laborat") || has(n, "laborat") || has(n, "coleta")) return "coleta_laboratorial";
-  if (has(g, "endoscop") || has(g, "colonoscop") || has(n, "endoscop") || has(n, "colonoscop"))
-    return "endoscopia";
+  if (has(g, "endoscop") || has(g, "colonoscop") || has(n, "endoscop") || has(n, "colonoscop")) return "endoscopia";
   if (has(g, "cardio") || has(n, "eletrocardio") || has(n, "ecocardio")) return "cardiologica";
   if (
-    has(g, "imagem") ||
-    has(g, "tomograf") ||
-    has(g, "ultrass") ||
-    has(g, "densitomet") ||
-    has(g, "raio") ||
-    has(g, "ressonan") ||
-    has(n, "raio-x") ||
-    has(n, "raio x") ||
-    has(n, "tomograf") ||
-    has(n, "ultrass") ||
-    has(n, "densitomet") ||
-    has(n, "ressonan") ||
-    has(n, "mamograf")
-  )
-    return "imagem";
+    has(g, "imagem") || has(g, "tomograf") || has(g, "ultrass") || has(g, "densitomet") ||
+    has(g, "raio") || has(g, "ressonan") ||
+    has(n, "raio-x") || has(n, "raio x") || has(n, "tomograf") || has(n, "ultrass") ||
+    has(n, "densitomet") || has(n, "ressonan") || has(n, "mamograf")
+  ) return "imagem";
   if (has(g, "cirurg") || has(n, "cirurgia")) return "cirurgia";
   if (has(t, "consulta")) return "consulta";
   if (has(t, "exame")) return "procedimento_ambulatorial";
@@ -161,13 +150,8 @@ export function tipoDaSessao(items: ProcMeta[]): TipoSessao {
   if (tipos.every((t) => t === "coleta_laboratorial")) return "coleta_laboratorial";
   if (tipos.every((t) => t === "imagem")) return "imagem";
   const prioridade: TipoSessao[] = [
-    "cirurgia",
-    "endoscopia",
-    "cardiologica",
-    "imagem",
-    "coleta_laboratorial",
-    "procedimento_ambulatorial",
-    "consulta",
+    "cirurgia", "endoscopia", "cardiologica", "imagem",
+    "coleta_laboratorial", "procedimento_ambulatorial", "consulta",
   ];
   for (const p of prioridade) if (uniq.has(p)) return p;
   return "consulta";

@@ -4,12 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
 } from "@/components/ui/command";
 
 export type SearchableOption = { value: string; label: string };
@@ -39,12 +34,7 @@ export function SearchableSelect({
   const selected = useMemo(() => options.find((o) => o.value === value), [options, value]);
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(o) => {
-        if (!disabled) setOpen(o);
-      }}
-    >
+    <Popover open={open} onOpenChange={(o) => { if (!disabled) setOpen(o); }}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -54,7 +44,9 @@ export function SearchableSelect({
           disabled={disabled}
           className={cn("w-full justify-between font-normal", className)}
         >
-          <span className="truncate text-left">{selected ? selected.label : placeholder}</span>
+          <span className="truncate text-left">
+            {selected ? selected.label : placeholder}
+          </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -87,7 +79,10 @@ export function SearchableSelect({
                   }}
                 >
                   <Check
-                    className={cn("mr-2 h-4 w-4", value === o.value ? "opacity-100" : "opacity-0")}
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === o.value ? "opacity-100" : "opacity-0",
+                    )}
                   />
                   <span className="truncate">{o.label}</span>
                 </CommandItem>

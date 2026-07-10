@@ -22,14 +22,8 @@ export interface HhpDrawerProps {
 }
 
 export function HhpDrawer({
-  open,
-  onOpenChange,
-  title,
-  description,
-  hiddenTitle = true,
-  side = "right",
-  maxWidth = "520px",
-  children,
+  open, onOpenChange, title, description, hiddenTitle = true,
+  side = "right", maxWidth = "520px", children,
 }: HhpDrawerProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -45,13 +39,9 @@ export function HhpDrawer({
           </VisuallyHidden.Root>
         ) : (
           <div className="px-6 pt-6 pb-2">
-            <SheetTitle className="text-base font-semibold tracking-tight text-slate-900">
-              {title}
-            </SheetTitle>
+            <SheetTitle className="text-base font-semibold tracking-tight text-slate-900">{title}</SheetTitle>
             {description && (
-              <SheetDescription className="text-xs text-slate-500 mt-1">
-                {description}
-              </SheetDescription>
+              <SheetDescription className="text-xs text-slate-500 mt-1">{description}</SheetDescription>
             )}
           </div>
         )}

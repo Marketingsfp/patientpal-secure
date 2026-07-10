@@ -51,22 +51,8 @@ export function MiniBarChart({
           const y = padT + innerH - (v / max) * innerH;
           return (
             <g key={i}>
-              <line
-                x1={padL}
-                x2={W - padR}
-                y1={y}
-                y2={y}
-                stroke="currentColor"
-                strokeOpacity={0.1}
-              />
-              <text
-                x={padL - 6}
-                y={y + 4}
-                fontSize="10"
-                textAnchor="end"
-                fill="currentColor"
-                opacity={0.6}
-              >
+              <line x1={padL} x2={W - padR} y1={y} y2={y} stroke="currentColor" strokeOpacity={0.1} />
+              <text x={padL - 6} y={y + 4} fontSize="10" textAnchor="end" fill="currentColor" opacity={0.6}>
                 {formatY(v)}
               </text>
             </g>

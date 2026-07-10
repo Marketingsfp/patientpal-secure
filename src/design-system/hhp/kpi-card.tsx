@@ -23,16 +23,8 @@ export interface HhpKpiCardProps {
 }
 
 export function HhpKpiCard({
-  label,
-  value,
-  icon: Icon = Activity,
-  tone = "default",
-  hint,
-  delta,
-  active,
-  compact = false,
-  onClick,
-  className,
+  label, value, icon: Icon = Activity, tone = "default",
+  hint, delta, active, compact = false, onClick, className,
 }: HhpKpiCardProps) {
   const Comp = onClick ? "button" : "div";
   return (
@@ -65,30 +57,23 @@ export function HhpKpiCard({
         <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
           {label}
         </span>
-        <span
-          className={cn(
-            "inline-flex h-6 w-6 items-center justify-center rounded-lg",
-            HHP_TONE_BG[tone],
-          )}
-        >
+        <span className={cn("inline-flex h-6 w-6 items-center justify-center rounded-lg", HHP_TONE_BG[tone])}>
           <Icon className="h-3 w-3" strokeWidth={2.5} />
         </span>
       </div>
-      <div className="mt-2 flex items-baseline gap-1.5">
+      <div className="mt-2 flex items-baseline gap-1.5 hhp-kpi-anim">
         <span
-          className={cn("tabular-nums font-bold text-slate-900", compact ? "text-xl" : "text-3xl")}
+          className={cn(
+            "tabular-nums font-bold text-slate-900",
+            compact ? "text-xl" : "text-3xl",
+          )}
+          style={{ fontFamily: "var(--hhp-font-display)", letterSpacing: "-0.02em" }}
         >
           {typeof value === "number" ? value.toLocaleString("pt-BR") : value}
         </span>
         {delta !== undefined && delta !== 0 && (
-          <span
-            className={cn(
-              "text-[10px] font-semibold tabular-nums",
-              delta > 0 ? HHP_TONE_TEXT[tone] : "text-slate-400",
-            )}
-          >
-            {delta > 0 ? "+" : ""}
-            {delta}
+          <span className={cn("text-[10px] font-semibold tabular-nums", delta > 0 ? HHP_TONE_TEXT[tone] : "text-slate-400")}>
+            {delta > 0 ? "+" : ""}{delta}
           </span>
         )}
       </div>
@@ -98,14 +83,8 @@ export function HhpKpiCard({
 
 /** Grade responsiva de KPIs com scroll horizontal no mobile e grid ≥ md. */
 export function HhpKpiRow({
-  children,
-  compact = false,
-  className,
-}: {
-  children: React.ReactNode;
-  compact?: boolean;
-  className?: string;
-}) {
+  children, compact = false, className,
+}: { children: React.ReactNode; compact?: boolean; className?: string }) {
   return (
     <div
       className={cn(

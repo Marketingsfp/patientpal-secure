@@ -13,9 +13,7 @@ export const Route = createFileRoute("/lp/$slug")({
   loader: async ({ params }) => {
     const { data, error } = await supabase
       .from("mkt_landing_pages")
-      .select(
-        "id, clinica_id, slug, titulo, subtitulo, hero_imagem_url, cor_primaria, cta_label, campos, conteudo_html, status",
-      )
+      .select("id, clinica_id, slug, titulo, subtitulo, hero_imagem_url, cor_primaria, cta_label, campos, conteudo_html, status")
       .eq("slug", params.slug)
       .eq("status", "publicada")
       .maybeSingle();
@@ -101,16 +99,10 @@ function LandingPageView() {
     <div className="min-h-screen bg-background">
       <div className="max-w-5xl mx-auto px-6 py-16 grid md:grid-cols-2 gap-12 items-center">
         <div className="space-y-6">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight" style={{ color: cor }}>
-            {page.titulo}
-          </h1>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight" style={{ color: cor }}>{page.titulo}</h1>
           {page.subtitulo && <p className="text-lg text-muted-foreground">{page.subtitulo}</p>}
           {page.hero_imagem_url && (
-            <img
-              src={page.hero_imagem_url}
-              alt={page.titulo}
-              className="w-full rounded-2xl shadow-lg"
-            />
+            <img src={page.hero_imagem_url} alt={page.titulo} className="w-full rounded-2xl shadow-lg" />
           )}
           {page.conteudo_html && (
             // eslint-disable-next-line react/no-danger
@@ -130,60 +122,26 @@ function LandingPageView() {
             <div className="text-center space-y-3 py-8">
               <CheckCircle2 className="h-12 w-12 mx-auto" style={{ color: cor }} />
               <h2 className="text-xl font-semibold">Recebemos seu contato!</h2>
-              <p className="text-sm text-muted-foreground">
-                Em breve nossa equipe entrará em contato.
-              </p>
+              <p className="text-sm text-muted-foreground">Em breve nossa equipe entrará em contato.</p>
             </div>
           ) : (
             <form onSubmit={submit} className="space-y-4">
               <h2 className="text-xl font-semibold">Preencha e fale conosco</h2>
               {campos.includes("nome") && (
-                <div className="space-y-1">
-                  <Label>Nome *</Label>
-                  <Input
-                    required
-                    value={form.nome}
-                    onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                  />
-                </div>
+                <div className="space-y-1"><Label>Nome *</Label><Input required value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} /></div>
               )}
               {campos.includes("telefone") && (
-                <div className="space-y-1">
-                  <Label>Telefone</Label>
-                  <Input
-                    value={form.telefone}
-                    onChange={(e) => setForm({ ...form, telefone: e.target.value })}
-                  />
-                </div>
+                <div className="space-y-1"><Label>Telefone</Label><Input value={form.telefone} onChange={e => setForm({ ...form, telefone: e.target.value })} /></div>
               )}
               {campos.includes("email") && (
-                <div className="space-y-1">
-                  <Label>E-mail</Label>
-                  <Input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  />
-                </div>
+                <div className="space-y-1"><Label>E-mail</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
               )}
               {campos.includes("mensagem") && (
-                <div className="space-y-1">
-                  <Label>Mensagem</Label>
-                  <Textarea
-                    rows={3}
-                    value={form.mensagem}
-                    onChange={(e) => setForm({ ...form, mensagem: e.target.value })}
-                  />
-                </div>
+                <div className="space-y-1"><Label>Mensagem</Label><Textarea rows={3} value={form.mensagem} onChange={e => setForm({ ...form, mensagem: e.target.value })} /></div>
               )}
               {erro && <p className="text-sm text-rose-600">{erro}</p>}
-              <Button
-                type="submit"
-                disabled={enviando}
-                className="w-full text-white"
-                style={{ backgroundColor: cor }}
-              >
-                {enviando ? "Enviando..." : page.cta_label || "Enviar"}
+              <Button type="submit" disabled={enviando} className="w-full text-white" style={{ backgroundColor: cor }}>
+                {enviando ? "Enviando..." : (page.cta_label || "Enviar")}
               </Button>
             </form>
           )}

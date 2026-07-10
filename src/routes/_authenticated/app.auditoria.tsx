@@ -10,21 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { exportToExcel } from "@/lib/export-csv";
@@ -46,11 +33,7 @@ interface AuditRow {
   created_at: string;
 }
 
-const ACTION_LABEL: Record<string, string> = {
-  INSERT: "Criou",
-  UPDATE: "Alterou",
-  DELETE: "Excluiu",
-};
+const ACTION_LABEL: Record<string, string> = { INSERT: "Criou", UPDATE: "Alterou", DELETE: "Excluiu" };
 const ACTION_COLOR: Record<string, string> = {
   INSERT: "bg-emerald-100 text-emerald-700",
   UPDATE: "bg-amber-100 text-amber-700",
@@ -84,27 +67,16 @@ function Page() {
     if (dataFim) q = q.lte("created_at", new Date(`${dataFim}T23:59:59`).toISOString());
     const { data, error } = await q;
     setLoading(false);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
     setRows((data as unknown as AuditRow[]) ?? []);
   };
 
-  useEffect(() => {
-    void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [clinicaAtual?.clinica_id]);
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
 
-  const tabelasUnicas = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.table_name))).sort(),
-    [rows],
-  );
+  const tabelasUnicas = useMemo(() => Array.from(new Set(rows.map((r) => r.table_name))).sort(), [rows]);
 
   const exportar = () => {
-    if (rows.length === 0) {
-      toast.error("Sem dados para exportar");
-      return;
-    }
+    if (rows.length === 0) { toast.error("Sem dados para exportar"); return; }
     exportToExcel(
       rows.map((r) => ({
         data: new Date(r.created_at).toLocaleString("pt-BR"),
@@ -134,20 +106,12 @@ function Page() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <ShieldCheck className="h-6 w-6 text-primary" /> Auditoria de uso
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Histórico de alterações no sistema — {clinicaAtual.clinica.nome}
-          </p>
+          <h1 className="text-2xl font-semibold flex items-center gap-2"><ShieldCheck className="h-6 w-6 text-primary" /> Auditoria de uso</h1>
+          <p className="text-sm text-muted-foreground">Histórico de alterações no sistema — {clinicaAtual.clinica.nome}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => void load()} disabled={loading}>
-            <RefreshCw className="h-4 w-4 mr-1" /> Atualizar
-          </Button>
-          <Button onClick={exportar}>
-            <Download className="h-4 w-4 mr-1" /> Baixar Excel
-          </Button>
+          <Button variant="outline" onClick={() => void load()} disabled={loading}><RefreshCw className="h-4 w-4 mr-1" /> Atualizar</Button>
+          <Button onClick={exportar}><Download className="h-4 w-4 mr-1" /> Baixar Excel</Button>
         </div>
       </div>
 
@@ -156,25 +120,17 @@ function Page() {
           <div>
             <Label className="text-xs">Tabela</Label>
             <Select value={tabela} onValueChange={setTabela}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
-                {tabelasUnicas.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
+                {tabelasUnicas.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div>
             <Label className="text-xs">Ação</Label>
             <Select value={acao} onValueChange={setAcao}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas</SelectItem>
                 <SelectItem value="INSERT">Criou</SelectItem>
@@ -185,11 +141,7 @@ function Page() {
           </div>
           <div>
             <Label className="text-xs">Usuário (e-mail)</Label>
-            <Input
-              value={usuario}
-              onChange={(e) => setUsuario(e.target.value)}
-              placeholder="Buscar e-mail..."
-            />
+            <Input value={usuario} onChange={(e) => setUsuario(e.target.value)} placeholder="Buscar e-mail..." />
           </div>
           <div>
             <Label className="text-xs">De</Label>
@@ -219,76 +171,43 @@ function Page() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  Carregando…
-                </TableCell>
-              </TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
             ) : rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  Nenhum registro de auditoria encontrado.
+              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum registro de auditoria encontrado.</TableCell></TableRow>
+            ) : rows.map((r) => (
+              <TableRow key={r.id}>
+                <TableCell className="text-sm">{new Date(r.created_at).toLocaleString("pt-BR")}</TableCell>
+                <TableCell className="text-sm">{r.user_email ?? "—"}</TableCell>
+                <TableCell><Badge className={ACTION_COLOR[r.action]}>{ACTION_LABEL[r.action] ?? r.action}</Badge></TableCell>
+                <TableCell className="text-sm font-mono">{r.table_name}</TableCell>
+                <TableCell className="text-xs font-mono text-muted-foreground truncate max-w-[200px]">{r.record_id ?? "—"}</TableCell>
+                <TableCell className="text-right">
+                  <Button size="sm" variant="ghost" onClick={() => setDetalhe(r)}>Ver</Button>
                 </TableCell>
               </TableRow>
-            ) : (
-              rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="text-sm">
-                    {new Date(r.created_at).toLocaleString("pt-BR")}
-                  </TableCell>
-                  <TableCell className="text-sm">{r.user_email ?? "—"}</TableCell>
-                  <TableCell>
-                    <Badge className={ACTION_COLOR[r.action]}>
-                      {ACTION_LABEL[r.action] ?? r.action}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm font-mono">{r.table_name}</TableCell>
-                  <TableCell className="text-xs font-mono text-muted-foreground truncate max-w-[200px]">
-                    {r.record_id ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button size="sm" variant="ghost" onClick={() => setDetalhe(r)}>
-                      Ver
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
+            ))}
           </TableBody>
         </Table>
       </div>
 
       <Dialog open={!!detalhe} onOpenChange={(o) => !o && setDetalhe(null)}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
-          <DialogHeader>
-            <DialogTitle>Detalhes da alteração</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Detalhes da alteração</DialogTitle></DialogHeader>
           {detalhe && (
             <div className="space-y-3 text-sm">
-              <div>
-                <strong>Usuário:</strong> {detalhe.user_email ?? "—"}
-              </div>
-              <div>
-                <strong>Data:</strong> {new Date(detalhe.created_at).toLocaleString("pt-BR")}
-              </div>
-              <div>
-                <strong>Tabela:</strong> {detalhe.table_name} | <strong>Ação:</strong>{" "}
-                {ACTION_LABEL[detalhe.action]}
-              </div>
+              <div><strong>Usuário:</strong> {detalhe.user_email ?? "—"}</div>
+              <div><strong>Data:</strong> {new Date(detalhe.created_at).toLocaleString("pt-BR")}</div>
+              <div><strong>Tabela:</strong> {detalhe.table_name} | <strong>Ação:</strong> {ACTION_LABEL[detalhe.action]}</div>
               {detalhe.dados_antes && (
                 <div>
                   <strong>Antes:</strong>
-                  <pre className="bg-muted p-3 rounded text-xs overflow-auto mt-1">
-                    {JSON.stringify(detalhe.dados_antes, null, 2)}
-                  </pre>
+                  <pre className="bg-muted p-3 rounded text-xs overflow-auto mt-1">{JSON.stringify(detalhe.dados_antes, null, 2)}</pre>
                 </div>
               )}
               {detalhe.dados_depois && (
                 <div>
                   <strong>Depois:</strong>
-                  <pre className="bg-muted p-3 rounded text-xs overflow-auto mt-1">
-                    {JSON.stringify(detalhe.dados_depois, null, 2)}
-                  </pre>
+                  <pre className="bg-muted p-3 rounded text-xs overflow-auto mt-1">{JSON.stringify(detalhe.dados_depois, null, 2)}</pre>
                 </div>
               )}
             </div>

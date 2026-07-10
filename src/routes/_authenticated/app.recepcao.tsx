@@ -48,16 +48,28 @@ function RecepcaoPage() {
   const [chamadas, setChamadas] = useState<Senha[]>([]);
   const [busy, setBusy] = useState(false);
 
+  // Refs para o atalho de teclado sempre ler o valor mais recente
+  // sem precisar remontar o listener a cada mudança
+  const clinicaIdRef = useRef(clinicaAtual?.clinica_id);
+  useEffect(() => { clinicaIdRef.current = clinicaAtual?.clinica_id; }, [clinicaAtual?.clinica_id]);
+
+  // Carrega o guichê salvo assim que a clínica é conhecida (namespaced por clínica)
   useEffect(() => {
-    localStorage.setItem("guiche", guiche);
-  }, [guiche]);
+    if (!clinicaAtual) return;
+    const saved = localStorage.getItem(`guiche:${clinicaAtual.clinica_id}`);
+    setGuiche(saved ?? "1");
+  }, [clinicaAtual?.clinica_id]);
+
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    localStorage.setItem(`guiche:${clinicaAtual.clinica_id}`, guiche);
+  }, [guiche, clinicaAtual?.clinica_id]);
 
   // Atalho: C = chamar próxima senha
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tgt = e.target as HTMLElement | null;
-      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable))
-        return;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key.toLowerCase() === "c") {
         e.preventDefault();
@@ -73,24 +85,10 @@ function RecepcaoPage() {
   const carregar = async () => {
     if (!clinicaAtual) return;
     const hoje = new Date().toISOString().slice(0, 10);
-    const sel =
-      "id, codigo, tipo, status, guiche, emitida_em, chamada_em, identificado_por_facial, paciente_id, pacientes(nome)";
-    const [{ data: emit }, { data: cham }] = await Promise.all([
-      supabase
-        .from("senhas")
-        .select(sel)
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("data_dia", hoje)
-        .eq("status", "emitida")
-        .order("emitida_em"),
-      supabase
-        .from("senhas")
-        .select(sel)
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("data_dia", hoje)
-        .eq("status", "chamada")
-        .order("chamada_em", { ascending: false })
-        .limit(10),
+    const sel = "id, codigo, tipo, status, guiche, emitida_em, chamada_em, identificado_por_facial, paciente_id, pacientes(nome)";
+    const [{ data: emit, error: errEmit }, { data: cham, error: errCham }] = await Promise.all([
+      supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "emitida").order("emitida_em"),
+      supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "chamada").order("chamada_em", { ascending: false }).limit(10),
     ]);
 
     if (errEmit || errCham) {
@@ -109,58 +107,40 @@ function RecepcaoPage() {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const debouncedReload = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        void carregar();
-      }, 400);
+      timer = setTimeout(() => { void carregar(); }, 400);
     };
     const ch = supabase
       .channel(`recepcao-${clinicaAtual.clinica_id}`)
       .on(
         "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "senhas",
-          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
-        },
+        { event: "*", schema: "public", table: "senhas", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
         debouncedReload,
       )
       .subscribe();
-    return () => {
-      if (timer) clearTimeout(timer);
-      void supabase.removeChannel(ch);
-    };
+    return () => { if (timer) clearTimeout(timer); void supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaAtual?.clinica_id]);
 
   async function chamarProxima() {
     if (!clinicaAtual) return;
-    if (!guiche.trim()) {
-      toast.error("Informe o guichê");
-      return;
-    }
+    if (!guiche.trim()) { toast.error("Informe o guichê"); return; }
     setBusy(true);
     const { data, error } = await supabase.rpc("chamar_proxima_senha", {
       _clinica_id: clinicaAtual.clinica_id,
       _guiche: guiche.trim(),
     });
     setBusy(false);
-    if (error) {
-      mostrarErro(error);
-      return;
-    }
-    if (!data) {
-      toast.info("Não há senhas na fila");
-      return;
-    }
+    if (error) { mostrarErro(error); return; }
+    if (!data) { toast.info("Não há senhas na fila"); return; }
     const row = Array.isArray(data) ? data[0] : data;
     toast.success(`Chamada ${row.codigo} no guichê ${guiche}`);
   }
 
   async function setStatus(id: string, status: "atendida" | "cancelada") {
     const now = new Date().toISOString();
-    const patch =
-      status === "atendida" ? { status, atendida_em: now } : { status, cancelada_em: now };
+    const patch = status === "atendida"
+      ? { status, atendida_em: now }
+      : { status, cancelada_em: now };
     const { error } = await supabase.from("senhas").update(patch).eq("id", id);
     if (error) mostrarErro(error);
   }
@@ -172,9 +152,7 @@ function RecepcaoPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Recepção · Filas</h1>
-          <p className="text-sm text-muted-foreground">
-            Chame a próxima senha e acompanhe a fila em tempo real.
-          </p>
+          <p className="text-sm text-muted-foreground">Chame a próxima senha e acompanhe a fila em tempo real.</p>
         </div>
         <div className="flex items-end gap-3">
           <div className="space-y-1">
@@ -188,19 +166,13 @@ function RecepcaoPage() {
           </div>
           <Button size="lg" onClick={chamarProxima} disabled={busy} data-primary>
             <Bell className="h-4 w-4 mr-2" /> Chamar próxima
-            <kbd className="ml-2 hidden md:inline-flex h-5 min-w-5 items-center justify-center rounded border bg-background/20 px-1 text-[10px] font-mono">
-              C
-            </kbd>
+            <kbd className="ml-2 hidden md:inline-flex h-5 min-w-5 items-center justify-center rounded border bg-background/20 px-1 text-[10px] font-mono">C</kbd>
           </Button>
           <Button variant="outline" asChild>
-            <a href="/totem" target="_blank" rel="noreferrer">
-              <ExternalLink className="h-4 w-4 mr-2" /> Totem
-            </a>
+            <a href="/totem" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-2" /> Totem</a>
           </Button>
           <Button variant="outline" asChild>
-            <a href="/painel" target="_blank" rel="noreferrer">
-              <ExternalLink className="h-4 w-4 mr-2" /> Painel
-            </a>
+            <a href="/painel" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-2" /> Painel</a>
           </Button>
         </div>
       </div>
@@ -212,22 +184,14 @@ function RecepcaoPage() {
             <span className="text-xs text-muted-foreground">Ordem: E · P · R · N</span>
           </div>
           <div className="space-y-2 max-h-[60vh] overflow-auto">
-            {fila.length === 0 && (
-              <div className="text-sm text-muted-foreground py-6 text-center">Fila vazia</div>
-            )}
+            {fila.length === 0 && <div className="text-sm text-muted-foreground py-6 text-center">Fila vazia</div>}
             {fila.map((s) => (
-              <div
-                key={s.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-muted/40"
-              >
+              <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40">
                 <div className="flex items-center gap-3">
-                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${TIPO_COR[s.tipo]}`}>
-                    {s.tipo}
-                  </span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${TIPO_COR[s.tipo]}`}>{s.tipo}</span>
                   <span className="font-bold tabular-nums">{s.codigo}</span>
                   <span className="text-sm text-muted-foreground">
-                    {s.pacientes?.nome ?? "Anônimo"}
-                    {s.identificado_por_facial ? " · 📷" : ""}
+                    {s.pacientes?.nome ?? "Anônimo"}{s.identificado_por_facial ? " · 📷" : ""}
                   </span>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setStatus(s.id, "cancelada")}>
@@ -241,20 +205,11 @@ function RecepcaoPage() {
         <section className="bg-card border rounded-xl p-5">
           <h2 className="font-semibold mb-3">Em atendimento / chamadas recentes</h2>
           <div className="space-y-2 max-h-[60vh] overflow-auto">
-            {chamadas.length === 0 && (
-              <div className="text-sm text-muted-foreground py-6 text-center">
-                Nenhuma chamada hoje
-              </div>
-            )}
+            {chamadas.length === 0 && <div className="text-sm text-muted-foreground py-6 text-center">Nenhuma chamada hoje</div>}
             {chamadas.map((s) => (
-              <div
-                key={s.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-muted/40"
-              >
+              <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40">
                 <div className="flex items-center gap-3">
-                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${TIPO_COR[s.tipo]}`}>
-                    {s.tipo}
-                  </span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${TIPO_COR[s.tipo]}`}>{s.tipo}</span>
                   <span className="font-bold tabular-nums">{s.codigo}</span>
                   <span className="text-sm text-muted-foreground">Guichê {s.guiche ?? "—"}</span>
                 </div>

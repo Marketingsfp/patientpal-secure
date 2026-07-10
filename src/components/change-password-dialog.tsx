@@ -3,11 +3,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,29 +59,15 @@ export function ChangePasswordDialog({ open, onOpenChange }: Props) {
         <div className="space-y-3">
           <div className="space-y-1">
             <Label htmlFor="pw-new">Nova senha</Label>
-            <Input
-              id="pw-new"
-              type="password"
-              value={pwNew}
-              onChange={(e) => setPwNew(e.target.value)}
-              autoComplete="new-password"
-            />
+            <Input id="pw-new" type="password" value={pwNew} onChange={(e) => setPwNew(e.target.value)} autoComplete="new-password" />
           </div>
           <div className="space-y-1">
             <Label htmlFor="pw-confirm">Confirmar nova senha</Label>
-            <Input
-              id="pw-confirm"
-              type="password"
-              value={pwConfirm}
-              onChange={(e) => setPwConfirm(e.target.value)}
-              autoComplete="new-password"
-            />
+            <Input id="pw-confirm" type="password" value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} autoComplete="new-password" />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pwSaving}>
-            Cancelar
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pwSaving}>Cancelar</Button>
           <Button data-primary onClick={() => void handleSave()} disabled={pwSaving}>
             {pwSaving ? "Salvando…" : "Salvar"}
           </Button>

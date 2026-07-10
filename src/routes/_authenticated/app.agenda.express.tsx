@@ -6,10 +6,7 @@ import { PatientSearchInput, type PatientOption } from "@/components/patient-sea
 import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
 import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
 import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
-import {
-  ProcedimentoPicker,
-  type ProcedimentoOption,
-} from "@/components/agenda/procedimento-picker";
+import { ProcedimentoPicker, type ProcedimentoOption } from "@/components/agenda/procedimento-picker";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -18,17 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import {
-  Zap,
-  CheckCircle2,
-  ArrowRight,
-  ArrowLeft,
-  User,
-  Clock,
-  Stethoscope,
-  Repeat,
-  AlertTriangle,
-  ShieldCheck,
-  PhoneCall,
+  Zap, CheckCircle2, ArrowRight, ArrowLeft, User, Clock, Stethoscope,
+  Repeat, AlertTriangle, ShieldCheck, PhoneCall,
 } from "lucide-react";
 import { somenteDigitos, isCPFValido } from "@/lib/cpf";
 
@@ -122,15 +110,8 @@ function AgendaExpressPage() {
 
   // Base importada?
   useEffect(() => {
-    if (!clinicaId) {
-      setBaseImportada(null);
-      return;
-    }
-    supabase
-      .from("clinicas")
-      .select("base_importada")
-      .eq("id", clinicaId)
-      .maybeSingle()
+    if (!clinicaId) { setBaseImportada(null); return; }
+    supabase.from("clinicas").select("base_importada").eq("id", clinicaId).maybeSingle()
       .then(({ data }) => setBaseImportada(Boolean(data?.base_importada)));
   }, [clinicaId]);
 
@@ -174,17 +155,11 @@ function AgendaExpressPage() {
         _paciente_id: paciente.id,
       });
       const urow = Array.isArray(u) ? u[0] : null;
-      setUltimo(
-        urow
-          ? {
-              medico_id: urow.medico_id,
-              medico_nome: urow.medico_nome,
-              especialidade_id: urow.especialidade_id,
-              especialidade_nome: urow.especialidade_nome,
-              procedimento: urow.procedimento,
-            }
-          : null,
-      );
+      setUltimo(urow ? {
+        medico_id: urow.medico_id, medico_nome: urow.medico_nome,
+        especialidade_id: urow.especialidade_id, especialidade_nome: urow.especialidade_nome,
+        procedimento: urow.procedimento,
+      } : null);
       setCheckingContato(false);
     })();
   }, [paciente, clinicaId]);
@@ -196,8 +171,8 @@ function AgendaExpressPage() {
     setSlots([]);
     const { data, error } = await supabase.rpc("get_horarios_disponiveis", {
       _clinica_id: clinicaId,
-      _especialidade_id: opts.espId ?? especialidadeId ?? undefined,
-      _medico_id: opts.medicoId ?? medicoId ?? undefined,
+      _especialidade_id: (opts.espId ?? especialidadeId) ?? undefined,
+      _medico_id: (opts.medicoId ?? medicoId) ?? undefined,
       _dias: 7,
       _limite: 80,
     });
@@ -211,50 +186,30 @@ function AgendaExpressPage() {
 
   async function criarPacienteRapido() {
     if (!clinicaId) return;
-    if (novoNome.trim().length < 3) {
-      toast.error("Informe o nome");
-      return;
-    }
-    if (somenteDigitos(novoTelefone).length < 10) {
-      toast.error("Telefone é obrigatório (DDD + número)");
-      return;
-    }
-    if (novoCpf && !isCPFValido(novoCpf)) {
-      toast.error("CPF inválido");
-      return;
-    }
+    if (novoNome.trim().length < 3) { toast.error("Informe o nome"); return; }
+    if (somenteDigitos(novoTelefone).length < 10) { toast.error("Telefone é obrigatório (DDD + número)"); return; }
+    if (novoCpf && !isCPFValido(novoCpf)) { toast.error("CPF inválido"); return; }
     setCriandoPaciente(true);
     try {
-      const { data, error } = await supabase
-        .from("pacientes")
-        .insert({
-          clinica_id: clinicaId,
-          nome: novoNome.trim(),
-          telefone: novoTelefone ? somenteDigitos(novoTelefone) : null,
-          cpf: novoCpf ? somenteDigitos(novoCpf) : null,
-          data_nascimento: novoNasc || null,
-          ativo: true,
-        })
-        .select("id, nome, cpf, telefone, data_nascimento, clinica_id")
-        .single();
+      const { data, error } = await supabase.from("pacientes").insert({
+        clinica_id: clinicaId,
+        nome: novoNome.trim(),
+        telefone: novoTelefone ? somenteDigitos(novoTelefone) : null,
+        cpf: novoCpf ? somenteDigitos(novoCpf) : null,
+        data_nascimento: novoNasc || null,
+        ativo: true,
+      }).select("id, nome, cpf, telefone, data_nascimento, clinica_id").single();
       if (error) throw error;
       const p: PatientOption = {
-        id: data.id,
-        nome: data.nome,
-        cpf: data.cpf,
-        telefone: data.telefone,
-        data_nascimento: data.data_nascimento,
-        clinica_id: data.clinica_id,
+        id: data.id, nome: data.nome, cpf: data.cpf, telefone: data.telefone,
+        data_nascimento: data.data_nascimento, clinica_id: data.clinica_id,
       };
       setPaciente(p);
       setStatus({ kind: "particular", paciente: p });
       setStep(2);
       toast.success("Paciente cadastrado");
-    } catch (e) {
-      mostrarErro(e);
-    } finally {
-      setCriandoPaciente(false);
-    }
+    } catch (e) { mostrarErro(e); }
+    finally { setCriandoPaciente(false); }
   }
 
   async function confirmarAgendamento() {
@@ -277,11 +232,8 @@ function AgendaExpressPage() {
       if (error) throw error;
       toast.success("Agendamento confirmado!");
       navigate({ to: "/app/agenda" });
-    } catch (e) {
-      mostrarErro(e);
-    } finally {
-      setConfirmando(false);
-    }
+    } catch (e) { mostrarErro(e); }
+    finally { setConfirmando(false); }
   }
 
   const podeAvancar1 = !!paciente && status.kind !== "vazio" && status.kind !== "novo";
@@ -295,19 +247,14 @@ function AgendaExpressPage() {
           <h1 className="text-2xl font-bold">Agendamento Express</h1>
           <p className="text-sm text-muted-foreground">4 passos, poucos cliques.</p>
         </div>
-        <Button variant="ghost" asChild>
-          <Link to="/app/agenda">Agenda completa</Link>
-        </Button>
+        <Button variant="ghost" asChild><Link to="/app/agenda">Agenda completa</Link></Button>
         <TurboModeToggle />
       </header>
 
       {/* Stepper */}
       <div className="flex items-center gap-2 text-sm">
         {[1, 2, 3, 4].map((n) => (
-          <div
-            key={n}
-            className={`flex-1 h-1.5 rounded-full ${step >= n ? "bg-primary" : "bg-muted"}`}
-          />
+          <div key={n} className={`flex-1 h-1.5 rounded-full ${step >= n ? "bg-primary" : "bg-muted"}`} />
         ))}
       </div>
 
@@ -324,8 +271,8 @@ function AgendaExpressPage() {
           <CardContent className="p-3 text-sm flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
             <div>
-              Base de dados desta unidade ainda não importada. A busca pode não encontrar pacientes
-              existentes — cadastre com atenção para não duplicar.
+              Base de dados desta unidade ainda não importada. A busca pode não encontrar pacientes existentes —
+              cadastre com atenção para não duplicar.
             </div>
           </CardContent>
         </Card>
@@ -344,10 +291,7 @@ function AgendaExpressPage() {
               autoFocus
               clinicaIdsOverride={clinicaId ? [clinicaId] : undefined}
               value={paciente}
-              onSelect={(p) => {
-                setPaciente(p);
-                if (!p) setStatus({ kind: "vazio" });
-              }}
+              onSelect={(p) => { setPaciente(p); if (!p) setStatus({ kind: "vazio" }); }}
               placeholder="CPF, telefone ou nome"
               enableVoice
             />
@@ -359,15 +303,15 @@ function AgendaExpressPage() {
               <div className="rounded-md border p-3 text-sm space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{paciente.nome}</span>
-                  {checkingContato && (
-                    <span className="text-xs text-muted-foreground">verificando…</span>
-                  )}
+                  {checkingContato && <span className="text-xs text-muted-foreground">verificando…</span>}
                   {status.kind === "associado" && (
                     <Badge className="bg-emerald-600 hover:bg-emerald-600 gap-1">
                       <ShieldCheck className="h-3 w-3" /> Associado — {status.convenio}
                     </Badge>
                   )}
-                  {status.kind === "particular" && <Badge variant="secondary">Particular</Badge>}
+                  {status.kind === "particular" && (
+                    <Badge variant="secondary">Particular</Badge>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {paciente.telefone ?? "sem telefone"} · {paciente.cpf ?? "sem CPF"}
@@ -386,32 +330,21 @@ function AgendaExpressPage() {
 
                 {ultimo?.medico_id && (
                   <div className="pt-2 flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setEspecialidadeId(ultimo.especialidade_id);
-                        setEspecialidadeNome(ultimo.especialidade_nome);
-                        setMedicoId(ultimo.medico_id);
-                        setStep(3);
-                        carregarSlots({
-                          medicoId: ultimo.medico_id,
-                          espId: ultimo.especialidade_id,
-                        });
-                      }}
-                    >
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setEspecialidadeId(ultimo.especialidade_id);
+                      setEspecialidadeNome(ultimo.especialidade_nome);
+                      setMedicoId(ultimo.medico_id);
+                      setStep(3);
+                      carregarSlots({ medicoId: ultimo.medico_id, espId: ultimo.especialidade_id });
+                    }}>
                       <Repeat className="h-3 w-3 mr-1" /> Agendar novamente ({ultimo.medico_nome})
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setMedicoId(ultimo.medico_id);
-                        setEspecialidadeId(null);
-                        setStep(3);
-                        carregarSlots({ medicoId: ultimo.medico_id, espId: null });
-                      }}
-                    >
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setMedicoId(ultimo.medico_id);
+                      setEspecialidadeId(null);
+                      setStep(3);
+                      carregarSlots({ medicoId: ultimo.medico_id, espId: null });
+                    }}>
                       Mesmo médico da última consulta
                     </Button>
                   </div>
@@ -421,9 +354,7 @@ function AgendaExpressPage() {
 
             {!paciente && (
               <details className="rounded-md border p-3 text-sm">
-                <summary className="cursor-pointer font-medium">
-                  Não encontrei — cadastrar novo (rápido)
-                </summary>
+                <summary className="cursor-pointer font-medium">Não encontrei — cadastrar novo (rápido)</summary>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div>
                     <Label>Nome completo *</Label>
@@ -439,11 +370,7 @@ function AgendaExpressPage() {
                   </div>
                   <div>
                     <Label>Nascimento</Label>
-                    <Input
-                      type="date"
-                      value={novoNasc}
-                      onChange={(e) => setNovoNasc(e.target.value)}
-                    />
+                    <Input type="date" value={novoNasc} onChange={(e) => setNovoNasc(e.target.value)} />
                   </div>
                 </div>
                 <div className="mt-3">
@@ -479,19 +406,13 @@ function AgendaExpressPage() {
                   key={e.id}
                   size="sm"
                   variant={especialidadeId === e.id ? "default" : "outline"}
-                  onClick={() => {
-                    setEspecialidadeId(e.id);
-                    setEspecialidadeNome(e.nome);
-                    setMedicoId(null);
-                  }}
+                  onClick={() => { setEspecialidadeId(e.id); setEspecialidadeNome(e.nome); setMedicoId(null); }}
                 >
                   {e.nome}
                 </Button>
               ))}
               {especialidades.length === 0 && (
-                <span className="text-sm text-muted-foreground">
-                  Nenhuma especialidade com médico ativo.
-                </span>
+                <span className="text-sm text-muted-foreground">Nenhuma especialidade com médico ativo.</span>
               )}
             </div>
 
@@ -515,23 +436,11 @@ function AgendaExpressPage() {
                 <ArrowLeft className="mr-1 h-4 w-4" /> Voltar
               </Button>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setStep(3);
-                    carregarSlots({ espId: especialidadeId });
-                  }}
-                  disabled={!especialidadeId}
-                >
+                <Button variant="outline" onClick={() => { setStep(3); carregarSlots({ espId: especialidadeId }); }}
+                  disabled={!especialidadeId}>
                   <Clock className="mr-1 h-4 w-4" /> Próximo horário disponível
                 </Button>
-                <Button
-                  disabled={!podeAvancar2}
-                  onClick={() => {
-                    setStep(3);
-                    carregarSlots({ espId: especialidadeId });
-                  }}
-                >
+                <Button disabled={!podeAvancar2} onClick={() => { setStep(3); carregarSlots({ espId: especialidadeId }); }}>
                   Continuar <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>
               </div>
@@ -550,9 +459,7 @@ function AgendaExpressPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {carregandoSlots && (
-              <div className="text-sm text-muted-foreground">Carregando horários…</div>
-            )}
+            {carregandoSlots && <div className="text-sm text-muted-foreground">Carregando horários…</div>}
             {!carregandoSlots && slots.length === 0 && (
               <div className="text-sm text-muted-foreground">
                 Nenhum horário disponível nos próximos 7 dias.
@@ -567,24 +474,17 @@ function AgendaExpressPage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {arr.map((s) => {
-                      const active =
-                        slotSelecionado?.medico_id === s.medico_id &&
-                        slotSelecionado?.inicio === s.inicio;
+                      const active = slotSelecionado?.medico_id === s.medico_id && slotSelecionado?.inicio === s.inicio;
                       return (
                         <Button
                           key={s.medico_id + s.inicio}
                           size="sm"
                           variant={active ? "default" : "outline"}
                           className="flex-col h-auto py-1.5 px-2"
-                          onClick={() => {
-                            setSlotSelecionado(s);
-                            setStep(4);
-                          }}
+                          onClick={() => { setSlotSelecionado(s); setStep(4); }}
                         >
                           <span className="font-mono">{fmtHora(s.inicio)}</span>
-                          <span className="text-[10px] font-normal opacity-80">
-                            {s.medico_nome}
-                          </span>
+                          <span className="text-[10px] font-normal opacity-80">{s.medico_nome}</span>
                         </Button>
                       );
                     })}
@@ -612,32 +512,21 @@ function AgendaExpressPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="rounded-md border p-3 text-sm space-y-1">
-              <div>
-                <span className="text-muted-foreground">Paciente:</span> <b>{paciente.nome}</b>
-              </div>
+              <div><span className="text-muted-foreground">Paciente:</span> <b>{paciente.nome}</b></div>
               {status.kind === "associado" && (
                 <div className="text-emerald-700 dark:text-emerald-400">
                   Associado — {status.convenio} · será cobrado como convênio
                 </div>
               )}
               {status.kind === "particular" && <div>Particular</div>}
-              <div>
-                <span className="text-muted-foreground">Médico:</span> {slotSelecionado.medico_nome}
-              </div>
+              <div><span className="text-muted-foreground">Médico:</span> {slotSelecionado.medico_nome}</div>
               {especialidadeNome && (
-                <div>
-                  <span className="text-muted-foreground">Especialidade:</span> {especialidadeNome}
-                </div>
+                <div><span className="text-muted-foreground">Especialidade:</span> {especialidadeNome}</div>
               )}
               {procedimento && (
-                <div>
-                  <span className="text-muted-foreground">Procedimento:</span> {procedimento.nome}
-                </div>
+                <div><span className="text-muted-foreground">Procedimento:</span> {procedimento.nome}</div>
               )}
-              <div>
-                <span className="text-muted-foreground">Quando:</span>{" "}
-                {fmtDia(slotSelecionado.inicio)} · {fmtHora(slotSelecionado.inicio)}
-              </div>
+              <div><span className="text-muted-foreground">Quando:</span> {fmtDia(slotSelecionado.inicio)} · {fmtHora(slotSelecionado.inicio)}</div>
             </div>
 
             {paciente.cadastro_incompleto && (

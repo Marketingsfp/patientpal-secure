@@ -12,24 +12,18 @@ export type DateRange = { from: string; to: string };
 export type DatePreset = "hoje" | "semana" | "quinzena" | "mes" | "periodo";
 
 const toISO = (d: Date) => {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  const y = x.getFullYear();
-  const m = String(x.getMonth() + 1).padStart(2, "0");
-  const day = String(x.getDate()).padStart(2, "0");
+  const x = new Date(d); x.setHours(0, 0, 0, 0);
+  const y = x.getFullYear(); const m = String(x.getMonth() + 1).padStart(2, "0"); const day = String(x.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 };
 
 export function computeRange(preset: DatePreset, ref: Date = new Date()): DateRange {
-  const today = new Date(ref);
-  today.setHours(0, 0, 0, 0);
+  const today = new Date(ref); today.setHours(0, 0, 0, 0);
   if (preset === "hoje") return { from: toISO(today), to: toISO(today) };
   if (preset === "semana") {
     const dow = today.getDay(); // 0 = dom
-    const start = new Date(today);
-    start.setDate(today.getDate() - dow);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
+    const start = new Date(today); start.setDate(today.getDate() - dow);
+    const end = new Date(start); end.setDate(start.getDate() + 6);
     return { from: toISO(start), to: toISO(end) };
   }
   if (preset === "quinzena") {
@@ -59,20 +53,11 @@ export interface DateRangeFilterProps {
 export function DateRangeFilter({ value, preset, onChange, className }: DateRangeFilterProps) {
   const [openFrom, setOpenFrom] = useState(false);
   const [openTo, setOpenTo] = useState(false);
-  const fromDate = useMemo(
-    () => (value.from ? new Date(value.from + "T00:00:00") : undefined),
-    [value.from],
-  );
-  const toDate = useMemo(
-    () => (value.to ? new Date(value.to + "T00:00:00") : undefined),
-    [value.to],
-  );
+  const fromDate = useMemo(() => (value.from ? new Date(value.from + "T00:00:00") : undefined), [value.from]);
+  const toDate = useMemo(() => (value.to ? new Date(value.to + "T00:00:00") : undefined), [value.to]);
 
   const setPreset = (p: DatePreset) => {
-    if (p === "periodo") {
-      onChange(value, "periodo");
-      return;
-    }
+    if (p === "periodo") { onChange(value, "periodo"); return; }
     onChange(computeRange(p), p);
   };
 
@@ -97,18 +82,7 @@ export function DateRangeFilter({ value, preset, onChange, className }: DateRang
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={fromDate}
-                onSelect={(d) => {
-                  if (d) {
-                    onChange({ from: toISO(d), to: value.to || toISO(d) }, "periodo");
-                    setOpenFrom(false);
-                  }
-                }}
-                initialFocus
-                className={cn("p-3 pointer-events-auto")}
-              />
+              <Calendar mode="single" selected={fromDate} onSelect={(d) => { if (d) { onChange({ from: toISO(d), to: value.to || toISO(d) }, "periodo"); setOpenFrom(false); } }} initialFocus className={cn("p-3 pointer-events-auto")} />
             </PopoverContent>
           </Popover>
           <span className="text-muted-foreground text-sm">até</span>
@@ -120,18 +94,7 @@ export function DateRangeFilter({ value, preset, onChange, className }: DateRang
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={toDate}
-                onSelect={(d) => {
-                  if (d) {
-                    onChange({ from: value.from || toISO(d), to: toISO(d) }, "periodo");
-                    setOpenTo(false);
-                  }
-                }}
-                initialFocus
-                className={cn("p-3 pointer-events-auto")}
-              />
+              <Calendar mode="single" selected={toDate} onSelect={(d) => { if (d) { onChange({ from: value.from || toISO(d), to: toISO(d) }, "periodo"); setOpenTo(false); } }} initialFocus className={cn("p-3 pointer-events-auto")} />
             </PopoverContent>
           </Popover>
         </div>

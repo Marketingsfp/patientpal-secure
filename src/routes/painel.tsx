@@ -53,12 +53,10 @@ function PainelPage() {
         .in("status", ["chamada", "atendida"])
         .order("chamada_em", { ascending: false })
         .limit(6);
-      const lista = ((data ?? []) as Array<Senha & { pacientes?: { nome: string } | null }>).map(
-        (s) => ({
-          ...s,
-          paciente_nome: s.pacientes?.nome ?? null,
-        }),
-      ) as Senha[];
+      const lista = ((data ?? []) as Array<Senha & { pacientes?: { nome: string } | null }>).map((s) => ({
+        ...s,
+        paciente_nome: s.pacientes?.nome ?? null,
+      })) as Senha[];
       setAtual(lista[0] ?? null);
       setHistorico(lista.slice(1));
     };
@@ -92,9 +90,7 @@ function PainelPage() {
       )
       .subscribe();
 
-    return () => {
-      void supabase.removeChannel(ch);
-    };
+    return () => { void supabase.removeChannel(ch); };
   }, [clinicaAtual?.clinica_id]);
 
   function falar(s: Senha) {
@@ -126,12 +122,7 @@ function PainelPage() {
     );
   }
 
-  if (!clinicaAtual)
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        Nenhuma clínica selecionada.
-      </div>
-    );
+  if (!clinicaAtual) return <div className="min-h-screen flex items-center justify-center bg-background">Nenhuma clínica selecionada.</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 to-slate-900 text-white flex flex-col">
@@ -140,9 +131,7 @@ function PainelPage() {
           <div className="text-xs uppercase tracking-widest text-white/60">Painel de chamada</div>
           <h1 className="text-3xl font-bold">{clinicaAtual.clinica.nome}</h1>
         </div>
-        <div className="text-right text-white/70 text-xl tabular-nums">
-          <PainelClock />
-        </div>
+        <div className="text-right text-white/70 text-xl tabular-nums"><PainelClock /></div>
       </header>
 
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8 p-12">
@@ -153,17 +142,11 @@ function PainelPage() {
               {(() => {
                 const ehNome = /[a-zA-Z]{3,}/.test(atual.codigo) && /\s/.test(atual.codigo.trim());
                 const fonte = ehNome
-                  ? atual.codigo.length > 16
-                    ? "text-7xl"
-                    : atual.codigo.length > 10
-                      ? "text-8xl"
-                      : "text-9xl"
+                  ? (atual.codigo.length > 16 ? "text-7xl" : atual.codigo.length > 10 ? "text-8xl" : "text-9xl")
                   : "text-[14rem] tabular-nums";
                 return (
                   <>
-                    <div
-                      className={`${fonte} font-black leading-none text-primary text-center break-words max-w-full`}
-                    >
+                    <div className={`${fonte} font-black leading-none text-primary text-center break-words max-w-full`}>
                       {atual.codigo}
                     </div>
                     {!ehNome && atual.paciente_nome && (
@@ -175,9 +158,7 @@ function PainelPage() {
                       {ehNome ? (
                         <span className="font-bold">{atual.guiche ?? "—"}</span>
                       ) : (
-                        <>
-                          Guichê <span className="font-bold">{atual.guiche ?? "—"}</span>
-                        </>
+                        <>Guichê <span className="font-bold">{atual.guiche ?? "—"}</span></>
                       )}
                     </div>
                   </>
@@ -194,10 +175,7 @@ function PainelPage() {
           <div className="space-y-4">
             {historico.length === 0 && <div className="text-white/30">Sem chamadas anteriores</div>}
             {historico.map((s) => (
-              <div
-                key={s.id}
-                className="flex items-center justify-between text-2xl border-b border-white/10 pb-3"
-              >
+              <div key={s.id} className="flex items-center justify-between text-2xl border-b border-white/10 pb-3">
                 <span className="font-bold tabular-nums">{s.codigo}</span>
                 <span className="text-white/60">Guichê {s.guiche ?? "—"}</span>
               </div>

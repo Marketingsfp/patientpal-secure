@@ -12,7 +12,9 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
  */
 export const gerarBoletosContrato = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ contratoId: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ contratoId: z.string().uuid() }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
 
@@ -22,12 +24,7 @@ export const gerarBoletosContrato = createServerFn({ method: "POST" })
       .eq("id", data.contratoId)
       .single();
     if (errC || !contrato) {
-      return {
-        pendentes: 0,
-        emitidos: 0,
-        mensagem: errC?.message ?? "Contrato não encontrado",
-        erro: true,
-      };
+      return { pendentes: 0, emitidos: 0, mensagem: errC?.message ?? "Contrato não encontrado", erro: true };
     }
 
     const { data: parcelas, error: errP } = await supabase

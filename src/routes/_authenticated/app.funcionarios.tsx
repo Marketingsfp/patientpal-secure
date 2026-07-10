@@ -7,14 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FuncionarioDadosDialog } from "@/components/funcionarios/FuncionarioDadosDialog";
 
 export const Route = createFileRoute("/_authenticated/app/funcionarios")({
@@ -35,10 +28,7 @@ function FuncionariosPage() {
   const { clinicaAtual } = useClinica();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dialog, setDialog] = useState<{ open: boolean; id?: string | null }>({
-    open: false,
-    id: null,
-  });
+  const [dialog, setDialog] = useState<{ open: boolean; id?: string | null }>({ open: false, id: null });
   const [busca, setBusca] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -64,17 +54,14 @@ function FuncionariosPage() {
       });
   }, [clinicaAtual?.clinica_id, reloadKey]);
 
-  if (!clinicaAtual)
-    return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
+  if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
 
   const q = busca.trim().toLowerCase();
   const filtrados = q
-    ? rows.filter(
-        (r) =>
-          r.funcionario_nome.toLowerCase().includes(q) ||
-          (r.cargo ?? "").toLowerCase().includes(q) ||
-          (r.setor ?? "").toLowerCase().includes(q),
-      )
+    ? rows.filter((r) =>
+        r.funcionario_nome.toLowerCase().includes(q) ||
+        (r.cargo ?? "").toLowerCase().includes(q) ||
+        (r.setor ?? "").toLowerCase().includes(q))
     : rows;
 
   return (
@@ -100,55 +87,36 @@ function FuncionariosPage() {
       </div>
 
       {loading ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent>
-        </Card>
+        <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent></Card>
       ) : filtrados.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <Users className="h-8 w-8 mx-auto mb-2 opacity-50" /> Nenhum funcionário cadastrado.
-          </CardContent>
-        </Card>
+        <Card><CardContent className="py-12 text-center text-muted-foreground">
+          <Users className="h-8 w-8 mx-auto mb-2 opacity-50" /> Nenhum funcionário cadastrado.
+        </CardContent></Card>
       ) : (
         <Card>
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Cargo</TableHead>
-                <TableHead>Setor</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Acesso</TableHead>
-                <TableHead className="w-16 text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
+            <TableHeader><TableRow>
+              <TableHead>Nome</TableHead>
+              <TableHead>Cargo</TableHead>
+              <TableHead>Setor</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Acesso</TableHead>
+              <TableHead className="w-16 text-right">Ações</TableHead>
+            </TableRow></TableHeader>
             <TableBody>
               {filtrados.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell>{r.funcionario_nome}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{r.cargo ?? "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{r.setor ?? "—"}</TableCell>
+                  <TableCell><Badge variant={r.status === "ativo" ? "default" : "outline"} className="capitalize">{r.status}</Badge></TableCell>
                   <TableCell>
-                    <Badge
-                      variant={r.status === "ativo" ? "default" : "outline"}
-                      className="capitalize"
-                    >
-                      {r.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {r.user_id ? (
-                      <Badge variant="secondary">Vinculado</Badge>
-                    ) : (
-                      <Badge variant="outline">Sem login</Badge>
-                    )}
+                    {r.user_id
+                      ? <Badge variant="secondary">Vinculado</Badge>
+                      : <Badge variant="outline">Sem login</Badge>}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setDialog({ open: true, id: r.id })}
-                    >
+                    <Button size="icon" variant="ghost" onClick={() => setDialog({ open: true, id: r.id })}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </TableCell>
