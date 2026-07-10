@@ -396,7 +396,7 @@ function Page() {
   };
   useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario, filterForma, filterPacienteDebounced, filterValorDebounced, filterFichaDebounced]);
   // Reseta a página sempre que qualquer filtro mudar
-  useEffect(() => { setPage(1); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario, filterForma, filterPacienteDebounced]);
+  useEffect(() => { setPage(1); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario, filterForma, filterPacienteDebounced, filterValorDebounced, filterFichaDebounced]);
   useEffect(() => { void loadOpts(); }, [clinicaAtual?.clinica_id]);
   const totais = resumo;
 
