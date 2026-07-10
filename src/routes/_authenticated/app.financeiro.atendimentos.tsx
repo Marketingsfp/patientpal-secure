@@ -184,6 +184,7 @@ function Page() {
   const [fPaciente, setFPaciente] = useState<string>("");
   const [fOrdem, setFOrdem] = useState<"data_desc" | "data_asc" | "gr" | "paciente_az" | "paciente_za">("gr");
   const [fTipo, setFTipo] = useState<"todos" | "medico" | "clinica">("todos");
+  const [fLaudo, setFLaudo] = useState<"todos" | "baixado" | "nao_baixado">("todos");
   const [contas, setContas] = useState<Conta[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [optsReady, setOptsReady] = useState(false);
@@ -340,6 +341,11 @@ function Page() {
   };
   const [laudoRegras, setLaudoRegras] = useState<LaudoRegra[]>([]);
   const [laudoSemRegra, setLaudoSemRegra] = useState(false);
+
+  // Diálogo de vínculo de laudo em lote
+  const [laudoLoteOpen, setLaudoLoteOpen] = useState(false);
+  const [laudoLoteLaudadorId, setLaudoLoteLaudadorId] = useState("");
+  const [laudoLoteSaving, setLaudoLoteSaving] = useState(false);
 
   // NFS-e
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
@@ -556,6 +562,99 @@ function Page() {
     }
     setLaudoOpen(false);
     setLaudoTarget(null);
+    await load();
+  };
+
+  const abrirLaudoLote = () => {
+    if (selectedLaudoElegiveis.length === 0) {
+      toast.info("Selecione atendimentos que exijam laudo e ainda não vinculados.");
+      return;
+    }
+    setLaudoLoteLaudadorId("");
+    setLaudoLoteOpen(true);
+  };
+
+  const vincularLaudoLote = async () => {
+    if (!clinicaAtual) return;
+    if (!laudoLoteLaudadorId) {
+      toast.error("Selecione o médico laudador");
+      return;
+    }
+    const alvos = selectedLaudoElegiveis;
+    if (alvos.length === 0) {
+      toast.info("Nenhum atendimento elegível.");
+      return;
+    }
+    setLaudoLoteSaving(true);
+    // Busca todas as regras para o laudador escolhido nesta clínica,
+    // indexadas por agenda_medico_id → (tipo, percentual, valor).
+    const { data: regrasData } = await supabase
+      .from("medico_repasse_laudo")
+      .select("agenda_medico_id, tipo_repasse, percentual, valor")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("laudador_medico_id", laudoLoteLaudadorId)
+      .eq("ativo", true);
+    const regraPorAgenda = new Map<string, LaudoRegra>();
+    for (const r of (regrasData as unknown as {
+      agenda_medico_id: string;
+      tipo_repasse: "valor" | "percentual";
+      percentual: number | null;
+      valor: number | null;
+    }[]) ?? []) {
+      regraPorAgenda.set(r.agenda_medico_id, {
+        laudador_medico_id: laudoLoteLaudadorId,
+        laudador_nome: "",
+        tipo_repasse: r.tipo_repasse,
+        percentual: r.percentual != null ? Number(r.percentual) : null,
+        valor: r.valor != null ? Number(r.valor) : null,
+      });
+    }
+    let ok = 0;
+    const semRegra: string[] = [];
+    const erros: string[] = [];
+    const nowIso = new Date().toISOString();
+    await Promise.all(
+      alvos.map(async (a) => {
+        if (!a.medico_id) {
+          semRegra.push(a.paciente_nome_extra ?? a.procedimento ?? a.id);
+          return;
+        }
+        const regra = regraPorAgenda.get(a.medico_id);
+        if (!regra) {
+          semRegra.push(a.paciente_nome_extra ?? a.procedimento ?? a.id);
+          return;
+        }
+        const valor = calcularSugestao(regra, Number(a.valor_total ?? 0));
+        if (!valor || valor <= 0) {
+          semRegra.push(a.paciente_nome_extra ?? a.procedimento ?? a.id);
+          return;
+        }
+        const tabela = a.origem === "agenda" ? "fin_lancamentos" : "fin_atendimentos";
+        const { error } = await supabase
+          .from(tabela)
+          .update({
+            medico_laudador_id: laudoLoteLaudadorId,
+            valor_laudo: valor,
+            laudo_status: "emitido",
+            laudo_emitido_em: nowIso,
+          })
+          .eq("id", a.id);
+        if (error) erros.push(error.message);
+        else ok += 1;
+      }),
+    );
+    setLaudoLoteSaving(false);
+    setLaudoLoteOpen(false);
+    if (ok > 0) {
+      const partes = [`${ok} laudo(s) vinculado(s)`];
+      if (semRegra.length) partes.push(`${semRegra.length} sem regra de repasse`);
+      if (erros.length) partes.push(`${erros.length} com erro`);
+      toast.success(partes.join(" • "));
+    } else if (semRegra.length) {
+      toast.error(`Nenhum vinculado — ${semRegra.length} sem regra de repasse cadastrada para este laudador.`);
+    } else if (erros.length) {
+      toast.error(`Falha ao vincular: ${erros[0]}`);
+    }
     await load();
   };
 
@@ -1384,10 +1483,16 @@ function Page() {
         : fTipo === "medico"
           ? base.filter((a) => (Number(a.valor_medico) || 0) > 0)
           : base.filter((a) => (Number(a.valor_medico) || 0) === 0);
+    const baseLaudo =
+      fLaudo === "todos"
+        ? baseTipo
+        : fLaudo === "baixado"
+          ? baseTipo.filter((a) => a.laudo_status === "emitido")
+          : baseTipo.filter((a) => a.laudo_status !== "emitido");
     const nomeDe = (a: Atend) =>
       norm(((a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "").trim());
     const grDe = (a: Atend) => a.agendamento_inicio ?? a.data ?? "";
-    const arr = [...baseTipo];
+    const arr = [...baseLaudo];
     switch (fOrdem) {
       case "data_asc":
         arr.sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
@@ -1414,7 +1519,7 @@ function Page() {
     }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, fPaciente, pacientes.length, fOrdem, fTipo]);
+  }, [items, fPaciente, pacientes.length, fOrdem, fTipo, fLaudo]);
   const totais = useMemo(
     () =>
       filteredItems.reduce(
@@ -1462,6 +1567,11 @@ function Page() {
   const podePagar = selectedItems.length > 0 && selectedNaoPagos.length === selectedItems.length;
   const podeReimprimir = selectedItems.length > 0 && selectedPagos.length === selectedItems.length;
   const misturado = selectedItems.length > 0 && selectedPagos.length > 0 && selectedNaoPagos.length > 0;
+  const selectedLaudoElegiveis = selectedItems.filter((a) => {
+    const procKey = a.procedimento ? norm(a.procedimento) : "";
+    const exige = procKey && procLaudo.get(procKey);
+    return exige && a.laudo_status !== "emitido";
+  });
   const reimprimirSelecionados = () => {
     if (!podeReimprimir) return;
     abrirSegundaViaLote(selectedPagos);
@@ -1743,6 +1853,18 @@ function Page() {
                   Imprimir 2ª via
                   {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={selectedLaudoElegiveis.length === 0}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedLaudoElegiveis.length > 0) abrirLaudoLote();
+                  }}
+                >
+                  <Stethoscope className="h-4 w-4 mr-2 text-sky-600" />
+                  Vincular vários laudos
+                  {selectedLaudoElegiveis.length ? ` (${selectedLaudoElegiveis.length})` : ""}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -1918,6 +2040,24 @@ function Page() {
                   <SelectItem value="todos">Todos</SelectItem>
                   <SelectItem value="medico">Apenas médico (com repasse)</SelectItem>
                   <SelectItem value="clinica">Apenas clínica (sem repasse)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">
+                Laudo
+                <span className="ml-1 font-normal text-muted-foreground">
+                  ({filteredItems.filter((a) => a.laudo_status === "emitido").length} baixados · {filteredItems.filter((a) => a.laudo_status !== "emitido").length} pendentes)
+                </span>
+              </Label>
+              <Select value={fLaudo} onValueChange={(v) => setFLaudo(v as "todos" | "baixado" | "nao_baixado")}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="baixado">Baixados</SelectItem>
+                  <SelectItem value="nao_baixado">Não baixados</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2118,7 +2258,7 @@ function Page() {
                                 className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
                               >
                                 <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
-                                Pago
+                                Vinculado
                               </Badge>
                             );
                           if (!exigeLaudo) return <span className="text-muted-foreground text-[10px]">—</span>;
@@ -2130,7 +2270,7 @@ function Page() {
                               className="h-6 text-[10px] px-2"
                               onClick={() => openLaudo(a)}
                             >
-                              Pagar
+                              Vincular
                             </Button>
                           );
                         })()}
@@ -2355,6 +2495,17 @@ function Page() {
                   <Printer className="h-4 w-4 mr-2" />
                   Imprimir 2ª via
                   {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={selectedLaudoElegiveis.length === 0}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedLaudoElegiveis.length > 0) abrirLaudoLote();
+                  }}
+                >
+                  <Stethoscope className="h-4 w-4 mr-2 text-sky-600" />
+                  Vincular vários laudos
+                  {selectedLaudoElegiveis.length ? ` (${selectedLaudoElegiveis.length})` : ""}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -2636,7 +2787,7 @@ function Page() {
       <Dialog open={laudoOpen} onOpenChange={setLaudoOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Marcar laudo emitido</DialogTitle>
+            <DialogTitle>Vincular laudo</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             {laudoTarget && (
@@ -2701,6 +2852,53 @@ function Page() {
             </Button>
             <Button onClick={emitirLaudo} disabled={laudoSaving}>
               {laudoSaving ? "Salvando..." : "Confirmar laudo emitido"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo: vincular laudos em lote */}
+      <Dialog open={laudoLoteOpen} onOpenChange={setLaudoLoteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Vincular laudos em lote</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-md border bg-muted/40 p-3 text-xs">
+              <b>{selectedLaudoElegiveis.length}</b> atendimento(s) elegível(is) para vínculo de laudo.
+            </div>
+            <div className="space-y-2">
+              <Label>Médico laudador</Label>
+              <Select
+                value={laudoLoteLaudadorId || undefined}
+                onValueChange={setLaudoLoteLaudadorId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o médico..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {medicos.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                O valor de cada laudo será calculado automaticamente pela regra de repasse
+                da agenda de cada atendimento. Atendimentos sem regra para este laudador serão ignorados.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLaudoLoteOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={vincularLaudoLote}
+              disabled={laudoLoteSaving || !laudoLoteLaudadorId}
+            >
+              {laudoLoteSaving ? "Vinculando..." : `Vincular (${selectedLaudoElegiveis.length})`}
             </Button>
           </DialogFooter>
         </DialogContent>

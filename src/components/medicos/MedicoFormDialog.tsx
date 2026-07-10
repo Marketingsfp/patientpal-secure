@@ -1490,7 +1490,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <p className="text-xs text-muted-foreground">
                       Use quando este cadastro representa uma <b>agenda de exame</b> (ex.: ELETROCARDIOGRAMA) e o laudo é feito por <b>outro médico</b>.
                       Liste abaixo os cardiologistas ativos da clínica e defina o repasse (percentual ou valor fixo por exame) que cada um recebe pelo laudo.
-                      O financeiro lança este repasse manualmente em <b>Financeiro → Laudos ECG</b> por período.
+                      O financeiro vincula este repasse em <b>Financeiro → Atendimentos</b>, filtrando pelo nome do médico da agenda.
                     </p>
                   </div>
                   {!editingMedicoId ? (
