@@ -302,34 +302,89 @@ function Page() {
   const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
   const [meuDataIni, setMeuDataIni] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [meuDataFim, setMeuDataFim] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [meuMedico, setMeuMedico] = useState<string>("__all__");
+  const [meuPaciente, setMeuPaciente] = useState<string>("");
+  const [openCal, setOpenCal] = useState(false);
   const minhasMovsFiltrados = useMemo<Mov[]>(() => {
-    if (meuPeriodo === "todos") return minhasMovs;
-    const now = new Date();
-    const fim = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-    let ini: Date;
-    if (meuPeriodo === "hoje") {
-      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    } else if (meuPeriodo === "semana") {
-      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0);
-    } else if (meuPeriodo === "quinzena") {
-      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14, 0, 0, 0, 0);
-    } else if (meuPeriodo === "mes") {
-      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0);
-    } else {
-      const [yi, mi, di] = meuDataIni.split("-").map(Number);
-      const [yf, mf, df] = meuDataFim.split("-").map(Number);
-      ini = new Date(yi, (mi || 1) - 1, di || 1, 0, 0, 0, 0);
-      return minhasMovs.filter((m) => {
+    // 1) filtro de período (data)
+    let base: Mov[] = minhasMovs;
+    if (meuPeriodo !== "todos") {
+      const now = new Date();
+      const fim = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      let ini: Date;
+      let fimP: Date = fim;
+      if (meuPeriodo === "hoje") {
+        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      } else if (meuPeriodo === "semana") {
+        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0);
+      } else if (meuPeriodo === "quinzena") {
+        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14, 0, 0, 0, 0);
+      } else if (meuPeriodo === "mes") {
+        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0);
+      } else {
+        const [yi, mi, di] = meuDataIni.split("-").map(Number);
+        const [yf, mf, df] = meuDataFim.split("-").map(Number);
+        ini = new Date(yi, (mi || 1) - 1, di || 1, 0, 0, 0, 0);
+        fimP = new Date(yf, (mf || 1) - 1, df || 1, 23, 59, 59, 999);
+      }
+      base = base.filter((m) => {
         const d = new Date(m.created_at);
-        const fimP = new Date(yf, (mf || 1) - 1, df || 1, 23, 59, 59, 999);
         return d >= ini && d <= fimP;
       });
     }
-    return minhasMovs.filter((m) => {
-      const d = new Date(m.created_at);
-      return d >= ini && d <= fim;
-    });
-  }, [minhasMovs, meuPeriodo, meuDataIni, meuDataFim]);
+    // 2) filtro por médico (usa enrichPorLanc quando disponível)
+    if (meuMedico && meuMedico !== "__all__") {
+      base = base.filter((m) => {
+        const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
+        return (enr?.medico ?? "").trim() === meuMedico;
+      });
+    }
+    // 3) filtro por paciente (nome antes do " — " na descrição)
+    const termo = meuPaciente.trim().toLocaleLowerCase("pt-BR");
+    if (termo) {
+      base = base.filter((m) => {
+        const desc = (m.descricao ?? "").toLocaleLowerCase("pt-BR");
+        return desc.includes(termo);
+      });
+    }
+    return base;
+  }, [minhasMovs, meuPeriodo, meuDataIni, meuDataFim, meuMedico, meuPaciente, enrichPorLanc]);
+
+  // Lista de médicos distintos presentes nos movimentos carregados.
+  const medicosDisponiveis = useMemo<string[]>(() => {
+    const set = new Set<string>();
+    for (const m of minhasMovs) {
+      const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
+      const nome = (enr?.medico ?? "").trim();
+      if (nome) set.add(nome);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [minhasMovs, enrichPorLanc]);
+
+  const filtrosAtivos =
+    meuPeriodo !== "hoje" || meuMedico !== "__all__" || meuPaciente.trim() !== "";
+  const limparFiltros = () => {
+    setMeuPeriodo("hoje");
+    setMeuMedico("__all__");
+    setMeuPaciente("");
+    const hj = new Date().toISOString().slice(0, 10);
+    setMeuDataIni(hj);
+    setMeuDataFim(hj);
+  };
+
+  // Rótulo curto do período para mostrar no botão do calendário.
+  const periodoLabel = useMemo(() => {
+    if (meuPeriodo === "hoje") return "Hoje";
+    if (meuPeriodo === "semana") return "Última semana";
+    if (meuPeriodo === "quinzena") return "Última quinzena";
+    if (meuPeriodo === "mes") return "Último mês";
+    if (meuPeriodo === "todos") return "Todos";
+    const p = (s: string) => {
+      const [y, m, d] = s.split("-");
+      return `${d}/${m}/${y}`;
+    };
+    return `${p(meuDataIni)} — ${p(meuDataFim)}`;
+  }, [meuPeriodo, meuDataIni, meuDataFim]);
 
   const [todasSessoes, setTodasSessoes] = useState<Sessao[]>([]);
   const [todosMovs, setTodosMovs] = useState<Mov[]>([]);
