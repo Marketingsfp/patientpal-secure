@@ -2225,7 +2225,9 @@ function AgendaPage() {
         supabase.from("agendamentos").update({
           paciente_id: origem.paciente_id ?? null,
           paciente_nome: origem.paciente_nome,
-          procedimento: origem.procedimento ?? null,
+          // Preserva o procedimento do slot de destino quando a origem não tinha
+          // um definido, para não deixar a cobrança cair no fallback "CONSULTA".
+          procedimento: origem.procedimento ?? alvo.procedimento ?? null,
           status: "agendado",
           observacoes: novasObs,
           data_pagamento: origem.data_pagamento ?? null,
