@@ -525,6 +525,30 @@ function Page() {
       return;
     }
     toast.success("Laudo emitido — repasse do laudador gerado");
+    // Gera comprovante de pagamento do laudo (mesmo modelo do repasse)
+    const hojeIso = new Date().toISOString();
+    const hoje = hojeIso.slice(0, 10);
+    const itemComprovante: Atend = {
+      ...laudoTarget,
+      medico_id: laudoForm.medico_laudador_id,
+      valor_medico: valor,
+      repasse_pago_em: hoje,
+      repasse_pago_at: hojeIso,
+      repasse_forma_pagamento: laudoTarget.forma_pagamento ?? null,
+      repasse_conta_id: laudoTarget.repasse_conta_id ?? null,
+    };
+    const c = buildComprovante([itemComprovante], {
+      data: hoje,
+      forma_pagamento: laudoTarget.forma_pagamento || "—",
+      conta_id: laudoTarget.repasse_conta_id ?? "",
+      pago_at: hojeIso,
+      reimpressao: false,
+    });
+    if (c) {
+      setComprovante(c);
+      setComprovantes([c]);
+      setComprovanteOpen(true);
+    }
     setLaudoOpen(false);
     setLaudoTarget(null);
     await load();
@@ -2005,7 +2029,7 @@ function Page() {
                                 className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
                               >
                                 <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
-                                Emitido
+                                Pago
                               </Badge>
                             );
                           if (!exigeLaudo) return <span className="text-muted-foreground text-[10px]">—</span>;
@@ -2017,7 +2041,7 @@ function Page() {
                               className="h-6 text-[10px] px-2"
                               onClick={() => openLaudo(a)}
                             >
-                              Laudar
+                              Pagar
                             </Button>
                           );
                         })()}
