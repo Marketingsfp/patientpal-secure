@@ -1,31 +1,27 @@
-## Objetivo
+## Restaurar lançamento REVISAO (DERMATOLOGIA) — SEVERINA TERTO
 
-Permitir desfazer a baixa (voltar o atendimento para "Confirmado") **sem exigir estorno do pagamento do paciente**, e habilitar essa ação **em lote**.
+Alvo: `fin_lancamentos.id = 658c8002-2b05-45dc-b3d0-9e645a35cbca` (ficha 002, agendamento `1951612f-9846-41af-8f4b-da5cdc6dca0d`), atualmente `status='cancelado'`, `repasse_pago=false`. Valor mantido em **R$ 0,01**.
 
-Hoje, `desfazerBaixa` bloqueia com "Há lançamento pago no caixa vinculado. Estorne pelo Mov. Caixa antes de desfazer a baixa." sempre que existe `fin_lancamentos` com `valor > 0` vinculado. O pagamento do paciente é uma trilha financeira independente do status médico do atendimento — não precisa ser estornado só para reverter a baixa.
+### Ação (via ferramenta de atualização de dados)
 
-## Mudanças (em `src/routes/_authenticated/app.financeiro.atendimentos.tsx`)
+Um único UPDATE em `fin_lancamentos`:
 
-### 1. `desfazerBaixa` — remover o bloqueio do lançamento pago
-- Remover o `toast.error` + `return` quando existe `fin_lancamentos` com `valor > 0` (nos dois ramos: origem `agenda` e origem `manual`).
-- Continuar apagando apenas os lançamentos-sombra (R$ 0,00) — não mexer nos lançamentos pagos do paciente.
-- Manter o bloqueio quando `repasse_pago` é true (repasse ao médico exige estorno próprio — outra trilha).
-- Ajustar o texto do `confirm()` para deixar claro que **o pagamento do paciente permanece intacto**.
+- `status` → `confirmado`
+- `repasse_pago` → `true`
+- `repasse_pago_em` → `2026-07-09`
+- `repasse_forma_pagamento` → `Dinheiro`
+- `repasse_conta_id` → `c4f7db58-3c38-4e0a-9e97-356c97d5aeee` (mesma conta usada no lançamento original)
+- `updated_at` → `now()`
 
-### 2. Novo `desfazerBaixaLote`
-- Alvos: `selectedItems.filter(a => !a.repasse_pago && isAtendido(a))`.
-- Atualiza `agendamentos.status = 'confirmado'` para os de origem `agenda` e `fin_atendimentos.status = 'confirmado'` para manuais (mesmo shape de `darBaixaLote`, mas na direção inversa).
-- Apaga lançamentos-sombra (R$ 0,00) vinculados; ignora lançamentos pagos.
-- Não bloqueia por lançamento pago; bloqueia se algum selecionado tiver `repasse_pago` (pede para deselecionar).
+Também marco a solicitação de estorno correspondente como revertida para trilha de auditoria:
 
-### 3. UI — expor a ação em lote
-- Derivar `selectedBaixados = selectedItems.filter(a => !a.repasse_pago && isAtendido(a))`.
-- Nos dois `DropdownMenu` de "Opções" (toolbar do topo, ~L1620, e barra sticky do rodapé, ~L2229), adicionar item **"Desfazer baixa (n)"** logo abaixo de "Dar baixa", com ícone e desabilitado quando `selectedBaixados.length === 0`.
+- Em `estorno_solicitacoes` id `03999650-71df-4e8a-b8da-189b6b2611d0`:
+  - `status` → `revertido`
+  - `resposta` → texto atual + " | Revertido a pedido do usuário em <hoje>"
 
-Nenhuma mudança de schema/RLS. Nenhuma mudança nos botões individuais da linha — o botão "Baixado" já chama `desfazerBaixa`, que passará a funcionar sem exigir estorno.
+O agendamento `1951612f` não precisa mudar (já está `status='agendado'`, sem executado_por/em — o pagamento em si não altera status médico).
 
-## Comportamento resultante
+O outro estorno (CONSULTA / ficha 006) fica como está — não foi solicitado.
 
-- Clicar em "Baixado" numa linha com pagamento do paciente: pede confirmação e volta para "Confirmado". O lançamento no caixa permanece.
-- Selecionar várias linhas baixadas → Opções → "Desfazer baixa (n)": reverte todas de uma vez.
-- Se qualquer selecionada tiver repasse já pago, a opção fica desabilitada (fluxo separado de estorno de repasse).
+### Depois
+Recarregar a tela de Atendimentos / Repasse para confirmar que o item volta a aparecer como pago com repasse concluído.
