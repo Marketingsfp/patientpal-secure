@@ -520,8 +520,11 @@ function Page() {
             exportToExcel(
               items.map((l) => ({
                 data: (l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) : ""),
+                hora: l.hora ?? "",
                 tipo: l.tipo,
                 descricao: l.descricao,
+                medico: l.medico_nome ?? "",
+                ficha: typeof l.ficha_numero === "number" ? String(l.ficha_numero).padStart(3, "0") : "",
                 categoria: l.categoria_id ? catMap.get(l.categoria_id) ?? "" : "",
                 conta: l.conta_id ? contaMap.get(l.conta_id) ?? "" : "",
                 forma_pagamento: l.forma_pagamento ?? "",
@@ -532,8 +535,11 @@ function Page() {
               `movimento-${fromDate}_a_${toDate}`,
               [
                 { key: "data", label: "Data" },
+                { key: "hora", label: "Hora" },
                 { key: "tipo", label: "Tipo" },
                 { key: "descricao", label: "Descrição" },
+                { key: "medico", label: "Médico" },
+                { key: "ficha", label: "Ficha" },
                 { key: "categoria", label: "Categoria" },
                 { key: "conta", label: "Conta" },
                 { key: "forma_pagamento", label: "Forma pagamento" },
