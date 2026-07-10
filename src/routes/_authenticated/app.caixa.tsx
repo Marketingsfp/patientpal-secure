@@ -429,6 +429,10 @@ function Page() {
   const [obsTerceiro, setObsTerceiro] = useState("");
   // Conferência por forma de pagamento no fechamento de terceiros.
   const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
+  // Fechamento em lote (por dia) — gestor
+  const [openLote, setOpenLote] = useState(false);
+  const [loteSelecionados, setLoteSelecionados] = useState<Record<string, boolean>>({});
+  const [obsLote, setObsLote] = useState("");
 
   // Atalho: 1..5 na modal de cobrança seleciona a forma da última linha
   useEffect(() => {
