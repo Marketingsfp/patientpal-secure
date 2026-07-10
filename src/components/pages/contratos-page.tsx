@@ -1289,17 +1289,24 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     }
     const dataInicioAntiga = (contrato as any).data_inicio as string | null;
     setSavingAdm(true);
+    // Se admin escolheu outra faixa, aplica novo valor_mensal
+    const faixaEscolhida = admFaixaId ? faixas.find((f) => f.id === admFaixaId) : null;
+    const novoValorMensal = faixaEscolhida ? Number(faixaEscolhida.valor_mensal) : null;
+    const updatePayload: any = {
+      convenio_id: admConvenioId,
+      paciente_id: admPaciente.id,
+      paciente_nome: admPaciente.nome,
+      data_inicio: admDataInicio,
+      taxa_adesao: taxa,
+      forma_pagamento: admForma || null,
+      observacoes: admObs || null,
+    };
+    if (novoValorMensal != null && novoValorMensal !== Number(valorMensalAtual)) {
+      updatePayload.valor_mensal = novoValorMensal;
+    }
     const { error } = await supabase
       .from("contratos_assinatura")
-      .update({
-        convenio_id: admConvenioId,
-        paciente_id: admPaciente.id,
-        paciente_nome: admPaciente.nome,
-        data_inicio: admDataInicio,
-        taxa_adesao: taxa,
-        forma_pagamento: admForma || null,
-        observacoes: admObs || null,
-      } as any)
+      .update(updatePayload)
       .eq("id", contrato.id);
     setSavingAdm(false);
     if (error) {
@@ -1313,6 +1320,21 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     (contrato as any).taxa_adesao = taxa;
     (contrato as any).forma_pagamento = admForma || null;
     (contrato as any).observacoes = admObs || null;
+    if (novoValorMensal != null && novoValorMensal !== Number(valorMensalAtual)) {
+      (contrato as any).valor_mensal = novoValorMensal;
+      setValorMensalAtual(novoValorMensal);
+      // Recalcula parcelas em aberto para o novo valor
+      const abertas = mens.filter((m) => m.status !== "pago");
+      if (abertas.length > 0) {
+        await Promise.all(
+          abertas.map((m) => {
+            const isBoleto = (m.forma_pagamento ?? (contrato as any).forma_pagamento) === "boleto";
+            const v = novoValorMensal + (isBoleto ? TAXA_BOLETO : 0);
+            return supabase.from("contrato_mensalidades").update({ valor: v }).eq("id", m.id);
+          }),
+        );
+      }
+    }
     toast.success("Contrato atualizado.");
     await load();
     // Se a data de início foi movida para o passado, oferecer regeneração com parcelas pagas.
