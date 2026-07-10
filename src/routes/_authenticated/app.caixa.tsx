@@ -970,6 +970,36 @@ function Page() {
       .reduce((acc, m) => acc + Number(m.valor || 0), 0);
   }, [todosMovs]);
 
+  // Total recebido/suprido por forma de pagamento em uma sessão qualquer
+  // (usa `todosMovs`). Decompõe pagamentos "misto" quando as observações do
+  // lançamento já foram carregadas via `mistoObs`.
+  const entradasPorFormaSessao = useCallback((sid: string) => {
+    const r: Record<string, number> = {
+      dinheiro: 0, pix: 0, debito: 0, credito: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0,
+    };
+    todosMovs.forEach((m) => {
+      if (m.sessao_id !== sid) return;
+      if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
+      const v = Number(m.valor || 0);
+      const bucket = normalizarForma(m.forma_pagamento);
+      if (bucket === "misto") {
+        const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+        const partes = decomporMistoObs(obs);
+        let somado = 0;
+        for (const [k, val] of Object.entries(partes)) {
+          r[k] = (r[k] ?? 0) + (val ?? 0);
+          somado += val ?? 0;
+        }
+        const resto = v - somado;
+        if (Math.abs(resto) > 0.005) r.outros += resto;
+      } else {
+        r[bucket] = (r[bucket] ?? 0) + v;
+      }
+    });
+    return r;
+  }, [todosMovs, mistoObs]);
+
   // Acoes
   const abrirCaixa = async (e: FormEvent) => {
     e.preventDefault();
