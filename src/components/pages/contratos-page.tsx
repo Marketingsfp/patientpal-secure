@@ -1567,6 +1567,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     { forma: "debito", label: "Cartão de Débito" },
     { forma: "credito", label: "Cartão de Crédito" },
     { forma: "boleto", label: "Boleto" },
+    { forma: "manual", label: "Manual" },
   ];
 
   const load = async () => {
@@ -1772,6 +1773,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     credito: "Cartão de Crédito",
     boleto: "Boleto",
     carne: "Carnê interno",
+    manual: "Manual",
   };
   const formaLabel = formaLabelMap[contrato.forma_pagamento ?? ""] ?? contrato.forma_pagamento ?? "—";
   const maxDep = Number(convenio?.max_dependentes ?? 0) || 0;

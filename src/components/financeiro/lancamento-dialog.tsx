@@ -259,6 +259,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     boleto: "Boleto",
     convenio: "Convênio",
     transferencia: "Transferência",
+    manual: "Manual",
   };
 
   const handleSave = async () => {
@@ -878,6 +879,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                   <SelectItem value="boleto">Boleto</SelectItem>
                   <SelectItem value="convenio">Convênio</SelectItem>
                   <SelectItem value="transferencia">Transferência</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
                 </SelectContent>
               </Select>
             </div>
