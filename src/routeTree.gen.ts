@@ -113,6 +113,7 @@ import { Route as AuthenticatedAppFinanceiroRegrasIaRouteImport } from './routes
 import { Route as AuthenticatedAppFinanceiroNotasRouteImport } from './routes/_authenticated/app.financeiro.notas'
 import { Route as AuthenticatedAppFinanceiroMovimentoRouteImport } from './routes/_authenticated/app.financeiro.movimento'
 import { Route as AuthenticatedAppFinanceiroLembretesRouteImport } from './routes/_authenticated/app.financeiro.lembretes'
+import { Route as AuthenticatedAppFinanceiroLaudosEcgRouteImport } from './routes/_authenticated/app.financeiro.laudos-ecg'
 import { Route as AuthenticatedAppFinanceiroEstornoRouteImport } from './routes/_authenticated/app.financeiro.estorno'
 import { Route as AuthenticatedAppFinanceiroEstatisticasRouteImport } from './routes/_authenticated/app.financeiro.estatisticas'
 import { Route as AuthenticatedAppFinanceiroEmpresasRouteImport } from './routes/_authenticated/app.financeiro.empresas'
@@ -720,6 +721,12 @@ const AuthenticatedAppFinanceiroLembretesRoute =
     path: '/lembretes',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
+const AuthenticatedAppFinanceiroLaudosEcgRoute =
+  AuthenticatedAppFinanceiroLaudosEcgRouteImport.update({
+    id: '/laudos-ecg',
+    path: '/laudos-ecg',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
 const AuthenticatedAppFinanceiroEstornoRoute =
   AuthenticatedAppFinanceiroEstornoRouteImport.update({
     id: '/estorno',
@@ -971,6 +978,7 @@ export interface FileRoutesByFullPath {
   '/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
   '/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
   '/app/financeiro/estorno': typeof AuthenticatedAppFinanceiroEstornoRoute
+  '/app/financeiro/laudos-ecg': typeof AuthenticatedAppFinanceiroLaudosEcgRoute
   '/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
   '/app/financeiro/movimento': typeof AuthenticatedAppFinanceiroMovimentoRoute
   '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
@@ -1096,6 +1104,7 @@ export interface FileRoutesByTo {
   '/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
   '/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
   '/app/financeiro/estorno': typeof AuthenticatedAppFinanceiroEstornoRoute
+  '/app/financeiro/laudos-ecg': typeof AuthenticatedAppFinanceiroLaudosEcgRoute
   '/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
   '/app/financeiro/movimento': typeof AuthenticatedAppFinanceiroMovimentoRoute
   '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
@@ -1227,6 +1236,7 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
   '/_authenticated/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
   '/_authenticated/app/financeiro/estorno': typeof AuthenticatedAppFinanceiroEstornoRoute
+  '/_authenticated/app/financeiro/laudos-ecg': typeof AuthenticatedAppFinanceiroLaudosEcgRoute
   '/_authenticated/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
   '/_authenticated/app/financeiro/movimento': typeof AuthenticatedAppFinanceiroMovimentoRoute
   '/_authenticated/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
@@ -1358,6 +1368,7 @@ export interface FileRouteTypes {
     | '/app/financeiro/empresas'
     | '/app/financeiro/estatisticas'
     | '/app/financeiro/estorno'
+    | '/app/financeiro/laudos-ecg'
     | '/app/financeiro/lembretes'
     | '/app/financeiro/movimento'
     | '/app/financeiro/notas'
@@ -1483,6 +1494,7 @@ export interface FileRouteTypes {
     | '/app/financeiro/empresas'
     | '/app/financeiro/estatisticas'
     | '/app/financeiro/estorno'
+    | '/app/financeiro/laudos-ecg'
     | '/app/financeiro/lembretes'
     | '/app/financeiro/movimento'
     | '/app/financeiro/notas'
@@ -1613,6 +1625,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/financeiro/empresas'
     | '/_authenticated/app/financeiro/estatisticas'
     | '/_authenticated/app/financeiro/estorno'
+    | '/_authenticated/app/financeiro/laudos-ecg'
     | '/_authenticated/app/financeiro/lembretes'
     | '/_authenticated/app/financeiro/movimento'
     | '/_authenticated/app/financeiro/notas'
@@ -2392,6 +2405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroLembretesRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
+    '/_authenticated/app/financeiro/laudos-ecg': {
+      id: '/_authenticated/app/financeiro/laudos-ecg'
+      path: '/laudos-ecg'
+      fullPath: '/app/financeiro/laudos-ecg'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroLaudosEcgRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
     '/_authenticated/app/financeiro/estorno': {
       id: '/_authenticated/app/financeiro/estorno'
       path: '/estorno'
@@ -2658,6 +2678,7 @@ interface AuthenticatedAppFinanceiroRouteChildren {
   AuthenticatedAppFinanceiroEmpresasRoute: typeof AuthenticatedAppFinanceiroEmpresasRoute
   AuthenticatedAppFinanceiroEstatisticasRoute: typeof AuthenticatedAppFinanceiroEstatisticasRoute
   AuthenticatedAppFinanceiroEstornoRoute: typeof AuthenticatedAppFinanceiroEstornoRoute
+  AuthenticatedAppFinanceiroLaudosEcgRoute: typeof AuthenticatedAppFinanceiroLaudosEcgRoute
   AuthenticatedAppFinanceiroLembretesRoute: typeof AuthenticatedAppFinanceiroLembretesRoute
   AuthenticatedAppFinanceiroMovimentoRoute: typeof AuthenticatedAppFinanceiroMovimentoRoute
   AuthenticatedAppFinanceiroNotasRoute: typeof AuthenticatedAppFinanceiroNotasRoute
@@ -2685,6 +2706,8 @@ const AuthenticatedAppFinanceiroRouteChildren: AuthenticatedAppFinanceiroRouteCh
       AuthenticatedAppFinanceiroEstatisticasRoute,
     AuthenticatedAppFinanceiroEstornoRoute:
       AuthenticatedAppFinanceiroEstornoRoute,
+    AuthenticatedAppFinanceiroLaudosEcgRoute:
+      AuthenticatedAppFinanceiroLaudosEcgRoute,
     AuthenticatedAppFinanceiroLembretesRoute:
       AuthenticatedAppFinanceiroLembretesRoute,
     AuthenticatedAppFinanceiroMovimentoRoute:
@@ -2920,13 +2943,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

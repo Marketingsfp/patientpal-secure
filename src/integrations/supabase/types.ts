@@ -3496,6 +3496,7 @@ export type Database = {
           id: string
           laudo_emitido_em: string | null
           laudo_lancamento_id: string | null
+          laudo_lote_id: string | null
           laudo_status: string | null
           medico_id: string | null
           medico_laudador_id: string | null
@@ -3533,6 +3534,7 @@ export type Database = {
           id?: string
           laudo_emitido_em?: string | null
           laudo_lancamento_id?: string | null
+          laudo_lote_id?: string | null
           laudo_status?: string | null
           medico_id?: string | null
           medico_laudador_id?: string | null
@@ -3570,6 +3572,7 @@ export type Database = {
           id?: string
           laudo_emitido_em?: string | null
           laudo_lancamento_id?: string | null
+          laudo_lote_id?: string | null
           laudo_status?: string | null
           medico_id?: string | null
           medico_laudador_id?: string | null
@@ -3626,6 +3629,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fin_lancamentos_laudo_lote_id_fkey"
+            columns: ["laudo_lote_id"]
+            isOneToOne: false
+            referencedRelation: "fin_laudo_lotes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fin_lancamentos_medico_id_fkey"
             columns: ["medico_id"]
             isOneToOne: false
@@ -3644,6 +3654,63 @@ export type Database = {
             columns: ["paciente_id"]
             isOneToOne: false
             referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fin_laudo_lotes: {
+        Row: {
+          agenda_medico_id: string
+          clinica_id: string
+          created_at: string
+          criado_por: string | null
+          id: string
+          observacoes: string | null
+          periodo_fim: string
+          periodo_inicio: string
+          total_ecgs: number
+          total_repasse: number
+          updated_at: string
+        }
+        Insert: {
+          agenda_medico_id: string
+          clinica_id: string
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          observacoes?: string | null
+          periodo_fim: string
+          periodo_inicio: string
+          total_ecgs?: number
+          total_repasse?: number
+          updated_at?: string
+        }
+        Update: {
+          agenda_medico_id?: string
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          observacoes?: string | null
+          periodo_fim?: string
+          periodo_inicio?: string
+          total_ecgs?: number
+          total_repasse?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_laudo_lotes_agenda_medico_id_fkey"
+            columns: ["agenda_medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_laudo_lotes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
             referencedColumns: ["id"]
           },
         ]
@@ -5047,6 +5114,67 @@ export type Database = {
             columns: ["procedimento_id"]
             isOneToOne: false
             referencedRelation: "procedimentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      medico_repasse_laudo: {
+        Row: {
+          agenda_medico_id: string
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          id: string
+          laudador_medico_id: string
+          percentual: number | null
+          tipo_repasse: string
+          updated_at: string
+          valor: number | null
+        }
+        Insert: {
+          agenda_medico_id: string
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          id?: string
+          laudador_medico_id: string
+          percentual?: number | null
+          tipo_repasse: string
+          updated_at?: string
+          valor?: number | null
+        }
+        Update: {
+          agenda_medico_id?: string
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          laudador_medico_id?: string
+          percentual?: number | null
+          tipo_repasse?: string
+          updated_at?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medico_repasse_laudo_agenda_medico_id_fkey"
+            columns: ["agenda_medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medico_repasse_laudo_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medico_repasse_laudo_laudador_medico_id_fkey"
+            columns: ["laudador_medico_id"]
+            isOneToOne: false
+            referencedRelation: "medicos"
             referencedColumns: ["id"]
           },
         ]

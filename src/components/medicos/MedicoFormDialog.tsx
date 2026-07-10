@@ -36,6 +36,14 @@ interface ConvenioRow {
   ativo: boolean;
 }
 
+interface LaudadorOption { id: string; nome: string; crm: string | null; crm_uf: string | null }
+interface LaudadorRow {
+  laudador_medico_id: string;
+  tipo_repasse: "percentual" | "valor";
+  percentual: string;
+  valor: string;
+}
+
 // Repasse individual agora é sempre vinculado a um serviço (ou categoria
 // sentinela auto-gerada). Não há seed de linhas avulsas.
 const CONVENIOS_PADRAO: ConvenioRow[] = [];
@@ -117,6 +125,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
   const [convenios, setConvenios] = useState<ConvenioRow[]>(CONVENIOS_PADRAO);
   const [form, setForm] = useState(emptyForm());
+  // Laudo Terceiro: catálogo de cardiologistas ativos da clínica + linhas configuradas
+  const [laudadoresCatalog, setLaudadoresCatalog] = useState<LaudadorOption[]>([]);
+  const [laudadores, setLaudadores] = useState<LaudadorRow[]>([]);
   // Map procedimento_id -> Map(normalizedSpecialtyKey -> originalSpecialtyName)
   const [procEspMap, setProcEspMap] = useState<Map<string, Map<string, string>>>(new Map());
 
@@ -403,6 +414,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setMedicoUserId(null);
       setExistingEmail(null);
       setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
+      setLaudadores([]);
+      setLaudadoresCatalog([]);
       setForm(emptyForm());
       return;
     }
@@ -450,6 +463,34 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       } else {
         setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
       }
+      // Laudo terceiro — catálogo de cardiologistas ativos + linhas já cadastradas
+      const cliId = med.clinica_id ?? clinicaId;
+      try {
+        const { data: cardios } = await supabase
+          .from("medicos")
+          .select("id, nome, crm, crm_uf, ativo, medico_especialidades!inner(especialidade:especialidades!inner(nome))")
+          .eq("clinica_id", cliId)
+          .eq("ativo", true)
+          .ilike("medico_especialidades.especialidade.nome", "%cardio%")
+          .neq("id", med.id)
+          .order("nome");
+        const catalog: LaudadorOption[] = ((cardios as any[]) ?? []).map((c) => ({
+          id: c.id, nome: c.nome, crm: c.crm ?? null, crm_uf: c.crm_uf ?? null,
+        }));
+        // dedup (join pode duplicar se médico tiver múltiplas linhas em cardio)
+        const seen = new Set<string>();
+        setLaudadoresCatalog(catalog.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true))));
+      } catch { setLaudadoresCatalog([]); }
+      const { data: laudos } = await supabase
+        .from("medico_repasse_laudo")
+        .select("laudador_medico_id, tipo_repasse, percentual, valor")
+        .eq("agenda_medico_id", med.id);
+      setLaudadores(((laudos as any[]) ?? []).map((r) => ({
+        laudador_medico_id: r.laudador_medico_id,
+        tipo_repasse: (r.tipo_repasse as "percentual" | "valor") ?? "percentual",
+        percentual: r.percentual != null ? String(r.percentual) : "",
+        valor: r.valor != null ? String(r.valor) : "",
+      })));
       const { data: mprocs } = await supabase
         .from("medico_procedimentos")
         .select("procedimento_id, especialidade_id")
@@ -656,6 +697,28 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         if (e3) { setSaving(false); mostrarErro(e3); return; }
       }
     }
+    // Laudo terceiro — replace-all
+    if (medicoId) {
+      await supabase.from("medico_repasse_laudo").delete().eq("agenda_medico_id", medicoId);
+      const laudoRows = laudadores
+        .filter((l) => l.laudador_medico_id && (
+          (l.tipo_repasse === "percentual" && l.percentual.trim() !== "" && Number(l.percentual) > 0) ||
+          (l.tipo_repasse === "valor" && l.valor.trim() !== "" && Number(l.valor) > 0)
+        ))
+        .map((l) => ({
+          clinica_id: activeClinicaId,
+          agenda_medico_id: medicoId!,
+          laudador_medico_id: l.laudador_medico_id,
+          tipo_repasse: l.tipo_repasse,
+          percentual: l.tipo_repasse === "percentual" ? Number(l.percentual) : null,
+          valor: l.tipo_repasse === "valor" ? Number(l.valor) : null,
+          ativo: true,
+        }));
+      if (laudoRows.length) {
+        const { error: eLaudo } = await supabase.from("medico_repasse_laudo").insert(laudoRows);
+        if (eLaudo) { setSaving(false); mostrarErro(eLaudo); return; }
+      }
+    }
     toast.success(editId ? "Médico atualizado!" : "Médico cadastrado!");
 
     // Auto-create paciente on new medico
@@ -739,12 +802,13 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <Tabs defaultValue="dados">
-              <TabsList className={asPage ? "grid grid-cols-6 w-full" : "grid grid-cols-6 w-full sticky top-[3.25rem] z-10"}>
+              <TabsList className={asPage ? "grid grid-cols-7 w-full" : "grid grid-cols-7 w-full sticky top-[3.25rem] z-10"}>
                 <TabsTrigger value="dados">Dados</TabsTrigger>
                 <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
                 <TabsTrigger value="agendas" disabled={!editingMedicoId}>Agendas</TabsTrigger>
                 <TabsTrigger value="banco">Banco</TabsTrigger>
                 <TabsTrigger value="repasse">Repasse</TabsTrigger>
+                <TabsTrigger value="laudo" disabled={!editingMedicoId}>Laudo Terceiro</TabsTrigger>
                 <TabsTrigger value="acesso">Acesso</TabsTrigger>
               </TabsList>
 
@@ -1413,6 +1477,100 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       </table>
                     </div>
                   )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="laudo" className="space-y-4 pt-4 pb-16">
+                <div className="space-y-3">
+                  <div>
+                    <Label>REPASSE LAUDO TERCEIRO</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Use quando este cadastro representa uma <b>agenda de exame</b> (ex.: ELETROCARDIOGRAMA) e o laudo é feito por <b>outro médico</b>.
+                      Liste abaixo os cardiologistas ativos da clínica e defina o repasse (percentual ou valor fixo por exame) que cada um recebe pelo laudo.
+                      O financeiro lança este repasse manualmente em <b>Financeiro → Laudos ECG</b> por período.
+                    </p>
+                  </div>
+                  {!editingMedicoId ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">Salve o médico antes de configurar o repasse de laudo.</p>
+                  ) : laudadoresCatalog.length === 0 ? (
+                    <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground text-center">
+                      Nenhum cardiologista ativo encontrado nesta clínica. Cadastre médicos com a especialidade <b>Cardiologia</b> para poder configurar o laudo.
+                    </div>
+                  ) : (
+                    <div className="border rounded-md overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/50">
+                          <tr className="text-left">
+                            <th className="px-2 py-2 font-medium">Laudador (Cardiologia)</th>
+                            <th className="px-2 py-2 font-medium w-40">Tipo</th>
+                            <th className="px-2 py-2 font-medium w-36">Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {laudadoresCatalog.map((cardio) => {
+                            const row = laudadores.find((l) => l.laudador_medico_id === cardio.id);
+                            const setRow = (patch: Partial<LaudadorRow>) => {
+                              setLaudadores((rows) => {
+                                const idx = rows.findIndex((l) => l.laudador_medico_id === cardio.id);
+                                if (idx === -1) {
+                                  return [...rows, {
+                                    laudador_medico_id: cardio.id,
+                                    tipo_repasse: "percentual",
+                                    percentual: "",
+                                    valor: "",
+                                    ...patch,
+                                  }];
+                                }
+                                return rows.map((r, j) => j === idx ? { ...r, ...patch } : r);
+                              });
+                            };
+                            const tipo = row?.tipo_repasse ?? "percentual";
+                            const value = tipo === "percentual" ? (row?.percentual ?? "") : (row?.valor ?? "");
+                            return (
+                              <tr key={cardio.id} className="border-t align-middle">
+                                <td className="px-2 py-1.5">
+                                  <div className="text-sm text-foreground/90">
+                                    {cardio.nome}
+                                    {cardio.crm && (
+                                      <span className="ml-2 text-xs text-muted-foreground">
+                                        CRM {cardio.crm}{cardio.crm_uf ? `/${cardio.crm_uf}` : ""}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-2 py-1">
+                                  <select
+                                    className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                    value={tipo}
+                                    onChange={(e) => setRow({ tipo_repasse: e.target.value as "percentual" | "valor" })}
+                                  >
+                                    <option value="percentual">% Percentual</option>
+                                    <option value="valor">R$ Valor</option>
+                                  </select>
+                                </td>
+                                <td className="px-2 py-1">
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min={0}
+                                    max={tipo === "percentual" ? 100 : undefined}
+                                    placeholder={tipo === "percentual" ? "% do faturado" : "R$ por exame"}
+                                    value={value}
+                                    onChange={(e) => setRow(tipo === "percentual"
+                                      ? { percentual: e.target.value }
+                                      : { valor: e.target.value })}
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Deixe o valor em branco / 0 para o médico que <b>não recebe laudo</b>. Este cadastro não gera lançamento automático — o financeiro decide quando lançar.
+                  </p>
                 </div>
               </TabsContent>
 
