@@ -1418,6 +1418,76 @@ function Page() {
     setDetalheMovs((data ?? []) as Mov[]);
   };
 
+  const imprimirRelatorioMovs = (movs: Mov[], periodo: string, subtitulo?: string) => {
+    const esc = (v: unknown) =>
+      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+    type Cat = { label: string; pagamento: number; recebimento: number };
+    const cats = new Map<string, Cat>();
+    let totPag = 0, totReceb = 0;
+    for (const m of movs) {
+      if (m.tipo === "abertura" || m.tipo === "fechamento") continue;
+      const key = TIPO_LABEL[m.tipo];
+      const cat = cats.get(key) ?? { label: key, pagamento: 0, recebimento: 0 };
+      const v = Number(m.valor || 0);
+      if (TIPO_SINAL[m.tipo] < 0) { cat.pagamento += v; totPag += v; }
+      else if (TIPO_SINAL[m.tipo] > 0) { cat.recebimento += v; totReceb += v; }
+      cats.set(key, cat);
+    }
+    let acc = 0;
+    const linhasCat = Array.from(cats.values()).map((c) => {
+      acc += c.recebimento - c.pagamento;
+      return '<tr><td>' + esc(c.label) + '</td><td style="text-align:right;">' + fmt(c.pagamento) + '</td><td style="text-align:right;">' + fmt(c.recebimento) + '</td><td style="text-align:right;">' + fmt(acc) + '</td></tr>';
+    }).join("");
+    type Forma = { label: string; pagamento: number; recebimento: number };
+    const formas = new Map<string, Forma>();
+    for (const m of movs) {
+      if (m.tipo === "abertura" || m.tipo === "fechamento") continue;
+      const bucket = normalizarForma(m.forma_pagamento) || "—";
+      if (bucket === "misto" && m.lancamento_id) {
+        const linhas = mistoObs.get(m.lancamento_id) ?? [];
+        for (const l of linhas) {
+          const lb = (l.forma || "—").toUpperCase();
+          const ff = formas.get(lb) ?? { label: lb, pagamento: 0, recebimento: 0 };
+          const lv = Number(l.valor || 0);
+          if (TIPO_SINAL[m.tipo] < 0) ff.pagamento += lv;
+          else if (TIPO_SINAL[m.tipo] > 0) ff.recebimento += lv;
+          formas.set(lb, ff);
+        }
+        continue;
+      }
+      const label = bucket.toUpperCase();
+      const f = formas.get(label) ?? { label, pagamento: 0, recebimento: 0 };
+      const v = Number(m.valor || 0);
+      if (TIPO_SINAL[m.tipo] < 0) f.pagamento += v;
+      else if (TIPO_SINAL[m.tipo] > 0) f.recebimento += v;
+      formas.set(label, f);
+    }
+    let accF = 0;
+    const linhasForma = Array.from(formas.values()).map((f) => {
+      accF += f.recebimento - f.pagamento;
+      return '<tr><td>' + esc(f.label) + '</td><td style="text-align:right;">' + fmt(f.pagamento) + '</td><td style="text-align:right;">' + fmt(f.recebimento) + '</td><td style="text-align:right;">' + fmt(accF) + '</td></tr>';
+    }).join("");
+    const qtd = movs.filter((m) => m.tipo !== "abertura" && m.tipo !== "fechamento").length;
+    const emissao = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+    const style = 'body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;} h1{font-size:16px;margin:0 0 6px;text-align:center;letter-spacing:.5px;} .meta{font-size:11px;color:#475569;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;} table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;} th,td{padding:5px 6px;border-bottom:1px solid #cbd5e1;} thead th{border-bottom:2px solid #0f172a;text-align:left;} thead th.n{text-align:right;} tfoot td{border-top:2px solid #0f172a;font-weight:700;} .right{text-align:right;}';
+    const empty = '<tr><td colspan="4" style="text-align:center;color:#64748b;">Sem movimentos</td></tr>';
+    const html =
+      '<!doctype html><html><head><meta charset="utf-8"/><title>Relatório de movimento de caixa</title><style>' + style + '</style></head><body>' +
+      '<div class="meta"><span>Emitido: ' + esc(emissao) + '</span></div>' +
+      '<h1>RELATÓRIO DE MOVIMENTO DE CAIXA</h1>' +
+      '<div class="meta"><span>Tipo: TODOS (SEM TRANSFERÊNCIA)</span><span>Período: ' + esc(periodo) + '</span><span>Agrupar: CATEGORIA</span></div>' +
+      (subtitulo ? '<div class="meta"><span>' + esc(subtitulo) + '</span></div>' : '') +
+      '<table><thead><tr><th>GERAL — Descrição</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + (linhasCat || empty) + '</tbody></table>' +
+      '<table><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + (linhasForma || empty) + '</tbody>' +
+      '<tfoot><tr><td>TOTAL</td><td class="right">' + fmt(totPag) + '</td><td class="right">' + fmt(totReceb) + '</td><td class="right">' + fmt(totReceb - totPag) + '</td></tr></tfoot></table>' +
+      '<div class="meta"><span>' + qtd + ' registro' + (qtd === 1 ? '' : 's') + '</span></div>' +
+      '<script>window.onload=function(){window.print();}</script></body></html>';
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
+    w.document.write(html);
+    w.document.close();
+  };
+
   const exportarTodos = () => {
     const rows = linhasTodosPorDia.map((l) => ({
       Operador: l.user_nome,
