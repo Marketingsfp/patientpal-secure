@@ -223,22 +223,13 @@ function Page() {
       toast.error("Repasse já pago — estorne o pagamento do repasse primeiro.");
       return null;
     }
-    const agId = lanc.agendamento_id;
-    if (!agId) {
-      toast.error("Apenas atendimentos vindos da agenda podem ser estornados.");
-      return null;
-    }
-    const { data: agAntes } = await supabase
-      .from("agendamentos")
-      .select("id, status, fluxo_etapa")
-      .eq("id", agId)
-      .maybeSingle();
-    // Marca o lançamento como CANCELADO (estornado). Não usamos DELETE
-    // porque a policy `fin_lanc_delete` só permite admin/gestor — para
-    // usuários financeiro o DELETE não retorna erro, mas afeta 0 linhas,
-    // deixando o pagamento "vivo" e o agendamento travado como pago na
-    // agenda. Como o restante do sistema já filtra apenas
-    // status='confirmado', mudar para 'cancelado' libera a ficha.
+    // Marca o lançamento como CANCELADO (estornado). Vale tanto para
+    // atendimentos da agenda quanto para receitas avulsas (ex.: mensalidade de
+    // contrato) que não têm agendamento vinculado. Não usamos DELETE porque a
+    // policy `fin_lanc_delete` só permite admin/gestor — para usuários
+    // financeiro o DELETE não retorna erro, mas afeta 0 linhas, deixando o
+    // pagamento "vivo". Como o restante do sistema já filtra apenas
+    // status='confirmado', mudar para 'cancelado' efetiva o estorno.
     const { error: eUpdLanc } = await supabase
       .from("fin_lancamentos")
       .update({ status: "cancelado" })
@@ -247,34 +238,85 @@ function Page() {
       mostrarErro(eUpdLanc, "falha ao estornar lançamento");
       return null;
     }
-    const { error: eUpd } = await supabase
-      .from("agendamentos")
-      .update({
-        status: "agendado",
-        fluxo_etapa: "aguardando_recepcao",
-        fluxo_atualizado_em: new Date().toISOString(),
-      })
-      .eq("id", agId);
-    if (eUpd) {
-      mostrarErro(eUpd);
-      return null;
-    }
-    try {
-      await logAction({
-        table_name: "agendamentos",
-        record_id: agId,
-        action: "ESTORNO",
-        clinica_id: clinicaAtual?.clinica_id,
-        dados_antes: agAntes ?? { id: agId },
-        dados_depois: {
-          id: agId,
+    const agId = lanc.agendamento_id;
+    if (agId) {
+      // Atendimento vindo da agenda: reabre a ficha (libera o horário).
+      const { data: agAntes } = await supabase
+        .from("agendamentos")
+        .select("id, status, fluxo_etapa")
+        .eq("id", agId)
+        .maybeSingle();
+      const { error: eUpd } = await supabase
+        .from("agendamentos")
+        .update({
           status: "agendado",
-          fin_lancamentos_id_removido: lanc.id,
-          valor_estornado: lanc.valor ?? null,
-        },
-      });
-    } catch {
-      /* auditoria best-effort */
+          fluxo_etapa: "aguardando_recepcao",
+          fluxo_atualizado_em: new Date().toISOString(),
+        })
+        .eq("id", agId);
+      if (eUpd) {
+        mostrarErro(eUpd);
+        return null;
+      }
+      try {
+        await logAction({
+          table_name: "agendamentos",
+          record_id: agId,
+          action: "ESTORNO",
+          clinica_id: clinicaAtual?.clinica_id,
+          dados_antes: agAntes ?? { id: agId },
+          dados_depois: {
+            id: agId,
+            status: "agendado",
+            fin_lancamentos_id_removido: lanc.id,
+            valor_estornado: lanc.valor ?? null,
+          },
+        });
+      } catch {
+        /* auditoria best-effort */
+      }
+    } else {
+      // Receita avulsa (ex.: mensalidade de contrato): não há agendamento para
+      // reabrir. Se houver uma parcela de mensalidade vinculada a este
+      // lançamento, reverte para "pendente" para que possa ser cobrada de novo.
+      const { data: mens } = await supabase
+        .from("contrato_mensalidades")
+        .select("id")
+        .eq("lancamento_id", lanc.id)
+        .maybeSingle();
+      if (mens) {
+        const { error: eMens } = await supabase
+          .from("contrato_mensalidades")
+          .update({
+            status: "pendente",
+            pago_em: null,
+            forma_pagamento: null,
+            valor_pago: null,
+            lancamento_id: null,
+          })
+          .eq("id", (mens as { id: string }).id);
+        if (eMens) {
+          mostrarErro(eMens, "lançamento estornado, mas falha ao reabrir a parcela da mensalidade");
+          return null;
+        }
+      }
+      try {
+        await logAction({
+          table_name: "fin_lancamentos",
+          record_id: lanc.id,
+          action: "ESTORNO",
+          clinica_id: clinicaAtual?.clinica_id,
+          dados_antes: { id: lanc.id, status: "confirmado" },
+          dados_depois: {
+            id: lanc.id,
+            status: "cancelado",
+            valor_estornado: lanc.valor ?? null,
+            mensalidade_revertida: (mens as { id: string } | null)?.id ?? null,
+          },
+        });
+      } catch {
+        /* auditoria best-effort */
+      }
     }
     return { executado: true, resposta: "Estorno executado" };
   };
