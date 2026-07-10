@@ -1,41 +1,37 @@
 ## Objetivo
+Em **Caixa → Movimentos da sessão**, separar o nome do serviço em uma coluna própria e adicionar a coluna **Médico**.
 
-Na página **Mov. Caixa** (`src/routes/_authenticated/app.financeiro.movimento.tsx`), acrescentar na listagem, para cada lançamento vindo de `fin_lancamentos`:
+## Mudanças em `src/routes/_authenticated/app.caixa.tsx`
 
-- **Médico** (nova coluna) — nome do médico do lançamento.
-- **Ficha** (nova coluna) — `ficha_numero` do agendamento vinculado.
-- **Horário** — hora do pagamento (HH:MM) exibida junto à Data, no mesmo formato que hoje é usado para sangria/suprimento (que já mostra hora).
+### 1. Enriquecer os movimentos após o `load()`
+Depois de carregar `movs` (linha ~406-411), fazer duas consultas em lote:
 
-Sem tocar em lógica financeira, RLS ou schema.
+- `fin_lancamentos` filtrando pelos `lancamento_id` presentes nos movimentos, selecionando `id, medico_id, agendamento_id, descricao`.
+- `medicos` para obter `nome` dos `medico_id` retornados.
+- Opcional: `agendamentos` → `procedimentos.nome` quando quisermos o nome oficial do procedimento (usaremos apenas se disponível; caso contrário caímos no parse da descrição).
 
-## Mudanças
+Guardar num `Map<lancamento_id, { medico_nome, servico_nome }>` em estado (`enrichPorLanc`).
 
-### 1. `load()` — trazer novos campos e enriquecer
+### 2. Derivar `servico` e `medico` para cada linha
+Função utilitária `deriveServicoMedico(m)`:
 
-- Ampliar o `select` em `fin_lancamentos` para incluir `medico_id, agendamento_id, created_at`.
-- Após montar `finList`, executar duas buscas em batch (só se houver ids):
-  - `medicos` → `id, nome` para os `medico_id` distintos.
-  - `agendamentos` → `id, ficha_numero` para os `agendamento_id` distintos.
-- Preencher em cada linha `fin`:
-  - `medico_nome` a partir do map.
-  - `ficha_numero` a partir do map.
-  - `hora` = `created_at` convertido para `HH:MM` local (mesma UX das linhas de `caixa_movimentos`, que já preenchem `hora`).
+- Se `m.lancamento_id` e houver enriquecimento → usar `servico_nome` (procedimento do agendamento ou fin_lancamentos.descricao) e `medico_nome`.
+- Fallback (abertura/fechamento/sangria/estorno manual): parse de `m.descricao`
+  - Serviço: parte após `" — "` ou `" · "`, removendo sufixos entre parênteses de forma de pagamento (`(cartão …)`, `(pix)`, etc.). Se não houver separador → `—`.
+  - Médico: `—`.
+- Descrição exibida na coluna "Descrição": manter o texto original (paciente + contexto) — o serviço fica destacado na nova coluna.
 
-### 2. Interface `Lanc`
+### 3. Tabela (linhas ~1304-1333)
+Cabeçalho passa a ser: `Data | Hora | Tipo | Descrição | Serviço | Médico | Forma | Valor | Ação`.
 
-Acrescentar `medico_nome?: string | null; ficha_numero?: number | null` (os demais já cabem em `hora`/`agendamento_id`).
+Adicionar duas novas `<TableCell>` entre Descrição e Forma exibindo `servico || "—"` e `medico || "—"`.
 
-### 3. Tabela (linhas ~671-694)
+Atualizar `colSpan={7}` da linha vazia para `colSpan={9}`.
 
-- Novo `<TableHead>Médico</TableHead>` entre "Descrição" e "Usuário".
-- Novo `<TableHead className="text-right">Ficha</TableHead>` entre "Médico" e "Usuário" (nº da ficha, formatação com 3 dígitos como no restante do sistema — `String(n).padStart(3,"0")`, fallback "—").
-- Célula da Data já concatena `hora` quando presente; passa a mostrar hora também para receitas/despesas (via `hora` derivado de `created_at`).
+### 4. Export Excel/PDF (linhas ~1037 e ~1080)
+Incluir colunas `Serviço` e `Médico` no CSV/Excel e no HTML de impressão, na mesma ordem da tabela.
 
-### 4. Exportar Excel (linhas ~468-486)
-
-Incluir no payload e nas colunas: `medico`, `ficha`, `hora` (novas colunas após "Data").
-
-## Fora de escopo
-
-- Linhas de `caixa_movimentos` (sangria/suprimento) não têm médico/ficha; ficam com "—" nas novas colunas.
-- Nenhuma alteração no filtro, no cálculo dos totais, no CRUD do dialog, ou nas outras abas.
+## Fora do escopo
+- Não altero a tabela "Histórico de sessões" nem a de Manager.
+- Sem mudanças no schema, cálculos, filtros ou fluxo de estorno.
+- Movimentos sem `lancamento_id` (abertura, fechamento, sangria) exibirão `—` em Médico.
