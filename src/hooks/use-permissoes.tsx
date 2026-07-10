@@ -106,5 +106,16 @@ export function usePermissoes(): {
     };
   }, [clinicaId, role]);
 
-  return { allowed, loading };
+  return { allowed, nivel, loading };
+}
+
+/**
+ * Retorna `true` quando o usuário tem acesso de escrita ao módulo informado.
+ * Admin (sem filtro) sempre pode escrever.
+ */
+export function usePodeEscrever(modulo: string): boolean {
+  const { nivel, allowed } = usePermissoes();
+  // Admin / carregando sem filtro: libera.
+  if (allowed === null) return true;
+  return nivel?.get(modulo) === "write";
 }
