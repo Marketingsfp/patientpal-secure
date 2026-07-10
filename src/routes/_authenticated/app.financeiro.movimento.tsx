@@ -383,6 +383,14 @@ function Page() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    // Forma de pagamento é obrigatória para receita já confirmada (pendente
+    // pode legitimamente não ter forma ainda). Sem essa checagem, lançamentos
+    // manuais ficavam com forma_pagamento NULL e a guia impressa (GR) caía
+    // num fallback enganoso em vez de refletir o pagamento real.
+    if (form.tipo === "receita" && form.status === "confirmado" && !form.forma_pagamento) {
+      toast.error("Selecione a forma de pagamento.");
+      return;
+    }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id, tipo: form.tipo, descricao: form.descricao.trim(),

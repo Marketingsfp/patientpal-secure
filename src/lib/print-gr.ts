@@ -584,7 +584,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   }
   const clinica = +(Math.max(0, valor - prestador)).toFixed(2);
 
-  const formaLbl = pagResolvido?.forma_pagamento ? (FORMA_LABEL[pagResolvido.forma_pagamento] ?? pagResolvido.forma_pagamento.toUpperCase()) : "DINHEIRO";
+  // NUNCA assumir "DINHEIRO" quando a forma real é desconhecida (lançamento
+  // antigo sem forma_pagamento salva, ou pagamento ainda não processado) — um
+  // fallback silencioso para dinheiro já causou guias mostrando forma errada
+  // para pagamentos reais em débito/pix/etc.
+  const formaLbl = pagResolvido?.forma_pagamento ? (FORMA_LABEL[pagResolvido.forma_pagamento] ?? pagResolvido.forma_pagamento.toUpperCase()) : "NÃO INFORMADO";
   const parcelasTxt = pagResolvido && pagResolvido.forma_pagamento === "cartao_credito" && pagResolvido.parcelas && pagResolvido.parcelas > 1
     ? `${pagResolvido.parcelas}x DE ${fmtBRL(valor / pagResolvido.parcelas)}`
     : "À VISTA";
@@ -968,7 +972,9 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     } catch { fichaByGrupo.set(key, 0); }
   }));
 
-  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "DINHEIRO";
+  // Ver comentário equivalente em printGuiaAtendimentoCore: nunca assumir
+  // "DINHEIRO" quando a forma real é desconhecida.
+  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "NÃO INFORMADO";
   const bandeiraTxt = pagamento.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
   const isMisto = pagamento.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
   const detalheRows = isMisto
@@ -1190,7 +1196,9 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
   const totalParcelas = contrato.num_parcelas ?? m.numero_parcela;
   const valor = Number(pagamento.valor ?? m.valor ?? 0);
 
-  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "DINHEIRO";
+  // Ver comentário equivalente em printGuiaAtendimentoCore: nunca assumir
+  // "DINHEIRO" quando a forma real é desconhecida.
+  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "NÃO INFORMADO";
   const isMisto = pagamento.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
   const parcelasTxt = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
     ? `${pagamento.parcelas}x DE ${fmtBRL(valor / pagamento.parcelas)}`

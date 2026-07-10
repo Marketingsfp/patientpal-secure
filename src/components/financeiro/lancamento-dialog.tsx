@@ -271,6 +271,16 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       toast.error("O valor do pagamento deve ser maior que zero.");
       return;
     }
+    // Forma de pagamento é obrigatória para receitas fora do fluxo "misto"
+    // (que já valida a soma das linhas mais abaixo). Sem essa checagem, o
+    // fluxo de "Valor manual" da agenda (que abre este diálogo com a forma
+    // propositalmente em branco) permitia salvar com forma_pagamento NULL —
+    // a guia impressa então caía num fallback "DINHEIRO" mesmo quando o
+    // pagamento real foi em débito/pix/etc, divergindo do que de fato ocorreu.
+    if (tipo === "receita" && !pagamentoMisto && !formaPagamento) {
+      toast.error("Selecione a forma de pagamento.");
+      return;
+    }
     // ----- Cortesia: exige justificativa + autorização de supervisor -----
     const norm0 = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
     const catAtual = categorias.find((c) => c.id === categoriaId) ?? null;
