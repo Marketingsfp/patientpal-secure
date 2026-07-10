@@ -2392,11 +2392,33 @@ function Page() {
             </div>
             <div className="space-y-2">
               <Label>Data do pagamento</Label>
-              <Input
-                type="date"
-                value={payForm.data}
-                onChange={(e) => setPayForm({ ...payForm, data: e.target.value })}
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn("w-full justify-start text-left font-normal", !payForm.data && "text-muted-foreground")}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {payForm.data
+                      ? format(parse(payForm.data, "yyyy-MM-dd", new Date()), "dd/MM/yyyy", { locale: ptBR })
+                      : "Selecionar data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    locale={ptBR}
+                    selected={payForm.data ? parse(payForm.data, "yyyy-MM-dd", new Date()) : undefined}
+                    onSelect={(d) => d && setPayForm({ ...payForm, data: format(d, "yyyy-MM-dd") })}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-muted-foreground">
+                Use uma data anterior para lançar pagamentos retroativos.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Conta</Label>
