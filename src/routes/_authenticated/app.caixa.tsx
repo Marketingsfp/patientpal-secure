@@ -2547,6 +2547,18 @@ function Page() {
               );
             })()}
             <div>
+              <Label>Data do fechamento</Label>
+              <Input
+                type="date"
+                value={dataFechamentoTerceiro}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setDataFechamentoTerceiro(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Dia a que este fechamento se refere.
+              </p>
+            </div>
+            <div>
               <Label>Observações</Label>
               <Textarea
                 value={obsTerceiro}
