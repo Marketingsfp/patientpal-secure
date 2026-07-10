@@ -1718,6 +1718,17 @@ function Page() {
                   {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  disabled={selectedBaixados.length === 0 || !podeEstornar}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedBaixados.length > 0) desfazerBaixaLote();
+                  }}
+                >
+                  <Undo2 className="h-4 w-4 mr-2 text-amber-600" />
+                  Desfazer baixa
+                  {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   disabled={!podeReimprimir}
                   onSelect={(e) => {
                     e.preventDefault();
@@ -2318,6 +2329,17 @@ function Page() {
                   <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
                   Dar baixa
                   {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={selectedBaixados.length === 0 || !podeEstornar}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedBaixados.length > 0) desfazerBaixaLote();
+                  }}
+                >
+                  <Undo2 className="h-4 w-4 mr-2 text-amber-600" />
+                  Desfazer baixa
+                  {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={!podeReimprimir}
