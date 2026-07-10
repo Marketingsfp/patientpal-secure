@@ -248,7 +248,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     a.procedimento
       ? supabase
           .from("procedimentos")
-          .select("nome, valor_dinheiro_pix, valor_cartao, tipo")
+          .select("id, nome, valor_dinheiro_pix, valor_cartao, tipo")
           .eq("clinica_id", clinicaId)
           .ilike("nome", a.procedimento)
           .maybeSingle()
@@ -258,7 +258,10 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const paciente = pac.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null; codigo_prontuario: string | null; numero_pasta: string | null } | null;
   const medicoBasic = med.data as { nome: string; especialidade: { nome: string } | null } | null;
   const medicoNome = medicoBasic?.nome ?? "—";
-  const espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
+  // Fallback: especialidade "principal" do médico (coluna medicos.especialidade_id).
+  // Para médicos com mais de uma especialidade essa coluna é apenas a primeira da
+  // lista e pode não corresponder ao serviço atendido — por isso é só o último recurso.
+  let espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
   let medicoData: { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null } | null = null;
   if (a.medico_id) {
     try {
@@ -280,7 +283,42 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       if (m) medicoCb = { aceita: !!m.aceita_cartao_beneficios, tipo: m.cb_tipo_repasse ?? null, valor: m.cb_valor_repasse ?? null, percentual: m.cb_percentual_repasse ?? null };
     } catch { medicoCb = null; }
   }
-  const procData = proc.data as { nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
+  const procData = proc.data as { id: string; nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
+
+  // Especialidade correta = a que está vinculada a ESTE serviço para ESTE médico
+  // (medico_procedimentos.especialidade_id), definida na aba Especialidades/Serviços
+  // do cadastro do médico. Só assim a guia sai coerente com o atendimento quando o
+  // médico tem várias especialidades. Se não houver vínculo, mantém o fallback acima.
+  if (medicoIdEfetivo && procData?.id) {
+    try {
+      const { data: mps } = await supabase
+        .from("medico_procedimentos")
+        .select("especialidade_id")
+        .eq("medico_id", medicoIdEfetivo)
+        .eq("procedimento_id", procData.id)
+        .not("especialidade_id", "is", null);
+      const eids = Array.from(
+        new Set(
+          ((mps ?? []) as Array<{ especialidade_id: string | null }>)
+            .map((r) => r.especialidade_id)
+            .filter((v): v is string => !!v),
+        ),
+      );
+      // Só usa a especialidade do serviço quando ela é INEQUÍVOCA (uma só). Se o
+      // mesmo serviço estiver vinculado a várias especialidades para este médico
+      // (cadastro bagunçado / import em massa), não dá para adivinhar qual vale —
+      // mantém a especialidade principal do médico (fallback acima).
+      if (eids.length === 1) {
+        const { data: esp } = await supabase
+          .from("especialidades")
+          .select("nome")
+          .eq("id", eids[0])
+          .maybeSingle();
+        const nomeVinculo = (esp as { nome: string | null } | null)?.nome;
+        if (nomeVinculo) espNome = nomeVinculo.toUpperCase();
+      }
+    } catch { /* mantém o fallback da especialidade principal do médico */ }
+  }
 
   // Se já temos pagamento informado, usa ele; senão busca valor REALMENTE pago
   // (fin_lancamentos confirmado) — garante que reimpressões usem o mesmo
