@@ -67,13 +67,13 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     orcamentos: "write", "consulta-rapida": "read", "perfil-proprio": "write",
     checkin: "write", painel: "write",
     chat: "write", "cartao-beneficios": "read", caixa: "write",
-    procedimentos: "read",
+    procedimentos: "read", nfse: "write",
     "atendimento-multiplo": "write", "tipos-servico": "read",
   },
   caixa: {
     caixa: "write", clientes: "read", recepcao: "read", financeiro: "read",
     "consulta-rapida": "read", "perfil-proprio": "write",
-    boletos: "write", nfse: "read", contratos: "read",
+    boletos: "write", nfse: "write", contratos: "read",
     "cartao-beneficios": "read", chat: "write",
   },
   financeiro: {
