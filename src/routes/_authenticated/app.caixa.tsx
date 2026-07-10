@@ -1885,7 +1885,38 @@ function Page() {
                   </Select>
                 </div>
                 <Button onClick={() => void loadTodos()}>Filtrar</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const hoje = new Date().toISOString().slice(0, 10);
+                    setFIni(hoje);
+                    setFFim(hoje);
+                  }}
+                  title="Filtrar apenas o dia de hoje"
+                >
+                  Hoje
+                </Button>
                 <Button variant="outline" onClick={exportarTodos}><FileDown className="h-4 w-4 mr-2" /> Excel</Button>
+                {(() => {
+                  const abertos = todasSessoes.filter((s) => s.status === "aberto").length;
+                  if (abertos === 0) return null;
+                  return (
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        const inicial: Record<string, boolean> = {};
+                        todasSessoes.forEach((s) => {
+                          if (s.status === "aberto") inicial[s.id] = true;
+                        });
+                        setLoteSelecionados(inicial);
+                        setObsLote("");
+                        setOpenLote(true);
+                      }}
+                    >
+                      <Lock className="h-4 w-4 mr-2" /> Fechar caixas abertos ({abertos})
+                    </Button>
+                  );
+                })()}
               </CardContent>
             </Card>
 
