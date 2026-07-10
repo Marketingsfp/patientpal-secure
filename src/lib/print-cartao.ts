@@ -33,6 +33,7 @@ type CardItem = {
   clinica: string;
   cidadeUf: string;
   telefone: string;
+  pac: string;
 };
 
 function corPlano(tipo: string): { bg: string; accent: string } {
@@ -58,6 +59,7 @@ function renderCard(item: CardItem, planoTipo: string): string {
         <div><span>CPF</span>${esc(fmtCPF(item.cpf))}</div>
         <div><span>Nº</span>${esc(item.numero)}</div>
         <div><span>Validade</span>${esc(item.validade)}</div>
+        <div><span>PAC</span>${esc(item.pac)}</div>
       </div>
       <div class="footer">${esc(item.cidadeUf)} • ${esc(item.telefone)}</div>
     </div>`;
@@ -97,6 +99,10 @@ export async function printCartoes(contratoId: string) {
   const validade = fmtData(addMeses(c.data_inicio, vigencia));
   const numero = String(c.numero).padStart(6, "0");
 
+  // PAC = total de pessoas vinculadas ao contrato (titular + dependentes ativos)
+  const totalPessoas = 1 + ((deps ?? []).length);
+  const pacStr = String(totalPessoas).padStart(2, "0");
+
   // Buscar CPF dos dependentes
   const depIds = (deps ?? []).map((d: any) => d.paciente_id);
   let depCpf = new Map<string, string>();
@@ -115,13 +121,13 @@ export async function printCartoes(contratoId: string) {
       nome: c.paciente_nome,
       cpf: _pa.cpf ?? "",
       tipo: "TITULAR",
-      numero, plano: planoNome, validade, clinica: clinicaNome, cidadeUf, telefone,
+      numero, plano: planoNome, validade, clinica: clinicaNome, cidadeUf, telefone, pac: pacStr,
     },
     ...((deps ?? []) as any[]).map((d) => ({
       nome: d.paciente_nome,
       cpf: depCpf.get(d.paciente_id) ?? "",
       tipo: (d.tipo === "agregado" ? "AGREGADO" : "DEPENDENTE") as "DEPENDENTE" | "AGREGADO",
-      numero, plano: planoNome, validade, clinica: clinicaNome, cidadeUf, telefone,
+      numero, plano: planoNome, validade, clinica: clinicaNome, cidadeUf, telefone, pac: pacStr,
     })),
   ];
 
@@ -146,7 +152,7 @@ export async function printCartoes(contratoId: string) {
   .tipo { font-weight: 800; font-size: 7pt; letter-spacing: 1pt; }
   .plano { font-size: 11pt; font-weight: 700; opacity: .95; margin-top: -1mm; }
   .nome { font-size: 12pt; font-weight: 800; letter-spacing: .5pt; }
-  .meta { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 2mm; font-size: 7.5pt; }
+  .meta { display: grid; grid-template-columns: 1.4fr 1fr 1fr 0.6fr; gap: 2mm; font-size: 7.5pt; }
   .meta div { display: flex; flex-direction: column; }
   .meta span { font-size: 5.5pt; opacity: .8; text-transform: uppercase; letter-spacing: .5pt; }
   .footer { font-size: 6.5pt; opacity: .85; text-align: right; }
