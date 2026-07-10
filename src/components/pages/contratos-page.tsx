@@ -2861,6 +2861,48 @@ h1, h2, h3 { margin: 0 0 6mm; }
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog
+        open={!!retroDialog?.open}
+        onOpenChange={(o) => { if (!o && !regerandoRetro) setRetroDialog(null); }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Data de início movida para o passado</DialogTitle>
+            <DialogDescription>
+              Já existem parcelas pagas nesse intervalo? Informe quantas para o sistema
+              marcar como pagas e gerar apenas as restantes até completar 12 parcelas.
+            </DialogDescription>
+          </DialogHeader>
+          {retroDialog && (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Parcelas já pagas</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={12}
+                  value={retroDialog.parcelasPagas}
+                  onChange={(e) => setRetroDialog({ ...retroDialog, parcelasPagas: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Serão geradas 12 parcelas a partir de {retroDialog.dataInicio.slice(8,10)}/{retroDialog.dataInicio.slice(5,7)}/{retroDialog.dataInicio.slice(0,4)}.
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRetroDialog(null)} disabled={regerandoRetro}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => regerarComPagas(Number(retroDialog?.parcelasPagas ?? 0))}
+              disabled={regerandoRetro}
+            >
+              {regerandoRetro ? "Gerando…" : "Confirmar e regenerar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
