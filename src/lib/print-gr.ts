@@ -846,8 +846,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     const procNomeBase = (a.procedimento || "CONSULTA").toUpperCase();
     const proc = procByNome.get(normalizar(procNomeBase));
     const espNome = a.medico_id ? (medById.get(a.medico_id)?.especialidadeNome ?? null) : null;
-    const espUp = espNome ? espNome.toUpperCase() : null;
-    const procNome = espUp && !procNomeBase.includes(espUp) ? `${espUp} - ${procNomeBase}` : procNomeBase;
+    const procNome = formatServicoLinha(procNomeBase, espNome);
     // Prioriza valor realmente pago (fin_lancamentos); cai para tabela de procedimentos.
     const valorPago = valorPagoByAg.get(a.id);
     const valor = valorPago != null && valorPago > 0
