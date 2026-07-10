@@ -114,7 +114,7 @@ function Page() {
       let offset = 0;
       for (;;) {
         let q = supabase.from("fin_lancamentos")
-          .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, criado_por")
+          .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, criado_por, medico_id, agendamento_id, created_at")
           .eq("clinica_id", clinicaAtual.clinica_id)
           .gte("data", fromDate).lte("data", toDate)
           .order("data", { ascending: false })
@@ -128,12 +128,66 @@ function Page() {
         if (filterPacienteDebounced) q = q.ilike("descricao", `%${filterPacienteDebounced}%`);
         const { data, error } = await q;
         if (error) { mostrarErro(error); setLoading(false); return; }
-        const rows = (data ?? []) as Array<Omit<Lanc, "origem">>;
-        finList.push(...rows.map((l) => ({ ...l, origem: "fin" as const })));
+        const rows = (data ?? []) as Array<
+          Omit<Lanc, "origem" | "medico_nome" | "ficha_numero"> & {
+            medico_id?: string | null;
+            agendamento_id?: string | null;
+            created_at?: string | null;
+          }
+        >;
+        finList.push(
+          ...rows.map((l) => ({
+            ...l,
+            origem: "fin" as const,
+            hora: l.created_at
+              ? (() => {
+                  const d = new Date(l.created_at as string);
+                  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                })()
+              : null,
+          })),
+        );
         if (rows.length < CHUNK) break;
         offset += CHUNK;
         if (offset >= MAX) break;
       }
+      // Enriquecer com nome do médico e nº da ficha do agendamento vinculado.
+      const medIds = Array.from(
+        new Set(
+          finList
+            .map((l) => (l as unknown as { medico_id?: string | null }).medico_id)
+            .filter((x): x is string => !!x),
+        ),
+      );
+      const agIds = Array.from(
+        new Set(
+          finList
+            .map((l) => (l as unknown as { agendamento_id?: string | null }).agendamento_id)
+            .filter((x): x is string => !!x),
+        ),
+      );
+      const medMap = new Map<string, string>();
+      if (medIds.length) {
+        const { data: meds } = await supabase.from("medicos").select("id, nome").in("id", medIds);
+        for (const m of (meds ?? []) as Array<{ id: string; nome: string | null }>) {
+          medMap.set(m.id, m.nome ?? "");
+        }
+      }
+      const fichaMap = new Map<string, number | null>();
+      if (agIds.length) {
+        const { data: ags } = await supabase.from("agendamentos").select("id, ficha_numero").in("id", agIds);
+        for (const a of (ags ?? []) as Array<{ id: string; ficha_numero: number | null }>) {
+          fichaMap.set(a.id, a.ficha_numero);
+        }
+      }
+      finList = finList.map((l) => {
+        const raw = l as unknown as { medico_id?: string | null; agendamento_id?: string | null };
+        return {
+          ...l,
+          medico_nome: raw.medico_id ? medMap.get(raw.medico_id) ?? null : null,
+          ficha_numero: raw.agendamento_id ? fichaMap.get(raw.agendamento_id) ?? null : null,
+        };
+      });
     }
     // 2) Transferências entre caixas — sangria/suprimento em caixa_movimentos
     //    (só carrega se o filtro Forma não estiver restringindo a algo específico
