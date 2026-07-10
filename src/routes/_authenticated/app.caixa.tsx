@@ -1151,7 +1151,7 @@ function Page() {
     if (error) { mostrarErro(error); return; }
     setOpenFechar(false);
     const obsFinal = obsFechamento;
-    setValorInformado(""); setObsFechamento("");
+    setValorInformado(""); setObsFechamento(""); setConferidoOwn({});
     toast.success("Caixa fechado");
     // Total recebido por forma de pagamento na sessão — normaliza aliases e
     // decompõe "misto" consultando observacoes do lançamento.
