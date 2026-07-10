@@ -2125,14 +2125,60 @@ h1, h2, h3 { margin: 0 0 6mm; }
               </div>
             </TabsContent>
             <TabsContent value="dados" className="mt-4 space-y-4">
-              <DadosField label="Convênio" value={convenio?.nome ?? "—"} />
+              {isAdmin ? (
+                <div className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-primary">
+                  Modo administrador — você pode alterar todos os campos deste contrato. Alterações não regeram parcelas
+                  automaticamente; use a opção “Regerar 12 parcelas futuras” abaixo quando quiser propagar o novo valor.
+                </div>
+              ) : null}
+              {isAdmin ? (
+                <div className="space-y-1">
+                  <Label>Convênio</Label>
+                  <Select value={admConvenioId} onValueChange={setAdmConvenioId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o convênio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {conveniosAdm.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <DadosField label="Convênio" value={convenio?.nome ?? "—"} />
+              )}
               <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
-              <DadosField
-                label="Paciente titular"
-                value={`${contrato.paciente_nome}${pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}`}
-              />
+              {isAdmin ? (
+                <div className="space-y-1">
+                  <Label>Paciente titular</Label>
+                  <PatientSearchInput
+                    value={admPaciente}
+                    onSelect={(p) => setAdmPaciente(p)}
+                    placeholder="Buscar paciente por nome ou CPF…"
+                  />
+                </div>
+              ) : (
+                <DadosField
+                  label="Paciente titular"
+                  value={`${contrato.paciente_nome}${pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}`}
+                />
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <DadosField label="Data início" value={fmtD(contrato.data_inicio)} />
+                {isAdmin ? (
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">Data início</div>
+                    <Input
+                      type="date"
+                      value={admDataInicio}
+                      onChange={(e) => setAdmDataInicio(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <DadosField label="Data início" value={fmtD(contrato.data_inicio)} />
+                )}
                 <div className="space-y-1">
                   <div className="text-xs text-muted-foreground">Dia de vencimento</div>
                   <Input
@@ -2141,7 +2187,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     max={31}
                     value={editDia}
                     onChange={(e) => setEditDia(e.target.value)}
-                    disabled={cancelado || savingDados}
+                    disabled={(cancelado && !isAdmin) || savingDados}
                   />
                 </div>
                 <div className="space-y-1">
@@ -2152,10 +2198,23 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     min={0}
                     value={editValor}
                     onChange={(e) => setEditValor(e.target.value)}
-                    disabled={cancelado || savingDados}
+                    disabled={(cancelado && !isAdmin) || savingDados}
                   />
                 </div>
-                <DadosField label="Taxa de adesão" value={BRL(Number(contrato.taxa_adesao ?? 0))} />
+                {isAdmin ? (
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">Taxa de adesão (R$)</div>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min={0}
+                      value={admTaxaAdesao}
+                      onChange={(e) => setAdmTaxaAdesao(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <DadosField label="Taxa de adesão" value={BRL(Number(contrato.taxa_adesao ?? 0))} />
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
                 <label className="flex items-center gap-2 text-sm">
@@ -2169,13 +2228,33 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <Button
                   size="sm"
                   onClick={salvarDadosFinanceiros}
-                  disabled={cancelado || savingDados}
+                  disabled={(cancelado && !isAdmin) || savingDados}
                   className="ml-auto"
                 >
                   {savingDados ? "Salvando…" : "Salvar valor e vencimento"}
                 </Button>
               </div>
-              <DadosField label="Forma de pagamento" value={formaLabel} />
+              {isAdmin ? (
+                <div className="space-y-1">
+                  <Label>Forma de pagamento</Label>
+                  <Select value={admForma || "__none__"} onValueChange={(v) => setAdmForma(v === "__none__" ? "" : v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a forma de pagamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Não definido</SelectItem>
+                      {formaOpcoes.map((f) => (
+                        <SelectItem key={f.forma} value={f.forma}>
+                          {f.label}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="carne">Carnê interno</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <DadosField label="Forma de pagamento" value={formaLabel} />
+              )}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-medium">
@@ -2236,7 +2315,32 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   )}
                 </div>
               </div>
-              {contrato.observacoes ? <DadosField label="Observações" value={contrato.observacoes} /> : null}
+              {isAdmin ? (
+                <div className="space-y-1">
+                  <Label>Observações</Label>
+                  <Textarea
+                    rows={3}
+                    value={admObs}
+                    onChange={(e) => setAdmObs(e.target.value)}
+                    placeholder="Observações internas do contrato"
+                  />
+                </div>
+              ) : contrato.observacoes ? (
+                <DadosField label="Observações" value={contrato.observacoes} />
+              ) : null}
+              {isAdmin ? (
+                <div className="flex justify-end pt-2">
+                  <Button onClick={salvarContratoAdmin} disabled={savingAdm}>
+                    {savingAdm ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Salvando…
+                      </>
+                    ) : (
+                      "Salvar alterações do contrato"
+                    )}
+                  </Button>
+                </div>
+              ) : null}
             </TabsContent>
             <TabsContent value="contrato" className="mt-4">
               <div className="flex items-center justify-between mb-2">
