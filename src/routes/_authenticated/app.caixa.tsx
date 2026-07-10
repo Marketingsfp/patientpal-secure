@@ -1770,11 +1770,24 @@ function Page() {
                         </span>
                       )}
                     </CardTitle>
-                    {!isManager && (
-                      <span className="text-xs text-muted-foreground">
-                        {new Date().toLocaleDateString("pt-BR")}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {!isManager && (
+                        <span className="text-xs text-muted-foreground">
+                          {new Date().toLocaleDateString("pt-BR")}
+                        </span>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => imprimirRelatorioMovs(
+                          minhasMovsFiltrados,
+                          isManager ? periodoLabel : new Date().toLocaleDateString("pt-BR"),
+                        )}
+                        disabled={minhasMovsFiltrados.length === 0}
+                      >
+                        <Printer className="h-4 w-4 mr-1" /> Relatório
+                      </Button>
+                    </div>
                   </div>
                   <div className="flex items-end gap-2 flex-wrap">
                     {isManager && (
