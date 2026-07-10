@@ -3457,7 +3457,7 @@ function AgendaPage() {
       enfermagem_recurso_id: ehRecurso ? form.medico_id : null,
       inicio: new Date(form.inicio).toISOString(),
       fim: new Date(form.fim).toISOString(),
-      procedimento: procedimentoTexto || null,
+      procedimento: form.procedimento?.trim() || null,
       status: form.status,
       observacoes: form.observacoes.trim() || null,
       data_pagamento: form.data_pagamento ? form.data_pagamento : null,
@@ -3465,38 +3465,26 @@ function AgendaPage() {
       tipo_atendimento: form.tipo_atendimento,
       forma_pagamento_prevista: form.forma_pagamento_prevista ? form.forma_pagamento_prevista : null,
     };
-    let novoId: string | null = editing?.id ?? null;
-    if (editing) {
-      const { error } = await supabase.from("agendamentos").update(payload).eq("id", editing.id);
-      if (error) {
-        setSaving(false);
-        mostrarErro(error);
-        return;
-      }
-    } else {
-      const { data: novo, error } = await supabase
-        .from("agendamentos")
-        .insert(payload)
-        .select("id")
-        .single();
-      if (error || !novo) {
-        setSaving(false);
-        mostrarErro(error);
-        return;
-      }
-      novoId = novo.id;
-    }
-    // Grava vínculos com itens do orçamento (consome itens individualmente
-    // para permitir agendamentos parciais futuros).
-    if (payload.orcamento_id && novoId && pendingOrcItemIds.length > 0) {
-      const vinculos = pendingOrcItemIds.map((itemId) => ({
+    // Delegação canônica: toda criação/edição de agendamento passa por
+    // `criarAgendamento` (ver docs/agenda/criar-agendamento-shared.md).
+    const procedimentosParaSalvar =
+      form.procedimentos && form.procedimentos.length > 0
+        ? form.procedimentos
+        : payload.procedimento
+          ? [payload.procedimento]
+          : [];
+    const multiExamesModo: "laboratorio" | "imagem" | null = null;
+    const result = await fnCriarAgendamento({
+      data: {
         clinica_id: clinicaAtual.clinica_id,
         editing_id: editing?.id ?? null,
         payload: payload as never,
         checagens: {
           validar_paciente_completo: true,
-          validar_agenda_aberta: !!form.medico_id && mudouHorarioOuMedico && !recursoIds.has(form.medico_id),
-          validar_inadimplencia: !!form.paciente_id && form.tipo_atendimento === "convenio",
+          validar_agenda_aberta:
+            !!form.medico_id && mudouHorarioOuMedico && !recursoIds.has(form.medico_id),
+          validar_inadimplencia:
+            !!form.paciente_id && form.tipo_atendimento === "convenio",
         },
         procedimentos: procedimentosParaSalvar,
         multi_exames_modo: multiExamesModo,
