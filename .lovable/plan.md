@@ -1,76 +1,72 @@
-## Objetivo
+## Foto 1 — Agrupar regras por carência
 
-Ao vender um cartão (contrato de convênio), cobrar juntos **mensalidade #1 + taxa de adesão**, mas imprimir **duas GRs separadas** e gerar **dois lançamentos financeiros distintos**. A partir da parcela 2, só sai a GR da mensalidade.
+Na aba **Regras de Preço** (`src/components/cartao-beneficios/regras-tab.tsx`), a tabela lista as regras em ordem plana. Vou agrupar visualmente por `carencia_mensalidades`, na seguinte ordem:
 
-## Mudanças
+1. **Imediato** (0)
+2. **Após 1ª mensalidade** (1)
+3. **Após 2ª mensalidade** (2)
+4. **Após 3ª mensalidade** (3)
+5. **Após 6ª mensalidade** (6)
+6. **Após 12ª mensalidade** (12)
 
-### 1. Marcar a taxa de adesão na parcela 1
+Cada grupo terá um cabeçalho colorido dentro da tabela (linha `TableRow` de largura total, tipo "Após 6ª mensalidade — 4 regras") e as regras daquele grupo listadas abaixo. Dentro do grupo mantém a ordenação atual por prioridade desc. Regras novas (`new-…`) aparecem sempre no topo do grupo "Imediato" (ou do grupo escolhido, quando o usuário mudar a carência a linha muda de grupo automaticamente).
 
-No banco: adicionar coluna em `contrato_mensalidades`:
+Nada muda no salvar / no cálculo — só ordenação e cabeçalhos.
 
-- `taxa_adesao NUMERIC(12,2) DEFAULT 0` — valor da taxa embutido nesta parcela (0 nas demais).
+## Foto 2 — "Um dos valores informados está fora do intervalo permitido"
 
-Na criação do contrato (`src/components/pages/contratos-page.tsx`, geração das parcelas na função de salvar):
+Esse erro é o **23514** (CHECK constraint), traduzido em `src/lib/traduzir-erro.ts`. A tabela `cb_convenio_regras` tem esta restrição:
 
-- Parcela 1: `taxa_adesao = convenio.taxa_adesao` (do contrato).
-- Parcelas 2..N: `taxa_adesao = 0`.
-- O campo `valor` de cada parcela continua sendo só a mensalidade (não somar a taxa) — a taxa fica destacada.
+```
+CHECK (limite_qtd IS NULL OR (
+  limite_qtd > 0
+  AND limite_periodo IN ('dia','semana','mes')
+  AND limite_escopo  IN ('contrato','paciente')
+  AND excedente_modo IN ('percentual_particular','valor_fixo','particular','bloquear')
+))
+```
 
-### 2. Diálogo de forma de pagamento (parcela 1)
+Mas o diálogo de limite (LimiteDialog) oferece opções que **não estão** no CHECK:
+- `limite_periodo = "contrato"` (não permitido pelo banco)
+- `limite_escopo = "titular_ou_dependente"` (não permitido pelo banco)
 
-Quando `pagMens.taxa_adesao > 0`:
+As regras da foto 2 mostram badge **"1/contrato titular-ou-dep"** — ou seja, foram configuradas com essas opções. Ao salvar, o Postgres rejeita → aparece a mensagem genérica de "fora do intervalo".
 
-- Mostrar as duas linhas no cabeçalho: "Mensalidade R$ X,XX + Taxa de adesão R$ Y,YY = Total R$ Z,ZZ".
-- Multa/juros por atraso continuam aplicando só sobre a mensalidade.
-- O valor total exibido nos botões de forma de pagamento passa a ser `mensalidade + taxa`.
+Não tem nada a ver com "gratuito" — o campo `gratuito` só marca a regra como cortesia; o problema é o **limite de uso** dessa regra.
 
-### 3. Pagamento: dois lançamentos + duas GRs
+### Correção (migração)
 
-Ao confirmar o pagamento da parcela 1 com taxa de adesão:
+Ampliar o CHECK para aceitar os valores que a UI já oferece:
 
-1. **Lançamento da mensalidade** (fluxo atual, categoria `MENSALIDADE CARTAO CONSULTA`) — valor da parcela.
-2. **Lançamento da taxa de adesão** — novo, categoria fixa `TAXA DE ADESAO CARTAO`, mesma forma de pagamento escolhida pelo operador.
-3. Marca a parcela como paga (com `pago_em`, `valor_pago = mensalidade + taxa`).
-4. Imprime **GR da mensalidade** (função existente `printGuiaMensalidade`, com valor da parcela apenas).
-5. Imprime **GR da taxa de adesão** — novo tipo de guia (`printGuiaTaxaAdesao`) em `src/lib/print-gr.ts`, seguindo o mesmo layout da GR de mensalidade mas com:
-   - Título "TAXA DE ADESÃO — CARTÃO DE BENEFÍCIOS"
-   - Descrição "TAXA DE ADESÃO — CONTRATO #N — <PLANO>"
-   - Numeração de vias própria (nova coluna `gr_impressoes.taxa_adesao_contrato_id` para controle de reimpressão).
+```sql
+alter table public.cb_convenio_regras
+  drop constraint cb_convenio_regras_limite_ck;
 
-Se o operador escolher pagamento misto, o rateio digitado se aplica ao **total**; o sistema divide proporcionalmente entre os dois lançamentos apenas para fins de registro contábil (o operador vê uma única cobrança). Simplificação: usar a mesma forma+detalhe no lançamento da mensalidade e no da taxa, cada um com seu próprio `valor`.
+alter table public.cb_convenio_regras
+  add constraint cb_convenio_regras_limite_ck
+  check (
+    limite_qtd is null or (
+      limite_qtd > 0
+      and limite_periodo in ('dia','semana','mes','contrato')
+      and limite_escopo  in ('contrato','paciente','titular_ou_dependente')
+      and excedente_modo in ('percentual_particular','valor_fixo','particular','bloquear')
+    )
+  );
+```
 
-### 4. Categoria financeira
+Isso libera "por contrato" (limite total no ciclo de vida do contrato) e "titular ou dependente" (mesmo consumo compartilhado), que já são referenciados na UI e no motor de agenda.
 
-Migration cria (se não existir) a categoria `TAXA DE ADESAO CARTAO` em `fin_categorias` por clínica, tipo `receita`. O `LancamentoDialog` já suporta `categoriaFixaNome`.
+### Mensagem mais clara (bônus)
 
-### 5. Reimpressão
+Em `src/lib/traduzir-erro.ts`, quando o 23514 for da constraint `cb_convenio_regras_limite_ck`, retornar uma mensagem específica: *"Configuração de limite inválida. Revise período/escopo/excedente."* Assim, se algum caminho ainda passar valor fora, o usuário sabe onde olhar.
 
-Aba "Contrato > parcelas": no botão "Imprimir GR" da parcela 1, quando `taxa_adesao > 0`, imprimir as duas guias em sequência.
+## Arquivos afetados
 
-## Detalhes técnicos
+- `src/components/cartao-beneficios/regras-tab.tsx` — agrupamento por carência.
+- `supabase/migrations/<novo>.sql` — ampliar CHECK de `cb_convenio_regras_limite_ck`.
+- `src/lib/traduzir-erro.ts` — mensagem específica para essa CHECK (opcional, mas útil).
 
-- **Schema** (`supabase--migration`):
-  - `ALTER TABLE contrato_mensalidades ADD COLUMN taxa_adesao NUMERIC(12,2) NOT NULL DEFAULT 0`.
-  - `ALTER TABLE gr_impressoes ADD COLUMN tipo TEXT` (valores: `mensalidade` | `taxa_adesao`) — para separar as vias das duas guias no mesmo mensalidade_id.
-  - Backfill: `UPDATE gr_impressoes SET tipo='mensalidade' WHERE tipo IS NULL`.
-  - Seed idempotente da categoria `TAXA DE ADESAO CARTAO` por clínica.
+## Fora do escopo
 
-- **Front** (`src/components/pages/contratos-page.tsx`):
-  - Interface `Mens` recebe `taxa_adesao`.
-  - Geração de parcelas grava `taxa_adesao` só na parcela 1.
-  - `pagValorFinal` para a parcela 1 passa a somar `taxa_adesao`.
-  - `onSavedWithData` do `LancamentoDialog` da parcela 1: insere um segundo `fin_lancamentos` com a taxa e chama a nova `printGuiaTaxaAdesao`.
-
-- **GR** (`src/lib/print-gr.ts`):
-  - Nova função `printGuiaTaxaAdesao({ mensalidadeId, clinicaId, ..., pagamento: { valor: taxaAdesao, ... } })`.
-  - Passa `tipo: 'taxa_adesao'` no insert de `gr_impressoes`.
-  - `printGuiaMensalidadeCore` passa `tipo: 'mensalidade'` e usa esse filtro ao consultar vias existentes.
-
-- **Nada muda** para contratos existentes: `taxa_adesao` fica 0 nas parcelas já criadas, então nenhum comportamento antigo altera.
-
-## Ordem de execução
-
-1. Migration (schema + backfill + categoria).
-2. Nova função `printGuiaTaxaAdesao` + filtro por `tipo` em `printGuiaMensalidadeCore`.
-3. Ajustes em `contratos-page.tsx` (criação, exibição, pagamento, reimpressão).
-4. Typecheck.
+- Não vou mexer no motor de aplicação de regra / cálculo de valor.
+- Não vou mudar nada nas telas de vendas, contratos ou faixas de preço.
