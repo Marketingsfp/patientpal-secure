@@ -2221,6 +2221,51 @@ function Page() {
             <DialogDescription>Saldo calculado: <strong>{fmt(saldoAtual)}</strong></DialogDescription>
           </DialogHeader>
           <form onSubmit={fecharCaixa} className="space-y-3">
+            {minhaSessao && (() => {
+              const porForma = entradasPorFormaSessao(minhaSessao.id);
+              const chaves = Array.from(new Set<string>([
+                ...Object.keys(conferidoOwn),
+                ...Object.keys(porForma).filter((k) => Math.abs(porForma[k] ?? 0) > 0.005),
+                "dinheiro",
+              ]));
+              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
+              chaves.sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b));
+              const totalConferido = Object.values(conferidoOwn)
+                .reduce((acc, v) => acc + (Number(v) || 0), 0);
+              return (
+                <div className="space-y-2">
+                  <Label>Conferência por forma de pagamento</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {chaves.map((k) => {
+                      const esperado = porForma[k] ?? 0;
+                      return (
+                        <div key={k} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-medium">{FORMA_LABEL[k as FormaBucket] ?? k}</span>
+                            <span className="text-muted-foreground">Esperado: {fmt(esperado)}</span>
+                          </div>
+                          <CurrencyInput
+                            value={conferidoOwn[k] ?? ""}
+                            onChange={(v) => {
+                              setConferidoOwn((prev) => {
+                                const next = { ...prev, [k]: v };
+                                const soma = Object.values(next).reduce((a, x) => a + (Number(x) || 0), 0);
+                                setValorInformado(soma.toFixed(2));
+                                return next;
+                              });
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-between text-sm pt-1 border-t">
+                    <span className="text-muted-foreground">Total conferido</span>
+                    <strong>{fmt(totalConferido)}</strong>
+                  </div>
+                </div>
+              );
+            })()}
             <div>
               <Label>Valor conferido em caixa</Label>
               <CurrencyInput value={valorInformado} onChange={setValorInformado} />
