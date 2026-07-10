@@ -20,6 +20,7 @@ import {
   HelpCircle,
   Printer,
   MoreHorizontal,
+  Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
