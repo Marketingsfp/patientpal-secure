@@ -2061,7 +2061,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
               ) : null}
 
               <div>
-                <h3 className="font-semibold text-sm mb-1">Mensalidades</h3>
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="font-semibold text-sm">Mensalidades</h3>
+                  {isAdmin ? (
+                    <Button size="sm" variant="outline" onClick={adicionarParcela}>
+                      <Plus className="h-3 w-3 mr-1" /> Adicionar parcela
+                    </Button>
+                  ) : null}
+                </div>
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader>
@@ -2085,8 +2092,38 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       {mens.map((m) => (
                         <TableRow key={m.id}>
                           <TableCell>{m.numero_parcela}</TableCell>
-                          <TableCell>{fmtD(m.vencimento)}</TableCell>
-                          <TableCell>{BRL(m.valor)}</TableCell>
+                          <TableCell>
+                            {isAdmin ? (
+                              <Input
+                                type="date"
+                                className="h-8 w-40"
+                                defaultValue={m.vencimento}
+                                onBlur={(e) => {
+                                  const v = e.target.value;
+                                  if (v && v !== m.vencimento) atualizarParcela(m.id, { vencimento: v });
+                                }}
+                              />
+                            ) : (
+                              fmtD(m.vencimento)
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {isAdmin ? (
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                className="h-8 w-28"
+                                defaultValue={Number(m.valor ?? 0).toFixed(2)}
+                                onBlur={(e) => {
+                                  const v = Number(String(e.target.value).replace(",", "."));
+                                  if (Number.isFinite(v) && v !== Number(m.valor)) atualizarParcela(m.id, { valor: v });
+                                }}
+                              />
+                            ) : (
+                              BRL(m.valor)
+                            )}
+                          </TableCell>
                           <TableCell>
                             <Badge
                               variant={
@@ -2106,16 +2143,28 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           </TableCell>
                           <TableCell>{fmtD(m.pago_em)}</TableCell>
                           <TableCell>
-                            {m.status === "pago" ? (
-                              <Button size="sm" variant="outline" onClick={() => marcarPago(m.id, false)}>
-                                Reverter
-                              </Button>
-                            ) : (
-                              <Button size="sm" disabled={cancelado} onClick={() => abrirFormaPag(m)}>
-                                <Check className="h-3 w-3 mr-1" />
-                                Pagar
-                              </Button>
-                            )}
+                            <div className="flex items-center gap-1 justify-end">
+                              {m.status === "pago" ? (
+                                <Button size="sm" variant="outline" onClick={() => marcarPago(m.id, false)}>
+                                  Reverter
+                                </Button>
+                              ) : (
+                                <Button size="sm" disabled={cancelado && !isAdmin} onClick={() => abrirFormaPag(m)}>
+                                  <Check className="h-3 w-3 mr-1" />
+                                  Pagar
+                                </Button>
+                              )}
+                              {isAdmin ? (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Excluir parcela"
+                                  onClick={() => excluirParcela(m.id)}
+                                >
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                                </Button>
+                              ) : null}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
