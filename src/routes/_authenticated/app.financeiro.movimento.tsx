@@ -571,7 +571,7 @@ function Page() {
     }).join("");
     const p = (s: string) => s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(0, 4);
     const periodo = p(fromDate) + " — " + p(toDate);
-    const clinicaNome = clinicaAtual?.clinica_nome ?? "";
+    const clinicaNome = "";
     const emissao = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
     const style = 'body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;} h1{font-size:16px;margin:0 0 6px;text-align:center;letter-spacing:.5px;} .meta{font-size:11px;color:#475569;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;} table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;} th,td{padding:5px 6px;border-bottom:1px solid #cbd5e1;} thead th{border-bottom:2px solid #0f172a;text-align:left;} thead th.n{text-align:right;} tfoot td{border-top:2px solid #0f172a;font-weight:700;} .right{text-align:right;}';
     const html =
