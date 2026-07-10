@@ -419,12 +419,6 @@ function Page() {
   const [obsFechamento, setObsFechamento] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Fechamento de sessão de outro operador (admin/gestor)
-  const [fecharAlheia, setFecharAlheia] = useState<Sessao | null>(null);
-  const [valorInformadoAlheia, setValorInformadoAlheia] = useState("");
-  const [obsFecharAlheia, setObsFecharAlheia] = useState("");
-  const [savingAlheia, setSavingAlheia] = useState(false);
-
   // Atalho: 1..5 na modal de cobrança seleciona a forma da última linha
   useEffect(() => {
     if (!openCobranca) return;
@@ -1145,51 +1139,6 @@ function Page() {
     void load();
   };
 
-  const fecharCaixaAlheia = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!fecharAlheia || !clinicaAtual || !user) return;
-    if (!obsFecharAlheia.trim()) {
-      toast.error("Informe uma observação/justificativa");
-      return;
-    }
-    const s = fecharAlheia;
-    const calc = calcSaldoSessao(s.id);
-    const informado = Number(valorInformadoAlheia) || 0;
-    const diff = informado - calc;
-    const gestorNome = user.user_metadata?.nome || user.email || "gestor";
-    const prefixo = `[FECHADO PELO GESTOR ${String(gestorNome).toUpperCase()}]`;
-    const obsFinal = `${prefixo} ${obsFecharAlheia.trim()}`;
-    setSavingAlheia(true);
-    const { error } = await supabase
-      .from("caixa_sessoes")
-      .update({
-        status: "fechado",
-        fechado_em: new Date().toISOString(),
-        valor_fechamento_informado: informado,
-        valor_fechamento_calculado: calc,
-        diferenca: diff,
-        observacoes: s.observacoes ? `${s.observacoes} | ${obsFinal}` : obsFinal,
-      })
-      .eq("id", s.id);
-    if (!error) {
-      await supabase.from("caixa_movimentos").insert({
-        sessao_id: s.id,
-        clinica_id: clinicaAtual.clinica_id,
-        user_id: s.user_id,
-        tipo: "fechamento",
-        valor: informado,
-        descricao: `${prefixo} Calculado: ${fmt(calc)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}${obsFecharAlheia.trim() ? " · " + obsFecharAlheia.trim() : ""}`,
-      });
-    }
-    setSavingAlheia(false);
-    if (error) { mostrarErro(error); return; }
-    setFecharAlheia(null);
-    setValorInformadoAlheia("");
-    setObsFecharAlheia("");
-    toast.success("Caixa do operador fechado");
-    void loadTodos();
-  };
-
   const verDetalhe = async (s: Sessao) => {
     setOpenDetalhe(s);
     const { data } = await supabase
@@ -1801,25 +1750,7 @@ function Page() {
                           <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
                             {fmt(s.diferenca)}
                           </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1 justify-end">
-                              {s.status === "aberto" && (
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => {
-                                    setFecharAlheia(s);
-                                    setValorInformadoAlheia(calcSaldoSessao(s.id).toFixed(2));
-                                    setObsFecharAlheia("");
-                                  }}
-                                  title="Fechar caixa deste operador"
-                                >
-                                  <Lock className="h-4 w-4 mr-1" /> Fechar
-                                </Button>
-                              )}
-                              <Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}><Eye className="h-4 w-4" /></Button>
-                            </div>
-                          </TableCell>
+                          <TableCell><Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}><Eye className="h-4 w-4" /></Button></TableCell>
                         </TableRow>
                       );
                     })}
@@ -2048,45 +1979,6 @@ function Page() {
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenFechar(false)}>Cancelar</Button>
               <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* === Modal Fechar caixa de outro operador (admin/gestor) === */}
-      <Dialog open={!!fecharAlheia} onOpenChange={(o) => { if (!o) { setFecharAlheia(null); setValorInformadoAlheia(""); setObsFecharAlheia(""); } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Fechar caixa do operador</DialogTitle>
-            <DialogDescription>
-              {fecharAlheia && (
-                <>
-                  <div><strong className="uppercase">{fecharAlheia.user_nome || fecharAlheia.user_id.slice(0, 8)}</strong></div>
-                  <div className="text-xs">Aberto em {fmtDT(fecharAlheia.aberto_em)}</div>
-                  <div className="mt-1">Saldo calculado: <strong>{fmt(calcSaldoSessao(fecharAlheia.id))}</strong></div>
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={fecharCaixaAlheia} className="space-y-3">
-            <div>
-              <Label>Valor conferido em caixa</Label>
-              <CurrencyInput value={valorInformadoAlheia} onChange={setValorInformadoAlheia} />
-            </div>
-            <div>
-              <Label>Justificativa <span className="text-rose-600">*</span></Label>
-              <Textarea
-                value={obsFecharAlheia}
-                onChange={(e) => setObsFecharAlheia(e.target.value)}
-                placeholder="Ex.: operador esqueceu de fechar; conferido pelo gestor"
-                required
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setFecharAlheia(null)}>Cancelar</Button>
-              <Button type="submit" variant="destructive" disabled={savingAlheia} data-primary>
-                <Lock className="h-4 w-4 mr-1" /> Confirmar fechamento
-              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -1,33 +1,32 @@
-## Fechar caixa de outros operadores (admin/gestor)
+## Estornar check-in (desfazer "Presente na clínica")
 
-Adicionar, na aba **"Todos (Financeiro)"** da tela Caixa, um botão **"Fechar"** por linha — visível apenas para admin/gestor e apenas em sessões com status `aberto`. Permite ao gestor encerrar sessões que operadores esqueceram de fechar.
+Adicionar no menu de ações (`⋯`) da agenda um item **"Estornar check-in"** que reverte o paciente de `triagem` para `aguardando_recepcao`, útil quando a recepção clicou por engano em "Presente na clínica".
 
-**RLS já permite:** as policies `cx_sess_update` e `caixa_movimentos_*` liberam `can_manage_clinica(auth.uid(), clinica_id)`, então não são necessárias mudanças de banco.
+## Regras
 
-## Fluxo
+- Item aparece **apenas quando** `fluxo_etapa === "triagem"` (paciente já com check-in confirmado, mas ainda não seguiu adiante).
+- **Não aparece** se o paciente já passou para etapas seguintes (`em_atendimento`, `laudo`, `finalizado`) — para evitar corrupção do fluxo. Nesses casos usar o cancelamento/reagendamento normal.
+- Não aparece em slots livres nem em agendamentos `realizado`.
+- Requer confirmação (`window.confirm`) antes de executar, para evitar clique acidental.
 
-1. Na tabela "Todos (Financeiro)", cada linha `status=aberto` ganha um botão **"Fechar"** (ícone cadeado).
-2. Ao clicar, abre um diálogo mostrando:
-   - Operador, abertura, saldo **calculado** da sessão
-   - Campo **"Valor informado"** (default = saldo calculado)
-   - Campo **"Observação"** (obrigatório — ex.: "Fechado pelo gestor Fulano")
-3. Ao confirmar:
-   - `UPDATE caixa_sessoes` da sessão-alvo: `status='fechado'`, `fechado_em=now()`, `valor_fechamento_informado`, `valor_fechamento_calculado`, `diferenca`, `observacoes` (prefixadas com `[FECHADO PELO GESTOR <nome>]`).
-   - `INSERT caixa_movimentos` tipo `fechamento` na sessão, com `user_id` do **operador dono** (para manter integridade do saldo) e descrição contendo o gestor responsável.
-   - Toast de sucesso e `loadTodos()` para recarregar.
+## Implementação
 
-## Detalhes técnicos
+Arquivo único: `src/routes/_authenticated/app.agenda.tsx`.
 
-- Arquivo único: `src/routes/_authenticated/app.caixa.tsx`.
-- Novo estado: `fecharAlheia: Sessao | null`, `valorInformadoAlheia`, `obsFecharAlheia`, `savingAlheia`.
-- Nova função `fecharCaixaAlheia(s: Sessao)` — espelha `fecharCaixa`, mas usa `s.id` / `s.user_id` e não imprime comprovante (opcional: reaproveitar `printComprovanteCaixa` marcando operador dono + "fechado por gestor").
-- Botão renderizado dentro da última `TableCell` da linha (ao lado do olho de detalhe), condicional a `s.status === 'aberto'`.
-- Nada de mudança em `caixa-shell` (fluxo v1 apenas).
+1. Nova função `estornarCheckin(a: Agendamento)`:
+   - `confirm("Desfazer check-in deste paciente? Ele voltará para 'aguardando recepção'.")`
+   - `UPDATE agendamentos SET fluxo_etapa='aguardando_recepcao', fluxo_atualizado_em=now() WHERE id=a.id`
+   - Atualiza `etapaMap` localmente para refletir na UI sem reload.
+   - Toast: "Check-in estornado".
+
+2. Novo `DropdownMenuItem` logo abaixo de "Presente na clínica" no dropdown de ações (linha ~5104):
+   - Condição: `etapaMap.get(a.id) === "triagem" && !isSlotLivre(a.paciente_nome) && a.status !== "realizado"`
+   - Ícone: `Undo2` (já importado do lucide-react) em cor âmbar.
+   - Label: **"Estornar check-in"**.
 
 ## Verificação
 
-1. Logar como admin, abrir **Caixa → Todos (Financeiro)**.
-2. Confirmar que sessões abertas de outros operadores mostram o botão "Fechar".
-3. Fechar uma sessão de teste, informar valor e observação, confirmar.
-4. Verificar que a linha passa para status `fechado`, com valores preenchidos e observação contendo o nome do gestor.
-5. Confirmar que operadores comuns (recepção/caixa) continuam sem enxergar a aba nem o botão.
+1. Confirmar presença de um paciente pela agenda (badge verde aparece).
+2. Abrir o menu `⋯` da mesma linha — deve aparecer "Estornar check-in".
+3. Clicar → confirmar no diálogo → paciente volta a mostrar o botão de check-in verde vazado (pendente).
+4. Confirmar que a opção some se o paciente já foi para atendimento/finalizado.
