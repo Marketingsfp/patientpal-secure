@@ -1275,6 +1275,90 @@ function Page() {
     }
   };
 
+  const desfazerBaixaLote = async () => {
+    if (!podeEstornar) {
+      toast.error("Sem permissão para desfazer a baixa.");
+      return;
+    }
+    const alvos = selectedItems.filter((a) => !a.repasse_pago && isAtendido(a));
+    if (alvos.length === 0) return;
+    if (
+      !confirm(
+        `Desfazer a baixa de ${alvos.length} atendimento(s)?\n\nOs atendimentos voltam para 'Confirmado'. Os pagamentos dos pacientes permanecem intactos no caixa — apenas lançamentos-sombra de R$ 0,00 são removidos.`,
+      )
+    )
+      return;
+    try {
+      const agIds = alvos
+        .filter((a) => a.origem === "agenda" && !!a.agendamento_id)
+        .map((a) => a.agendamento_id as string);
+      const manualIds = alvos.filter((a) => a.origem === "manual").map((a) => a.id);
+
+      // Coleta lançamentos-sombra (R$ 0,00) para apagar.
+      let sombraIds: string[] = [];
+      if (agIds.length) {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("id, valor, agendamento_id")
+          .in("agendamento_id", agIds);
+        const rows = (lancs ?? []) as Array<{ id: string; valor: number | string | null }>;
+        sombraIds.push(...rows.filter((l) => Number(l.valor) === 0).map((l) => l.id));
+      }
+      if (manualIds.length) {
+        const { data: fas } = await supabase
+          .from("fin_atendimentos")
+          .select("lancamento_id")
+          .in("id", manualIds);
+        const lancIds = ((fas ?? []) as Array<{ lancamento_id: string | null }>)
+          .map((r) => r.lancamento_id)
+          .filter((x): x is string => !!x);
+        if (lancIds.length) {
+          const { data: lancs } = await supabase
+            .from("fin_lancamentos")
+            .select("id, valor")
+            .in("id", lancIds);
+          const rows = (lancs ?? []) as Array<{ id: string; valor: number | string | null }>;
+          sombraIds.push(...rows.filter((l) => Number(l.valor) === 0).map((l) => l.id));
+        }
+      }
+
+      if (agIds.length) {
+        const { error } = await supabase
+          .from("agendamentos")
+          .update({ status: "confirmado" })
+          .in("id", agIds);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      if (manualIds.length) {
+        const { error } = await supabase
+          .from("fin_atendimentos")
+          .update({ status: "confirmado" })
+          .in("id", manualIds);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      if (sombraIds.length) {
+        const { error: delErr } = await supabase
+          .from("fin_lancamentos")
+          .delete()
+          .in("id", sombraIds);
+        if (delErr) {
+          mostrarErro(delErr);
+          return;
+        }
+      }
+      toast.success(`Baixa desfeita em ${alvos.length} atendimento(s).`);
+      await load();
+    } catch (err) {
+      mostrarErro(err);
+    }
+  };
+
   const medMap = useMemo(() => new Map(medicos.map((m) => [m.id, m.nome])), [medicos]);
   const pacMap = useMemo(() => {
     const m = new Map<string, string>(pacientes.map((p) => [p.id, p.nome]));
