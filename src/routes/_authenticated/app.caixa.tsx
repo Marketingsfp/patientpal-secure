@@ -2042,6 +2042,7 @@ function Page() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Operador</TableHead>
+                      <TableHead>Dia</TableHead>
                       <TableHead>Abertura</TableHead>
                       <TableHead>Fechamento</TableHead>
                       <TableHead>Status</TableHead>
@@ -2055,40 +2056,44 @@ function Page() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {todasSessoes.length === 0 && (
-                      <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">Sem sessões no período</TableCell></TableRow>
+                    {linhasTodosPorDia.length === 0 && (
+                      <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">Sem sessões no período</TableCell></TableRow>
                     )}
-                    {todasSessoes.map((s) => {
-                      const calc = calcSaldoSessao(s.id);
-                      const sangria = calcSangriaSessao(s.id);
-                      const estorno = calcEstornoSessao(s.id);
+                    {linhasTodosPorDia.map((l) => {
+                      const sAberta = l.sessaoAbertaId
+                        ? l.sessoes.find((x) => x.id === l.sessaoAbertaId)
+                        : null;
+                      const sPrincipal = sAberta ?? l.sessoes[0];
                       return (
-                        <TableRow key={s.id}>
-                          <TableCell className="font-medium uppercase">{(s.user_nome || s.user_id.slice(0, 8)).toUpperCase()}</TableCell>
-                          <TableCell>{fmtDT(s.aberto_em)}</TableCell>
-                          <TableCell>{fmtDT(s.fechado_em)}</TableCell>
-                          <TableCell><Badge variant={s.status === "aberto" ? "default" : "secondary"}>{s.status}</Badge></TableCell>
-                          <TableCell className="text-right">{fmt(s.valor_abertura)}</TableCell>
-                          <TableCell className="text-right">{fmt(calc)}</TableCell>
-                          <TableCell className="text-right">{fmt(s.valor_fechamento_informado)}</TableCell>
-                          <TableCell className={`text-right ${sangria > 0 ? "text-amber-700" : "text-muted-foreground"}`}>{fmt(sangria)}</TableCell>
-                          <TableCell className={`text-right ${estorno > 0 ? "text-rose-700" : "text-muted-foreground"}`}>{fmt(estorno)}</TableCell>
-                          <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
-                            {fmt(s.diferenca)}
+                        <TableRow key={l.key}>
+                          <TableCell className="font-medium uppercase">{l.user_nome.toUpperCase()}</TableCell>
+                          <TableCell className="whitespace-nowrap">{fmtDia(l.data)}</TableCell>
+                          <TableCell>{fmtHora(l.primeiraAbertura)}</TableCell>
+                          <TableCell>{fmtHora(l.ultimoFechamento)}</TableCell>
+                          <TableCell><Badge variant={l.statusDia === "aberto" ? "default" : "secondary"}>{l.statusDia}</Badge></TableCell>
+                          <TableCell className="text-right">{fmt(l.valorAbertura)}</TableCell>
+                          <TableCell className="text-right">{fmt(l.calculado)}</TableCell>
+                          <TableCell className="text-right">{fmt(l.informado)}</TableCell>
+                          <TableCell className={`text-right ${l.sangria > 0 ? "text-amber-700" : "text-muted-foreground"}`}>{fmt(l.sangria)}</TableCell>
+                          <TableCell className={`text-right ${l.estorno > 0 ? "text-rose-700" : "text-muted-foreground"}`}>{fmt(l.estorno)}</TableCell>
+                          <TableCell className={`text-right ${l.diferenca < 0 ? "text-rose-600" : l.diferenca > 0 ? "text-amber-600" : ""}`}>
+                            {fmt(l.diferenca)}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
-                            <Button size="sm" variant="ghost" onClick={() => verDetalhe(s)} title="Ver detalhes">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {s.status === "aberto" && (
+                            {sPrincipal && (
+                              <Button size="sm" variant="ghost" onClick={() => verDetalhe(sPrincipal)} title="Ver detalhes">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {sAberta && (
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 title="Fechar este caixa"
                                 onClick={() => {
-                                  setOpenFecharTerceiro(s);
+                                  setOpenFecharTerceiro(sAberta);
                                   setObsTerceiro("");
-                                  const porForma = entradasPorFormaSessao(s.id);
+                                  const porForma = entradasPorFormaSessao(sAberta.id);
                                   const inicial: Record<string, string> = {};
                                   let soma = 0;
                                   for (const k of Object.keys(porForma)) {
