@@ -2759,6 +2759,22 @@ function Page() {
             <Button variant="outline" onClick={() => setComprovanteOpen(false)}>
               Fechar
             </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                document.body.classList.add("print-resumo-only");
+                const cleanup = () => {
+                  document.body.classList.remove("print-resumo-only");
+                  window.removeEventListener("afterprint", cleanup);
+                };
+                window.addEventListener("afterprint", cleanup);
+                window.print();
+                setTimeout(cleanup, 60000);
+              }}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir resumo (médico)
+            </Button>
             <Button onClick={() => window.print()}>
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
