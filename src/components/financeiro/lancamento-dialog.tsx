@@ -259,6 +259,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     boleto: "Boleto",
     convenio: "Convênio",
     transferencia: "Transferência",
+    manual: "Manual",
   };
 
   const handleSave = async () => {
