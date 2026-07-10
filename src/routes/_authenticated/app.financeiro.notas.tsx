@@ -158,12 +158,15 @@ function Page() {
       if (cpfLimpo.length !== 11 && cpfLimpo.length !== 14) {
         throw new Error("CPF/CNPJ do tomador é obrigatório (11 ou 14 dígitos).");
       }
+      const descFinal = tomador.dependenteAtendido
+        ? `${descricao || "Serviços prestados"} — Atendido: ${tomador.dependenteAtendido}`
+        : (descricao || "Serviços prestados");
       const res = await emitirFn({ data: {
         emitenteId,
         pacienteId: p.id,
         pagamentoId: n.id ?? undefined,
         valorServicos: Number(n.valor),
-        descricaoServicos: descricao || "Serviços prestados",
+        descricaoServicos: descFinal,
         tomador: { ...tomador, cpfCnpj: cpfLimpo },
       } });
       const nfseId = (res as { id?: string })?.id;
