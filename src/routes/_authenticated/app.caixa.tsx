@@ -301,6 +301,10 @@ function Page() {
   // "Estornado" (aprovado) conforme a decisão do financeiro.
   const [estornosPorLanc, setEstornosPorLanc] = useState<Map<string, "pendente" | "aprovado">>(new Map());
   const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, { servico: string | null; medico: string | null }>>(new Map());
+  // Conjunto de lancamento_ids cujo fin_lancamentos.status = 'cancelado'
+  // (i.e., estornados). Esses recebimentos não devem entrar no saldo do
+  // caixa mesmo que o movimento reverso ainda não tenha sido gravado.
+  const [lancsCancelados, setLancsCancelados] = useState<Set<string>>(new Set());
   // Filtro de período para "Movimentos" (padrão: hoje)
   type PeriodoFiltro = "hoje" | "semana" | "quinzena" | "mes" | "intervalo" | "todos";
   const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
