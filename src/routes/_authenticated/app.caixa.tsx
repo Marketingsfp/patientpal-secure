@@ -1830,7 +1830,25 @@ function Page() {
                           <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
                             {fmt(s.diferenca)}
                           </TableCell>
-                          <TableCell><Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}><Eye className="h-4 w-4" /></Button></TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <Button size="sm" variant="ghost" onClick={() => verDetalhe(s)} title="Ver detalhes">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {s.status === "aberto" && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Fechar este caixa"
+                                onClick={() => {
+                                  setOpenFecharTerceiro(s);
+                                  setInformadoTerceiro(calc.toFixed(2));
+                                  setObsTerceiro("");
+                                }}
+                              >
+                                <Lock className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                       );
                     })}
