@@ -730,6 +730,8 @@ function Page() {
               <TableHead className="w-10"></TableHead>
               <TableHead>Data</TableHead>
               <TableHead>Descrição</TableHead>
+              <TableHead>Médico</TableHead>
+              <TableHead className="text-right">Ficha</TableHead>
               <TableHead>Usuário</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Valor</TableHead>
@@ -748,6 +750,8 @@ function Page() {
                 }</TableCell>
                 <TableCell className="text-sm">{(l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) + (l.hora ? " " + l.hora : "") : "")}</TableCell>
                 <TableCell>{l.descricao}</TableCell>
+                <TableCell className="text-sm whitespace-nowrap">{l.medico_nome || "—"}</TableCell>
+                <TableCell className="text-sm text-right tabular-nums">{typeof l.ficha_numero === "number" ? String(l.ficha_numero).padStart(3, "0") : "—"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{l.criado_por ? userMap.get(l.criado_por) ?? "—" : "—"}</TableCell>
                 <TableCell><Badge variant={l.status === "confirmado" ? "default" : "secondary"}>{l.status}</Badge></TableCell>
                 <TableCell className={`text-right font-medium ${
