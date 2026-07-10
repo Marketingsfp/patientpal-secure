@@ -2082,6 +2082,40 @@ function Page() {
         </DialogContent>
       </Dialog>
 
+      {/* === Modal Fechar caixa de OUTRO usuário (gestor/admin) === */}
+      <Dialog open={!!openFecharTerceiro} onOpenChange={(o) => { if (!o) setOpenFecharTerceiro(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Fechar caixa de outro operador</DialogTitle>
+            {openFecharTerceiro && (
+              <DialogDescription>
+                Operador: <strong className="uppercase">{openFecharTerceiro.user_nome || openFecharTerceiro.user_id.slice(0, 8)}</strong>
+                <br />
+                Saldo calculado: <strong>{fmt(calcSaldoSessao(openFecharTerceiro.id))}</strong>
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <form onSubmit={fecharSessaoTerceiro} className="space-y-3">
+            <div>
+              <Label>Valor conferido em caixa</Label>
+              <CurrencyInput value={informadoTerceiro} onChange={setInformadoTerceiro} />
+            </div>
+            <div>
+              <Label>Observações</Label>
+              <Textarea
+                value={obsTerceiro}
+                onChange={(e) => setObsTerceiro(e.target.value)}
+                placeholder="Motivo do fechamento pelo gestor (ex.: operador ausente, fim de turno etc.)"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setOpenFecharTerceiro(null)}>Cancelar</Button>
+              <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* === Modal Cobrança === */}
       <Dialog open={!!openCobranca} onOpenChange={(o) => { if (!o) setOpenCobranca(null); }}>
         <DialogContent>
