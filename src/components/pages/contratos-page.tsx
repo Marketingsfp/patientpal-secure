@@ -2289,7 +2289,36 @@ h1, h2, h3 { margin: 0 0 6mm; }
               ) : (
                 <DadosField label="Convênio" value={convenio?.nome ?? "—"} />
               )}
-              <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
+              {isAdmin && faixas.length > 0 ? (
+                <div className="space-y-1">
+                  <Label>Nº de pessoas no contrato</Label>
+                  <Select value={admFaixaId} onValueChange={setAdmFaixaId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a faixa…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {faixas.map((f) => {
+                        const range =
+                          f.vidas_ate == null
+                            ? `${f.vidas_de}+ pessoas`
+                            : f.vidas_ate === f.vidas_de
+                              ? `${f.vidas_de} ${f.vidas_de === 1 ? "pessoa" : "pessoas"}`
+                              : `${f.vidas_de} a ${f.vidas_ate} pessoas`;
+                        return (
+                          <SelectItem key={f.id} value={f.id}>
+                            {range} — {BRL(Number(f.valor_mensal))}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Ao salvar, o valor mensal do contrato e das parcelas em aberto serão atualizados para a faixa selecionada.
+                  </p>
+                </div>
+              ) : (
+                <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
+              )}
               {isAdmin ? (
                 <div className="space-y-1">
                   <Label>Paciente titular</Label>
