@@ -594,8 +594,44 @@ function Page() {
                 <div className="space-y-2"><Label>Data</Label>
                   <Input type="date" required value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></div>
               </div>
+              <div className="space-y-2"><Label>Referente a</Label>
+                <Select
+                  value={form.referente_a}
+                  onValueChange={(v) => setForm({ ...form, referente_a: v as "medico" | "funcionario" | "outros", descricao: "" })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="medico">Médico</SelectItem>
+                    <SelectItem value="funcionario">Funcionário</SelectItem>
+                    <SelectItem value="outros">Outros</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2"><Label>Descrição *</Label>
-                <Input required value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} /></div>
+                {form.referente_a === "medico" ? (
+                  <Select value={form.descricao || ""} onValueChange={(v) => setForm({ ...form, descricao: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o médico" /></SelectTrigger>
+                    <SelectContent>
+                      {medicosOpts.map((m) => <SelectItem key={m.id} value={m.nome}>{m.nome}</SelectItem>)}
+                      {form.descricao && !medicosOpts.some((m) => m.nome === form.descricao) && (
+                        <SelectItem value={form.descricao}>{form.descricao}</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                ) : form.referente_a === "funcionario" ? (
+                  <Select value={form.descricao || ""} onValueChange={(v) => setForm({ ...form, descricao: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o funcionário" /></SelectTrigger>
+                    <SelectContent>
+                      {funcionariosOpts.map((f) => <SelectItem key={f.id} value={f.nome}>{f.nome}</SelectItem>)}
+                      {form.descricao && !funcionariosOpts.some((f) => f.nome === form.descricao) && (
+                        <SelectItem value={form.descricao}>{form.descricao}</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input required value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} />
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Valor (R$) *</Label>
                   <CurrencyInput value={form.valor} onChange={(v) => setForm({ ...form, valor: v })} /></div>
