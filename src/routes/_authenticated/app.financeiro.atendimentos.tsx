@@ -2672,7 +2672,7 @@ function Page() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 border rounded-md p-3 mb-3">
+              <div className="comprovante-resumo grid grid-cols-2 gap-x-6 gap-y-1.5 border rounded-md p-3 mb-3">
                 <div>
                   <span className="text-xs text-muted-foreground">Médico: </span>
                   <b>{comprovante.medicoNome}</b>
