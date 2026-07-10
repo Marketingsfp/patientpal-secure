@@ -108,9 +108,18 @@ interface Props {
   editingMedicoId?: string | null;
   onSaved?: () => void;
   asPage?: boolean;
+  // Pré-preenche o nome ao abrir em modo "novo médico" — usado para completar
+  // o cadastro de alguém cujo perfil de acesso já é "Médico" (clinica_memberships)
+  // mas ainda não tem registro em `medicos` (CRM etc.).
+  prefillNome?: string;
+  // Vincula o registro `medicos` recém-criado a este user_id existente (mesmo
+  // caso acima). Sem isso, o médico completado ficaria com um login "solto"
+  // (sem user_id), sem contar como cadastro completo para quem já tinha
+  // perfil de acesso "Médico" — continuaria aparecendo como pendente.
+  prefillUserId?: string;
 }
 
-export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoId, onSaved, asPage = false }: Props) {
+export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoId, onSaved, asPage = false, prefillNome, prefillUserId }: Props) {
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
   const getLoginFn = useServerFn(getFuncionarioLogin);
   const definirSenhaFn = useServerFn(definirSenhaFuncionario);
@@ -416,7 +425,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
       setLaudadores([]);
       setLaudadoresCatalog([]);
-      setForm(emptyForm());
+      setForm({ ...emptyForm(), nome: prefillNome ?? "" });
       return;
     }
     void (async () => {
@@ -544,7 +553,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     return () => {
       cancelled = true;
     };
-  }, [open, editingMedicoId, clinicaId]);
+  }, [open, editingMedicoId, clinicaId, prefillNome]);
 
   async function salvarNovaSenha() {
     if (!medicoUserId) return;
@@ -616,6 +625,10 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       conta: form.conta || null,
       pix_chave: form.pix_chave || null,
       ativo: form.ativo,
+      // Só entra no INSERT (nunca no UPDATE, para não sobrescrever o vínculo
+      // de um médico já existente): liga este novo registro a um user_id que
+      // já tinha perfil de acesso "Médico" mas cadastro incompleto.
+      ...(!editId && prefillUserId ? { user_id: prefillUserId } : {}),
     };
     let medicoId = editId;
     if (editId) {

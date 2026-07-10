@@ -30,7 +30,6 @@ interface Funcionario {
   nome: string;
   role: string;
   ativo: boolean;
-  medicoPendente?: boolean;
 }
 
 interface Medico {
@@ -42,6 +41,11 @@ interface Medico {
   telefone: string | null;
   ativo: boolean;
   especialidades?: string[];
+  // Perfil de acesso já é "Médico" (clinica_memberships), mas ainda não existe
+  // registro em `medicos` (falta CRM). Aparece aqui, na aba Médicos, com um
+  // aviso — nunca deve sumir do sistema. `id` sintético = "pending-<user_id>".
+  pending?: boolean;
+  user_id?: string;
 }
 
 const limparPrefixoMedico = (nome: string) =>
@@ -61,6 +65,8 @@ function EquipePage() {
   const [medicoStatus, setMedicoStatus] = useState<"ativos" | "inativos" | "todos">("ativos");
   const [funcDialog, setFuncDialog] = useState<{ open: boolean; userId?: string | null }>({ open: false, userId: null });
   const [medicoDialog, setMedicoDialog] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
+  const [medicoPrefillNome, setMedicoPrefillNome] = useState<string | undefined>(undefined);
+  const [medicoPrefillUserId, setMedicoPrefillUserId] = useState<string | undefined>(undefined);
   const [enfDialog, setEnfDialog] = useState<{ open: boolean; userId?: string | null }>({ open: false, userId: null });
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -98,14 +104,29 @@ function EquipePage() {
         nome: nomeMap.get(r.user_id) ?? "(sem nome)",
         role: r.role,
         ativo: r.ativo,
-        medicoPendente: r.role === "medico" && !medicosUserIds.has(r.user_id),
       }));
       allRows.sort((a, b) => a.nome.localeCompare(b.nome));
       const enfRows = allRows.filter((r) => r.role === "enfermeiro");
-      // Exclui da lista de Funcionários apenas quem é médico E já tem
-      // cadastro completo em `medicos` (aparece só na aba Médicos). Médico
-      // "pendente" (sem CRM cadastrado ainda) continua visível aqui.
-      setFuncionarios(allRows.filter((r) => r.role !== "enfermeiro" && !(r.role === "medico" && medicosUserIds.has(r.user_id))));
+      // Quem é médico nunca aparece em Funcionários (nem "pendente" — esses
+      // vão para a aba Médicos, mesclados via medicosPendentes abaixo).
+      setFuncionarios(allRows.filter((r) => r.role !== "enfermeiro" && r.role !== "medico"));
+      // Perfil "Médico" sem cadastro completo em `medicos` (falta CRM): mantém
+      // visível na aba Médicos como pendente — nunca deve desaparecer do
+      // sistema. Usa o próprio membership como linha sintética (id prefixado).
+      const medicosPendentes: Medico[] = mems
+        .filter((r) => r.role === "medico" && !medicosUserIds.has(r.user_id))
+        .map((r) => ({
+          id: `pending-${r.user_id}`,
+          nome: nomeMap.get(r.user_id) ?? "(sem nome)",
+          crm: null,
+          crm_uf: null,
+          email: null,
+          telefone: null,
+          ativo: r.ativo,
+          especialidades: [],
+          pending: true,
+          user_id: r.user_id,
+        }));
 
       // Carrega vínculos de agendas para enfermeiros
       let agendasMap = new Map<string, string[]>();
@@ -144,7 +165,10 @@ function EquipePage() {
           espMap.set(v.medico_id, arr);
         }
       }
-      setMedicos(medicosBase.map((md) => ({ ...md, especialidades: espMap.get(md.id) ?? [] })));
+      setMedicos([
+        ...medicosBase.map((md) => ({ ...md, especialidades: espMap.get(md.id) ?? [] })),
+        ...medicosPendentes,
+      ]);
       setLoading(false);
     });
   }, [clinicaAtual?.clinica_id, reloadKey]);
@@ -155,6 +179,8 @@ function EquipePage() {
   };
   const escolherMedico = () => {
     setOpenChooser(false);
+    setMedicoPrefillNome(undefined);
+    setMedicoPrefillUserId(undefined);
     setMedicoDialog({ open: true, id: null });
   };
   const escolherEnfermagem = () => {
@@ -240,14 +266,7 @@ function EquipePage() {
                   {funcsFiltrados.map((f) => (
                     <TableRow key={f.id}>
                       <TableCell>{f.nome}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground capitalize">
-                        {f.role}
-                        {f.medicoPendente && (
-                          <Badge variant="destructive" className="ml-2 align-middle">
-                            Cadastro de médico pendente (falta CRM)
-                          </Badge>
-                        )}
-                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground capitalize">{f.role}</TableCell>
                       <TableCell>
                         <Badge variant={f.ativo ? "default" : "outline"}>{f.ativo ? "Ativo" : "Inativo"}</Badge>
                       </TableCell>
@@ -312,13 +331,36 @@ function EquipePage() {
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{m.telefone ?? "—"}</TableCell>
-                      <TableCell>{m.ativo ? <Badge>Ativo</Badge> : <Badge variant="outline">Inativo</Badge>}</TableCell>
+                      <TableCell>
+                        {m.pending ? (
+                          <Badge variant="destructive">Cadastro pendente (falta CRM)</Badge>
+                        ) : m.ativo ? (
+                          <Badge>Ativo</Badge>
+                        ) : (
+                          <Badge variant="outline">Inativo</Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
-                        <Button size="icon" variant="ghost" asChild>
-                          <Link to="/app/equipe/medico/$medicoId/editar" params={{ medicoId: m.id }}>
+                        {m.pending ? (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            title="Completar cadastro de médico"
+                            onClick={() => {
+                              setMedicoPrefillNome(m.nome);
+                              setMedicoPrefillUserId(m.user_id);
+                              setMedicoDialog({ open: true, id: null });
+                            }}
+                          >
                             <Pencil className="h-4 w-4" />
-                          </Link>
-                        </Button>
+                          </Button>
+                        ) : (
+                          <Button size="icon" variant="ghost" asChild>
+                            <Link to="/app/equipe/medico/$medicoId/editar" params={{ medicoId: m.id }}>
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -433,6 +475,8 @@ function EquipePage() {
           onOpenChange={(o) => setMedicoDialog((s) => ({ ...s, open: o }))}
           clinicaId={clinicaAtual.clinica_id}
           editingMedicoId={medicoDialog.id}
+          prefillNome={medicoPrefillNome}
+          prefillUserId={medicoPrefillUserId}
           onSaved={() => setReloadKey((k) => k + 1)}
         />
       )}
