@@ -1,27 +1,41 @@
-## Restaurar lançamento REVISAO (DERMATOLOGIA) — SEVERINA TERTO
+## Objetivo
 
-Alvo: `fin_lancamentos.id = 658c8002-2b05-45dc-b3d0-9e645a35cbca` (ficha 002, agendamento `1951612f-9846-41af-8f4b-da5cdc6dca0d`), atualmente `status='cancelado'`, `repasse_pago=false`. Valor mantido em **R$ 0,01**.
+Na página **Mov. Caixa** (`src/routes/_authenticated/app.financeiro.movimento.tsx`), acrescentar na listagem, para cada lançamento vindo de `fin_lancamentos`:
 
-### Ação (via ferramenta de atualização de dados)
+- **Médico** (nova coluna) — nome do médico do lançamento.
+- **Ficha** (nova coluna) — `ficha_numero` do agendamento vinculado.
+- **Horário** — hora do pagamento (HH:MM) exibida junto à Data, no mesmo formato que hoje é usado para sangria/suprimento (que já mostra hora).
 
-Um único UPDATE em `fin_lancamentos`:
+Sem tocar em lógica financeira, RLS ou schema.
 
-- `status` → `confirmado`
-- `repasse_pago` → `true`
-- `repasse_pago_em` → `2026-07-09`
-- `repasse_forma_pagamento` → `Dinheiro`
-- `repasse_conta_id` → `c4f7db58-3c38-4e0a-9e97-356c97d5aeee` (mesma conta usada no lançamento original)
-- `updated_at` → `now()`
+## Mudanças
 
-Também marco a solicitação de estorno correspondente como revertida para trilha de auditoria:
+### 1. `load()` — trazer novos campos e enriquecer
 
-- Em `estorno_solicitacoes` id `03999650-71df-4e8a-b8da-189b6b2611d0`:
-  - `status` → `revertido`
-  - `resposta` → texto atual + " | Revertido a pedido do usuário em <hoje>"
+- Ampliar o `select` em `fin_lancamentos` para incluir `medico_id, agendamento_id, created_at`.
+- Após montar `finList`, executar duas buscas em batch (só se houver ids):
+  - `medicos` → `id, nome` para os `medico_id` distintos.
+  - `agendamentos` → `id, ficha_numero` para os `agendamento_id` distintos.
+- Preencher em cada linha `fin`:
+  - `medico_nome` a partir do map.
+  - `ficha_numero` a partir do map.
+  - `hora` = `created_at` convertido para `HH:MM` local (mesma UX das linhas de `caixa_movimentos`, que já preenchem `hora`).
 
-O agendamento `1951612f` não precisa mudar (já está `status='agendado'`, sem executado_por/em — o pagamento em si não altera status médico).
+### 2. Interface `Lanc`
 
-O outro estorno (CONSULTA / ficha 006) fica como está — não foi solicitado.
+Acrescentar `medico_nome?: string | null; ficha_numero?: number | null` (os demais já cabem em `hora`/`agendamento_id`).
 
-### Depois
-Recarregar a tela de Atendimentos / Repasse para confirmar que o item volta a aparecer como pago com repasse concluído.
+### 3. Tabela (linhas ~671-694)
+
+- Novo `<TableHead>Médico</TableHead>` entre "Descrição" e "Usuário".
+- Novo `<TableHead className="text-right">Ficha</TableHead>` entre "Médico" e "Usuário" (nº da ficha, formatação com 3 dígitos como no restante do sistema — `String(n).padStart(3,"0")`, fallback "—").
+- Célula da Data já concatena `hora` quando presente; passa a mostrar hora também para receitas/despesas (via `hora` derivado de `created_at`).
+
+### 4. Exportar Excel (linhas ~468-486)
+
+Incluir no payload e nas colunas: `medico`, `ficha`, `hora` (novas colunas após "Data").
+
+## Fora de escopo
+
+- Linhas de `caixa_movimentos` (sangria/suprimento) não têm médico/ficha; ficam com "—" nas novas colunas.
+- Nenhuma alteração no filtro, no cálculo dos totais, no CRUD do dialog, ou nas outras abas.
