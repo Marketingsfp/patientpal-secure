@@ -429,6 +429,10 @@ function Page() {
   const [obsTerceiro, setObsTerceiro] = useState("");
   // Conferência por forma de pagamento no fechamento de terceiros.
   const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
+  // Fechamento em lote (por dia) — gestor
+  const [openLote, setOpenLote] = useState(false);
+  const [loteSelecionados, setLoteSelecionados] = useState<Record<string, boolean>>({});
+  const [obsLote, setObsLote] = useState("");
 
   // Atalho: 1..5 na modal de cobrança seleciona a forma da última linha
   useEffect(() => {
@@ -1259,7 +1263,58 @@ function Page() {
     void load();
   };
 
+  // Fecha em lote todas as sessões marcadas — usa o saldo calculado como
+  // valor informado (diferença = 0). Uma observação global identifica o
+  // fechamento como feito pelo gestor.
+  const fecharLote = async () => {
+    if (!clinicaAtual || !user) return;
+    const alvos = todasSessoes.filter(
+      (s) => s.status === "aberto" && loteSelecionados[s.id],
+    );
+    if (alvos.length === 0) {
+      toast.error("Selecione ao menos um caixa aberto para fechar.");
+      return;
+    }
+    setSaving(true);
+    let ok = 0;
+    let fail = 0;
+    const gestorNome = user.user_metadata?.nome || user.email || "gestor";
+    for (const alvo of alvos) {
+      const calc = calcSaldoSessao(alvo.id);
+      const { error } = await supabase
+        .from("caixa_sessoes")
+        .update({
+          status: "fechado",
+          fechado_em: new Date().toISOString(),
+          valor_fechamento_informado: calc,
+          valor_fechamento_calculado: calc,
+          diferenca: 0,
+          observacoes: `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado em lote por ${gestorNome}]${obsLote ? " " + obsLote : ""}`,
+        })
+        .eq("id", alvo.id);
+      if (error) { fail += 1; continue; }
+      await supabase.from("caixa_movimentos").insert({
+        sessao_id: alvo.id,
+        clinica_id: clinicaAtual.clinica_id,
+        user_id: user.id,
+        tipo: "fechamento",
+        valor: calc,
+        descricao: `Fechamento em lote pelo gestor. Operador original: ${alvo.user_nome || alvo.user_id.slice(0, 8)} | Calculado: ${fmt(calc)}${obsLote ? " | " + obsLote : ""}`,
+      });
+      ok += 1;
+    }
+    setSaving(false);
+    setOpenLote(false);
+    setLoteSelecionados({});
+    setObsLote("");
+    if (ok > 0) toast.success(`${ok} caixa(s) fechado(s)${fail ? ` — ${fail} falha(s)` : ""}`);
+    else if (fail > 0) toast.error(`Falha ao fechar ${fail} caixa(s)`);
+    void loadTodos();
+    void load();
+  };
+
   const verDetalhe = async (s: Sessao) => {
+    // (marcador para localizar próxima função)
     setOpenDetalhe(s);
     const { data } = await supabase
       .from("caixa_movimentos")
@@ -1830,7 +1885,38 @@ function Page() {
                   </Select>
                 </div>
                 <Button onClick={() => void loadTodos()}>Filtrar</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const hoje = new Date().toISOString().slice(0, 10);
+                    setFIni(hoje);
+                    setFFim(hoje);
+                  }}
+                  title="Filtrar apenas o dia de hoje"
+                >
+                  Hoje
+                </Button>
                 <Button variant="outline" onClick={exportarTodos}><FileDown className="h-4 w-4 mr-2" /> Excel</Button>
+                {(() => {
+                  const abertos = todasSessoes.filter((s) => s.status === "aberto").length;
+                  if (abertos === 0) return null;
+                  return (
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        const inicial: Record<string, boolean> = {};
+                        todasSessoes.forEach((s) => {
+                          if (s.status === "aberto") inicial[s.id] = true;
+                        });
+                        setLoteSelecionados(inicial);
+                        setObsLote("");
+                        setOpenLote(true);
+                      }}
+                    >
+                      <Lock className="h-4 w-4 mr-2" /> Fechar caixas abertos ({abertos})
+                    </Button>
+                  );
+                })()}
               </CardContent>
             </Card>
 
@@ -2209,6 +2295,81 @@ function Page() {
               <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* === Modal Fechamento em lote (por dia/período) === */}
+      <Dialog open={openLote} onOpenChange={setOpenLote}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Fechar caixas abertos no período</DialogTitle>
+            <DialogDescription>
+              Cada caixa selecionado será fechado com o valor <strong>calculado</strong> (diferença = 0). Use quando os operadores esquecem de fechar o próprio caixa ao fim do dia.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="max-h-80 overflow-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10"></TableHead>
+                    <TableHead>Operador</TableHead>
+                    <TableHead>Abertura</TableHead>
+                    <TableHead className="text-right">Calculado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {todasSessoes.filter((s) => s.status === "aberto").length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        Nenhum caixa aberto no período.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {todasSessoes.filter((s) => s.status === "aberto").map((s) => {
+                    const calc = calcSaldoSessao(s.id);
+                    const checked = !!loteSelecionados[s.id];
+                    return (
+                      <TableRow key={s.id}>
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => setLoteSelecionados((prev) => ({ ...prev, [s.id]: e.target.checked }))}
+                            className="h-4 w-4"
+                          />
+                        </TableCell>
+                        <TableCell className="uppercase font-medium">{(s.user_nome || s.user_id.slice(0, 8)).toUpperCase()}</TableCell>
+                        <TableCell>{fmtDT(s.aberto_em)}</TableCell>
+                        <TableCell className="text-right">{fmt(calc)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            <div>
+              <Label>Observação (aplicada a todos)</Label>
+              <Textarea
+                value={obsLote}
+                onChange={(e) => setObsLote(e.target.value)}
+                placeholder="Ex.: Fechamento de fim de dia — operadores não fecharam o caixa."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setOpenLote(false)}>Cancelar</Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={saving}
+              onClick={() => void fecharLote()}
+              data-primary
+            >
+              <Lock className="h-4 w-4 mr-2" />
+              Confirmar fechamento em lote
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
