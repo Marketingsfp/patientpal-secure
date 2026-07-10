@@ -1570,7 +1570,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                     className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                     title="Remover configuração de repasse deste laudador"
                                     disabled={!row}
-                                    onClick={() => setLaudadores((rows) => rows.filter((l) => l.laudador_medico_id !== cardio.id))}
                                     onClick={() => {
                                       setLaudadores((rows) => rows.filter((l) => l.laudador_medico_id !== cardio.id));
                                       setLaudadoresCatalog((cat) => cat.filter((c) => c.id !== cardio.id));
