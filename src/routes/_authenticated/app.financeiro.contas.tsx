@@ -128,7 +128,12 @@ function Page() {
                     <SelectTrigger><SelectValue placeholder="Selecione a bandeira" /></SelectTrigger>
                     <SelectContent>
                       {BANDEIRAS.map((b) => (
-                        <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
+                        <SelectItem key={b.value} value={b.value}>
+                          <span className="flex items-center gap-2">
+                            <BandeiraIcon value={b.value} />
+                            {b.label}
+                          </span>
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -162,7 +167,10 @@ function Page() {
                     <h3 className="font-semibold truncate">{c.nome}</h3>
                     <Badge variant="secondary" className="mt-1">{c.tipo}</Badge>
                     {c.bandeira && (
-                      <p className="text-xs text-muted-foreground mt-1 uppercase">{BANDEIRAS.find((b) => b.value === c.bandeira)?.label ?? c.bandeira}</p>
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                        <BandeiraIcon value={c.bandeira} />
+                        {BANDEIRAS.find((b) => b.value === c.bandeira)?.label ?? c.bandeira}
+                      </p>
                     )}
                     {c.banco && <p className="text-sm text-muted-foreground mt-2">{c.banco} {c.agencia && `Ag. ${c.agencia}`} {c.conta && `Cc. ${c.conta}`}</p>}
                     <p className="text-sm mt-2">Saldo inicial: <strong>{fmt(Number(c.saldo_inicial))}</strong></p>
