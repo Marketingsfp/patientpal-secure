@@ -1874,8 +1874,19 @@ function Page() {
                                 title="Fechar este caixa"
                                 onClick={() => {
                                   setOpenFecharTerceiro(s);
-                                  setInformadoTerceiro(calc.toFixed(2));
                                   setObsTerceiro("");
+                                  const porForma = entradasPorFormaSessao(s.id);
+                                  const inicial: Record<string, string> = {};
+                                  let soma = 0;
+                                  for (const k of Object.keys(porForma)) {
+                                    const v = porForma[k] ?? 0;
+                                    if (Math.abs(v) > 0.005 || k === "dinheiro") {
+                                      inicial[k] = v.toFixed(2);
+                                      soma += v;
+                                    }
+                                  }
+                                  setConferidoTerceiro(inicial);
+                                  setInformadoTerceiro(soma.toFixed(2));
                                 }}
                               >
                                 <Lock className="h-4 w-4" />
