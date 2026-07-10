@@ -1219,6 +1219,8 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [admForma, setAdmForma] = useState<string>(contrato.forma_pagamento ?? "");
   const [admObs, setAdmObs] = useState<string>(contrato.observacoes ?? "");
   const [savingAdm, setSavingAdm] = useState(false);
+  const [retroDialog, setRetroDialog] = useState<{ open: boolean; parcelasPagas: string; dataInicio: string } | null>(null);
+  const [regerandoRetro, setRegerandoRetro] = useState(false);
   useEffect(() => {
     setAdmConvenioId(contrato.convenio_id ?? "");
     setAdmDataInicio(contrato.data_inicio ?? "");
