@@ -1,72 +1,55 @@
-## Foto 1 — Agrupar regras por carência
+## Diagnóstico
 
-Na aba **Regras de Preço** (`src/components/cartao-beneficios/regras-tab.tsx`), a tabela lista as regras em ordem plana. Vou agrupar visualmente por `carencia_mensalidades`, na seguinte ordem:
+O saldo de R$ 535,00 mostrado para **Tatiane Barreto** é um **saldo fantasma**. Confirmei no banco:
 
-1. **Imediato** (0)
-2. **Após 1ª mensalidade** (1)
-3. **Após 2ª mensalidade** (2)
-4. **Após 3ª mensalidade** (3)
-5. **Após 6ª mensalidade** (6)
-6. **Após 12ª mensalidade** (12)
+- Sessão de caixa aberta em 10/07/2026, 5 movimentos.
+- 4 recebimentos de mensalidade (R$ 120 + 120 + 120 + 175 = **R$ 535**).
+- Cada um está vinculado a um `fin_lancamentos` cujo **status é `cancelado`** (estornado).
+- Ou seja: os estornos foram aprovados, mas **nenhum movimento reverso foi lançado no caixa**.
 
-Cada grupo terá um cabeçalho colorido dentro da tabela (linha `TableRow` de largura total, tipo "Após 6ª mensalidade — 4 regras") e as regras daquele grupo listadas abaixo. Dentro do grupo mantém a ordenação atual por prioridade desc. Regras novas (`new-…`) aparecem sempre no topo do grupo "Imediato" (ou do grupo escolhido, quando o usuário mudar a carência a linha muda de grupo automaticamente).
+### Causa raiz (código)
 
-Nada muda no salvar / no cálculo — só ordenação e cabeçalhos.
+Em `src/routes/_authenticated/app.financeiro.estorno.tsx` (função `executarEstorno`, linhas ~226-320), ao aprovar uma solicitação de estorno o sistema:
 
-## Foto 2 — "Um dos valores informados está fora do intervalo permitido"
+- Marca `fin_lancamentos.status = 'cancelado'`.
+- Reabre o agendamento (se houver) ou volta a parcela do contrato para `pendente`.
+- **NÃO** cria um movimento de sangria/despesa em `caixa_movimentos` para reverter a entrada.
 
-Esse erro é o **23514** (CHECK constraint), traduzido em `src/lib/traduzir-erro.ts`. A tabela `cb_convenio_regras` tem esta restrição:
+Já o `saldoAtual` do caixa (`app.caixa.tsx`, linha ~879) soma **todo `recebimento`** da sessão, sem olhar o status do lançamento vinculado. Resultado: o dinheiro "sai" do controle financeiro mas continua no saldo do caixa.
 
-```
-CHECK (limite_qtd IS NULL OR (
-  limite_qtd > 0
-  AND limite_periodo IN ('dia','semana','mes')
-  AND limite_escopo  IN ('contrato','paciente')
-  AND excedente_modo IN ('percentual_particular','valor_fixo','particular','bloquear')
-))
-```
+## Correção
 
-Mas o diálogo de limite (LimiteDialog) oferece opções que **não estão** no CHECK:
-- `limite_periodo = "contrato"` (não permitido pelo banco)
-- `limite_escopo = "titular_ou_dependente"` (não permitido pelo banco)
+### 1) Correção da causa (código) — `executarEstorno`
 
-As regras da foto 2 mostram badge **"1/contrato titular-ou-dep"** — ou seja, foram configuradas com essas opções. Ao salvar, o Postgres rejeita → aparece a mensagem genérica de "fora do intervalo".
+Quando o lançamento tem um `caixa_movimentos` de tipo `recebimento` apontando para ele:
 
-Não tem nada a ver com "gratuito" — o campo `gratuito` só marca a regra como cortesia; o problema é o **limite de uso** dessa regra.
+- Inserir um novo `caixa_movimentos` na **mesma sessão** do movimento original, com:
+  - `tipo = 'sangria'`
+  - `valor = valor do recebimento` (positivo — o sinal já é −1 no cálculo)
+  - `forma_pagamento` = mesma do recebimento original (para o relatório por forma bater)
+  - `descricao = "Estorno — <descrição original>"`
+  - `lancamento_id = lanc.id`
+  - `user_id` = usuário da sessão (o dono do caixa), para não quebrar RLS
+- Se a sessão do recebimento original estiver `fechada`, **não** mexer nela: inserir num movimento de estorno na sessão aberta do próprio operador do estorno (financeiro), com a mesma descrição, para que o histórico financeiro reflita a saída. Isso é o mesmo padrão de "sangria" que o front já reconhece pela palavra "Estorno" na descrição (visto em `app.caixa.tsx` linha 1072).
 
-### Correção (migração)
+### 2) Blindagem (defensive) — `saldoAtual`
 
-Ampliar o CHECK para aceitar os valores que a UI já oferece:
+Em `app.caixa.tsx`, ao calcular `saldoAtual` e nos agregados diários (`porDia`, `porFormaEntradas`, etc.), quando um `caixa_movimentos.recebimento` tem `lancamento_id` cujo `fin_lancamentos.status = 'cancelado'`, **ignorar** esse movimento no saldo (equivalente a assumir que houve estorno). Assim mesmo dados retroativos (sem movimento reverso gravado) já param de contar.
 
-```sql
-alter table public.cb_convenio_regras
-  drop constraint cb_convenio_regras_limite_ck;
+Para isso, o `load` já busca `fin_lancamentos` dos `lancIds` (para enriquecer serviço/médico); vou incluir `status` no select e propagar num `Set<string>` de "lançamentos cancelados". O `useMemo` do `saldoAtual` passa a filtrar recebimentos cujo `lancamento_id ∈` esse Set.
 
-alter table public.cb_convenio_regras
-  add constraint cb_convenio_regras_limite_ck
-  check (
-    limite_qtd is null or (
-      limite_qtd > 0
-      and limite_periodo in ('dia','semana','mes','contrato')
-      and limite_escopo  in ('contrato','paciente','titular_ou_dependente')
-      and excedente_modo in ('percentual_particular','valor_fixo','particular','bloquear')
-    )
-  );
-```
+### 3) Correção pontual dos dados (Tatiane)
 
-Isso libera "por contrato" (limite total no ciclo de vida do contrato) e "titular ou dependente" (mesmo consumo compartilhado), que já são referenciados na UI e no motor de agenda.
-
-### Mensagem mais clara (bônus)
-
-Em `src/lib/traduzir-erro.ts`, quando o 23514 for da constraint `cb_convenio_regras_limite_ck`, retornar uma mensagem específica: *"Configuração de limite inválida. Revise período/escopo/excedente."* Assim, se algum caminho ainda passar valor fora, o usuário sabe onde olhar.
+Inserir 4 movimentos de sangria "Estorno — …" na sessão `94b0dc10-…` (a aberta da Tatiane), um para cada recebimento cancelado, referenciando o mesmo `forma_pagamento` e `lancamento_id`. Saldo passa a **R$ 0,00**, refletindo a realidade (não há dinheiro em caixa).
 
 ## Arquivos afetados
 
-- `src/components/cartao-beneficios/regras-tab.tsx` — agrupamento por carência.
-- `supabase/migrations/<novo>.sql` — ampliar CHECK de `cb_convenio_regras_limite_ck`.
-- `src/lib/traduzir-erro.ts` — mensagem específica para essa CHECK (opcional, mas útil).
+- `src/routes/_authenticated/app.financeiro.estorno.tsx` — gera reversal em `caixa_movimentos` ao aprovar estorno.
+- `src/routes/_authenticated/app.caixa.tsx` — ignora recebimentos com lançamento cancelado no saldo/agregados; carrega `status` do `fin_lancamentos`.
+- **Data fix** via `supabase--insert` — sangrias de estorno na sessão da Tatiane.
 
 ## Fora do escopo
 
-- Não vou mexer no motor de aplicação de regra / cálculo de valor.
-- Não vou mudar nada nas telas de vendas, contratos ou faixas de preço.
+- Não vou mudar o layout do caixa nem os relatórios.
+- Não vou mexer no fluxo de solicitação de estorno (só na aprovação).
+- Não vou reabrir sessões fechadas para corrigir estornos antigos: nesses casos o estorno cai como sangria na sessão aberta do financeiro que aprovou (comportamento contábil correto: o dinheiro só sai quando é devolvido ao paciente).

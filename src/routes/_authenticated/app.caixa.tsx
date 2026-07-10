@@ -301,6 +301,10 @@ function Page() {
   // "Estornado" (aprovado) conforme a decisão do financeiro.
   const [estornosPorLanc, setEstornosPorLanc] = useState<Map<string, "pendente" | "aprovado">>(new Map());
   const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, { servico: string | null; medico: string | null }>>(new Map());
+  // Conjunto de lancamento_ids cujo fin_lancamentos.status = 'cancelado'
+  // (i.e., estornados). Esses recebimentos não devem entrar no saldo do
+  // caixa mesmo que o movimento reverso ainda não tenha sido gravado.
+  const [lancsCancelados, setLancsCancelados] = useState<Set<string>>(new Set());
   // Filtro de período para "Movimentos" (padrão: hoje)
   type PeriodoFiltro = "hoje" | "semana" | "quinzena" | "mes" | "intervalo" | "todos";
   const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
@@ -511,12 +515,16 @@ function Page() {
       // Enriquecer com nome do serviço e médico
       const lancIds = Array.from(new Set(movsList.map((m) => m.lancamento_id).filter((x): x is string => !!x)));
       const enrich = new Map<string, { servico: string | null; medico: string | null }>();
+      const cancelados = new Set<string>();
       if (lancIds.length > 0) {
         const { data: lancs } = await supabase
           .from("fin_lancamentos")
-          .select("id, medico_id, agendamento_id, descricao")
+          .select("id, medico_id, agendamento_id, descricao, status")
           .in("id", lancIds);
-        const lancRows = (lancs ?? []) as Array<{ id: string; medico_id: string | null; agendamento_id: string | null; descricao: string | null }>;
+        const lancRows = (lancs ?? []) as Array<{ id: string; medico_id: string | null; agendamento_id: string | null; descricao: string | null; status: string | null }>;
+        for (const l of lancRows) {
+          if (l.status === "cancelado") cancelados.add(l.id);
+        }
         const medIds = Array.from(new Set(lancRows.map((l) => l.medico_id).filter((x): x is string => !!x)));
         const agIds = Array.from(new Set(lancRows.map((l) => l.agendamento_id).filter((x): x is string => !!x)));
         const [medRes, agRes] = await Promise.all([
@@ -564,6 +572,7 @@ function Page() {
         }
       }
       setEnrichPorLanc(enrich);
+      setLancsCancelados(cancelados);
     } else {
       // Sem sessão aberta: mostrar movimentos das sessões recentes do próprio usuário
       // (assim mensalidades pagas numa sessão já encerrada continuam visíveis
@@ -582,6 +591,7 @@ function Page() {
         setMinhasMovs([]);
       }
       setEnrichPorLanc(new Map());
+      setLancsCancelados(new Set());
     }
 
     setMinhasSessoes((histRes.data ?? []) as Sessao[]);
@@ -878,11 +888,23 @@ function Page() {
   // Calculos
   const saldoAtual = useMemo(() => {
     if (!minhaSessao) return 0;
-    return minhasMovs.reduce(
-      (acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0),
-      0,
-    );
-  }, [minhaSessao, minhasMovs]);
+    return minhasMovs.reduce((acc, m) => {
+      // Blindagem: recebimento cujo lançamento foi cancelado (estornado) não
+      // entra no saldo. A sangria de reversão correspondente também é
+      // ignorada — o par se anula, mas se o reverso ainda não foi gravado
+      // (dados antigos) o saldo já fica correto.
+      if (m.lancamento_id && lancsCancelados.has(m.lancamento_id)) {
+        if (m.tipo === "recebimento") return acc;
+        if (
+          m.tipo === "sangria" &&
+          (m.descricao ?? "").toLowerCase().startsWith("estorno")
+        ) {
+          return acc;
+        }
+      }
+      return acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0);
+    }, 0);
+  }, [minhaSessao, minhasMovs, lancsCancelados]);
 
   const resumoTipos = useMemo(() => {
     const r: Record<MovTipo, number> = {
