@@ -1218,6 +1218,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [admTaxaAdesao, setAdmTaxaAdesao] = useState<string>(String(Number(contrato.taxa_adesao ?? 0).toFixed(2)));
   const [admForma, setAdmForma] = useState<string>(contrato.forma_pagamento ?? "");
   const [admObs, setAdmObs] = useState<string>(contrato.observacoes ?? "");
+  const [admFaixaId, setAdmFaixaId] = useState<string>("");
   const [savingAdm, setSavingAdm] = useState(false);
   const [retroDialog, setRetroDialog] = useState<{ open: boolean; parcelasPagas: string; dataInicio: string } | null>(null);
   const [regerandoRetro, setRegerandoRetro] = useState(false);
