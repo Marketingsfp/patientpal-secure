@@ -351,7 +351,36 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
             ) : regras.length === 0 ? (
               <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
-            ) : regras.map((r, idx) => (
+            ) : (() => {
+              // Agrupa regras (mantendo o índice original em `regras`) pela carência.
+              const buckets = new Map<number, Array<{ r: CbRegra; idx: number }>>();
+              regras.forEach((r, idx) => {
+                const key = Number(r.carencia_mensalidades ?? 0) || 0;
+                if (!buckets.has(key)) buckets.set(key, []);
+                buckets.get(key)!.push({ r, idx });
+              });
+              // Ordem: presets primeiro (0,1,2,3,6,12), depois qualquer valor extra.
+              const orderedKeys = [
+                ...CARENCIA_GROUPS.map(g => g.value).filter(k => buckets.has(k)),
+                ...Array.from(buckets.keys())
+                  .filter(k => !CARENCIA_GROUPS.some(g => g.value === k))
+                  .sort((a, b) => a - b),
+              ];
+              return orderedKeys.flatMap((key) => {
+                const items = buckets.get(key)!;
+                return [
+                  <TableRow key={`grp-${key}`} className="bg-muted/60 hover:bg-muted/60">
+                    <TableCell colSpan={11} className="py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <span className="inline-flex items-center gap-2">
+                        <Timer className="h-3.5 w-3.5" />
+                        {carenciaLabel(key)}
+                        <span className="text-[10px] font-normal normal-case text-muted-foreground/80">
+                          — {items.length} {items.length === 1 ? "regra" : "regras"}
+                        </span>
+                      </span>
+                    </TableCell>
+                  </TableRow>,
+                  ...items.map(({ r, idx }) => (
               <TableRow key={r.id}>
                 <TableCell>
                   <SearchableSelect
@@ -471,7 +500,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   </Button>
                 </TableCell>
               </TableRow>
-            ))}
+                  )),
+                ];
+              });
+            })()}
           </TableBody>
         </Table>
       </div>
