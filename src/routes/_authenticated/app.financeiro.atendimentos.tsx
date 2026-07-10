@@ -184,6 +184,7 @@ function Page() {
   const [fPaciente, setFPaciente] = useState<string>("");
   const [fOrdem, setFOrdem] = useState<"data_desc" | "data_asc" | "gr" | "paciente_az" | "paciente_za">("gr");
   const [fTipo, setFTipo] = useState<"todos" | "medico" | "clinica">("todos");
+  const [fLaudo, setFLaudo] = useState<"todos" | "baixado" | "nao_baixado">("todos");
   const [contas, setContas] = useState<Conta[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [optsReady, setOptsReady] = useState(false);
@@ -1482,10 +1483,16 @@ function Page() {
         : fTipo === "medico"
           ? base.filter((a) => (Number(a.valor_medico) || 0) > 0)
           : base.filter((a) => (Number(a.valor_medico) || 0) === 0);
+    const baseLaudo =
+      fLaudo === "todos"
+        ? baseTipo
+        : fLaudo === "baixado"
+          ? baseTipo.filter((a) => a.laudo_status === "emitido")
+          : baseTipo.filter((a) => a.laudo_status !== "emitido");
     const nomeDe = (a: Atend) =>
       norm(((a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "").trim());
     const grDe = (a: Atend) => a.agendamento_inicio ?? a.data ?? "";
-    const arr = [...baseTipo];
+    const arr = [...baseLaudo];
     switch (fOrdem) {
       case "data_asc":
         arr.sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
@@ -1512,7 +1519,7 @@ function Page() {
     }
     return arr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, fPaciente, pacientes.length, fOrdem, fTipo]);
+  }, [items, fPaciente, pacientes.length, fOrdem, fTipo, fLaudo]);
   const totais = useMemo(
     () =>
       filteredItems.reduce(
@@ -2033,6 +2040,24 @@ function Page() {
                   <SelectItem value="todos">Todos</SelectItem>
                   <SelectItem value="medico">Apenas médico (com repasse)</SelectItem>
                   <SelectItem value="clinica">Apenas clínica (sem repasse)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">
+                Laudo
+                <span className="ml-1 font-normal text-muted-foreground">
+                  ({filteredItems.filter((a) => a.laudo_status === "emitido").length} baixados · {filteredItems.filter((a) => a.laudo_status !== "emitido").length} pendentes)
+                </span>
+              </Label>
+              <Select value={fLaudo} onValueChange={(v) => setFLaudo(v as "todos" | "baixado" | "nao_baixado")}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="baixado">Baixados</SelectItem>
+                  <SelectItem value="nao_baixado">Não baixados</SelectItem>
                 </SelectContent>
               </Select>
             </div>
