@@ -959,6 +959,57 @@ function Page() {
     return r;
   }, [minhasMovs, mistoObs]);
 
+  // Quebra do "Saldo" por dia (com base em created_at das movimentações
+  // da sessão atual). Cada dia mostra entradas, saídas, saldo do dia e
+  // entradas agrupadas por forma de pagamento.
+  interface DiaResumo {
+    dia: string;                // YYYY-MM-DD
+    label: string;              // dd/mm/yyyy
+    entradas: number;
+    saidas: number;
+    saldo: number;
+    porForma: Record<string, number>;
+  }
+  const resumoPorDia = useMemo<DiaResumo[]>(() => {
+    const mapa = new Map<string, DiaResumo>();
+    const bucketInit = (): Record<string, number> => ({
+      dinheiro: 0, pix: 0, debito: 0, credito: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0,
+    });
+    for (const m of minhasMovs) {
+      const d = new Date(m.created_at);
+      const dia = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      let r = mapa.get(dia);
+      if (!r) {
+        r = { dia, label: d.toLocaleDateString("pt-BR"), entradas: 0, saidas: 0, saldo: 0, porForma: bucketInit() };
+        mapa.set(dia, r);
+      }
+      const v = Number(m.valor || 0);
+      const sinal = TIPO_SINAL[m.tipo];
+      r.saldo += sinal * v;
+      if (m.tipo === "recebimento" || m.tipo === "suprimento") {
+        r.entradas += v;
+        const bucket = normalizarForma(m.forma_pagamento);
+        if (bucket === "misto") {
+          const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+          const partes = decomporMistoObs(obs);
+          let somado = 0;
+          for (const [k, val] of Object.entries(partes)) {
+            r.porForma[k] = (r.porForma[k] ?? 0) + (val ?? 0);
+            somado += val ?? 0;
+          }
+          const resto = v - somado;
+          if (Math.abs(resto) > 0.005) r.porForma.outros += resto;
+        } else {
+          r.porForma[bucket] = (r.porForma[bucket] ?? 0) + v;
+        }
+      } else if (m.tipo === "sangria" || m.tipo === "despesa") {
+        r.saidas += v;
+      }
+    }
+    return Array.from(mapa.values()).sort((a, b) => b.dia.localeCompare(a.dia));
+  }, [minhasMovs, mistoObs]);
+
   // Calculo por sessao (todos)
   const calcSaldoSessao = useCallback((sid: string) => {
     return todosMovs
