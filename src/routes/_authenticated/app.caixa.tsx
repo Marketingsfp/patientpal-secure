@@ -427,6 +427,8 @@ function Page() {
   const [openFecharTerceiro, setOpenFecharTerceiro] = useState<Sessao | null>(null);
   const [informadoTerceiro, setInformadoTerceiro] = useState("");
   const [obsTerceiro, setObsTerceiro] = useState("");
+  // Conferência por forma de pagamento no fechamento de terceiros.
+  const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
 
   // Atalho: 1..5 na modal de cobrança seleciona a forma da última linha
   useEffect(() => {
@@ -895,8 +897,9 @@ function Page() {
     });
     scan(minhasMovs);
     scan(detalheMovs);
+    scan(todosMovs);
     return Array.from(ids);
-  }, [minhasMovs, detalheMovs]);
+  }, [minhasMovs, detalheMovs, todosMovs]);
   useEffect(() => {
     let alive = true;
     const pendentes = mistoLancIds.filter((id) => !(id in mistoObs));
@@ -966,6 +969,36 @@ function Page() {
       .filter((m) => m.sessao_id === sid && (m.descricao ?? "").toLowerCase().includes("estorno"))
       .reduce((acc, m) => acc + Number(m.valor || 0), 0);
   }, [todosMovs]);
+
+  // Total recebido/suprido por forma de pagamento em uma sessão qualquer
+  // (usa `todosMovs`). Decompõe pagamentos "misto" quando as observações do
+  // lançamento já foram carregadas via `mistoObs`.
+  const entradasPorFormaSessao = useCallback((sid: string) => {
+    const r: Record<string, number> = {
+      dinheiro: 0, pix: 0, debito: 0, credito: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0,
+    };
+    todosMovs.forEach((m) => {
+      if (m.sessao_id !== sid) return;
+      if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
+      const v = Number(m.valor || 0);
+      const bucket = normalizarForma(m.forma_pagamento);
+      if (bucket === "misto") {
+        const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+        const partes = decomporMistoObs(obs);
+        let somado = 0;
+        for (const [k, val] of Object.entries(partes)) {
+          r[k] = (r[k] ?? 0) + (val ?? 0);
+          somado += val ?? 0;
+        }
+        const resto = v - somado;
+        if (Math.abs(resto) > 0.005) r.outros += resto;
+      } else {
+        r[bucket] = (r[bucket] ?? 0) + v;
+      }
+    });
+    return r;
+  }, [todosMovs, mistoObs]);
 
   // Acoes
   const abrirCaixa = async (e: FormEvent) => {
@@ -1169,8 +1202,17 @@ function Page() {
     const alvo = openFecharTerceiro;
     if (!alvo || !clinicaAtual || !user) return;
     const calc = calcSaldoSessao(alvo.id);
-    const informado = Number(informadoTerceiro) || 0;
+    const conferidoNum: Record<string, number> = {};
+    for (const [k, v] of Object.entries(conferidoTerceiro)) {
+      const n = Number(v) || 0;
+      if (Math.abs(n) > 0.005) conferidoNum[k] = n;
+    }
+    const informado = Object.values(conferidoNum).reduce((a, x) => a + x, 0)
+      || (Number(informadoTerceiro) || 0);
     const diff = informado - calc;
+    const breakdownStr = Object.entries(conferidoNum)
+      .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k}: ${fmt(v)}`)
+      .join("; ");
     setSaving(true);
     const { error } = await supabase
       .from("caixa_sessoes")
@@ -1181,8 +1223,8 @@ function Page() {
         valor_fechamento_calculado: calc,
         diferenca: diff,
         observacoes: obsTerceiro
-          ? `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}] ${obsTerceiro}`
-          : `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}]`,
+          ? `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}] ${obsTerceiro}${breakdownStr ? " | Conferência: " + breakdownStr : ""}`
+          : `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}]${breakdownStr ? " | Conferência: " + breakdownStr : ""}`,
       })
       .eq("id", alvo.id);
     if (!error) {
@@ -1192,7 +1234,7 @@ function Page() {
         user_id: user.id,
         tipo: "fechamento",
         valor: informado,
-        descricao: `Fechamento pelo gestor. Operador original: ${alvo.user_nome || alvo.user_id.slice(0, 8)} | Calculado: ${fmt(calc)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}`,
+        descricao: `Fechamento pelo gestor. Operador original: ${alvo.user_nome || alvo.user_id.slice(0, 8)} | Calculado: ${fmt(calc)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}${breakdownStr ? " | " + breakdownStr : ""}`,
       });
     }
     setSaving(false);
@@ -1200,6 +1242,7 @@ function Page() {
     setOpenFecharTerceiro(null);
     setInformadoTerceiro("");
     setObsTerceiro("");
+    setConferidoTerceiro({});
     toast.success(`Caixa de ${alvo.user_nome || "operador"} fechado`);
     printComprovanteCaixa({
       tipo: "fechamento",
@@ -1210,6 +1253,7 @@ function Page() {
       valorInformado: informado,
       diferenca: diff,
       descricao: obsTerceiro ? `Fechado pelo gestor. ${obsTerceiro}` : "Fechado pelo gestor.",
+      porForma: conferidoNum,
     });
     void loadTodos();
     void load();
@@ -1841,8 +1885,19 @@ function Page() {
                                 title="Fechar este caixa"
                                 onClick={() => {
                                   setOpenFecharTerceiro(s);
-                                  setInformadoTerceiro(calc.toFixed(2));
                                   setObsTerceiro("");
+                                  const porForma = entradasPorFormaSessao(s.id);
+                                  const inicial: Record<string, string> = {};
+                                  let soma = 0;
+                                  for (const k of Object.keys(porForma)) {
+                                    const v = porForma[k] ?? 0;
+                                    if (Math.abs(v) > 0.005 || k === "dinheiro") {
+                                      inicial[k] = v.toFixed(2);
+                                      soma += v;
+                                    }
+                                  }
+                                  setConferidoTerceiro(inicial);
+                                  setInformadoTerceiro(soma.toFixed(2));
                                 }}
                               >
                                 <Lock className="h-4 w-4" />
@@ -2096,10 +2151,51 @@ function Page() {
             )}
           </DialogHeader>
           <form onSubmit={fecharSessaoTerceiro} className="space-y-3">
-            <div>
-              <Label>Valor conferido em caixa</Label>
-              <CurrencyInput value={informadoTerceiro} onChange={setInformadoTerceiro} />
-            </div>
+            {openFecharTerceiro && (() => {
+              const porForma = entradasPorFormaSessao(openFecharTerceiro.id);
+              const chaves = Array.from(new Set<string>([
+                ...Object.keys(conferidoTerceiro),
+                ...Object.keys(porForma).filter((k) => Math.abs(porForma[k] ?? 0) > 0.005),
+                "dinheiro",
+              ]));
+              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
+              chaves.sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b));
+              const totalConferido = Object.values(conferidoTerceiro)
+                .reduce((acc, v) => acc + (Number(v) || 0), 0);
+              return (
+                <div className="space-y-2">
+                  <Label>Conferência por forma de pagamento</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {chaves.map((k) => {
+                      const esperado = porForma[k] ?? 0;
+                      return (
+                        <div key={k} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-medium">{FORMA_LABEL[k as FormaBucket] ?? k}</span>
+                            <span className="text-muted-foreground">Esperado: {fmt(esperado)}</span>
+                          </div>
+                          <CurrencyInput
+                            value={conferidoTerceiro[k] ?? ""}
+                            onChange={(v) => {
+                              setConferidoTerceiro((prev) => {
+                                const next = { ...prev, [k]: v };
+                                const soma = Object.values(next).reduce((a, x) => a + (Number(x) || 0), 0);
+                                setInformadoTerceiro(soma.toFixed(2));
+                                return next;
+                              });
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-between text-sm pt-1 border-t">
+                    <span className="text-muted-foreground">Total conferido</span>
+                    <strong>{fmt(totalConferido)}</strong>
+                  </div>
+                </div>
+              );
+            })()}
             <div>
               <Label>Observações</Label>
               <Textarea
