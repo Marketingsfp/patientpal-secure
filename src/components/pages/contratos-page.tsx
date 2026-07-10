@@ -1658,25 +1658,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setAdmFaixaId(match?.id ?? "");
   }, [faixas, valorMensalAtual]);
 
-  // Carrega lista de pacientes da clínica do contrato ao abrir o diálogo
-  useEffect(() => {
-    if (!incOpen) return;
-    let cancelled = false;
-    (async () => {
-      setIncLoadingPac(true);
-      const { data } = await supabase
-        .from("pacientes")
-        .select("id, nome, cpf, telefone, data_nascimento, clinica_id")
-        .eq("clinica_id", (contrato as any).clinica_id)
-        .order("nome");
-      if (cancelled) return;
-      setIncPacientes((data ?? []) as PatientOption[]);
-      setIncLoadingPac(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [incOpen, contrato]);
+  // Busca de pacientes agora é feita sob demanda pelo PatientSearchInput.
 
   const marcarPago = async (id: string, paga: boolean, forma?: string | null) => {
     const patch = paga
@@ -2754,34 +2736,35 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Paciente</Label>
-              <Select
-                value={incPaciente?.id ?? ""}
-                onValueChange={(id) => {
-                  const p = incPacientes.find((x) => x.id === id) ?? null;
-                  setIncPaciente(p);
-                }}
-                disabled={incLoadingPac}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={incLoadingPac ? "Carregando pacientes…" : "Selecione o paciente"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {(() => {
+              {incPaciente ? (
+                <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
+                  <span className="font-medium text-sm">
+                    {incPaciente.nome}
+                    {incPaciente.cpf ? ` — ${incPaciente.cpf}` : ""}
+                  </span>
+                  <Button size="sm" variant="ghost" onClick={() => setIncPaciente(null)}>
+                    Trocar
+                  </Button>
+                </div>
+              ) : (
+                <PatientSearchInput
+                  clinicaIdsOverride={[(contrato as any).clinica_id]}
+                  placeholder="Buscar por nome, CPF, prontuário, pasta ou nascimento…"
+                  onSelect={(p) => {
+                    if (!p) return;
                     const titularId = (contrato as any).paciente_id as string | undefined;
-                    const jaDep = new Set(depsAtivos.map((d) => d.paciente_id));
-                    const list = incPacientes.filter((p) => p.id !== titularId && !jaDep.has(p.id));
-                    if (list.length === 0) {
-                      return <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum paciente disponível</div>;
+                    if (p.id === titularId) {
+                      toast.error("Este paciente é o titular do contrato.");
+                      return;
                     }
-                    return list.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.nome}
-                        {p.cpf ? ` — ${p.cpf}` : ""}
-                      </SelectItem>
-                    ));
-                  })()}
-                </SelectContent>
-              </Select>
+                    if (depsAtivos.some((d) => d.paciente_id === p.id)) {
+                      toast.error("Este paciente já é dependente ativo do contrato.");
+                      return;
+                    }
+                    setIncPaciente(p);
+                  }}
+                />
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
