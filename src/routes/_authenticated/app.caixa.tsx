@@ -1383,6 +1383,8 @@ function Page() {
                         <TableHead>Hora</TableHead>
                         <TableHead>Tipo</TableHead>
                         <TableHead>Descrição</TableHead>
+                        <TableHead>Serviço</TableHead>
+                        <TableHead>Médico</TableHead>
                         <TableHead>Forma</TableHead>
                         <TableHead className="text-right">Valor</TableHead>
                         <TableHead className="text-right w-[1%]">Ação</TableHead>
@@ -1391,18 +1393,24 @@ function Page() {
                     <TableBody>
                       {minhasMovsFiltrados.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground">
+                          <TableCell colSpan={9} className="text-center text-muted-foreground">
                             {isManager
                               ? "Sem movimentos no período"
                               : "Sem movimentos hoje"}
                           </TableCell>
                         </TableRow>
-                      ) : minhasMovsFiltrados.map((m) => (
+                      ) : minhasMovsFiltrados.map((m) => {
+                        const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
+                        const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
+                        const medico = enr?.medico ?? null;
+                        return (
                         <TableRow key={m.id}>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
                           <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                           <TableCell>{m.descricao || "—"}</TableCell>
+                          <TableCell className="text-xs">{servico || "—"}</TableCell>
+                          <TableCell className="text-xs">{medico || "—"}</TableCell>
                           <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
