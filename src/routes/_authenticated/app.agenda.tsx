@@ -3447,12 +3447,7 @@ function AgendaPage() {
     };
     // Delegação canônica: toda criação/edição de agendamento passa por
     // `criarAgendamento` (ver docs/agenda/criar-agendamento-shared.md).
-    const procedimentosParaSalvar =
-      form.procedimentos && form.procedimentos.length > 0
-        ? form.procedimentos
-        : payload.procedimento
-          ? [payload.procedimento]
-          : [];
+    const procedimentosParaSalvar = payload.procedimento ? [payload.procedimento] : [];
     const multiExamesModo: "laboratorio" | "imagem" | null = null;
     const result = await fnCriarAgendamento({
       data: {
