@@ -5116,6 +5116,11 @@ function AgendaPage() {
                             <BadgeCheck className="h-4 w-4 mr-2 text-emerald-600" /> Presente na clínica
                           </DropdownMenuItem>
                         )}
+                        {!isSlotLivre(a.paciente_nome) && a.status !== "realizado" && etapaMap.get(a.id) === "triagem" && (
+                          <DropdownMenuItem onClick={() => estornarCheckin(a)}>
+                            <Undo2 className="h-4 w-4 mr-2 text-amber-600" /> Estornar check-in
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onClick={() => imprimirGR(a)}
                           disabled={!pagosSet.has(a.id)}
