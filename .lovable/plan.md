@@ -1,32 +1,39 @@
-## Estornar check-in (desfazer "Presente na clínica")
+## Objetivo
 
-Adicionar no menu de ações (`⋯`) da agenda um item **"Estornar check-in"** que reverte o paciente de `triagem` para `aguardando_recepcao`, útil quando a recepção clicou por engano em "Presente na clínica".
+Trocar o campo "Forma de pagamento" no diálogo "Novo lançamento" (Financeiro → Mov. Caixa) de um `<Input>` de texto livre por um `<Select>` com as opções padrão já usadas no sistema.
 
-## Regras
+## Onde
 
-- Item aparece **apenas quando** `fluxo_etapa === "triagem"` (paciente já com check-in confirmado, mas ainda não seguiu adiante).
-- **Não aparece** se o paciente já passou para etapas seguintes (`em_atendimento`, `laudo`, `finalizado`) — para evitar corrupção do fluxo. Nesses casos usar o cancelamento/reagendamento normal.
-- Não aparece em slots livres nem em agendamentos `realizado`.
-- Requer confirmação (`window.confirm`) antes de executar, para evitar clique acidental.
+Arquivo: `src/routes/_authenticated/app.financeiro.movimento.tsx` (linhas 607-608, dentro do diálogo "Novo lançamento" / edição de lançamento).
 
-## Implementação
+## Opções da lista
 
-Arquivo único: `src/routes/_authenticated/app.agenda.tsx`.
+Reaproveitando exatamente os mesmos valores usados em `src/components/financeiro/lancamento-dialog.tsx` (para manter consistência com filtros, relatórios e caixa):
 
-1. Nova função `estornarCheckin(a: Agendamento)`:
-   - `confirm("Desfazer check-in deste paciente? Ele voltará para 'aguardando recepção'.")`
-   - `UPDATE agendamentos SET fluxo_etapa='aguardando_recepcao', fluxo_atualizado_em=now() WHERE id=a.id`
-   - Atualiza `etapaMap` localmente para refletir na UI sem reload.
-   - Toast: "Check-in estornado".
+- Dinheiro → `dinheiro`
+- Pix → `pix`
+- Cartão Crédito → `cartao_credito`
+- Cartão Débito → `cartao_debito`
+- Boleto → `boleto`
+- Convênio → `convenio`
+- Transferência → `transferencia`
 
-2. Novo `DropdownMenuItem` logo abaixo de "Presente na clínica" no dropdown de ações (linha ~5104):
-   - Condição: `etapaMap.get(a.id) === "triagem" && !isSlotLivre(a.paciente_nome) && a.status !== "realizado"`
-   - Ícone: `Undo2` (já importado do lucide-react) em cor âmbar.
-   - Label: **"Estornar check-in"**.
+Mais uma opção "— (não informar)" para permitir salvar vazio (mantém compatibilidade com o comportamento atual do campo, que aceita nulo).
 
-## Verificação
+## Mudança de UI
 
-1. Confirmar presença de um paciente pela agenda (badge verde aparece).
-2. Abrir o menu `⋯` da mesma linha — deve aparecer "Estornar check-in".
-3. Clicar → confirmar no diálogo → paciente volta a mostrar o botão de check-in verde vazado (pendente).
-4. Confirmar que a opção some se o paciente já foi para atendimento/finalizado.
+Substituir:
+
+```tsx
+<Input value={form.forma_pagamento}
+       onChange={(e) => setForm({ ...form, forma_pagamento: e.target.value })}
+       placeholder="Pix, cartão, dinheiro..." />
+```
+
+Por um `<Select>` (padrão shadcn já importado no arquivo) com os itens acima. O valor salvo continua indo em `forma_pagamento` (string ou `null`), sem mudança no banco nem no fluxo de salvar.
+
+## Observações
+
+- Não altera categorias, contas, status, nem qualquer regra de negócio.
+- Lançamentos antigos que tenham valores fora dessa lista (ex.: "maestro", "caixa") continuarão sendo exibidos normalmente em tabelas/filtros; só o formulário de novo/edição passa a oferecer a lista fixa.
+- Se um lançamento existente for aberto para edição com forma fora da lista, o Select mostra o valor bruto até o usuário escolher outro (comportamento padrão do shadcn Select).
