@@ -1467,6 +1467,11 @@ function Page() {
   const podePagar = selectedItems.length > 0 && selectedNaoPagos.length === selectedItems.length;
   const podeReimprimir = selectedItems.length > 0 && selectedPagos.length === selectedItems.length;
   const misturado = selectedItems.length > 0 && selectedPagos.length > 0 && selectedNaoPagos.length > 0;
+  const selectedLaudoElegiveis = selectedItems.filter((a) => {
+    const procKey = a.procedimento ? norm(a.procedimento) : "";
+    const exige = procKey && procLaudo.get(procKey);
+    return exige && a.laudo_status !== "emitido";
+  });
   const reimprimirSelecionados = () => {
     if (!podeReimprimir) return;
     abrirSegundaViaLote(selectedPagos);
