@@ -97,11 +97,19 @@ export function FuncionarioFormDialog({ open, onOpenChange, clinicaId, editingUs
     }
     void (async () => {
       setLoading(true);
-      const [{ data: contrato }, { data: prof }, { data: mem }] = await Promise.all([
-        supabase.from("hr_contratos").select("*").eq("clinica_id", clinicaId).eq("user_id", editingUserId).maybeSingle(),
+      const [{ data: contratos }, { data: prof }, { data: mem }] = await Promise.all([
+        supabase.from("hr_contratos").select("*").eq("clinica_id", clinicaId).eq("user_id", editingUserId)
+          .order("created_at", { ascending: false }),
         supabase.from("profiles").select("nome, telefone, telefone2").eq("id", editingUserId).maybeSingle(),
         supabase.from("clinica_memberships").select("id, role, ativo").eq("clinica_id", clinicaId).eq("user_id", editingUserId).maybeSingle(),
       ]);
+      // Um funcionário pode ter mais de um hr_contratos na mesma clínica (histórico
+      // de contratos, ou duplicatas legadas de um bug de salvamento). Nunca usar
+      // .maybeSingle() aqui: com 2+ linhas ela falha silenciosamente (data null),
+      // fazendo a tela achar que não existe contrato e criar OUTRO ao salvar — é
+      // assim que as duplicatas se multiplicam. Preferimos o contrato ativo mais
+      // recente; sem nenhum ativo, o mais recente de qualquer status.
+      const contrato = (contratos ?? []).find((c) => c.status === "ativo") ?? (contratos ?? [])[0] ?? null;
       const nome = (contrato?.funcionario_nome as string | undefined) ?? (prof?.nome as string | undefined) ?? "";
       const telefone = (prof?.telefone as string | undefined) ?? "";
       const telefone2 = ((prof as { telefone2?: string | null } | null)?.telefone2 as string | undefined) ?? "";
