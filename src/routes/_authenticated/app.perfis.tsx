@@ -16,14 +16,12 @@ import {
   ShieldCheck, ConciergeBell, Wallet, DollarSign, HeartPulse, Stethoscope, Briefcase,
   ChevronDown, ChevronRight, Save, Loader2,
 } from "lucide-react";
+import { PRESETS, type Acesso, type PerfilKey } from "@/lib/permissoes-presets";
 
 export const Route = createFileRoute("/_authenticated/app/perfis")({
   component: PerfisPage,
   head: () => ({ meta: [{ title: "Perfis de Acesso — ClinicaOS" }] }),
 });
-
-type PerfilKey = "admin" | "gestor" | "medico" | "recepcao" | "caixa" | "financeiro" | "enfermeiro";
-type Acesso = "none" | "read" | "write";
 
 const PERFIS: Array<{
   key: PerfilKey;
@@ -95,6 +93,7 @@ const GRUPOS: Grupo[] = [
       { key: "cartao-beneficios", nome: "Cartão Benefícios", descricao: "Planos e contratos" },
       { key: "painel", nome: "Painel de Senhas", descricao: "Painel público de chamadas" },
       { key: "documentos", nome: "Documentos do paciente", descricao: "Anexos e arquivos clínicos" },
+      { key: "atendimento-multiplo", nome: "Atendimento Múltiplo", descricao: "Atendimentos e pagamentos agrupados" },
     ],
   },
   {
@@ -136,6 +135,8 @@ const GRUPOS: Grupo[] = [
       { key: "estoque", nome: "Estoque", descricao: "Produtos e movimentos" },
       { key: "modelos-documentos", nome: "Modelos de Documentos", descricao: "Templates de documentos" },
       { key: "clinicas", nome: "Clínicas", descricao: "Cadastro de clínicas (multi-empresa)" },
+      { key: "tipos-servico", nome: "Tipos de serviço", descricao: "Classificação de serviços" },
+      { key: "enfermagem-recursos", nome: "Recursos de enfermagem", descricao: "Recursos operacionais de enfermagem" },
     ],
   },
   {
@@ -163,6 +164,7 @@ const GRUPOS: Grupo[] = [
       { key: "nfse", nome: "NFS-e", descricao: "Notas fiscais de serviço" },
       { key: "integration-secrets", nome: "Integrações", descricao: "Chaves e integrações externas" },
       { key: "lgpd", nome: "LGPD", descricao: "Gestão de privacidade" },
+      { key: "painel-executivo", nome: "Painel Executivo", descricao: "Indicadores executivos da clínica" },
     ],
   },
   {
@@ -174,57 +176,6 @@ const GRUPOS: Grupo[] = [
 ];
 
 const TODOS_MODULOS = GRUPOS.flatMap((g) => g.modulos.map((m) => m.key));
-
-// Sugestão inicial (mock) por perfil
-const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
-  admin: Object.fromEntries(TODOS_MODULOS.map((k) => [k, "write" as Acesso])),
-  gestor: {
-    dashboard: "write", agenda: "write", fluxo: "write", clientes: "write",
-    chat: "write", checkin: "read", recepcao: "read", orcamentos: "read",
-    caixa: "read", financeiro: "read", boletos: "read", contratos: "read",
-    nfse: "read", relatorios: "write", auditoria: "read", lgpd: "read",
-    equipe: "write", "hr-contratos": "read", "hr-ponto": "read",
-    "hr-ferias": "read", "hr-holerites": "read", treinamentos: "read",
-    cargos: "read", setores: "read", unidades: "read", medicos: "read",
-    especialidades: "read", procedimentos: "read", disponibilidades: "write",
-    "prontuario-modelos": "read", "modelos-documentos": "read", planos: "read",
-    estoque: "read", crm: "read", campanhas: "read", "mkt-leads": "read",
-    "consulta-rapida": "read", "alertas-enfermagem": "read",
-    "cartao-beneficios": "read", painel: "read", "perfil-proprio": "write",
-  },
-  medico: {
-    agenda: "write", "atendimento-ia": "write", "exames-resultados": "read",
-    "consulta-rapida": "read", "perfil-proprio": "write", "prontuario-modelos": "read",
-    odontologia: "write", prontuarios: "write", anamneses: "write",
-    documentos: "write", clientes: "read", chat: "write",
-  },
-  recepcao: {
-    agenda: "write", recepcao: "write", clientes: "write", fluxo: "write",
-    orcamentos: "write", "consulta-rapida": "read", "perfil-proprio": "write",
-    checkin: "write", painel: "write", anamneses: "write", documentos: "read",
-    chat: "write", "cartao-beneficios": "read", caixa: "read",
-  },
-  caixa: {
-    caixa: "write", clientes: "read", recepcao: "read", financeiro: "read",
-    "consulta-rapida": "read", "perfil-proprio": "write",
-    boletos: "write", nfse: "read", contratos: "read",
-    "cartao-beneficios": "read", chat: "write",
-  },
-  financeiro: {
-    financeiro: "write", caixa: "read", relatorios: "write", orcamentos: "read",
-    clientes: "read", "cartao-beneficios": "write", "perfil-proprio": "write",
-    boletos: "write", nfse: "write", contratos: "write", planos: "read",
-    "hr-holerites": "read", "hr-contratos": "read", auditoria: "read",
-    "integration-secrets": "read", chat: "write", dashboard: "read",
-  },
-  enfermeiro: {
-    "triagem-enfermagem": "write", "alertas-enfermagem": "write",
-    agenda: "read", clientes: "read", "consulta-rapida": "read",
-    "atendimento-ia": "read", "perfil-proprio": "write",
-    anamneses: "write", prontuarios: "read", estoque: "read",
-    documentos: "read", chat: "write",
-  },
-};
 
 function buildInitialState(): Record<PerfilKey, Record<string, Acesso>> {
   const out = {} as Record<PerfilKey, Record<string, Acesso>>;
@@ -240,6 +191,7 @@ function buildInitialState(): Record<PerfilKey, Record<string, Acesso>> {
 function PerfisPage() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
+  const podeAdministrar = clinicaAtual?.role === "admin";
   const [tab, setTab] = useState<"perfis" | "permissoes">("perfis");
   const [perfilSel, setPerfilSel] = useState<PerfilKey>("admin");
   const [matriz, setMatriz] = useState<Record<PerfilKey, Record<string, Acesso>>>(buildInitialState);
@@ -318,6 +270,10 @@ function PerfisPage() {
   }, [clinicaId]);
 
   const salvar = async () => {
+    if (!podeAdministrar) {
+      toast.error("Somente administradores podem alterar permissões.");
+      return;
+    }
     const perfilId = perfilIds[perfilSel];
     if (!perfilId) {
       toast.error("Perfil ainda não foi inicializado.");
@@ -445,10 +401,10 @@ function PerfisPage() {
                   <Badge variant="outline" className="text-sm">
                     Acessos: <span className="ml-1 font-semibold">{acessosPerfil}</span> / {totalModulos}
                   </Badge>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("read")} disabled={loading || saving}>Tudo Leitura</Button>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("write")} disabled={loading || saving}>Tudo Edição</Button>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("none")} disabled={loading || saving}>Limpar</Button>
-                  <Button size="sm" onClick={salvar} disabled={loading || saving || !perfilIds[perfilSel]}>
+                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("read")} disabled={!podeAdministrar || loading || saving}>Tudo Leitura</Button>
+                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("write")} disabled={!podeAdministrar || loading || saving}>Tudo Edição</Button>
+                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("none")} disabled={!podeAdministrar || loading || saving}>Limpar</Button>
+                  <Button size="sm" onClick={salvar} disabled={!podeAdministrar || loading || saving || !perfilIds[perfilSel]}>
                     {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                     Salvar
                   </Button>
@@ -500,6 +456,7 @@ function PerfisPage() {
                                 <RadioGroup
                                   value={val}
                                   onValueChange={(v) => setAcesso(m.key, v as Acesso)}
+                                  disabled={!podeAdministrar}
                                   className="flex items-center justify-end gap-4"
                                 >
                                   <label className="flex items-center gap-1.5 text-sm cursor-pointer">

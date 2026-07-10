@@ -439,12 +439,13 @@ export function AppShell() {
   const currentModulo = moduloDaRota(location.pathname);
   const rotaPermitida =
     allowedModules === null
-    || permsLoading
     || currentModulo === null
     || (typeof currentModulo === "string" && allowedModules.has(currentModulo));
-  const guardedOutlet = rotaPermitida
-    ? <Outlet />
-    : <SemPermissao modulo={currentModulo ?? undefined} />;
+  const guardedOutlet = permsLoading
+    ? <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">Carregando permissões…</div>
+    : rotaPermitida
+      ? <Outlet />
+      : <SemPermissao modulo={currentModulo ?? undefined} />;
 
   if (isEmbed) {
     return (

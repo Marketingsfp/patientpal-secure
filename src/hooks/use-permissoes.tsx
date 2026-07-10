@@ -33,14 +33,16 @@ export function usePermissoes(): {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const role = clinicaAtual?.role ?? null;
-  const [allowed, setAllowed] = useState<Set<string> | null>(null);
-  const [nivel, setNivel] = useState<Map<string, "read" | "write"> | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Começa fechado. `null` é reservado exclusivamente ao admin já identificado.
+  const [allowed, setAllowed] = useState<Set<string> | null>(() => new Set());
+  const [nivel, setNivel] = useState<Map<string, "read" | "write"> | null>(() => new Map());
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!clinicaId || !role) {
-      setAllowed(null);
-      setNivel(null);
+      setAllowed(new Set());
+      setNivel(new Map());
+      setLoading(false);
       return;
     }
     // Admin: sem filtro.
@@ -51,6 +53,9 @@ export function usePermissoes(): {
     }
 
     let cancelled = false;
+    // Troca de clínica/perfil: não preserve permissões da sessão anterior.
+    setAllowed(new Set());
+    setNivel(new Map());
     setLoading(true);
     void (async () => {
       try {
@@ -94,8 +99,8 @@ export function usePermissoes(): {
         setNivel(nvl);
       } catch (e) {
         console.error("[usePermissoes] erro carregando permissões", e);
-        // Em caso de erro, cai no preset para não travar o usuário.
-        if (!cancelled) { setAllowed(presetAllowedSet(role)); setNivel(nivelDoPreset(role)); }
+        // Autorização deve falhar fechada: erro de rede/RLS nunca amplia acesso.
+        if (!cancelled) { setAllowed(new Set()); setNivel(new Map()); }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -109,7 +114,7 @@ export function usePermissoes(): {
 
 /**
  * Nível de acesso do usuário atual num módulo específico.
- * - admin (ou ainda carregando com nivel=null) → "write" (sem restrição).
+ * - admin identificado (allowed=null) → "write" (sem restrição).
  * - Sem entrada no mapa → "none".
  */
 export function useAcessoModulo(modulo: string): Acesso {
