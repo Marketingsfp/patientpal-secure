@@ -2643,6 +2643,25 @@ h1, h2, h3 { margin: 0 0 6mm; }
               Dica: use as teclas 1–{formaOpcoes.length + 1} para escolher rapidamente.
             </span>
           </p>
+          {pagMens && pagTaxaAdesao > 0 ? (
+            <div className="rounded-md border border-primary/40 bg-primary/5 p-2 text-xs space-y-0.5">
+              <div className="flex justify-between">
+                <span>Mensalidade</span>
+                <span>{BRL(pagValorFinal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Taxa de adesão</span>
+                <span>{BRL(pagTaxaAdesao)}</span>
+              </div>
+              <div className="flex justify-between font-semibold pt-1 border-t border-primary/30">
+                <span>Total a cobrar</span>
+                <span>{BRL(pagTotalCobrar)}</span>
+              </div>
+              <div className="text-[10px] text-muted-foreground pt-1">
+                Serão emitidas 2 GRs separadas (mensalidade e taxa de adesão) e 2 lançamentos financeiros distintos.
+              </div>
+            </div>
+          ) : null}
           {pagMens && pagDiasAtraso > 0 ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs space-y-0.5">
               <div className="flex justify-between">
@@ -2677,7 +2696,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   </kbd>
                   {op.label}
                 </span>
-                <span className="font-semibold">{BRL(pagValorFinal)}</span>
+                <span className="font-semibold">{BRL(pagTotalCobrar)}</span>
               </Button>
             ))}
             <Button variant="default" className="justify-center h-12 mt-1 bg-primary" onClick={escolherMisto}>
