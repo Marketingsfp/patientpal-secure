@@ -1,42 +1,95 @@
-## Diagnóstico
+# Redesign do modal de Auditoria da Agenda + observações manuais
 
-Reproduzi o cenário via banco. Os itens do orçamento #202600023 estão cadastrados assim em `procedimentos`:
+## Contexto
 
-| Item | grupo | tipo | tipo_procedimento |
-|---|---|---|---|
-| ACIDO URICO, HEPATOGRAMA | `Laboratório` | `exame` | `laboratorio` |
-| HEMOGRAMA, T4 LIVRE, TSH | `null` | `exame` | `laboratorio` |
-| FERRO SERICO, HB GLICOSILADA, LIPIDOGRAMA, VITAMINA B12, VITAMINA D, VDRL | `null` | `exame` | `null` (legado) |
+Na Agenda existe hoje um modal "Histórico de alterações" (foto 2) que mostra cada evento em um card colorido com badge "Alterou/Criou/Excluiu", nome da tabela em fonte monoespaçada e diffs em vermelho/verde. Isso é útil pra debug técnico, mas fica visualmente pesado e "de sistema" pro dia a dia da clínica.
 
-Em `src/routes/_authenticated/app.agenda.tsx` (linhas ~2359-2418) o agrupamento usa apenas `grupo || tipo`, retornando três chaves distintas: `LABORATORIO`, `EXAME` e (para os sem `tipo_procedimento`) mais `EXAME`. Como `gruposDistintos.size > 1`, o dialog "Dividir orçamento" abre indevidamente e o mesmo agrupamento defeituoso replica no dialog (`agruparItens` em `src/components/agenda/dividir-orcamento-dialog.tsx`), gerando as 3 linhas visíveis na foto 2 com médicos aleatórios.
+A referência (foto 1) é uma **tabela limpa** com três colunas — **Data**, **Usuário** e **Histórico** — em linguagem simples. A foto 3 pede também um **campo de texto + botão "+ Adicionar"** no topo do modal, para o próprio usuário registrar observações manuais (ex.: "paciente ligou pedindo remarcação").
 
-Regra correta: quando **todos** os itens são de laboratório, o orçamento vai como **um único agendamento** para o médico "Laboratório", sem dialog de divisão.
+## Pré-requisito bloqueante: restaurar o build
 
-## Correções
+Antes de qualquer coisa, o build precisa voltar a passar. Hoje ele falha com ~70 erros vindos da resolução automática de conflitos de merge de mensagens anteriores (variáveis/imports que estavam do "outro lado" do conflito foram descartadas em `app.agenda.tsx`, `app.caixa.tsx`, `agenda-v2-shell.tsx`, `menu-v2`, `financeiro.*`, `print-gr.ts`, `cliente-form.tsx` etc.).
 
-### 1. `src/routes/_authenticated/app.agenda.tsx` — fluxo `buscarOrcamento`
+Consertar isso "à mão" um símbolo por vez é arriscadíssimo e vai reintroduzir regressões silenciosas. O caminho correto é **restaurar pela aba History** a um checkpoint verde anterior aos conflitos. Depois do restore, aplico o redesign abaixo isolado, em um único passo.
 
-- No `SELECT` de `procedimentos` (~linha 2364) incluir `tipo_procedimento` além de `grupo, tipo`.
-- Reforçar `isLab(pid)`: considerar lab quando `tipo_procedimento === 'laboratorio'` **ou** (`grupo` normalizado = `LABORATORIO`) **ou** `tipo` = `EXAME`/`LABORATORIO` (mantém compatibilidade com cadastro legado sem `tipo_procedimento`).
-- Ajustar `grupoDe(pid)`: se `isLab(pid)` → retornar `"LABORATORIO"`; senão manter `norm(grupo) || norm(tipo) || "OUTROS"`. Isso unifica todos os exames de lab num único grupo mesmo com cadastros heterogêneos.
-- Após montar `gruposDistintos`, se `todosLab === true` **nunca** abrir o dialog de divisão; seguir sempre o fluxo de 1 grupo com `procStr = "LABORATÓRIO (N EXAMES): ..."`.
-- Pré-selecionar o médico "Laboratório" no `setForm(...)`: procurar em `medicos` o primeiro cujo nome normalizado inicie com `LABORATORIO`/`LABORATÓRIO` (o cadastro "DR(A). LABORATORIO" já existe na clínica). Se não existir, mostrar toast informando "Cadastre um profissional 'Laboratório' para agendar exames laboratoriais" e não travar (o usuário escolhe manualmente).
+<presentation-actions>
+  <presentation-open-history>Abrir History</presentation-open-history>
+</presentation-actions>
 
-### 2. `src/components/agenda/dividir-orcamento-dialog.tsx` — defesa em profundidade
+## O que muda depois do restore
 
-Mesmo com o guard acima, o dialog ainda existe para orçamentos mistos (consulta + lab + imagem). Para evitar sub-divisão de exames de lab em subgrupos quando o dialog abrir:
+### 1. Nova tabela `agendamento_notas` (observações manuais)
 
-- Adicionar campo opcional `tipo_procedimento: string | null` em `DividirItem`.
-- Em `agruparItens`, para cada item calcular chave por prioridade: `LABORATORIO` se `tipo_procedimento === 'laboratorio'` (ou fallback `tipo === 'exame'` com `grupo` vazio) → todos exames de lab caem no mesmo grupo `LABORATORIO`; demais mantêm `norm(grupo) || norm(tipo) || "OUTROS"`.
-- Ao construir `itensRicos` no chamador, passar também `tipo_procedimento`.
+Migration com:
 
-### 3. Prevenção para não repetir
+- `id uuid PK default gen_random_uuid()`
+- `agendamento_id uuid NOT NULL references agendamentos(id) on delete cascade`
+- `clinica_id uuid NOT NULL` (usado nas policies)
+- `texto text NOT NULL check (length(trim(texto)) > 0)`
+- `user_id uuid`, `user_nome text`, `user_email text` (capturados no INSERT)
+- `created_at timestamptz NOT NULL default now()`
+- Index em `(agendamento_id, created_at desc)`
+- `GRANT SELECT, INSERT ON public.agendamento_notas TO authenticated`
+- `GRANT ALL … TO service_role`
+- RLS habilitado + policies: SELECT/INSERT para usuários da clínica (via helper `usuario_da_clinica(clinica_id)` já existente no projeto).
 
-- Documentar em `docs/regras-negocio.md` (seção Agenda / Orçamentos): "Orçamento composto exclusivamente por procedimentos com `tipo_procedimento='laboratorio'` (ou legado `tipo='exame'`) gera **um único** agendamento vinculado ao profissional 'Laboratório'. Nunca aciona o fluxo de divisão."
-- Nada de mock/dados falsos. Não vou alterar cadastros existentes de `procedimentos`; a lógica passa a ser tolerante ao legado (`tipo_procedimento` nulo).
+Não permite UPDATE/DELETE — observação manual, uma vez lançada, fica no histórico (é auditoria).
 
-## Verificação
+### 2. Redesign do modal "Histórico" em `src/routes/_authenticated/app.agenda.tsx`
 
-- Reagendar o orçamento #202600023 (após cancelar os 3 agendamentos criados erroneamente) e conferir: 1 agendamento com "LABORATÓRIO (11 EXAMES): ..." vinculado ao médico "Laboratório".
-- Rodar cenário misto (1 consulta + 3 exames de lab) e conferir que o dialog de divisão abre com 2 grupos: `CONSULTA` e `LABORATORIO` único.
-- Console limpo, sem regressão em orçamentos não-lab.
+Substituo o conteúdo do `<Dialog open={!!auditAg} …>` (linhas ~5624–5763) por:
+
+**Header** — mantém título "Histórico" (mais curto que "Histórico de alterações"), ícone `ShieldCheck`, subtítulo com paciente + data/hora do agendamento.
+
+**Composer manual (topo, referência foto 3):**
+- `<Textarea>` com placeholder "Escreva uma observação sobre este agendamento…", rows=3.
+- Botão `+ Adicionar` alinhado à direita, primário azul (`bg-primary`), desabilitado quando o texto está vazio ou salvando.
+- Ao clicar: INSERT em `agendamento_notas` com `agendamento_id`, `clinica_id`, `texto`, `user_id/nome/email` do `useAuth`. Depois limpa o textarea, dá toast de sucesso e recarrega a lista.
+
+**Tabela unificada (referência foto 1):**
+
+Três colunas: **Data | Usuário | Histórico**, linhas com divisórias sutis (`divide-y`), cabeçalho em `bg-muted`, tipografia limpa (sem badges coloridos, sem `font-mono`, sem cards).
+
+Fonte de linhas = merge ordenado por `created_at desc` de:
+
+1. **`audit_log` do agendamento** (já carregado hoje) — traduzido para linguagem natural:
+   - `INSERT agendamentos` → "AGENDAMENTO CRIADO"
+   - `UPDATE agendamentos` com `fluxo_etapa` mudando → "FLUXO ALTERADO PARA <TRIAGEM>" (usa o mapa de labels de etapa já existente)
+   - `UPDATE agendamentos` com `status` mudando → "STATUS ALTERADO PARA <REALIZADO>"
+   - `UPDATE agendamentos` com `medico_id`/`procedimento_id`/`inicio` → "REAGENDADO / MÉDICO ALTERADO / PROCEDIMENTO ALTERADO"
+   - `DELETE agendamentos` → "AGENDAMENTO EXCLUÍDO"
+   - `INSERT fin_lancamentos` → "PAGAMENTO DA CONSULTA REGISTRADO" (ou "DUPLICATA DE R$ X,XX GERADA VIA FATURAMENTO DO AGENDAMENTO" quando houver `origem = 'faturamento'`)
+   - `UPDATE fin_lancamentos` com `repasse_pago true` → "REPASSE MÉDICO PAGO"
+2. **`agendamento_notas`** — cada linha vira "HISTÓRICO: `<texto em maiúsculas>`" no estilo da foto 1 (que usa CAIXA ALTA).
+
+Um pequeno helper `descreverEvento(row)` centraliza essa tradução. Campos técnicos crus (`fluxo_etapa: aguardando_recepcao → triagem`) somem — vai só o texto legível.
+
+**Coluna Usuário:** nome resolvido via `equipeList` (já usado hoje) a partir de `user_email`; fallback para o email. Para `agendamento_notas`, usa `user_nome` gravado no próprio registro.
+
+**Coluna Data:** `dd/MM/yyyy` numa linha, `HH:mm` embaixo (igual foto 1).
+
+**Empty state:** "Nenhum histórico registrado para este agendamento." centralizado.
+
+**Footer:** só o botão `Fechar` cinza (já existe).
+
+### 3. Layout / design tokens
+
+- Modal cresce um pouco: `max-w-4xl`, `max-h-[85vh]`, `flex-col`.
+- Composer fica em bloco separado por `border-b` para dar respiro visual.
+- Tabela responsiva: em telas < md, colunas Usuário/Histórico empilham (Data fica à esquerda como âncora).
+- Sem cores fortes por tipo de evento — foto 1 é neutra. Mantenho apenas ícone `ShieldCheck` no header e o botão azul do "Adicionar".
+- Usa tokens semânticos do design system (`bg-card`, `bg-muted`, `text-foreground`, `border`) — nada de `bg-white`/`text-black` hardcoded.
+
+### 4. Fora do escopo
+
+- Não vou reescrever o back-end do `audit_log`. Ele continua gravando os campos técnicos; a tradução acontece só na UI.
+- Não vou implementar edição/exclusão de observação manual.
+- Não vou tocar em outros modais que usam `audit_log` (ex.: histórico de orçamento) — este redesign é só o da Agenda.
+
+## Ordem de execução após aprovação do plano
+
+1. **Você** restaura via History para um checkpoint verde anterior aos conflitos.
+2. Eu confirmo que o build voltou (`bun run build:dev` limpo).
+3. Migration da tabela `agendamento_notas` + policies + grants.
+4. Refactor do bloco do `<Dialog>` de auditoria em `app.agenda.tsx` (composer + tabela + helper `descreverEvento`).
+5. Verifico visualmente abrindo o modal em um agendamento com histórico e lançando uma observação manual.
