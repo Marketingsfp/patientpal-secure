@@ -2471,6 +2471,17 @@ function Page() {
                   Imprimir 2ª via
                   {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={selectedLaudoElegiveis.length === 0}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedLaudoElegiveis.length > 0) abrirLaudoLote();
+                  }}
+                >
+                  <Stethoscope className="h-4 w-4 mr-2 text-sky-600" />
+                  Vincular vários laudos
+                  {selectedLaudoElegiveis.length ? ` (${selectedLaudoElegiveis.length})` : ""}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button size="sm" variant="ghost" onClick={() => setSel(new Set())}>
