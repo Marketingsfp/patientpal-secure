@@ -15,6 +15,13 @@ export interface PrintGRInput {
   usuarioId?: string | null;
   /** Se true, NÃO grava nova via — apenas reimprime a última via existente. */
   reimpressao?: boolean;
+  /**
+   * Número da ficha (posição da linha na agenda) já calculado pelo chamador.
+   * Quando informado, a guia usa EXATAMENTE este número — garante que a guia
+   * bate com a lista da agenda mesmo havendo slots no mesmo horário. Sem ele,
+   * a posição é recalculada aqui (fallback).
+   */
+  fichaNumero?: number | null;
   pagamento?: {
     valor: number;
     forma_pagamento: string | null;
@@ -180,7 +187,7 @@ export async function printGuiaAtendimento(input: PrintGRInput) {
   return printGuiaAtendimentoCore(input);
 }
 
-async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento }: PrintGRInput) {
+async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento, fichaNumero }: PrintGRInput) {
   // Controle de vias: máximo 2 (1ª e 2ª via). Reimpressão repete a última sem incrementar.
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
@@ -430,31 +437,28 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
   const procNome = espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
 
-  // Ficha = posição do paciente na agenda do médico no dia (ex.: nº 1 da Dr. Valéria).
-  // Se já houver ficha_numero gravado no agendamento, reutiliza — assim o número
-  // impresso na 1ª GR nunca muda, mesmo que alguém insira/mova agendamentos depois.
+  // Ficha = POSIÇÃO da linha na agenda do dia (mesma regra da lista da agenda —
+  // app.agenda.tsx > fichaPorId): conta TODOS os slots por dia/agenda na ordem do
+  // horário, inclusive livres. O chamador (a agenda) passa o número já calculado
+  // em `fichaNumero` — assim a guia bate EXATAMENTE com a lista, mesmo quando há
+  // slots no mesmo horário. Sem ele, recalcula aqui como fallback.
   const inicioDt = new Date(a.inicio);
   const diaIni = new Date(inicioDt); diaIni.setHours(0, 0, 0, 0);
   const diaFim = new Date(inicioDt); diaFim.setHours(23, 59, 59, 999);
-  let fichaNum = Number((a as { ficha_numero?: number | null }).ficha_numero ?? 0) || 0;
-  let fichaJaGravada = fichaNum > 0;
-  if (!fichaJaGravada) {
+  let fichaNum = typeof fichaNumero === "number" && fichaNumero > 0 ? fichaNumero : 0;
+  if (fichaNum === 0) {
     try {
       let qFicha = supabase
         .from("agendamentos")
-        .select("id, inicio, paciente_id, paciente_nome")
+        .select("id, inicio")
         .gte("inicio", diaIni.toISOString())
         .lte("inicio", diaFim.toISOString())
-        .order("inicio", { ascending: true });
+        .order("inicio", { ascending: true })
+        .order("id", { ascending: true });
       if (a.agenda_id) qFicha = qFicha.eq("agenda_id", a.agenda_id);
       else if (medicoIdEfetivo) qFicha = qFicha.eq("medico_id", medicoIdEfetivo);
       const { data: lista } = await qFicha;
-      const validos = (lista ?? []).filter((r: any) => {
-        const n = String(r.paciente_nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-        if (!r.paciente_id && (n === "disponivel" || n === "bloqueio" || n === "")) return false;
-        return true;
-      });
-      const idx = validos.findIndex((r: any) => r.id === a.id);
+      const idx = (lista ?? []).findIndex((r: any) => r.id === a.id);
       fichaNum = idx >= 0 ? idx + 1 : 0;
     } catch { fichaNum = 0; }
   }
@@ -669,16 +673,10 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         ficha_numero: fichaNum > 0 ? fichaNum : null,
       } as never);
     } catch (_) { /* falha silenciosa: registro de via não deve bloquear impressão */ }
-    // Congela o número da ficha no próprio agendamento na 1ª impressão.
-    if (!fichaJaGravada && fichaNum > 0) {
-      try {
-        await supabase
-          .from("agendamentos")
-          .update({ ficha_numero: fichaNum } as never)
-          .eq("id", agendamentoId)
-          .is("ficha_numero", null);
-      } catch (_) { /* noop */ }
-    }
+    // Não "congela" mais ficha_numero no agendamento: a ficha é POSICIONAL e
+    // acompanha a lista da agenda (pode mudar se slots forem inseridos/removidos
+    // antes da paciente). O gr_impressoes acima guarda o número de cada via só
+    // para histórico.
   }
 }
 
@@ -931,16 +929,14 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         .select("id, paciente_id, paciente_nome, inicio")
         .gte("inicio", ini.toISOString())
         .lte("inicio", fim.toISOString())
-        .order("inicio", { ascending: true });
+        .order("inicio", { ascending: true })
+        .order("id", { ascending: true });
       if (g.agendaId) q = q.eq("agenda_id", g.agendaId);
       else if (g.medicoId) q = q.eq("medico_id", g.medicoId);
       const { data } = await q;
-      const validos = (data ?? []).filter((r: any) => {
-        const n = String(r.paciente_nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-        if (!r.paciente_id && (n === "disponivel" || n === "bloqueio" || n === "")) return false;
-        return true;
-      });
-      const idx = validos.findIndex((r: any) => r.id === g.agIdRef);
+      // Posicional (mesma regra da lista da agenda e da GR individual): conta
+      // TODOS os slots do dia/agenda na ordem do hor\u00e1rio, inclusive livres.
+      const idx = (data ?? []).findIndex((r: any) => r.id === g.agIdRef);
       fichaByGrupo.set(key, idx >= 0 ? idx + 1 : 0);
     } catch { fichaByGrupo.set(key, 0); }
   }));

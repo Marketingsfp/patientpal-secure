@@ -1829,25 +1829,19 @@ function AgendaPage() {
 
   const fichaPorId = useMemo(() => {
     const m = new Map<string, string>();
-    // Numeração sequencial por dia e por AGENDA (fallback: médico) na ordem do
-    // horário — mesma regra usada pela GR em src/lib/print-gr.ts. Slots livres
-    // (Disponível/Bloqueio) NÃO entram na contagem, pois a GR também os ignora.
-    // Se o agendamento já tem `ficha_numero` gravado (na 1ª impressão da GR),
-    // ele PREVALECE sobre a posição dinâmica — o número da ficha impresso na
-    // guia jamais deve divergir do sistema.
+    // Numeração POSICIONAL por dia/agenda na ordem do horário: cada linha
+    // (inclusive slots livres) recebe o número da sua POSIÇÃO na lista. O número
+    // reflete onde a linha está, então a sequência nunca "pula" (ex.: …012, 013,
+    // 014…) — antes o `ficha_numero` gravado (que conta só pacientes reais)
+    // sobrescrevia a posição e embaralhava a lista (…012, 001, 014…).
     const contadores = new Map<string, number>();
     const ordenados = [...items].sort((a, b) => a.inicio.localeCompare(b.inicio));
     ordenados.forEach((a) => {
       const dia = a.inicio.slice(0, 10);
       const chave = `${dia}__${a.agenda_id ?? a.medico_id ?? "sem-agenda"}`;
-      // Numeração POSICIONAL fixa: todo slot (inclusive DISPONÍVEL/BLOQUEIO)
-      // recebe um número sequencial por dia/agenda. Assim a ficha nunca fica
-      // em branco nem "pula" quando o horário está livre.
       const n = (contadores.get(chave) ?? 0) + 1;
       contadores.set(chave, n);
-      const fixa = (a as { ficha_numero?: number | null }).ficha_numero;
-      const num = typeof fixa === "number" && fixa > 0 ? fixa : n;
-      m.set(a.id, String(num).padStart(3, "0"));
+      m.set(a.id, String(n).padStart(3, "0"));
     });
     return m;
   }, [items]);
@@ -3321,12 +3315,15 @@ function AgendaPage() {
           };
         }
       } catch { /* segue sem enriquecer — printGuiaAtendimento tem fallback próprio */ }
+      const fichaStr = fichaPorId.get(a.id);
+      const fichaNumero = fichaStr && fichaStr !== "—" ? Number(fichaStr) : undefined;
       await printGuiaAtendimento({
         agendamentoId: a.id,
         clinicaId: clinicaAtual.clinica_id,
         usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
         usuarioId: user?.id ?? null,
         pagamento: pagamentoInfo,
+        fichaNumero,
       });
     } catch (err) {
       mostrarErro(err);
