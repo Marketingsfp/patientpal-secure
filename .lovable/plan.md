@@ -1,25 +1,31 @@
-## Objetivo
+## Diagnóstico
 
-Adicionar campo **Bandeira** no formulário de conta em `/app/financeiro/contas` (Nova/Editar conta) que aparece somente quando o Tipo é **Cartão** (ou Maquininha), com as opções Visa, Mastercard, Elo, American Express, Hipercard, Diners, Outra.
+Na rotina que vincula um orçamento a um agendamento (`src/routes/_authenticated/app.agenda.tsx`, ~linha 2409-2444), o código decide se abre o diálogo "Dividir orçamento" baseado em **grupos distintos** dos itens:
 
-## Mudanças
+```ts
+const grupoDe = (pid) => norm(proc.grupo) || norm(proc.tipo) || "OUTROS";
+const gruposDistintos = new Set(its.map(i => grupoDe(i.procedimento_id)));
+if (gruposDistintos.size > 1) { /* abre split */ }
+```
 
-### 1. Banco de dados (migration)
-- Adicionar coluna `bandeira TEXT NULL` na tabela `fin_contas`.
-- Sem alteração de RLS/GRANT (coluna nova em tabela existente).
+Já existe, poucas linhas acima, a variável `todosLab` que verifica se **todos** os itens são de laboratório (por `grupo=LABORATORIO`, `tipo=EXAME` ou `tipo=LABORATORIO`).
 
-### 2. Formulário `src/routes/_authenticated/app.financeiro.contas.tsx`
-- Adicionar `bandeira: ""` ao estado `form` (e ao reset `openNew` / `openEdit`).
-- Renderizar condicionalmente o Select **Bandeira** logo abaixo do campo Tipo, apenas quando `form.tipo === "cartao"` ou `form.tipo === "maquininha"`.
-- Opções: Visa, Mastercard, Elo, American Express, Hipercard, Diners, Outra (valores em minúsculas — `visa`, `mastercard`, etc — para consistência com o resto do sistema, onde o helper `montarSufixoCartao` já faz `.toUpperCase()` na exibição).
-- No `submit`, incluir `bandeira: form.tipo === "cartao" || form.tipo === "maquininha" ? (form.bandeira || null) : null` no payload de insert/update.
-- Ao trocar o Tipo para algo que não seja cartão/maquininha, limpar `bandeira` no estado.
-- Exibir a bandeira no card da conta (linha discreta abaixo do nome) quando existir.
+No orçamento da foto, os exames de laboratório estão cadastrados com `grupo`/`tipo` inconsistentes entre si (ex.: uns com `tipo=EXAME`, outros com `grupo=LABORATORIO`, outros sem `grupo` mas com nome de lab). Como o agrupador só olha o texto bruto, cria 2-3 buckets → abre a divisão → o operador acaba distribuindo entre médicos diferentes.
 
-### 3. Sem impacto em outras telas
-- As telas de Caixa e Lançamento Financeiro já têm seus próprios seletores de bandeira por transação — não são alteradas.
+## Correção
+
+### 1. `src/routes/_authenticated/app.agenda.tsx` (bloqueio na origem)
+Antes de comparar `gruposDistintos.size > 1`, se `todosLab === true` **não abrir o split**: cai direto no fluxo de 1 grupo (linha 2447+), que gera **um único agendamento** com descrição `LABORATÓRIO (N EXAMES): ...`. Isso já é o comportamento correto.
+
+### 2. `src/components/agenda/dividir-orcamento-dialog.tsx` (defesa em profundidade)
+Ajustar `agruparItens` para que, quando **todos** os itens tiverem categoria laboratório (via `categoriaDoProcedimento`/`buildCategoriaResolver` do helper existente em `src/lib/procedimento/categoria.ts`), sejam colapsados em um único grupo `LABORATÓRIO` — assim, mesmo que o dialog seja aberto por outro caminho, ele não permitirá dividir laboratório entre profissionais.
+
+Se o dialog receber somente itens de laboratório e existir um profissional cujo nome normalizado contenha `LABORATORIO`/`LABORATÓRIO` (médico ou recurso de enfermagem), pré-selecionar automaticamente esse profissional no grupo.
+
+### 3. Sem migração
+Apenas mudança de lógica no frontend; nada muda no banco.
 
 ## Verificação
-- Abrir "Nova conta" → escolher Tipo "Cartão" → Select "Bandeira" aparece com Visa/Mastercard/etc.
-- Trocar Tipo para "Banco" → campo Bandeira some.
-- Salvar e reabrir em edição → bandeira persistida corretamente.
+- Criar/recuperar orçamento com N itens de laboratório com `grupo/tipo` diferentes → botão de vincular na Agenda gera **um único** agendamento "LABORATÓRIO (N EXAMES)" e não abre a tela de divisão.
+- Orçamento misto (lab + imagem) continua abrindo a divisão normalmente.
+- Orçamento 100% imagem ou consulta continua abrindo a divisão como hoje.
