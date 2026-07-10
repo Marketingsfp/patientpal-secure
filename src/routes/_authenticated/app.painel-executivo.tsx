@@ -722,20 +722,22 @@ function EstornoDrawer({
       // 4) Registra solicitação aprovada em estorno_solicitacoes (rastro)
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        await supabase.from("estorno_solicitacoes").insert({
-          clinica_id: clinicaId,
-          paciente_nome: alvo.paciente_nome,
-          descricao: alvo.procedimento ?? null,
-          valor: alvo.valor_total,
-          motivo: motivo.trim(),
-          status: "aprovado",
-          solicitado_por: user?.id ?? null,
-          resolvido_por: user?.id ?? null,
-          resolvido_em: new Date().toISOString(),
-          resposta: "Estorno executado a partir do Painel Executivo",
-          lancamento_id: lancId ?? null,
-          tipo: "devolucao",
-        });
+        if (user?.id) {
+          await supabase.from("estorno_solicitacoes").insert({
+            clinica_id: clinicaId,
+            paciente_nome: alvo.paciente_nome,
+            descricao: alvo.procedimento ?? null,
+            valor: alvo.valor_total,
+            motivo: motivo.trim(),
+            status: "aprovado",
+            solicitado_por: user.id,
+            resolvido_por: user.id,
+            resolvido_em: new Date().toISOString(),
+            resposta: "Estorno executado a partir do Painel Executivo",
+            lancamento_id: lancId ?? null,
+            tipo: "devolucao",
+          });
+        }
       } catch { /* rastro best-effort */ }
 
       toast.success("Atendimento estornado.");
