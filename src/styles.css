@@ -608,3 +608,11 @@ html.theme-emerald {
 .hhp-kpi-anim {
   animation: hhp-kpi-in 320ms var(--hhp-ease, cubic-bezier(0.32, 0.72, 0, 1)) both;
 }
+
+/* Impressão global do app: força A4 retrato para janelas de print padrão
+ * (window.print()). Impressões térmicas usam iframes com documento próprio
+ * e @page interno, portanto não são afetadas por esta regra. */
+@page { size: A4 portrait; margin: 12mm; }
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+}
