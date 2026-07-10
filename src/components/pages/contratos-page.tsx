@@ -153,16 +153,36 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
   const [detail, setDetail] = useState<Contrato | null>(null);
   const [sortPaciente, setSortPaciente] = useState<null | "asc" | "desc">(null);
 
-  const load = async () => {
+  // Termo com debounce para acionar busca server-side sem bater a cada tecla.
+  const [qDebounced, setQDebounced] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setQDebounced(q.trim()), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const load = async (termo = "") => {
     if (!clinicaAtual) return;
     setLoading(true);
+    let contratosQuery = supabase
+      .from("contratos_assinatura")
+      .select("*")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .order("created_at", { ascending: false });
+    const s = termo.trim();
+    if (s.length >= 2) {
+      // Busca no servidor: por nome do paciente (ilike) e, quando o termo for
+      // numérico, também pelo número do contrato. Isso evita perder registros
+      // fora dos 500 mais recentes (clínicas com >500 contratos).
+      const soDigitos = /^\d+$/.test(s);
+      const orExpr = soDigitos
+        ? `paciente_nome.ilike.%${s}%,numero.eq.${s}`
+        : `paciente_nome.ilike.%${s}%`;
+      contratosQuery = contratosQuery.or(orExpr).limit(200);
+    } else {
+      contratosQuery = contratosQuery.limit(500);
+    }
     const [cs, cv] = await Promise.all([
-      supabase
-        .from("contratos_assinatura")
-        .select("*")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .order("created_at", { ascending: false })
-        .limit(500),
+      contratosQuery,
       supabase
         .from("cb_convenios")
         .select("*")
@@ -176,8 +196,8 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
     setLoading(false);
   };
   useEffect(() => {
-    load(); /* eslint-disable-next-line */
-  }, [clinicaAtual?.clinica_id]);
+    load(qDebounced); /* eslint-disable-next-line */
+  }, [clinicaAtual?.clinica_id, qDebounced]);
 
   // Deep-link: abrir automaticamente um contrato específico (ex.: vindo da aba Convênio no cadastro do cliente)
   useEffect(() => {
