@@ -1202,8 +1202,17 @@ function Page() {
     const alvo = openFecharTerceiro;
     if (!alvo || !clinicaAtual || !user) return;
     const calc = calcSaldoSessao(alvo.id);
-    const informado = Number(informadoTerceiro) || 0;
+    const conferidoNum: Record<string, number> = {};
+    for (const [k, v] of Object.entries(conferidoTerceiro)) {
+      const n = Number(v) || 0;
+      if (Math.abs(n) > 0.005) conferidoNum[k] = n;
+    }
+    const informado = Object.values(conferidoNum).reduce((a, x) => a + x, 0)
+      || (Number(informadoTerceiro) || 0);
     const diff = informado - calc;
+    const breakdownStr = Object.entries(conferidoNum)
+      .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k}: ${fmt(v)}`)
+      .join("; ");
     setSaving(true);
     const { error } = await supabase
       .from("caixa_sessoes")
@@ -1214,8 +1223,8 @@ function Page() {
         valor_fechamento_calculado: calc,
         diferenca: diff,
         observacoes: obsTerceiro
-          ? `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}] ${obsTerceiro}`
-          : `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}]`,
+          ? `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}] ${obsTerceiro}${breakdownStr ? " | Conferência: " + breakdownStr : ""}`
+          : `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}]${breakdownStr ? " | Conferência: " + breakdownStr : ""}`,
       })
       .eq("id", alvo.id);
     if (!error) {
@@ -1225,7 +1234,7 @@ function Page() {
         user_id: user.id,
         tipo: "fechamento",
         valor: informado,
-        descricao: `Fechamento pelo gestor. Operador original: ${alvo.user_nome || alvo.user_id.slice(0, 8)} | Calculado: ${fmt(calc)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}`,
+        descricao: `Fechamento pelo gestor. Operador original: ${alvo.user_nome || alvo.user_id.slice(0, 8)} | Calculado: ${fmt(calc)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}${breakdownStr ? " | " + breakdownStr : ""}`,
       });
     }
     setSaving(false);
@@ -1233,6 +1242,7 @@ function Page() {
     setOpenFecharTerceiro(null);
     setInformadoTerceiro("");
     setObsTerceiro("");
+    setConferidoTerceiro({});
     toast.success(`Caixa de ${alvo.user_nome || "operador"} fechado`);
     printComprovanteCaixa({
       tipo: "fechamento",
@@ -1243,6 +1253,7 @@ function Page() {
       valorInformado: informado,
       diferenca: diff,
       descricao: obsTerceiro ? `Fechado pelo gestor. ${obsTerceiro}` : "Fechado pelo gestor.",
+      porForma: conferidoNum,
     });
     void loadTodos();
     void load();
