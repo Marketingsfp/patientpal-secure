@@ -1,25 +1,36 @@
-## Novo filtro "Laudo" na tela Atendimentos
+## Problema
 
-Adicionar um filtro dropdown ao lado dos filtros existentes (após "Tipo"), com três opções:
+Quando o repasse do laudador é apagado/estornado, o atendimento de origem continua com `laudo_status = 'emitido'` e a coluna Laudo segue mostrando **Vinculado**. Falta a propagação inversa: hoje só existe um trigger que cancela o repasse quando o lançamento de origem é cancelado (`trg_cancelar_laudo_ao_cancelar_lanc`), mas nada que faça o caminho contrário quando o repasse é apagado/cancelado.
 
-- **Todos** (padrão)
-- **Baixados** — `laudo_status === "emitido"`
-- **Não baixados** — `laudo_status !== "emitido"`
+Confirmado no banco (paciente QUEDIMA SUELEN, ECG): o `fin_lancamentos` de origem continua com `laudo_status='emitido'`, `medico_laudador_id` e `valor_laudo` preenchidos, mesmo depois do repasse ter sido removido — por isso a badge fica presa em "Vinculado".
 
-O botão amarelo "Baixar" na coluna Laudo marca o atendimento como `laudo_status = 'emitido'`, então esse é o critério.
+## Correção
 
-## Implementação
+Migration única com dois gatilhos que espelham o comportamento já existente:
 
-Arquivo único: `src/routes/_authenticated/app.financeiro.atendimentos.tsx`
+1. **AFTER DELETE em `fin_atendimentos`** — quando a linha excluída era um repasse de laudo (`forma_pagamento = 'laudo'` e `laudo_de_atendimento_id` ou observação com o UUID do lançamento origem), resetar no registro origem:
+   - `laudo_status = NULL`
+   - `medico_laudador_id = NULL`
+   - `valor_laudo = NULL`
+   - `laudo_emitido_em = NULL`
+   - `laudo_lancamento_id = NULL`
+   
+   A origem pode estar em `fin_atendimentos` (via `laudo_de_atendimento_id`) ou em `fin_lancamentos` (via `laudo_lancamento_id = OLD.id`). O trigger cobre os dois casos.
 
-1. Novo estado: `const [fLaudo, setFLaudo] = useState<"todos" | "baixado" | "nao_baixado">("todos");`
-2. Aplicar no filtro em memória (mesmo bloco onde `fStatus`/`fTipo` são aplicados):
-   - `baixado`: manter apenas `a.laudo_status === "emitido"`
-   - `nao_baixado`: manter apenas `a.laudo_status !== "emitido"`
-3. Novo `<Select>` entre "Tipo" e "Ordenar por", seguindo o mesmo padrão visual (Label `text-xs font-medium`, trigger `h-9`).
-4. Contagem visível — mostrar quantidade ao lado do label, ex.: `Laudo — 27 baixados / 8 pendentes` (calculado a partir da lista já filtrada pelos demais critérios, para dar feedback rápido).
+2. **AFTER UPDATE OF status em `fin_atendimentos`** — quando o repasse passa a `cancelado` (mesma condição de origem acima), aplicar o mesmo reset. Isso alinha o comportamento com o trigger que já cancela o repasse quando o lançamento origem é cancelado.
 
-## Escopo
+Também um **script de saneamento** único (na mesma migration) para consertar registros já quebrados: para cada `fin_lancamentos`/`fin_atendimentos` com `laudo_status='emitido'` cuja linha de repasse referenciada não existe mais ou está cancelada, aplicar o mesmo reset. Isso destrava o caso do QUEDIMA SUELEN e qualquer outro histórico.
 
-- Apenas UI/filtro em memória — sem mudança de schema, sem alteração de consulta ao banco.
-- Não altera comportamento do botão "Baixar" nem dos outros filtros.
+## Fora do escopo
+
+- Sem mudança de UI, sem mexer no fluxo de "Vincular".
+- Sem alterar o comportamento do `trg_cancelar_laudo_ao_cancelar_lanc` (continua cascateando origem → repasse).
+- Sem migrações de dados além do saneamento acima.
+
+## Detalhes técnicos
+
+Arquivos:
+- Nova migration em `supabase/migrations/` criando duas funções `SECURITY DEFINER` (`fn_reset_laudo_ao_remover_repasse`, `fn_reset_laudo_ao_cancelar_repasse`) e dois triggers em `fin_atendimentos`.
+- UPDATE de saneamento no final da mesma migration.
+
+Sem mudanças em código TS — a badge já lê `laudo_status`, então basta o dado ficar correto.
