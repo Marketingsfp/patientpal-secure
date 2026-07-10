@@ -48,6 +48,7 @@ import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
+import { usePickTomador } from "@/components/nfse/use-pick-tomador";
 import { useAuth } from "@/hooks/use-auth";
 import {
   getProcedimentosAgenda,
