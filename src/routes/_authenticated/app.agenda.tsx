@@ -804,11 +804,14 @@ function AgendaPage() {
       data_pagamento: null,
     } as never).eq("id", origem.id);
     if (e1) { setReagSalvando(false); mostrarErro(e1); return; }
-    // 2) Coloca a paciente na ficha de destino (slot escolhido), preservando o horário do slot
+    // 2) Coloca a paciente na ficha de destino (slot escolhido), preservando o horário do slot.
+    //    Importante: se a origem NÃO tinha procedimento (ex.: slot sem serviço), mantemos o
+    //    procedimento que já estava no slot de destino, para não esvaziar essa informação —
+    //    isso evita que a cobrança caia depois no fallback genérico "CONSULTA".
     const { error: e2 } = await supabase.from("agendamentos").update({
       paciente_id: origem.paciente_id ?? null,
       paciente_nome: origem.paciente_nome,
-      procedimento: origem.procedimento ?? null,
+      procedimento: origem.procedimento ?? slot.procedimento ?? null,
       status: "agendado",
       observacoes: novasObs,
       data_pagamento: origem.data_pagamento ?? null,
@@ -2171,7 +2174,7 @@ function AgendaPage() {
     const df = new Date(dataAlvo); df.setHours(23, 59, 59, 999);
     const { data: destinoRaw, error: eDest } = await supabase
       .from("agendamentos")
-      .select("id,paciente_id,paciente_nome,inicio,fim,medico_id,status")
+      .select("id,paciente_id,paciente_nome,inicio,fim,medico_id,status,procedimento")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("medico_id", slot.medico_id)
       .gte("inicio", di.toISOString())
@@ -2181,7 +2184,7 @@ function AgendaPage() {
     if (eDest) { mostrarErro(eDest); return; }
     const destino = (destinoRaw ?? []) as Array<{
       id: string; paciente_id: string | null; paciente_nome: string;
-      inicio: string; fim: string; medico_id: string | null; status: string;
+      inicio: string; fim: string; medico_id: string | null; status: string; procedimento: string | null;
     }>;
     const fichaInicial = destino.findIndex(s => s.id === slot.id) + 1;
     if (fichaInicial <= 0) { toast.error("Não foi possível localizar a ficha do slot escolhido."); return; }
@@ -2222,7 +2225,9 @@ function AgendaPage() {
         supabase.from("agendamentos").update({
           paciente_id: origem.paciente_id ?? null,
           paciente_nome: origem.paciente_nome,
-          procedimento: origem.procedimento ?? null,
+          // Preserva o procedimento do slot de destino quando a origem não tinha
+          // um definido, para não deixar a cobrança cair no fallback "CONSULTA".
+          procedimento: origem.procedimento ?? alvo.procedimento ?? null,
           status: "agendado",
           observacoes: novasObs,
           data_pagamento: origem.data_pagamento ?? null,
