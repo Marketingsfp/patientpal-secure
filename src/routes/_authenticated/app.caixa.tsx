@@ -423,6 +423,11 @@ function Page() {
   const [obsFechamento, setObsFechamento] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Fechamento de caixa de OUTRO usuário (gestor/admin no tab "Todos").
+  const [openFecharTerceiro, setOpenFecharTerceiro] = useState<Sessao | null>(null);
+  const [informadoTerceiro, setInformadoTerceiro] = useState("");
+  const [obsTerceiro, setObsTerceiro] = useState("");
+
   // Atalho: 1..5 na modal de cobrança seleciona a forma da última linha
   useEffect(() => {
     if (!openCobranca) return;
@@ -1158,6 +1163,58 @@ function Page() {
     void load();
   };
 
+  // Fechamento pelo gestor de um caixa aberto por outro usuário.
+  const fecharSessaoTerceiro = async (e: FormEvent) => {
+    e.preventDefault();
+    const alvo = openFecharTerceiro;
+    if (!alvo || !clinicaAtual || !user) return;
+    const calc = calcSaldoSessao(alvo.id);
+    const informado = Number(informadoTerceiro) || 0;
+    const diff = informado - calc;
+    setSaving(true);
+    const { error } = await supabase
+      .from("caixa_sessoes")
+      .update({
+        status: "fechado",
+        fechado_em: new Date().toISOString(),
+        valor_fechamento_informado: informado,
+        valor_fechamento_calculado: calc,
+        diferenca: diff,
+        observacoes: obsTerceiro
+          ? `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}] ${obsTerceiro}`
+          : `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}]`,
+      })
+      .eq("id", alvo.id);
+    if (!error) {
+      await supabase.from("caixa_movimentos").insert({
+        sessao_id: alvo.id,
+        clinica_id: clinicaAtual.clinica_id,
+        user_id: user.id,
+        tipo: "fechamento",
+        valor: informado,
+        descricao: `Fechamento pelo gestor. Operador original: ${alvo.user_nome || alvo.user_id.slice(0, 8)} | Calculado: ${fmt(calc)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}`,
+      });
+    }
+    setSaving(false);
+    if (error) { mostrarErro(error); return; }
+    setOpenFecharTerceiro(null);
+    setInformadoTerceiro("");
+    setObsTerceiro("");
+    toast.success(`Caixa de ${alvo.user_nome || "operador"} fechado`);
+    printComprovanteCaixa({
+      tipo: "fechamento",
+      clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
+      operadorNome: alvo.user_nome || "Atendente",
+      valor: informado,
+      saldoCalculado: calc,
+      valorInformado: informado,
+      diferenca: diff,
+      descricao: obsTerceiro ? `Fechado pelo gestor. ${obsTerceiro}` : "Fechado pelo gestor.",
+    });
+    void loadTodos();
+    void load();
+  };
+
   const verDetalhe = async (s: Sessao) => {
     setOpenDetalhe(s);
     const { data } = await supabase
@@ -1773,7 +1830,25 @@ function Page() {
                           <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
                             {fmt(s.diferenca)}
                           </TableCell>
-                          <TableCell><Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}><Eye className="h-4 w-4" /></Button></TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <Button size="sm" variant="ghost" onClick={() => verDetalhe(s)} title="Ver detalhes">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {s.status === "aberto" && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Fechar este caixa"
+                                onClick={() => {
+                                  setOpenFecharTerceiro(s);
+                                  setInformadoTerceiro(calc.toFixed(2));
+                                  setObsTerceiro("");
+                                }}
+                              >
+                                <Lock className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                       );
                     })}
@@ -2001,6 +2076,40 @@ function Page() {
             </div>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpenFechar(false)}>Cancelar</Button>
+              <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* === Modal Fechar caixa de OUTRO usuário (gestor/admin) === */}
+      <Dialog open={!!openFecharTerceiro} onOpenChange={(o) => { if (!o) setOpenFecharTerceiro(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Fechar caixa de outro operador</DialogTitle>
+            {openFecharTerceiro && (
+              <DialogDescription>
+                Operador: <strong className="uppercase">{openFecharTerceiro.user_nome || openFecharTerceiro.user_id.slice(0, 8)}</strong>
+                <br />
+                Saldo calculado: <strong>{fmt(calcSaldoSessao(openFecharTerceiro.id))}</strong>
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <form onSubmit={fecharSessaoTerceiro} className="space-y-3">
+            <div>
+              <Label>Valor conferido em caixa</Label>
+              <CurrencyInput value={informadoTerceiro} onChange={setInformadoTerceiro} />
+            </div>
+            <div>
+              <Label>Observações</Label>
+              <Textarea
+                value={obsTerceiro}
+                onChange={(e) => setObsTerceiro(e.target.value)}
+                placeholder="Motivo do fechamento pelo gestor (ex.: operador ausente, fim de turno etc.)"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setOpenFecharTerceiro(null)}>Cancelar</Button>
               <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
             </DialogFooter>
           </form>
