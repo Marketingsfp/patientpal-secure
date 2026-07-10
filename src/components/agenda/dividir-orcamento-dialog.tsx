@@ -30,6 +30,7 @@ export type DividirItem = {
   procedimento_id: string | null;
   grupo: string | null;
   tipo: string | null;
+  tipo_procedimento?: string | null;
 };
 
 export type DividirMedicoOpt = {
@@ -95,8 +96,16 @@ const minToHm = (n: number) => `${pad2(Math.floor(n / 60))}:${pad2(n % 60)}`;
 function agruparItens(itens: DividirItem[]): GrupoForm[] {
   const map = new Map<string, GrupoForm>();
   for (const it of itens) {
-    const g = norm(it.grupo) || norm(it.tipo) || "OUTROS";
-    const label = (it.grupo ?? it.tipo ?? "Outros").toUpperCase();
+    // Laboratório sempre colapsa num único grupo, independentemente de
+    // "grupo"/"tipo" (evita sub-divisão de exames como HEMOGRAMA vs ACIDO URICO).
+    const tp = norm(it.tipo_procedimento);
+    const isLab =
+      tp === "LABORATORIO" ||
+      norm(it.grupo) === "LABORATORIO" ||
+      norm(it.tipo) === "LABORATORIO" ||
+      (tp === "" && norm(it.tipo) === "EXAME" && norm(it.grupo) === "");
+    const g = isLab ? "LABORATORIO" : norm(it.grupo) || norm(it.tipo) || "OUTROS";
+    const label = isLab ? "LABORATÓRIO" : (it.grupo ?? it.tipo ?? "Outros").toUpperCase();
     if (!map.has(g)) {
       map.set(g, {
         key: g,
