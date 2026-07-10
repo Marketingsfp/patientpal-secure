@@ -58,6 +58,7 @@ import { Barcode, FileText } from "lucide-react";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { EditarPacienteRapidoDialog } from "@/components/contratos/editar-paciente-rapido-dialog";
+import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) =>
@@ -396,6 +397,10 @@ function NovoContratoForm({
   const [editarPaciente, setEditarPaciente] = useState<null | {
     alvo: "titular" | number;
     focus?: "email" | "telefone";
+  }>(null);
+  const [quickCreate, setQuickCreate] = useState<null | {
+    alvo: "titular" | "dependente";
+    nome: string;
   }>(null);
   const gerarBoletosFn = useServerFn(gerarBoletosContrato);
   // Duplicidade: verifica se titular já tem contrato ativo nesta clínica
