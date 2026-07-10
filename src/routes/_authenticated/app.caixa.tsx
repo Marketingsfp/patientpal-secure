@@ -1145,6 +1145,51 @@ function Page() {
     void load();
   };
 
+  const fecharCaixaAlheia = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!fecharAlheia || !clinicaAtual || !user) return;
+    if (!obsFecharAlheia.trim()) {
+      toast.error("Informe uma observação/justificativa");
+      return;
+    }
+    const s = fecharAlheia;
+    const calc = calcSaldoSessao(s.id);
+    const informado = Number(valorInformadoAlheia) || 0;
+    const diff = informado - calc;
+    const gestorNome = user.user_metadata?.nome || user.email || "gestor";
+    const prefixo = `[FECHADO PELO GESTOR ${String(gestorNome).toUpperCase()}]`;
+    const obsFinal = `${prefixo} ${obsFecharAlheia.trim()}`;
+    setSavingAlheia(true);
+    const { error } = await supabase
+      .from("caixa_sessoes")
+      .update({
+        status: "fechado",
+        fechado_em: new Date().toISOString(),
+        valor_fechamento_informado: informado,
+        valor_fechamento_calculado: calc,
+        diferenca: diff,
+        observacoes: s.observacoes ? `${s.observacoes} | ${obsFinal}` : obsFinal,
+      })
+      .eq("id", s.id);
+    if (!error) {
+      await supabase.from("caixa_movimentos").insert({
+        sessao_id: s.id,
+        clinica_id: clinicaAtual.clinica_id,
+        user_id: s.user_id,
+        tipo: "fechamento",
+        valor: informado,
+        descricao: `${prefixo} Calculado: ${fmt(calc)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}${obsFecharAlheia.trim() ? " · " + obsFecharAlheia.trim() : ""}`,
+      });
+    }
+    setSavingAlheia(false);
+    if (error) { mostrarErro(error); return; }
+    setFecharAlheia(null);
+    setValorInformadoAlheia("");
+    setObsFecharAlheia("");
+    toast.success("Caixa do operador fechado");
+    void loadTodos();
+  };
+
   const verDetalhe = async (s: Sessao) => {
     setOpenDetalhe(s);
     const { data } = await supabase
