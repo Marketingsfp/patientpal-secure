@@ -1286,6 +1286,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       toast.error("Taxa de adesão inválida");
       return;
     }
+    const dataInicioAntiga = (contrato as any).data_inicio as string | null;
     setSavingAdm(true);
     const { error } = await supabase
       .from("contratos_assinatura")
@@ -1312,6 +1313,80 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     (contrato as any).forma_pagamento = admForma || null;
     (contrato as any).observacoes = admObs || null;
     toast.success("Contrato atualizado.");
+    await load();
+    // Se a data de início foi movida para o passado, oferecer regeneração com parcelas pagas.
+    if (dataInicioAntiga && admDataInicio < dataInicioAntiga) {
+      const hoje = new Date();
+      const primDoMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const ini = new Date(admDataInicio + "T00:00:00");
+      const iniMes = new Date(ini.getFullYear(), ini.getMonth(), 1);
+      if (iniMes < primDoMesAtual) {
+        const mesesCheios = (primDoMesAtual.getFullYear() - iniMes.getFullYear()) * 12 + (primDoMesAtual.getMonth() - iniMes.getMonth());
+        const sugestao = Math.max(0, Math.min(12, mesesCheios));
+        setRetroDialog({ open: true, parcelasPagas: String(sugestao), dataInicio: admDataInicio });
+      }
+    }
+  };
+
+  // Regenera as 12 parcelas a partir da nova data de início; as N primeiras entram como pagas.
+  const regerarComPagas = async (n: number) => {
+    if (!retroDialog) return;
+    const iniStr = retroDialog.dataInicio;
+    if (!iniStr) return;
+    const dia = Math.max(1, Math.min(31, Number((contrato as any).dia_vencimento) || 10));
+    const valor = Number((contrato as any).valor_mensal ?? 0);
+    const pagas = Math.max(0, Math.min(12, Math.floor(n)));
+    setRegerandoRetro(true);
+    // 1) Apaga pendentes existentes
+    const { error: delErr } = await supabase
+      .from("contrato_mensalidades")
+      .delete()
+      .eq("contrato_id", contrato.id)
+      .eq("status", "pendente");
+    if (delErr) {
+      setRegerandoRetro(false);
+      return mostrarErro(delErr);
+    }
+    // 2) Próximo número de parcela
+    const { data: maxRow } = await supabase
+      .from("contrato_mensalidades")
+      .select("numero_parcela")
+      .eq("contrato_id", contrato.id)
+      .order("numero_parcela", { ascending: false })
+      .limit(1);
+    let prox = ((maxRow?.[0]?.numero_parcela ?? 0) as number) + 1;
+    // 3) Gera 12 parcelas a partir do mês da nova data de início
+    const ini = new Date(iniStr + "T00:00:00");
+    const baseAno = ini.getFullYear();
+    const baseMes = ini.getMonth();
+    const rows: any[] = [];
+    for (let i = 0; i < 12; i++) {
+      const ref = new Date(baseAno, baseMes + i, 1);
+      const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
+      const d = Math.min(dia, lastDay);
+      const venc = new Date(ref.getFullYear(), ref.getMonth(), d);
+      const vencIso = venc.toISOString().slice(0, 10);
+      const paga = i < pagas;
+      rows.push({
+        contrato_id: contrato.id,
+        clinica_id: (contrato as any).clinica_id,
+        numero_parcela: prox++,
+        vencimento: vencIso,
+        valor,
+        status: paga ? "pago" : "pendente",
+        pago_em: paga ? vencIso : null,
+        valor_pago: paga ? valor : null,
+      });
+    }
+    const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows);
+    setRegerandoRetro(false);
+    if (insErr) return mostrarErro(insErr, "falha ao gerar parcelas");
+    setRetroDialog(null);
+    toast.success(
+      pagas > 0
+        ? `${pagas} parcela${pagas === 1 ? "" : "s"} marcada${pagas === 1 ? "" : "s"} como paga${pagas === 1 ? "" : "s"} e ${12 - pagas} pendente${12 - pagas === 1 ? "" : "s"} gerada${12 - pagas === 1 ? "" : "s"}.`
+        : "12 parcelas pendentes geradas.",
+    );
     await load();
   };
 
