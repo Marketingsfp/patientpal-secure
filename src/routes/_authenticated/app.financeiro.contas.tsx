@@ -27,14 +27,19 @@ interface Conta {
   bandeira: string | null;
 }
 const EMPTY = { nome: "", tipo: "banco", banco: "", agencia: "", conta: "", saldo_inicial: "0", bandeira: "" };
+// Badges de texto SVG para bandeiras que não estão no simpleicons (Elo, Hipercard).
+const textBadge = (text: string, bg: string, fg = "#fff") => {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 24'><rect width='60' height='24' rx='4' fill='${bg}'/><text x='30' y='16' font-family='Arial,Helvetica,sans-serif' font-size='11' font-weight='700' fill='${fg}' text-anchor='middle'>${text}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+};
 const BANDEIRAS = [
   { value: "visa", label: "Visa", icon: "https://cdn.simpleicons.org/visa" },
   { value: "mastercard", label: "Mastercard", icon: "https://cdn.simpleicons.org/mastercard" },
-  { value: "elo", label: "Elo", icon: "https://cdn.simpleicons.org/elo" },
+  { value: "elo", label: "Elo", icon: textBadge("ELO", "#000") },
   { value: "amex", label: "American Express", icon: "https://cdn.simpleicons.org/americanexpress" },
-  { value: "hipercard", label: "Hipercard", icon: null },
+  { value: "hipercard", label: "Hipercard", icon: textBadge("HIPER", "#B3131B") },
   { value: "diners", label: "Diners", icon: "https://cdn.simpleicons.org/dinersclub" },
-  { value: "outra", label: "Outra", icon: null },
+  { value: "outra", label: "Outra", icon: null as string | null },
 ];
 function BandeiraIcon({ value, className = "h-4 w-6" }: { value: string | null | undefined; className?: string }) {
   const b = BANDEIRAS.find((x) => x.value === value);
