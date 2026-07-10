@@ -30,6 +30,7 @@ interface Funcionario {
   nome: string;
   role: string;
   ativo: boolean;
+  medicoPendente?: boolean;
 }
 
 interface Medico {
@@ -67,18 +68,24 @@ function EquipePage() {
     if (!clinicaAtual) return;
     setLoading(true);
     void Promise.all([
+      // Todos os vínculos, inclusive role="medico": um perfil trocado para
+      // Médico só deve sair da lista de Funcionários quando o cadastro em
+      // `medicos` (CRM etc.) já existir — antes disso, some da lista de
+      // Funcionários E não aparece em Médicos por falta desse registro,
+      // desaparecendo do sistema por completo. Ver filtro abaixo.
       supabase
         .from("clinica_memberships")
         .select("id, user_id, role, ativo")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .neq("role", "medico"),
+        .eq("clinica_id", clinicaAtual.clinica_id),
       supabase
         .from("medicos")
-        .select("id, nome, crm, crm_uf, email, telefone, ativo")
+        .select("id, user_id, nome, crm, crm_uf, email, telefone, ativo")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .order("nome"),
     ]).then(async ([f, m]) => {
       const mems = (f.data ?? []) as Array<{ id: string; user_id: string; role: string; ativo: boolean }>;
+      const medicosRaw = (m.data ?? []) as Array<{ user_id: string | null }>;
+      const medicosUserIds = new Set(medicosRaw.map((x) => x.user_id).filter((x): x is string => !!x));
       const ids = Array.from(new Set(mems.map((x) => x.user_id)));
       const nomeMap = new Map<string, string>();
       if (ids.length) {
@@ -91,10 +98,14 @@ function EquipePage() {
         nome: nomeMap.get(r.user_id) ?? "(sem nome)",
         role: r.role,
         ativo: r.ativo,
+        medicoPendente: r.role === "medico" && !medicosUserIds.has(r.user_id),
       }));
       allRows.sort((a, b) => a.nome.localeCompare(b.nome));
       const enfRows = allRows.filter((r) => r.role === "enfermeiro");
-      setFuncionarios(allRows.filter((r) => r.role !== "enfermeiro"));
+      // Exclui da lista de Funcionários apenas quem é médico E já tem
+      // cadastro completo em `medicos` (aparece só na aba Médicos). Médico
+      // "pendente" (sem CRM cadastrado ainda) continua visível aqui.
+      setFuncionarios(allRows.filter((r) => r.role !== "enfermeiro" && !(r.role === "medico" && medicosUserIds.has(r.user_id))));
 
       // Carrega vínculos de agendas para enfermeiros
       let agendasMap = new Map<string, string[]>();
@@ -229,7 +240,14 @@ function EquipePage() {
                   {funcsFiltrados.map((f) => (
                     <TableRow key={f.id}>
                       <TableCell>{f.nome}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground capitalize">{f.role}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground capitalize">
+                        {f.role}
+                        {f.medicoPendente && (
+                          <Badge variant="destructive" className="ml-2 align-middle">
+                            Cadastro de médico pendente (falta CRM)
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={f.ativo ? "default" : "outline"}>{f.ativo ? "Ativo" : "Inativo"}</Badge>
                       </TableCell>
