@@ -1,39 +1,32 @@
 ## Objetivo
 
-Trocar o campo "Forma de pagamento" no diálogo "Novo lançamento" (Financeiro → Mov. Caixa) de um `<Input>` de texto livre por um `<Select>` com as opções padrão já usadas no sistema.
+No diálogo "Novo lançamento" (Financeiro → Mov. Caixa), adicionar um campo novo **antes** do "Valor" que controla como a Descrição é preenchida.
 
-## Onde
+## Mudanças
 
-Arquivo: `src/routes/_authenticated/app.financeiro.movimento.tsx` (linhas 607-608, dentro do diálogo "Novo lançamento" / edição de lançamento).
+**Arquivo:** `src/routes/_authenticated/app.financeiro.movimento.tsx`
 
-## Opções da lista
+1. **Novo estado** `referenteA: "medico" | "funcionario" | "outros"` (default: `"outros"`) no `form`/`EMPTY`. Ao abrir o diálogo em modo edição, inferir o valor: se a descrição bate com um médico cadastrado → `medico`; se bate com um funcionário → `funcionario`; senão → `outros`.
 
-Reaproveitando exatamente os mesmos valores usados em `src/components/financeiro/lancamento-dialog.tsx` (para manter consistência com filtros, relatórios e caixa):
+2. **Carregar listas** ao montar a página (junto dos outros `useEffect` de refs por clínica):
+   - `medicos`: `select id, nome from medicos where clinica_id = ... and ativo = true order by nome`
+   - `funcionarios`: nomes de `profiles` de `clinica_memberships` com role ≠ `paciente`/`medico` e ativos (mesmo padrão já usado na página Equipe). Ordenar por nome, remover duplicados.
 
-- Dinheiro → `dinheiro`
-- Pix → `pix`
-- Cartão Crédito → `cartao_credito`
-- Cartão Débito → `cartao_debito`
-- Boleto → `boleto`
-- Convênio → `convenio`
-- Transferência → `transferencia`
+3. **Novo campo no formulário**, inserido logo abaixo do par "Tipo / Data" e acima da Descrição:
+   ```
+   Label: "Referente a"
+   Select com opções: Médico | Funcionário | Outros
+   ```
+   Ao trocar o valor, limpar `form.descricao`.
 
-Mais uma opção "— (não informar)" para permitir salvar vazio (mantém compatibilidade com o comportamento atual do campo, que aceita nulo).
+4. **Campo Descrição condicional:**
+   - `referenteA === "medico"` → `Select` listando `medicos.nome` (grava o nome como string em `form.descricao`). Se a descrição atual não estiver na lista (edição legada), preserva como opção extra, igual ao padrão já usado em "Forma de pagamento".
+   - `referenteA === "funcionario"` → `Select` listando funcionários (mesmo padrão).
+   - `referenteA === "outros"` → mantém o `<Input>` de texto livre atual.
 
-## Mudança de UI
-
-Substituir:
-
-```tsx
-<Input value={form.forma_pagamento}
-       onChange={(e) => setForm({ ...form, forma_pagamento: e.target.value })}
-       placeholder="Pix, cartão, dinheiro..." />
-```
-
-Por um `<Select>` (padrão shadcn já importado no arquivo) com os itens acima. O valor salvo continua indo em `forma_pagamento` (string ou `null`), sem mudança no banco nem no fluxo de salvar.
+5. **Sem alterações em lógica de negócio:** o valor salvo em `fin_lancamentos.descricao` continua sendo uma string simples. Nenhum novo campo no banco. Nenhuma alteração em filtros, tabela, export ou permissões.
 
 ## Observações
 
-- Não altera categorias, contas, status, nem qualquer regra de negócio.
-- Lançamentos antigos que tenham valores fora dessa lista (ex.: "maestro", "caixa") continuarão sendo exibidos normalmente em tabelas/filtros; só o formulário de novo/edição passa a oferecer a lista fixa.
-- Se um lançamento existente for aberto para edição com forma fora da lista, o Select mostra o valor bruto até o usuário escolher outro (comportamento padrão do shadcn Select).
+- O campo "Referente a" é apenas auxiliar de UI para escolher entre lista/texto livre; não é persistido.
+- Lançamentos existentes continuam a exibir/editar normalmente (fallback para "Outros" quando a descrição não bate com nenhum médico/funcionário conhecido).
