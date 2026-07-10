@@ -1217,12 +1217,17 @@ function Page() {
     if (!minhaSessao || !clinicaAtual || !user) return;
     const informado = Number(valorInformado) || 0;
     const diff = informado - saldoAtual;
+    // Data escolhida pelo operador — usa 23:59:59 local desse dia para preservar o dia contábil.
+    const hoje = new Date().toISOString().slice(0, 10);
+    const fechadoEmISO = dataFechamento && dataFechamento !== hoje
+      ? new Date(`${dataFechamento}T23:59:59`).toISOString()
+      : new Date().toISOString();
     setSaving(true);
     const { error } = await supabase
       .from("caixa_sessoes")
       .update({
         status: "fechado",
-        fechado_em: new Date().toISOString(),
+        fechado_em: fechadoEmISO,
         valor_fechamento_informado: informado,
         valor_fechamento_calculado: saldoAtual,
         diferenca: diff,
@@ -1238,6 +1243,7 @@ function Page() {
         user_id: user.id,
         tipo: "fechamento",
         valor: informado,
+        created_at: fechadoEmISO,
         descricao: `Fechamento. Calculado: ${fmt(saldoAtual)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}`,
       });
     }
@@ -1246,6 +1252,7 @@ function Page() {
     setOpenFechar(false);
     const obsFinal = obsFechamento;
     setValorInformado(""); setObsFechamento(""); setConferidoOwn({});
+    setDataFechamento(new Date().toISOString().slice(0, 10));
     toast.success("Caixa fechado");
     // Total recebido por forma de pagamento na sessão — normaliza aliases e
     // decompõe "misto" consultando observacoes do lançamento.
