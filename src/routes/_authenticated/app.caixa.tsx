@@ -231,6 +231,10 @@ function Page() {
   const { user } = useAuth();
   const podeEscrever = usePodeEscrever("caixa");
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
+  const podeLancarRecebDespesa =
+    clinicaAtual?.role === "admin" ||
+    clinicaAtual?.role === "gestor" ||
+    clinicaAtual?.role === "financeiro";
 
   const [tab, setTab] = useState<"meu" | "todos" | "repasse">("meu");
   const [estornoFor, setEstornoFor] = useState<Mov | null>(null);
@@ -1241,7 +1245,7 @@ function Page() {
         <TabsList>
           <TabsTrigger value="meu">Meu caixa</TabsTrigger>
           {isManager && <TabsTrigger value="todos"><Users className="h-4 w-4 mr-1" /> Todos (Financeiro)</TabsTrigger>}
-          <TabsTrigger value="repasse"><HandCoins className="h-4 w-4 mr-1" /> Repasse médico</TabsTrigger>
+          {podeLancarRecebDespesa && <TabsTrigger value="repasse"><HandCoins className="h-4 w-4 mr-1" /> Repasse médico</TabsTrigger>}
         </TabsList>
 
         {/* ===================== MEU CAIXA ===================== */}
@@ -1332,12 +1336,16 @@ function Page() {
                 <Button variant="outline" onClick={() => setOpenMov({ tipo: "sangria" })}>
                   <ArrowUpFromLine className="h-4 w-4 mr-2 text-rose-600" /> Sangria
                 </Button>
-                <Button variant="outline" onClick={() => setOpenMov({ tipo: "recebimento" })}>
-                  <PlusCircle className="h-4 w-4 mr-2 text-emerald-600" /> Recebimento
-                </Button>
-                <Button variant="outline" onClick={() => setOpenMov({ tipo: "despesa" })}>
-                  <MinusCircle className="h-4 w-4 mr-2 text-rose-600" /> Despesa
-                </Button>
+                {podeLancarRecebDespesa && (
+                  <>
+                    <Button variant="outline" onClick={() => setOpenMov({ tipo: "recebimento" })}>
+                      <PlusCircle className="h-4 w-4 mr-2 text-emerald-600" /> Recebimento
+                    </Button>
+                    <Button variant="outline" onClick={() => setOpenMov({ tipo: "despesa" })}>
+                      <MinusCircle className="h-4 w-4 mr-2 text-rose-600" /> Despesa
+                    </Button>
+                  </>
+                )}
                 <div className="flex-1" />
                 <Button variant="destructive" onClick={() => { setValorInformado(saldoAtual.toFixed(2)); setOpenFechar(true); }}>
                   <Lock className="h-4 w-4 mr-2" /> Fechar caixa

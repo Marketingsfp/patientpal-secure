@@ -1,18 +1,39 @@
-## Corrigir manualmente o repasse do atendimento da Vanderlea
+## Objetivo
 
-**Diagnóstico:** O lançamento `707961b6-edaf-4689-8f2f-5bf44188298a` (Vanderlea Pereira, TESTE ERGOMETRICO, 09/07/26) tem na descrição "CARTAO CONSULTA + SEGUROS (LIMITE ATINGIDO)". A tela detecta "CARTÃO CONSULTA" e aplica o repasse de Cartão Benefícios do médico (`cb_valor_repasse = R$ 0`), em vez do repasse padrão (R$ 175,00).
+Trocar o campo "Forma de pagamento" no diálogo "Novo lançamento" (Financeiro → Mov. Caixa) de um `<Input>` de texto livre por um `<Select>` com as opções padrão já usadas no sistema.
 
-## Ação
+## Onde
 
-Como o pagamento real foi por cartão/seguro (limite do cartão consulta foi atingido), remover o rótulo "CARTAO CONSULTA" da descrição do lançamento para que o cálculo caia no repasse padrão do médico (R$ 175,00).
+Arquivo: `src/routes/_authenticated/app.financeiro.movimento.tsx` (linhas 607-608, dentro do diálogo "Novo lançamento" / edição de lançamento).
 
-- Alterar `fin_lancamentos.descricao` de:
-  - `VANDERLEA PEREIRA DA SILVA DE OLIVEIRA — TESTE ERGOMETRICO — CARTAO CONSULTA + SEGUROS (LIMITE ATINGIDO)`
-  - para:
-  - `VANDERLEA PEREIRA DA SILVA DE OLIVEIRA — TESTE ERGOMETRICO — SEGUROS (LIMITE CARTAO CONSULTA ATINGIDO)`
+## Opções da lista
 
-A palavra "CARTAO CONSULTA" deixa de estar contígua, então a função `isCartaoConsultaDesc` não a detecta e o repasse volta a R$ 175,00 automaticamente. Não altera nenhum outro registro nem regra do sistema.
+Reaproveitando exatamente os mesmos valores usados em `src/components/financeiro/lancamento-dialog.tsx` (para manter consistência com filtros, relatórios e caixa):
 
-## Verificação
+- Dinheiro → `dinheiro`
+- Pix → `pix`
+- Cartão Crédito → `cartao_credito`
+- Cartão Débito → `cartao_debito`
+- Boleto → `boleto`
+- Convênio → `convenio`
+- Transferência → `transferencia`
 
-Após a alteração, recarregar a tela **Financeiro → Atendimentos** e confirmar que a linha da Vanderlea passa a mostrar R$ 175,00 na coluna Médico e R$ 125,00 na coluna Clínica, com botão de seleção habilitado (deixa de exibir "Sem repasse").
+Mais uma opção "— (não informar)" para permitir salvar vazio (mantém compatibilidade com o comportamento atual do campo, que aceita nulo).
+
+## Mudança de UI
+
+Substituir:
+
+```tsx
+<Input value={form.forma_pagamento}
+       onChange={(e) => setForm({ ...form, forma_pagamento: e.target.value })}
+       placeholder="Pix, cartão, dinheiro..." />
+```
+
+Por um `<Select>` (padrão shadcn já importado no arquivo) com os itens acima. O valor salvo continua indo em `forma_pagamento` (string ou `null`), sem mudança no banco nem no fluxo de salvar.
+
+## Observações
+
+- Não altera categorias, contas, status, nem qualquer regra de negócio.
+- Lançamentos antigos que tenham valores fora dessa lista (ex.: "maestro", "caixa") continuarão sendo exibidos normalmente em tabelas/filtros; só o formulário de novo/edição passa a oferecer a lista fixa.
+- Se um lançamento existente for aberto para edição com forma fora da lista, o Select mostra o valor bruto até o usuário escolher outro (comportamento padrão do shadcn Select).

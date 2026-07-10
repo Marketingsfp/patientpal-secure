@@ -41,7 +41,7 @@ import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/di
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, UserMinus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, UserMinus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText, Undo2,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
@@ -3087,6 +3087,17 @@ function AgendaPage() {
     setEtapaMap((m) => { const n = new Map(m); n.set(a.id, "triagem"); return n; });
   };
 
+  const estornarCheckin = async (a: Agendamento) => {
+    if (!window.confirm("Desfazer check-in deste paciente? Ele voltará para 'aguardando recepção'.")) return;
+    const { error } = await supabase
+      .from("agendamentos")
+      .update({ fluxo_etapa: "aguardando_recepcao", fluxo_atualizado_em: new Date().toISOString() } as never)
+      .eq("id", a.id);
+    if (error) { mostrarErro(error); return; }
+    toast.success("Check-in estornado");
+    setEtapaMap((m) => { const n = new Map(m); n.set(a.id, "aguardando_recepcao"); return n; });
+  };
+
   const escolherForma = (op: FormaOpcao) => {
     if (!formaPagCtx) return;
     const ids = formaPagCtx.agId.split(",").filter(Boolean);
@@ -5103,6 +5114,11 @@ function AgendaPage() {
                         {!isSlotLivre(a.paciente_nome) && a.status !== "realizado" && (
                           <DropdownMenuItem onClick={() => confirmarPresenca(a)}>
                             <BadgeCheck className="h-4 w-4 mr-2 text-emerald-600" /> Presente na clínica
+                          </DropdownMenuItem>
+                        )}
+                        {!isSlotLivre(a.paciente_nome) && a.status !== "realizado" && etapaMap.get(a.id) === "triagem" && (
+                          <DropdownMenuItem onClick={() => estornarCheckin(a)}>
+                            <Undo2 className="h-4 w-4 mr-2 text-amber-600" /> Estornar check-in
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem

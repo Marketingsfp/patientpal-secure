@@ -605,7 +605,27 @@ function Page() {
                   </Select></div>
               </div>
               <div className="space-y-2"><Label>Forma de pagamento</Label>
-                <Input value={form.forma_pagamento} onChange={(e) => setForm({ ...form, forma_pagamento: e.target.value })} placeholder="Pix, cartão, dinheiro..." /></div>
+                <Select
+                  value={form.forma_pagamento || "none"}
+                  onValueChange={(v) => setForm({ ...form, forma_pagamento: v === "none" ? "" : v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">—</SelectItem>
+                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                    <SelectItem value="pix">Pix</SelectItem>
+                    <SelectItem value="cartao_credito">Cartão Crédito</SelectItem>
+                    <SelectItem value="cartao_debito">Cartão Débito</SelectItem>
+                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="convenio">Convênio</SelectItem>
+                    <SelectItem value="transferencia">Transferência</SelectItem>
+                    {form.forma_pagamento &&
+                      !["dinheiro","pix","cartao_credito","cartao_debito","boleto","convenio","transferencia"].includes(form.forma_pagamento) && (
+                      <SelectItem value={form.forma_pagamento}>{form.forma_pagamento}</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2"><Label>Observações</Label>
                 <Textarea rows={2} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></div>
               <DialogFooter><Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button></DialogFooter>
@@ -774,7 +794,7 @@ function Page() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="Estornar"
+                        title="Estornar lançamento — mantém o registro no histórico com status 'cancelado' e desvincula o laudo (recomendado para repasses)."
                         disabled={estornando === l.id}
                         onClick={() => estornar(l)}
                       >
@@ -783,8 +803,8 @@ function Page() {
                     ) : null}
                     {podeEscrever && l.origem !== "caixa" ? (
                       <>
-                        <Button variant="ghost" size="icon" title="Editar" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
-                        <Button variant="ghost" size="icon" title="Excluir" onClick={() => remove(l)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                        <Button variant="ghost" size="icon" title="Editar lançamento — alterar descrição, valor, categoria, conta ou forma de pagamento." onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" title="Excluir lançamento — remove definitivamente do banco (sem histórico). Use apenas para lançamentos criados por engano; para repasses prefira Estornar." onClick={() => remove(l)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                       </>
                     ) : null}
                   </div>
