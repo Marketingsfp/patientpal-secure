@@ -36,6 +36,14 @@ interface ConvenioRow {
   ativo: boolean;
 }
 
+interface LaudadorOption { id: string; nome: string; crm: string | null; crm_uf: string | null }
+interface LaudadorRow {
+  laudador_medico_id: string;
+  tipo_repasse: "percentual" | "valor";
+  percentual: string;
+  valor: string;
+}
+
 // Repasse individual agora é sempre vinculado a um serviço (ou categoria
 // sentinela auto-gerada). Não há seed de linhas avulsas.
 const CONVENIOS_PADRAO: ConvenioRow[] = [];
