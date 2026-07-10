@@ -642,6 +642,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       }
     } catch (e) {
       console.error("Falha ao registrar no caixa:", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.warning(
+        `Lançamento salvo, mas não foi possível registrar em Movimentos da Sessão: ${msg}`,
+      );
     }
     onSavedWithData?.({
       valor: Number(valor),
