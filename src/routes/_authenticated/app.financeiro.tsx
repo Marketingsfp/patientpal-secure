@@ -17,7 +17,6 @@ const subnav = [
   { to: "/app/financeiro/bi", label: "BI", icon: BarChart3 },
   { to: "/app/financeiro/analitico", label: "Analítico", icon: LineChart },
   { to: "/app/financeiro/atendimentos", label: "Atendimentos", icon: Stethoscope },
-  { to: "/app/financeiro/laudos-ecg", label: "Laudos ECG", icon: ScrollText },
   { to: "/app/financeiro/estorno", label: "Estorno", icon: Undo2 },
   { to: "/app/financeiro/empresas", label: "Empresas", icon: Building },
   { to: "/app/financeiro/notas", label: "Notas Pacientes", icon: FileText },
