@@ -28,14 +28,19 @@ interface Conta {
 }
 const EMPTY = { nome: "", tipo: "banco", banco: "", agencia: "", conta: "", saldo_inicial: "0", bandeira: "" };
 const BANDEIRAS = [
-  { value: "visa", label: "Visa" },
-  { value: "mastercard", label: "Mastercard" },
-  { value: "elo", label: "Elo" },
-  { value: "amex", label: "American Express" },
-  { value: "hipercard", label: "Hipercard" },
-  { value: "diners", label: "Diners" },
-  { value: "outra", label: "Outra" },
+  { value: "visa", label: "Visa", icon: "https://cdn.simpleicons.org/visa" },
+  { value: "mastercard", label: "Mastercard", icon: "https://cdn.simpleicons.org/mastercard" },
+  { value: "elo", label: "Elo", icon: "https://cdn.simpleicons.org/elo" },
+  { value: "amex", label: "American Express", icon: "https://cdn.simpleicons.org/americanexpress" },
+  { value: "hipercard", label: "Hipercard", icon: null },
+  { value: "diners", label: "Diners", icon: "https://cdn.simpleicons.org/dinersclub" },
+  { value: "outra", label: "Outra", icon: null },
 ];
+function BandeiraIcon({ value, className = "h-4 w-6" }: { value: string | null | undefined; className?: string }) {
+  const b = BANDEIRAS.find((x) => x.value === value);
+  if (!b?.icon) return <CreditCard className={className} />;
+  return <img src={b.icon} alt={b.label} className={`${className} object-contain`} />;
+}
 const tipoUsaBandeira = (t: string) => t === "cartao" || t === "maquininha";
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
