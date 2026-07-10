@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, Wallet, Pencil, Trash2 } from "lucide-react";
+import { Plus, Wallet, Pencil, Trash2, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,14 +28,19 @@ interface Conta {
 }
 const EMPTY = { nome: "", tipo: "banco", banco: "", agencia: "", conta: "", saldo_inicial: "0", bandeira: "" };
 const BANDEIRAS = [
-  { value: "visa", label: "Visa" },
-  { value: "mastercard", label: "Mastercard" },
-  { value: "elo", label: "Elo" },
-  { value: "amex", label: "American Express" },
-  { value: "hipercard", label: "Hipercard" },
-  { value: "diners", label: "Diners" },
-  { value: "outra", label: "Outra" },
+  { value: "visa", label: "Visa", icon: "https://cdn.simpleicons.org/visa" },
+  { value: "mastercard", label: "Mastercard", icon: "https://cdn.simpleicons.org/mastercard" },
+  { value: "elo", label: "Elo", icon: "https://cdn.simpleicons.org/elo" },
+  { value: "amex", label: "American Express", icon: "https://cdn.simpleicons.org/americanexpress" },
+  { value: "hipercard", label: "Hipercard", icon: null },
+  { value: "diners", label: "Diners", icon: "https://cdn.simpleicons.org/dinersclub" },
+  { value: "outra", label: "Outra", icon: null },
 ];
+function BandeiraIcon({ value, className = "h-4 w-6" }: { value: string | null | undefined; className?: string }) {
+  const b = BANDEIRAS.find((x) => x.value === value);
+  if (!b?.icon) return <CreditCard className={className} />;
+  return <img src={b.icon} alt={b.label} className={`${className} object-contain`} />;
+}
 const tipoUsaBandeira = (t: string) => t === "cartao" || t === "maquininha";
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -123,7 +128,12 @@ function Page() {
                     <SelectTrigger><SelectValue placeholder="Selecione a bandeira" /></SelectTrigger>
                     <SelectContent>
                       {BANDEIRAS.map((b) => (
-                        <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>
+                        <SelectItem key={b.value} value={b.value}>
+                          <span className="flex items-center gap-2">
+                            <BandeiraIcon value={b.value} />
+                            {b.label}
+                          </span>
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -157,7 +167,10 @@ function Page() {
                     <h3 className="font-semibold truncate">{c.nome}</h3>
                     <Badge variant="secondary" className="mt-1">{c.tipo}</Badge>
                     {c.bandeira && (
-                      <p className="text-xs text-muted-foreground mt-1 uppercase">{BANDEIRAS.find((b) => b.value === c.bandeira)?.label ?? c.bandeira}</p>
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                        <BandeiraIcon value={c.bandeira} />
+                        {BANDEIRAS.find((b) => b.value === c.bandeira)?.label ?? c.bandeira}
+                      </p>
                     )}
                     {c.banco && <p className="text-sm text-muted-foreground mt-2">{c.banco} {c.agencia && `Ag. ${c.agencia}`} {c.conta && `Cc. ${c.conta}`}</p>}
                     <p className="text-sm mt-2">Saldo inicial: <strong>{fmt(Number(c.saldo_inicial))}</strong></p>
