@@ -165,11 +165,6 @@ function NfsePage() {
     return Array.from(porEmitente.values());
   }, [filtrados]);
 
-  const emitidasComPdf = useMemo(
-    () => filtrados.filter((r) => r.status === "emitida" && !!r.url_pdf).slice(0, 4),
-    [filtrados],
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -223,36 +218,6 @@ function NfsePage() {
           </div>
         )}
       </div>
-
-      {emitidasComPdf.length > 0 && (
-        <div className="rounded-lg border bg-card p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-medium">DANFSE — últimas emitidas ({emitidasComPdf.length})</div>
-            <div className="text-xs text-muted-foreground">Pré-visualização dos PDFs</div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {emitidasComPdf.map((r) => (
-              <div key={r.id} className="border rounded-md overflow-hidden bg-muted/20 flex flex-col">
-                <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/40 text-xs">
-                  <div className="truncate">
-                    <span className="font-medium">Nº {r.numero ?? "—"}</span>
-                    <span className="text-muted-foreground"> · {r.tomador_nome ?? "—"} · {Number(r.valor_servicos).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
-                  </div>
-                  <div className="flex gap-1 shrink-0">
-                    <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => setPdfVisualizando(r)} title="Ampliar">
-                      <Eye className="h-3.5 w-3.5" />
-                    </Button>
-                    <a href={r.url_pdf!} target="_blank" rel="noreferrer" title="Abrir em nova aba" className="inline-flex items-center px-2 rounded hover:bg-accent text-primary">
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  </div>
-                </div>
-                <PdfPreview nfseId={r.id} baixar={baixarArquivo} className="w-full h-[480px] bg-white" title={`DANFSE ${r.numero ?? r.id}`} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="rounded-lg border bg-card overflow-hidden">
         <Table>

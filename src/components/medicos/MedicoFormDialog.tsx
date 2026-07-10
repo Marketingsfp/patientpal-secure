@@ -1457,9 +1457,16 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                 </select>
                               </td>
                               <td className="px-2 py-1">
-                                <Input type="number" step="0.01" min={0}
-                                  value={c.tipo_repasse === "percentual" ? c.percentual : c.valor}
-                                  onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? (c.tipo_repasse === "percentual" ? { ...x, percentual: e.target.value } : { ...x, valor: e.target.value }) : x))} />
+                                {c.tipo_repasse === "percentual" ? (
+                                  <Input type="number" step="0.01" min={0}
+                                    value={c.percentual}
+                                    onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, percentual: e.target.value } : x))} />
+                                ) : (
+                                  <CurrencyInput
+                                    value={c.valor}
+                                    onChange={(v) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, valor: v } : x))}
+                                  />
+                                )}
                               </td>
                               <td className="px-2 py-1 text-right">
                                 {catLbl || servicoLbl ? null : (
@@ -1546,17 +1553,22 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                   </select>
                                 </td>
                                 <td className="px-2 py-1">
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    min={0}
-                                    max={tipo === "percentual" ? 100 : undefined}
-                                    placeholder={tipo === "percentual" ? "% do faturado" : "R$ por exame"}
-                                    value={value}
-                                    onChange={(e) => setRow(tipo === "percentual"
-                                      ? { percentual: e.target.value }
-                                      : { valor: e.target.value })}
-                                  />
+                                  {tipo === "percentual" ? (
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      min={0}
+                                      max={100}
+                                      placeholder="% do faturado"
+                                      value={value}
+                                      onChange={(e) => setRow({ percentual: e.target.value })}
+                                    />
+                                  ) : (
+                                    <CurrencyInput
+                                      value={value}
+                                      onChange={(v) => setRow({ valor: v })}
+                                    />
+                                  )}
                                 </td>
                                 <td className="px-2 py-1 text-right">
                                   <Button
