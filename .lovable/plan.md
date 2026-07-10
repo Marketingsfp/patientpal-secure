@@ -1,37 +1,32 @@
 ## Objetivo
-Em **Caixa → Movimentos da sessão**, separar o nome do serviço em uma coluna própria e adicionar a coluna **Médico**.
+Organizar o conteúdo da aba "Meu caixa" (rota `/app/caixa`) em 4 sub-abas para reduzir a poluição visual. Nenhuma regra de negócio, cálculo, permissão, filtro ou fluxo (recebimento, estorno, cobrança) é alterada — apenas o agrupamento visual.
 
-## Mudanças em `src/routes/_authenticated/app.caixa.tsx`
+## Sub-abas propostas (dentro de "Meu caixa")
 
-### 1. Enriquecer os movimentos após o `load()`
-Depois de carregar `movs` (linha ~406-411), fazer duas consultas em lote:
+1. **Saldo** (padrão ao entrar)
+   - 4 cards: Saldo atual, Abertura, Entradas, Saídas
+   - Card "Entradas por forma de pagamento" (Dinheiro/PIX/Débito/Crédito/etc.)
+   - Barra de ações: Suprimento · Sangria · Recebimento · Despesa · Fechar caixa
 
-- `fin_lancamentos` filtrando pelos `lancamento_id` presentes nos movimentos, selecionando `id, medico_id, agendamento_id, descricao`.
-- `medicos` para obter `nome` dos `medico_id` retornados.
-- Opcional: `agendamentos` → `procedimentos.nome` quando quisermos o nome oficial do procedimento (usaremos apenas se disponível; caso contrário caímos no parse da descrição).
+2. **Movimentos**
+   - Card "Movimentos da sessão / Movimentos de hoje" com o seletor de período (para gestor), tabela completa e todas as colunas atuais (Data, Hora, Tipo, Descrição, Serviço, Médico, Forma, Valor, Ação de estorno).
 
-Guardar num `Map<lancamento_id, { medico_nome, servico_nome }>` em estado (`enrichPorLanc`).
+3. **Histórico**
+   - Card "Meu histórico" (tabela de sessões anteriores do próprio operador com abertura/fechamento/diferença/detalhe).
 
-### 2. Derivar `servico` e `medico` para cada linha
-Função utilitária `deriveServicoMedico(m)`:
+4. **Aguardando**
+   - Card "Cobrança de pacientes (N aguardando)" com o grid de fichas e botão "Cobrar".
+   - Manter o mesmo comportamento do atalho `?receber=...` (abrir diálogo de cobrança).
 
-- Se `m.lancamento_id` e houver enriquecimento → usar `servico_nome` (procedimento do agendamento ou fin_lancamentos.descricao) e `medico_nome`.
-- Fallback (abertura/fechamento/sangria/estorno manual): parse de `m.descricao`
-  - Serviço: parte após `" — "` ou `" · "`, removendo sufixos entre parênteses de forma de pagamento (`(cartão …)`, `(pix)`, etc.). Se não houver separador → `—`.
-  - Médico: `—`.
-- Descrição exibida na coluna "Descrição": manter o texto original (paciente + contexto) — o serviço fica destacado na nova coluna.
+## Detalhes técnicos
+- Arquivo único: `src/routes/_authenticated/app.caixa.tsx`.
+- Envolver o conteúdo atual de `<TabsContent value="meu">` em um segundo `<Tabs>` interno com `defaultValue="saldo"` e `TabsList` com os 4 gatilhos.
+- Preservar o guard `!minhaSessao` (mostrando o card "Abrir caixa") acima das sub-abas — sem caixa aberto, as sub-abas ficam ocultas.
+- Preservar `loading`, estados, handlers, `enrichPorLanc`, `estornosPorLanc`, atalho `?receber=…`, exports e diálogos existentes.
+- Nenhum novo estado persistido; a sub-aba selecionada é apenas UI local (`useState`).
+- Sem mudanças nas abas "Todos (Financeiro)" e "Repasse médico".
 
-### 3. Tabela (linhas ~1304-1333)
-Cabeçalho passa a ser: `Data | Hora | Tipo | Descrição | Serviço | Médico | Forma | Valor | Ação`.
-
-Adicionar duas novas `<TableCell>` entre Descrição e Forma exibindo `servico || "—"` e `medico || "—"`.
-
-Atualizar `colSpan={7}` da linha vazia para `colSpan={9}`.
-
-### 4. Export Excel/PDF (linhas ~1037 e ~1080)
-Incluir colunas `Serviço` e `Médico` no CSV/Excel e no HTML de impressão, na mesma ordem da tabela.
-
-## Fora do escopo
-- Não altero a tabela "Histórico de sessões" nem a de Manager.
-- Sem mudanças no schema, cálculos, filtros ou fluxo de estorno.
-- Movimentos sem `lancamento_id` (abertura, fechamento, sangria) exibirão `—` em Médico.
+## Fora de escopo
+- Cálculos, RLS, schema, permissões, fluxo de estorno, impressão, KPIs.
+- Aba "Todos (Financeiro)" e "Repasse médico".
+- Feature flag `caixa_v2` / `CaixaShellV2` (essas telas não são tocadas).
