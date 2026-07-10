@@ -1,34 +1,42 @@
-Em **Caixa → Meu caixa → Movimentos**, adicionar filtros por médico e paciente e trocar o "Período" por um seletor com calendário (data inicial/final).
+## Diagnóstico
 
-## O que muda na UI
+Reproduzi o cenário via banco. Os itens do orçamento #202600023 estão cadastrados assim em `procedimentos`:
 
-Barra de filtros acima da tabela de movimentos (uma linha, com wrap em telas menores):
+| Item | grupo | tipo | tipo_procedimento |
+|---|---|---|---|
+| ACIDO URICO, HEPATOGRAMA | `Laboratório` | `exame` | `laboratorio` |
+| HEMOGRAMA, T4 LIVRE, TSH | `null` | `exame` | `laboratorio` |
+| FERRO SERICO, HB GLICOSILADA, LIPIDOGRAMA, VITAMINA B12, VITAMINA D, VDRL | `null` | `exame` | `null` (legado) |
 
-```text
-[ Período ▾  01/07/2026 → 10/07/2026 ]   [ Médico ▾ ]   [ Paciente 🔍 ______ ]   [ Limpar ]
-```
+Em `src/routes/_authenticated/app.agenda.tsx` (linhas ~2359-2418) o agrupamento usa apenas `grupo || tipo`, retornando três chaves distintas: `LABORATORIO`, `EXAME` e (para os sem `tipo_procedimento`) mais `EXAME`. Como `gruposDistintos.size > 1`, o dialog "Dividir orçamento" abre indevidamente e o mesmo agrupamento defeituoso replica no dialog (`agruparItens` em `src/components/agenda/dividir-orcamento-dialog.tsx`), gerando as 3 linhas visíveis na foto 2 com médicos aleatórios.
 
-- **Período** — botão que abre um `Popover` com um `Calendar` de intervalo (react-day-picker `mode="range"`), já usado em `src/components/date-range-filter.tsx`. Presets rápidos ao lado: Hoje, Última semana, Última quinzena, Último mês, Todos. Fim das opções "Intervalo personalizado" separado — o intervalo agora é o próprio botão.
-- **Médico** — `Select` com a lista distinta de médicos presentes nos movimentos carregados ("Todos" + nomes de `enrichPorLanc`).
-- **Paciente** — `Input` de busca livre; casa com o nome extraído da descrição (o padrão é `"NOME PACIENTE — SERVICO"`), case-insensitive.
-- **Limpar** — aparece quando algum filtro está ativo; volta a Hoje / Todos / vazio.
+Regra correta: quando **todos** os itens são de laboratório, o orçamento vai como **um único agendamento** para o médico "Laboratório", sem dialog de divisão.
 
-Comportamento:
-- Filtros são combinados (AND). Contador "N de M movimentos" ao lado do título quando há filtro ativo.
-- Vazio filtrado: mensagem "Nenhum movimento corresponde aos filtros" com botão "Limpar filtros".
-- Para não-gestor (visão "Movimentos de hoje") os filtros de médico e paciente também aparecem, mas o período permanece fixo em "Hoje" (regra atual mantida).
+## Correções
 
-## Onde mudar
+### 1. `src/routes/_authenticated/app.agenda.tsx` — fluxo `buscarOrcamento`
 
-Arquivo único: `src/routes/_authenticated/app.caixa.tsx`
+- No `SELECT` de `procedimentos` (~linha 2364) incluir `tipo_procedimento` além de `grupo, tipo`.
+- Reforçar `isLab(pid)`: considerar lab quando `tipo_procedimento === 'laboratorio'` **ou** (`grupo` normalizado = `LABORATORIO`) **ou** `tipo` = `EXAME`/`LABORATORIO` (mantém compatibilidade com cadastro legado sem `tipo_procedimento`).
+- Ajustar `grupoDe(pid)`: se `isLab(pid)` → retornar `"LABORATORIO"`; senão manter `norm(grupo) || norm(tipo) || "OUTROS"`. Isso unifica todos os exames de lab num único grupo mesmo com cadastros heterogêneos.
+- Após montar `gruposDistintos`, se `todosLab === true` **nunca** abrir o dialog de divisão; seguir sempre o fluxo de 1 grupo com `procStr = "LABORATÓRIO (N EXAMES): ..."`.
+- Pré-selecionar o médico "Laboratório" no `setForm(...)`: procurar em `medicos` o primeiro cujo nome normalizado inicie com `LABORATORIO`/`LABORATÓRIO` (o cadastro "DR(A). LABORATORIO" já existe na clínica). Se não existir, mostrar toast informando "Cadastre um profissional 'Laboratório' para agendar exames laboratoriais" e não travar (o usuário escolhe manualmente).
 
-1. Estender o estado do filtro (`meuPeriodo`, `meuDataIni`, `meuDataFim`) com `meuMedico: string` e `meuPaciente: string`.
-2. Ajustar `minhasMovsFiltrados` (useMemo) para aplicar médico (via `enrichPorLanc.get(lancamento_id)?.medico`) e paciente (extraído de `m.descricao` antes do `—`).
-3. Substituir o bloco atual do "Período" (linhas 1362–1402) pelo novo trio de controles usando `Popover` + `Calendar` do design system. Manter os presets como pequenos botões dentro do popover.
-4. Derivar `medicosDisponiveis` (Set ordenado a partir de `enrichPorLanc`) para popular o Select.
+### 2. `src/components/agenda/dividir-orcamento-dialog.tsx` — defesa em profundidade
 
-## Fora de escopo
+Mesmo com o guard acima, o dialog ainda existe para orçamentos mistos (consulta + lab + imagem). Para evitar sub-divisão de exames de lab em subgrupos quando o dialog abrir:
 
-- Nenhuma mudança na aba "Todos (Financeiro)" ou "Repasse médico" — só "Meu caixa → Movimentos".
-- Sem alteração de schema, RLS ou queries — filtragem 100% client-side sobre o que já é carregado.
-- Sem novo componente compartilhado; se `date-range-filter.tsx` servir direto, reutilizo; senão faço inline com `Popover + Calendar` já existentes no projeto.
+- Adicionar campo opcional `tipo_procedimento: string | null` em `DividirItem`.
+- Em `agruparItens`, para cada item calcular chave por prioridade: `LABORATORIO` se `tipo_procedimento === 'laboratorio'` (ou fallback `tipo === 'exame'` com `grupo` vazio) → todos exames de lab caem no mesmo grupo `LABORATORIO`; demais mantêm `norm(grupo) || norm(tipo) || "OUTROS"`.
+- Ao construir `itensRicos` no chamador, passar também `tipo_procedimento`.
+
+### 3. Prevenção para não repetir
+
+- Documentar em `docs/regras-negocio.md` (seção Agenda / Orçamentos): "Orçamento composto exclusivamente por procedimentos com `tipo_procedimento='laboratorio'` (ou legado `tipo='exame'`) gera **um único** agendamento vinculado ao profissional 'Laboratório'. Nunca aciona o fluxo de divisão."
+- Nada de mock/dados falsos. Não vou alterar cadastros existentes de `procedimentos`; a lógica passa a ser tolerante ao legado (`tipo_procedimento` nulo).
+
+## Verificação
+
+- Reagendar o orçamento #202600023 (após cancelar os 3 agendamentos criados erroneamente) e conferir: 1 agendamento com "LABORATÓRIO (11 EXAMES): ..." vinculado ao médico "Laboratório".
+- Rodar cenário misto (1 consulta + 3 exames de lab) e conferir que o dialog de divisão abre com 2 grupos: `CONSULTA` e `LABORATORIO` único.
+- Console limpo, sem regressão em orçamentos não-lab.
