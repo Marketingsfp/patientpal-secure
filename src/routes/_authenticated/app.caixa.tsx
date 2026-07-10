@@ -423,6 +423,11 @@ function Page() {
   const [obsFechamento, setObsFechamento] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Fechamento de caixa de OUTRO usuário (gestor/admin no tab "Todos").
+  const [openFecharTerceiro, setOpenFecharTerceiro] = useState<Sessao | null>(null);
+  const [informadoTerceiro, setInformadoTerceiro] = useState("");
+  const [obsTerceiro, setObsTerceiro] = useState("");
+
   // Atalho: 1..5 na modal de cobrança seleciona a forma da última linha
   useEffect(() => {
     if (!openCobranca) return;
