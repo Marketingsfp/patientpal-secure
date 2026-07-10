@@ -1179,8 +1179,6 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [incParentesco, setIncParentesco] = useState<string>("");
   const [incTipo, setIncTipo] = useState<string>("dependente");
   const [incSaving, setIncSaving] = useState(false);
-  const [incPacientes, setIncPacientes] = useState<PatientOption[]>([]);
-  const [incLoadingPac, setIncLoadingPac] = useState(false);
   const [excAlvo, setExcAlvo] = useState<Dep | null>(null);
   const [termoOpen, setTermoOpen] = useState(false);
   const [termoMovimento, setTermoMovimento] = useState<"Inclusão" | "Exclusão">("Inclusão");
@@ -1546,25 +1544,9 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     load(); /* eslint-disable-next-line */
   }, [contrato.id]);
 
-  // Carrega lista de pacientes da clínica do contrato ao abrir o diálogo
-  useEffect(() => {
-    if (!incOpen) return;
-    let cancelled = false;
-    (async () => {
-      setIncLoadingPac(true);
-      const { data } = await supabase
-        .from("pacientes")
-        .select("id, nome, cpf, telefone, data_nascimento, clinica_id")
-        .eq("clinica_id", (contrato as any).clinica_id)
-        .order("nome");
-      if (cancelled) return;
-      setIncPacientes((data ?? []) as PatientOption[]);
-      setIncLoadingPac(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [incOpen, contrato]);
+  // A seleção de paciente no diálogo "Incluir dependente" usa PatientSearchInput
+  // (busca sob demanda por nome/CPF/prontuário), então não pré-carregamos mais
+  // a lista inteira de pacientes da clínica aqui.
 
   const marcarPago = async (id: string, paga: boolean, forma?: string | null) => {
     const patch = paga
@@ -2613,34 +2595,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Paciente</Label>
-              <Select
-                value={incPaciente?.id ?? ""}
-                onValueChange={(id) => {
-                  const p = incPacientes.find((x) => x.id === id) ?? null;
-                  setIncPaciente(p);
-                }}
-                disabled={incLoadingPac}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={incLoadingPac ? "Carregando pacientes…" : "Selecione o paciente"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {(() => {
-                    const titularId = (contrato as any).paciente_id as string | undefined;
-                    const jaDep = new Set(depsAtivos.map((d) => d.paciente_id));
-                    const list = incPacientes.filter((p) => p.id !== titularId && !jaDep.has(p.id));
-                    if (list.length === 0) {
-                      return <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum paciente disponível</div>;
-                    }
-                    return list.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.nome}
-                        {p.cpf ? ` — ${p.cpf}` : ""}
-                      </SelectItem>
-                    ));
-                  })()}
-                </SelectContent>
-              </Select>
+              <PatientSearchInput
+                value={incPaciente}
+                onSelect={(p) => setIncPaciente(p)}
+                placeholder="Buscar paciente por nome, CPF ou prontuário…"
+              />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
