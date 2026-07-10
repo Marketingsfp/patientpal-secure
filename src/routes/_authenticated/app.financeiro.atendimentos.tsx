@@ -2233,7 +2233,7 @@ function Page() {
                               className="h-6 text-[10px] px-2"
                               onClick={() => openLaudo(a)}
                             >
-                              Pagar
+                              Vincular
                             </Button>
                           );
                         })()}
