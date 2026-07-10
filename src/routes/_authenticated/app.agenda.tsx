@@ -2174,7 +2174,7 @@ function AgendaPage() {
     const df = new Date(dataAlvo); df.setHours(23, 59, 59, 999);
     const { data: destinoRaw, error: eDest } = await supabase
       .from("agendamentos")
-      .select("id,paciente_id,paciente_nome,inicio,fim,medico_id,status")
+      .select("id,paciente_id,paciente_nome,inicio,fim,medico_id,status,procedimento")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("medico_id", slot.medico_id)
       .gte("inicio", di.toISOString())
@@ -2184,7 +2184,7 @@ function AgendaPage() {
     if (eDest) { mostrarErro(eDest); return; }
     const destino = (destinoRaw ?? []) as Array<{
       id: string; paciente_id: string | null; paciente_nome: string;
-      inicio: string; fim: string; medico_id: string | null; status: string;
+      inicio: string; fim: string; medico_id: string | null; status: string; procedimento: string | null;
     }>;
     const fichaInicial = destino.findIndex(s => s.id === slot.id) + 1;
     if (fichaInicial <= 0) { toast.error("Não foi possível localizar a ficha do slot escolhido."); return; }
