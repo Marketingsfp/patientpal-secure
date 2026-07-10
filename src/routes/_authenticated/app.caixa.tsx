@@ -959,6 +959,57 @@ function Page() {
     return r;
   }, [minhasMovs, mistoObs]);
 
+  // Quebra do "Saldo" por dia (com base em created_at das movimentações
+  // da sessão atual). Cada dia mostra entradas, saídas, saldo do dia e
+  // entradas agrupadas por forma de pagamento.
+  interface DiaResumo {
+    dia: string;                // YYYY-MM-DD
+    label: string;              // dd/mm/yyyy
+    entradas: number;
+    saidas: number;
+    saldo: number;
+    porForma: Record<string, number>;
+  }
+  const resumoPorDia = useMemo<DiaResumo[]>(() => {
+    const mapa = new Map<string, DiaResumo>();
+    const bucketInit = (): Record<string, number> => ({
+      dinheiro: 0, pix: 0, debito: 0, credito: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0,
+    });
+    for (const m of minhasMovs) {
+      const d = new Date(m.created_at);
+      const dia = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      let r = mapa.get(dia);
+      if (!r) {
+        r = { dia, label: d.toLocaleDateString("pt-BR"), entradas: 0, saidas: 0, saldo: 0, porForma: bucketInit() };
+        mapa.set(dia, r);
+      }
+      const v = Number(m.valor || 0);
+      const sinal = TIPO_SINAL[m.tipo];
+      r.saldo += sinal * v;
+      if (m.tipo === "recebimento" || m.tipo === "suprimento") {
+        r.entradas += v;
+        const bucket = normalizarForma(m.forma_pagamento);
+        if (bucket === "misto") {
+          const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+          const partes = decomporMistoObs(obs);
+          let somado = 0;
+          for (const [k, val] of Object.entries(partes)) {
+            r.porForma[k] = (r.porForma[k] ?? 0) + (val ?? 0);
+            somado += val ?? 0;
+          }
+          const resto = v - somado;
+          if (Math.abs(resto) > 0.005) r.porForma.outros += resto;
+        } else {
+          r.porForma[bucket] = (r.porForma[bucket] ?? 0) + v;
+        }
+      } else if (m.tipo === "sangria" || m.tipo === "despesa") {
+        r.saidas += v;
+      }
+    }
+    return Array.from(mapa.values()).sort((a, b) => b.dia.localeCompare(a.dia));
+  }, [minhasMovs, mistoObs]);
+
   // Calculo por sessao (todos)
   const calcSaldoSessao = useCallback((sid: string) => {
     return todosMovs
@@ -1639,32 +1690,47 @@ function Page() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground">Entradas por forma de pagamento</CardTitle>
+                  <CardTitle className="text-xs text-muted-foreground">Movimentação por dia</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  {(() => {
+                <CardContent className="space-y-4">
+                  {resumoPorDia.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sem movimentações nesta sessão.</p>
+                  ) : resumoPorDia.map((d) => {
                     const cards: Array<{ label: string; value: number; sempre?: boolean }> = [
-                      { label: "Dinheiro", value: entradasPorForma.dinheiro, sempre: true },
-                      { label: "PIX", value: entradasPorForma.pix, sempre: true },
-                      { label: "Débito", value: entradasPorForma.debito, sempre: true },
-                      { label: "Crédito", value: entradasPorForma.credito, sempre: true },
-                      { label: "Boleto", value: entradasPorForma.boleto },
-                      { label: "Transferência", value: entradasPorForma.transferencia },
-                      { label: "Convênio", value: entradasPorForma.convenio },
-                      { label: "Outros", value: entradasPorForma.outros },
+                      { label: "Dinheiro", value: d.porForma.dinheiro ?? 0, sempre: true },
+                      { label: "PIX", value: d.porForma.pix ?? 0, sempre: true },
+                      { label: "Débito", value: d.porForma.debito ?? 0, sempre: true },
+                      { label: "Crédito", value: d.porForma.credito ?? 0, sempre: true },
+                      { label: "Boleto", value: d.porForma.boleto ?? 0 },
+                      { label: "Transferência", value: d.porForma.transferencia ?? 0 },
+                      { label: "Convênio", value: d.porForma.convenio ?? 0 },
+                      { label: "Outros", value: d.porForma.outros ?? 0 },
                     ];
                     const visiveis = cards.filter((c) => c.sempre || (c.value ?? 0) > 0.005);
                     return (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {visiveis.map((it) => (
-                          <div key={it.label} className="rounded-md border bg-muted/30 px-3 py-2">
-                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{it.label}</div>
-                            <div className="text-base font-semibold tabular-nums">{fmt(it.value)}</div>
+                      <div key={d.dia} className="rounded-lg border p-3 space-y-3 bg-card">
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <div className="font-semibold text-sm flex items-center gap-2">
+                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                            {d.label}
                           </div>
-                        ))}
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
+                            <span>Entradas: <b className="text-emerald-600">{fmt(d.entradas)}</b></span>
+                            <span>Saídas: <b className="text-rose-600">{fmt(d.saidas)}</b></span>
+                            <span>Saldo do dia: <b className={d.saldo >= 0 ? "text-primary" : "text-rose-600"}>{fmt(d.saldo)}</b></span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                          {visiveis.map((it) => (
+                            <div key={it.label} className="rounded-md border bg-muted/30 px-3 py-2">
+                              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{it.label}</div>
+                              <div className="text-base font-semibold tabular-nums">{fmt(it.value)}</div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     );
-                  })()}
+                  })}
                 </CardContent>
               </Card>
 
