@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, Wallet, Pencil, Trash2 } from "lucide-react";
+import { Plus, Wallet, Pencil, Trash2, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
