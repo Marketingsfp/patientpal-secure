@@ -2053,6 +2053,45 @@ function Page() {
         </DialogContent>
       </Dialog>
 
+      {/* === Modal Fechar caixa de outro operador (admin/gestor) === */}
+      <Dialog open={!!fecharAlheia} onOpenChange={(o) => { if (!o) { setFecharAlheia(null); setValorInformadoAlheia(""); setObsFecharAlheia(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Fechar caixa do operador</DialogTitle>
+            <DialogDescription>
+              {fecharAlheia && (
+                <>
+                  <div><strong className="uppercase">{fecharAlheia.user_nome || fecharAlheia.user_id.slice(0, 8)}</strong></div>
+                  <div className="text-xs">Aberto em {fmtDT(fecharAlheia.aberto_em)}</div>
+                  <div className="mt-1">Saldo calculado: <strong>{fmt(calcSaldoSessao(fecharAlheia.id))}</strong></div>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={fecharCaixaAlheia} className="space-y-3">
+            <div>
+              <Label>Valor conferido em caixa</Label>
+              <CurrencyInput value={valorInformadoAlheia} onChange={setValorInformadoAlheia} />
+            </div>
+            <div>
+              <Label>Justificativa <span className="text-rose-600">*</span></Label>
+              <Textarea
+                value={obsFecharAlheia}
+                onChange={(e) => setObsFecharAlheia(e.target.value)}
+                placeholder="Ex.: operador esqueceu de fechar; conferido pelo gestor"
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setFecharAlheia(null)}>Cancelar</Button>
+              <Button type="submit" variant="destructive" disabled={savingAlheia} data-primary>
+                <Lock className="h-4 w-4 mr-1" /> Confirmar fechamento
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* === Modal Cobrança === */}
       <Dialog open={!!openCobranca} onOpenChange={(o) => { if (!o) setOpenCobranca(null); }}>
         <DialogContent>
