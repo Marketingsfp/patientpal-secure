@@ -332,6 +332,7 @@ function Page() {
   const [nfseEmitting, setNfseEmitting] = useState(false);
   const emitirNfseFn = useServerFn(emitirNfse);
   const consultarNfseFn = useServerFn(consultarNfse);
+  const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
 
   useEffect(() => {
     if (!clinicaAtual) {
@@ -379,6 +380,20 @@ function Page() {
       const p = pac as PacFull;
       const valor = Number(a.valor_total) || 0;
       if (valor <= 0) throw new Error("Valor do atendimento é zero");
+      const tomador = await pickTomadorNfse({
+        paciente: {
+          nome: p.nome,
+          cpfCnpj: p.cpf ?? undefined,
+          email: p.email ?? undefined,
+          cep: p.cep ?? undefined,
+          logradouro: p.logradouro ?? undefined,
+          numero: p.numero ?? undefined,
+          bairro: p.bairro ?? undefined,
+          municipio: p.cidade ?? undefined,
+          uf: p.estado ?? undefined,
+        },
+      });
+      if (!tomador) { setNfseEmitting(false); toast.error("Emissão cancelada."); return; }
       const res = await emitirNfseFn({
         data: {
           emitenteId,
@@ -387,17 +402,7 @@ function Page() {
           pagamentoId: a.id ?? undefined,
           valorServicos: valor,
           descricaoServicos: nfseDesc || "Serviços prestados",
-          tomador: {
-            nome: p.nome,
-            cpfCnpj: p.cpf ?? undefined,
-            email: p.email ?? undefined,
-            cep: p.cep ?? undefined,
-            logradouro: p.logradouro ?? undefined,
-            numero: p.numero ?? undefined,
-            bairro: p.bairro ?? undefined,
-            municipio: p.cidade ?? undefined,
-            uf: p.estado ?? undefined,
-          },
+          tomador,
         },
       });
       const nfseId = (res as { id?: string })?.id;
