@@ -1451,6 +1451,9 @@ function Page() {
   const selectedNaoBaixados = selectedItems.filter(
     (a) => !a.repasse_pago && !isAtendido(a),
   );
+  const selectedBaixados = selectedItems.filter(
+    (a) => !a.repasse_pago && isAtendido(a),
+  );
   const podePagar = selectedItems.length > 0 && selectedNaoPagos.length === selectedItems.length;
   const podeReimprimir = selectedItems.length > 0 && selectedPagos.length === selectedItems.length;
   const misturado = selectedItems.length > 0 && selectedPagos.length > 0 && selectedNaoPagos.length > 0;
