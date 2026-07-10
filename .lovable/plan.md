@@ -1,32 +1,34 @@
-## Objetivo
-Organizar o conteúdo da aba "Meu caixa" (rota `/app/caixa`) em 4 sub-abas para reduzir a poluição visual. Nenhuma regra de negócio, cálculo, permissão, filtro ou fluxo (recebimento, estorno, cobrança) é alterada — apenas o agrupamento visual.
+Em **Caixa → Meu caixa → Movimentos**, adicionar filtros por médico e paciente e trocar o "Período" por um seletor com calendário (data inicial/final).
 
-## Sub-abas propostas (dentro de "Meu caixa")
+## O que muda na UI
 
-1. **Saldo** (padrão ao entrar)
-   - 4 cards: Saldo atual, Abertura, Entradas, Saídas
-   - Card "Entradas por forma de pagamento" (Dinheiro/PIX/Débito/Crédito/etc.)
-   - Barra de ações: Suprimento · Sangria · Recebimento · Despesa · Fechar caixa
+Barra de filtros acima da tabela de movimentos (uma linha, com wrap em telas menores):
 
-2. **Movimentos**
-   - Card "Movimentos da sessão / Movimentos de hoje" com o seletor de período (para gestor), tabela completa e todas as colunas atuais (Data, Hora, Tipo, Descrição, Serviço, Médico, Forma, Valor, Ação de estorno).
+```text
+[ Período ▾  01/07/2026 → 10/07/2026 ]   [ Médico ▾ ]   [ Paciente 🔍 ______ ]   [ Limpar ]
+```
 
-3. **Histórico**
-   - Card "Meu histórico" (tabela de sessões anteriores do próprio operador com abertura/fechamento/diferença/detalhe).
+- **Período** — botão que abre um `Popover` com um `Calendar` de intervalo (react-day-picker `mode="range"`), já usado em `src/components/date-range-filter.tsx`. Presets rápidos ao lado: Hoje, Última semana, Última quinzena, Último mês, Todos. Fim das opções "Intervalo personalizado" separado — o intervalo agora é o próprio botão.
+- **Médico** — `Select` com a lista distinta de médicos presentes nos movimentos carregados ("Todos" + nomes de `enrichPorLanc`).
+- **Paciente** — `Input` de busca livre; casa com o nome extraído da descrição (o padrão é `"NOME PACIENTE — SERVICO"`), case-insensitive.
+- **Limpar** — aparece quando algum filtro está ativo; volta a Hoje / Todos / vazio.
 
-4. **Aguardando**
-   - Card "Cobrança de pacientes (N aguardando)" com o grid de fichas e botão "Cobrar".
-   - Manter o mesmo comportamento do atalho `?receber=...` (abrir diálogo de cobrança).
+Comportamento:
+- Filtros são combinados (AND). Contador "N de M movimentos" ao lado do título quando há filtro ativo.
+- Vazio filtrado: mensagem "Nenhum movimento corresponde aos filtros" com botão "Limpar filtros".
+- Para não-gestor (visão "Movimentos de hoje") os filtros de médico e paciente também aparecem, mas o período permanece fixo em "Hoje" (regra atual mantida).
 
-## Detalhes técnicos
-- Arquivo único: `src/routes/_authenticated/app.caixa.tsx`.
-- Envolver o conteúdo atual de `<TabsContent value="meu">` em um segundo `<Tabs>` interno com `defaultValue="saldo"` e `TabsList` com os 4 gatilhos.
-- Preservar o guard `!minhaSessao` (mostrando o card "Abrir caixa") acima das sub-abas — sem caixa aberto, as sub-abas ficam ocultas.
-- Preservar `loading`, estados, handlers, `enrichPorLanc`, `estornosPorLanc`, atalho `?receber=…`, exports e diálogos existentes.
-- Nenhum novo estado persistido; a sub-aba selecionada é apenas UI local (`useState`).
-- Sem mudanças nas abas "Todos (Financeiro)" e "Repasse médico".
+## Onde mudar
+
+Arquivo único: `src/routes/_authenticated/app.caixa.tsx`
+
+1. Estender o estado do filtro (`meuPeriodo`, `meuDataIni`, `meuDataFim`) com `meuMedico: string` e `meuPaciente: string`.
+2. Ajustar `minhasMovsFiltrados` (useMemo) para aplicar médico (via `enrichPorLanc.get(lancamento_id)?.medico`) e paciente (extraído de `m.descricao` antes do `—`).
+3. Substituir o bloco atual do "Período" (linhas 1362–1402) pelo novo trio de controles usando `Popover` + `Calendar` do design system. Manter os presets como pequenos botões dentro do popover.
+4. Derivar `medicosDisponiveis` (Set ordenado a partir de `enrichPorLanc`) para popular o Select.
 
 ## Fora de escopo
-- Cálculos, RLS, schema, permissões, fluxo de estorno, impressão, KPIs.
-- Aba "Todos (Financeiro)" e "Repasse médico".
-- Feature flag `caixa_v2` / `CaixaShellV2` (essas telas não são tocadas).
+
+- Nenhuma mudança na aba "Todos (Financeiro)" ou "Repasse médico" — só "Meu caixa → Movimentos".
+- Sem alteração de schema, RLS ou queries — filtragem 100% client-side sobre o que já é carregado.
+- Sem novo componente compartilhado; se `date-range-filter.tsx` servir direto, reutilizo; senão faço inline com `Popover + Calendar` já existentes no projeto.
