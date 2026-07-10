@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Download, Undo2 } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, Download, Undo2, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,7 +67,7 @@ function Page() {
   const [editing, setEditing] = useState<Lanc | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [filterTipo, setFilterTipo] = useState<"todos" | "receita" | "despesa" | "transferencia">("todos");
-  const [fromDate, setFromDate] = useState(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
+  const [fromDate, setFromDate] = useState(new Date().toISOString().slice(0, 10));
   const [toDate, setToDate] = useState(new Date().toISOString().slice(0, 10));
   const [detalhe, setDetalhe] = useState<null | "receita" | "despesa" | "saldo">(null);
   const [resumo, setResumo] = useState<{ r: number; d: number; saldo: number; totalRows: number }>({ r: 0, d: 0, saldo: 0, totalRows: 0 });
@@ -535,12 +535,70 @@ function Page() {
 
   const catsFiltradas = cats.filter((c) => !c.tipo || c.tipo === form.tipo);
 
+  const imprimirRelatorio = () => {
+    if (!items.length) { toast.info("Sem dados para o relatório."); return; }
+    const catMap = new Map(cats.map((c) => [c.id, c.nome]));
+    const esc = (v: unknown) =>
+      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+    type Row = { label: string; pagamento: number; recebimento: number };
+    const cats2 = new Map<string, Row>();
+    const formas = new Map<string, Row>();
+    let totPag = 0, totReceb = 0;
+    for (const l of items) {
+      const v = Number(l.valor || 0);
+      const isReceita = l.tipo === "receita" || (l.tipo === "transferencia" && l.transferSentido === "entrada");
+      const isDespesa = l.tipo === "despesa" || (l.tipo === "transferencia" && l.transferSentido === "saida");
+      const catLabel = (l.categoria_id ? catMap.get(l.categoria_id) : null) || (isReceita ? "RECEBIMENTOS DIVERSOS" : "DESPESAS DIVERSAS");
+      const c = cats2.get(catLabel) ?? { label: catLabel, pagamento: 0, recebimento: 0 };
+      if (isReceita) { c.recebimento += v; totReceb += v; }
+      else if (isDespesa) { c.pagamento += v; totPag += v; }
+      cats2.set(catLabel, c);
+      const fLabel = (l.forma_pagamento || "—").toUpperCase();
+      const f = formas.get(fLabel) ?? { label: fLabel, pagamento: 0, recebimento: 0 };
+      if (isReceita) f.recebimento += v;
+      else if (isDespesa) f.pagamento += v;
+      formas.set(fLabel, f);
+    }
+    let acc = 0;
+    const linhasCat = Array.from(cats2.values()).map((c) => {
+      acc += c.recebimento - c.pagamento;
+      return '<tr><td>' + esc(c.label) + '</td><td style="text-align:right;">' + fmt(c.pagamento) + '</td><td style="text-align:right;">' + fmt(c.recebimento) + '</td><td style="text-align:right;">' + fmt(acc) + '</td></tr>';
+    }).join("");
+    let accF = 0;
+    const linhasForma = Array.from(formas.values()).map((f) => {
+      accF += f.recebimento - f.pagamento;
+      return '<tr><td>' + esc(f.label) + '</td><td style="text-align:right;">' + fmt(f.pagamento) + '</td><td style="text-align:right;">' + fmt(f.recebimento) + '</td><td style="text-align:right;">' + fmt(accF) + '</td></tr>';
+    }).join("");
+    const p = (s: string) => s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(0, 4);
+    const periodo = p(fromDate) + " — " + p(toDate);
+    const clinicaNome = "";
+    const emissao = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+    const style = 'body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;} h1{font-size:16px;margin:0 0 6px;text-align:center;letter-spacing:.5px;} .meta{font-size:11px;color:#475569;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;} table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;} th,td{padding:5px 6px;border-bottom:1px solid #cbd5e1;} thead th{border-bottom:2px solid #0f172a;text-align:left;} thead th.n{text-align:right;} tfoot td{border-top:2px solid #0f172a;font-weight:700;} .right{text-align:right;}';
+    const html =
+      '<!doctype html><html><head><meta charset="utf-8"/><title>Relatório de movimento de caixa</title><style>' + style + '</style></head><body>' +
+      '<div class="meta"><span>' + esc(clinicaNome) + '</span><span>Emitido: ' + esc(emissao) + '</span></div>' +
+      '<h1>RELATÓRIO DE MOVIMENTO DE CAIXA</h1>' +
+      '<div class="meta"><span>Tipo: TODOS (SEM TRANSFERÊNCIA)</span><span>Período: ' + esc(periodo) + '</span><span>Agrupar: CATEGORIA</span></div>' +
+      '<table><thead><tr><th>GERAL — Descrição</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + linhasCat + '</tbody></table>' +
+      '<table><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + linhasForma + '</tbody>' +
+      '<tfoot><tr><td>TOTAL</td><td class="right">' + fmt(totPag) + '</td><td class="right">' + fmt(totReceb) + '</td><td class="right">' + fmt(totReceb - totPag) + '</td></tr></tfoot></table>' +
+      '<div class="meta"><span>' + items.length + ' registro' + (items.length === 1 ? '' : 's') + '</span></div>' +
+      '<script>window.onload=function(){window.print();}</script></body></html>';
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
+    w.document.write(html);
+    w.document.close();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div><h1 className="text-2xl font-semibold">Movimento de Caixa</h1>
           <p className="text-sm text-muted-foreground">Receitas e despesas do período</p></div>
         <div className="flex gap-2">
+        <Button variant="outline" onClick={imprimirRelatorio} disabled={!items.length}>
+          <Printer className="h-4 w-4 mr-2" />Relatório
+        </Button>
         <Button
           variant="outline"
           onClick={() => {

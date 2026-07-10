@@ -1208,7 +1208,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   }, [contrato.id]);
 
   // ---- Edição avançada (ADM) ----
-  const isAdmin = clinicaAtual?.role === "admin";
+  const isAdmin = clinicaAtual?.role === "admin" || clinicaAtual?.role === "caixa";
   const [conveniosAdm, setConveniosAdm] = useState<Array<{ id: string; nome: string }>>([]);
   const [admConvenioId, setAdmConvenioId] = useState<string>(contrato.convenio_id ?? "");
   const [admPaciente, setAdmPaciente] = useState<PatientOption | null>(null);
@@ -1216,7 +1216,10 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [admTaxaAdesao, setAdmTaxaAdesao] = useState<string>(String(Number(contrato.taxa_adesao ?? 0).toFixed(2)));
   const [admForma, setAdmForma] = useState<string>(contrato.forma_pagamento ?? "");
   const [admObs, setAdmObs] = useState<string>(contrato.observacoes ?? "");
+  const [admFaixaId, setAdmFaixaId] = useState<string>("");
   const [savingAdm, setSavingAdm] = useState(false);
+  const [retroDialog, setRetroDialog] = useState<{ open: boolean; parcelasPagas: string; dataInicio: string } | null>(null);
+  const [regerandoRetro, setRegerandoRetro] = useState(false);
   useEffect(() => {
     setAdmConvenioId(contrato.convenio_id ?? "");
     setAdmDataInicio(contrato.data_inicio ?? "");
@@ -1282,18 +1285,26 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       toast.error("Taxa de adesão inválida");
       return;
     }
+    const dataInicioAntiga = (contrato as any).data_inicio as string | null;
     setSavingAdm(true);
+    // Se admin escolheu outra faixa, aplica novo valor_mensal
+    const faixaEscolhida = admFaixaId ? faixas.find((f) => f.id === admFaixaId) : null;
+    const novoValorMensal = faixaEscolhida ? Number(faixaEscolhida.valor_mensal) : null;
+    const updatePayload: any = {
+      convenio_id: admConvenioId,
+      paciente_id: admPaciente.id,
+      paciente_nome: admPaciente.nome,
+      data_inicio: admDataInicio,
+      taxa_adesao: taxa,
+      forma_pagamento: admForma || null,
+      observacoes: admObs || null,
+    };
+    if (novoValorMensal != null && novoValorMensal !== Number(valorMensalAtual)) {
+      updatePayload.valor_mensal = novoValorMensal;
+    }
     const { error } = await supabase
       .from("contratos_assinatura")
-      .update({
-        convenio_id: admConvenioId,
-        paciente_id: admPaciente.id,
-        paciente_nome: admPaciente.nome,
-        data_inicio: admDataInicio,
-        taxa_adesao: taxa,
-        forma_pagamento: admForma || null,
-        observacoes: admObs || null,
-      } as any)
+      .update(updatePayload)
       .eq("id", contrato.id);
     setSavingAdm(false);
     if (error) {
@@ -1307,7 +1318,96 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     (contrato as any).taxa_adesao = taxa;
     (contrato as any).forma_pagamento = admForma || null;
     (contrato as any).observacoes = admObs || null;
+    if (novoValorMensal != null && novoValorMensal !== Number(valorMensalAtual)) {
+      (contrato as any).valor_mensal = novoValorMensal;
+      setValorMensalAtual(novoValorMensal);
+      // Recalcula parcelas em aberto para o novo valor
+      const abertas = mens.filter((m) => m.status !== "pago");
+      if (abertas.length > 0) {
+        await Promise.all(
+          abertas.map((m) => {
+            const isBoleto = (m.forma_pagamento ?? (contrato as any).forma_pagamento) === "boleto";
+            const v = novoValorMensal + (isBoleto ? TAXA_BOLETO : 0);
+            return supabase.from("contrato_mensalidades").update({ valor: v }).eq("id", m.id);
+          }),
+        );
+      }
+    }
     toast.success("Contrato atualizado.");
+    await load();
+    // Se a data de início foi movida para o passado, oferecer regeneração com parcelas pagas.
+    if (dataInicioAntiga && admDataInicio < dataInicioAntiga) {
+      const hoje = new Date();
+      const primDoMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const ini = new Date(admDataInicio + "T00:00:00");
+      const iniMes = new Date(ini.getFullYear(), ini.getMonth(), 1);
+      if (iniMes < primDoMesAtual) {
+        const mesesCheios = (primDoMesAtual.getFullYear() - iniMes.getFullYear()) * 12 + (primDoMesAtual.getMonth() - iniMes.getMonth());
+        const sugestao = Math.max(0, Math.min(12, mesesCheios));
+        setRetroDialog({ open: true, parcelasPagas: String(sugestao), dataInicio: admDataInicio });
+      }
+    }
+  };
+
+  // Regenera as 12 parcelas a partir da nova data de início; as N primeiras entram como pagas.
+  const regerarComPagas = async (n: number) => {
+    if (!retroDialog) return;
+    const iniStr = retroDialog.dataInicio;
+    if (!iniStr) return;
+    const dia = Math.max(1, Math.min(31, Number((contrato as any).dia_vencimento) || 10));
+    const valor = Number((contrato as any).valor_mensal ?? 0);
+    const pagas = Math.max(0, Math.min(12, Math.floor(n)));
+    setRegerandoRetro(true);
+    // 1) Apaga pendentes existentes
+    const { error: delErr } = await supabase
+      .from("contrato_mensalidades")
+      .delete()
+      .eq("contrato_id", contrato.id)
+      .eq("status", "pendente");
+    if (delErr) {
+      setRegerandoRetro(false);
+      return mostrarErro(delErr);
+    }
+    // 2) Próximo número de parcela
+    const { data: maxRow } = await supabase
+      .from("contrato_mensalidades")
+      .select("numero_parcela")
+      .eq("contrato_id", contrato.id)
+      .order("numero_parcela", { ascending: false })
+      .limit(1);
+    let prox = ((maxRow?.[0]?.numero_parcela ?? 0) as number) + 1;
+    // 3) Gera 12 parcelas a partir do mês da nova data de início
+    const ini = new Date(iniStr + "T00:00:00");
+    const baseAno = ini.getFullYear();
+    const baseMes = ini.getMonth();
+    const rows: any[] = [];
+    for (let i = 0; i < 12; i++) {
+      const ref = new Date(baseAno, baseMes + i, 1);
+      const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
+      const d = Math.min(dia, lastDay);
+      const venc = new Date(ref.getFullYear(), ref.getMonth(), d);
+      const vencIso = venc.toISOString().slice(0, 10);
+      const paga = i < pagas;
+      rows.push({
+        contrato_id: contrato.id,
+        clinica_id: (contrato as any).clinica_id,
+        numero_parcela: prox++,
+        vencimento: vencIso,
+        valor,
+        status: paga ? "pago" : "pendente",
+        pago_em: paga ? vencIso : null,
+        valor_pago: paga ? valor : null,
+      });
+    }
+    const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows);
+    setRegerandoRetro(false);
+    if (insErr) return mostrarErro(insErr, "falha ao gerar parcelas");
+    setRetroDialog(null);
+    toast.success(
+      pagas > 0
+        ? `${pagas} parcela${pagas === 1 ? "" : "s"} marcada${pagas === 1 ? "" : "s"} como paga${pagas === 1 ? "" : "s"} e ${12 - pagas} pendente${12 - pagas === 1 ? "" : "s"} gerada${12 - pagas === 1 ? "" : "s"}.`
+        : "12 parcelas pendentes geradas.",
+    );
     await load();
   };
 
@@ -1544,9 +1644,19 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     load(); /* eslint-disable-next-line */
   }, [contrato.id]);
 
-  // A seleção de paciente no diálogo "Incluir dependente" usa PatientSearchInput
-  // (busca sob demanda por nome/CPF/prontuário), então não pré-carregamos mais
-  // a lista inteira de pacientes da clínica aqui.
+  // Sincroniza a faixa "admin" com a faixa vigente (baseada no valor_mensal atual)
+  useEffect(() => {
+    if (!faixas.length) {
+      setAdmFaixaId("");
+      return;
+    }
+    const v = Number(valorMensalAtual);
+    const match =
+      faixas.find((f) => Number(f.valor_mensal) === v) ?? faixas[0];
+    setAdmFaixaId(match?.id ?? "");
+  }, [faixas, valorMensalAtual]);
+
+  // Busca de pacientes agora é feita sob demanda pelo PatientSearchInput.
 
   const marcarPago = async (id: string, paga: boolean, forma?: string | null) => {
     const patch = paga
@@ -2181,7 +2291,36 @@ h1, h2, h3 { margin: 0 0 6mm; }
               ) : (
                 <DadosField label="Convênio" value={convenio?.nome ?? "—"} />
               )}
-              <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
+              {isAdmin && faixas.length > 0 ? (
+                <div className="space-y-1">
+                  <Label>Nº de pessoas no contrato</Label>
+                  <Select value={admFaixaId} onValueChange={setAdmFaixaId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a faixa…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {faixas.map((f) => {
+                        const range =
+                          f.vidas_ate == null
+                            ? `${f.vidas_de}+ pessoas`
+                            : f.vidas_ate === f.vidas_de
+                              ? `${f.vidas_de} ${f.vidas_de === 1 ? "pessoa" : "pessoas"}`
+                              : `${f.vidas_de} a ${f.vidas_ate} pessoas`;
+                        return (
+                          <SelectItem key={f.id} value={f.id}>
+                            {range} — {BRL(Number(f.valor_mensal))}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Ao salvar, o valor mensal do contrato e das parcelas em aberto serão atualizados para a faixa selecionada.
+                  </p>
+                </div>
+              ) : (
+                <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
+              )}
               {isAdmin ? (
                 <div className="space-y-1">
                   <Label>Paciente titular</Label>
@@ -2595,11 +2734,35 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Paciente</Label>
-              <PatientSearchInput
-                value={incPaciente}
-                onSelect={(p) => setIncPaciente(p)}
-                placeholder="Buscar paciente por nome, CPF ou prontuário…"
-              />
+              {incPaciente ? (
+                <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
+                  <span className="font-medium text-sm">
+                    {incPaciente.nome}
+                    {incPaciente.cpf ? ` — ${incPaciente.cpf}` : ""}
+                  </span>
+                  <Button size="sm" variant="ghost" onClick={() => setIncPaciente(null)}>
+                    Trocar
+                  </Button>
+                </div>
+              ) : (
+                <PatientSearchInput
+                  clinicaIdsOverride={[(contrato as any).clinica_id]}
+                  placeholder="Buscar por nome, CPF, prontuário, pasta ou nascimento…"
+                  onSelect={(p) => {
+                    if (!p) return;
+                    const titularId = (contrato as any).paciente_id as string | undefined;
+                    if (p.id === titularId) {
+                      toast.error("Este paciente é o titular do contrato.");
+                      return;
+                    }
+                    if (depsAtivos.some((d) => d.paciente_id === p.id)) {
+                      toast.error("Este paciente já é dependente ativo do contrato.");
+                      return;
+                    }
+                    setIncPaciente(p);
+                  }}
+                />
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
@@ -2739,6 +2902,48 @@ h1, h2, h3 { margin: 0 0 6mm; }
               disabled={cancelSaving || !cancelMotivo.trim()}
             >
               {cancelSaving ? "Cancelando…" : "Confirmar cancelamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={!!retroDialog?.open}
+        onOpenChange={(o) => { if (!o && !regerandoRetro) setRetroDialog(null); }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Data de início movida para o passado</DialogTitle>
+            <DialogDescription>
+              Já existem parcelas pagas nesse intervalo? Informe quantas para o sistema
+              marcar como pagas e gerar apenas as restantes até completar 12 parcelas.
+            </DialogDescription>
+          </DialogHeader>
+          {retroDialog && (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Parcelas já pagas</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={12}
+                  value={retroDialog.parcelasPagas}
+                  onChange={(e) => setRetroDialog({ ...retroDialog, parcelasPagas: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Serão geradas 12 parcelas a partir de {retroDialog.dataInicio.slice(8,10)}/{retroDialog.dataInicio.slice(5,7)}/{retroDialog.dataInicio.slice(0,4)}.
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRetroDialog(null)} disabled={regerandoRetro}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => regerarComPagas(Number(retroDialog?.parcelasPagas ?? 0))}
+              disabled={regerandoRetro}
+            >
+              {regerandoRetro ? "Gerando…" : "Confirmar e regenerar"}
             </Button>
           </DialogFooter>
         </DialogContent>
