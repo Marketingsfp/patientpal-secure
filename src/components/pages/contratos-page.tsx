@@ -837,6 +837,35 @@ function NovoContratoForm({
                 </SelectContent>
               </Select>
             </div>
+            {(() => {
+              // Mostra campo "já pagas" quando data de início é anterior ao mês atual
+              if (!dataInicio || !convenio) return null;
+              const ini = new Date(dataInicio + "T00:00:00");
+              const hoje = new Date();
+              const mesesDecorridos =
+                (hoje.getFullYear() - ini.getFullYear()) * 12 + (hoje.getMonth() - ini.getMonth());
+              if (mesesDecorridos < 1) return null;
+              const maxPagas = Math.max(0, convenio.num_parcelas - 1);
+              const sugestao = Math.min(mesesDecorridos, maxPagas);
+              return (
+                <div className="col-span-2">
+                  <Label>Mensalidades já pagas anteriormente</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={maxPagas}
+                    value={mensalidadesJaPagas}
+                    onChange={(e) => {
+                      const v = Math.max(0, Math.min(maxPagas, Number(e.target.value) || 0));
+                      setMensalidadesJaPagas(v);
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Use para lançar contratos antigos já em andamento. As primeiras {mensalidadesJaPagas || "N"} parcelas serão registradas como <strong>pagas</strong> e apenas as {convenio.num_parcelas - mensalidadesJaPagas} restantes ficarão em aberto. Sugestão com base na data: {sugestao}.
+                  </p>
+                </div>
+              );
+            })()}
             <div>
               <Label>Valor mensal</Label>
               <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">
