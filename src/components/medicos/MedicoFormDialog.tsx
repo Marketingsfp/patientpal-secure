@@ -1497,6 +1497,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     </div>
                   )}
                 </div>
+                {form.nome.trim().toUpperCase() === "ELETROCARDIOGRAMA" && (
                 <div className="space-y-3 pt-4 border-t mt-4">
                   <div>
                     <Label>REPASSE LAUDO TERCEIRO</Label>
@@ -1610,6 +1611,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     Deixe o valor em branco / 0 para o médico que <b>não recebe laudo</b>. Este cadastro não gera lançamento automático — o financeiro decide quando lançar.
                   </p>
                 </div>
+                )}
               </TabsContent>
 
               <TabsContent value="acesso" className="space-y-4 pt-4 pb-16">
