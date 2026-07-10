@@ -1,55 +1,56 @@
-## Diagnóstico
 
-O contrato existe e está ativo:
+## Objetivo
 
-- **ID**: `9cf00f18-…986f`
-- **Nº**: `20261306`
-- **Paciente**: ROBERTA SAMPAIO DA SILVA
-- **Clínica**: POLICLINICA MENINO JESUS (mesma da sessão)
-- **Status**: `ativo` — não está cancelado, nem em outra clínica
-- **Criado em**: 11/06/2026
+Permitir, na tela de nova venda do Cartão Benefício, cadastrar rapidamente um paciente sem sair do formulário quando o titular ou dependente ainda não existe. Um botão aparece dentro do campo de busca sempre que o usuário digita algo e a lista fica vazia ("Nenhum paciente encontrado").
 
-Ou seja, o alerta vermelho "Já possui contrato #20261306" está correto — o dado está lá.
+## Escopo
 
-### Por que a busca em "Vendas" não acha
+Somente frontend. Reaproveita o padrão de "cadastro rápido" já existente no fluxo `agenda.express` (insert direto em `pacientes` com os campos mínimos). Sem mudanças de banco.
 
-Em `src/components/pages/contratos-page.tsx` (função `load`, linha ~156), a listagem faz:
+## Fluxo do usuário
 
-```ts
-supabase
-  .from("contratos_assinatura")
-  .select("*")
-  .eq("clinica_id", clinicaAtual.clinica_id)
-  .order("created_at", { ascending: false })
-  .limit(500)
-```
+1. Na venda do Cartão Benefício, ao buscar o Paciente titular ou um Dependente, se nenhum registro aparecer:
+   - O dropdown mostra, além da mensagem "Nenhum paciente encontrado", um botão **"Cadastrar novo paciente"** (já pré-preenchendo o texto digitado).
+2. O botão abre um **modal de cadastro rápido** com os campos: Nome (obrigatório), CPF (opcional, validado), Data de nascimento (opcional), Telefone (opcional), E-mail (opcional).
+3. Ao confirmar, o paciente é criado em `pacientes` na clínica atual e o modal fecha.
+4. O paciente recém-criado é automaticamente selecionado no campo de origem (titular ou dependente) — sem precisar buscar de novo.
 
-E o filtro do campo de busca é feito **no cliente**, em cima do que já veio (`list.filter(...)`).
+## Onde entra no código
 
-A clínica POLICLINICA MENINO JESUS tem **1878 contratos**. Como só carregamos os 500 mais recentes, o contrato da Roberta (11/06/2026) ficou fora da janela → a busca local retorna "Nenhum contrato", mesmo o registro existindo.
+- **`src/components/patient-search-input.tsx`**
+  - Nova prop opcional `onRequestCreate?: (query: string) => void`.
+  - No estado "Nenhum paciente encontrado", quando a prop existir, renderizar um botão `Cadastrar "<query>"` que chama `onRequestCreate(query)` e fecha o dropdown.
+  - Comportamento atual (busca, seleção, voz) não muda para chamadas que não passem a prop.
 
-Isso vai acontecer com qualquer contrato antigo de qualquer clínica com >500 registros.
+- **Novo componente `src/components/pacientes/quick-patient-dialog.tsx`**
+  - `<QuickPatientDialog open clinicaId nomeInicial onOpenChange onCreated />`.
+  - Formulário com Nome, CPF (com validação `isCPFValido`), Data de nascimento, Telefone, E-mail.
+  - Ao salvar: `supabase.from("pacientes").insert({...}).select(...).single()` (mesmo shape usado em `app.agenda.express.tsx`), toast de sucesso e `onCreated(paciente)` retornando um `PatientOption` completo (via `carregarPacienteCompleto` já existente na página, ou consulta direta com os campos que o `PatientSearchInput` espera).
+  - Validações simples (nome ≥ 3 chars, CPF válido se informado, e‑mail com formato válido se informado).
 
-## Correção proposta
+- **`src/components/pages/contratos-page.tsx`**
+  - Estado `quickCreate: { alvo: "titular" | "dependente"; nome: string } | null`.
+  - Nos dois `PatientSearchInput` (titular ~linha 800 e dependente ~linha 945): passar `onRequestCreate={(q) => setQuickCreate({ alvo, nome: q })}`.
+  - Renderizar `<QuickPatientDialog>` no final do formulário; no `onCreated(p)`:
+    - Se `alvo === "titular"`: `setTitular(await carregarPacienteCompleto(p))`.
+    - Se `alvo === "dependente"`: validar duplicidade (mesmas regras já existentes) e `addDep(await carregarPacienteCompleto(p))`.
+    - Fechar o modal.
 
-Trocar a busca por uma consulta server-side quando há termo digitado, mantendo a listagem inicial paginada.
+## Regras e restrições
 
-### Alterações em `src/components/pages/contratos-page.tsx`
+- O paciente é criado sempre na `clinica_id` atual da venda.
+- Se a busca original estiver com <2 caracteres, o botão não aparece (mesmo threshold atual do dropdown). O usuário pode digitar o nome que quer cadastrar e depois clicar em "Cadastrar…".
+- Nenhum campo obrigatório novo além do Nome — mantém a decisão anterior de deixar e-mail e foto opcionais.
+- Sem impacto no `PatientSearchInput` usado nas outras telas (Agenda, NFS-e, etc.): a prop é opcional.
 
-1. **Debounce do termo `q`** (~300ms) para não bater no banco a cada tecla.
-2. **Novo efeito** que, quando `q` tem ≥ 2 caracteres, refaz o `load` com filtro no banco:
-   - `.eq("clinica_id", …)`
-   - `.or("paciente_nome.ilike.%<q>%,numero.eq.<q_se_numerico>")` — usar `numero.eq` só quando `q` for numérico; senão só o `ilike` do nome.
-   - Manter `.order("created_at", desc)` e `.limit(200)`.
-3. **Sem termo** → mantém o comportamento atual (500 mais recentes).
-4. Manter o `filtered` local para ordenação por paciente (`sortPaciente`) e como fallback exato — mas sem descartar resultados.
-5. Pequeno indicador "Buscando…" enquanto a query roda (reaproveitar `loading`).
+## Detalhes técnicos
 
-Nenhuma mudança de schema, RLS ou lógica de negócio; puramente na camada de leitura da tela de Contratos → Vendas.
+- Reusar helpers existentes: `somenteDigitos`, `isCPFValido`, `mostrarErro`, `toast`, `PatientOption` de `@/components/patient-search-input`, `carregarPacienteCompleto` de `contratos-page.tsx`.
+- O insert deve incluir apenas campos preenchidos (evitar strings vazias em CPF/telefone/e-mail para não colidir com constraints).
+- Após criar, se o botão foi acionado a partir de "dependente", executar as mesmas checagens de duplicidade que hoje já rodam no `onSelect` do `PatientSearchInput` de dependentes.
 
-## Como validar
+## Fora de escopo
 
-1. Abrir Cartão Benefícios → Vendas, buscar por "ROBERTA SAMPAIO DA SILVA" → deve aparecer o contrato #20261306.
-2. Buscar por `20261306` → mesmo resultado.
-3. Buscar por um paciente com contrato recente (já dentro dos 500) → continua aparecendo, sem regressão.
-4. Limpar a busca → volta a listar os 500 mais recentes.
+- Cadastro completo do paciente (endereço, responsável, foto, plano etc.) — segue no cadastro completo em `Clientes`.
+- Alterações no `PatientSearchInput` de outras telas.
+- Mudanças em RLS/policies de `pacientes`.
