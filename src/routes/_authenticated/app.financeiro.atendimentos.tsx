@@ -2044,6 +2044,24 @@ function Page() {
               </Select>
             </div>
             <div className="space-y-1.5">
+              <Label className="text-xs font-medium">
+                Laudo
+                <span className="ml-1 font-normal text-muted-foreground">
+                  ({filteredItems.filter((a) => a.laudo_status === "emitido").length} baixados · {filteredItems.filter((a) => a.laudo_status !== "emitido").length} pendentes)
+                </span>
+              </Label>
+              <Select value={fLaudo} onValueChange={(v) => setFLaudo(v as "todos" | "baixado" | "nao_baixado")}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="baixado">Baixados</SelectItem>
+                  <SelectItem value="nao_baixado">Não baixados</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
               <Label className="text-xs font-medium">Ordenar por</Label>
               <Select value={fOrdem} onValueChange={(v) => setFOrdem(v as typeof fOrdem)}>
                 <SelectTrigger className="h-9">
