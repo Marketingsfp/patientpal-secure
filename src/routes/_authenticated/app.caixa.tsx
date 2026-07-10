@@ -1931,6 +1931,7 @@ function Page() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Dia</TableHead>
                       <TableHead>Abertura</TableHead>
                       <TableHead>Fechamento</TableHead>
                       <TableHead>Status</TableHead>
@@ -1941,21 +1942,29 @@ function Page() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {minhasSessoes.map((s) => (
-                      <TableRow key={s.id}>
-                        <TableCell>{fmtDT(s.aberto_em)}</TableCell>
-                        <TableCell>{fmtDT(s.fechado_em)}</TableCell>
-                        <TableCell>
-                          <Badge variant={s.status === "aberto" ? "default" : "secondary"}>{s.status}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">{fmt(s.valor_abertura)}</TableCell>
-                        <TableCell className="text-right">{fmt(s.valor_fechamento_informado)}</TableCell>
-                        <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
-                          {fmt(s.diferenca)}
-                        </TableCell>
-                        <TableCell><Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}><Eye className="h-4 w-4" /></Button></TableCell>
-                      </TableRow>
-                    ))}
+                    {linhasMinhasPorDia.map((l) => {
+                      const sPrincipal = l.sessoes[0];
+                      return (
+                        <TableRow key={l.key}>
+                          <TableCell className="font-medium">{fmtDia(l.data)}</TableCell>
+                          <TableCell>{fmtHora(l.primeiraAbertura)}</TableCell>
+                          <TableCell>{fmtHora(l.ultimoFechamento)}</TableCell>
+                          <TableCell>
+                            <Badge variant={l.statusDia === "aberto" ? "default" : "secondary"}>{l.statusDia}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">{fmt(l.valorAbertura)}</TableCell>
+                          <TableCell className="text-right">{fmt(l.informado)}</TableCell>
+                          <TableCell className={`text-right ${l.diferenca < 0 ? "text-rose-600" : l.diferenca > 0 ? "text-amber-600" : ""}`}>
+                            {fmt(l.diferenca)}
+                          </TableCell>
+                          <TableCell>
+                            {sPrincipal && (
+                              <Button size="sm" variant="ghost" onClick={() => verDetalhe(sPrincipal)}><Eye className="h-4 w-4" /></Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
