@@ -2258,7 +2258,7 @@ function Page() {
                                 className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
                               >
                                 <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
-                                Pago
+                                Vinculado
                               </Badge>
                             );
                           if (!exigeLaudo) return <span className="text-muted-foreground text-[10px]">—</span>;
