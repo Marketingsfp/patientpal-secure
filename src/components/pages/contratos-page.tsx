@@ -1210,6 +1210,28 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   }, [contrato.id]);
 
   const salvarDadosFinanceiros = async () => {
+// placeholder-adm-marker
+    return await _salvarDadosFinanceiros();
+  };
+  // ---- Edição avançada (ADM) ----
+  const isAdmin = clinicaAtual?.role === "admin";
+  const [conveniosAdm, setConveniosAdm] = useState<Array<{ id: string; nome: string }>>([]);
+  const [admConvenioId, setAdmConvenioId] = useState<string>(contrato.convenio_id ?? "");
+  const [admPaciente, setAdmPaciente] = useState<PatientOption | null>(null);
+  const [admDataInicio, setAdmDataInicio] = useState<string>(contrato.data_inicio ?? "");
+  const [admTaxaAdesao, setAdmTaxaAdesao] = useState<string>(String(Number(contrato.taxa_adesao ?? 0).toFixed(2)));
+  const [admForma, setAdmForma] = useState<string>(contrato.forma_pagamento ?? "");
+  const [admObs, setAdmObs] = useState<string>(contrato.observacoes ?? "");
+  const [savingAdm, setSavingAdm] = useState(false);
+  useEffect(() => {
+    setAdmConvenioId(contrato.convenio_id ?? "");
+    setAdmDataInicio(contrato.data_inicio ?? "");
+    setAdmTaxaAdesao(String(Number(contrato.taxa_adesao ?? 0).toFixed(2)));
+    setAdmForma(contrato.forma_pagamento ?? "");
+    setAdmObs(contrato.observacoes ?? "");
+  }, [contrato.id]);
+
+  const _salvarDadosFinanceiros = async () => {
     const v = Number(String(editValor).replace(",", "."));
     const dia = Math.max(1, Math.min(31, Number(editDia) || 0));
     if (!Number.isFinite(v) || v < 0) {
