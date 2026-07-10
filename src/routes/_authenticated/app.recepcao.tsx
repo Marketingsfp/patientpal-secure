@@ -48,28 +48,9 @@ function RecepcaoPage() {
   const [chamadas, setChamadas] = useState<Senha[]>([]);
   const [busy, setBusy] = useState(false);
 
-<<<<<<< HEAD
   useEffect(() => {
     localStorage.setItem("guiche", guiche);
   }, [guiche]);
-=======
-  // Refs para o atalho de teclado sempre ler o valor mais recente
-  // sem precisar remontar o listener a cada mudança
-  const clinicaIdRef = useRef(clinicaAtual?.clinica_id);
-  useEffect(() => { clinicaIdRef.current = clinicaAtual?.clinica_id; }, [clinicaAtual?.clinica_id]);
-
-  // Carrega o guichê salvo assim que a clínica é conhecida (namespaced por clínica)
-  useEffect(() => {
-    if (!clinicaAtual) return;
-    const saved = localStorage.getItem(`guiche:${clinicaAtual.clinica_id}`);
-    setGuiche(saved ?? "1");
-  }, [clinicaAtual?.clinica_id]);
-
-  useEffect(() => {
-    if (!clinicaAtual) return;
-    localStorage.setItem(`guiche:${clinicaAtual.clinica_id}`, guiche);
-  }, [guiche, clinicaAtual?.clinica_id]);
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 
   // Atalho: C = chamar próxima senha
   useEffect(() => {
@@ -92,7 +73,6 @@ function RecepcaoPage() {
   const carregar = async () => {
     if (!clinicaAtual) return;
     const hoje = new Date().toISOString().slice(0, 10);
-<<<<<<< HEAD
     const sel =
       "id, codigo, tipo, status, guiche, emitida_em, chamada_em, identificado_por_facial, paciente_id, pacientes(nome)";
     const [{ data: emit }, { data: cham }] = await Promise.all([
@@ -111,12 +91,6 @@ function RecepcaoPage() {
         .eq("status", "chamada")
         .order("chamada_em", { ascending: false })
         .limit(10),
-=======
-    const sel = "id, codigo, tipo, status, guiche, emitida_em, chamada_em, identificado_por_facial, paciente_id, pacientes(nome)";
-    const [{ data: emit, error: errEmit }, { data: cham, error: errCham }] = await Promise.all([
-      supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "emitida").order("emitida_em"),
-      supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "chamada").order("chamada_em", { ascending: false }).limit(10),
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     ]);
 
     if (errEmit || errCham) {

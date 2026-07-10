@@ -205,13 +205,9 @@ function Page() {
   const [fFim, setFFim] = useState<string>(hoje);
   const [fStatus, setFStatus] = useState<"todos" | "aberto" | "pago">("aberto");
   const [fPaciente, setFPaciente] = useState<string>("");
-<<<<<<< HEAD
   const [fOrdem, setFOrdem] = useState<
     "data_desc" | "data_asc" | "gr" | "paciente_az" | "paciente_za"
   >("data_desc");
-=======
-  const [fOrdem, setFOrdem] = useState<"data_desc" | "data_asc" | "gr" | "paciente_az" | "paciente_za">("gr");
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   const [fTipo, setFTipo] = useState<"todos" | "medico" | "clinica">("todos");
   const [contas, setContas] = useState<Conta[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -1161,7 +1157,6 @@ function Page() {
     }
   };
 
-<<<<<<< HEAD
   const estornar = async (a: Atend) => {
     if (a.repasse_pago) {
       toast.error(
@@ -1226,15 +1221,6 @@ function Page() {
       mostrarErro(eUpd);
       return;
     }
-=======
-  const darBaixa = async (a: Atend) => {
-    if (
-      !confirm(
-        "Confirmar baixa do atendimento?\n\nO médico será marcado como tendo atendido este paciente e o repasse ficará liberado para pagamento.",
-      )
-    )
-      return;
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
     try {
       if (a.origem === "agenda") {
         if (!a.agendamento_id) {
@@ -1475,13 +1461,10 @@ function Page() {
     } catch (err) {
       mostrarErro(err);
     }
-<<<<<<< HEAD
     toast.success(
       "Atendimento estornado — receita removida e agendamento liberado para nova cobrança.",
     );
     await load();
-=======
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   };
 
   const medMap = useMemo(() => new Map(medicos.map((m) => [m.id, m.nome])), [medicos]);
@@ -1556,19 +1539,11 @@ function Page() {
 
   const isAtendido = (a: Atend) =>
     a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
-<<<<<<< HEAD
   const selectables = filteredItems.filter(
     (a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0 && isAtendido(a),
   );
   const allSelected =
     selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
-=======
-  // Itens selecionáveis: qualquer atendimento com repasse > 0.
-  // As ações do topo validam individualmente o que cada uma aceita
-  // (baixa em lote, pagar repasse, 2ª via).
-  const selectables = filteredItems.filter((a) => (a.valor_medico ?? 0) > 0);
-  const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   const toggleAll = () => {
     if (allSelected) setSel(new Set());
     else setSel(new Set(selectables.map((a) => `${a.origem}:${a.id}`)));
@@ -1762,7 +1737,6 @@ function Page() {
 
   return (
     <div className="space-y-3">
-<<<<<<< HEAD
       {podeEstornar && solicitacoes.length > 0 && (
         <Card className="border-rose-300 bg-rose-50/60">
           <CardContent className="p-3">
@@ -1836,8 +1810,6 @@ function Page() {
           </CardContent>
         </Card>
       )}
-=======
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
@@ -1900,12 +1872,8 @@ function Page() {
               title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
             >
               <Wallet className="h-4 w-4 mr-2" />
-<<<<<<< HEAD
               Pagar repasse
               {selectedItems.length ? ` (${selectedItems.length} • ${fmt(selectedTotal)})` : ""}
-=======
-              Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length} • ${fmt(selectedNaoPagos.reduce((s, x) => s + (Number(x.valor_medico) || 0), 0))})` : ""}
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
             </Button>
           )}
           {!isMedicoOnly && (
@@ -2245,14 +2213,9 @@ function Page() {
                       />
                     </TableHead>
                   )}
-<<<<<<< HEAD
                   <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">
                     Data
                   </TableHead>
-=======
-                  <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap text-center w-10">Ficha</TableHead>
-                  <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">Data</TableHead>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                   <TableHead className="text-[11px] font-medium px-2">Médico</TableHead>
                   <TableHead className="text-[11px] font-medium px-2">Paciente</TableHead>
                   <TableHead className="text-[11px] font-medium px-2">Serviço</TableHead>
@@ -2287,19 +2250,8 @@ function Page() {
                   const procedimentoNome = a.procedimento ?? "—";
 
                   // Define as cores das linhas para o efeito zebrado acompanhar a coluna fixa
-<<<<<<< HEAD
                   const rowBg =
                     idx % 2 === 0 ? "bg-background" : "bg-slate-50 dark:bg-slate-900/40";
-=======
-                  const isSelected = sel.has(`${a.origem}:${a.id}`);
-                  const baixaPendente = !a.repasse_pago && !isAtendido(a);
-                  const rowBg =
-                    isSelected && baixaPendente
-                      ? "bg-amber-50 dark:bg-amber-950/30"
-                      : idx % 2 === 0
-                        ? "bg-background"
-                        : "bg-slate-50 dark:bg-slate-900/40";
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 
                   return (
                     <TableRow
@@ -2308,7 +2260,6 @@ function Page() {
                     >
                       {!isMedicoOnly && (
                         <TableCell className="px-2">
-<<<<<<< HEAD
                           {!a.repasse_pago && (a.valor_medico ?? 0) > 0 ? (
                             isAtendido(a) ? (
                               <Checkbox
@@ -2326,24 +2277,6 @@ function Page() {
                               </span>
                             )
                           ) : null}
-=======
-                          {(a.valor_medico ?? 0) > 0 ? (
-                            <Checkbox
-                              checked={sel.has(`${a.origem}:${a.id}`)}
-                              onCheckedChange={() => toggleOne(a)}
-                              aria-label={a.repasse_pago ? "Selecionar para 2ª via" : "Selecionar"}
-                              title={a.repasse_pago ? "Selecionar para reimprimir 2ª via" : undefined}
-                              className="h-4 w-4"
-                            />
-                          ) : (
-                            <span
-                              title="Sem valor de repasse cadastrado para este médico/procedimento"
-                              className="text-[10px] text-muted-foreground whitespace-nowrap"
-                            >
-                              Sem repasse
-                            </span>
-                          )}
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                         </TableCell>
                       )}
                       <TableCell className="text-xs whitespace-nowrap px-2 text-center font-mono text-muted-foreground">
@@ -2361,14 +2294,10 @@ function Page() {
                       <TableCell className="text-xs max-w-[90px] truncate px-2" title={medicoNome}>
                         {medicoNome}
                       </TableCell>
-<<<<<<< HEAD
                       <TableCell
                         className="text-xs font-medium max-w-[120px] truncate px-2"
                         title={pacienteNome}
                       >
-=======
-                      <TableCell className="text-xs font-medium max-w-[190px] truncate px-2" title={pacienteNome}>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                         {pacienteNome}
                       </TableCell>
                       <TableCell
@@ -2542,59 +2471,12 @@ function Page() {
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
-<<<<<<< HEAD
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7"
                                 onClick={() => remove(a)}
                               >
-=======
-                              {a.repasse_pago && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  title="Imprimir comprovante de repasse"
-                                  onClick={() => abrirComprovanteDoItem(a)}
-                                >
-                                  <Printer className="h-3.5 w-3.5 text-primary" />
-                                </Button>
-                              )}
-                              {a.repasse_pago || a.status === "realizado" ? (
-                                <Button
-                                  size="sm"
-                                  disabled={!podeEstornar || a.repasse_pago}
-                                  className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
-                                  title={
-                                    a.repasse_pago
-                                      ? "Repasse já pago — estorne o repasse antes de desfazer a baixa"
-                                      : podeEstornar
-                                        ? "Clique para desfazer a baixa"
-                                        : "Repasse já baixado"
-                                  }
-                                  onClick={() => desfazerBaixa(a)}
-                                >
-                                  <CheckCircle2 className="h-3 w-3" /> Baixado
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  className={cn(
-                                    "h-6 px-2 text-[10px] gap-1 border",
-                                    isSelected
-                                      ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
-                                      : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
-                                  )}
-                                  title="Dá baixa (marcar como realizado e liberar repasse)"
-                                  onClick={() => darBaixa(a)}
-                                >
-                                  {isSelected ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                                  Baixar
-                                </Button>
-                              )}
-                              <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" onClick={() => remove(a)}>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                                 <Trash2 className="h-3.5 w-3.5 text-destructive" />
                               </Button>
                             </div>

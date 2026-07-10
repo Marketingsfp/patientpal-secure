@@ -1355,7 +1355,6 @@ export function AtendRoteamento() {
             <DialogTitle>{edit ? "Editar" : "Nova"} regra de roteamento</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSalvar} className="space-y-3">
-<<<<<<< HEAD
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
                 <Label>Nome *</Label>
@@ -1371,11 +1370,6 @@ export function AtendRoteamento() {
                   defaultValue={edit?.ordem ?? 0}
                 />
               </div>
-=======
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-2"><Label>Nome *</Label><Input name="nome" defaultValue={edit?.nome ?? ""} required maxLength={120} /></div>
-              <div><Label>Ordem</Label><Input name="ordem" type="number" min={0} max={999} defaultValue={edit?.ordem ?? 0} /></div>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

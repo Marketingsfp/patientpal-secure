@@ -8,7 +8,6 @@ export type Acesso = "none" | "read" | "write";
 
 export const TODOS_MODULOS: ReadonlyArray<string> = [
   // Operação
-<<<<<<< HEAD
   "agenda",
   "checkin",
   "caixa",
@@ -22,11 +21,6 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "cartao-beneficios",
   "painel",
   "documentos",
-=======
-  "agenda", "checkin", "caixa", "chat", "clientes", "dashboard", "fluxo",
-  "orcamentos", "recepcao", "triagem-enfermagem", "cartao-beneficios",
-  "painel", "documentos", "atendimento-multiplo",
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   // Inteligência
   "atendimento-ia",
   "crm",
@@ -44,7 +38,6 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "mkt-landing",
   "mkt-segmentos",
   // Cadastros
-<<<<<<< HEAD
   "equipe",
   "especialidades",
   "disponibilidades",
@@ -57,11 +50,6 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "estoque",
   "modelos-documentos",
   "clinicas",
-=======
-  "equipe", "especialidades", "disponibilidades", "prontuario-modelos",
-  "perfis", "unidades", "medicos", "procedimentos", "planos", "estoque",
-  "modelos-documentos", "clinicas", "tipos-servico", "enfermagem-recursos",
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   // RH
   "hr-ponto",
   "hr-contratos",
@@ -70,7 +58,6 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "treinamentos",
   "lms-admin",
   // Gestão
-<<<<<<< HEAD
   "cargos",
   "financeiro",
   "funcionarios",
@@ -82,11 +69,6 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "nfse",
   "integration-secrets",
   "lgpd",
-=======
-  "cargos", "financeiro", "funcionarios", "relatorios", "auditoria", "setores",
-  "boletos", "contratos", "nfse", "integration-secrets", "lgpd",
-  "painel-executivo",
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   // Sistema
   "perfil-proprio",
 ];
@@ -94,7 +76,6 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
 export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
   admin: Object.fromEntries(TODOS_MODULOS.map((k) => [k, "write" as Acesso])),
   gestor: {
-<<<<<<< HEAD
     dashboard: "write",
     agenda: "write",
     fluxo: "write",
@@ -150,29 +131,6 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     documentos: "write",
     clientes: "read",
     chat: "write",
-=======
-    dashboard: "write", agenda: "write", fluxo: "write", clientes: "write",
-    chat: "write", checkin: "read", recepcao: "read", orcamentos: "read",
-    caixa: "read", financeiro: "write", boletos: "read", contratos: "read",
-    nfse: "read", relatorios: "write", auditoria: "read", lgpd: "read",
-    equipe: "write", "hr-contratos": "read", "hr-ponto": "read",
-    "hr-ferias": "read", "hr-holerites": "read", treinamentos: "read",
-    cargos: "read", setores: "read", unidades: "read", medicos: "read",
-    especialidades: "read", procedimentos: "read", disponibilidades: "write",
-    "prontuario-modelos": "read", "modelos-documentos": "read", planos: "read",
-    estoque: "read", crm: "read", campanhas: "read", "mkt-leads": "read",
-    "consulta-rapida": "read", "alertas-enfermagem": "read",
-    "cartao-beneficios": "read", painel: "read", "perfil-proprio": "write",
-    "painel-executivo": "write", "atendimento-multiplo": "read",
-    "tipos-servico": "read", "enfermagem-recursos": "read",
-  },
-  medico: {
-    agenda: "write", "atendimento-ia": "write", "exames-resultados": "read",
-    "consulta-rapida": "read", "perfil-proprio": "write", "prontuario-modelos": "read",
-    odontologia: "write", prontuarios: "write", anamneses: "write",
-    documentos: "write", clientes: "read", chat: "write",
-    "atendimento-multiplo": "write",
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   },
   recepcao: {
     agenda: "write",
@@ -223,7 +181,6 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     dashboard: "read",
   },
   enfermeiro: {
-<<<<<<< HEAD
     "triagem-enfermagem": "write",
     "alertas-enfermagem": "write",
     agenda: "read",
@@ -237,14 +194,6 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     documentos: "read",
     chat: "write",
     orcamentos: "write",
-=======
-    "triagem-enfermagem": "write", "alertas-enfermagem": "write",
-    agenda: "read", clientes: "read", "consulta-rapida": "read",
-    "atendimento-ia": "read", "perfil-proprio": "write",
-    anamneses: "write", prontuarios: "read", estoque: "read",
-    documentos: "read", chat: "write", orcamentos: "write",
-    "atendimento-multiplo": "write", "enfermagem-recursos": "write",
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
   },
 };
 

@@ -432,10 +432,6 @@ export function AtendMacros() {
                 <Label>Título *</Label>
                 <Input name="titulo" defaultValue={edit?.titulo ?? ""} required maxLength={120} />
               </div>
-<<<<<<< HEAD
-=======
-              <div className="sm:col-span-2"><Label>Título *</Label><Input name="titulo" defaultValue={edit?.titulo ?? ""} required maxLength={120} /></div>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
             </div>
             <div>
               <Label>Conteúdo *</Label>
@@ -845,7 +841,6 @@ export function AtendPausas() {
             <DialogTitle>{edit ? "Editar" : "Novo"} motivo de pausa</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSalvar} className="space-y-3">
-<<<<<<< HEAD
             <div>
               <Label>Nome *</Label>
               <Input name="nome" defaultValue={edit?.nome ?? ""} required maxLength={80} />
@@ -874,13 +869,6 @@ export function AtendPausas() {
                   defaultValue={edit?.tolerancia_minutos ?? 5}
                 />
               </div>
-=======
-            <div><Label>Nome *</Label><Input name="nome" defaultValue={edit?.nome ?? ""} required maxLength={80} /></div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div><Label>Cor</Label><Input name="cor" type="color" defaultValue={edit?.cor ?? "#6b7280"} /></div>
-              <div><Label>Ícone</Label><Input name="icone" defaultValue={edit?.icone ?? ""} maxLength={40} placeholder="coffee" /></div>
-              <div><Label>Tolerância (min)</Label><Input name="tolerancia" type="number" min={0} max={480} defaultValue={edit?.tolerancia_minutos ?? 5} /></div>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">

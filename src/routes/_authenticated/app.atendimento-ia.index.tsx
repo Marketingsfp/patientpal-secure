@@ -251,20 +251,10 @@ function AtendimentoIaPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "triagens_enfermagem" },
-<<<<<<< HEAD
         () => {
           setTriagensTick((t) => t + 1);
         },
       )
-=======
-        () => { setTriagensTick((t) => t + 1); })
-      .on("postgres_changes",
-        { event: "*", schema: "public", table: "fin_lancamentos" },
-        () => { setPagamentosTick((t) => t + 1); })
-      .on("postgres_changes",
-        { event: "*", schema: "public", table: "agendamento_orcamento_itens" },
-        () => { setPagamentosTick((t) => t + 1); })
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
       .subscribe();
     return () => {
       void supabase.removeChannel(ch);
@@ -326,18 +316,7 @@ function AtendimentoIaPage() {
 
         <div className="space-y-2">
           <Label className="flex items-center gap-1.5">
-<<<<<<< HEAD
             <Users className="h-4 w-4" /> Fila de atendimento ({filaOrdenada.length})
-=======
-            <Users className="h-4 w-4" /> Fila de atendimento
-            {(() => {
-              const total = filaOrdenada.length;
-              const pendentes = filaOrdenada.filter((f) => f.fluxo_etapa !== "finalizado").length;
-              if (total === 0) return " (0)";
-              if (pendentes === total) return ` (${total})`;
-              return ` (${pendentes} pendente${pendentes === 1 ? "" : "s"} de ${total})`;
-            })()}
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
           </Label>
           {filaOrdenada.length === 0 ? (
             <div className="text-xs text-muted-foreground border border-dashed rounded-md p-4 text-center">
@@ -376,18 +355,10 @@ function AtendimentoIaPage() {
                     const pago = Boolean(pag?.pago);
                     const atendido = it.fluxo_etapa === "finalizado";
                     return (
-<<<<<<< HEAD
                       <TableRow key={it.id}>
                         <TableCell className="tabular-nums text-xs text-muted-foreground">
                           {idx + 1}
                         </TableCell>
-=======
-                      <TableRow
-                        key={it.id}
-                        className={`${atendido ? "opacity-60" : ""} ${!atendido && !pago && pag ? "border-l-4 border-l-amber-400" : ""}`.trim()}
-                      >
-                        <TableCell className="tabular-nums text-xs text-muted-foreground">{idx + 1}</TableCell>
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
                         <TableCell className="tabular-nums text-xs">{hora}</TableCell>
                         <TableCell className="font-medium uppercase">{it.paciente_nome}</TableCell>
                         <TableCell className="hidden md:table-cell text-xs text-muted-foreground">

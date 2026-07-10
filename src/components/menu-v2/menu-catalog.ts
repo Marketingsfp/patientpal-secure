@@ -33,7 +33,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
-<<<<<<< HEAD
   Zap,
   LogIn,
   Workflow,
@@ -42,10 +41,6 @@ import {
   Sparkles,
   Bell,
   FileSignature,
-=======
-  Zap, LogIn, Workflow, ListChecks, Brain, Sparkles, Bell, FileSignature,
-  TrendingUp, HardDrive,
->>>>>>> 18eb686dbc25b258ff35f41366dbb0c3660f374b
 } from "lucide-react";
 
 export type MenuItem = {
