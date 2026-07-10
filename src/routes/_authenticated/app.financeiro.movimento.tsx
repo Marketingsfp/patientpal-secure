@@ -774,7 +774,7 @@ function Page() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="Estornar"
+                        title="Estornar lançamento — mantém o registro no histórico com status 'cancelado' e desvincula o laudo (recomendado para repasses)."
                         disabled={estornando === l.id}
                         onClick={() => estornar(l)}
                       >
@@ -783,8 +783,8 @@ function Page() {
                     ) : null}
                     {podeEscrever && l.origem !== "caixa" ? (
                       <>
-                        <Button variant="ghost" size="icon" title="Editar" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
-                        <Button variant="ghost" size="icon" title="Excluir" onClick={() => remove(l)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                        <Button variant="ghost" size="icon" title="Editar lançamento — alterar descrição, valor, categoria, conta ou forma de pagamento." onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" title="Excluir lançamento — remove definitivamente do banco (sem histórico). Use apenas para lançamentos criados por engano; para repasses prefira Estornar." onClick={() => remove(l)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                       </>
                     ) : null}
                   </div>
