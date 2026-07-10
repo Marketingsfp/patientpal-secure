@@ -618,13 +618,16 @@ function NovoContratoForm({
     const valorParcela = valor + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
       const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
+      const jaPago = i < mensalidadesJaPagas;
+      const vencStr = venc.toISOString().slice(0, 10);
       return {
         contrato_id: contrato.id,
         clinica_id: clinicaId,
         numero_parcela: i + 1,
-        vencimento: venc.toISOString().slice(0, 10),
+        vencimento: vencStr,
         valor: valorParcela,
-        status: "pendente",
+        status: jaPago ? "pago" : "pendente",
+        ...(jaPago ? { pago_em: vencStr, valor_pago: valorParcela } : {}),
       };
     });
     const { error: mensErr } = await supabase.from("contrato_mensalidades").insert(parcelas);
