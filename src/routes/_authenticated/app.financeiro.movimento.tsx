@@ -36,6 +36,10 @@ interface Lanc {
   transferSentido?: "entrada" | "saida";
   /** HH:MM local — só preenchido para linhas vindas de caixa_movimentos */
   hora?: string | null;
+  /** Nome do médico do lançamento (linhas de fin_lancamentos com medico_id). */
+  medico_nome?: string | null;
+  /** Nº da ficha do agendamento vinculado. */
+  ficha_numero?: number | null;
 }
 interface Opt { id: string; nome: string; tipo?: string }
 
@@ -110,7 +114,7 @@ function Page() {
       let offset = 0;
       for (;;) {
         let q = supabase.from("fin_lancamentos")
-          .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, criado_por")
+          .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, criado_por, medico_id, agendamento_id, created_at")
           .eq("clinica_id", clinicaAtual.clinica_id)
           .gte("data", fromDate).lte("data", toDate)
           .order("data", { ascending: false })
@@ -124,12 +128,66 @@ function Page() {
         if (filterPacienteDebounced) q = q.ilike("descricao", `%${filterPacienteDebounced}%`);
         const { data, error } = await q;
         if (error) { mostrarErro(error); setLoading(false); return; }
-        const rows = (data ?? []) as Array<Omit<Lanc, "origem">>;
-        finList.push(...rows.map((l) => ({ ...l, origem: "fin" as const })));
+        const rows = (data ?? []) as Array<
+          Omit<Lanc, "origem" | "medico_nome" | "ficha_numero"> & {
+            medico_id?: string | null;
+            agendamento_id?: string | null;
+            created_at?: string | null;
+          }
+        >;
+        finList.push(
+          ...rows.map((l) => ({
+            ...l,
+            origem: "fin" as const,
+            hora: l.created_at
+              ? (() => {
+                  const d = new Date(l.created_at as string);
+                  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+                })()
+              : null,
+          })),
+        );
         if (rows.length < CHUNK) break;
         offset += CHUNK;
         if (offset >= MAX) break;
       }
+      // Enriquecer com nome do médico e nº da ficha do agendamento vinculado.
+      const medIds = Array.from(
+        new Set(
+          finList
+            .map((l) => (l as unknown as { medico_id?: string | null }).medico_id)
+            .filter((x): x is string => !!x),
+        ),
+      );
+      const agIds = Array.from(
+        new Set(
+          finList
+            .map((l) => (l as unknown as { agendamento_id?: string | null }).agendamento_id)
+            .filter((x): x is string => !!x),
+        ),
+      );
+      const medMap = new Map<string, string>();
+      if (medIds.length) {
+        const { data: meds } = await supabase.from("medicos").select("id, nome").in("id", medIds);
+        for (const m of (meds ?? []) as Array<{ id: string; nome: string | null }>) {
+          medMap.set(m.id, m.nome ?? "");
+        }
+      }
+      const fichaMap = new Map<string, number | null>();
+      if (agIds.length) {
+        const { data: ags } = await supabase.from("agendamentos").select("id, ficha_numero").in("id", agIds);
+        for (const a of (ags ?? []) as Array<{ id: string; ficha_numero: number | null }>) {
+          fichaMap.set(a.id, a.ficha_numero);
+        }
+      }
+      finList = finList.map((l) => {
+        const raw = l as unknown as { medico_id?: string | null; agendamento_id?: string | null };
+        return {
+          ...l,
+          medico_nome: raw.medico_id ? medMap.get(raw.medico_id) ?? null : null,
+          ficha_numero: raw.agendamento_id ? fichaMap.get(raw.agendamento_id) ?? null : null,
+        };
+      });
     }
     // 2) Transferências entre caixas — sangria/suprimento em caixa_movimentos
     //    (só carrega se o filtro Forma não estiver restringindo a algo específico
@@ -462,8 +520,11 @@ function Page() {
             exportToExcel(
               items.map((l) => ({
                 data: (l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) : ""),
+                hora: l.hora ?? "",
                 tipo: l.tipo,
                 descricao: l.descricao,
+                medico: l.medico_nome ?? "",
+                ficha: typeof l.ficha_numero === "number" ? String(l.ficha_numero).padStart(3, "0") : "",
                 categoria: l.categoria_id ? catMap.get(l.categoria_id) ?? "" : "",
                 conta: l.conta_id ? contaMap.get(l.conta_id) ?? "" : "",
                 forma_pagamento: l.forma_pagamento ?? "",
@@ -474,8 +535,11 @@ function Page() {
               `movimento-${fromDate}_a_${toDate}`,
               [
                 { key: "data", label: "Data" },
+                { key: "hora", label: "Hora" },
                 { key: "tipo", label: "Tipo" },
                 { key: "descricao", label: "Descrição" },
+                { key: "medico", label: "Médico" },
+                { key: "ficha", label: "Ficha" },
                 { key: "categoria", label: "Categoria" },
                 { key: "conta", label: "Conta" },
                 { key: "forma_pagamento", label: "Forma pagamento" },
@@ -672,6 +736,8 @@ function Page() {
               <TableHead className="w-10"></TableHead>
               <TableHead>Data</TableHead>
               <TableHead>Descrição</TableHead>
+              <TableHead>Médico</TableHead>
+              <TableHead className="text-right">Ficha</TableHead>
               <TableHead>Usuário</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Valor</TableHead>
@@ -690,6 +756,8 @@ function Page() {
                 }</TableCell>
                 <TableCell className="text-sm">{(l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) + (l.hora ? " " + l.hora : "") : "")}</TableCell>
                 <TableCell>{l.descricao}</TableCell>
+                <TableCell className="text-sm whitespace-nowrap">{l.medico_nome || "—"}</TableCell>
+                <TableCell className="text-sm text-right tabular-nums">{typeof l.ficha_numero === "number" ? String(l.ficha_numero).padStart(3, "0") : "—"}</TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{l.criado_por ? userMap.get(l.criado_por) ?? "—" : "—"}</TableCell>
                 <TableCell><Badge variant={l.status === "confirmado" ? "default" : "secondary"}>{l.status}</Badge></TableCell>
                 <TableCell className={`text-right font-medium ${

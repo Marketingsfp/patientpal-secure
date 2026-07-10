@@ -1,36 +1,41 @@
 ## Objetivo
 
-No diálogo **"Marcar laudo emitido"** (Financeiro › Atendimentos), após escolher o **Médico laudador**, o campo **Valor do laudo (R$)** passa a ser preenchido automaticamente a partir do cadastro feito na aba **Repasse** do médico dono da agenda (ex.: Eletrocardiograma).
+Na página **Mov. Caixa** (`src/routes/_authenticated/app.financeiro.movimento.tsx`), acrescentar na listagem, para cada lançamento vindo de `fin_lancamentos`:
 
-## Fonte dos dados
+- **Médico** (nova coluna) — nome do médico do lançamento.
+- **Ficha** (nova coluna) — `ficha_numero` do agendamento vinculado.
+- **Horário** — hora do pagamento (HH:MM) exibida junto à Data, no mesmo formato que hoje é usado para sangria/suprimento (que já mostra hora).
 
-Tabela `medico_repasse_laudo` — já é onde a aba "Repasse › Laudo Terceiro" grava as regras.
+Sem tocar em lógica financeira, RLS ou schema.
 
-Chave da busca:
-- `clinica_id` = clínica atual
-- `agenda_medico_id` = `laudoTarget.medico_id` (a agenda do exame, ex.: Eletrocardiograma)
-- `laudador_medico_id` = médico escolhido no dropdown
-- `ativo = true`
+## Mudanças
 
-Cálculo do sugerido:
-- `tipo_repasse = "valor"` → usa `valor` diretamente.
-- `tipo_repasse = "percentual"` → `laudoTarget.valor_total * percentual / 100`.
+### 1. `load()` — trazer novos campos e enriquecer
 
-## Alterações em `src/routes/_authenticated/app.financeiro.atendimentos.tsx`
+- Ampliar o `select` em `fin_lancamentos` para incluir `medico_id, agendamento_id, created_at`.
+- Após montar `finList`, executar duas buscas em batch (só se houver ids):
+  - `medicos` → `id, nome` para os `medico_id` distintos.
+  - `agendamentos` → `id, ficha_numero` para os `agendamento_id` distintos.
+- Preencher em cada linha `fin`:
+  - `medico_nome` a partir do map.
+  - `ficha_numero` a partir do map.
+  - `hora` = `created_at` convertido para `HH:MM` local (mesma UX das linhas de `caixa_movimentos`, que já preenchem `hora`).
 
-1. **Limitar o dropdown "Médico laudador"** aos laudadores cadastrados para a agenda daquele atendimento (`medico_repasse_laudo.laudador_medico_id`), buscando quando o diálogo abrir. Se não houver nenhum cadastrado, mostra a lista atual como fallback e um aviso curto no diálogo.
+### 2. Interface `Lanc`
 
-2. **Ao abrir o diálogo (`openLaudo`)**: se o atendimento já tem `medico_laudador_id`, buscar a regra correspondente e sugerir o valor (se ainda não houver `valor_laudo` gravado).
+Acrescentar `medico_nome?: string | null; ficha_numero?: number | null` (os demais já cabem em `hora`/`agendamento_id`).
 
-3. **Ao trocar o médico laudador no `Select`**: disparar a busca da regra `(agenda_medico_id, laudador_medico_id)` e:
-   - preencher `laudoForm.valor_laudo` com o sugerido;
-   - manter o campo editável (usuário pode sobrescrever);
-   - se não existir regra cadastrada, zerar o campo e mostrar um texto discreto: *"Sem regra cadastrada para este laudador — informe o valor manualmente."*
+### 3. Tabela (linhas ~671-694)
 
-4. **Sem mudanças no `emitirLaudo`**: a gravação continua igual (`valor_laudo` já vem do form).
+- Novo `<TableHead>Médico</TableHead>` entre "Descrição" e "Usuário".
+- Novo `<TableHead className="text-right">Ficha</TableHead>` entre "Médico" e "Usuário" (nº da ficha, formatação com 3 dígitos como no restante do sistema — `String(n).padStart(3,"0")`, fallback "—").
+- Célula da Data já concatena `hora` quando presente; passa a mostrar hora também para receitas/despesas (via `hora` derivado de `created_at`).
+
+### 4. Exportar Excel (linhas ~468-486)
+
+Incluir no payload e nas colunas: `medico`, `ficha`, `hora` (novas colunas após "Data").
 
 ## Fora de escopo
 
-- Não altera o cadastro em `MedicoFormDialog` nem a página `Laudos ECG`.
-- Não muda a estrutura da tabela `medico_repasse_laudo`.
-- Não altera o botão "Confirmar laudo emitido".
+- Linhas de `caixa_movimentos` (sangria/suprimento) não têm médico/ficha; ficam com "—" nas novas colunas.
+- Nenhuma alteração no filtro, no cálculo dos totais, no CRUD do dialog, ou nas outras abas.

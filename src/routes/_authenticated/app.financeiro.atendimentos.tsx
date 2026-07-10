@@ -20,6 +20,7 @@ import {
   HelpCircle,
   Printer,
   MoreHorizontal,
+  Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -525,6 +526,30 @@ function Page() {
       return;
     }
     toast.success("Laudo emitido — repasse do laudador gerado");
+    // Gera comprovante de pagamento do laudo (mesmo modelo do repasse)
+    const hojeIso = new Date().toISOString();
+    const hoje = hojeIso.slice(0, 10);
+    const itemComprovante: Atend = {
+      ...laudoTarget,
+      medico_id: laudoForm.medico_laudador_id,
+      valor_medico: valor,
+      repasse_pago_em: hoje,
+      repasse_pago_at: hojeIso,
+      repasse_forma_pagamento: laudoTarget.forma_pagamento ?? null,
+      repasse_conta_id: laudoTarget.repasse_conta_id ?? null,
+    };
+    const c = buildComprovante([itemComprovante], {
+      data: hoje,
+      forma_pagamento: laudoTarget.forma_pagamento || "—",
+      conta_id: laudoTarget.repasse_conta_id ?? "",
+      pago_at: hojeIso,
+      reimpressao: false,
+    });
+    if (c) {
+      setComprovante(c);
+      setComprovantes([c]);
+      setComprovanteOpen(true);
+    }
     setLaudoOpen(false);
     setLaudoTarget(null);
     await load();
@@ -1135,14 +1160,15 @@ function Page() {
     }
     if (
       !confirm(
-        "Desfazer a baixa deste atendimento?\n\nO atendimento volta para 'Confirmado' e deixa de constar como pago. Lançamentos-sombra de R$ 0,00 serão removidos automaticamente.",
+        "Desfazer a baixa deste atendimento?\n\nO atendimento volta para 'Confirmado'. O pagamento do paciente (se houver) permanece intacto no caixa — só o lançamento-sombra de R$ 0,00 é removido.",
       )
     )
       return;
     try {
       // Verifica lançamento(s) em caixa vinculados. Só apagamos os R$ 0,00
-      // (lançamento-sombra "SEM COBRANÇA"). Valores > 0 precisam ser
-      // estornados no Mov. Caixa antes, para preservar a trilha financeira.
+      // (lançamento-sombra "SEM COBRANÇA"). Lançamentos pagos (valor > 0)
+      // permanecem — o pagamento do paciente é trilha independente do
+      // status médico do atendimento.
       let sombraIds: string[] = [];
       if (a.origem === "agenda" && a.agendamento_id) {
         const { data: lancs } = await supabase
@@ -1150,13 +1176,6 @@ function Page() {
           .select("id, valor")
           .eq("agendamento_id", a.agendamento_id);
         const rows = (lancs ?? []) as Array<{ id: string; valor: number | string | null }>;
-        const naoZero = rows.filter((l) => Number(l.valor) > 0);
-        if (naoZero.length > 0) {
-          toast.error(
-            "Há lançamento pago no caixa vinculado. Estorne pelo Mov. Caixa antes de desfazer a baixa.",
-          );
-          return;
-        }
         sombraIds = rows.filter((l) => Number(l.valor) === 0).map((l) => l.id);
       } else if (a.origem !== "agenda") {
         const { data: fa } = await supabase
@@ -1172,15 +1191,7 @@ function Page() {
             .eq("id", lancId)
             .maybeSingle();
           const row = l as { id: string; valor: number | string | null } | null;
-          if (row) {
-            if (Number(row.valor) > 0) {
-              toast.error(
-                "Há lançamento pago no caixa vinculado. Estorne pelo Mov. Caixa antes de desfazer a baixa.",
-              );
-              return;
-            }
-            sombraIds = [row.id];
-          }
+          if (row && Number(row.valor) === 0) sombraIds = [row.id];
         }
       }
 
@@ -1259,6 +1270,90 @@ function Page() {
         }
       }
       toast.success(`Baixa realizada em ${alvos.length} atendimento(s). Repasses liberados.`);
+      await load();
+    } catch (err) {
+      mostrarErro(err);
+    }
+  };
+
+  const desfazerBaixaLote = async () => {
+    if (!podeEstornar) {
+      toast.error("Sem permissão para desfazer a baixa.");
+      return;
+    }
+    const alvos = selectedItems.filter((a) => !a.repasse_pago && isAtendido(a));
+    if (alvos.length === 0) return;
+    if (
+      !confirm(
+        `Desfazer a baixa de ${alvos.length} atendimento(s)?\n\nOs atendimentos voltam para 'Confirmado'. Os pagamentos dos pacientes permanecem intactos no caixa — apenas lançamentos-sombra de R$ 0,00 são removidos.`,
+      )
+    )
+      return;
+    try {
+      const agIds = alvos
+        .filter((a) => a.origem === "agenda" && !!a.agendamento_id)
+        .map((a) => a.agendamento_id as string);
+      const manualIds = alvos.filter((a) => a.origem === "manual").map((a) => a.id);
+
+      // Coleta lançamentos-sombra (R$ 0,00) para apagar.
+      let sombraIds: string[] = [];
+      if (agIds.length) {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("id, valor, agendamento_id")
+          .in("agendamento_id", agIds);
+        const rows = (lancs ?? []) as Array<{ id: string; valor: number | string | null }>;
+        sombraIds.push(...rows.filter((l) => Number(l.valor) === 0).map((l) => l.id));
+      }
+      if (manualIds.length) {
+        const { data: fas } = await supabase
+          .from("fin_atendimentos")
+          .select("lancamento_id")
+          .in("id", manualIds);
+        const lancIds = ((fas ?? []) as Array<{ lancamento_id: string | null }>)
+          .map((r) => r.lancamento_id)
+          .filter((x): x is string => !!x);
+        if (lancIds.length) {
+          const { data: lancs } = await supabase
+            .from("fin_lancamentos")
+            .select("id, valor")
+            .in("id", lancIds);
+          const rows = (lancs ?? []) as Array<{ id: string; valor: number | string | null }>;
+          sombraIds.push(...rows.filter((l) => Number(l.valor) === 0).map((l) => l.id));
+        }
+      }
+
+      if (agIds.length) {
+        const { error } = await supabase
+          .from("agendamentos")
+          .update({ status: "confirmado" })
+          .in("id", agIds);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      if (manualIds.length) {
+        const { error } = await supabase
+          .from("fin_atendimentos")
+          .update({ status: "confirmado" })
+          .in("id", manualIds);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      }
+      if (sombraIds.length) {
+        const { error: delErr } = await supabase
+          .from("fin_lancamentos")
+          .delete()
+          .in("id", sombraIds);
+        if (delErr) {
+          mostrarErro(delErr);
+          return;
+        }
+      }
+      toast.success(`Baixa desfeita em ${alvos.length} atendimento(s).`);
       await load();
     } catch (err) {
       mostrarErro(err);
@@ -1356,6 +1451,9 @@ function Page() {
   const selectedNaoPagos = selectedItems.filter((a) => !a.repasse_pago);
   const selectedNaoBaixados = selectedItems.filter(
     (a) => !a.repasse_pago && !isAtendido(a),
+  );
+  const selectedBaixados = selectedItems.filter(
+    (a) => !a.repasse_pago && isAtendido(a),
   );
   const podePagar = selectedItems.length > 0 && selectedNaoPagos.length === selectedItems.length;
   const podeReimprimir = selectedItems.length > 0 && selectedPagos.length === selectedItems.length;
@@ -1618,6 +1716,17 @@ function Page() {
                   <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
                   Dar baixa
                   {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={selectedBaixados.length === 0 || !podeEstornar}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedBaixados.length > 0) desfazerBaixaLote();
+                  }}
+                >
+                  <Undo2 className="h-4 w-4 mr-2 text-amber-600" />
+                  Desfazer baixa
+                  {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={!podeReimprimir}
@@ -2005,7 +2114,7 @@ function Page() {
                                 className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
                               >
                                 <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
-                                Emitido
+                                Pago
                               </Badge>
                             );
                           if (!exigeLaudo) return <span className="text-muted-foreground text-[10px]">—</span>;
@@ -2017,7 +2126,7 @@ function Page() {
                               className="h-6 text-[10px] px-2"
                               onClick={() => openLaudo(a)}
                             >
-                              Laudar
+                              Pagar
                             </Button>
                           );
                         })()}
@@ -2220,6 +2329,17 @@ function Page() {
                   <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
                   Dar baixa
                   {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={selectedBaixados.length === 0 || !podeEstornar}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (selectedBaixados.length > 0) desfazerBaixaLote();
+                  }}
+                >
+                  <Undo2 className="h-4 w-4 mr-2 text-amber-600" />
+                  Desfazer baixa
+                  {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={!podeReimprimir}
