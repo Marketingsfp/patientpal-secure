@@ -47,10 +47,48 @@ export function SolicitarEstornoDialog({
     const txt = motivo.trim();
     if (txt.length < 5) { toast.error("Descreva o motivo (mínimo 5 caracteres)"); return; }
     setSaving(true);
+    // Evita duplicidade: se já existe uma solicitação pendente ou aprovada
+    // para o mesmo lançamento, não cria outra.
+    if (lancamentoId) {
+      const { data: exist } = await supabase
+        .from("estorno_solicitacoes")
+        .select("id, status")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("lancamento_id", lancamentoId)
+        .in("status", ["pendente", "aprovado"])
+        .limit(1);
+      if (exist && exist.length > 0) {
+        setSaving(false);
+        toast.error(
+          exist[0].status === "pendente"
+            ? "Já existe uma solicitação pendente para este lançamento."
+            : "Este lançamento já foi estornado.",
+        );
+        // Sincroniza a UI: fecha o diálogo e força o pai a recarregar o
+        // estado das solicitações para que o botão exiba corretamente
+        // "Aguardando aprovação" ou "Estornado".
+        onOpenChange(false);
+        onCreated?.();
+        return;
+      }
+    }
     const { error } = await supabase.from("estorno_solicitacoes").insert({
       clinica_id: clinicaAtual.clinica_id,
       lancamento_id: lancamentoId ?? null,
-      agendamento_id: agendamentoId ?? null,
+      agendamento_id: await (async () => {
+        if (agendamentoId) return agendamentoId;
+        // Deriva a partir do lançamento para que a Agenda consiga marcar
+        // a linha em vermelho e ocultar o paciente para o médico.
+        if (lancamentoId) {
+          const { data: lanc } = await supabase
+            .from("fin_lancamentos")
+            .select("agendamento_id")
+            .eq("id", lancamentoId)
+            .maybeSingle();
+          return (lanc as { agendamento_id: string | null } | null)?.agendamento_id ?? null;
+        }
+        return null;
+      })(),
       paciente_nome: pacienteNome ?? null,
       descricao: descricao ?? null,
       valor: valor ?? null,

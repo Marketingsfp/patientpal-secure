@@ -41,13 +41,20 @@ import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/di
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, UserMinus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
+import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  getProcedimentosAgenda,
+  getMedicoProcedimentosAgenda,
+  getMedicoConveniosAgenda,
+  getProcedimentosComValor,
+} from "@/lib/agenda/refs-cache";
 import { useServerFn } from "@tanstack/react-start";
 import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
@@ -183,74 +190,10 @@ async function buscarProcedimentoPorNome(
   return proc ?? escolhido ?? null;
 }
 
-// Cache em memória de procedimentos da clínica (com valores) para acelerar
-// o diálogo de pagamento. TTL curto: 60s. Invalida automaticamente.
-type ProcComValor = {
-  nome: string;
-  valor_dinheiro: number | null;
-  valor_pix: number | null;
-  valor_padrao: number | null;
-  valor_cartao: number | null;
-  valor_cartao_credito: number | null;
-  valor_cartao_debito: number | null;
-  valor_dinheiro_pix: number | null;
-};
-const _procsCache = new Map<string, { ts: number; data: ProcComValor[] }>();
-const PROCS_TTL_MS = 60_000;
-async function getProcedimentosComValor(clinicaId: string): Promise<ProcComValor[]> {
-  const cached = _procsCache.get(clinicaId);
-  if (cached && Date.now() - cached.ts < PROCS_TTL_MS) return cached.data;
-  const { data } = await supabase
-    .from("procedimentos")
-    .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
-    .eq("clinica_id", clinicaId)
-    .eq("ativo", true)
-    .limit(5000);
-  const rows = (data ?? []) as ProcComValor[];
-  _procsCache.set(clinicaId, { ts: Date.now(), data: rows });
-  return rows;
-}
-
-async function fetchProcedimentosAgenda(clinicaId: string): Promise<ProcedimentoRef[]> {
-  const pageSize = 1000;
-  const rows: ProcedimentoRef[] = [];
-
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
-      .from("procedimentos")
-      .select("id,nome,tipo,grupo,tipo_procedimento")
-      .eq("clinica_id", clinicaId)
-      .eq("ativo", true)
-      .order("nome")
-      .range(from, from + pageSize - 1);
-
-    if (error) throw error;
-    const page = (data ?? []) as ProcedimentoRef[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
-
-  return rows;
-}
-
-async function fetchMedicoProcedimentosAgenda(clinicaId: string): Promise<MedicoProcedimentoRef[]> {
-  // Filtra por clínica via inner join em medicos (evita carregar dados de
-  // outras clínicas e usa o índice idx_medicos_clinica_ativo).
-  const pageSize = 5000;
-  const rows: MedicoProcedimentoRef[] = [];
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
-      .from("medico_procedimentos")
-      .select("medico_id,procedimento_id,especialidade_id,created_at,medicos!inner(clinica_id)")
-      .eq("medicos.clinica_id", clinicaId)
-      .range(from, from + pageSize - 1);
-    if (error) throw error;
-    const page = (data ?? []) as unknown as MedicoProcedimentoRef[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
-  return rows;
-}
+// Fetchers com cache in-memory (60s / 300s) vivem em src/lib/agenda/refs-cache.ts.
+// Adaptadores locais para preservar o restante do arquivo sem renomeações.
+const fetchProcedimentosAgenda = getProcedimentosAgenda;
+const fetchMedicoProcedimentosAgenda = getMedicoProcedimentosAgenda;
 
 type DescontoConvenio =
   | { tipo: "percentual"; valor: number }
@@ -655,6 +598,10 @@ function AgendaPage() {
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
   const [agendasPorMedico, setAgendasPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
   const [procIdsPorAgenda, setProcIdsPorAgenda] = useState<Map<string, Set<string>>>(new Map());
+  // Solicitações de estorno pendentes por agendamento — a linha correspondente
+  // fica em vermelho e, para o médico, o paciente é ocultado até o financeiro
+  // decidir.
+  const [estornoPendAgs, setEstornoPendAgs] = useState<Set<string>>(new Set());
   const [filtroDiaSemana, setFiltroDiaSemana] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroCliente, setFiltroCliente] = useState("");
@@ -881,6 +828,13 @@ function AgendaPage() {
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
   const [pagamentoExtraIds, setPagamentoExtraIds] = useState<string[]>([]);
   const [pagamentoForma, setPagamentoForma] = useState<string>("");
+  // Peso por atendimento p/ rateio quando o pagamento é agrupado.
+  // key = agendamento_id, value = valor cheio (cartão preferido, senão dinheiro).
+  const [pagamentoPesos, setPagamentoPesos] = useState<Record<string, number>>({});
+  // Rótulo curto por atendimento p/ compor a descrição individual do lançamento.
+  const [pagamentoRotulos, setPagamentoRotulos] = useState<Record<string, string>>({});
+  // Nome do paciente do pagamento agrupado (para compor descrições individuais).
+  const [pagamentoPacienteNome, setPagamentoPacienteNome] = useState<string>("");
   // Sinaliza que após o pagamento+impressão devemos abrir a emissão da NFS-e.
   const emitirNotaAposRef = useRef(false);
   const emitenteNotaAposRef = useRef<string | null>(null);
@@ -1267,13 +1221,13 @@ function AgendaPage() {
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
-    const [m, e, me, pr, sr, mc, mp, er, erp, agendasRes] = await Promise.all([
+    const [m, e, me, pr, sr, mcRows, mp, er, erp, agendasRes] = await Promise.all([
       supabase.from("medicos").select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("especialidades").select("id,nome").order("nome"),
+      supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id,medicos!inner(clinica_id)").eq("medicos.clinica_id", clinicaAtual.clinica_id),
       fetchProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("procedimento_split_regras").select("medico_id,procedimento_id").eq("clinica_id", clinicaAtual.clinica_id).not("medico_id", "is", null),
-      supabase.from("medico_convenios").select("medico_id,nome,ativo,medicos!inner(clinica_id)").eq("ativo", true).eq("medicos.clinica_id", clinicaAtual.clinica_id),
+      getMedicoConveniosAgenda(clinicaAtual.clinica_id),
       fetchMedicoProcedimentosAgenda(clinicaAtual.clinica_id),
       supabase.from("enfermagem_recursos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("enfermagem_recurso_procedimentos").select("recurso_id,procedimento_id,enfermagem_recursos!inner(clinica_id)").eq("enfermagem_recursos.clinica_id", clinicaAtual.clinica_id),
@@ -1362,6 +1316,15 @@ function AgendaPage() {
       if (!map.has(r.medico_id)) map.set(r.medico_id, new Set());
       map.get(r.medico_id)!.add(r.especialidade_id);
     }
+    // Também considera a especialidade principal salva em `medicos.especialidade_id`
+    // (nem todo médico tem entrada em `medico_especialidades`). Sem isso, o filtro
+    // "Especialidade" da agenda não encontra agendamentos desses médicos.
+    for (const md of medicosBase) {
+      if (md.especialidade_id) {
+        if (!map.has(md.id)) map.set(md.id, new Set());
+        map.get(md.id)!.add(md.especialidade_id);
+      }
+    }
     setMedicoEspec(map);
     // Médicos com mais de uma especialidade: precisam mostrar o serviço como "NOME (ESPECIALIDADE)".
     const medicoMultiEsp = new Set<string>();
@@ -1424,7 +1387,7 @@ function AgendaPage() {
     setProcOpcoesPorMedico(procOpcoesMap);
     const medicosIds = new Set((((m.data ?? []) as unknown) as Medico[]).map((x) => x.id));
     const nm = new Map<string, Set<string>>();
-    for (const r of (mc.data ?? []) as Array<{ medico_id: string; nome: string }>) {
+    for (const r of (mcRows ?? []) as Array<{ medico_id: string; nome: string }>) {
       if (!r.medico_id || !medicosIds.has(r.medico_id)) continue;
       if (!nm.has(r.medico_id)) nm.set(r.medico_id, new Set());
       nm.get(r.medico_id)!.add(normalizar(r.nome));
@@ -1434,6 +1397,15 @@ function AgendaPage() {
   };
 
   useEffect(() => { loadRef(); }, [clinicaAtual?.clinica_id]);
+
+  // Sincroniza cadastros (serviços do médico, vínculos serviço↔agenda,
+  // especialidades, recursos de enfermagem) sempre que o diálogo de
+  // agendamento é aberto. Sem isso, um serviço adicionado ao médico em
+  // outra aba/dispositivo só aparece após um refresh da página.
+  useEffect(() => {
+    if (open) void loadRef();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Fallback definitivo: se ao selecionar um médico a lista local de
   // serviços vier vazia (por qualquer motivo — cache defasado, RLS,
@@ -1542,6 +1514,48 @@ function AgendaPage() {
     if (isMedicoOnly && medicoLogadoId) setFiltroMedico(medicoLogadoId);
   }, [isMedicoOnly, medicoLogadoId]);
 
+  // Carrega os agendamentos que têm uma solicitação de estorno PENDENTE.
+  // O `agendamento_id` pode estar preenchido diretamente na solicitação ou
+  // ser derivado do `lancamento_id` → `fin_lancamentos.agendamento_id`.
+  useEffect(() => {
+    if (!clinicaAtual) { setEstornoPendAgs(new Set()); return; }
+    let cancelado = false;
+    const carregar = async () => {
+      const { data } = await supabase
+        .from("estorno_solicitacoes")
+        .select("agendamento_id, lancamento_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("status", "pendente");
+      const set = new Set<string>();
+      const lancIds: string[] = [];
+      for (const r of (data ?? []) as Array<{ agendamento_id: string | null; lancamento_id: string | null }>) {
+        if (r.agendamento_id) set.add(r.agendamento_id);
+        else if (r.lancamento_id) lancIds.push(r.lancamento_id);
+      }
+      if (lancIds.length > 0) {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("agendamento_id")
+          .in("id", lancIds);
+        for (const l of (lancs ?? []) as Array<{ agendamento_id: string | null }>) {
+          if (l.agendamento_id) set.add(l.agendamento_id);
+        }
+      }
+      if (!cancelado) setEstornoPendAgs(set);
+    };
+    void carregar();
+    const ch = supabase
+      .channel(`agenda-estornos-${clinicaAtual.clinica_id}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "estorno_solicitacoes", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
+        () => { void carregar(); })
+      .subscribe();
+    return () => {
+      cancelado = true;
+      void supabase.removeChannel(ch);
+    };
+  }, [clinicaAtual?.clinica_id]);
+
   // Verifica se o usuário logado é médico da clínica atual (para liberar status "Realizado")
   useEffect(() => {
     (async () => {
@@ -1642,7 +1656,20 @@ function AgendaPage() {
   const procedimentoFormulario = (medicoId: string | null | undefined, procedimento: string | null | undefined) => {
     const atual = procedimentoEfetivo(medicoId, procedimento);
     const med = medicoId ? medicos.find((m) => m.id === medicoId) : null;
-    if (atual && med?.especialidade_nome && normalizar(atual) === normalizar(med.especialidade_nome)) return "";
+    if (atual && med?.especialidade_nome && normalizar(atual) === normalizar(med.especialidade_nome)) {
+      // Só zera se for realmente a especialidade sintética — se o texto
+      // corresponder a um procedimento cadastrado para o médico/recurso
+      // (ex.: recurso "TESTE ERGOMETRICO" que executa o exame homônimo),
+      // mantém o valor para não perder o serviço no submit.
+      const opts = opcoesProcedimentoMedico(
+        medicoId ?? null,
+        editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
+      );
+      const alvo = normalizar(atual);
+      const ehProcedimentoReal = opts.some((o) => normalizar(o.nome) === alvo)
+        || normalizar(procedimentoPadraoDoMedico(medicoId) ?? "") === alvo;
+      if (!ehProcedimentoReal) return "";
+    }
     return atual;
   };
 
@@ -1667,6 +1694,12 @@ function AgendaPage() {
     if (!espIds || espIds.size === 0) return false;
     return Array.from(espIds).some((id) => normalizar(especialidades.find((e) => e.id === id)?.nome ?? "").includes("laborat"));
   };
+
+  // Rótulo de fallback quando um agendamento não tem procedimento nomeado.
+  // Agendamentos de laboratório NÃO podem exibir "Consulta"; usam
+  // "EXAMES LABORATORIAIS" para deixar claro o tipo de atendimento.
+  const rotuloFallbackProc = (medicoId: string | null | undefined) =>
+    medicoEhLaboratorioFormulario(medicoId) ? "EXAMES LABORATORIAIS" : "CONSULTA";
 
   const procedimentoEhImagem = (label: string) => {
     // Preferência: consulta a categoria no cadastro do procedimento.
@@ -1806,19 +1839,14 @@ function AgendaPage() {
     const ordenados = [...items].sort((a, b) => a.inicio.localeCompare(b.inicio));
     ordenados.forEach((a) => {
       const dia = a.inicio.slice(0, 10);
-      const fixa = (a as { ficha_numero?: number | null }).ficha_numero;
-      if (typeof fixa === "number" && fixa > 0) {
-        m.set(a.id, String(fixa).padStart(3, "0"));
-        return;
-      }
-      // Alinhado à GR: ignora slots livres na numeração dinâmica.
-      if (isSlotLivre(a.paciente_nome) || !a.paciente_id) {
-        return;
-      }
       const chave = `${dia}__${a.agenda_id ?? a.medico_id ?? "sem-agenda"}`;
+      // Numeração POSICIONAL fixa: todo slot (inclusive DISPONÍVEL/BLOQUEIO)
+      // recebe um número sequencial por dia/agenda. Assim a ficha nunca fica
+      // em branco nem "pula" quando o horário está livre.
       const n = (contadores.get(chave) ?? 0) + 1;
       contadores.set(chave, n);
-      const num = n;
+      const fixa = (a as { ficha_numero?: number | null }).ficha_numero;
+      const num = typeof fixa === "number" && fixa > 0 ? fixa : n;
       m.set(a.id, String(num).padStart(3, "0"));
     });
     return m;
@@ -1931,17 +1959,26 @@ function AgendaPage() {
     // Resolve todos os procedimentos em paralelo (cada um pode cair em
     // fallback no banco; em paralelo o tempo total fica ~= 1 chamada).
     const procsResolvidos = await Promise.all(
-      itens.map((it) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? "CONSULTA", procs)),
+      itens.map((it) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? rotuloFallbackProc(it.medico_id), procs)),
     );
-    for (const p of procsResolvidos as any[]) {
+    const pesos: Record<string, number> = {};
+    const rotulos: Record<string, string> = {};
+    (procsResolvidos as any[]).forEach((p, idx) => {
       const valorCartao = valorCartaoProcedimento(p);
-      totalDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+      const valorDin = primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+      totalDinheiro += valorDin;
       totalPix      += valorCartao;
       totalDebito   += valorCartao;
       totalCredito  += valorCartao;
-    }
+      // Peso p/ rateio: prioriza valor de cartão (cheio); se 0, usa dinheiro.
+      pesos[itens[idx].id] = valorCartao > 0 ? valorCartao : valorDin;
+      rotulos[itens[idx].id] = itens[idx].procedimento ?? rotuloFallbackProc(itens[idx].medico_id);
+    });
+    setPagamentoPesos(pesos);
+    setPagamentoRotulos(rotulos);
     const paciente = itens[0].paciente_nome;
-    const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`;
+    setPagamentoPacienteNome(paciente);
+    const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? rotuloFallbackProc(i.medico_id))).join(" + ")} (${itens.length} serviços)`;
     const opcoes: FormaOpcao[] = [
       { forma: "dinheiro", label: "Dinheiro", valor: totalDinheiro },
       { forma: "pix", label: "Pix", valor: totalPix },
@@ -1953,7 +1990,7 @@ function AgendaPage() {
       agId: itens.map(i => i.id).join(","),
       desc,
       paciente,
-      procedimento: `${itens.map(i => (i.procedimento ?? "CONSULTA")).join(" + ")} (${itens.length} serviços)`,
+      procedimento: `${itens.map(i => (i.procedimento ?? rotuloFallbackProc(i.medico_id))).join(" + ")} (${itens.length} serviços)`,
       medico: (() => {
         const m = medicos.find((mm) => mm.id === itens[0].medico_id);
         return m?.nome ?? undefined;
@@ -2591,7 +2628,8 @@ function AgendaPage() {
         .map((p) => procedimentoFormulario(form.medico_id, p).trim())
         .filter(Boolean),
     ));
-    if (procedimentosParaSalvar.length === 0) { toast.error("Selecione o serviço"); return; }
+    // Serviço é opcional — quando não informado, o agendamento é salvo sem
+    // procedimento e a cobrança pode ser feita via "Valor manual".
     const procedimentoTexto = procedimentosParaSalvar.join(" + ");
     const multiExamesModo = procedimentosParaSalvar.length > 1
       ? (medicoEhLaboratorioFormulario(form.medico_id) ? "laboratorio" : "imagem")
@@ -2677,7 +2715,7 @@ function AgendaPage() {
       // no cadastro. Resolvemos cada procedimento individualmente e somamos.
       const nomesParaValorar = procedimentosParaSalvar.length > 0
         ? procedimentosParaSalvar
-        : [payload.procedimento ?? "CONSULTA"];
+        : [payload.procedimento ?? rotuloFallbackProc(payload.medico_id)];
       const procsIndividuais = await Promise.all(
         nomesParaValorar.map((nome) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista)),
       );
@@ -2731,9 +2769,9 @@ function AgendaPage() {
         // Agrupa o principal + irmãos (imagem multi-exame) para que a mesma
         // cobrança marque todos os agendamentos correspondentes como pagos.
         agId: [novoId, ...(result.sibling_ids ?? [])].join(","),
-        desc: `${payload.paciente_nome} — ${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
+        desc: `${payload.paciente_nome} — ${payload.procedimento ?? rotuloFallbackProc(payload.medico_id)}${descSuffix}`,
         paciente: payload.paciente_nome ?? "",
-        procedimento: `${payload.procedimento ?? "CONSULTA"}${descSuffix}`,
+        procedimento: `${payload.procedimento ?? rotuloFallbackProc(payload.medico_id)}${descSuffix}`,
         medico: medicos.find((m) => m.id === payload.medico_id)?.nome ?? undefined,
         especialidade: medicos.find((m) => m.id === payload.medico_id)?.especialidade_nome ?? undefined,
       });
@@ -2924,12 +2962,12 @@ function AgendaPage() {
     // Multi-exame (laboratório/imagem): quando o nome vem concatenado com " + ",
     // resolvemos cada item individualmente e somamos. Para agendamento simples,
     // o split retorna apenas um item e o comportamento permanece igual.
-    const nomesParaValorar = (a.procedimento ?? "CONSULTA")
+    const nomesParaValorar = (a.procedimento ?? rotuloFallbackProc(a.medico_id))
       .split(/\s+\+\s+/)
       .map((s) => s.trim())
       .filter(Boolean);
     const procsIndividuais = await Promise.all(
-      (nomesParaValorar.length > 0 ? nomesParaValorar : ["CONSULTA"]).map((nome) =>
+      (nomesParaValorar.length > 0 ? nomesParaValorar : [rotuloFallbackProc(a.medico_id)]).map((nome) =>
         buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista),
       ),
     );
@@ -2979,12 +3017,60 @@ function AgendaPage() {
         toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
       }
     }
+    // Procedimento sem valor (ex.: REVISÃO / retorno gratuito). Não abre o
+    // fluxo de cobrança — registra um lançamento de valor 0 (linha-sombra),
+    // marca como pago e avança o fluxo, do mesmo modo que um pagamento normal.
+    const totalOpcoes = opcoes.reduce((s, o) => s + (Number(o.valor) || 0), 0);
+    // Só auto-registra "SEM COBRANÇA" quando o procedimento foi encontrado
+    // no cadastro E realmente está com valor zero. Se nenhum procedimento
+    // casou (ex.: laboratório com nome genérico "EXAMES LABORATORIAIS" ou
+    // agendamento com procedimento em branco), abrimos o diálogo de forma
+    // de pagamento normalmente para o operador digitar o valor.
+    const algumProcCasou = (procsIndividuais as any[]).some((p) => p != null);
+    const ehLab = medicoEhLaboratorioFormulario(a.medico_id);
+    if (!opcoesOrc && totalOpcoes <= 0 && algumProcCasou && !ehLab) {
+      const desc = `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix} — SEM COBRANÇA`;
+      const { error: errSC } = await supabase.from("fin_lancamentos").insert({
+        clinica_id: clinicaAtual.clinica_id,
+        tipo: "receita" as const,
+        descricao: desc,
+        valor: 0,
+        data: new Date().toISOString().slice(0, 10),
+        status: "confirmado" as const,
+        agendamento_id: a.id,
+        observacoes: "Atendimento sem cobrança (procedimento sem valor).",
+      });
+      if (errSC) {
+        mostrarErro(errSC, "falha ao registrar atendimento sem cobrança");
+        return;
+      }
+      setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
+      // Auto check-in apenas se o atendimento for do mesmo dia.
+      try {
+        const hoje = new Date().toISOString().slice(0, 10);
+        if (a.inicio && new Date(a.inicio).toISOString().slice(0, 10) === hoje) {
+          const { error: errFluxo } = await supabase
+            .from("agendamentos")
+            .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
+            .eq("id", a.id);
+          if (errFluxo) {
+            mostrarErro(errFluxo, "registro salvo, mas falhou ao avançar o fluxo");
+          } else {
+            setEtapaMap((m) => { const n = new Map(m); n.set(a.id, "triagem"); return n; });
+          }
+        }
+      } catch (err) {
+        mostrarErro(err);
+      }
+      toast.success("Atendimento sem cobrança registrado.");
+      return;
+    }
     setFormaPagOpcoes(opcoes);
     setFormaPagCtx({
       agId: a.id,
-      desc: `${a.paciente_nome} — ${a.procedimento ?? "CONSULTA"}${descSuffix}`,
+      desc: `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`,
       paciente: a.paciente_nome ?? "",
-      procedimento: `${a.procedimento ?? "CONSULTA"}${descSuffix}`,
+      procedimento: `${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`,
       medico: medicos.find((m) => m.id === a.medico_id)?.nome ?? undefined,
       especialidade: medicos.find((m) => m.id === a.medico_id)?.especialidade_nome ?? undefined,
     });
@@ -3040,9 +3126,25 @@ function AgendaPage() {
     requestAnimationFrame(() => setFormaPagOpen(false));
   };
 
+  // Pagamento com valor manual: abre o diálogo de lançamento com valor vazio
+  // e sem forma pré-selecionada, permitindo ao usuário digitar livremente.
+  const escolherManual = () => {
+    if (!formaPagCtx) return;
+    const ids = formaPagCtx.agId.split(",").filter(Boolean);
+    const principal = ids[0] ?? null;
+    const extras = ids.slice(1);
+    setPagamentoDesc(`${descricaoComDesconto(formaPagCtx.desc)} — valor manual`);
+    setPagamentoValor("");
+    setPagamentoForma("");
+    setPagamentoAgId(principal);
+    setPagamentoExtraIds(extras);
+    setPagamentoOpen(true);
+    requestAnimationFrame(() => setFormaPagOpen(false));
+  };
+
   // Atalhos de teclado no diálogo "Forma de pagamento":
-  // 1=Dinheiro, 2=PIX, 3=Débito, 4=Crédito, 5=Mais de uma forma
-  // (segue a ordem exibida em formaPagOpcoes; tecla 5 = misto).
+  // 1=Dinheiro, 2=PIX, 3=Débito, 4=Crédito, 5=Mais de uma forma, 6=Valor manual
+  // (segue a ordem exibida em formaPagOpcoes; tecla N+1 = misto, N+2 = manual).
   useEffect(() => {
     if (!formaPagOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -3056,6 +3158,9 @@ function AgendaPage() {
         } else if (idx === formaPagOpcoes.length) {
           e.preventDefault();
           escolherMisto();
+        } else if (idx === formaPagOpcoes.length + 1) {
+          e.preventDefault();
+          escolherManual();
         }
       }
     };
@@ -3179,11 +3284,62 @@ function AgendaPage() {
       return;
     }
     try {
+      // Reimpressão: carrega a forma/parcelas/bandeira reais do lançamento
+      // confirmado deste agendamento para que a 2ª via mantenha exatamente
+      // a forma de pagamento escolhida (evita cair no default "DINHEIRO"
+      // quando o lançamento não tem forma preenchida).
+      let pagamentoInfo: {
+        valor: number;
+        forma_pagamento: string | null;
+        parcelas: number | null;
+        bandeira_cartao: string | null;
+      } | undefined;
+      try {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("valor, forma_pagamento, parcelas, bandeira_cartao, created_at")
+          .eq("agendamento_id", a.id)
+          .eq("tipo", "receita")
+          .eq("status", "confirmado")
+          .order("created_at", { ascending: false });
+        const rows = (lancs ?? []) as Array<{
+          valor: number | string;
+          forma_pagamento: string | null;
+          parcelas: number | null;
+          bandeira_cartao: string | null;
+        }>;
+        if (rows.length > 0) {
+          const total = rows.reduce((s, r) => s + Number(r.valor ?? 0), 0);
+          // Toma a primeira linha com forma preenchida (mais recente); se
+          // nenhuma tiver, usa null (o print exibirá "—" no lugar do default).
+          const comForma = rows.find((r) => r.forma_pagamento) ?? rows[0];
+          pagamentoInfo = {
+            valor: total,
+            forma_pagamento: comForma.forma_pagamento,
+            parcelas: comForma.parcelas,
+            bandeira_cartao: comForma.bandeira_cartao,
+          };
+        }
+      } catch { /* segue sem enriquecer — printGuiaAtendimento tem fallback próprio */ }
       await printGuiaAtendimento({
         agendamentoId: a.id,
         clinicaId: clinicaAtual.clinica_id,
         usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
         usuarioId: user?.id ?? null,
+        pagamento: pagamentoInfo,
+      });
+    } catch (err) {
+      mostrarErro(err);
+    }
+  };
+
+  const imprimirComprovante = async (a: Agendamento) => {
+    if (!clinicaAtual) return;
+    try {
+      await printComprovanteAgendamento({
+        agendamentoId: a.id,
+        clinicaId: clinicaAtual.clinica_id,
+        usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
       });
     } catch (err) {
       mostrarErro(err);
@@ -3373,7 +3529,7 @@ function AgendaPage() {
                   fim: fmtHora(a.fim),
                   profissional: medicoNomeAgendamento(a),
                   paciente: a.paciente_nome,
-                  procedimento: a.procedimento ?? "CONSULTA",
+                  procedimento: a.procedimento ?? rotuloFallbackProc(a.medico_id),
                   status: a.status,
                   observacoes: a.observacoes ?? "",
                 })),
@@ -3400,7 +3556,7 @@ function AgendaPage() {
               <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
+          <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
             <DialogHeader className="space-y-1 px-6 pt-5 pb-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
               <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900">
                 {editing
@@ -3843,13 +3999,31 @@ function AgendaPage() {
               <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border border-primary-foreground/40 bg-primary-foreground/10 text-xs font-mono mr-2">{formaPagOpcoes.length + 1}</kbd>
               💰 Mais de uma forma de pagamento
             </Button>
+            <Button
+              variant="secondary"
+              className="justify-center h-12"
+              onClick={escolherManual}
+            >
+              <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border bg-muted text-xs font-mono mr-2">{formaPagOpcoes.length + 2}</kbd>
+              ✏️ Valor manual
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
       <LancamentoDialog
         open={pagamentoOpen}
-        onOpenChange={(v) => { setPagamentoOpen(v); if (!v) { setPagamentoAgId(null); setPagamentoExtraIds([]); setDescontoPendente(null); } }}
+        onOpenChange={(v) => {
+          setPagamentoOpen(v);
+          if (!v) {
+            setPagamentoAgId(null);
+            setPagamentoExtraIds([]);
+            setPagamentoPesos({});
+            setPagamentoRotulos({});
+            setPagamentoPacienteNome("");
+            setDescontoPendente(null);
+          }
+        }}
         tipo="receita"
         initialDescricao={pagamentoDesc}
         initialValor={pagamentoValor}
@@ -3858,24 +4032,152 @@ function AgendaPage() {
         onSavedWithData={async (dados) => {
           if (!pagamentoAgId || !clinicaAtual) return;
           const agId = pagamentoAgId;
-          // marca todos os agendamentos da cobrança agrupada como pagos
+          // Cobrança agrupada: em vez de 1 lançamento principal + N sombras (R$ 0,00),
+          // divide o valor total proporcionalmente entre os N atendimentos e cria
+          // 1 lançamento por atendimento — permitindo estorno individual sem
+          // afetar os demais do grupo.
           if (pagamentoExtraIds.length > 0) {
-            // insere linhas-sombra (valor 0) para que os demais agendamentos
-            // apareçam como "pagos" sem duplicar receita financeira
-            const sombras = pagamentoExtraIds.map((extraId) => ({
+            const todosIds = [agId, ...pagamentoExtraIds];
+            const N = todosIds.length;
+            const totalPeso = todosIds.reduce((s, id) => s + (pagamentoPesos[id] ?? 0), 0);
+            const valorTotal = Number(dados.valor) || 0;
+            // Rateio proporcional pelo peso; se soma de pesos for 0, divide igualmente.
+            const valoresRat = todosIds.map((id) =>
+              totalPeso > 0
+                ? Math.round(((pagamentoPesos[id] ?? 0) / totalPeso) * valorTotal * 100) / 100
+                : Math.round((valorTotal / N) * 100) / 100,
+            );
+            // Ajuste de arredondamento: joga a diferença no principal.
+            const somaRat = valoresRat.reduce((s, v) => s + v, 0);
+            const diff = Math.round((valorTotal - somaRat) * 100) / 100;
+            valoresRat[0] = Math.round((valoresRat[0] + diff) * 100) / 100;
+
+            const grupoId = (typeof crypto !== "undefined" && "randomUUID" in crypto)
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+            // Usuário atual — usado como criado_por em TODOS os lançamentos do
+            // grupo, garantindo que o Movimento de Caixa mostre o operador
+            // em todas as linhas do rateio.
+            const currentUserId = (await supabase.auth.getUser()).data.user?.id ?? null;
+
+            // 1) Localiza o lançamento principal recém-criado pelo LancamentoDialog
+            //    (agendamento_id = principal, tipo = receita, status = confirmado, mais recente).
+            const { data: principalRow, error: errPrincipal } = await supabase
+              .from("fin_lancamentos")
+              .select("id, observacoes, criado_por")
+              .eq("clinica_id", clinicaAtual.clinica_id)
+              .eq("agendamento_id", agId)
+              .eq("tipo", "receita")
+              .eq("status", "confirmado")
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (errPrincipal) {
+              mostrarErro(errPrincipal, "pagamento salvo, mas falhou ao localizar o lançamento principal");
+            }
+
+            // Preserva o trecho "Pagamento misto: ..." das observações do
+            // principal para que o caixa/relatórios consigam decompor as
+            // formas de pagamento em cada lançamento do grupo.
+            const obsOriginal = (principalRow as { observacoes?: string | null } | null)?.observacoes ?? "";
+            const idxMisto = obsOriginal.indexOf("Pagamento misto:");
+            const trechoMisto = idxMisto >= 0
+              ? obsOriginal.slice(idxMisto).split(" | ")[0]
+              : "";
+
+            // 2) Atualiza o principal com valor rateado + grupo_pagamento_id + descrição individual.
+            const rotuloPrincipal = pagamentoRotulos[agId] ?? "CONSULTA";
+            if (principalRow?.id) {
+              const { error: errUpdPrinc } = await supabase
+                .from("fin_lancamentos")
+                .update({
+                  valor: valoresRat[0],
+                  grupo_pagamento_id: grupoId,
+                  descricao: `${pagamentoPacienteNome} — ${rotuloPrincipal} (1/${N} do grupo)`,
+                  criado_por: (principalRow as { criado_por?: string | null }).criado_por ?? currentUserId,
+                  observacoes: [
+                    `Pagamento agrupado (grupo ${grupoId}) — 1/${N} atendimentos`,
+                    trechoMisto,
+                  ].filter(Boolean).join(" | "),
+                } as never)
+                .eq("id", principalRow.id);
+              if (errUpdPrinc) {
+                mostrarErro(errUpdPrinc, "pagamento salvo, mas falhou ao ajustar o principal");
+              }
+            }
+
+            // 3) Insere N-1 lançamentos individuais (um por extra).
+            const extrasRows = pagamentoExtraIds.map((extraId, i) => ({
               clinica_id: clinicaAtual.clinica_id,
               tipo: "receita" as const,
-              descricao: `${pagamentoDesc} — vinculado ao pagamento agrupado`,
-              valor: 0,
+              descricao: `${pagamentoPacienteNome} — ${pagamentoRotulos[extraId] ?? "CONSULTA"} (${i + 2}/${N} do grupo)`,
+              valor: valoresRat[i + 1],
               data: new Date().toISOString().slice(0, 10),
               forma_pagamento: dados.forma_pagamento,
               status: "confirmado" as const,
               agendamento_id: extraId,
-              observacoes: `Pagamento agrupado com agendamento ${agId}`,
+              grupo_pagamento_id: grupoId,
+              criado_por: (principalRow as { criado_por?: string | null } | null)?.criado_por ?? currentUserId,
+              observacoes: [
+                `Pagamento agrupado (grupo ${grupoId}) — ${i + 2}/${N} atendimentos`,
+                trechoMisto,
+              ].filter(Boolean).join(" | "),
             }));
-            const { error: errSombras } = await supabase.from("fin_lancamentos").insert(sombras);
-            if (errSombras) {
-              mostrarErro(errSombras, "pagamento salvo, mas falhou ao vincular itens extras");
+            const { data: extrasInseridos, error: errExtras } = await supabase
+              .from("fin_lancamentos")
+              .insert(extrasRows as never)
+              .select("id, agendamento_id");
+            if (errExtras) {
+              mostrarErro(errExtras, "pagamento salvo, mas falhou ao vincular itens extras");
+            }
+
+            // 4) Espelha a divisão no Caixa: o LancamentoDialog criou 1 movimento
+            //    com o valor total. Ajustamos esse movimento para o principal
+            //    rateado e criamos N-1 movimentos individuais (um por extra).
+            try {
+              if (principalRow?.id) {
+                const { data: movPrinc } = await supabase
+                  .from("caixa_movimentos")
+                  .select("id, sessao_id, clinica_id, user_id, forma_pagamento")
+                  .eq("lancamento_id", principalRow.id)
+                  .order("created_at", { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+                if (movPrinc) {
+                  await supabase
+                    .from("caixa_movimentos")
+                    .update({
+                      valor: valoresRat[0],
+                      descricao: `${pagamentoPacienteNome} — ${rotuloPrincipal} (1/${N} do grupo)`,
+                    } as never)
+                    .eq("id", movPrinc.id);
+                  const extrasList = (extrasInseridos ?? []) as Array<{ id: string; agendamento_id: string | null }>;
+                  const movsExtras = pagamentoExtraIds.map((extraId, i) => {
+                    const lanc = extrasList.find((r) => r.agendamento_id === extraId);
+                    return {
+                      sessao_id: movPrinc.sessao_id,
+                      clinica_id: movPrinc.clinica_id,
+                      user_id: movPrinc.user_id,
+                      tipo: "recebimento" as const,
+                      valor: valoresRat[i + 1],
+                      descricao: `${pagamentoPacienteNome} — ${pagamentoRotulos[extraId] ?? "CONSULTA"} (${i + 2}/${N} do grupo)`,
+                      forma_pagamento: movPrinc.forma_pagamento,
+                      lancamento_id: lanc?.id ?? null,
+                    };
+                  });
+                  if (movsExtras.length > 0) {
+                    const { error: errMovExtras } = await supabase
+                      .from("caixa_movimentos")
+                      .insert(movsExtras as never);
+                    if (errMovExtras) {
+                      console.error("Falha ao criar movimentos de caixa dos extras:", errMovExtras);
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              console.error("Falha ao espelhar divisão no caixa:", e);
             }
           }
           setPagosSet((prev) => {
@@ -4503,24 +4805,38 @@ function AgendaPage() {
                 const presente =
                   !realizado &&
                   (pagoHoje || !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow));
+                const estornoPend = estornoPendAgs.has(a.id);
+                // Para o médico, oculta a identidade do paciente enquanto a
+                // solicitação de estorno estiver pendente.
+                const ocultarPaciente = estornoPend && isMedicoOnly;
               return (
                   <TableRow
                     key={a.id}
                     className={
-                      realizado
+                      estornoPend
+                        ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-rose-100 hover:[&>td]:bg-rose-100"
+                        : realizado
                         ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#d1f0d6] hover:[&>td]:bg-[#d1f0d6]"
                         : presente
                           ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#a8c8ed] hover:[&>td]:bg-[#a8c8ed]"
                           : "[&>td]:py-1 [&>td]:h-9 text-xs"
                     }
                     style={
-                      realizado
+                      estornoPend
+                        ? { backgroundColor: "#fee2e2", borderLeft: "3px solid #dc2626" }
+                        : realizado
                         ? { backgroundColor: "#d1f0d6", borderLeft: "3px solid #8fd49a" }
                         : presente
                           ? { backgroundColor: "#a8c8ed", borderLeft: "3px solid #7aa9d8" }
                           : undefined
                     }
-                    title={presente ? "Cliente presente na clínica" : undefined}
+                    title={
+                      estornoPend
+                        ? "Estorno solicitado — aguardando decisão do financeiro"
+                        : presente
+                          ? "Cliente presente na clínica"
+                          : undefined
+                    }
                   >
                   <TableCell title="Marque para cobrar este atendimento em um pagamento agrupado">
                     <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
@@ -4557,7 +4873,14 @@ function AgendaPage() {
                     })()}
                   </TableCell>
                   <TableCell className="pr-1 align-middle max-w-[220px]">
-                    {isSlotLivre(a.paciente_nome) ? (
+                    {ocultarPaciente ? (
+                      <span
+                        className="inline-flex items-center gap-1 text-xs uppercase font-medium text-rose-700 italic"
+                        title="Paciente oculto — estorno solicitado, aguardando aprovação"
+                      >
+                        — aguardando estorno —
+                      </span>
+                    ) : isSlotLivre(a.paciente_nome) ? (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -4622,7 +4945,10 @@ function AgendaPage() {
                     <ProcedimentoCell
                       valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                       opcoes={opcoesProcedimentoMedico(a.medico_id)}
-                      padrao={procedimentoPadraoDoMedico(a.medico_id)}
+                      padrao={
+                        procedimentoPadraoDoMedico(a.medico_id)
+                        || (medicoEhLaboratorioFormulario(a.medico_id) ? "EXAMES LABORATORIAIS" : "")
+                      }
                       semFallback={!!medicos.find((m) => m.id === a.medico_id)?.procedimento_padrao_em_branco}
                       disabled={isSlotLivre(a.paciente_nome)}
                       onChange={(novo) => atualizarProcedimento(a, novo)}
@@ -4632,6 +4958,8 @@ function AgendaPage() {
                     <div className="flex flex-col items-center gap-0.5">
                       {isSlotLivre(a.paciente_nome) ? (
                         <Badge className="bg-slate-100 text-slate-600 border border-slate-300">Livre</Badge>
+                      ) : estornoPend ? (
+                        <Badge className="bg-rose-100 text-rose-800 border border-rose-300">Estorno solicitado</Badge>
                       ) : (
                         <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
                       )}
@@ -4770,6 +5098,14 @@ function AgendaPage() {
                             <span className="ml-2 text-xs text-muted-foreground">(pagar primeiro)</span>
                           )}
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
+                          <Printer className="h-4 w-4 mr-2" /> Comprovante de agendamento
+                        </DropdownMenuItem>
+                        {!isSlotLivre(a.paciente_nome) && a.status !== "realizado" && (
+                          <DropdownMenuItem onClick={() => remove(a)}>
+                            <UserMinus className="h-4 w-4 mr-2 text-amber-600" /> Desmarcar paciente
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => {
                           const url = `${window.location.origin}/p/${(a as any).token_publico}`;
                           navigator.clipboard.writeText(url);
@@ -4833,6 +5169,7 @@ function AgendaPage() {
             { cor: "#fef3b6", borda: "#f0dc7a", label: "Atrasado para consulta" },
             { cor: "#e0cdf0", borda: "#bea4d8", label: "Agendamento on-line" },
             { cor: "#f7b6c0", borda: "#e88594", label: "Não comparecimento" },
+            { cor: "#fee2e2", borda: "#dc2626", label: "Estorno solicitado" },
           ].map((s) => (
             <div key={s.label} className="flex items-center gap-2 text-sm">
               <span
@@ -4861,6 +5198,9 @@ function AgendaPage() {
           onSlotClick={(a) => openSlot(a)}
           onAgClick={(a) => openEdit(a)}
           fmtHora={fmtHora}
+          estornoPendAgs={estornoPendAgs}
+          ocultarPacienteMedico={isMedicoOnly}
+          ehLaboratorio={medicoEhLaboratorioFormulario}
         />
       )}
 
@@ -5051,7 +5391,7 @@ function MedicoFiltroInput({
 }
 
 function AgendaPorMedicoGrid({
-  medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora,
+  medicoId, dias, dataRef, items, onSlotClick, onAgClick, fmtHora, estornoPendAgs, ocultarPacienteMedico, ehLaboratorio,
 }: {
   medicoId: string;
   dias: number;
@@ -5060,6 +5400,9 @@ function AgendaPorMedicoGrid({
   onSlotClick: (a: Agendamento) => void;
   onAgClick: (a: Agendamento) => void;
   fmtHora: (iso: string) => string;
+  estornoPendAgs: Set<string>;
+  ocultarPacienteMedico: boolean;
+  ehLaboratorio?: (medicoId: string | null | undefined) => boolean;
 }) {
   const diasSemana = ["DOMINGO", "SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"];
 
@@ -5155,6 +5498,9 @@ function AgendaPorMedicoGrid({
                         onAgClick={onAgClick}
                         fmtHora={fmtHora}
                         corStatus={corStatus}
+                        estornoPend={!!(ag && estornoPendAgs.has(ag.id))}
+                        ocultarPaciente={!!(ag && estornoPendAgs.has(ag.id) && ocultarPacienteMedico)}
+                        procedimentoFallback={ag?.procedimento ?? (ehLaboratorio?.(ag?.medico_id) ? "EXAMES LABORATORIAIS" : "CONSULTA")}
                       />
                     );
                   })}
@@ -5182,7 +5528,7 @@ function FragmentDayHeader({ dia, fmtCabecalho }: { dia: string; fmtCabecalho: (
 }
 
 function FragmentDayCell({
-  ag, dia, hi, onSlotClick, onAgClick, fmtHora, corStatus,
+  ag, dia, hi, onSlotClick, onAgClick, fmtHora, corStatus, estornoPend, ocultarPaciente, procedimentoFallback,
 }: {
   ag: Agendamento | undefined;
   dia: string;
@@ -5191,6 +5537,9 @@ function FragmentDayCell({
   onAgClick: (a: Agendamento) => void;
   fmtHora: (iso: string) => string;
   corStatus: (s: Status) => string;
+  estornoPend: boolean;
+  ocultarPaciente: boolean;
+  procedimentoFallback?: string;
 }) {
   const ehLivre = ag && isSlotLivre(ag.paciente_nome);
   return (
@@ -5210,11 +5559,26 @@ function FragmentDayCell({
         ) : (
           <button
             type="button"
-            onClick={() => (ehLivre ? onSlotClick(ag) : onAgClick(ag))}
-            className={`w-full text-left rounded-md px-2 py-1.5 text-xs leading-tight truncate hover:brightness-95 transition ${corStatus(ag.status)}`}
-            title={`${ag.paciente_nome} — ${ag.procedimento ?? "CONSULTA"}`}
+            onClick={() => (ehLivre ? onSlotClick(ag) : (ocultarPaciente ? undefined : onAgClick(ag)))}
+            disabled={ocultarPaciente}
+            className={
+              `w-full text-left rounded-md px-2 py-1.5 text-xs leading-tight truncate hover:brightness-95 transition ${
+                estornoPend
+                  ? "bg-rose-100 text-rose-800 border border-rose-300"
+                  : corStatus(ag.status)
+              } ${ocultarPaciente ? "cursor-not-allowed opacity-90" : ""}`
+            }
+            title={
+              estornoPend
+                ? "Estorno solicitado — aguardando decisão do financeiro"
+                : `${ag.paciente_nome} — ${procedimentoFallback ?? ag.procedimento ?? "CONSULTA"}`
+            }
           >
-            {ehLivre ? "+ Agendar" : ag.paciente_nome}
+            {ehLivre
+              ? "+ Agendar"
+              : ocultarPaciente
+                ? "— aguardando estorno —"
+                : ag.paciente_nome}
           </button>
         )}
       </td>

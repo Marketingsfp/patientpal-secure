@@ -1,27 +1,89 @@
-## Diagnóstico
+# Plano — Repasse de Laudo ECG (rateio manual entre cardiologistas)
 
-A pré-carga de `labProcIds` no diálogo de Novo Orçamento agora inclui **~4.470 procedimentos** (todos com `tipo_procedimento='laboratorio'` ou `grupo ILIKE '%labor%'`, união feita em memória). Ao pesquisar "glicose" em categoria Laboratório, a busca faz:
+## Decisões alinhadas com você
+- **Escopo:** só ECG por enquanto (sem generalizar para outros exames com laudo).
+- **Quem lauda:** rateio entre todos os cardiologistas cadastrados na clínica.
+- **Valor:** cadastrado por médico (cada cardiologista tem seu próprio % ou R$ fixo).
+- **Momento:** o financeiro lança manualmente. Nada é gerado automático no atendimento.
 
+## Análise dos 4 eixos
+- 💰 **Financeiro:** elimina risco de pagar laudo não feito; permite que o financeiro só solte o repasse depois de confirmar a lista de ECGs laudados no período.
+- ⏱️ **Operacional:** recepção segue igual (não muda nada no agendamento do ECG). Financeiro ganha uma tela dedicada com pré-cálculo por cardiologista.
+- 😊 **Experiência:** paciente não afetado; cardiologistas passam a receber pelo laudo de forma rastreável.
+- 🛡️ **Auditoria:** cada lançamento fica com médico beneficiado + usuário que lançou + período + lista de ECGs de base.
+
+## O que aparece na UI
+
+**1. Cadastro do médico "ELETROCARDIOGRAMA" (o da agenda)** — nova aba **Repasse Laudo**
+
+Igual em estilo à seção Repasse Individual da foto 2. Lista todos os cardiologistas ativos da clínica (via `medico_especialidades` + especialidade Cardiologia) com duas colunas editáveis:
+
+```text
+Nome do laudador              Tipo         Valor
+─────────────────────────────────────────────────
+Dr. João Cardio               % Percentual   40
+Dra. Maria Cardio             R$ Valor       15,00
+Dr. Pedro Cardio               —              —    (não lauda)
 ```
-q.in("id", ids)  // ids.length ≈ 4470
-```
 
-O PostgREST recebe uma URL com ~165KB, muito acima do limite (nginx/Cloudflare rejeitam), então a request falha e o `data` volta vazio — nenhum exame de glicose aparece. É regressão da correção anterior: enquanto `procedimento_especialidades` tinha 18 linhas, o `in()` cabia; após adicionar a união com `tipo_procedimento`, estourou.
+Deixar em branco = médico não recebe laudo. O cadastro é por-agenda-ECG (fica ligado ao médico "ELETROCARDIOGRAMA"), o que permite ter no futuro uma agenda "ECG Unidade 2" com laudadores diferentes.
 
-## Correção
+**2. Financeiro → nova sub-aba "Laudos ECG"** (dentro do módulo Repasse Médico / Financeiro)
 
-Em `src/routes/_authenticated/app.orcamentos.tsx` (busca de procedimentos, linhas ~614–731):
+Fluxo em 3 passos:
+1. Filtro por período (data de início/fim) + clínica.
+2. Sistema mostra:
+   - Total de ECGs realizados no período (`fin_atendimentos` cujo `medico_id` = agenda ECG e serviço = ECG).
+   - Para cada cardiologista com repasse configurado, o **valor pré-calculado** aplicando o %/R$ dele sobre o total de ECGs (a definir na aprovação: sobre valor faturado ou por unidade — ver ponto aberto abaixo).
+   - Valor sugerido, editável.
+3. Botão **"Lançar repasses"** — cria 1 lançamento em `fin_lancamentos` por cardiologista, categoria "Repasse Laudo ECG", com `medico_id` = laudador, referência à agenda-ECG e ao período.
 
-1. **Remover o prefetch** `labProcIds` e o estado associado. Passa a ser desnecessário.
-2. **Aplicar o filtro de categoria direto na query de busca** (PostgREST combina múltiplos `.or()` como AND):
-   - Categoria `laboratorio`: `q.or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%")`.
-   - Categoria `demais`: `q.not("tipo_procedimento","eq","laboratorio").not("grupo","ilike","%labor%")` (registros com `grupo` nulo continuam aparecendo, pois `not ilike` inclui NULL como não-match).
-3. **Manter o filtro de nome** como está (`.or("nome.ilike.%q%,nome.ilike.%norm%")`) — combinado com o `.or()` de categoria fica: `(nome match) AND (categoria match)`.
-4. Remover o guard `if (categoria && labProcIds == null) return;` e a dependência `labProcIds` do `useEffect`.
+Cada lançamento gera linha em `audit_log`.
 
-Efeito: a busca passa a ser executada 100% no banco, sem prefetch nem lista gigante de IDs. Os 15 exames de glicose voltam a aparecer, e a busca fica mais rápida. Alinhado com a fonte de verdade usada pelo cadastro de Serviços.
+## Detalhes técnicos
 
-## Fora do escopo
+**Modelo de dados:**
+- Nova tabela `medico_repasse_laudo`
+  - `agenda_medico_id` (o médico-agenda, ex.: ELETROCARDIOGRAMA)
+  - `laudador_medico_id` (o cardiologista)
+  - `tipo_repasse` (`percentual` | `valor`)
+  - `percentual` / `valor` (mesmo padrão de `medico_convenios`)
+  - `clinica_id`, timestamps
+  - UNIQUE (`agenda_medico_id`, `laudador_medico_id`)
+- Nova tabela `fin_laudo_lotes` para agrupar o lançamento manual (opcional, mas ajuda auditoria)
+  - `periodo_inicio`, `periodo_fim`, `agenda_medico_id`, `total_ecgs`, `criado_por`, `criado_em`
+  - filhas em `fin_lancamentos` referenciam o lote.
+- GRANTs + RLS: SELECT/INSERT/UPDATE/DELETE para `authenticated` filtrado por `clinica_id`; `service_role` full.
+- Sem CHECK constraint com `now()`; usar trigger só para `updated_at`.
 
-- Não mexer em `procedimento_especialidades` — o cadastro de Serviços grava a classificação em `tipo_procedimento`/`grupo`, então essa é a fonte usada.
-- Não alterar nenhuma outra tela (agenda, caixa, atendimento).
+**Arquivos que devem mudar:**
+- `src/components/medicos/MedicoFormDialog.tsx` → nova aba "Repasse Laudo" (visível só quando o médico é o de agenda ECG, ou sempre — a decidir; ver ponto aberto).
+- `src/routes/_authenticated/app.financeiro.tsx` → novo item de subnav "Laudos ECG".
+- `src/routes/_authenticated/app.financeiro.laudos-ecg.tsx` → nova página (filtro + tabela pré-cálculo + lançar).
+- `src/lib/financeiro/laudos.functions.ts` (novo) — server fns:
+  - `listarCardiologistasComRepasseLaudo({ agendaMedicoId })`
+  - `preCalcularLaudosEcg({ periodo, agendaMedicoId })`
+  - `lancarLaudosEcg({ periodo, agendaMedicoId, itens })` (protegido por `requireSupabaseAuth`)
+- Migration única para tabelas + GRANTs + RLS.
+
+**Regras de negócio críticas (governança):**
+- Bloquear valor negativo, % > 100.
+- Impedir lançar 2× o mesmo lote (mesmo `agenda_medico_id` + mesmo período).
+- Não permitir alterar/deletar lançamento de laudo depois de conciliado (`fin_lancamentos.conciliado_em`).
+
+## Pontos que ainda preciso confirmar antes de implementar
+
+1. **Base do %:** o percentual do laudador incide sobre **o valor faturado dos ECGs** no período (ex.: 40% de R$ 1.000 = R$ 400) ou **por unidade de ECG** (ex.: R$ 15 × 60 ECGs)? A resposta muda o pré-cálculo.
+2. **Como identificar "o médico-agenda ECG":** existe uma flag hoje ou é só pelo nome? Ideal marcar no cadastro do médico "é agenda de exame — não recebe repasse próprio".
+3. **Categoria financeira:** criar categoria específica "Repasse Laudo ECG" em `fin_categorias` ou reutilizar a de repasse médico existente?
+
+Posso responder a #2 com um SELECT rápido no banco assim que você aprovar o plano, ou você já sabe a resposta.
+
+## Estimativa
+- Migration + backend: ~1h30
+- UI cadastro (aba nova no MedicoFormDialog): ~1h
+- Página financeiro Laudos ECG: ~2h
+- Testes manuais + auditoria: ~30min
+- **Total:** ~5h
+
+Se aprovar, começo pela migration (que precisa da sua aprovação separada) e depois toco o resto de uma vez.

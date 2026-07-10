@@ -103,6 +103,16 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     setSupervisorInfo(null); setSupervisorOpen(false);
     setCortesiaJustificativa(""); setAuthIntent("desconto");
     setBloqueioCartao(null); setTipoAgendamento(null); setConvenioNome(null);
+    // Reset dos campos de pagamento: evita que estado remanescente de uma
+    // abertura anterior (ex.: linhas mistas sem bandeira, bandeira já
+    // preenchida em outro atendimento) bloqueie o Save do próximo pagamento.
+    setBandeiraCartao("");
+    setParcelas("1");
+    setValorRecebido("");
+    setPagamentoMisto(false);
+    setPagamentos([{ forma: "dinheiro", recebido: "" }]);
+    setEmitirNfse(false);
+    setObservacoes("");
     if (initialFormaPagamento !== undefined) {
       if (initialFormaPagamento === "__misto__") {
         setPagamentoMisto(true);
@@ -110,6 +120,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       } else {
         setFormaPagamento(initialFormaPagamento);
       }
+    } else {
+      setFormaPagamento("");
     }
     (async () => {
       const [{ data: cats }, { data: cs }] = await Promise.all([
@@ -319,6 +331,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               .select("id")
               .eq("agendamento_id", agendamentoId)
               .eq("tipo", "receita")
+              .neq("status", "cancelado")
               .limit(1)
               .maybeSingle()
           : Promise.resolve({ data: null }),
@@ -684,11 +697,9 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               <CurrencyInput
                 value={valor}
                 onChange={setValor}
-                disabled={!!initialValor}
-                readOnly={!!initialValor}
               />
               {!!initialValor && (
-                <p className="text-xs text-muted-foreground">Definido pelo serviço</p>
+                <p className="text-xs text-muted-foreground">Sugerido pelo serviço — editável</p>
               )}
             </div>
             <div className="space-y-1.5">

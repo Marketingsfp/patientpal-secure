@@ -10,6 +10,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -37,6 +38,87 @@ export const Route = createFileRoute("/_authenticated/app/caixa")({
   component: CaixaRouteDispatcher,
   head: () => ({ meta: [{ title: "Caixa — ClinicaOS" }] }),
 });
+
+/**
+ * Normaliza o valor gravado em `caixa_movimentos.forma_pagamento` para os
+ * buckets exibidos no painel (Dinheiro / PIX / Débito / Crédito / Boleto /
+ * Transferência / Convênio). Aliases: `cartao_credito`/`cartao_debito` do
+ * banco viram `credito`/`debito`. Retorna `misto` para pagamentos divididos
+ * (que são decompostos depois consultando `fin_lancamentos.observacoes`) e
+ * `outros` como residual.
+ */
+const FORMA_BUCKETS = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio"] as const;
+type FormaBucket = typeof FORMA_BUCKETS[number] | "misto" | "outros";
+
+function normalizarForma(f: string | null | undefined): FormaBucket {
+  const k = (f ?? "").toLowerCase().trim();
+  if (!k) return "outros";
+  if (k === "dinheiro" || k === "pix" || k === "boleto" || k === "transferencia" || k === "convenio" || k === "misto") return k;
+  if (k === "credito" || k === "cartao_credito" || k === "cartão_credito" || k === "cartao credito") return "credito";
+  if (k === "debito" || k === "cartao_debito" || k === "cartão_debito" || k === "cartao debito") return "debito";
+  return "outros";
+}
+
+/**
+ * Extrai as parcelas de um pagamento misto a partir do trecho
+ * `Pagamento misto: Dinheiro R$ 60,00; PIX R$ 50,00 | ...` gravado em
+ * `fin_lancamentos.observacoes`. Retorna somas por bucket já normalizado.
+ */
+function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaBucket, number>> {
+  const out: Partial<Record<FormaBucket, number>> = {};
+  if (!obs) return out;
+  const idx = obs.indexOf("Pagamento misto:");
+  if (idx < 0) return out;
+  const trecho = obs.slice(idx + "Pagamento misto:".length).split(" | ")[0];
+  const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
+  const LABEL_TO_KEY: Array<[RegExp, FormaBucket]> = [
+    [/^cart[ãa]o\s*cr[ée]dito/i, "credito"],
+    [/^cart[ãa]o\s*d[ée]bito/i, "debito"],
+    [/^cr[ée]dito/i, "credito"],
+    [/^d[ée]bito/i, "debito"],
+    [/^dinheiro/i, "dinheiro"],
+    [/^pix/i, "pix"],
+    [/^boleto/i, "boleto"],
+    [/^conv[êe]nio/i, "convenio"],
+    [/^transfer[êe]ncia/i, "transferencia"],
+  ];
+  const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
+  for (const p of partes) {
+    const match = LABEL_TO_KEY.find(([re]) => re.test(p));
+    if (!match) continue;
+    const valMatch = p.match(/R\$\s*([\d.]+,\d{2})/);
+    if (!valMatch) continue;
+    const v = parseBRL(valMatch[1]);
+    out[match[1]] = (out[match[1]] ?? 0) + v;
+  }
+  return out;
+}
+
+/**
+ * Rótulo bonito para exibir a forma de pagamento em tabelas. Para
+ * `misto`, converte as parcelas decompostas em algo como
+ * "Dinheiro R$ 60,00 · PIX R$ 100,00". Sem observações do lançamento
+ * ainda em cache, retorna "Misto (dividido)".
+ */
+const FORMA_LABEL: Record<FormaBucket, string> = {
+  dinheiro: "Dinheiro", pix: "PIX", debito: "Cartão débito", credito: "Cartão crédito",
+  boleto: "Boleto", transferencia: "Transferência", convenio: "Convênio",
+  misto: "Misto", outros: "Outros",
+};
+function formatarFormaPagamento(
+  m: { forma_pagamento: string | null; lancamento_id?: string | null },
+  mistoObs: Record<string, string>,
+): string {
+  const bucket = normalizarForma(m.forma_pagamento);
+  if (bucket !== "misto") return m.forma_pagamento || "—";
+  const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+  const partes = obs ? decomporMistoObs(obs) : {};
+  const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0);
+  if (entradas.length === 0) return "Misto (dividido)";
+  return entradas
+    .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k} ${(v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`)
+    .join(" · ");
+}
 
 /**
  * Promoção controlada do CaixaShellV2 para `/app/caixa`, atrás da flag
@@ -124,6 +206,7 @@ function montarSufixoCartao(forma: string, bandeira: string, parcelas: string): 
 function Page() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const podeEscrever = usePodeEscrever("caixa");
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
 
   const [tab, setTab] = useState<"meu" | "todos" | "repasse">("meu");
@@ -185,6 +268,11 @@ function Page() {
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
+  // Solicitações de estorno vinculadas às movimentações visíveis
+  // (chave = lancamento_id, valor = status). Usado para trocar o botão
+  // "Solicitar estorno" por "Aguardando aprovação" (pendente) ou
+  // "Estornado" (aprovado) conforme a decisão do financeiro.
+  const [estornosPorLanc, setEstornosPorLanc] = useState<Map<string, "pendente" | "aprovado">>(new Map());
   // Filtro de período para "Movimentos" (padrão: hoje)
   type PeriodoFiltro = "hoje" | "semana" | "quinzena" | "mes" | "intervalo" | "todos";
   const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
@@ -246,6 +334,8 @@ function Page() {
   const [movForma, setMovForma] = useState("dinheiro");
   const [movBandeira, setMovBandeira] = useState("");
   const [movParcelas, setMovParcelas] = useState("1");
+  const [movDestinoUserId, setMovDestinoUserId] = useState("");
+  const [membrosClinica, setMembrosClinica] = useState<Array<{ user_id: string; nome: string }>>([]);
   const [valorInformado, setValorInformado] = useState("");
   const [obsFechamento, setObsFechamento] = useState("");
   const [saving, setSaving] = useState(false);
@@ -326,6 +416,70 @@ function Page() {
     setMinhasSessoes((histRes.data ?? []) as Sessao[]);
     setLoading(false);
   }, [clinicaAtual, user]);
+
+  // Recarrega o conjunto de solicitações de estorno pendentes vinculadas
+  // às movimentações atuais para trocar o botão pelo rótulo
+  // "Aguardando aprovação" quando o financeiro ainda não decidiu.
+  const reloadEstornosPendentes = useCallback(async () => {
+    if (!clinicaAtual) { setEstornosPorLanc(new Map()); return; }
+    const ids = Array.from(new Set(
+      minhasMovs.map((m) => m.lancamento_id).filter((x): x is string => !!x),
+    ));
+    if (ids.length === 0) { setEstornosPorLanc(new Map()); return; }
+    const { data } = await supabase
+      .from("estorno_solicitacoes")
+      .select("lancamento_id, status")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .in("lancamento_id", ids)
+      .in("status", ["pendente", "aprovado"]);
+    const map = new Map<string, "pendente" | "aprovado">();
+    for (const r of (data ?? []) as Array<{ lancamento_id: string | null; status: string }>) {
+      if (!r.lancamento_id) continue;
+      // pendente prevalece sobre aprovado caso ambos existam
+      const prev = map.get(r.lancamento_id);
+      if (prev === "pendente") continue;
+      if (r.status === "pendente" || r.status === "aprovado") {
+        map.set(r.lancamento_id, r.status);
+      }
+    }
+    setEstornosPorLanc(map);
+  }, [clinicaAtual, minhasMovs]);
+
+  useEffect(() => {
+    void reloadEstornosPendentes();
+  }, [reloadEstornosPendentes]);
+
+  // Realtime: se o financeiro aprovar/recusar ou outro caixa solicitar,
+  // atualiza o rótulo do botão sem exigir F5.
+  useEffect(() => {
+    if (!clinicaAtual) return;
+    const ch = supabase
+      .channel(`caixa-estornos-${clinicaAtual.clinica_id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "estorno_solicitacoes",
+          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
+        },
+        () => { void reloadEstornosPendentes(); },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+  }, [clinicaAtual, reloadEstornosPendentes]);
+
+  // Se o usuário voltar para a aba após o financeiro decidir e o evento
+  // realtime tiver sido perdido, ressincroniza ao ganhar foco.
+  useEffect(() => {
+    const onFocus = () => { void reloadEstornosPendentes(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [reloadEstornosPendentes]);
 
   // Carrega a fila de cobrança (agendamentos hoje aguardando caixa)
   const loadFilaCaixa = useCallback(async () => {
@@ -526,6 +680,30 @@ function Page() {
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { if (tab === "todos") void loadTodos(); }, [tab, loadTodos]);
 
+  // Membros da clínica para o seletor de destino de sangria/suprimento
+  useEffect(() => {
+    if (!clinicaAtual) { setMembrosClinica([]); return; }
+    let alive = true;
+    void (async () => {
+      const { data: memb } = await supabase
+        .from("clinica_memberships")
+        .select("user_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true);
+      const ids = ((memb ?? []) as Array<{ user_id: string }>).map((m) => m.user_id);
+      if (!ids.length) { if (alive) setMembrosClinica([]); return; }
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, nome")
+        .in("id", ids);
+      const list = ((profs ?? []) as Array<{ id: string; nome: string | null }>)
+        .map((p) => ({ user_id: p.id, nome: p.nome || "(sem nome)" }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+      if (alive) setMembrosClinica(list);
+    })();
+    return () => { alive = false; };
+  }, [clinicaAtual?.clinica_id]);
+
   // Calculos
   const saldoAtual = useMemo(() => {
     if (!minhaSessao) return 0;
@@ -543,6 +721,71 @@ function Page() {
     minhasMovs.forEach((m) => { r[m.tipo] += Number(m.valor || 0); });
     return r;
   }, [minhasMovs]);
+
+  // Decomposição de pagamentos "misto" — busca observações dos lançamentos
+  // vinculados às movimentações da sessão atual. Chave = lancamento_id.
+  const [mistoObs, setMistoObs] = useState<Record<string, string>>({});
+  const mistoLancIds = useMemo(() => {
+    const ids = new Set<string>();
+    const scan = (arr: Mov[]) => arr.forEach((m) => {
+      if (m.tipo === "recebimento" && normalizarForma(m.forma_pagamento) === "misto" && m.lancamento_id) {
+        ids.add(m.lancamento_id);
+      }
+    });
+    scan(minhasMovs);
+    scan(detalheMovs);
+    return Array.from(ids);
+  }, [minhasMovs, detalheMovs]);
+  useEffect(() => {
+    let alive = true;
+    const pendentes = mistoLancIds.filter((id) => !(id in mistoObs));
+    if (pendentes.length === 0) return;
+    (async () => {
+      const { data } = await supabase.from("fin_lancamentos")
+        .select("id, observacoes").in("id", pendentes);
+      if (!alive || !data) return;
+      setMistoObs((prev) => {
+        const next = { ...prev };
+        for (const row of data) next[row.id as string] = (row.observacoes as string | null) ?? "";
+        // Marca também os que não voltaram, para não refazer o fetch em loop.
+        for (const id of pendentes) if (!(id in next)) next[id] = "";
+        return next;
+      });
+    })();
+    return () => { alive = false; };
+  }, [mistoLancIds, mistoObs]);
+
+  // Entradas agrupadas por forma de pagamento (recebimento + suprimento).
+  // Aliases cartao_credito/cartao_debito ficam em credito/debito; pagamentos
+  // "misto" são decompostos pelas observações do fin_lancamento.
+  const entradasPorForma = useMemo(() => {
+    const r: Record<string, number> & { total: number } = {
+      dinheiro: 0, pix: 0, debito: 0, credito: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0, total: 0,
+    };
+    minhasMovs.forEach((m) => {
+      if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
+      const v = Number(m.valor || 0);
+      r.total += v;
+      const bucket = normalizarForma(m.forma_pagamento);
+      if (bucket === "misto") {
+        const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+        const partes = decomporMistoObs(obs);
+        let somado = 0;
+        for (const [k, val] of Object.entries(partes)) {
+          r[k] = (r[k] ?? 0) + (val ?? 0);
+          somado += val ?? 0;
+        }
+        // Diferença (ex.: obs ainda não carregada, ou parcela sem label
+        // reconhecido) vai para "outros" para preservar o total.
+        const resto = v - somado;
+        if (Math.abs(resto) > 0.005) r.outros += resto;
+      } else {
+        r[bucket] += v;
+      }
+    });
+    return r;
+  }, [minhasMovs, mistoObs]);
 
   // Calculo por sessao (todos)
   const calcSaldoSessao = useCallback((sid: string) => {
@@ -628,6 +871,19 @@ function Page() {
     if (ehPagto && (movForma === "credito" || movForma === "debito") && !movBandeira) {
       toast.error("Selecione a bandeira do cartão"); return;
     }
+    const ehTransfer = openMov.tipo === "sangria" || openMov.tipo === "suprimento";
+    if (ehTransfer && !movDestinoUserId) {
+      toast.error(openMov.tipo === "sangria"
+        ? "Selecione a quem o dinheiro está sendo entregue"
+        : "Selecione de quem o dinheiro está sendo recebido");
+      return;
+    }
+    const destinoNome = ehTransfer
+      ? (membrosClinica.find((m) => m.user_id === movDestinoUserId)?.nome ?? null)
+      : null;
+    const sufixoDestino = ehTransfer && destinoNome
+      ? ` — ${openMov.tipo === "sangria" ? "Entregue a" : "Recebido de"}: ${destinoNome}`
+      : "";
     const sufixoCartao = ehPagto ? montarSufixoCartao(movForma, movBandeira, movParcelas) : "";
     setSaving(true);
     const { error } = await supabase.from("caixa_movimentos").insert({
@@ -636,16 +892,18 @@ function Page() {
       user_id: user.id,
       tipo: openMov.tipo,
       valor: v,
-      descricao: (movDesc || "") + sufixoCartao || null,
+      descricao: ((movDesc || "") + sufixoCartao + sufixoDestino) || null,
       forma_pagamento: ehPagto ? movForma : null,
+      destino_user_id: ehTransfer ? movDestinoUserId : null,
+      destino_nome: ehTransfer ? destinoNome : null,
     });
     setSaving(false);
     if (error) { mostrarErro(error); return; }
     setOpenMov(null);
     const tipoLancado = openMov.tipo;
-    const descLancada = (movDesc || "") + sufixoCartao;
+    const descLancada = (movDesc || "") + sufixoCartao + sufixoDestino;
     setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
-    setMovBandeira(""); setMovParcelas("1");
+    setMovBandeira(""); setMovParcelas("1"); setMovDestinoUserId("");
     toast.success(`${TIPO_LABEL[tipoLancado]} registrada`);
     if (tipoLancado === "sangria" || tipoLancado === "suprimento") {
       printComprovanteCaixa({
@@ -654,6 +912,7 @@ function Page() {
         operadorNome: minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
         valor: v,
         descricao: descLancada || null,
+        destinoNome,
       });
     }
     void load();
@@ -694,52 +953,41 @@ function Page() {
     const obsFinal = obsFechamento;
     setValorInformado(""); setObsFechamento("");
     toast.success("Caixa fechado");
-    // Total recebido por forma de pagamento na sessão
+    // Total recebido por forma de pagamento na sessão — normaliza aliases e
+    // decompõe "misto" consultando observacoes do lançamento.
     const porForma: Record<string, number> = {};
-    const mistoLancIds: string[] = [];
+    const mistoIds: string[] = [];
+    const mistoValoresTotais: Record<string, number> = {};
     minhasMovs.forEach((m) => {
       if (m.tipo !== "recebimento") return;
-      const k = (m.forma_pagamento || "outros").toLowerCase();
-      if (k === "misto" && m.lancamento_id) mistoLancIds.push(m.lancamento_id);
-      porForma[k] = (porForma[k] || 0) + Number(m.valor || 0);
+      const v = Number(m.valor || 0);
+      const bucket = normalizarForma(m.forma_pagamento);
+      if (bucket === "misto" && m.lancamento_id) {
+        mistoIds.push(m.lancamento_id);
+        mistoValoresTotais[m.lancamento_id] = (mistoValoresTotais[m.lancamento_id] ?? 0) + v;
+      } else {
+        porForma[bucket] = (porForma[bucket] ?? 0) + v;
+      }
     });
-    // Decompõe "misto" nas formas reais consultando observacoes do lançamento.
-    if (mistoLancIds.length > 0) {
+    if (mistoIds.length > 0) {
       const { data: lancs } = await supabase
         .from("fin_lancamentos")
         .select("id, observacoes")
-        .in("id", mistoLancIds);
-      const LABEL_TO_KEY: Array<[RegExp, string]> = [
-        [/^cart[ãa]o\s*cr[ée]dito/i, "credito"],
-        [/^cart[ãa]o\s*d[ée]bito/i, "debito"],
-        [/^dinheiro/i, "dinheiro"],
-        [/^pix/i, "pix"],
-        [/^boleto/i, "boleto"],
-        [/^conv[êe]nio/i, "convenio"],
-        [/^transfer[êe]ncia/i, "transferencia"],
-      ];
-      const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
-      (lancs ?? []).forEach((l: { observacoes: string | null }) => {
-        const obs = l.observacoes ?? "";
-        const idx = obs.indexOf("Pagamento misto:");
-        if (idx < 0) return;
-        const trecho = obs.slice(idx + "Pagamento misto:".length).split(" | ")[0];
-        const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
-        let somaDecomposta = 0;
-        for (const p of partes) {
-          const match = LABEL_TO_KEY.find(([re]) => re.test(p));
-          if (!match) continue;
-          const valMatch = p.match(/R\$\s*([\d\.]+,\d{2})/);
-          if (!valMatch) continue;
-          const v = parseBRL(valMatch[1]);
-          porForma[match[1]] = (porForma[match[1]] || 0) + v;
-          somaDecomposta += v;
+        .in("id", mistoIds);
+      (lancs ?? []).forEach((l: { id: string; observacoes: string | null }) => {
+        const partes = decomporMistoObs(l.observacoes);
+        let somado = 0;
+        for (const [k, val] of Object.entries(partes)) {
+          porForma[k] = (porForma[k] ?? 0) + (val ?? 0);
+          somado += val ?? 0;
         }
-        // Remove do bucket "misto" o que foi decomposto
-        porForma.misto = Math.max(0, (porForma.misto || 0) - somaDecomposta);
+        const total = mistoValoresTotais[l.id] ?? 0;
+        const resto = total - somado;
+        if (Math.abs(resto) > 0.005) porForma.outros = (porForma.outros ?? 0) + resto;
       });
-      if ((porForma.misto || 0) < 0.005) delete porForma.misto;
     }
+    // Remove buckets zerados para não poluir o comprovante.
+    for (const k of Object.keys(porForma)) if (Math.abs(porForma[k]) < 0.005) delete porForma[k];
     printComprovanteCaixa({
       tipo: "fechamento",
       clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
@@ -900,6 +1148,37 @@ function Page() {
                 </Card>
               </div>
 
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs text-muted-foreground">Entradas por forma de pagamento</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const cards: Array<{ label: string; value: number; sempre?: boolean }> = [
+                      { label: "Dinheiro", value: entradasPorForma.dinheiro, sempre: true },
+                      { label: "PIX", value: entradasPorForma.pix, sempre: true },
+                      { label: "Débito", value: entradasPorForma.debito, sempre: true },
+                      { label: "Crédito", value: entradasPorForma.credito, sempre: true },
+                      { label: "Boleto", value: entradasPorForma.boleto },
+                      { label: "Transferência", value: entradasPorForma.transferencia },
+                      { label: "Convênio", value: entradasPorForma.convenio },
+                      { label: "Outros", value: entradasPorForma.outros },
+                    ];
+                    const visiveis = cards.filter((c) => c.sempre || (c.value ?? 0) > 0.005);
+                    return (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {visiveis.map((it) => (
+                          <div key={it.label} className="rounded-md border bg-muted/30 px-3 py-2">
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{it.label}</div>
+                            <div className="text-base font-semibold tabular-nums">{fmt(it.value)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => setOpenMov({ tipo: "suprimento" })}>
                   <ArrowDownToLine className="h-4 w-4 mr-2 text-emerald-600" /> Suprimento
@@ -1048,12 +1327,43 @@ function Page() {
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
                           <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                           <TableCell>{m.descricao || "—"}</TableCell>
-                          <TableCell>{m.forma_pagamento || "—"}</TableCell>
+                          <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                           </TableCell>
                           <TableCell className="text-right">
-                            {m.tipo === "recebimento" && (
+                            {m.tipo === "recebimento" && podeEscrever && (
+                              (() => {
+                                const st = m.lancamento_id ? estornosPorLanc.get(m.lancamento_id) : undefined;
+                                if (st === "pendente") {
+                                  return (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled
+                                      className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
+                                      title="Solicitação de estorno enviada — aguardando decisão do financeiro"
+                                    >
+                                      <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
+                                    </Button>
+                                  );
+                                }
+                                if (st === "aprovado") {
+                                  return (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled
+                                      className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
+                                      title="Este lançamento já foi estornado"
+                                    >
+                                      <Undo2 className="h-3 w-3 mr-1" /> Estornado
+                                    </Button>
+                                  );
+                                }
+                                return (
                               <Button
                                 type="button"
                                 size="sm"
@@ -1064,6 +1374,8 @@ function Page() {
                               >
                                 <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
                               </Button>
+                                );
+                              })()
                             )}
                           </TableCell>
                         </TableRow>
@@ -1327,6 +1639,24 @@ function Page() {
               <Label>Descrição</Label>
               <Input value={movDesc} onChange={(e) => setMovDesc(e.target.value)} placeholder="Motivo / referência" />
             </div>
+            {openMov && (openMov.tipo === "sangria" || openMov.tipo === "suprimento") && (
+              <div>
+                <Label>{openMov.tipo === "sangria" ? "Entregue a *" : "Recebido de *"}</Label>
+                <Select value={movDestinoUserId} onValueChange={setMovDestinoUserId}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o usuário..." /></SelectTrigger>
+                  <SelectContent>
+                    {membrosClinica.map((m) => (
+                      <SelectItem key={m.user_id} value={m.user_id}>{m.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {openMov.tipo === "sangria"
+                    ? "Registre a quem o dinheiro está sendo entregue (ex.: financeiro, gestor)."
+                    : "Registre de quem o dinheiro está sendo recebido."}
+                </p>
+              </div>
+            )}
             {openMov && (openMov.tipo === "recebimento" || openMov.tipo === "despesa") && (
               <div>
                 <Label>Forma de pagamento</Label>
@@ -1616,7 +1946,7 @@ function Page() {
                         <TableCell>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
                         <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                         <TableCell>{m.descricao || "—"}</TableCell>
-                        <TableCell>{m.forma_pagamento || "—"}</TableCell>
+                        <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
                         <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                           {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                         </TableCell>
@@ -1641,6 +1971,7 @@ function Page() {
           const idx = d.indexOf("—");
           return idx > 0 ? d.slice(0, idx).trim() : null;
         })()}
+        onCreated={() => { void reloadEstornosPendentes(); }}
       />
       <Dialog open={!!caixaDrill} onOpenChange={(v) => { if (!v) setCaixaDrill(null); }}>
         <DialogContent className="max-w-3xl">
@@ -1690,7 +2021,7 @@ function Page() {
                         <TableCell className="whitespace-nowrap">{fmtDT(m.created_at)}</TableCell>
                         <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                         <TableCell>{m.descricao ?? "—"}</TableCell>
-                        <TableCell>{m.forma_pagamento ?? "—"}</TableCell>
+                        <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
                         <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
                           {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                         </TableCell>
