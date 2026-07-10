@@ -1831,16 +1831,18 @@ function AgendaPage() {
 
   const fichaPorId = useMemo(() => {
     const m = new Map<string, string>();
-    // Numeração POSICIONAL por dia/agenda na ordem do horário: cada linha
-    // (inclusive slots livres) recebe o número da sua POSIÇÃO na lista. O número
-    // reflete onde a linha está, então a sequência nunca "pula" (ex.: …012, 013,
-    // 014…) — antes o `ficha_numero` gravado (que conta só pacientes reais)
-    // sobrescrevia a posição e embaralhava a lista (…012, 001, 014…).
+    // Numeração POSICIONAL por dia/PROFISSIONAL na ordem do horário: cada linha
+    // (inclusive slots livres) recebe o número da sua POSIÇÃO na lista. Agrupa
+    // por medico_id (não por agenda_id) porque um mesmo profissional pode ter
+    // vários agenda_id no mesmo dia (ex.: slots gerados por modelos diferentes) —
+    // agrupar por agenda_id fazia o contador reiniciar no meio da lista e
+    // duplicar números (ex.: …012, 001, 014…) quando um agendamento real caía
+    // num agenda_id diferente dos slots livres ao redor.
     const contadores = new Map<string, number>();
     const ordenados = [...items].sort((a, b) => a.inicio.localeCompare(b.inicio));
     ordenados.forEach((a) => {
       const dia = a.inicio.slice(0, 10);
-      const chave = `${dia}__${a.agenda_id ?? a.medico_id ?? "sem-agenda"}`;
+      const chave = `${dia}__${a.medico_id ?? a.agenda_id ?? "sem-profissional"}`;
       const n = (contadores.get(chave) ?? 0) + 1;
       contadores.set(chave, n);
       m.set(a.id, String(n).padStart(3, "0"));

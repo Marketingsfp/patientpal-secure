@@ -438,10 +438,12 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const procNome = espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
 
   // Ficha = POSIÇÃO da linha na agenda do dia (mesma regra da lista da agenda —
-  // app.agenda.tsx > fichaPorId): conta TODOS os slots por dia/agenda na ordem do
-  // horário, inclusive livres. O chamador (a agenda) passa o número já calculado
-  // em `fichaNumero` — assim a guia bate EXATAMENTE com a lista, mesmo quando há
-  // slots no mesmo horário. Sem ele, recalcula aqui como fallback.
+  // app.agenda.tsx > fichaPorId): conta TODOS os slots por dia/PROFISSIONAL na
+  // ordem do horário, inclusive livres. Agrupa por médico (não por agenda_id)
+  // porque um mesmo profissional pode ter vários agenda_id no mesmo dia — agrupar
+  // por agenda_id duplicava números (ex.: duas linhas "001" no mesmo dia). O
+  // chamador (a agenda) passa o número já calculado em `fichaNumero` — assim a
+  // guia bate EXATAMENTE com a lista. Sem ele, recalcula aqui como fallback.
   const inicioDt = new Date(a.inicio);
   const diaIni = new Date(inicioDt); diaIni.setHours(0, 0, 0, 0);
   const diaFim = new Date(inicioDt); diaFim.setHours(23, 59, 59, 999);
@@ -455,8 +457,8 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         .lte("inicio", diaFim.toISOString())
         .order("inicio", { ascending: true })
         .order("id", { ascending: true });
-      if (a.agenda_id) qFicha = qFicha.eq("agenda_id", a.agenda_id);
-      else if (medicoIdEfetivo) qFicha = qFicha.eq("medico_id", medicoIdEfetivo);
+      if (medicoIdEfetivo) qFicha = qFicha.eq("medico_id", medicoIdEfetivo);
+      else if (a.agenda_id) qFicha = qFicha.eq("agenda_id", a.agenda_id);
       const { data: lista } = await qFicha;
       const idx = (lista ?? []).findIndex((r: any) => r.id === a.id);
       fichaNum = idx >= 0 ? idx + 1 : 0;
@@ -931,11 +933,12 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         .lte("inicio", fim.toISOString())
         .order("inicio", { ascending: true })
         .order("id", { ascending: true });
-      if (g.agendaId) q = q.eq("agenda_id", g.agendaId);
-      else if (g.medicoId) q = q.eq("medico_id", g.medicoId);
+      // Agrupa por profissional (medico_id), nao por agenda_id: mesma regra da
+      // lista da agenda e da GR individual. Um mesmo profissional pode ter
+      // varios agenda_id no mesmo dia, e agrupar por agenda_id duplicava numeros.
+      if (g.medicoId) q = q.eq("medico_id", g.medicoId);
+      else if (g.agendaId) q = q.eq("agenda_id", g.agendaId);
       const { data } = await q;
-      // Posicional (mesma regra da lista da agenda e da GR individual): conta
-      // TODOS os slots do dia/agenda na ordem do hor\u00e1rio, inclusive livres.
       const idx = (data ?? []).findIndex((r: any) => r.id === g.agIdRef);
       fichaByGrupo.set(key, idx >= 0 ? idx + 1 : 0);
     } catch { fichaByGrupo.set(key, 0); }
