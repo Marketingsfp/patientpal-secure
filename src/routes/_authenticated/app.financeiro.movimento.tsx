@@ -76,6 +76,10 @@ function Page() {
   const [filterForma, setFilterForma] = useState<string>("todos");
   const [filterPaciente, setFilterPaciente] = useState<string>("");
   const [filterPacienteDebounced, setFilterPacienteDebounced] = useState<string>("");
+  const [filterValor, setFilterValor] = useState<string>("");
+  const [filterValorDebounced, setFilterValorDebounced] = useState<string>("");
+  const [filterFicha, setFilterFicha] = useState<string>("");
+  const [filterFichaDebounced, setFilterFichaDebounced] = useState<string>("");
   const PAGE_SIZE = 100;
   const [page, setPage] = useState(1);
 
@@ -83,6 +87,14 @@ function Page() {
     const t = setTimeout(() => setFilterPacienteDebounced(filterPaciente.trim()), 300);
     return () => clearTimeout(t);
   }, [filterPaciente]);
+  useEffect(() => {
+    const t = setTimeout(() => setFilterValorDebounced(filterValor.trim()), 300);
+    return () => clearTimeout(t);
+  }, [filterValor]);
+  useEffect(() => {
+    const t = setTimeout(() => setFilterFichaDebounced(filterFicha.trim()), 300);
+    return () => clearTimeout(t);
+  }, [filterFicha]);
 
   const applyForma = <T extends { or: (s: string) => T; ilike: (c: string, p: string) => T }>(q: T): T => {
     switch (filterForma) {
@@ -266,8 +278,29 @@ function Page() {
       }));
     }
     // Merge ordenado por data desc
-    const merged = [...finList, ...caixaList].sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0));
+    let merged = [...finList, ...caixaList].sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0));
+    // Filtros client-side: valor exato e nº da ficha (referência).
+    const vNum = filterValorDebounced ? Number(filterValorDebounced.replace(",", ".")) : NaN;
+    if (Number.isFinite(vNum)) {
+      merged = merged.filter((l) => Math.abs(Number(l.valor) - vNum) < 0.005);
+    }
+    const fNum = filterFichaDebounced ? Number(filterFichaDebounced) : NaN;
+    if (Number.isFinite(fNum)) {
+      merged = merged.filter((l) => Number(l.ficha_numero) === fNum);
+    }
     setItems(merged);
+    // Se qualquer filtro client-side estiver ativo, recomputa o resumo a partir da lista filtrada.
+    if (Number.isFinite(vNum) || Number.isFinite(fNum)) {
+      let r = 0, d = 0;
+      for (const l of merged) {
+        if (l.status === "cancelado") continue;
+        if (filterStatus !== "todos" && l.status !== filterStatus) continue;
+        const v = Number(l.valor) || 0;
+        if (l.tipo === "receita") r += v;
+        else if (l.tipo === "despesa") d += v;
+      }
+      setResumo({ r, d, saldo: r - d, totalRows: merged.length });
+    }
     setLoading(false);
   };
   const loadResumo = async () => {
@@ -361,9 +394,9 @@ function Page() {
       setFuncionariosOpts(dedup);
     } else { setUsuarios([]); setFuncionariosOpts([]); }
   };
-  useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario, filterForma, filterPacienteDebounced]);
+  useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario, filterForma, filterPacienteDebounced, filterValorDebounced, filterFichaDebounced]);
   // Reseta a página sempre que qualquer filtro mudar
-  useEffect(() => { setPage(1); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario, filterForma, filterPacienteDebounced]);
+  useEffect(() => { setPage(1); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario, filterForma, filterPacienteDebounced, filterValorDebounced, filterFichaDebounced]);
   useEffect(() => { void loadOpts(); }, [clinicaAtual?.clinica_id]);
   const totais = resumo;
 
@@ -860,6 +893,25 @@ function Page() {
             value={filterPaciente}
             onChange={(e) => setFilterPaciente(e.target.value)}
             placeholder="Buscar por nome do paciente..."
+          /></div>
+        <div className="space-y-1"><Label className="text-xs">Valor (R$)</Label>
+          <Input
+            type="number"
+            step="0.01"
+            min={0}
+            className="w-32"
+            value={filterValor}
+            onChange={(e) => setFilterValor(e.target.value)}
+            placeholder="Ex.: 36,00"
+          /></div>
+        <div className="space-y-1"><Label className="text-xs">Ficha (referência)</Label>
+          <Input
+            type="number"
+            min={0}
+            className="w-32"
+            value={filterFicha}
+            onChange={(e) => setFilterFicha(e.target.value)}
+            placeholder="Nº da ficha"
           /></div>
       </CardContent></Card>
 
