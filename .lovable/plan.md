@@ -1,44 +1,55 @@
-## O que já existe (base atual)
+## Diagnóstico
 
-Quando alguém clica **Pagar** em uma mensalidade do Cartão Benefício (`contratos-page.tsx`), abre o **LancamentoDialog** com `categoriaFixaNome: "MENSALIDADE CARTAO CONSULTA"`. Esse diálogo já:
+O contrato existe e está ativo:
 
-1. Insere em `fin_lancamentos` (Mov. Caixa / Financeiro).
-2. Abre automaticamente uma sessão de caixa do atendente logado se ele não tiver uma.
-3. Insere em `caixa_movimentos` (Movimentos da Sessão), com `user_id = auth.uid()` e `sessao_id` da sessão aberta.
+- **ID**: `9cf00f18-…986f`
+- **Nº**: `20261306`
+- **Paciente**: ROBERTA SAMPAIO DA SILVA
+- **Clínica**: POLICLINICA MENINO JESUS (mesma da sessão)
+- **Status**: `ativo` — não está cancelado, nem em outra clínica
+- **Criado em**: 11/06/2026
 
-Consulta na base confirmou que a última mensalidade paga hoje (parcela 7/12 do contrato #20261878) gerou o registro corretamente em `caixa_movimentos`. Ou seja, o mecanismo já existe — mas o usuário relata que **na tela não aparece**. Preciso reproduzir para achar o ponto exato da falha antes de mexer no código.
+Ou seja, o alerta vermelho "Já possui contrato #20261306" está correto — o dado está lá.
 
-## Hipóteses do porquê "não aparece"
+### Por que a busca em "Vendas" não acha
 
-1. **Erro silencioso no bloco de caixa** — o `try/catch` em `lancamento-dialog.tsx` (linhas 590-645) engole qualquer falha de RLS/abertura de sessão com um `console.error`. Se algum insert falhar (ex.: `is_member(user, clinica)` retornar false para o perfil de caixa, política de INSERT bloquear), o pagamento é gravado no financeiro mas **não** entra no caixa — sem feedback visual.
-2. **Sessão auto-aberta em outra clínica/contexto** — se o atendente troca de clínica entre pagar e olhar o caixa, o `load()` de `/app/caixa` só busca sessão aberta da clínica atual e não encontra a movimentação.
-3. **Filtro da aba "Meu caixa"** — em `app.caixa.tsx` linha 488, `minhasMovs` só carrega movimentos da **sessão aberta**. Se a sessão foi fechada (ou o atendente entrou em outro dia), a mensalidade paga hoje some dessa aba mas ainda existe no banco.
-4. **Categoria "MENSALIDADE CARTAO CONSULTA" não cadastrada** — se a categoria não existir na clínica, o `fin_lancamentos.insert` pode falhar antes do bloco de caixa, e o `try` do caixa nem chega a rodar.
+Em `src/components/pages/contratos-page.tsx` (função `load`, linha ~156), a listagem faz:
 
-## Plano
+```ts
+supabase
+  .from("contratos_assinatura")
+  .select("*")
+  .eq("clinica_id", clinicaAtual.clinica_id)
+  .order("created_at", { ascending: false })
+  .limit(500)
+```
 
-### 1. Reproduzir e diagnosticar
-- Peço ao usuário o **nome do atendente**, a **clínica** e o **contrato** onde ele testou. Puxo do banco: `caixa_sessoes` desse atendente (abertas/fechadas hoje), `caixa_movimentos` da sessão, `fin_lancamentos` da mensalidade correspondente e a categoria `MENSALIDADE CARTAO CONSULTA` na clínica.
-- Se o `fin_lancamento` existir mas o `caixa_movimento` não → problema no bloco de caixa (hipótese 1). Se ambos existem em outra sessão → hipótese 2 ou 3.
+E o filtro do campo de busca é feito **no cliente**, em cima do que já veio (`list.filter(...)`).
 
-### 2. Fechar as brechas identificadas em `lancamento-dialog.tsx`
-- Transformar o `console.error` do bloco de caixa em **toast de aviso** ("Lançamento salvo, mas não foi possível registrar no caixa: <erro>"). Assim qualquer falha futura fica visível no ato — nada de "não aparece" silencioso.
-- Garantir que `descricao` do `caixa_movimentos` inclua o **nome do paciente + parcela + nº do contrato** (já é o caso via `initialDescricao` do contrato). Sem alteração de dados.
+A clínica POLICLINICA MENINO JESUS tem **1878 contratos**. Como só carregamos os 500 mais recentes, o contrato da Roberta (11/06/2026) ficou fora da janela → a busca local retorna "Nenhum contrato", mesmo o registro existindo.
 
-### 3. Ajustes na visualização em `app.caixa.tsx` (se hipótese 3 for a causa)
-- Na aba **"Meu caixa"** (`tab === "meu"`), quando **não há sessão aberta**, ao invés de mostrar `minhasMovs = []`, buscar os movimentos das sessões recentes do próprio usuário (últimas 20 já são carregadas em `histRes`) filtradas pelo período selecionado. Assim, pagamentos feitos numa sessão que já foi encerrada continuam visíveis para o atendente que fez.
-- Nenhuma mudança em RLS ou schema.
+Isso vai acontecer com qualquer contrato antigo de qualquer clínica com >500 registros.
 
-### 4. Validação
-- Reproduzir o pagamento de uma mensalidade nova, confirmar visualmente:
-  - Linha aparece em **Mov. Caixa** (`/app/financeiro/movimento`) com categoria "MENSALIDADE CARTAO CONSULTA".
-  - Linha aparece em **Movimentos da Sessão** (`/app/caixa` → aba "Meu caixa") do atendente que clicou em Pagar.
-- Se o diagnóstico apontar que precisa também gerar movimento para parcelas marcadas como "já pagas anteriormente" no cadastro do contrato, alinho com o usuário antes de mexer (é comportamento retroativo).
+## Correção proposta
 
-### Detalhes técnicos
+Trocar a busca por uma consulta server-side quando há termo digitado, mantendo a listagem inicial paginada.
 
-- Arquivos a editar: `src/components/financeiro/lancamento-dialog.tsx` (toast do bloco caixa) e possivelmente `src/routes/_authenticated/app.caixa.tsx` (fallback quando não há sessão aberta).
-- Sem migração de banco. Sem mudança em `contratos-page.tsx` (o fluxo já está correto lá).
-- Sem alteração das políticas RLS existentes.
+### Alterações em `src/components/pages/contratos-page.tsx`
 
-Assim que o plano for aprovado, começo pela reprodução (item 1) — preciso do nome do atendente e do contrato onde o pagamento "sumiu".
+1. **Debounce do termo `q`** (~300ms) para não bater no banco a cada tecla.
+2. **Novo efeito** que, quando `q` tem ≥ 2 caracteres, refaz o `load` com filtro no banco:
+   - `.eq("clinica_id", …)`
+   - `.or("paciente_nome.ilike.%<q>%,numero.eq.<q_se_numerico>")` — usar `numero.eq` só quando `q` for numérico; senão só o `ilike` do nome.
+   - Manter `.order("created_at", desc)` e `.limit(200)`.
+3. **Sem termo** → mantém o comportamento atual (500 mais recentes).
+4. Manter o `filtered` local para ordenação por paciente (`sortPaciente`) e como fallback exato — mas sem descartar resultados.
+5. Pequeno indicador "Buscando…" enquanto a query roda (reaproveitar `loading`).
+
+Nenhuma mudança de schema, RLS ou lógica de negócio; puramente na camada de leitura da tela de Contratos → Vendas.
+
+## Como validar
+
+1. Abrir Cartão Benefícios → Vendas, buscar por "ROBERTA SAMPAIO DA SILVA" → deve aparecer o contrato #20261306.
+2. Buscar por `20261306` → mesmo resultado.
+3. Buscar por um paciente com contrato recente (já dentro dos 500) → continua aparecendo, sem regressão.
+4. Limpar a busca → volta a listar os 500 mais recentes.
