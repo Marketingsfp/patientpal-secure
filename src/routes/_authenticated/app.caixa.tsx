@@ -231,6 +231,10 @@ function Page() {
   const { user } = useAuth();
   const podeEscrever = usePodeEscrever("caixa");
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
+  const podeLancarRecebDespesa =
+    clinicaAtual?.role === "admin" ||
+    clinicaAtual?.role === "gestor" ||
+    clinicaAtual?.role === "financeiro";
 
   const [tab, setTab] = useState<"meu" | "todos" | "repasse">("meu");
   const [estornoFor, setEstornoFor] = useState<Mov | null>(null);
