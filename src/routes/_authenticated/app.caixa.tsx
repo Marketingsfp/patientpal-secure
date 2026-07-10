@@ -2546,13 +2546,8 @@ function Page() {
             </div>
             {minhaSessao && (() => {
               const porForma = porFormaDoDiaFechamento;
-              const chaves = Array.from(new Set<string>([
-                ...Object.keys(conferidoOwn),
-                ...Object.keys(porForma).filter((k) => Math.abs(porForma[k] ?? 0) > 0.005),
-                "dinheiro",
-              ]));
               const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
-              chaves.sort((a, b) => ordem.indexOf(a) - ordem.indexOf(b));
+              const chaves = ordem;
               const totalConferido = Object.values(conferidoOwn)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
