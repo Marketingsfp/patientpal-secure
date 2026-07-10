@@ -125,6 +125,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
   const [convenios, setConvenios] = useState<ConvenioRow[]>(CONVENIOS_PADRAO);
   const [form, setForm] = useState(emptyForm());
+  // Laudo Terceiro: catálogo de cardiologistas ativos da clínica + linhas configuradas
+  const [laudadoresCatalog, setLaudadoresCatalog] = useState<LaudadorOption[]>([]);
+  const [laudadores, setLaudadores] = useState<LaudadorRow[]>([]);
   // Map procedimento_id -> Map(normalizedSpecialtyKey -> originalSpecialtyName)
   const [procEspMap, setProcEspMap] = useState<Map<string, Map<string, string>>>(new Map());
 
