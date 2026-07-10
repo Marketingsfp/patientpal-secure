@@ -2464,6 +2464,18 @@ function Page() {
               <CurrencyInput value={valorInformado} onChange={setValorInformado} />
             </div>
             <div>
+              <Label>Data do fechamento</Label>
+              <Input
+                type="date"
+                value={dataFechamento}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setDataFechamento(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Escolha o dia a que este fechamento se refere. Use uma data anterior se está fechando o caixa de um dia passado.
+              </p>
+            </div>
+            <div>
               <Label>Observações</Label>
               <Textarea value={obsFechamento} onChange={(e) => setObsFechamento(e.target.value)} />
             </div>
