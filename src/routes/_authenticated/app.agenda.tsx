@@ -297,24 +297,6 @@ type ProcComValor = {
   valor_cartao_debito: number | null;
   valor_dinheiro_pix: number | null;
 };
-const _procsCache = new Map<string, { ts: number; data: ProcComValor[] }>();
-const PROCS_TTL_MS = 60_000;
-async function getProcedimentosComValor(clinicaId: string): Promise<ProcComValor[]> {
-  const cached = _procsCache.get(clinicaId);
-  if (cached && Date.now() - cached.ts < PROCS_TTL_MS) return cached.data;
-  const { data } = await supabase
-    .from("procedimentos")
-    .select(
-      "nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix",
-    )
-    .eq("clinica_id", clinicaId)
-    .eq("ativo", true)
-    .limit(5000);
-  const rows = (data ?? []) as ProcComValor[];
-  _procsCache.set(clinicaId, { ts: Date.now(), data: rows });
-  return rows;
-}
-
 async function fetchProcedimentosAgenda(clinicaId: string): Promise<ProcedimentoRef[]> {
   const pageSize = 1000;
   const rows: ProcedimentoRef[] = [];
