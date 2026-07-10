@@ -2505,19 +2505,27 @@ function Page() {
               <Label>Médico laudador</Label>
               <Select
                 value={laudoForm.medico_laudador_id || undefined}
-                onValueChange={(v) => setLaudoForm({ ...laudoForm, medico_laudador_id: v })}
+                onValueChange={onChangeLaudador}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o médico..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {medicos.map((m) => (
+                  {(laudoRegras.length > 0
+                    ? laudoRegras.map((r) => ({ id: r.laudador_medico_id, nome: r.laudador_nome }))
+                    : medicos
+                  ).map((m) => (
                     <SelectItem key={m.id} value={m.id}>
                       {m.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {laudoRegras.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Nenhum laudador cadastrado na aba Repasse desta agenda — informe o valor manualmente.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Valor do laudo (R$)</Label>
@@ -2525,6 +2533,11 @@ function Page() {
                 value={laudoForm.valor_laudo}
                 onChange={(v) => setLaudoForm({ ...laudoForm, valor_laudo: v })}
               />
+              {laudoSemRegra && (
+                <p className="text-xs text-muted-foreground">
+                  Sem regra cadastrada para este laudador — informe o valor manualmente.
+                </p>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">
               Ao confirmar, o sistema gera automaticamente um lançamento de repasse para o laudador no valor informado.
