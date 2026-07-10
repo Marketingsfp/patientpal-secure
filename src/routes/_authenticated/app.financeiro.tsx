@@ -2,7 +2,7 @@ import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-rout
 import {
   LayoutDashboard, ArrowLeftRight, BarChart3, LineChart, Stethoscope,
   Building, FileText, FileBarChart, PieChart, Bell, Tag, Wallet,
-  Sparkles, AlertTriangle, Undo2, ScrollText,
+  Sparkles, AlertTriangle, Undo2,
 } from "lucide-react";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 
