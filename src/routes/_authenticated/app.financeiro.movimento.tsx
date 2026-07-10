@@ -46,6 +46,7 @@ interface Opt { id: string; nome: string; tipo?: string }
 const EMPTY = {
   tipo: "receita" as "receita" | "despesa", descricao: "", valor: "", data: new Date().toISOString().slice(0, 10),
   status: "confirmado", categoria_id: "", conta_id: "", forma_pagamento: "", observacoes: "",
+  referente_a: "outros" as "medico" | "funcionario" | "outros",
 };
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -58,6 +59,8 @@ function Page() {
   const [cats, setCats] = useState<Opt[]>([]);
   const [contas, setContas] = useState<Opt[]>([]);
   const [usuarios, setUsuarios] = useState<Opt[]>([]);
+  const [medicosOpts, setMedicosOpts] = useState<Opt[]>([]);
+  const [funcionariosOpts, setFuncionariosOpts] = useState<Opt[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -327,20 +330,36 @@ function Page() {
   };
   const loadOpts = async () => {
     if (!clinicaAtual) return;
-    const [c, b, m] = await Promise.all([
+    const [c, b, m, meds] = await Promise.all([
       supabase.from("fin_categorias").select("id, nome, tipo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("fin_contas").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("clinica_memberships").select("user_id").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true),
+      supabase.from("clinica_memberships").select("user_id, role").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true),
+      supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
     ]);
     setCats((c.data ?? []) as Opt[]); setContas((b.data ?? []) as Opt[]);
-    const userIds = ((m.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id);
+    setMedicosOpts(((meds.data ?? []) as Array<{ id: string; nome: string | null }>).map((x) => ({ id: x.id, nome: x.nome || "(sem nome)" })));
+    const mems = ((m.data ?? []) as Array<{ user_id: string; role: string }>);
+    const userIds = mems.map((r) => r.user_id);
     if (userIds.length) {
       const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", userIds);
       const list = ((profs ?? []) as Array<{ id: string; nome: string | null }>)
         .map((p) => ({ id: p.id, nome: p.nome || "(sem nome)" }))
         .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
       setUsuarios(list);
-    } else setUsuarios([]);
+      // Funcionários = memberships ativos que NÃO são paciente nem médico
+      const funcIds = new Set(mems.filter((r) => r.role !== "paciente" && r.role !== "medico").map((r) => r.user_id));
+      const funcNames = list.filter((p) => funcIds.has(p.id));
+      // Deduplicar por nome (case-insensitive)
+      const seen = new Set<string>();
+      const dedup: Opt[] = [];
+      for (const f of funcNames) {
+        const k = f.nome.trim().toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        dedup.push(f);
+      }
+      setFuncionariosOpts(dedup);
+    } else { setUsuarios([]); setFuncionariosOpts([]); }
   };
   useEffect(() => { void load(); void loadResumo(); }, [clinicaAtual?.clinica_id, filterTipo, fromDate, toDate, filterStatus, filterUsuario, filterForma, filterPacienteDebounced]);
   // Reseta a página sempre que qualquer filtro mudar
@@ -351,10 +370,14 @@ function Page() {
   const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (l: Lanc) => {
     if (l.origem === "caixa" || l.tipo === "transferencia") return; // transferências de caixa são somente-leitura aqui
+    const desc = (l.descricao ?? "").trim().toLowerCase();
+    const isMedico = medicosOpts.some((x) => x.nome.trim().toLowerCase() === desc);
+    const isFunc = !isMedico && funcionariosOpts.some((x) => x.nome.trim().toLowerCase() === desc);
     setEditing(l); setForm({
     tipo: l.tipo as "receita" | "despesa", descricao: l.descricao, valor: String(l.valor), data: l.data, status: l.status,
     categoria_id: l.categoria_id ?? "", conta_id: l.conta_id ?? "",
     forma_pagamento: l.forma_pagamento ?? "", observacoes: "",
+    referente_a: isMedico ? "medico" : isFunc ? "funcionario" : "outros",
   }); setOpen(true); };
 
   const submit = async (e: FormEvent) => {
