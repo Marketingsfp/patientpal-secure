@@ -76,6 +76,10 @@ function Page() {
   const [filterForma, setFilterForma] = useState<string>("todos");
   const [filterPaciente, setFilterPaciente] = useState<string>("");
   const [filterPacienteDebounced, setFilterPacienteDebounced] = useState<string>("");
+  const [filterValor, setFilterValor] = useState<string>("");
+  const [filterValorDebounced, setFilterValorDebounced] = useState<string>("");
+  const [filterFicha, setFilterFicha] = useState<string>("");
+  const [filterFichaDebounced, setFilterFichaDebounced] = useState<string>("");
   const PAGE_SIZE = 100;
   const [page, setPage] = useState(1);
 
@@ -83,6 +87,14 @@ function Page() {
     const t = setTimeout(() => setFilterPacienteDebounced(filterPaciente.trim()), 300);
     return () => clearTimeout(t);
   }, [filterPaciente]);
+  useEffect(() => {
+    const t = setTimeout(() => setFilterValorDebounced(filterValor.trim()), 300);
+    return () => clearTimeout(t);
+  }, [filterValor]);
+  useEffect(() => {
+    const t = setTimeout(() => setFilterFichaDebounced(filterFicha.trim()), 300);
+    return () => clearTimeout(t);
+  }, [filterFicha]);
 
   const applyForma = <T extends { or: (s: string) => T; ilike: (c: string, p: string) => T }>(q: T): T => {
     switch (filterForma) {
