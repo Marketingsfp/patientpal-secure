@@ -1010,6 +1010,50 @@ function Page() {
     return Array.from(mapa.values()).sort((a, b) => b.dia.localeCompare(a.dia));
   }, [minhasMovs, mistoObs]);
 
+  // Helper: converte `created_at` para "YYYY-MM-DD" no fuso local, para casar
+  // com o `<input type="date">` do modal de fechamento.
+  const localYMD = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  // Escopo por dia selecionado no modal de "Fechar caixa": movimentos,
+  // saldo (entradas - saídas) e por-forma calculados apenas daquele dia.
+  const movsDoDiaFechamento = useMemo(() => {
+    if (!dataFechamento) return minhasMovs;
+    return minhasMovs.filter((m) => localYMD(m.created_at) === dataFechamento);
+  }, [minhasMovs, dataFechamento]);
+  const saldoDoDiaFechamento = useMemo(() => {
+    return movsDoDiaFechamento.reduce(
+      (acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0), 0,
+    );
+  }, [movsDoDiaFechamento]);
+  const porFormaDoDiaFechamento = useMemo<Record<string, number>>(() => {
+    const r: Record<string, number> = {
+      dinheiro: 0, pix: 0, debito: 0, credito: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0,
+    };
+    movsDoDiaFechamento.forEach((m) => {
+      if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
+      const v = Number(m.valor || 0);
+      const bucket = normalizarForma(m.forma_pagamento);
+      if (bucket === "misto") {
+        const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+        const partes = decomporMistoObs(obs);
+        let somado = 0;
+        for (const [k, val] of Object.entries(partes)) {
+          r[k] = (r[k] ?? 0) + (val ?? 0);
+          somado += val ?? 0;
+        }
+        const resto = v - somado;
+        if (Math.abs(resto) > 0.005) r.outros += resto;
+      } else {
+        r[bucket] = (r[bucket] ?? 0) + v;
+      }
+    });
+    return r;
+  }, [movsDoDiaFechamento, mistoObs]);
+
   // Calculo por sessao (todos)
   const calcSaldoSessao = useCallback((sid: string) => {
     return todosMovs
@@ -1267,7 +1311,9 @@ function Page() {
     e.preventDefault();
     if (!minhaSessao || !clinicaAtual || !user) return;
     const informado = Number(valorInformado) || 0;
-    const diff = informado - saldoAtual;
+    // Escopo por dia selecionado: fecha apenas os valores do dia escolhido.
+    const saldoRef = saldoDoDiaFechamento;
+    const diff = informado - saldoRef;
     // Data escolhida pelo operador — usa 23:59:59 local desse dia para preservar o dia contábil.
     const hoje = new Date().toISOString().slice(0, 10);
     const fechadoEmISO = dataFechamento && dataFechamento !== hoje
@@ -1280,11 +1326,11 @@ function Page() {
         status: "fechado",
         fechado_em: fechadoEmISO,
         valor_fechamento_informado: informado,
-        valor_fechamento_calculado: saldoAtual,
+        valor_fechamento_calculado: saldoRef,
         diferenca: diff,
         observacoes: obsFechamento
-          ? `${minhaSessao.observacoes ? minhaSessao.observacoes + " | " : ""}${obsFechamento}`
-          : minhaSessao.observacoes,
+          ? `${minhaSessao.observacoes ? minhaSessao.observacoes + " | " : ""}[Dia ${dataFechamento}] ${obsFechamento}`
+          : `${minhaSessao.observacoes ? minhaSessao.observacoes + " | " : ""}[Dia ${dataFechamento}]`,
       })
       .eq("id", minhaSessao.id);
     if (!error) {
@@ -1295,7 +1341,7 @@ function Page() {
         tipo: "fechamento",
         valor: informado,
         created_at: fechadoEmISO,
-        descricao: `Fechamento. Calculado: ${fmt(saldoAtual)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}`,
+        descricao: `Fechamento do dia ${dataFechamento}. Calculado: ${fmt(saldoRef)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}`,
       });
     }
     setSaving(false);
@@ -1305,39 +1351,8 @@ function Page() {
     setValorInformado(""); setObsFechamento(""); setConferidoOwn({});
     setDataFechamento(new Date().toISOString().slice(0, 10));
     toast.success("Caixa fechado");
-    // Total recebido por forma de pagamento na sessão — normaliza aliases e
-    // decompõe "misto" consultando observacoes do lançamento.
-    const porForma: Record<string, number> = {};
-    const mistoIds: string[] = [];
-    const mistoValoresTotais: Record<string, number> = {};
-    minhasMovs.forEach((m) => {
-      if (m.tipo !== "recebimento") return;
-      const v = Number(m.valor || 0);
-      const bucket = normalizarForma(m.forma_pagamento);
-      if (bucket === "misto" && m.lancamento_id) {
-        mistoIds.push(m.lancamento_id);
-        mistoValoresTotais[m.lancamento_id] = (mistoValoresTotais[m.lancamento_id] ?? 0) + v;
-      } else {
-        porForma[bucket] = (porForma[bucket] ?? 0) + v;
-      }
-    });
-    if (mistoIds.length > 0) {
-      const { data: lancs } = await supabase
-        .from("fin_lancamentos")
-        .select("id, observacoes")
-        .in("id", mistoIds);
-      (lancs ?? []).forEach((l: { id: string; observacoes: string | null }) => {
-        const partes = decomporMistoObs(l.observacoes);
-        let somado = 0;
-        for (const [k, val] of Object.entries(partes)) {
-          porForma[k] = (porForma[k] ?? 0) + (val ?? 0);
-          somado += val ?? 0;
-        }
-        const total = mistoValoresTotais[l.id] ?? 0;
-        const resto = total - somado;
-        if (Math.abs(resto) > 0.005) porForma.outros = (porForma.outros ?? 0) + resto;
-      });
-    }
+    // Comprovante escopado ao dia selecionado.
+    const porForma: Record<string, number> = { ...porFormaDoDiaFechamento };
     // Remove buckets zerados para não poluir o comprovante.
     for (const k of Object.keys(porForma)) if (Math.abs(porForma[k]) < 0.005) delete porForma[k];
     printComprovanteCaixa({
@@ -1345,10 +1360,10 @@ function Page() {
       clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
       operadorNome: minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
       valor: informado,
-      saldoCalculado: saldoAtual,
+      saldoCalculado: saldoRef,
       valorInformado: informado,
       diferenca: diff,
-      descricao: obsFinal || null,
+      descricao: `Fechamento do dia ${dataFechamento}${obsFinal ? " — " + obsFinal : ""}`,
       porForma,
     });
     void load();
@@ -2477,11 +2492,60 @@ function Page() {
       <Dialog open={openFechar} onOpenChange={setOpenFechar}>
         <DialogContent>
           <DialogHeader><DialogTitle>Fechar caixa</DialogTitle>
-            <DialogDescription>Saldo calculado: <strong>{fmt(saldoAtual)}</strong></DialogDescription>
+            <DialogDescription>
+              Fechando o dia <strong>{dataFechamento ? new Date(`${dataFechamento}T00:00:00`).toLocaleDateString("pt-BR") : "—"}</strong>
+              {" · "}Saldo calculado do dia: <strong>{fmt(saldoDoDiaFechamento)}</strong>
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={fecharCaixa} className="space-y-3">
+            <div>
+              <Label>Dia a fechar</Label>
+              <Input
+                type="date"
+                value={dataFechamento}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => {
+                  const novo = e.target.value;
+                  setDataFechamento(novo);
+                  // Ao trocar o dia, pré-preenche a conferência com os valores
+                  // esperados daquele dia (o operador ajusta em seguida).
+                  const filtrados = novo
+                    ? minhasMovs.filter((m) => localYMD(m.created_at) === novo)
+                    : minhasMovs;
+                  const pf: Record<string, number> = {};
+                  filtrados.forEach((m) => {
+                    if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
+                    const v = Number(m.valor || 0);
+                    const bucket = normalizarForma(m.forma_pagamento);
+                    if (bucket === "misto") {
+                      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+                      const partes = decomporMistoObs(obs);
+                      let somado = 0;
+                      for (const [k, val] of Object.entries(partes)) {
+                        pf[k] = (pf[k] ?? 0) + (val ?? 0); somado += val ?? 0;
+                      }
+                      const resto = v - somado;
+                      if (Math.abs(resto) > 0.005) pf.outros = (pf.outros ?? 0) + resto;
+                    } else {
+                      pf[bucket] = (pf[bucket] ?? 0) + v;
+                    }
+                  });
+                  const inicial: Record<string, string> = {};
+                  for (const [k, v] of Object.entries(pf)) {
+                    if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
+                  }
+                  if (!inicial.dinheiro) inicial.dinheiro = "0.00";
+                  setConferidoOwn(inicial);
+                  const soma = Object.values(inicial).reduce((a, x) => a + (Number(x) || 0), 0);
+                  setValorInformado(soma.toFixed(2));
+                }}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Só os movimentos deste dia serão considerados no fechamento.
+              </p>
+            </div>
             {minhaSessao && (() => {
-              const porForma = entradasPorFormaSessao(minhaSessao.id);
+              const porForma = porFormaDoDiaFechamento;
               const chaves = Array.from(new Set<string>([
                 ...Object.keys(conferidoOwn),
                 ...Object.keys(porForma).filter((k) => Math.abs(porForma[k] ?? 0) > 0.005),
@@ -2528,18 +2592,6 @@ function Page() {
             <div>
               <Label>Valor conferido em caixa</Label>
               <CurrencyInput value={valorInformado} onChange={setValorInformado} />
-            </div>
-            <div>
-              <Label>Data do fechamento</Label>
-              <Input
-                type="date"
-                value={dataFechamento}
-                max={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => setDataFechamento(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Escolha o dia a que este fechamento se refere. Use uma data anterior se está fechando o caixa de um dia passado.
-              </p>
             </div>
             <div>
               <Label>Observações</Label>
