@@ -130,6 +130,7 @@ type Mens = {
   status: string;
   pago_em: string | null;
   forma_pagamento: string | null;
+  taxa_adesao?: number | null;
 };
 type Dep = {
   id: string;
