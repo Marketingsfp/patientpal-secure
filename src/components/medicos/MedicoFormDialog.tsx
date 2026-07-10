@@ -463,6 +463,34 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       } else {
         setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
       }
+      // Laudo terceiro — catálogo de cardiologistas ativos + linhas já cadastradas
+      const cliId = med.clinica_id ?? clinicaId;
+      try {
+        const { data: cardios } = await supabase
+          .from("medicos")
+          .select("id, nome, crm, crm_uf, ativo, medico_especialidades!inner(especialidade:especialidades!inner(nome))")
+          .eq("clinica_id", cliId)
+          .eq("ativo", true)
+          .ilike("medico_especialidades.especialidade.nome", "%cardio%")
+          .neq("id", med.id)
+          .order("nome");
+        const catalog: LaudadorOption[] = ((cardios as any[]) ?? []).map((c) => ({
+          id: c.id, nome: c.nome, crm: c.crm ?? null, crm_uf: c.crm_uf ?? null,
+        }));
+        // dedup (join pode duplicar se médico tiver múltiplas linhas em cardio)
+        const seen = new Set<string>();
+        setLaudadoresCatalog(catalog.filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true))));
+      } catch { setLaudadoresCatalog([]); }
+      const { data: laudos } = await supabase
+        .from("medico_repasse_laudo")
+        .select("laudador_medico_id, tipo_repasse, percentual, valor")
+        .eq("agenda_medico_id", med.id);
+      setLaudadores(((laudos as any[]) ?? []).map((r) => ({
+        laudador_medico_id: r.laudador_medico_id,
+        tipo_repasse: (r.tipo_repasse as "percentual" | "valor") ?? "percentual",
+        percentual: r.percentual != null ? String(r.percentual) : "",
+        valor: r.valor != null ? String(r.valor) : "",
+      })));
       const { data: mprocs } = await supabase
         .from("medico_procedimentos")
         .select("procedimento_id, especialidade_id")
