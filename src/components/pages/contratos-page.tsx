@@ -367,6 +367,7 @@ function NovoContratoForm({
   const [faixaId, setFaixaId] = useState<string>("");
   const [diaVenc, setDiaVenc] = useState(10);
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().slice(0, 10));
+  const [mensalidadesJaPagas, setMensalidadesJaPagas] = useState(0);
   const [tipoCobranca, setTipoCobranca] = useState<"boleto" | "carne" | null>(null);
   const [obs, setObs] = useState("");
   const [deps, setDeps] = useState<Array<Paciente & { parentesco: string; tipo: string }>>([]);
@@ -617,13 +618,16 @@ function NovoContratoForm({
     const valorParcela = valor + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
       const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
+      const jaPago = i < mensalidadesJaPagas;
+      const vencStr = venc.toISOString().slice(0, 10);
       return {
         contrato_id: contrato.id,
         clinica_id: clinicaId,
         numero_parcela: i + 1,
-        vencimento: venc.toISOString().slice(0, 10),
+        vencimento: vencStr,
         valor: valorParcela,
-        status: "pendente",
+        status: jaPago ? "pago" : "pendente",
+        ...(jaPago ? { pago_em: vencStr, valor_pago: valorParcela } : {}),
       };
     });
     const { error: mensErr } = await supabase.from("contrato_mensalidades").insert(parcelas);
@@ -833,6 +837,35 @@ function NovoContratoForm({
                 </SelectContent>
               </Select>
             </div>
+            {(() => {
+              // Mostra campo "já pagas" quando data de início é anterior ao mês atual
+              if (!dataInicio || !convenio) return null;
+              const ini = new Date(dataInicio + "T00:00:00");
+              const hoje = new Date();
+              const mesesDecorridos =
+                (hoje.getFullYear() - ini.getFullYear()) * 12 + (hoje.getMonth() - ini.getMonth());
+              if (mesesDecorridos < 1) return null;
+              const maxPagas = Math.max(0, convenio.num_parcelas - 1);
+              const sugestao = Math.min(mesesDecorridos, maxPagas);
+              return (
+                <div className="col-span-2">
+                  <Label>Mensalidades já pagas anteriormente</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={maxPagas}
+                    value={mensalidadesJaPagas}
+                    onChange={(e) => {
+                      const v = Math.max(0, Math.min(maxPagas, Number(e.target.value) || 0));
+                      setMensalidadesJaPagas(v);
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Use para lançar contratos antigos já em andamento. As primeiras {mensalidadesJaPagas || "N"} parcelas serão registradas como <strong>pagas</strong> e apenas as {convenio.num_parcelas - mensalidadesJaPagas} restantes ficarão em aberto. Sugestão com base na data: {sugestao}.
+                  </p>
+                </div>
+              );
+            })()}
             <div>
               <Label>Valor mensal</Label>
               <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">
