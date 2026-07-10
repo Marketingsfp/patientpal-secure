@@ -1,6 +1,37 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
+ * Formata a linha "SERVIÇO" da GR colocando a especialidade do procedimento
+ * (o "(XXX)" que vem colado no nome do procedimento) na frente, e a
+ * especialidade principal do médico entre parênteses no fim.
+ *
+ *   procNomeBase="CONSULTA (CARDIOLOGIA)", espMedico="GERIATRIA"
+ *     → "CARDIOLOGIA - CONSULTA (GERIATRIA)"
+ *
+ * Fallbacks: sem "(XXX)" no procedimento, mantém a ordem antiga
+ * (`${espMedico} - ${procNomeBase}`). Especialidades iguais colapsam.
+ */
+function formatServicoLinha(procNomeBase: string, espMedicoRaw: string | null | undefined): string {
+  const base = (procNomeBase ?? "").toUpperCase().trim();
+  const espMedico = (espMedicoRaw ?? "").toUpperCase().trim();
+  const m = base.match(/^(.*)\s*\(([^()]+)\)\s*$/);
+  if (m) {
+    const procLimpo = m[1].trim();
+    const espServico = m[2].trim();
+    if (espServico && espMedico && espServico !== espMedico) {
+      return `${espServico} - ${procLimpo} (${espMedico})`;
+    }
+    if (espServico) {
+      return `${espServico} - ${procLimpo}`;
+    }
+  }
+  if (espMedico && !base.includes(espMedico)) {
+    return `${espMedico} - ${base}`;
+  }
+  return base;
+}
+
+/**
  * Imprime a GR (Guia de Recebimento / Guia de Atendimento) no formato
  * térmico 80mm — compatível com Bematech MP-4200 TH e similares.
  *
