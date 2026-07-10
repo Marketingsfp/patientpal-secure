@@ -1477,10 +1477,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     </div>
                   )}
                 </div>
-              </TabsContent>
-
-              <TabsContent value="laudo" className="space-y-4 pt-4 pb-16">
-                <div className="space-y-3">
+                <div className="space-y-3 pt-4 border-t mt-4">
                   <div>
                     <Label>REPASSE LAUDO TERCEIRO</Label>
                     <p className="text-xs text-muted-foreground">
