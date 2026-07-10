@@ -421,6 +421,7 @@ function Page() {
   const [membrosClinica, setMembrosClinica] = useState<Array<{ user_id: string; nome: string }>>([]);
   const [valorInformado, setValorInformado] = useState("");
   const [obsFechamento, setObsFechamento] = useState("");
+  const [dataFechamento, setDataFechamento] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
   // Conferência por forma de pagamento no fechamento do próprio caixa.
   const [conferidoOwn, setConferidoOwn] = useState<Record<string, string>>({});
@@ -429,6 +430,7 @@ function Page() {
   const [openFecharTerceiro, setOpenFecharTerceiro] = useState<Sessao | null>(null);
   const [informadoTerceiro, setInformadoTerceiro] = useState("");
   const [obsTerceiro, setObsTerceiro] = useState("");
+  const [dataFechamentoTerceiro, setDataFechamentoTerceiro] = useState<string>(() => new Date().toISOString().slice(0, 10));
   // Conferência por forma de pagamento no fechamento de terceiros.
   const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
   // Fechamento em lote (por dia) — gestor
