@@ -888,11 +888,23 @@ function Page() {
   // Calculos
   const saldoAtual = useMemo(() => {
     if (!minhaSessao) return 0;
-    return minhasMovs.reduce(
-      (acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0),
-      0,
-    );
-  }, [minhaSessao, minhasMovs]);
+    return minhasMovs.reduce((acc, m) => {
+      // Blindagem: recebimento cujo lançamento foi cancelado (estornado) não
+      // entra no saldo. A sangria de reversão correspondente também é
+      // ignorada — o par se anula, mas se o reverso ainda não foi gravado
+      // (dados antigos) o saldo já fica correto.
+      if (m.lancamento_id && lancsCancelados.has(m.lancamento_id)) {
+        if (m.tipo === "recebimento") return acc;
+        if (
+          m.tipo === "sangria" &&
+          (m.descricao ?? "").toLowerCase().startsWith("estorno")
+        ) {
+          return acc;
+        }
+      }
+      return acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0);
+    }, 0);
+  }, [minhaSessao, minhasMovs, lancsCancelados]);
 
   const resumoTipos = useMemo(() => {
     const r: Record<MovTipo, number> = {
