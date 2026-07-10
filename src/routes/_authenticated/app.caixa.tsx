@@ -1163,11 +1163,59 @@ function Page() {
     void load();
   };
 
-  const verDetalhe = async (s: Sessao) => {
-    void 0;
-    return _verDetalheImpl(s);
+  // Fechamento pelo gestor de um caixa aberto por outro usuário.
+  const fecharSessaoTerceiro = async (e: FormEvent) => {
+    e.preventDefault();
+    const alvo = openFecharTerceiro;
+    if (!alvo || !clinicaAtual || !user) return;
+    const calc = calcSaldoSessao(alvo.id);
+    const informado = Number(informadoTerceiro) || 0;
+    const diff = informado - calc;
+    setSaving(true);
+    const { error } = await supabase
+      .from("caixa_sessoes")
+      .update({
+        status: "fechado",
+        fechado_em: new Date().toISOString(),
+        valor_fechamento_informado: informado,
+        valor_fechamento_calculado: calc,
+        diferenca: diff,
+        observacoes: obsTerceiro
+          ? `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}] ${obsTerceiro}`
+          : `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}]`,
+      })
+      .eq("id", alvo.id);
+    if (!error) {
+      await supabase.from("caixa_movimentos").insert({
+        sessao_id: alvo.id,
+        clinica_id: clinicaAtual.clinica_id,
+        user_id: user.id,
+        tipo: "fechamento",
+        valor: informado,
+        descricao: `Fechamento pelo gestor. Operador original: ${alvo.user_nome || alvo.user_id.slice(0, 8)} | Calculado: ${fmt(calc)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}`,
+      });
+    }
+    setSaving(false);
+    if (error) { mostrarErro(error); return; }
+    setOpenFecharTerceiro(null);
+    setInformadoTerceiro("");
+    setObsTerceiro("");
+    toast.success(`Caixa de ${alvo.user_nome || "operador"} fechado`);
+    printComprovanteCaixa({
+      tipo: "fechamento",
+      clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
+      operadorNome: alvo.user_nome || "Atendente",
+      valor: informado,
+      saldoCalculado: calc,
+      valorInformado: informado,
+      diferenca: diff,
+      descricao: obsTerceiro ? `Fechado pelo gestor. ${obsTerceiro}` : "Fechado pelo gestor.",
+    });
+    void loadTodos();
+    void load();
   };
-  const _verDetalheImpl = async (s: Sessao) => {
+
+  const verDetalhe = async (s: Sessao) => {
     setOpenDetalhe(s);
     const { data } = await supabase
       .from("caixa_movimentos")
