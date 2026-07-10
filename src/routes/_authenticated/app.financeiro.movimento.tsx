@@ -278,8 +278,29 @@ function Page() {
       }));
     }
     // Merge ordenado por data desc
-    const merged = [...finList, ...caixaList].sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0));
+    let merged = [...finList, ...caixaList].sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0));
+    // Filtros client-side: valor exato e nº da ficha (referência).
+    const vNum = filterValorDebounced ? Number(filterValorDebounced.replace(",", ".")) : NaN;
+    if (Number.isFinite(vNum)) {
+      merged = merged.filter((l) => Math.abs(Number(l.valor) - vNum) < 0.005);
+    }
+    const fNum = filterFichaDebounced ? Number(filterFichaDebounced) : NaN;
+    if (Number.isFinite(fNum)) {
+      merged = merged.filter((l) => Number(l.ficha_numero) === fNum);
+    }
     setItems(merged);
+    // Se qualquer filtro client-side estiver ativo, recomputa o resumo a partir da lista filtrada.
+    if (Number.isFinite(vNum) || Number.isFinite(fNum)) {
+      let r = 0, d = 0;
+      for (const l of merged) {
+        if (l.status === "cancelado") continue;
+        if (filterStatus !== "todos" && l.status !== filterStatus) continue;
+        const v = Number(l.valor) || 0;
+        if (l.tipo === "receita") r += v;
+        else if (l.tipo === "despesa") d += v;
+      }
+      setResumo({ r, d, saldo: r - d, totalRows: merged.length });
+    }
     setLoading(false);
   };
   const loadResumo = async () => {
