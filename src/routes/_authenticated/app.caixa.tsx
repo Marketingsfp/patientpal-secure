@@ -1264,6 +1264,7 @@ function Page() {
   };
 
   const verDetalhe = async (s: Sessao) => {
+    // (marcador para localizar próxima função)
     setOpenDetalhe(s);
     const { data } = await supabase
       .from("caixa_movimentos")
