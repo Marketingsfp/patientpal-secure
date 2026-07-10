@@ -1245,7 +1245,7 @@ function Page() {
         <TabsList>
           <TabsTrigger value="meu">Meu caixa</TabsTrigger>
           {isManager && <TabsTrigger value="todos"><Users className="h-4 w-4 mr-1" /> Todos (Financeiro)</TabsTrigger>}
-          <TabsTrigger value="repasse"><HandCoins className="h-4 w-4 mr-1" /> Repasse médico</TabsTrigger>
+          {podeLancarRecebDespesa && <TabsTrigger value="repasse"><HandCoins className="h-4 w-4 mr-1" /> Repasse médico</TabsTrigger>}
         </TabsList>
 
         {/* ===================== MEU CAIXA ===================== */}
