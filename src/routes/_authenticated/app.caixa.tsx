@@ -1010,6 +1010,50 @@ function Page() {
     return Array.from(mapa.values()).sort((a, b) => b.dia.localeCompare(a.dia));
   }, [minhasMovs, mistoObs]);
 
+  // Helper: converte `created_at` para "YYYY-MM-DD" no fuso local, para casar
+  // com o `<input type="date">` do modal de fechamento.
+  const localYMD = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  // Escopo por dia selecionado no modal de "Fechar caixa": movimentos,
+  // saldo (entradas - saídas) e por-forma calculados apenas daquele dia.
+  const movsDoDiaFechamento = useMemo(() => {
+    if (!dataFechamento) return minhasMovs;
+    return minhasMovs.filter((m) => localYMD(m.created_at) === dataFechamento);
+  }, [minhasMovs, dataFechamento]);
+  const saldoDoDiaFechamento = useMemo(() => {
+    return movsDoDiaFechamento.reduce(
+      (acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0), 0,
+    );
+  }, [movsDoDiaFechamento]);
+  const porFormaDoDiaFechamento = useMemo<Record<string, number>>(() => {
+    const r: Record<string, number> = {
+      dinheiro: 0, pix: 0, debito: 0, credito: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0,
+    };
+    movsDoDiaFechamento.forEach((m) => {
+      if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
+      const v = Number(m.valor || 0);
+      const bucket = normalizarForma(m.forma_pagamento);
+      if (bucket === "misto") {
+        const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+        const partes = decomporMistoObs(obs);
+        let somado = 0;
+        for (const [k, val] of Object.entries(partes)) {
+          r[k] = (r[k] ?? 0) + (val ?? 0);
+          somado += val ?? 0;
+        }
+        const resto = v - somado;
+        if (Math.abs(resto) > 0.005) r.outros += resto;
+      } else {
+        r[bucket] = (r[bucket] ?? 0) + v;
+      }
+    });
+    return r;
+  }, [movsDoDiaFechamento, mistoObs]);
+
   // Calculo por sessao (todos)
   const calcSaldoSessao = useCallback((sid: string) => {
     return todosMovs
