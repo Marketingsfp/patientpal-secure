@@ -435,7 +435,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     } catch { /* noop */ }
   }
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
-  const procNome = espNome && !procNomeBase.includes(espNome) ? `${espNome} - ${procNomeBase}` : procNomeBase;
+  const procNome = formatServicoLinha(procNomeBase, espNome);
 
   // Ficha = POSIÇÃO da linha na fila geral da CLÍNICA no dia (mesma regra da
   // lista da agenda — app.agenda.tsx > fichaPorId): conta TODOS os agendamentos
