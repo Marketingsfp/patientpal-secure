@@ -897,8 +897,9 @@ function Page() {
     });
     scan(minhasMovs);
     scan(detalheMovs);
+    scan(todosMovs);
     return Array.from(ids);
-  }, [minhasMovs, detalheMovs]);
+  }, [minhasMovs, detalheMovs, todosMovs]);
   useEffect(() => {
     let alive = true;
     const pendentes = mistoLancIds.filter((id) => !(id in mistoObs));
