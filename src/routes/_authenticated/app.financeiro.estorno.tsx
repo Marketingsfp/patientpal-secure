@@ -238,6 +238,66 @@ function Page() {
       mostrarErro(eUpdLanc, "falha ao estornar lançamento");
       return null;
     }
+    // Reverte o(s) recebimento(s) de caixa vinculados a este lançamento,
+    // inserindo uma sangria na MESMA sessão do recebimento original. Sem
+    // isso o saldo do caixa continuaria refletindo dinheiro que não existe
+    // mais (ver bug: estornos aprovados sem reversão no caixa).
+    try {
+      const { data: recebs } = await supabase
+        .from("caixa_movimentos")
+        .select("id, sessao_id, clinica_id, user_id, valor, descricao, forma_pagamento, lancamento_id")
+        .eq("lancamento_id", lanc.id)
+        .eq("tipo", "recebimento");
+      const recebRows =
+        (recebs ?? []) as Array<{
+          id: string;
+          sessao_id: string;
+          clinica_id: string;
+          user_id: string;
+          valor: number;
+          descricao: string | null;
+          forma_pagamento: string | null;
+          lancamento_id: string | null;
+        }>;
+      if (recebRows.length > 0) {
+        // Ignora recebimentos que já tenham uma sangria de estorno anterior
+        const { data: jaEstornados } = await supabase
+          .from("caixa_movimentos")
+          .select("sessao_id, lancamento_id, descricao, tipo")
+          .eq("lancamento_id", lanc.id)
+          .eq("tipo", "sangria");
+        const chaveJa = new Set(
+          ((jaEstornados ?? []) as Array<{ sessao_id: string; descricao: string | null }>)
+            .filter((r) => (r.descricao ?? "").toLowerCase().startsWith("estorno"))
+            .map((r) => r.sessao_id),
+        );
+        const paraInserir = recebRows
+          .filter((r) => !chaveJa.has(r.sessao_id))
+          .map((r) => ({
+            sessao_id: r.sessao_id,
+            clinica_id: r.clinica_id,
+            user_id: r.user_id,
+            tipo: "sangria" as const,
+            valor: Number(r.valor || 0),
+            descricao: `Estorno — ${r.descricao ?? ""}`.trim(),
+            forma_pagamento: r.forma_pagamento,
+            lancamento_id: r.lancamento_id,
+          }));
+        if (paraInserir.length > 0) {
+          const { error: eRev } = await supabase
+            .from("caixa_movimentos")
+            .insert(paraInserir);
+          if (eRev) {
+            // Não bloqueia o estorno — apenas avisa. O saldo do caixa
+            // será corrigido pela blindagem do front (que ignora
+            // recebimentos com lançamento cancelado).
+            console.warn("Falha ao lançar sangria de estorno no caixa:", eRev);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Reversão de caixa não pôde ser aplicada:", err);
+    }
     const agId = lanc.agendamento_id;
     if (agId) {
       // Atendimento vindo da agenda: reabre a ficha (libera o horário).
