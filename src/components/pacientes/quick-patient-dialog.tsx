@@ -77,19 +77,17 @@ export function QuickPatientDialog({
 
     setSaving(true);
     try {
-      const payload: Record<string, unknown> = {
-        clinica_id: clinicaId,
-        nome: nomeLimpo,
-        ativo: true,
-      };
-      if (cpf) payload.cpf = somenteDigitos(cpf);
-      if (dataNasc) payload.data_nascimento = dataNasc;
-      if (telDigits) payload.telefone = telDigits;
-      if (email) payload.email = email.trim();
-
       const { data, error } = await supabase
         .from("pacientes")
-        .insert(payload)
+        .insert({
+          clinica_id: clinicaId,
+          nome: nomeLimpo,
+          ativo: true,
+          cpf: cpf ? somenteDigitos(cpf) : null,
+          data_nascimento: dataNasc || null,
+          telefone: telDigits || null,
+          email: email ? email.trim() : null,
+        })
         .select("id, nome, cpf, telefone, data_nascimento, clinica_id, email")
         .single();
       if (error) throw error;
