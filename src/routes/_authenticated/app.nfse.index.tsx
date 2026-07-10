@@ -165,11 +165,6 @@ function NfsePage() {
     return Array.from(porEmitente.values());
   }, [filtrados]);
 
-  const emitidasComPdf = useMemo(
-    () => filtrados.filter((r) => r.status === "emitida" && !!r.url_pdf).slice(0, 4),
-    [filtrados],
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
