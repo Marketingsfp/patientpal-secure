@@ -422,6 +422,8 @@ function Page() {
   const [valorInformado, setValorInformado] = useState("");
   const [obsFechamento, setObsFechamento] = useState("");
   const [saving, setSaving] = useState(false);
+  // Conferência por forma de pagamento no fechamento do próprio caixa.
+  const [conferidoOwn, setConferidoOwn] = useState<Record<string, string>>({});
 
   // Fechamento de caixa de OUTRO usuário (gestor/admin no tab "Todos").
   const [openFecharTerceiro, setOpenFecharTerceiro] = useState<Sessao | null>(null);
@@ -1518,7 +1520,19 @@ function Page() {
                   </>
                 )}
                 <div className="flex-1" />
-                <Button variant="destructive" onClick={() => { setValorInformado(saldoAtual.toFixed(2)); setOpenFechar(true); }}>
+                <Button variant="destructive" onClick={() => {
+                  setValorInformado(saldoAtual.toFixed(2));
+                  if (minhaSessao) {
+                    const porForma = entradasPorFormaSessao(minhaSessao.id);
+                    const inicial: Record<string, string> = {};
+                    for (const [k, v] of Object.entries(porForma)) {
+                      if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
+                    }
+                    if (!inicial.dinheiro) inicial.dinheiro = "0.00";
+                    setConferidoOwn(inicial);
+                  }
+                  setOpenFechar(true);
+                }}>
                   <Lock className="h-4 w-4 mr-2" /> Fechar caixa
                 </Button>
               </div>
