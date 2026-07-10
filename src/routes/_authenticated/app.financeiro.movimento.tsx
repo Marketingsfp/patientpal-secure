@@ -36,6 +36,10 @@ interface Lanc {
   transferSentido?: "entrada" | "saida";
   /** HH:MM local — só preenchido para linhas vindas de caixa_movimentos */
   hora?: string | null;
+  /** Nome do médico do lançamento (linhas de fin_lancamentos com medico_id). */
+  medico_nome?: string | null;
+  /** Nº da ficha do agendamento vinculado. */
+  ficha_numero?: number | null;
 }
 interface Opt { id: string; nome: string; tipo?: string }
 
