@@ -1164,6 +1164,10 @@ function Page() {
   };
 
   const verDetalhe = async (s: Sessao) => {
+    void 0;
+    return _verDetalheImpl(s);
+  };
+  const _verDetalheImpl = async (s: Sessao) => {
     setOpenDetalhe(s);
     const { data } = await supabase
       .from("caixa_movimentos")
