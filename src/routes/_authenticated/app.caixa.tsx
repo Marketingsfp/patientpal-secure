@@ -1801,7 +1801,25 @@ function Page() {
                           <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
                             {fmt(s.diferenca)}
                           </TableCell>
-                          <TableCell><Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}><Eye className="h-4 w-4" /></Button></TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1 justify-end">
+                              {s.status === "aberto" && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setFecharAlheia(s);
+                                    setValorInformadoAlheia(calcSaldoSessao(s.id).toFixed(2));
+                                    setObsFecharAlheia("");
+                                  }}
+                                  title="Fechar caixa deste operador"
+                                >
+                                  <Lock className="h-4 w-4 mr-1" /> Fechar
+                                </Button>
+                              )}
+                              <Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}><Eye className="h-4 w-4" /></Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       );
                     })}
