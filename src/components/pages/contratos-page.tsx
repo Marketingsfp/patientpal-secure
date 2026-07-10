@@ -1218,6 +1218,7 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [admTaxaAdesao, setAdmTaxaAdesao] = useState<string>(String(Number(contrato.taxa_adesao ?? 0).toFixed(2)));
   const [admForma, setAdmForma] = useState<string>(contrato.forma_pagamento ?? "");
   const [admObs, setAdmObs] = useState<string>(contrato.observacoes ?? "");
+  const [admFaixaId, setAdmFaixaId] = useState<string>("");
   const [savingAdm, setSavingAdm] = useState(false);
   const [retroDialog, setRetroDialog] = useState<{ open: boolean; parcelasPagas: string; dataInicio: string } | null>(null);
   const [regerandoRetro, setRegerandoRetro] = useState(false);
@@ -1288,17 +1289,24 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     }
     const dataInicioAntiga = (contrato as any).data_inicio as string | null;
     setSavingAdm(true);
+    // Se admin escolheu outra faixa, aplica novo valor_mensal
+    const faixaEscolhida = admFaixaId ? faixas.find((f) => f.id === admFaixaId) : null;
+    const novoValorMensal = faixaEscolhida ? Number(faixaEscolhida.valor_mensal) : null;
+    const updatePayload: any = {
+      convenio_id: admConvenioId,
+      paciente_id: admPaciente.id,
+      paciente_nome: admPaciente.nome,
+      data_inicio: admDataInicio,
+      taxa_adesao: taxa,
+      forma_pagamento: admForma || null,
+      observacoes: admObs || null,
+    };
+    if (novoValorMensal != null && novoValorMensal !== Number(valorMensalAtual)) {
+      updatePayload.valor_mensal = novoValorMensal;
+    }
     const { error } = await supabase
       .from("contratos_assinatura")
-      .update({
-        convenio_id: admConvenioId,
-        paciente_id: admPaciente.id,
-        paciente_nome: admPaciente.nome,
-        data_inicio: admDataInicio,
-        taxa_adesao: taxa,
-        forma_pagamento: admForma || null,
-        observacoes: admObs || null,
-      } as any)
+      .update(updatePayload)
       .eq("id", contrato.id);
     setSavingAdm(false);
     if (error) {
@@ -1312,6 +1320,21 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     (contrato as any).taxa_adesao = taxa;
     (contrato as any).forma_pagamento = admForma || null;
     (contrato as any).observacoes = admObs || null;
+    if (novoValorMensal != null && novoValorMensal !== Number(valorMensalAtual)) {
+      (contrato as any).valor_mensal = novoValorMensal;
+      setValorMensalAtual(novoValorMensal);
+      // Recalcula parcelas em aberto para o novo valor
+      const abertas = mens.filter((m) => m.status !== "pago");
+      if (abertas.length > 0) {
+        await Promise.all(
+          abertas.map((m) => {
+            const isBoleto = (m.forma_pagamento ?? (contrato as any).forma_pagamento) === "boleto";
+            const v = novoValorMensal + (isBoleto ? TAXA_BOLETO : 0);
+            return supabase.from("contrato_mensalidades").update({ valor: v }).eq("id", m.id);
+          }),
+        );
+      }
+    }
     toast.success("Contrato atualizado.");
     await load();
     // Se a data de início foi movida para o passado, oferecer regeneração com parcelas pagas.
@@ -1622,6 +1645,18 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   useEffect(() => {
     load(); /* eslint-disable-next-line */
   }, [contrato.id]);
+
+  // Sincroniza a faixa "admin" com a faixa vigente (baseada no valor_mensal atual)
+  useEffect(() => {
+    if (!faixas.length) {
+      setAdmFaixaId("");
+      return;
+    }
+    const v = Number(valorMensalAtual);
+    const match =
+      faixas.find((f) => Number(f.valor_mensal) === v) ?? faixas[0];
+    setAdmFaixaId(match?.id ?? "");
+  }, [faixas, valorMensalAtual]);
 
   // Carrega lista de pacientes da clínica do contrato ao abrir o diálogo
   useEffect(() => {
@@ -2276,7 +2311,36 @@ h1, h2, h3 { margin: 0 0 6mm; }
               ) : (
                 <DadosField label="Convênio" value={convenio?.nome ?? "—"} />
               )}
-              <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
+              {isAdmin && faixas.length > 0 ? (
+                <div className="space-y-1">
+                  <Label>Nº de pessoas no contrato</Label>
+                  <Select value={admFaixaId} onValueChange={setAdmFaixaId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a faixa…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {faixas.map((f) => {
+                        const range =
+                          f.vidas_ate == null
+                            ? `${f.vidas_de}+ pessoas`
+                            : f.vidas_ate === f.vidas_de
+                              ? `${f.vidas_de} ${f.vidas_de === 1 ? "pessoa" : "pessoas"}`
+                              : `${f.vidas_de} a ${f.vidas_ate} pessoas`;
+                        return (
+                          <SelectItem key={f.id} value={f.id}>
+                            {range} — {BRL(Number(f.valor_mensal))}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Ao salvar, o valor mensal do contrato e das parcelas em aberto serão atualizados para a faixa selecionada.
+                  </p>
+                </div>
+              ) : (
+                <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
+              )}
               {isAdmin ? (
                 <div className="space-y-1">
                   <Label>Paciente titular</Label>
