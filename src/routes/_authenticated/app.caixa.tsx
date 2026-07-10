@@ -2298,6 +2298,81 @@ function Page() {
         </DialogContent>
       </Dialog>
 
+      {/* === Modal Fechamento em lote (por dia/período) === */}
+      <Dialog open={openLote} onOpenChange={setOpenLote}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Fechar caixas abertos no período</DialogTitle>
+            <DialogDescription>
+              Cada caixa selecionado será fechado com o valor <strong>calculado</strong> (diferença = 0). Use quando os operadores esquecem de fechar o próprio caixa ao fim do dia.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="max-h-80 overflow-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10"></TableHead>
+                    <TableHead>Operador</TableHead>
+                    <TableHead>Abertura</TableHead>
+                    <TableHead className="text-right">Calculado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {todasSessoes.filter((s) => s.status === "aberto").length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        Nenhum caixa aberto no período.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {todasSessoes.filter((s) => s.status === "aberto").map((s) => {
+                    const calc = calcSaldoSessao(s.id);
+                    const checked = !!loteSelecionados[s.id];
+                    return (
+                      <TableRow key={s.id}>
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => setLoteSelecionados((prev) => ({ ...prev, [s.id]: e.target.checked }))}
+                            className="h-4 w-4"
+                          />
+                        </TableCell>
+                        <TableCell className="uppercase font-medium">{(s.user_nome || s.user_id.slice(0, 8)).toUpperCase()}</TableCell>
+                        <TableCell>{fmtDT(s.aberto_em)}</TableCell>
+                        <TableCell className="text-right">{fmt(calc)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            <div>
+              <Label>Observação (aplicada a todos)</Label>
+              <Textarea
+                value={obsLote}
+                onChange={(e) => setObsLote(e.target.value)}
+                placeholder="Ex.: Fechamento de fim de dia — operadores não fecharam o caixa."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setOpenLote(false)}>Cancelar</Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={saving}
+              onClick={() => void fecharLote()}
+              data-primary
+            >
+              <Lock className="h-4 w-4 mr-2" />
+              Confirmar fechamento em lote
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* === Modal Cobrança === */}
       <Dialog open={!!openCobranca} onOpenChange={(o) => { if (!o) setOpenCobranca(null); }}>
         <DialogContent>
