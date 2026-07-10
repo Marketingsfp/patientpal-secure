@@ -159,6 +159,19 @@ export function usePickTomador() {
                 <Label>Município</Label>
                 <Input value={terceiro.municipio ?? ""} onChange={(e) => setTerceiro({ ...terceiro, municipio: e.target.value })} />
               </div>
+              <div className="sm:col-span-2 space-y-1">
+                <Label>Dependente atendido (opcional)</Label>
+                <Textarea
+                  rows={2}
+                  maxLength={200}
+                  placeholder="Nome do dependente / paciente efetivamente atendido"
+                  value={terceiro.dependenteAtendido ?? ""}
+                  onChange={(e) => setTerceiro({ ...terceiro, dependenteAtendido: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Aparecerá na descrição dos serviços da NFS-e.
+                </p>
+              </div>
             </div>
           </div>
         )}
