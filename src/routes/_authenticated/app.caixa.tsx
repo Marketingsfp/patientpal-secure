@@ -1416,56 +1416,120 @@ function Page() {
                   </Card>
                 ) : (
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
-                  <CardTitle className="text-base">
-                    {isManager ? "Movimentos da sessão" : "Movimentos de hoje"}
-                  </CardTitle>
-                  {isManager ? (
-                    <div className="flex items-end gap-2 flex-wrap">
+                <CardHeader className="gap-3">
+                  <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
+                    <CardTitle className="text-base">
+                      {isManager ? "Movimentos da sessão" : "Movimentos de hoje"}
+                      {filtrosAtivos && (
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          ({minhasMovsFiltrados.length} de {minhasMovs.length})
+                        </span>
+                      )}
+                    </CardTitle>
+                    {!isManager && (
+                      <span className="text-xs text-muted-foreground">
+                        {new Date().toLocaleDateString("pt-BR")}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-end gap-2 flex-wrap">
+                    {isManager && (
                       <div>
                         <Label className="text-xs">Período</Label>
-                        <Select value={meuPeriodo} onValueChange={(v) => setMeuPeriodo(v as typeof meuPeriodo)}>
-                          <SelectTrigger className="h-8 w-[160px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="hoje">Hoje</SelectItem>
-                            <SelectItem value="semana">Última semana</SelectItem>
-                            <SelectItem value="quinzena">Última quinzena</SelectItem>
-                            <SelectItem value="mes">Último mês</SelectItem>
-                            <SelectItem value="intervalo">Intervalo personalizado</SelectItem>
-                            <SelectItem value="todos">Todos</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Popover open={openCal} onOpenChange={setOpenCal}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-8 justify-start font-normal min-w-[220px]">
+                              <CalendarIcon className="h-3.5 w-3.5 mr-2" />
+                              {periodoLabel}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <div className="flex flex-col sm:flex-row">
+                              <div className="flex sm:flex-col gap-1 p-2 border-b sm:border-b-0 sm:border-r bg-muted/30">
+                                {([
+                                  ["hoje", "Hoje"],
+                                  ["semana", "Última semana"],
+                                  ["quinzena", "Última quinzena"],
+                                  ["mes", "Último mês"],
+                                  ["todos", "Todos"],
+                                ] as const).map(([v, lbl]) => (
+                                  <Button
+                                    key={v}
+                                    type="button"
+                                    variant={meuPeriodo === v ? "default" : "ghost"}
+                                    size="sm"
+                                    className="justify-start text-xs h-7"
+                                    onClick={() => { setMeuPeriodo(v); setOpenCal(false); }}
+                                  >
+                                    {lbl}
+                                  </Button>
+                                ))}
+                              </div>
+                              <Calendar
+                                mode="range"
+                                locale={ptBR}
+                                numberOfMonths={2}
+                                selected={{
+                                  from: meuDataIni ? new Date(meuDataIni + "T00:00:00") : undefined,
+                                  to: meuDataFim ? new Date(meuDataFim + "T00:00:00") : undefined,
+                                }}
+                                onSelect={(range: DateRange | undefined) => {
+                                  if (!range?.from) return;
+                                  const f = range.from;
+                                  const t = range.to ?? range.from;
+                                  const iso = (d: Date) =>
+                                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                                  setMeuDataIni(iso(f));
+                                  setMeuDataFim(iso(t));
+                                  setMeuPeriodo("intervalo");
+                                  if (range.to) setOpenCal(false);
+                                }}
+                                initialFocus
+                                className={cn("p-3 pointer-events-auto")}
+                              />
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
-                      {meuPeriodo === "intervalo" && (
-                        <>
-                          <div>
-                            <Label className="text-xs">De</Label>
-                            <Input
-                              type="date"
-                              value={meuDataIni}
-                              onChange={(e) => setMeuDataIni(e.target.value)}
-                              className="h-8 w-[150px]"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">Até</Label>
-                            <Input
-                              type="date"
-                              value={meuDataFim}
-                              onChange={(e) => setMeuDataFim(e.target.value)}
-                              className="h-8 w-[150px]"
-                            />
-                          </div>
-                        </>
-                      )}
+                    )}
+                    <div>
+                      <Label className="text-xs">Médico</Label>
+                      <Select value={meuMedico} onValueChange={setMeuMedico}>
+                        <SelectTrigger className="h-8 w-[200px]">
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Todos os médicos</SelectItem>
+                          {medicosDisponiveis.map((n) => (
+                            <SelectItem key={n} value={n}>{n}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">
-                      {new Date().toLocaleDateString("pt-BR")}
-                    </span>
-                  )}
+                    <div>
+                      <Label className="text-xs">Paciente</Label>
+                      <div className="relative">
+                        <Search className="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={meuPaciente}
+                          onChange={(e) => setMeuPaciente(e.target.value)}
+                          placeholder="Buscar paciente..."
+                          className="h-8 w-[200px] pl-7"
+                        />
+                      </div>
+                    </div>
+                    {filtrosAtivos && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={limparFiltros}
+                        className="h-8 text-xs"
+                      >
+                        <X className="h-3.5 w-3.5 mr-1" /> Limpar
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
                   <Table>
@@ -1486,9 +1550,11 @@ function Page() {
                       {minhasMovsFiltrados.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={9} className="text-center text-muted-foreground">
-                            {isManager
-                              ? "Sem movimentos no período"
-                              : "Sem movimentos hoje"}
+                            {filtrosAtivos
+                              ? "Nenhum movimento corresponde aos filtros"
+                              : isManager
+                                ? "Sem movimentos no período"
+                                : "Sem movimentos hoje"}
                           </TableCell>
                         </TableRow>
                       ) : minhasMovsFiltrados.map((m) => {
