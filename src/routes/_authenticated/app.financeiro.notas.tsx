@@ -58,6 +58,7 @@ function Page() {
   const [emitting, setEmitting] = useState(false);
   const emitirFn = useServerFn(emitirNfse);
   const consultarFn = useServerFn(consultarNfse);
+  const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
 
   const load = async () => {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
@@ -138,7 +139,22 @@ function Page() {
         .eq("id", n.paciente_id).maybeSingle();
       if (pacErr || !pac) throw new Error("Paciente não encontrado");
       const p = pac as PacFull;
-      const cpfLimpo = (tomadorCpf || p.cpf || "").replace(/\D/g, "");
+      const cpfPaciente = (tomadorCpf || p.cpf || "").replace(/\D/g, "");
+      const tomador = await pickTomadorNfse({
+        paciente: {
+          nome: p.nome,
+          cpfCnpj: cpfPaciente || undefined,
+          email: p.email ?? undefined,
+          cep: p.cep ?? undefined,
+          logradouro: p.logradouro ?? undefined,
+          numero: p.numero ?? undefined,
+          bairro: p.bairro ?? undefined,
+          municipio: p.cidade ?? undefined,
+          uf: p.estado ?? undefined,
+        },
+      });
+      if (!tomador) { setEmitting(false); toast.error("Emissão cancelada."); return; }
+      const cpfLimpo = (tomador.cpfCnpj ?? "").replace(/\D/g, "");
       if (cpfLimpo.length !== 11 && cpfLimpo.length !== 14) {
         throw new Error("CPF/CNPJ do tomador é obrigatório (11 ou 14 dígitos).");
       }
@@ -148,17 +164,7 @@ function Page() {
         pagamentoId: n.id ?? undefined,
         valorServicos: Number(n.valor),
         descricaoServicos: descricao || "Serviços prestados",
-        tomador: {
-          nome: p.nome,
-          cpfCnpj: cpfLimpo,
-          email: p.email ?? undefined,
-          cep: p.cep ?? undefined,
-          logradouro: p.logradouro ?? undefined,
-          numero: p.numero ?? undefined,
-          bairro: p.bairro ?? undefined,
-          municipio: p.cidade ?? undefined,
-          uf: p.estado ?? undefined,
-        },
+        tomador: { ...tomador, cpfCnpj: cpfLimpo },
       } });
       const nfseId = (res as { id?: string })?.id;
       toast.success("NFS-e enviada. Consultando status...");
