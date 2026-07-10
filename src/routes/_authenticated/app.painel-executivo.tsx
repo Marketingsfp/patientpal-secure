@@ -527,7 +527,19 @@ function PainelExecutivoPage() {
 }
 
 // ---------- Ranking card ----------
-function RankCard({ title, rows }: { title: string; rows: { nome: string; valor: number | string; extra?: string }[] }) {
+function RankCard({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: {
+    nome: string;
+    valor: number | string;
+    extra?: string;
+    actionLabel?: string;
+    onAction?: () => void;
+  }[];
+}) {
   const _tone: HhpTone = "default"; void _tone;
   return (
     <Card>
@@ -546,6 +558,16 @@ function RankCard({ title, rows }: { title: string; rows: { nome: string; valor:
                 <div className="flex items-center gap-3 shrink-0">
                   {r.extra && <span className="text-xs text-muted-foreground">{r.extra}</span>}
                   <span className="font-semibold tabular-nums">{typeof r.valor === "number" ? int(r.valor) : r.valor}</span>
+                  {r.onAction && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+                      onClick={r.onAction}
+                    >
+                      <Undo2 className="h-3 w-3 mr-1" /> {r.actionLabel ?? "Estornar"}
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -553,5 +575,281 @@ function RankCard({ title, rows }: { title: string; rows: { nome: string; valor:
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ---------- Estorno Drawer ----------
+type EstornoRow = {
+  id: string;
+  data: string;
+  paciente_nome: string;
+  medico_nome: string;
+  procedimento: string | null;
+  valor_total: number;
+  status: string;
+  lancamento_id: string | null;
+};
+
+function EstornoDrawer({
+  clinicaId,
+  periodo,
+  filtro,
+  onClose,
+  onDone,
+}: {
+  clinicaId: string;
+  periodo: Periodo;
+  filtro:
+    | { tipo: "medico"; medicoId: string; label: string }
+    | { tipo: "procedimento"; procedimento: string; label: string };
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [rows, setRows] = useState<EstornoRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [alvo, setAlvo] = useState<EstornoRow | null>(null);
+  const [motivo, setMotivo] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      setLoading(true);
+      let q = supabase.from("fin_atendimentos")
+        .select("id,data,paciente_id,medico_id,procedimento,valor_total,status,lancamento_id")
+        .eq("clinica_id", clinicaId)
+        .gte("data", periodo.de).lte("data", periodo.ate)
+        .order("data", { ascending: false });
+      if (filtro.tipo === "medico") q = q.eq("medico_id", filtro.medicoId);
+      else q = q.eq("procedimento", filtro.procedimento);
+      const { data, error } = await q;
+      if (error) { mostrarErro(error); setRows([]); setLoading(false); return; }
+      const atds = (data ?? []) as Array<{
+        id: string; data: string; paciente_id: string | null; medico_id: string | null;
+        procedimento: string | null; valor_total: number; status: string; lancamento_id: string | null;
+      }>;
+      const pacIds = [...new Set(atds.map(a => a.paciente_id).filter(Boolean) as string[])];
+      const medIds = [...new Set(atds.map(a => a.medico_id).filter(Boolean) as string[])];
+      const [pacR, medR] = await Promise.all([
+        pacIds.length ? supabase.from("pacientes").select("id,nome").in("id", pacIds) : Promise.resolve({ data: [] as { id: string; nome: string }[] }),
+        medIds.length ? supabase.from("medicos").select("id,nome").in("id", medIds) : Promise.resolve({ data: [] as { id: string; nome: string }[] }),
+      ]);
+      const pacMap = new Map(((pacR.data ?? []) as { id: string; nome: string }[]).map(p => [p.id, p.nome]));
+      const medMap = new Map(((medR.data ?? []) as { id: string; nome: string }[]).map(m => [m.id, m.nome]));
+      setRows(atds.map(a => ({
+        id: a.id,
+        data: a.data,
+        paciente_nome: a.paciente_id ? (pacMap.get(a.paciente_id) ?? "—") : "—",
+        medico_nome: a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—",
+        procedimento: a.procedimento,
+        valor_total: Number(a.valor_total ?? 0),
+        status: a.status,
+        lancamento_id: a.lancamento_id,
+      })));
+      setLoading(false);
+    })();
+  }, [clinicaId, periodo.de, periodo.ate, filtro]);
+
+  const executar = async () => {
+    if (!alvo) return;
+    if (motivo.trim().length < 5) { toast.error("Descreva o motivo (mínimo 5 caracteres)."); return; }
+    setSaving(true);
+    try {
+      // Bloqueia se repasse já pago
+      const { data: atdInfo } = await supabase
+        .from("fin_atendimentos")
+        .select("repasse_pago,lancamento_id")
+        .eq("id", alvo.id).maybeSingle();
+      if (atdInfo?.repasse_pago) {
+        toast.error("Repasse já pago — estorne o pagamento do repasse primeiro.");
+        return;
+      }
+      const lancId = atdInfo?.lancamento_id ?? alvo.lancamento_id;
+
+      // 1) Cancela o lançamento financeiro, se existir
+      if (lancId) {
+        const { data: lanc } = await supabase
+          .from("fin_lancamentos")
+          .select("id,agendamento_id,valor")
+          .eq("id", lancId).maybeSingle();
+        const { error: eL } = await supabase
+          .from("fin_lancamentos")
+          .update({ status: "cancelado" })
+          .eq("id", lancId);
+        if (eL) { mostrarErro(eL, "falha ao estornar lançamento"); return; }
+
+        // 2) Reabre o agendamento vinculado (se veio da agenda)
+        if (lanc?.agendamento_id) {
+          const { data: agAntes } = await supabase
+            .from("agendamentos")
+            .select("id,status,fluxo_etapa")
+            .eq("id", lanc.agendamento_id).maybeSingle();
+          const { error: eA } = await supabase
+            .from("agendamentos")
+            .update({
+              status: "agendado",
+              fluxo_etapa: "aguardando_recepcao",
+              fluxo_atualizado_em: new Date().toISOString(),
+            })
+            .eq("id", lanc.agendamento_id);
+          if (eA) { mostrarErro(eA); return; }
+          try {
+            await logAction({
+              table_name: "agendamentos",
+              record_id: lanc.agendamento_id,
+              action: "ESTORNO",
+              clinica_id: clinicaId,
+              dados_antes: agAntes ?? { id: lanc.agendamento_id },
+              dados_depois: {
+                id: lanc.agendamento_id,
+                status: "agendado",
+                fin_lancamentos_id_removido: lancId,
+                valor_estornado: lanc.valor ?? null,
+                motivo: motivo.trim(),
+                origem: "painel-executivo",
+              },
+            });
+          } catch { /* auditoria best-effort */ }
+        }
+      }
+
+      // 3) Cancela o atendimento financeiro
+      const { error: eAtd } = await supabase
+        .from("fin_atendimentos")
+        .update({ status: "cancelado", observacoes: `[ESTORNO PAINEL] ${motivo.trim()}` })
+        .eq("id", alvo.id);
+      if (eAtd) { mostrarErro(eAtd, "falha ao cancelar atendimento"); return; }
+
+      // 4) Registra solicitação aprovada em estorno_solicitacoes (rastro)
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        await supabase.from("estorno_solicitacoes").insert({
+          clinica_id: clinicaId,
+          paciente_nome: alvo.paciente_nome,
+          descricao: alvo.procedimento ?? null,
+          valor: alvo.valor_total,
+          motivo: motivo.trim(),
+          status: "aprovado",
+          solicitado_por: user?.id ?? null,
+          resolvido_por: user?.id ?? null,
+          resolvido_em: new Date().toISOString(),
+          resposta: "Estorno executado a partir do Painel Executivo",
+          lancamento_id: lancId ?? null,
+          tipo: "devolucao",
+        });
+      } catch { /* rastro best-effort */ }
+
+      toast.success("Atendimento estornado.");
+      setRows(prev => prev.map(r => r.id === alvo.id ? { ...r, status: "cancelado" } : r));
+      setAlvo(null);
+      setMotivo("");
+      onDone();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const podeEstornar = (r: EstornoRow) => r.status !== "cancelado";
+
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Undo2 className="h-4 w-4 text-rose-700" />
+            Estornar atendimento — {filtro.tipo === "medico" ? "Médico" : "Procedimento"}: {filtro.label}
+          </DialogTitle>
+          <DialogDescription>
+            Período {periodo.de} → {periodo.ate}. O estorno cancela o lançamento financeiro,
+            reabre o agendamento na agenda e marca o atendimento como cancelado.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="max-h-[60vh] overflow-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[100px]">Data</TableHead>
+                <TableHead>Paciente</TableHead>
+                <TableHead>Médico</TableHead>
+                <TableHead>Procedimento</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-[1%] text-right">Ação</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading && (
+                <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-6">Carregando…</TableCell></TableRow>
+              )}
+              {!loading && rows.length === 0 && (
+                <TableRow><TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-6">Nenhum atendimento no período.</TableCell></TableRow>
+              )}
+              {rows.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="whitespace-nowrap text-xs">{new Date(`${r.data}T00:00:00`).toLocaleDateString("pt-BR")}</TableCell>
+                  <TableCell className="text-sm font-medium uppercase">{r.paciente_nome}</TableCell>
+                  <TableCell className="text-sm">{r.medico_nome}</TableCell>
+                  <TableCell className="text-sm">{r.procedimento ?? "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums">{money(r.valor_total)}</TableCell>
+                  <TableCell>
+                    <Badge variant={r.status === "cancelado" ? "secondary" : "outline"} className="text-[10px]">
+                      {r.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!podeEstornar(r)}
+                      className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+                      onClick={() => { setAlvo(r); setMotivo(""); }}
+                    >
+                      <Undo2 className="h-3 w-3 mr-1" /> Estornar
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Fechar</Button>
+        </DialogFooter>
+      </DialogContent>
+
+      {/* Confirmação */}
+      <Dialog open={!!alvo} onOpenChange={(v) => { if (!v && !saving) { setAlvo(null); setMotivo(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar estorno</DialogTitle>
+            <DialogDescription>
+              Esta ação cancela o lançamento financeiro, reabre o agendamento e marca o atendimento como cancelado.
+            </DialogDescription>
+          </DialogHeader>
+          {alvo && (
+            <div className="space-y-3">
+              <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-0.5">
+                <div><span className="text-muted-foreground">Paciente:</span> <strong>{alvo.paciente_nome}</strong></div>
+                <div><span className="text-muted-foreground">Médico:</span> {alvo.medico_nome}</div>
+                <div><span className="text-muted-foreground">Procedimento:</span> {alvo.procedimento ?? "—"}</div>
+                <div><span className="text-muted-foreground">Valor:</span> <strong>{money(alvo.valor_total)}</strong></div>
+              </div>
+              <div>
+                <Label>Motivo do estorno (obrigatório)</Label>
+                <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={4} maxLength={1000} placeholder="Descreva o motivo…" />
+                <p className="mt-1 text-xs text-muted-foreground">{motivo.trim().length}/1000 — mínimo de 5 caracteres.</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAlvo(null); setMotivo(""); }} disabled={saving}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => void executar()} disabled={saving || motivo.trim().length < 5}>
+              {saving ? "Estornando…" : "Confirmar estorno"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Dialog>
   );
 }
