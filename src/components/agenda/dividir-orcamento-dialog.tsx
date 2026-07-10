@@ -74,6 +74,26 @@ const hmToMin = (s: string) => {
 const minToHm = (n: number) => `${pad2(Math.floor(n / 60))}:${pad2(n % 60)}`;
 
 function agruparItens(itens: DividirItem[]): GrupoForm[] {
+  // Se TODOS os itens forem de laboratório (por grupo, tipo ou nome), colapsa
+  // em um único grupo. Laboratório nunca é dividido entre profissionais —
+  // vira um único agendamento no médico/recurso "Laboratório".
+  const ehLab = (it: DividirItem) => {
+    const g = norm(it.grupo);
+    const t = norm(it.tipo);
+    return g === "LABORATORIO" || t === "EXAME" || t === "LABORATORIO";
+  };
+  if (itens.length > 0 && itens.every(ehLab)) {
+    return [{
+      key: "LABORATORIO",
+      label: "Laboratório",
+      itens: [...itens],
+      medico_id: "",
+      data: "",
+      hora: "",
+      duracao: 30,
+      observacoes: "",
+    }];
+  }
   const map = new Map<string, GrupoForm>();
   for (const it of itens) {
     const g = norm(it.grupo) || norm(it.tipo) || "OUTROS";
@@ -219,11 +239,17 @@ export function DividirOrcamentoDialog({
       const gs = agruparItens(itens).map((g, i) => {
         const d = new Date(base);
         d.setMinutes(d.getMinutes() + i * 30);
-        return { ...g, data: toDateStr(d), hora: toHmStr(d) };
+        // Pré-seleciona o profissional "Laboratório" quando o grupo é lab.
+        let medico_id = "";
+        if (g.key === "LABORATORIO") {
+          const lab = medicos.find((m) => norm(m.nome).includes("LABORATORIO"));
+          if (lab) medico_id = lab.id;
+        }
+        return { ...g, data: toDateStr(d), hora: toHmStr(d), medico_id };
       });
       setGrupos(gs);
     }
-  }, [open, itens, inicioPadrao]);
+  }, [open, itens, inicioPadrao, medicos]);
 
   // Carrega vínculos profissionais x procedimentos do orçamento.
   useEffect(() => {
