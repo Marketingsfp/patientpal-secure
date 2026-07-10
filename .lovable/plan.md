@@ -1,60 +1,47 @@
-## Alterar ordem no campo SERVIÇO da Guia de Atendimento
 
-### O que muda
+# Vincular laudo (individual e em lote)
 
-Na Guia (GR) impressa, o serviço hoje sai como:
+Arquivo único: `src/routes/_authenticated/app.financeiro.atendimentos.tsx`.
 
-```
-1  GERIATRIA - CONSULTA (CARDIOLOGIA)
-```
+## 1. Botão da linha na coluna "Laudo"
 
-onde `GERIATRIA` é a especialidade principal do médico e `(CARDIOLOGIA)` é a especialidade do procedimento que já vem "colada" no nome (ex.: `CONSULTA (CARDIOLOGIA)`).
+- Trocar o texto do botão de **"Pagar"** para **"Vincular"**.
+- Comportamento **mantido**: continua abrindo o dialog `openLaudo(a)` que já seleciona o médico laudador e calcula o valor automaticamente pela regra de repasse (fluxo confirmado pelo usuário).
+- Título do dialog atualizado para "Vincular laudo" (o restante do fluxo `emitirLaudo` fica igual).
 
-Passa a sair invertido — a especialidade do procedimento vai para frente, e a especialidade do médico vai entre parênteses no fim:
+## 2. Nova opção no menu "Opções": Vincular vários
 
-```
-1  CARDIOLOGIA - CONSULTA (GERIATRIA)
-```
+Adicionar um novo `DropdownMenuItem` (nos dois menus de Opções — desktop e mobile: linhas ~1698 e ~2322) com o rótulo:
 
-Outros exemplos:
+> **Vincular vários laudos**  ({n} selecionados)
 
-- `GERIATRIA - ECOCARDIOGRAMA (ADULTO) (CARDIOLOGIA)` → `CARDIOLOGIA - ECOCARDIOGRAMA (ADULTO) (GERIATRIA)`
-- Sem `(...)` no procedimento: `GERIATRIA - CONSULTA` (fallback mantém como hoje).
-- Especialidade do médico igual à do procedimento: sai apenas `CARDIOLOGIA - CONSULTA` (sem parênteses redundante).
+Regras de habilitação:
+- Fica desabilitado se não houver nenhum atendimento selecionado que precise de laudo e ainda não tenha laudo emitido (usa a mesma lógica de `exigeLaudo` + `laudo_status !== "emitido"` já existente).
 
-### Onde alterar
+Ao clicar abre um novo dialog **Vincular laudos em lote** com:
 
-- `src/lib/print-gr.ts`
-  - Linha 437-438 (impressão da GR de um agendamento): trocar a composição atual `${espNome} - ${procNomeBase}` pela nova ordem.
-  - Linha 846-850 (relatório de GRs em lote): aplicar a mesma regra para manter consistência.
+1. Contagem de atendimentos elegíveis selecionados.
+2. Campo **Médico laudador** — dropdown com busca (mesmo Select já usado no dialog individual, reaproveitando a lista de médicos da clínica).
+3. Botões **Cancelar** e **Vincular (N)**.
 
-### Lógica
+Ao confirmar:
 
-```text
-procNomeBase = "CONSULTA (CARDIOLOGIA)"
-espMedico    = "GERIATRIA"
+- Para cada atendimento elegível, aplica a regra de repasse do médico da agenda contra o laudador escolhido (mesmo `calcularSugestao`), calcula `valor_laudo`, faz `UPDATE` em `fin_lancamentos` ou `fin_atendimentos` (conforme `origem`) setando:
+  - `medico_laudador_id`
+  - `valor_laudo`
+  - `laudo_status = 'emitido'`
+  - `laudo_emitido_em = now()`
+- Se algum atendimento não tiver regra cadastrada para aquele laudador, ele é ignorado e listado no toast final (ex.: "8 vinculados, 2 sem regra de repasse").
+- Ao final chama `load()` para atualizar a tela. Não abre comprovante em lote nesta versão (evita popup em cadeia).
 
-# extrair último "(...)" do procNomeBase
-match trailing /\s*\(([^()]+)\)\s*$/ em procNomeBase
-  → espServico = "CARDIOLOGIA"
-  → procLimpo  = "CONSULTA"
+## Detalhes técnicos
 
-if espServico && espMedico && espServico !== espMedico:
-  saida = `${espServico} - ${procLimpo} (${espMedico})`
-elif espMedico && !procNomeBase.includes(espMedico):
-  saida = `${espMedico} - ${procNomeBase}`   # fallback atual
-else:
-  saida = procNomeBase
-```
+- Novo estado local: `laudoLoteOpen`, `laudoLoteLaudadorId`, `laudoLoteSaving`.
+- Nova função `abrirLaudoLote()` (valida seleção) e `vincularLaudoLote()` (executa updates em paralelo com `Promise.all`, agrega resultados).
+- Reutiliza a lista de médicos já carregada em `medicos` (state existente) para o dropdown.
+- Sem alterações de schema; usa apenas colunas já existentes em `fin_lancamentos` / `fin_atendimentos`.
 
-### Fora do escopo
+## Fora de escopo
 
-- Não muda o cálculo de valores, repasse, ficha, prontuário ou qualquer outro campo — apenas a string que aparece na linha `SERVIÇO`.
-- Não altera o cadastro de procedimentos nem o nome no banco.
-
-### Governança (4 eixos)
-
-- 💰 Financeiro: neutro.
-- ⏱️ Operacional: recepção e médico leem primeiro a especialidade do procedimento (o que o paciente está fazendo hoje), evitando confusão com a especialidade principal do médico.
-- 😊 Experiência: guia mais clara para o paciente — bate com o que ele veio fazer.
-- 🛡️ Segurança/Auditoria: nenhuma mudança em dados persistidos, só formatação de impressão.
+- Nenhuma mudança em RLS, migrations, ou em outros arquivos.
+- O botão "Pagar repasse" médico (do topo da lista) continua como está — a mudança é só na coluna **Laudo**.
