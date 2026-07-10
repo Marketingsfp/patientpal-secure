@@ -2451,6 +2451,7 @@ export type Database = {
           observacoes: string | null
           pago_em: string | null
           status: string
+          taxa_adesao: number
           updated_at: string
           valor: number
           valor_pago: number | null
@@ -2469,6 +2470,7 @@ export type Database = {
           observacoes?: string | null
           pago_em?: string | null
           status?: string
+          taxa_adesao?: number
           updated_at?: string
           valor?: number
           valor_pago?: number | null
@@ -2487,6 +2489,7 @@ export type Database = {
           observacoes?: string | null
           pago_em?: string | null
           status?: string
+          taxa_adesao?: number
           updated_at?: string
           valor?: number
           valor_pago?: number | null
@@ -3871,6 +3874,7 @@ export type Database = {
           impresso_por: string | null
           impresso_por_nome: string | null
           mensalidade_id: string | null
+          tipo: string
           via_numero: number
         }
         Insert: {
@@ -3882,6 +3886,7 @@ export type Database = {
           impresso_por?: string | null
           impresso_por_nome?: string | null
           mensalidade_id?: string | null
+          tipo?: string
           via_numero: number
         }
         Update: {
@@ -3893,6 +3898,7 @@ export type Database = {
           impresso_por?: string | null
           impresso_por_nome?: string | null
           mensalidade_id?: string | null
+          tipo?: string
           via_numero?: number
         }
         Relationships: [
