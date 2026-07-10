@@ -1624,6 +1624,18 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     load(); /* eslint-disable-next-line */
   }, [contrato.id]);
 
+  // Sincroniza a faixa "admin" com a faixa vigente (baseada no valor_mensal atual)
+  useEffect(() => {
+    if (!faixas.length) {
+      setAdmFaixaId("");
+      return;
+    }
+    const v = Number(valorMensalAtual);
+    const match =
+      faixas.find((f) => Number(f.valor_mensal) === v) ?? faixas[0];
+    setAdmFaixaId(match?.id ?? "");
+  }, [faixas, valorMensalAtual]);
+
   // Carrega lista de pacientes da clínica do contrato ao abrir o diálogo
   useEffect(() => {
     if (!incOpen) return;
