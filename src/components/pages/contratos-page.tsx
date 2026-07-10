@@ -1694,6 +1694,9 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     return base * 1.1 + base * 0.0033 * diasAtraso;
   };
   const pagValorFinal = calcValorComJuros(pagMens);
+  // Taxa de adesão embutida apenas na 1ª parcela (0 nas demais). Não sofre juros.
+  const pagTaxaAdesao = pagMens ? Number(pagMens.taxa_adesao ?? 0) || 0 : 0;
+  const pagTotalCobrar = pagValorFinal + pagTaxaAdesao;
   const pagDiasAtraso = pagMens
     ? Math.max(
         0,
