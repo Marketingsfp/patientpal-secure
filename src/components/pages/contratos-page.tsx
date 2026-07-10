@@ -2730,6 +2730,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
         onSavedWithData={async (dados) => {
           if (!pagMens || !clinicaAtual) return;
           const mensId = pagMens.id;
+          const taxaAdesao = Number(pagMens.taxa_adesao ?? 0) || 0;
           await marcarPago(mensId, true, dados.forma_pagamento ?? "misto");
           try {
             await printGuiaMensalidade({
@@ -2745,7 +2746,89 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 detalhe: dados.pagamentos_detalhe,
               },
             });
-            toast.success("Pagamento registrado e GR enviado para impressão.");
+            // Se a parcela carrega a taxa de adesão (apenas a 1ª parcela),
+            // gera um lançamento financeiro separado + GR própria.
+            if (taxaAdesao > 0) {
+              try {
+                // 1) Busca categoria "TAXA DE ADESAO CARTAO" (seed feito na migration).
+                const { data: catRow } = await supabase
+                  .from("fin_categorias")
+                  .select("id")
+                  .eq("clinica_id", clinicaAtual.clinica_id)
+                  .ilike("nome", "TAXA DE ADESAO CARTAO")
+                  .eq("tipo", "receita")
+                  .maybeSingle();
+                const categoriaTaxaId = (catRow as { id: string } | null)?.id ?? null;
+
+                // 2) Insere lançamento independente para a taxa de adesão,
+                // com mesma forma de pagamento escolhida pelo operador.
+                const hojeStr = new Date().toISOString().slice(0, 10);
+                const { data: lancTaxa, error: errLanc } = await supabase
+                  .from("fin_lancamentos")
+                  .insert({
+                    clinica_id: clinicaAtual.clinica_id,
+                    tipo: "receita",
+                    descricao: `Taxa de adesão — Contrato #${contrato.numero} — ${contrato.paciente_nome}`,
+                    valor: taxaAdesao,
+                    data: hojeStr,
+                    categoria_id: categoriaTaxaId,
+                    forma_pagamento: dados.forma_pagamento,
+                    bandeira_cartao: dados.bandeira_cartao,
+                    parcelas: dados.parcelas,
+                    status: "confirmado",
+                    paciente_id: (contrato as { paciente_id?: string | null }).paciente_id ?? null,
+                    criado_por: user?.id ?? null,
+                  } as never)
+                  .select("id")
+                  .single();
+                if (errLanc) throw errLanc;
+
+                // 3) Registra movimento no caixa (sessão aberta do usuário).
+                if (user?.id) {
+                  const { data: sess } = await supabase
+                    .from("caixa_sessoes")
+                    .select("id")
+                    .eq("clinica_id", clinicaAtual.clinica_id)
+                    .eq("user_id", user.id)
+                    .eq("status", "aberto")
+                    .order("aberto_em", { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                  if (sess?.id) {
+                    await supabase.from("caixa_movimentos").insert({
+                      sessao_id: sess.id,
+                      clinica_id: clinicaAtual.clinica_id,
+                      user_id: user.id,
+                      tipo: "recebimento",
+                      valor: taxaAdesao,
+                      descricao: `Taxa de adesão — Contrato #${contrato.numero} — ${contrato.paciente_nome}`,
+                      forma_pagamento: dados.forma_pagamento,
+                      lancamento_id: (lancTaxa as { id: string } | null)?.id ?? null,
+                    } as never);
+                  }
+                }
+
+                // 4) Imprime a GR da taxa de adesão.
+                await printGuiaTaxaAdesao({
+                  mensalidadeId: mensId,
+                  clinicaId: clinicaAtual.clinica_id,
+                  valorTaxa: taxaAdesao,
+                  usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+                  usuarioId: user?.id ?? null,
+                  pagamento: {
+                    forma_pagamento: dados.forma_pagamento,
+                    parcelas: dados.parcelas,
+                    bandeira_cartao: dados.bandeira_cartao,
+                    detalhe: dados.pagamentos_detalhe,
+                  },
+                });
+                toast.success("Pagamento registrado. GRs de mensalidade e taxa de adesão enviadas para impressão.");
+              } catch (err) {
+                mostrarErro(err);
+              }
+            } else {
+              toast.success("Pagamento registrado e GR enviado para impressão.");
+            }
           } catch (err) {
             mostrarErro(err);
           }
