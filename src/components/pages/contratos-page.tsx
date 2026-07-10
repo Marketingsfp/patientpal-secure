@@ -625,12 +625,16 @@ function NovoContratoForm({
       const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
       const jaPago = i < mensalidadesJaPagas;
       const vencStr = venc.toISOString().slice(0, 10);
+      // Taxa de adesão só na 1ª parcela. Se o operador informou parcelas
+      // "já pagas" (contrato retroativo), a taxa também já foi paga e vai zero.
+      const taxaParcela = i === 0 && !jaPago ? Number(taxa || 0) : 0;
       return {
         contrato_id: contrato.id,
         clinica_id: clinicaId,
         numero_parcela: i + 1,
         vencimento: vencStr,
         valor: valorParcela,
+        taxa_adesao: taxaParcela,
         status: jaPago ? "pago" : "pendente",
         ...(jaPago ? { pago_em: vencStr, valor_pago: valorParcela } : {}),
       };
