@@ -804,11 +804,14 @@ function AgendaPage() {
       data_pagamento: null,
     } as never).eq("id", origem.id);
     if (e1) { setReagSalvando(false); mostrarErro(e1); return; }
-    // 2) Coloca a paciente na ficha de destino (slot escolhido), preservando o horário do slot
+    // 2) Coloca a paciente na ficha de destino (slot escolhido), preservando o horário do slot.
+    //    Importante: se a origem NÃO tinha procedimento (ex.: slot sem serviço), mantemos o
+    //    procedimento que já estava no slot de destino, para não esvaziar essa informação —
+    //    isso evita que a cobrança caia depois no fallback genérico "CONSULTA".
     const { error: e2 } = await supabase.from("agendamentos").update({
       paciente_id: origem.paciente_id ?? null,
       paciente_nome: origem.paciente_nome,
-      procedimento: origem.procedimento ?? null,
+      procedimento: origem.procedimento ?? slot.procedimento ?? null,
       status: "agendado",
       observacoes: novasObs,
       data_pagamento: origem.data_pagamento ?? null,
