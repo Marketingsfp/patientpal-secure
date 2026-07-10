@@ -1,50 +1,48 @@
-## Diagnóstico — o que aconteceu com a ficha 185
+## Objetivo
+Permitir que o perfil **ADM** (role `admin` da clínica) edite todos os campos do contrato de Cartão Convênio já existente — hoje só valor mensal, dia de vencimento e ações de dependentes/parcelas estão liberados; os demais campos são somente-leitura.
 
-**Rastreamento do agendamento (id `ed231b94…`, dra. Roberta, 10/07/2026 09:10):**
+## Onde
+`src/components/pages/contratos-page.tsx` — bloco do detalhe do contrato (`TabsContent value="dados"` linhas ~1985‑2098) e tabela de Mensalidades (linhas ~1921‑1983).
 
-1. O horário nasceu como **slot genérico** ("SLOT GERADO AUTOMATICAMENTE"), com `paciente_nome = "DISPONIVEL"` e `procedimento = "RISCO CIRURGICO"` (rótulo do slot).
-2. Quando a recepção atribuiu a paciente MARIA SELMA ao slot, o `paciente_id` foi preenchido — porém o campo `procedimento` foi **zerado (NULL)** no mesmo UPDATE. É por isso que a coluna "Serviço" na agenda ainda mostra "RISCO CIRURGICO" (vem do label do slot), mas no banco não há procedimento vinculado.
-3. Às 11:52 a recepcionista (EDNALDA) cobrou R$ 110,00 em dinheiro. O `fin_lancamentos` gerado ficou:
-   - `descricao = "MARIA SELMA FERNANDES SANTOS — CONSULTA"` (fallback genérico porque `agendamentos.procedimento` estava NULL).
-   - `agendamento_id` correto (Roberta).
-   - **`medico_id` = CLAUDIA MARIA** (não Roberta). Fonte do erro: o caminho de cobrança usado não copiou o médico do agendamento; algum campo de médico foi preenchido/mantido de outra tela.
-4. A guia impressa (2ª via, 16:11) exibiu "CARDIOLOGIA – CONSULTA" porque a rotina de impressão monta o texto com a **especialidade da médica** (`CARDIOLOGIA`, vinda de Roberta) + o `procedimento`/fallback (`CONSULTA`). Ou seja: a GR imprimiu como se estivesse tudo certo, mas o dado do médico no lançamento não bate.
-5. Em **Financeiro > Atendimentos** a linha existe (é a `002 · R$ 110,00`), mas aparece atribuída a **CLAUDIA MA…** e sem serviço — por isso passa despercebida. Efeito colateral: o **repasse médico** dessa consulta iria para a profissional errada.
+## Detecção do perfil
+Usar o hook já existente:
+```ts
+import { useClinica } from "@/hooks/use-clinica";
+const { clinicaAtual } = useClinica();
+const isAdmin = clinicaAtual?.role === "admin";
+```
+Todos os campos novos ficam por trás de `isAdmin`. Perfis não-admin continuam vendo exatamente a tela atual (nada muda para eles).
 
-Resumo: o pagamento está registrado, só que com **médico errado** e **serviço genérico**, e por isso não é reconhecido como o atendimento da Roberta na tela de Atendimentos.
+## Campos que passam a ser editáveis (apenas ADM)
 
-## Plano de correção
+Aba **Dados** — trocar cada `DadosField` correspondente por um controle editável:
 
-### 1. Corrigir o registro atual (dados)
+| Campo | Controle | Coluna em `contratos_assinatura` |
+|---|---|---|
+| Convênio | `<select>` populado por `cb_convenios` da clínica (ativos) | `convenio_id` |
+| Nº de pessoas no contrato | `<select>` das faixas do convênio escolhido (recarrega `cb_convenio_faixas` ao trocar) | `faixa_id`, `total_vidas`, `valor_mensal` (sincroniza com a faixa) |
+| Paciente titular | Combobox de pacientes da clínica (mesmo padrão do modal "Incluir dependente") | `paciente_id`, `paciente_nome` |
+| Data início | `<input type="date">` | `data_inicio` |
+| Dia de vencimento | (já existe) | `dia_vencimento` |
+| Valor mensal | (já existe) | `valor_mensal` |
+| Taxa de adesão | `<input type="number">` | `taxa_adesao` |
+| Forma de pagamento | `<select>` (Dinheiro/Pix/Débito/Crédito/Boleto — mesma lista `formasPag` já usada) | `forma_pagamento` |
+| Observações | `<textarea>` | `observacoes` |
 
-Migração pontual (`supabase/migrations/…_fix_ficha_185_maria_selma.sql`):
-- `UPDATE fin_lancamentos SET medico_id = '<Roberta>', descricao = 'MARIA SELMA FERNANDES SANTOS — CARDIOLOGIA - CONSULTA' WHERE id = '8f18613f-785f-416c-9eb0-dc149b9b2e48'`.
-- `UPDATE agendamentos SET procedimento = 'CONSULTA (CARDIOLOGIA)' WHERE id = 'ed231b94-a70a-43df-9bee-cfa90fcf935a'` (garante que uma futura reimpressão/relatório mostre o serviço certo).
+Ação: um único botão **"Salvar alterações do contrato"** (visível só para admin) que faz `update contratos_assinatura` com os campos alterados. Botão atual "Salvar valor e vencimento" + checkbox "Regerar 12 parcelas futuras" permanece.
 
-### 2. Prevenir — não deixar `agendamentos.procedimento` ser zerado ao ocupar slot
+Trocar convênio/faixa não regenera parcelas automaticamente — para evitar sobrescrever histórico. Se o admin quiser propagar o novo valor, usa o checkbox "Regerar 12 parcelas futuras" que já existe. Isso vai no texto de ajuda ao lado do salvar.
 
-`src/routes/_authenticated/app.agenda.tsx` (fluxos que trocam "DISPONIVEL" por paciente real):
-- No UPDATE do agendamento, remover o campo `procedimento` do payload quando o valor novo seria NULL/vazio, preservando o que já estava lá.
-- Se o rótulo do slot for genérico (ex.: "RISCO CIRURGICO", "DISPONIVEL"), abrir um seletor obrigatório de procedimento antes de salvar (usando `medico_procedimentos` da médica; se houver um único, seleciona automaticamente).
+## Aba Mensalidades — edição por parcela (apenas ADM)
 
-### 3. Prevenir — cobrança nunca cria lançamento com médico "solto"
+Na tabela de Mensalidades, para admin:
+- **Vencimento** e **Valor** de cada linha viram inputs editáveis (`date` e `number`) com auto-save on blur (`update contrato_mensalidades set vencimento/valor where id`).
+- Botão **Reverter** (marcar como pendente) e **Pagar** ficam habilitados mesmo quando o contrato está `cancelado` (hoje `disabled={cancelado}` bloqueia). Assim o ADM ajusta "número de mensalidades pagas" livremente.
+- Novo botão **"+ Adicionar parcela"** (rodapé da tabela) que insere uma nova linha em `contrato_mensalidades` com número sequencial, vencimento default = hoje, valor = valor mensal atual, status = pendente.
+- Ícone lixeira por linha para **excluir parcela** (com confirm), removendo a linha de `contrato_mensalidades`.
 
-`src/components/financeiro/lancamento-dialog.tsx` e caminhos de cobrança em `app.agenda.tsx`:
-- Quando `agendamentoId` está setado, `medico_id` do `fin_lancamentos` deve ser SEMPRE `agendamento.medico_id`. Congelar o campo de médico no diálogo (readonly) e sobrescrever no `insert` mesmo que o usuário tenha mexido em outro lugar da UI.
-- Se `agendamento.procedimento` estiver NULL no momento do pagamento, **exigir** escolha de procedimento antes de confirmar (com pré-seleção baseada em `medico_procedimentos`). Nunca gravar descrição com fallback `"CONSULTA"` num lançamento pago.
-- Após o insert, propagar de volta o procedimento escolhido para `agendamentos.procedimento` (mantém consistência entre agenda, GR e repasse).
-
-### 4. Auditoria mínima em `fin_lancamentos`
-
-Hoje `audit_log` só cobre `agendamentos` — por isso não conseguimos rastrear a origem do `medico_id = Claudia`. Adicionar trigger `AFTER INSERT/UPDATE/DELETE` em `fin_lancamentos` gravando `user_email`, `dados_antes`, `dados_depois` (mesmo padrão dos triggers existentes). Isso permite investigar rapidamente casos parecidos no futuro.
-
-### Detalhes técnicos (para revisão)
-
-- Ids envolvidos: agendamento `ed231b94-a70a-43df-9bee-cfa90fcf935a`; lançamento `8f18613f-785f-416c-9eb0-dc149b9b2e48`; médica correta Roberta `0e7c549d-d5a0-4e4e-92e8-8994a46494e3`; médica gravada errada Claudia `76f64b9b-148e-4da8-8964-55f2433fc1ad`; paciente `c88a9c7f-1359-41e3-b114-01d8248296e0`.
-- Nenhuma linha em `fin_atendimentos` foi criada — a página Financeiro > Atendimentos une `fin_atendimentos` + `fin_lancamentos` (agenda). Portanto a linha existe, mas com atribuição errada.
-- A migração é apenas UPDATE em duas linhas — reversível manualmente se necessário.
-
-### Fora de escopo (proposto não fazer agora)
-
-- Recalcular repasses históricos de outros lançamentos (só se você pedir, depois de rodar o item 4 e investigar).
-- Renomear o slot "RISCO CIRURGICO" no cadastro da agenda — é decisão de negócio.
+## Considerações
+- Nenhuma mudança de schema, RLS ou migration — as políticas atuais de `contratos_assinatura` e `contrato_mensalidades` já permitem update/insert/delete pelo admin da clínica.
+- Nenhuma alteração para perfis que não são admin — a UI original permanece intocada por trás do `isAdmin ? <editor/> : <DadosField/>`.
+- Sem cascatas silenciosas: mudar convênio/faixa/paciente NÃO reescreve parcelas nem dependentes; a regeração continua sendo opt‑in via checkbox existente.
+- Reaproveitar utilitário `mostrarErro` e padrão `toast.success` já usados no arquivo.
