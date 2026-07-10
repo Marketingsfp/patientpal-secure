@@ -31,6 +31,20 @@ interface Props {
 
 const TIPOS = ["consulta", "exame", "procedimento", "cirurgia"];
 
+// Ordem e rótulos dos grupos de carência exibidos na tabela.
+const CARENCIA_GROUPS: Array<{ value: number; label: string }> = [
+  { value: 0, label: "Imediato" },
+  { value: 1, label: "Após 1ª mensalidade" },
+  { value: 2, label: "Após 2ª mensalidade" },
+  { value: 3, label: "Após 3ª mensalidade" },
+  { value: 6, label: "Após 6ª mensalidade" },
+  { value: 12, label: "Após 12ª mensalidade" },
+];
+const carenciaLabel = (n: number | null | undefined) => {
+  const v = Number(n ?? 0);
+  return CARENCIA_GROUPS.find(g => g.value === v)?.label ?? `Após ${v}ª mensalidade`;
+};
+
 export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props) {
   const [regras, setRegras] = useState<CbRegra[]>([]);
   const [especialidades, setEspecialidades] = useState<EspOpt[]>([]);
