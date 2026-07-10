@@ -3233,13 +3233,8 @@ function AgendaPage() {
         return;
       }
       const valor = pagoInfoMap.get(a.id)?.valor ?? 0;
-      const res = await emitirNfseFn({ data: {
-        emitenteId: emitenteIdEscolhido,
-        pacienteId: pac.id,
-        agendamentoId: a.id,
-        valorServicos: Number(valor) || 0,
-        descricaoServicos: a.procedimento || "Serviços prestados",
-        tomador: {
+      const tomador = await pickTomadorNfse({
+        paciente: {
           nome: pac.nome,
           cpfCnpj: pac.cpf ?? undefined,
           email: pac.email ?? undefined,
@@ -3250,6 +3245,15 @@ function AgendaPage() {
           municipio: pac.cidade ?? undefined,
           uf: pac.estado ?? undefined,
         },
+      });
+      if (!tomador) { toast.error("Emissão cancelada."); return; }
+      const res = await emitirNfseFn({ data: {
+        emitenteId: emitenteIdEscolhido,
+        pacienteId: pac.id,
+        agendamentoId: a.id,
+        valorServicos: Number(valor) || 0,
+        descricaoServicos: a.procedimento || "Serviços prestados",
+        tomador,
       } });
       const nfseId = (res as { id?: string })?.id;
       if (nfseId) {
