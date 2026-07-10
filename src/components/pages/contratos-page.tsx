@@ -1209,10 +1209,6 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setEditDia(String(contrato.dia_vencimento ?? 10));
   }, [contrato.id]);
 
-  const salvarDadosFinanceiros = async () => {
-// placeholder-adm-marker
-    return await _salvarDadosFinanceiros();
-  };
   // ---- Edição avançada (ADM) ----
   const isAdmin = clinicaAtual?.role === "admin";
   const [conveniosAdm, setConveniosAdm] = useState<Array<{ id: string; nome: string }>>([]);
@@ -1231,7 +1227,131 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     setAdmObs(contrato.observacoes ?? "");
   }, [contrato.id]);
 
-  const _salvarDadosFinanceiros = async () => {
+  // Carrega lista de convênios ativos (ADM)
+  useEffect(() => {
+    if (!isAdmin || !clinicaAtual?.clinica_id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("cb_convenios")
+        .select("id, nome")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .order("nome");
+      if (!cancelled) setConveniosAdm(((data as any[]) ?? []).map((c) => ({ id: c.id, nome: c.nome })));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, clinicaAtual?.clinica_id]);
+  // Preenche paciente titular no combobox (ADM)
+  useEffect(() => {
+    if (!isAdmin) return;
+    const pid = (contrato as any).paciente_id as string | null | undefined;
+    if (!pid) {
+      setAdmPaciente(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("pacientes")
+        .select("id, nome, cpf, telefone, data_nascimento, clinica_id")
+        .eq("id", pid)
+        .maybeSingle();
+      if (!cancelled && data) setAdmPaciente(data as PatientOption);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, contrato.id]);
+
+  const salvarContratoAdmin = async () => {
+    const taxa = Number(String(admTaxaAdesao).replace(",", "."));
+    if (!admConvenioId) {
+      toast.error("Selecione um convênio");
+      return;
+    }
+    if (!admPaciente?.id) {
+      toast.error("Selecione o paciente titular");
+      return;
+    }
+    if (!admDataInicio) {
+      toast.error("Informe a data de início");
+      return;
+    }
+    if (!Number.isFinite(taxa) || taxa < 0) {
+      toast.error("Taxa de adesão inválida");
+      return;
+    }
+    setSavingAdm(true);
+    const { error } = await supabase
+      .from("contratos_assinatura")
+      .update({
+        convenio_id: admConvenioId,
+        paciente_id: admPaciente.id,
+        paciente_nome: admPaciente.nome,
+        data_inicio: admDataInicio,
+        taxa_adesao: taxa,
+        forma_pagamento: admForma || null,
+        observacoes: admObs || null,
+      } as any)
+      .eq("id", contrato.id);
+    setSavingAdm(false);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    (contrato as any).convenio_id = admConvenioId;
+    (contrato as any).paciente_id = admPaciente.id;
+    (contrato as any).paciente_nome = admPaciente.nome;
+    (contrato as any).data_inicio = admDataInicio;
+    (contrato as any).taxa_adesao = taxa;
+    (contrato as any).forma_pagamento = admForma || null;
+    (contrato as any).observacoes = admObs || null;
+    toast.success("Contrato atualizado.");
+    await load();
+  };
+
+  // Edição de parcelas (ADM)
+  const atualizarParcela = async (
+    id: string,
+    patch: Partial<{ vencimento: string; valor: number | string }>,
+  ) => {
+    const payload: any = { ...patch };
+    if (payload.valor !== undefined) payload.valor = Number(String(payload.valor).replace(",", "."));
+    const { error } = await supabase.from("contrato_mensalidades").update(payload).eq("id", id);
+    if (error) return mostrarErro(error);
+    setMens((rows) =>
+      rows.map((r) =>
+        r.id === id ? ({ ...r, ...(patch as any), valor: payload.valor ?? r.valor } as Mens) : r,
+      ),
+    );
+  };
+  const adicionarParcela = async () => {
+    const prox = mens.reduce((mx, m) => Math.max(mx, Number(m.numero_parcela) || 0), 0) + 1;
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { error } = await supabase.from("contrato_mensalidades").insert({
+      contrato_id: contrato.id,
+      clinica_id: (contrato as any).clinica_id,
+      numero_parcela: prox,
+      vencimento: hoje,
+      valor: Number(valorMensalAtual) || 0,
+      status: "pendente",
+    } as any);
+    if (error) return mostrarErro(error);
+    toast.success("Parcela adicionada.");
+    await load();
+  };
+  const excluirParcela = async (id: string) => {
+    if (!confirm("Excluir esta parcela? Essa ação não pode ser desfeita.")) return;
+    const { error } = await supabase.from("contrato_mensalidades").delete().eq("id", id);
+    if (error) return mostrarErro(error);
+    toast.success("Parcela removida.");
+    await load();
+  };
+
+  const salvarDadosFinanceiros = async () => {
     const v = Number(String(editValor).replace(",", "."));
     const dia = Math.max(1, Math.min(31, Number(editDia) || 0));
     if (!Number.isFinite(v) || v < 0) {
