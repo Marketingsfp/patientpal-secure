@@ -802,12 +802,13 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <Tabs defaultValue="dados">
-              <TabsList className={asPage ? "grid grid-cols-6 w-full" : "grid grid-cols-6 w-full sticky top-[3.25rem] z-10"}>
+              <TabsList className={asPage ? "grid grid-cols-7 w-full" : "grid grid-cols-7 w-full sticky top-[3.25rem] z-10"}>
                 <TabsTrigger value="dados">Dados</TabsTrigger>
                 <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
                 <TabsTrigger value="agendas" disabled={!editingMedicoId}>Agendas</TabsTrigger>
                 <TabsTrigger value="banco">Banco</TabsTrigger>
                 <TabsTrigger value="repasse">Repasse</TabsTrigger>
+                <TabsTrigger value="laudo" disabled={!editingMedicoId}>Laudo Terceiro</TabsTrigger>
                 <TabsTrigger value="acesso">Acesso</TabsTrigger>
               </TabsList>
 
