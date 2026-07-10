@@ -74,7 +74,9 @@ export function usePermissoes(): { allowed: Set<string> | null; loading: boolean
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [clinicaId, role]);
 
   return { allowed, loading };

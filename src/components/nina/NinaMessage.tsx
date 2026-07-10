@@ -35,9 +35,7 @@ export function NinaMessage({ content, variant, className }: Props) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          a: ({ node, ...props }) => (
-            <a {...props} target="_blank" rel="noreferrer noopener" />
-          ),
+          a: ({ node, ...props }) => <a {...props} target="_blank" rel="noreferrer noopener" />,
         }}
       >
         {content}

@@ -1,11 +1,55 @@
 import { createFileRoute, useLocation, useNavigate } from "@tanstack/react-router";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { MessageCircle, Send, Mic, Bot, CheckCheck, Phone, FileText, DollarSign, Cake, Calendar, Sparkles, Brain, Loader2, Copy, CheckCircle2, AlertCircle, Eye, EyeOff, Smartphone, Instagram, Facebook, Globe, Plus, Pencil, X, Paperclip, Smile, Search, PanelRightClose, PanelRightOpen, MoreVertical, User, Tag, ArrowLeft } from "lucide-react";
+import {
+  MessageCircle,
+  Send,
+  Mic,
+  Bot,
+  CheckCheck,
+  Phone,
+  FileText,
+  DollarSign,
+  Cake,
+  Calendar,
+  Sparkles,
+  Brain,
+  Loader2,
+  Copy,
+  CheckCircle2,
+  AlertCircle,
+  Eye,
+  EyeOff,
+  Smartphone,
+  Instagram,
+  Facebook,
+  Globe,
+  Plus,
+  Pencil,
+  X,
+  Paperclip,
+  Smile,
+  Search,
+  PanelRightClose,
+  PanelRightOpen,
+  MoreVertical,
+  User,
+  Tag,
+  ArrowLeft,
+} from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useClinica } from "@/hooks/use-clinica";
 import { chatNina } from "@/lib/nina.functions";
-import { obterWhatsappConfig, salvarWhatsappConfig, testarConexaoWhatsapp } from "@/lib/whatsapp.functions";
-import { enviarMensagemWhatsapp, listarTemplatesWhatsapp, criarTemplateWhatsapp, excluirTemplateWhatsapp } from "@/lib/whatsapp.functions";
+import {
+  obterWhatsappConfig,
+  salvarWhatsappConfig,
+  testarConexaoWhatsapp,
+} from "@/lib/whatsapp.functions";
+import {
+  enviarMensagemWhatsapp,
+  listarTemplatesWhatsapp,
+  criarTemplateWhatsapp,
+  excluirTemplateWhatsapp,
+} from "@/lib/whatsapp.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -17,12 +61,31 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { NinaMessage, TypingDots } from "@/components/nina/NinaMessage";
 import { formatWhatsappText } from "@/components/nina/formatWhatsappText";
-import { AtendDashboard, AtendDepartamentos, AtendMacros, AtendKb, AtendPausas, AtendMeuStatus } from "@/components/nina/AtendimentoTabs";
-import { AtendInbox, AtendSupervisor, AtendRelatorios, AtendRoteamento } from "@/components/nina/AtendimentoExtraTabs";
+import {
+  AtendDashboard,
+  AtendDepartamentos,
+  AtendMacros,
+  AtendKb,
+  AtendPausas,
+  AtendMeuStatus,
+} from "@/components/nina/AtendimentoTabs";
+import {
+  AtendInbox,
+  AtendSupervisor,
+  AtendRelatorios,
+  AtendRoteamento,
+} from "@/components/nina/AtendimentoExtraTabs";
 
 export const Route = createFileRoute("/_authenticated/app/nina")({
   component: NinaPage,
@@ -30,40 +93,94 @@ export const Route = createFileRoute("/_authenticated/app/nina")({
 });
 
 type Msg = { from: "paciente" | "nina"; text: string; at: string; tipo?: "texto" | "audio" };
-type Conv = { id: string; nome: string; telefone: string; ultima: string; quando: string; naoLidas: number; msgs: Msg[] };
+type Conv = {
+  id: string;
+  nome: string;
+  telefone: string;
+  ultima: string;
+  quando: string;
+  naoLidas: number;
+  msgs: Msg[];
+};
 
 const MOCK: Conv[] = [
   {
-    id: "1", nome: "Ana Beatriz Souza", telefone: "+55 11 98765-4321",
-    ultima: "Obrigada! Confirmado 👍", quando: "agora", naoLidas: 0,
+    id: "1",
+    nome: "Ana Beatriz Souza",
+    telefone: "+55 11 98765-4321",
+    ultima: "Obrigada! Confirmado 👍",
+    quando: "agora",
+    naoLidas: 0,
     msgs: [
-      { from: "nina", at: "09:12", tipo: "texto", text: "Olá Ana! Aqui é a Nina da Clínica 💚. Confirmando sua consulta com Dr. Pereira amanhã (17/05) às 14h30. Posso confirmar? (1) Sim (2) Remarcar" },
+      {
+        from: "nina",
+        at: "09:12",
+        tipo: "texto",
+        text: "Olá Ana! Aqui é a Nina da Clínica 💚. Confirmando sua consulta com Dr. Pereira amanhã (17/05) às 14h30. Posso confirmar? (1) Sim (2) Remarcar",
+      },
       { from: "paciente", at: "09:15", tipo: "texto", text: "1" },
-      { from: "nina", at: "09:15", tipo: "texto", text: "Perfeito! Consulta confirmada ✅. Endereço: Av. Paulista, 1000. Qualquer dúvida é só chamar." },
+      {
+        from: "nina",
+        at: "09:15",
+        tipo: "texto",
+        text: "Perfeito! Consulta confirmada ✅. Endereço: Av. Paulista, 1000. Qualquer dúvida é só chamar.",
+      },
       { from: "paciente", at: "09:16", tipo: "texto", text: "Obrigada! Confirmado 👍" },
     ],
   },
   {
-    id: "2", nome: "Carlos Henrique", telefone: "+55 11 97654-3210",
-    ultima: "🎤 Áudio (0:14)", quando: "12 min", naoLidas: 2,
+    id: "2",
+    nome: "Carlos Henrique",
+    telefone: "+55 11 97654-3210",
+    ultima: "🎤 Áudio (0:14)",
+    quando: "12 min",
+    naoLidas: 2,
     msgs: [
-      { from: "paciente", at: "10:02", tipo: "audio", text: "🎤 Áudio transcrito: \"Oi, queria remarcar meu exame de ultrassom para semana que vem se possível\"" },
-      { from: "nina", at: "10:02", tipo: "texto", text: "Claro Carlos! Temos esses horários: (1) Ter 21/05 09h (2) Qua 22/05 15h (3) Qui 23/05 10h30" },
+      {
+        from: "paciente",
+        at: "10:02",
+        tipo: "audio",
+        text: '🎤 Áudio transcrito: "Oi, queria remarcar meu exame de ultrassom para semana que vem se possível"',
+      },
+      {
+        from: "nina",
+        at: "10:02",
+        tipo: "texto",
+        text: "Claro Carlos! Temos esses horários: (1) Ter 21/05 09h (2) Qua 22/05 15h (3) Qui 23/05 10h30",
+      },
     ],
   },
   {
-    id: "3", nome: "Mariana Costa", telefone: "+55 11 96543-2109",
-    ultima: "Boleto enviado", quando: "1h", naoLidas: 0,
+    id: "3",
+    nome: "Mariana Costa",
+    telefone: "+55 11 96543-2109",
+    ultima: "Boleto enviado",
+    quando: "1h",
+    naoLidas: 0,
     msgs: [
-      { from: "nina", at: "08:30", tipo: "texto", text: "Mariana, segue o boleto da sua consulta de R$ 130,00 com vencimento 20/05. Linha digitável: 23793.38128 60082.901141 51000.063307 5 98760000013000" },
+      {
+        from: "nina",
+        at: "08:30",
+        tipo: "texto",
+        text: "Mariana, segue o boleto da sua consulta de R$ 130,00 com vencimento 20/05. Linha digitável: 23793.38128 60082.901141 51000.063307 5 98760000013000",
+      },
       { from: "nina", at: "08:30", tipo: "texto", text: "📎 boleto_2025_05.pdf" },
     ],
   },
   {
-    id: "4", nome: "João Pedro Silva", telefone: "+55 11 95432-1098",
-    ultima: "🎉 Parabéns recebido", quando: "ontem", naoLidas: 0,
+    id: "4",
+    nome: "João Pedro Silva",
+    telefone: "+55 11 95432-1098",
+    ultima: "🎉 Parabéns recebido",
+    quando: "ontem",
+    naoLidas: 0,
     msgs: [
-      { from: "nina", at: "08:00", tipo: "texto", text: "🎂 Feliz aniversário, João! A equipe da Clínica deseja muita saúde. Como presente: 20% OFF em qualquer exame neste mês 🎁" },
+      {
+        from: "nina",
+        at: "08:00",
+        tipo: "texto",
+        text: "🎂 Feliz aniversário, João! A equipe da Clínica deseja muita saúde. Como presente: 20% OFF em qualquer exame neste mês 🎁",
+      },
     ],
   },
 ];
@@ -95,7 +212,27 @@ function NinaPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const hashAba = (location.hash ?? "").replace(/^#/, "");
-  const abaAtiva = ["treinada", "chat", "automacoes", "config", "templates", "atend-status", "atend-dashboard", "atend-depto", "atend-macros", "atend-kb", "atend-pausas", "atend-inbox", "atend-supervisor", "atend-relatorios", "atend-roteamento"].includes(hashAba) ? (hashAba === "chat" ? "atend-inbox" : hashAba) : "atend-inbox";
+  const abaAtiva = [
+    "treinada",
+    "chat",
+    "automacoes",
+    "config",
+    "templates",
+    "atend-status",
+    "atend-dashboard",
+    "atend-depto",
+    "atend-macros",
+    "atend-kb",
+    "atend-pausas",
+    "atend-inbox",
+    "atend-supervisor",
+    "atend-relatorios",
+    "atend-roteamento",
+  ].includes(hashAba)
+    ? hashAba === "chat"
+      ? "atend-inbox"
+      : hashAba
+    : "atend-inbox";
   const setAbaAtiva = (v: string) => {
     navigate({ to: "/app/nina", hash: v, replace: true });
   };
@@ -133,7 +270,9 @@ function NinaPage() {
     setLoadingConv(true);
     const { data, error } = await supabase
       .from("whatsapp_mensagens")
-      .select("id, wa_message_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em")
+      .select(
+        "id, wa_message_id, direction, from_number, to_number, body, tipo, enviada_por, recebida_em",
+      )
       .eq("clinica_id", clinicaId)
       .order("recebida_em", { ascending: true })
       .limit(1000);
@@ -144,7 +283,7 @@ function NinaPage() {
     }
     const map = new Map<string, Conv>();
     for (const row of data || []) {
-      const telefone = row.direction === "in" ? (row.from_number || "") : (row.to_number || "");
+      const telefone = row.direction === "in" ? row.from_number || "" : row.to_number || "";
       if (!telefone) continue;
       const key = telefone.replace(/\D/g, "");
       let conv = map.get(key);
@@ -172,10 +311,14 @@ function NinaPage() {
     }
     const lista = Array.from(map.values()).sort((a, b) => (a.quando === "agora" ? -1 : 1));
     setConversas(lista);
-    setSel((prev) => (prev ? lista.find((c) => c.id === prev.id) || lista[0] || null : lista[0] || null));
+    setSel((prev) =>
+      prev ? lista.find((c) => c.id === prev.id) || lista[0] || null : lista[0] || null,
+    );
   }, [clinicaId]);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
 
   // Realtime: novas mensagens chegam automaticamente
   useEffect(() => {
@@ -184,15 +327,25 @@ function NinaPage() {
       .channel(`wa-msgs-${clinicaId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "whatsapp_mensagens", filter: `clinica_id=eq.${clinicaId}` },
-        () => { carregar(); },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "whatsapp_mensagens",
+          filter: `clinica_id=eq.${clinicaId}`,
+        },
+        () => {
+          carregar();
+        },
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [clinicaId, carregar]);
 
-  const conversasFiltradas = conversas.filter((c) =>
-    !busca || c.nome.toLowerCase().includes(busca.toLowerCase()) || c.telefone.includes(busca),
+  const conversasFiltradas = conversas.filter(
+    (c) =>
+      !busca || c.nome.toLowerCase().includes(busca.toLowerCase()) || c.telefone.includes(busca),
   );
 
   return (
@@ -208,25 +361,48 @@ function NinaPage() {
         {/* ============ AUTOMAÇÕES ============ */}
         <TabsContent value="automacoes" className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
-            <AutoCard icon={Calendar} cor="text-blue-500"
+            <AutoCard
+              icon={Calendar}
+              cor="text-blue-500"
               titulo="Confirmação de agendamento"
               desc="Envia mensagem 24h antes da consulta pedindo confirmação. Reagenda se o paciente responder."
-              ativa />
-            <AutoCard icon={FileText} cor="text-purple-500"
+              ativa
+            />
+            <AutoCard
+              icon={FileText}
+              cor="text-purple-500"
               titulo="Envio da GR / comprovante"
-              desc="Após o pagamento, envia automaticamente a Guia de Recolhimento ou comprovante em PDF." ativa />
-            <AutoCard icon={DollarSign} cor="text-amber-500"
+              desc="Após o pagamento, envia automaticamente a Guia de Recolhimento ou comprovante em PDF."
+              ativa
+            />
+            <AutoCard
+              icon={DollarSign}
+              cor="text-amber-500"
               titulo="Cobrança de boleto / Pix"
-              desc="Envia o boleto/Pix no dia da emissão e lembretes 3 dias antes e no vencimento." ativa />
-            <AutoCard icon={Cake} cor="text-pink-500"
+              desc="Envia o boleto/Pix no dia da emissão e lembretes 3 dias antes e no vencimento."
+              ativa
+            />
+            <AutoCard
+              icon={Cake}
+              cor="text-pink-500"
               titulo="Aniversários e campanhas"
-              desc="Parabeniza pacientes no aniversário e dispara campanhas segmentadas (ex: revisão anual)." ativa />
-            <AutoCard icon={Mic} cor="text-emerald-500"
+              desc="Parabeniza pacientes no aniversário e dispara campanhas segmentadas (ex: revisão anual)."
+              ativa
+            />
+            <AutoCard
+              icon={Mic}
+              cor="text-emerald-500"
               titulo="Resposta a áudios"
-              desc="Transcreve áudios do paciente com IA (Gemini) e responde por texto ou áudio." ativa />
-            <AutoCard icon={Sparkles} cor="text-primary"
+              desc="Transcreve áudios do paciente com IA (Gemini) e responde por texto ou áudio."
+              ativa
+            />
+            <AutoCard
+              icon={Sparkles}
+              cor="text-primary"
               titulo="Atendimento inteligente"
-              desc="Nina responde dúvidas frequentes (preços, endereço, horários) e escala para atendente quando necessário." ativa />
+              desc="Nina responde dúvidas frequentes (preços, endereço, horários) e escala para atendente quando necessário."
+              ativa
+            />
           </div>
         </TabsContent>
 
@@ -241,26 +417,60 @@ function NinaPage() {
         </TabsContent>
 
         {/* ============ ATENDIMENTO — Dashboard ============ */}
-        <TabsContent value="atend-dashboard"><AtendDashboard /></TabsContent>
-        <TabsContent value="atend-status"><AtendMeuStatus /></TabsContent>
-        <TabsContent value="atend-depto"><AtendDepartamentos /></TabsContent>
-        <TabsContent value="atend-macros"><AtendMacros /></TabsContent>
-        <TabsContent value="atend-kb"><AtendKb /></TabsContent>
-        <TabsContent value="atend-pausas"><AtendPausas /></TabsContent>
-        <TabsContent value="atend-inbox"><AtendInbox /></TabsContent>
-        <TabsContent value="atend-supervisor"><AtendSupervisor /></TabsContent>
-        <TabsContent value="atend-relatorios"><AtendRelatorios /></TabsContent>
-        <TabsContent value="atend-roteamento"><AtendRoteamento /></TabsContent>
+        <TabsContent value="atend-dashboard">
+          <AtendDashboard />
+        </TabsContent>
+        <TabsContent value="atend-status">
+          <AtendMeuStatus />
+        </TabsContent>
+        <TabsContent value="atend-depto">
+          <AtendDepartamentos />
+        </TabsContent>
+        <TabsContent value="atend-macros">
+          <AtendMacros />
+        </TabsContent>
+        <TabsContent value="atend-kb">
+          <AtendKb />
+        </TabsContent>
+        <TabsContent value="atend-pausas">
+          <AtendPausas />
+        </TabsContent>
+        <TabsContent value="atend-inbox">
+          <AtendInbox />
+        </TabsContent>
+        <TabsContent value="atend-supervisor">
+          <AtendSupervisor />
+        </TabsContent>
+        <TabsContent value="atend-relatorios">
+          <AtendRelatorios />
+        </TabsContent>
+        <TabsContent value="atend-roteamento">
+          <AtendRoteamento />
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function AutoCard({ icon: Icon, cor, titulo, desc, ativa }: { icon: any; cor: string; titulo: string; desc: string; ativa: boolean }) {
+function AutoCard({
+  icon: Icon,
+  cor,
+  titulo,
+  desc,
+  ativa,
+}: {
+  icon: any;
+  cor: string;
+  titulo: string;
+  desc: string;
+  ativa: boolean;
+}) {
   return (
     <Card>
       <CardContent className="p-4 flex items-start gap-3">
-        <div className={`h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0 ${cor}`}>
+        <div
+          className={`h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0 ${cor}`}
+        >
           <Icon className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
@@ -335,7 +545,10 @@ function NinaTreinada() {
         </CardHeader>
         <div ref={scrollRef} className="flex-1 overflow-auto p-4 space-y-3 bg-muted/20">
           {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "assistant" ? "justify-start" : "justify-end"}`}>
+            <div
+              key={i}
+              className={`flex ${m.role === "assistant" ? "justify-start" : "justify-end"}`}
+            >
               <div
                 className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm break-words ${
                   m.role === "assistant"
@@ -443,9 +656,16 @@ function ConfiguracaoWhatsApp() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [canal, setCanal] = useState<"evolution" | "oficial" | "instagram" | "facebook" | "site">("oficial");
+  const [canal, setCanal] = useState<"evolution" | "oficial" | "instagram" | "facebook" | "site">(
+    "oficial",
+  );
   const [showToken, setShowToken] = useState(false);
-  const [form, setForm] = useState({ display_name: "", phone_number_id: "", waba_id: "", access_token: "" });
+  const [form, setForm] = useState({
+    display_name: "",
+    phone_number_id: "",
+    waba_id: "",
+    access_token: "",
+  });
   const [horario, setHorario] = useState({ inicio: "08:00", fim: "18:00" });
   const [savingHorario, setSavingHorario] = useState(false);
 
@@ -466,7 +686,9 @@ function ConfiguracaoWhatsApp() {
     }
   }, [clinicaAtual, obter]);
 
-  useEffect(() => { void carregar(); }, [carregar]);
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
 
   const abrirDialog = () => {
     if (!cfg) return;
@@ -486,9 +708,11 @@ function ConfiguracaoWhatsApp() {
   }
   if (loading || !cfg) {
     return (
-      <Card><CardContent className="py-12 text-center text-muted-foreground flex items-center justify-center gap-2">
-        <Loader2 className="h-4 w-4 animate-spin" /> Carregando configuração…
-      </CardContent></Card>
+      <Card>
+        <CardContent className="py-12 text-center text-muted-foreground flex items-center justify-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Carregando configuração…
+        </CardContent>
+      </Card>
     );
   }
 
@@ -527,7 +751,12 @@ function ConfiguracaoWhatsApp() {
 
   const onTestar = async () => {
     // se há valores não salvos, salva antes de testar
-    if (form.phone_number_id !== cfg.phone_number_id || form.waba_id !== cfg.waba_id || form.display_name !== cfg.display_name || form.access_token) {
+    if (
+      form.phone_number_id !== cfg.phone_number_id ||
+      form.waba_id !== cfg.waba_id ||
+      form.display_name !== cfg.display_name ||
+      form.access_token
+    ) {
       await onSalvar();
     }
     setTesting(true);
@@ -570,14 +799,27 @@ function ConfiguracaoWhatsApp() {
     }
   };
 
-  const statusBadge = cfg.ultimo_teste_ok
-    ? <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100"><CheckCircle2 className="h-3 w-3 mr-1" /> Conectado{cfg.display_phone_number ? ` — ${cfg.display_phone_number}` : ""}</Badge>
-    : cfg.ultimo_teste_ok === false
-      ? <Badge variant="destructive"><AlertCircle className="h-3 w-3 mr-1" /> Falha no último teste</Badge>
-      : <Badge variant="outline">Não testado</Badge>;
+  const statusBadge = cfg.ultimo_teste_ok ? (
+    <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+      <CheckCircle2 className="h-3 w-3 mr-1" /> Conectado
+      {cfg.display_phone_number ? ` — ${cfg.display_phone_number}` : ""}
+    </Badge>
+  ) : cfg.ultimo_teste_ok === false ? (
+    <Badge variant="destructive">
+      <AlertCircle className="h-3 w-3 mr-1" /> Falha no último teste
+    </Badge>
+  ) : (
+    <Badge variant="outline">Não testado</Badge>
+  );
 
   const canaisDisponiveis = [
-    { id: "oficial", label: "API Oficial", icon: MessageCircle, color: "text-emerald-600", disabled: false },
+    {
+      id: "oficial",
+      label: "API Oficial",
+      icon: MessageCircle,
+      color: "text-emerald-600",
+      disabled: false,
+    },
   ] as const;
 
   return (
@@ -589,7 +831,9 @@ function ConfiguracaoWhatsApp() {
               <CardTitle>Conexões de atendimento</CardTitle>
               <CardDescription>Gerencie os canais conectados à Nina</CardDescription>
             </div>
-            <Button onClick={abrirDialog}><Plus className="h-4 w-4 mr-1" /> Nova Conexão</Button>
+            <Button onClick={abrirDialog}>
+              <Plus className="h-4 w-4 mr-1" /> Nova Conexão
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -600,7 +844,9 @@ function ConfiguracaoWhatsApp() {
                   <MessageCircle className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <div className="font-medium truncate">{cfg.display_name || "WhatsApp API Oficial"}</div>
+                  <div className="font-medium truncate">
+                    {cfg.display_name || "WhatsApp API Oficial"}
+                  </div>
                   <div className="text-xs text-muted-foreground truncate">
                     {cfg.display_phone_number || cfg.phone_number_id || "—"}
                   </div>
@@ -608,7 +854,9 @@ function ConfiguracaoWhatsApp() {
               </div>
               <div className="flex items-center gap-2">
                 {statusBadge}
-                <Button variant="ghost" size="icon" onClick={abrirDialog}><Pencil className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={abrirDialog}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
               </div>
             </div>
           ) : (
@@ -629,18 +877,34 @@ function ConfiguracaoWhatsApp() {
               <Label className="text-xs">Callback URL</Label>
               <div className="flex gap-2">
                 <Input value={webhookUrl} readOnly className="font-mono text-xs" />
-                <Button type="button" size="icon" variant="outline" onClick={() => copy(webhookUrl, "URL")}><Copy className="h-4 w-4" /></Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={() => copy(webhookUrl, "URL")}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
               </div>
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Verify Token</Label>
               <div className="flex gap-2">
                 <Input value={cfg.verify_token} readOnly className="font-mono text-xs" />
-                <Button type="button" size="icon" variant="outline" onClick={() => copy(cfg.verify_token, "Verify Token")}><Copy className="h-4 w-4" /></Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={() => copy(cfg.verify_token, "Verify Token")}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Em <strong>Meta for Developers → Seu App → WhatsApp → Configuration → Webhooks</strong>, cole a URL e o Verify Token, depois assine o campo <code>messages</code>.
+              Em{" "}
+              <strong>Meta for Developers → Seu App → WhatsApp → Configuration → Webhooks</strong>,
+              cole a URL e o Verify Token, depois assine o campo <code>messages</code>.
             </p>
           </div>
         </CardContent>
@@ -650,7 +914,8 @@ function ConfiguracaoWhatsApp() {
         <CardHeader>
           <CardTitle>Horário de atendimento humano</CardTitle>
           <CardDescription>
-            Dentro deste intervalo a equipe responde manualmente. <strong>Fora</strong> dele a Nina responde automaticamente pelo WhatsApp.
+            Dentro deste intervalo a equipe responde manualmente. <strong>Fora</strong> dele a Nina
+            responde automaticamente pelo WhatsApp.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -674,7 +939,13 @@ function ConfiguracaoWhatsApp() {
           </div>
           <div className="flex justify-end">
             <Button onClick={onSalvarHorario} disabled={savingHorario}>
-              {savingHorario ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvando…</> : "Salvar horário"}
+              {savingHorario ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Salvando…
+                </>
+              ) : (
+                "Salvar horário"
+              )}
             </Button>
           </div>
         </CardContent>
@@ -701,13 +972,17 @@ function ConfiguracaoWhatsApp() {
                       disabled={c.disabled}
                       onClick={() => !c.disabled && setCanal(c.id as typeof canal)}
                       className={`relative flex flex-col items-center gap-1 rounded-lg border p-3 text-xs transition ${
-                        active ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-muted/50"
+                        active
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border hover:bg-muted/50"
                       } ${c.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                     >
                       <Icon className={`h-5 w-5 ${active ? "text-primary" : c.color}`} />
                       <span className="font-medium leading-tight text-center">{c.label}</span>
                       {c.disabled && (
-                        <span className="absolute -top-1.5 -right-1.5 text-[9px] bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 border">em breve</span>
+                        <span className="absolute -top-1.5 -right-1.5 text-[9px] bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 border">
+                          em breve
+                        </span>
                       )}
                     </button>
                   );
@@ -749,10 +1024,19 @@ function ConfiguracaoWhatsApp() {
                   type={showToken ? "text" : "password"}
                   value={form.access_token}
                   onChange={(e) => setForm({ ...form, access_token: e.target.value })}
-                  placeholder={cfg.has_access_token ? "•••••••• (preenchido — deixe em branco para manter)" : "Permanent token ou System User token"}
+                  placeholder={
+                    cfg.has_access_token
+                      ? "•••••••• (preenchido — deixe em branco para manter)"
+                      : "Permanent token ou System User token"
+                  }
                   autoComplete="off"
                 />
-                <Button type="button" size="icon" variant="outline" onClick={() => setShowToken((v) => !v)}>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setShowToken((v) => !v)}
+                >
                   {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
@@ -761,7 +1045,13 @@ function ConfiguracaoWhatsApp() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={onTestar} disabled={testing || saving}>
-              {testing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Testando…</> : "Testar Conexão"}
+              {testing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Testando…
+                </>
+              ) : (
+                "Testar Conexão"
+              )}
             </Button>
             <Button onClick={onSalvar} disabled={saving || testing}>
               {saving ? "Salvando…" : "Salvar"}
@@ -789,7 +1079,19 @@ type InboxProps = {
   loadingConv: boolean;
 };
 
-function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca, draft, setDraft, enviando, enviarMensagem, loadingConv }: InboxProps) {
+function InboxWhatsapp({
+  conversas,
+  todasConversas,
+  sel,
+  setSel,
+  busca,
+  setBusca,
+  draft,
+  setDraft,
+  enviando,
+  enviarMensagem,
+  loadingConv,
+}: InboxProps) {
   const [filtro, setFiltro] = useState<"todas" | "naolidas" | "nina" | "humano">("todas");
   const [painelAberto, setPainelAberto] = useState(false);
   const [notas, setNotas] = useState<Record<string, string>>({});
@@ -806,9 +1108,9 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const listaFinal = useMemo(() => {
-    if (filtro === "naolidas") return conversas.filter(c => c.naoLidas > 0);
-    if (filtro === "nina") return conversas.filter(c => c.msgs.at(-1)?.from === "nina");
-    if (filtro === "humano") return conversas.filter(c => c.msgs.at(-1)?.from === "paciente");
+    if (filtro === "naolidas") return conversas.filter((c) => c.naoLidas > 0);
+    if (filtro === "nina") return conversas.filter((c) => c.msgs.at(-1)?.from === "nina");
+    if (filtro === "humano") return conversas.filter((c) => c.msgs.at(-1)?.from === "paciente");
     return conversas;
   }, [conversas, filtro]);
 
@@ -819,7 +1121,13 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
   }, [sel?.id, sel?.msgs.length]);
 
   const initials = (nome: string) =>
-    nome.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase() || "?";
+    nome
+      .split(" ")
+      .filter(Boolean)
+      .map((n) => n[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "?";
 
   const totalNaoLidas = todasConversas.reduce((s, c) => s + c.naoLidas, 0);
 
@@ -840,12 +1148,14 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
             />
           </div>
           <div className="flex gap-1 flex-wrap">
-            {([
-              { k: "todas", label: "Todas", count: todasConversas.length },
-              { k: "naolidas", label: "Não lidas", count: totalNaoLidas },
-              { k: "nina", label: "Nina" },
-              { k: "humano", label: "Aguardando" },
-            ] as const).map(f => (
+            {(
+              [
+                { k: "todas", label: "Todas", count: todasConversas.length },
+                { k: "naolidas", label: "Não lidas", count: totalNaoLidas },
+                { k: "nina", label: "Nina" },
+                { k: "humano", label: "Aguardando" },
+              ] as const
+            ).map((f) => (
               <button
                 key={f.k}
                 onClick={() => setFiltro(f.k)}
@@ -856,7 +1166,7 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
                 }`}
               >
                 {f.label}
-                {("count" in f && f.count) ? <span className="opacity-80">·{f.count}</span> : null}
+                {"count" in f && f.count ? <span className="opacity-80">·{f.count}</span> : null}
               </button>
             ))}
           </div>
@@ -867,7 +1177,7 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
               {loadingConv ? "Carregando…" : "Nenhuma conversa nesse filtro."}
             </div>
           )}
-          {listaFinal.map(c => {
+          {listaFinal.map((c) => {
             const ativo = sel?.id === c.id;
             const ultimaFromNina = c.msgs.at(-1)?.from === "nina";
             return (
@@ -889,7 +1199,9 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
                   </div>
                   <div className="flex items-center justify-between gap-2 mt-0.5">
                     <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                      {ultimaFromNina && <CheckCheck className="h-3 w-3 text-emerald-500 shrink-0" />}
+                      {ultimaFromNina && (
+                        <CheckCheck className="h-3 w-3 text-emerald-500 shrink-0" />
+                      )}
                       <span className="truncate">{c.ultima || "—"}</span>
                     </div>
                     {c.naoLidas > 0 && (
@@ -941,12 +1253,18 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setPainelAberto(v => !v)}
+                  onClick={() => setPainelAberto((v) => !v)}
                   title={painelAberto ? "Fechar painel" : "Abrir painel"}
                 >
-                  {painelAberto ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+                  {painelAberto ? (
+                    <PanelRightClose className="h-4 w-4" />
+                  ) : (
+                    <PanelRightOpen className="h-4 w-4" />
+                  )}
                 </Button>
-                <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
               </div>
             </header>
 
@@ -955,8 +1273,12 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
             </div>
 
             <div className="border-t border-border bg-card p-2.5 flex items-end gap-2">
-              <Button variant="ghost" size="icon" title="Anexar"><Paperclip className="h-4 w-4" /></Button>
-              <Button variant="ghost" size="icon" title="Emoji"><Smile className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" title="Anexar">
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" title="Emoji">
+                <Smile className="h-4 w-4" />
+              </Button>
               <Textarea
                 placeholder="Digite uma mensagem…"
                 value={draft}
@@ -971,14 +1293,20 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
                 rows={1}
                 className="flex-1 resize-none min-h-9 max-h-32 py-2"
               />
-              <Button variant="ghost" size="icon" title="Gravar áudio"><Mic className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" title="Gravar áudio">
+                <Mic className="h-4 w-4" />
+              </Button>
               <Button
                 size="icon"
                 onClick={() => enviarMensagem()}
                 disabled={enviando || !draft.trim()}
                 className="bg-emerald-500 hover:bg-emerald-600"
               >
-                {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {enviando ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
               </Button>
             </div>
           </>
@@ -993,19 +1321,11 @@ function InboxWhatsapp({ conversas, todasConversas, sel, setSel, busca, setBusca
       {/* ============ COLUNA 3 — PAINEL DO CONTATO (xl+ inline, menor vira Sheet) ============ */}
       {isWide && painelAberto && sel && (
         <aside className="flex w-[300px] 2xl:w-[340px] shrink-0 border-l border-border bg-card flex-col overflow-auto">
-          <PainelContatoConteudo
-            sel={sel}
-            notas={notas}
-            setNotas={setNotas}
-            initials={initials}
-          />
+          <PainelContatoConteudo sel={sel} notas={notas} setNotas={setNotas} initials={initials} />
         </aside>
       )}
       {!isWide && (
-        <Sheet
-          open={painelAberto && !!sel}
-          onOpenChange={(o) => setPainelAberto(o)}
-        >
+        <Sheet open={painelAberto && !!sel} onOpenChange={(o) => setPainelAberto(o)}>
           <SheetContent side="right" className="w-[320px] sm:w-[360px] p-0">
             {sel && (
               <div className="h-full overflow-auto">
@@ -1037,48 +1357,60 @@ function PainelContatoConteudo({
 }) {
   return (
     <div className="p-4 space-y-4">
-              <div className="flex flex-col items-center text-center pb-3 border-b border-border">
-                <div className="h-20 w-20 rounded-full bg-primary/15 text-primary flex items-center justify-center text-2xl font-semibold mb-2">
-                  {initials(sel.nome)}
-                </div>
-                <div className="font-semibold">{sel.nome}</div>
-                <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                  <Phone className="h-3 w-3" /> {sel.telefone}
-                </div>
-              </div>
+      <div className="flex flex-col items-center text-center pb-3 border-b border-border">
+        <div className="h-20 w-20 rounded-full bg-primary/15 text-primary flex items-center justify-center text-2xl font-semibold mb-2">
+          {initials(sel.nome)}
+        </div>
+        <div className="font-semibold">{sel.nome}</div>
+        <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+          <Phone className="h-3 w-3" /> {sel.telefone}
+        </div>
+      </div>
 
-              <div>
-                <div className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider mb-2 flex items-center gap-1">
-                  <Tag className="h-3 w-3" /> Tags
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  <Badge variant="outline" className="text-[10px]">Paciente</Badge>
-                  <Badge variant="outline" className="text-[10px]">WhatsApp</Badge>
-                </div>
-              </div>
+      <div>
+        <div className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider mb-2 flex items-center gap-1">
+          <Tag className="h-3 w-3" /> Tags
+        </div>
+        <div className="flex flex-wrap gap-1">
+          <Badge variant="outline" className="text-[10px]">
+            Paciente
+          </Badge>
+          <Badge variant="outline" className="text-[10px]">
+            WhatsApp
+          </Badge>
+        </div>
+      </div>
 
-              <PainelInfoCard icon={User} titulo="Paciente vinculado" valor="—" />
-              <PainelInfoCard icon={Calendar} titulo="Próximo agendamento" valor="—" />
-              <PainelInfoCard icon={FileText} titulo="Última consulta" valor="—" />
-              <PainelInfoCard icon={DollarSign} titulo="Mensalidades em aberto" valor="—" />
+      <PainelInfoCard icon={User} titulo="Paciente vinculado" valor="—" />
+      <PainelInfoCard icon={Calendar} titulo="Próximo agendamento" valor="—" />
+      <PainelInfoCard icon={FileText} titulo="Última consulta" valor="—" />
+      <PainelInfoCard icon={DollarSign} titulo="Mensalidades em aberto" valor="—" />
 
-              <div>
-                <div className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider mb-2">
-                  Notas internas
-                </div>
-                <Textarea
-                  rows={4}
-                  placeholder="Anotações sobre esse contato…"
-                  value={notas[sel.id] || ""}
-                  onChange={(e) => setNotas({ ...notas, [sel.id]: e.target.value })}
-                  className="text-xs resize-none"
-                />
-              </div>
+      <div>
+        <div className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider mb-2">
+          Notas internas
+        </div>
+        <Textarea
+          rows={4}
+          placeholder="Anotações sobre esse contato…"
+          value={notas[sel.id] || ""}
+          onChange={(e) => setNotas({ ...notas, [sel.id]: e.target.value })}
+          className="text-xs resize-none"
+        />
+      </div>
     </div>
   );
 }
 
-function PainelInfoCard({ icon: Icon, titulo, valor }: { icon: any; titulo: string; valor: string }) {
+function PainelInfoCard({
+  icon: Icon,
+  titulo,
+  valor,
+}: {
+  icon: any;
+  titulo: string;
+  valor: string;
+}) {
   return (
     <div className="rounded-md border border-border p-3 bg-muted/30">
       <div className="text-[10px] font-semibold uppercase text-muted-foreground tracking-wider flex items-center gap-1 mb-1">
@@ -1094,9 +1426,7 @@ function renderMensagensAgrupadas(msgs: Msg[]) {
   // marcamos um único grupo "Hoje" no topo se houver mensagens.
   if (!msgs.length) {
     return (
-      <div className="text-center text-xs text-muted-foreground py-8">
-        Nenhuma mensagem ainda.
-      </div>
+      <div className="text-center text-xs text-muted-foreground py-8">Nenhuma mensagem ainda.</div>
     );
   }
   return (
@@ -1198,21 +1528,32 @@ function TemplatesWhatsapp() {
     }
   }, [clinicaId, listar]);
 
-  useEffect(() => { void carregar(); }, [carregar]);
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
 
   const resetForm = () => {
-    setName(""); setCategory("UTILITY"); setLanguage("pt_BR");
-    setHeaderText(""); setBody("Olá {{1}}, sua consulta está confirmada para {{2}}.");
-    setFooter(""); setExamples(["Maria", "20/05 às 14h"]);
+    setName("");
+    setCategory("UTILITY");
+    setLanguage("pt_BR");
+    setHeaderText("");
+    setBody("Olá {{1}}, sua consulta está confirmada para {{2}}.");
+    setFooter("");
+    setExamples(["Maria", "20/05 às 14h"]);
   };
 
   const submeter = async () => {
     if (!clinicaId) return;
     if (!/^[a-z0-9_]+$/.test(name)) {
-      toast.error("Nome inválido. Use apenas minúsculas, números e _ (underline). Ex: confirmacao_consulta");
+      toast.error(
+        "Nome inválido. Use apenas minúsculas, números e _ (underline). Ex: confirmacao_consulta",
+      );
       return;
     }
-    if (!body.trim()) { toast.error("Corpo da mensagem é obrigatório"); return; }
+    if (!body.trim()) {
+      toast.error("Corpo da mensagem é obrigatório");
+      return;
+    }
     if (varCount > 0 && examples.some((e) => !e.trim())) {
       toast.error("Preencha um exemplo para cada variável {{n}}");
       return;
@@ -1261,11 +1602,14 @@ function TemplatesWhatsapp() {
       PAUSED: "bg-muted text-muted-foreground border-border",
       DISABLED: "bg-muted text-muted-foreground border-border",
     };
-    return <Badge variant="outline" className={map[s] ?? ""}>{s}</Badge>;
+    return (
+      <Badge variant="outline" className={map[s] ?? ""}>
+        {s}
+      </Badge>
+    );
   };
 
-  const bodyOf = (t: TplRow) =>
-    (t.components ?? []).find((c) => c.type === "BODY")?.text ?? "";
+  const bodyOf = (t: TplRow) => (t.components ?? []).find((c) => c.type === "BODY")?.text ?? "";
 
   return (
     <div className="space-y-4">
@@ -1273,14 +1617,21 @@ function TemplatesWhatsapp() {
         <div>
           <h2 className="text-xl font-semibold">Templates aprovados pela Meta</h2>
           <p className="text-sm text-muted-foreground">
-            Mensagens iniciadas pela clínica (fora da janela de 24h) só podem usar templates aprovados pela Meta.
+            Mensagens iniciadas pela clínica (fora da janela de 24h) só podem usar templates
+            aprovados pela Meta.
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={carregar} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
           </Button>
-          <Button onClick={() => { resetForm(); setOpen(true); }} disabled={!clinicaId}>
+          <Button
+            onClick={() => {
+              resetForm();
+              setOpen(true);
+            }}
+            disabled={!clinicaId}
+          >
             <Plus className="h-4 w-4 mr-2" /> Novo template
           </Button>
         </div>
@@ -1305,8 +1656,12 @@ function TemplatesWhatsapp() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium">{t.name}</span>
                       {statusBadge(t.status)}
-                      <Badge variant="secondary" className="text-[10px]">{t.category}</Badge>
-                      <Badge variant="outline" className="text-[10px]">{t.language}</Badge>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {t.category}
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px]">
+                        {t.language}
+                      </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap line-clamp-3">
                       {bodyOf(t) || "—"}
@@ -1330,7 +1685,8 @@ function TemplatesWhatsapp() {
           <DialogHeader>
             <DialogTitle>Novo template</DialogTitle>
             <DialogDescription>
-              O template será enviado para aprovação da Meta. Pode levar de alguns minutos a 24h para ser aprovado.
+              O template será enviado para aprovação da Meta. Pode levar de alguns minutos a 24h
+              para ser aprovado.
             </DialogDescription>
           </DialogHeader>
 
@@ -1340,7 +1696,9 @@ function TemplatesWhatsapp() {
                 <Label>Nome (id) *</Label>
                 <Input
                   value={name}
-                  onChange={(e) => setName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"))}
+                  onChange={(e) =>
+                    setName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_"))
+                  }
                   placeholder="confirmacao_consulta"
                 />
                 <p className="text-[11px] text-muted-foreground">Minúsculas, números e _</p>
@@ -1383,7 +1741,12 @@ function TemplatesWhatsapp() {
             </div>
 
             <div className="space-y-2">
-              <Label>Corpo da mensagem * <span className="text-muted-foreground">— use {"{{1}}"}, {"{{2}}"} para variáveis</span></Label>
+              <Label>
+                Corpo da mensagem *{" "}
+                <span className="text-muted-foreground">
+                  — use {"{{1}}"}, {"{{2}}"} para variáveis
+                </span>
+              </Label>
               <Textarea
                 rows={5}
                 value={body}
@@ -1391,13 +1754,17 @@ function TemplatesWhatsapp() {
                 maxLength={1024}
                 placeholder="Olá {{1}}, sua consulta está marcada para {{2}}."
               />
-              <p className="text-[11px] text-muted-foreground">{body.length}/1024 — {varCount} variável(is) detectada(s)</p>
+              <p className="text-[11px] text-muted-foreground">
+                {body.length}/1024 — {varCount} variável(is) detectada(s)
+              </p>
             </div>
 
             {varCount > 0 && (
               <div className="space-y-2">
                 <Label>Exemplos das variáveis *</Label>
-                <p className="text-[11px] text-muted-foreground">A Meta exige um valor de exemplo para cada {"{{n}}"}.</p>
+                <p className="text-[11px] text-muted-foreground">
+                  A Meta exige um valor de exemplo para cada {"{{n}}"}.
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   {examples.map((v, i) => (
                     <div key={i} className="flex items-center gap-2">
@@ -1405,7 +1772,9 @@ function TemplatesWhatsapp() {
                       <Input
                         value={v}
                         onChange={(e) => {
-                          const next = [...examples]; next[i] = e.target.value; setExamples(next);
+                          const next = [...examples];
+                          next[i] = e.target.value;
+                          setExamples(next);
                         }}
                         placeholder={`Exemplo para {{${i + 1}}}`}
                       />
@@ -1427,9 +1796,15 @@ function TemplatesWhatsapp() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+              Cancelar
+            </Button>
             <Button onClick={submeter} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
               Enviar para aprovação
             </Button>
           </DialogFooter>

@@ -23,7 +23,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/_authenticated/app/orcamentos-agenda")({
   component: OrcamentosAgendaPage,
@@ -40,7 +46,9 @@ function OrcamentosAgendaPage() {
   const [leftPct, setLeftPct] = useState(45);
   const [agendaAberta, setAgendaAberta] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [modoVisualizacao, setModoVisualizacao] = useState<"split" | "orcamentos" | "agenda">("split");
+  const [modoVisualizacao, setModoVisualizacao] = useState<"split" | "orcamentos" | "agenda">(
+    "split",
+  );
   const [agendaSrc, setAgendaSrc] = useState(
     search.orc ? `/app/agenda?embed=1&orc=${search.orc}` : "/app/agenda?embed=1",
   );
@@ -170,7 +178,8 @@ function OrcamentosAgendaPage() {
               <div className="hidden lg:flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
                 <Info className="h-3 w-3" />
                 <span>
-                  Clique em <span className="font-medium text-emerald-600">Agendar</span> para abrir na agenda
+                  Clique em <span className="font-medium text-emerald-600">Agendar</span> para abrir
+                  na agenda
                 </span>
               </div>
             )}
@@ -223,7 +232,12 @@ function OrcamentosAgendaPage() {
             {/* Controles */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="ghost" onClick={recarregarOrcamentos} className="h-8 w-8 p-0">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={recarregarOrcamentos}
+                  className="h-8 w-8 p-0"
+                >
                   <RefreshCw className="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
@@ -232,7 +246,12 @@ function OrcamentosAgendaPage() {
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="ghost" onClick={recarregarAgenda} className="h-8 w-8 p-0">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={recarregarAgenda}
+                  className="h-8 w-8 p-0"
+                >
                   <RefreshCw className="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
@@ -255,8 +274,17 @@ function OrcamentosAgendaPage() {
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" variant="ghost" onClick={toggleFullscreen} className="h-8 w-8 p-0">
-                  {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={toggleFullscreen}
+                  className="h-8 w-8 p-0"
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>{isFullscreen ? "Sair da tela cheia" : "Tela cheia"}</TooltipContent>
@@ -270,7 +298,11 @@ function OrcamentosAgendaPage() {
                   onClick={alternarAgenda}
                   className="h-8 w-8 p-0"
                 >
-                  {agendaAberta ? <X className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+                  {agendaAberta ? (
+                    <X className="h-3.5 w-3.5" />
+                  ) : (
+                    <PanelRightOpen className="h-3.5 w-3.5" />
+                  )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>{agendaAberta ? "Fechar agenda" : "Abrir agenda"}</TooltipContent>
@@ -304,7 +336,12 @@ function OrcamentosAgendaPage() {
                 </Badge>
               </div>
               <div className="flex items-center gap-1">
-                <Button size="sm" variant="ghost" onClick={recarregarOrcamentos} className="h-7 w-7 p-0">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={recarregarOrcamentos}
+                  className="h-7 w-7 p-0"
+                >
                   <RefreshCw className="h-3 w-3" />
                 </Button>
                 <Button
@@ -360,7 +397,12 @@ function OrcamentosAgendaPage() {
                   </Badge>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button size="sm" variant="ghost" onClick={recarregarAgenda} className="h-7 w-7 p-0">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={recarregarAgenda}
+                    className="h-7 w-7 p-0"
+                  >
                     <RefreshCw className="h-3 w-3" />
                   </Button>
                   <Button
@@ -372,7 +414,12 @@ function OrcamentosAgendaPage() {
                     <ExternalLink className="h-3 w-3" />
                   </Button>
                   {modoVisualizacao !== "agenda" && (
-                    <Button size="sm" variant="ghost" onClick={() => setAgendaAberta(false)} className="h-7 w-7 p-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setAgendaAberta(false)}
+                      className="h-7 w-7 p-0"
+                    >
                       <X className="h-3 w-3" />
                     </Button>
                   )}
@@ -406,10 +453,16 @@ function OrcamentosAgendaPage() {
           </div>
           <div className="flex items-center gap-3">
             <span>
-              Clique em <kbd className="px-1.5 py-0.5 bg-muted rounded text-[9px] font-mono">Agendar</kbd> para enviar à
-              agenda
+              Clique em{" "}
+              <kbd className="px-1.5 py-0.5 bg-muted rounded text-[9px] font-mono">Agendar</kbd>{" "}
+              para enviar à agenda
             </span>
-            <Button variant="ghost" size="sm" className="h-5 px-2 text-[10px]" onClick={() => setShowDica(!showDica)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 px-2 text-[10px]"
+              onClick={() => setShowDica(!showDica)}
+            >
               {showDica ? "Ocultar dica" : "Mostrar dica"}
             </Button>
           </div>

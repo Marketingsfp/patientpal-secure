@@ -1,11 +1,23 @@
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Printer } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,7 +52,18 @@ interface Props {
   categoriaFixaNome?: string;
 }
 
-export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento, categoriaFixaNome }: Props) {
+export function LancamentoDialog({
+  open,
+  onOpenChange,
+  tipo,
+  onSaved,
+  onSavedWithData,
+  initialDescricao,
+  initialValor,
+  agendamentoId,
+  initialFormaPagamento,
+  categoriaFixaNome,
+}: Props) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const role = clinicaAtual?.role ?? null;
@@ -74,7 +97,11 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const [descontoMotivo, setDescontoMotivo] = useState("");
   const [valorOriginal, setValorOriginal] = useState<string>("");
   const [supervisorOpen, setSupervisorOpen] = useState(false);
-  const [supervisorInfo, setSupervisorInfo] = useState<{ userId: string; nome: string; role: string } | null>(null);
+  const [supervisorInfo, setSupervisorInfo] = useState<{
+    userId: string;
+    nome: string;
+    role: string;
+  } | null>(null);
   // Bloqueio: paciente com mensalidade vencida no cartão benefícios.
   // Quando bloqueado, o pagamento só pode ser feito como Particular.
   const [bloqueioCartao, setBloqueioCartao] = useState<{
@@ -94,10 +121,16 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     if (initialValor !== undefined) setValor(initialValor);
     if (initialValor !== undefined) setValorOriginal(initialValor);
     // Reseta desconto a cada abertura
-    setDescontoAtivo(false); setDescontoTipo("valor");
-    setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
-    setSupervisorInfo(null); setSupervisorOpen(false);
-    setBloqueioCartao(null); setTipoAgendamento(null); setConvenioNome(null);
+    setDescontoAtivo(false);
+    setDescontoTipo("valor");
+    setDescontoInput("");
+    setDescontoAutorizado("");
+    setDescontoMotivo("");
+    setSupervisorInfo(null);
+    setSupervisorOpen(false);
+    setBloqueioCartao(null);
+    setTipoAgendamento(null);
+    setConvenioNome(null);
     if (initialFormaPagamento !== undefined) {
       if (initialFormaPagamento === "__misto__") {
         setPagamentoMisto(true);
@@ -108,12 +141,28 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     }
     (async () => {
       const [{ data: cats }, { data: cs }] = await Promise.all([
-        supabase.from("fin_categorias").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("tipo", tipo).eq("ativo", true).order("nome"),
-        supabase.from("fin_contas").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
+        supabase
+          .from("fin_categorias")
+          .select("id, nome")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("tipo", tipo)
+          .eq("ativo", true)
+          .order("nome"),
+        supabase
+          .from("fin_contas")
+          .select("id, nome")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("ativo", true)
+          .order("nome"),
       ]);
       const lista = cats ?? [];
       setCategorias(lista);
-      const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      const norm = (s: string) =>
+        s
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .trim();
       const listaContas = cs ?? [];
       setContas(listaContas);
       const caixa = listaContas.find((c) => norm(c.nome) === "caixa");
@@ -137,7 +186,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
             .eq("id", agendamentoId)
             .maybeSingle();
           const pid = ag?.paciente_id ?? null;
-          const tipoAg = (ag as { tipo_atendimento?: string | null } | null)?.tipo_atendimento ?? null;
+          const tipoAg =
+            (ag as { tipo_atendimento?: string | null } | null)?.tipo_atendimento ?? null;
           setTipoAgendamento(tipoAg);
           if (pid) {
             const { data: contrato } = await supabase
@@ -149,7 +199,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               .order("created_at", { ascending: false })
               .limit(1)
               .maybeSingle();
-            const convNome = (contrato as { cb_convenios?: { nome?: string } } | null)?.cb_convenios?.nome;
+            const convNome = (contrato as { cb_convenios?: { nome?: string } } | null)?.cb_convenios
+              ?.nome;
             if (convNome) setConvenioNome(convNome);
             // Só sugere a categoria do convênio quando o agendamento foi
             // marcado como "convenio". Se for "particular", mantém a
@@ -198,7 +249,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     if (!isFinite(n) || n <= 0) return 0;
     if (descontoTipo === "percentual") {
       const pct = Math.min(100, Math.max(0, n));
-      return Math.round((origNum * pct) / 100 * 100) / 100;
+      return Math.round(((origNum * pct) / 100) * 100) / 100;
     }
     return Math.min(origNum, Math.round(n * 100) / 100);
   })();
@@ -210,9 +261,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     setValor(novo.toFixed(2));
   }, [descontoAtivo, descontoInput, descontoTipo, valorOriginal, origNum, descontoNum, open]);
   const recebidoNum = Number(valorRecebido || 0);
-  const trocoDinheiro = formaPagamento === "dinheiro" && recebidoNum > valorNum
-    ? recebidoNum - valorNum
-    : 0;
+  const trocoDinheiro =
+    formaPagamento === "dinheiro" && recebidoNum > valorNum ? recebidoNum - valorNum : 0;
   // Compute "pago" (effective amount applied to total) and "troco" per row.
   // Cash: pago = min(recebido, remaining-before-this-row); excess = troco.
   // Other forms: pago = recebido, troco = 0.
@@ -220,7 +270,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     let restante = valorNum;
     return pagamentos.map((p) => {
       const rec = Number(p.recebido || 0);
-      let pago = 0, troco = 0;
+      let pago = 0,
+        troco = 0;
       if (p.forma === "dinheiro") {
         pago = Math.min(rec, Math.max(0, restante));
         troco = Math.max(0, rec - pago);
@@ -257,11 +308,22 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // Bloqueio por débito no cartão benefícios — só libera se o pagamento
     // for feito como Particular.
     if (bloqueioCartao?.bloqueado) {
-      const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      const norm = (s: string) =>
+        s
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .trim();
       const catEscolhida = categorias.find((c) => c.id === categoriaId) ?? null;
-      const catEhConvenio = !!(catEscolhida && convenioNome && norm(catEscolhida.nome) === norm(convenioNome));
+      const catEhConvenio = !!(
+        catEscolhida &&
+        convenioNome &&
+        norm(catEscolhida.nome) === norm(convenioNome)
+      );
       const formaEhConvenio = !pagamentoMisto && formaPagamento === "convenio";
-      const mistoTemConvenio = pagamentoMisto && pagamentos.some((p) => p.forma === "convenio" && Number(p.recebido || 0) > 0);
+      const mistoTemConvenio =
+        pagamentoMisto &&
+        pagamentos.some((p) => p.forma === "convenio" && Number(p.recebido || 0) > 0);
       if (catEhConvenio || formaEhConvenio || mistoTemConvenio) {
         toast.error(
           `Paciente com R$ ${bloqueioCartao.totalAberto.toFixed(2)} em atraso no cartão benefícios (${bloqueioCartao.qtdAtrasadas} parcela(s)). Este atendimento só pode ser pago como Particular — troque a categoria/forma e tente novamente.`,
@@ -274,21 +336,28 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     if (descontoAtivo) {
       if (!supervisorInfo && !ehSupervisor) {
         toast.error("É necessária a autorização de um supervisor para aplicar desconto.");
-        setSaving(false); return;
+        setSaving(false);
+        return;
       }
       if (descontoNum <= 0) {
         toast.error("Informe um valor de desconto maior que zero.");
-        setSaving(false); return;
+        setSaving(false);
+        return;
       }
       if (!descontoAutorizado.trim()) {
         toast.error("Informe quem autorizou o desconto.");
-        setSaving(false); return;
+        setSaving(false);
+        return;
       }
     }
     // H2 — Roda jaPago + agendamento em paralelo. Antes eram duas queries
     // seriais (jaPago aqui, agendamento mais abaixo) e ainda uma 3ª query
     // duplicada para procedimento dentro do bloco de splits.
-    type AgPrefetch = { medico_id: string | null; paciente_id: string | null; procedimento: string | null };
+    type AgPrefetch = {
+      medico_id: string | null;
+      paciente_id: string | null;
+      procedimento: string | null;
+    };
     let agPrefetch: AgPrefetch | null = null;
     if (agendamentoId) {
       const [jaPagoRes, agRes] = await Promise.all([
@@ -323,7 +392,9 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     }
     if (!pagamentoMisto && formaPagamento === "dinheiro") {
       if (valorRecebido && recebidoNum > 0 && recebidoNum + 0.005 < valorNum) {
-        toast.error(`Valor recebido (${formatBRL(recebidoNum)}) é menor que o total (${formatBRL(valorNum)})`);
+        toast.error(
+          `Valor recebido (${formatBRL(recebidoNum)}) é menor que o total (${formatBRL(valorNum)})`,
+        );
         setSaving(false);
         return;
       }
@@ -336,7 +407,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         .filter(({ p, i }) => p.forma && linhasCalc[i].pago > 0);
       if (validIdx.length === 0) {
         toast.error("Adicione ao menos uma forma de pagamento");
-        setSaving(false); return;
+        setSaving(false);
+        return;
       }
       const dinheiroInvalido = validIdx.find(({ p, i }) => {
         if (p.forma !== "dinheiro") return false;
@@ -344,35 +416,48 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         return rec <= 0 || rec + 0.005 < linhasCalc[i].pago;
       });
       if (dinheiroInvalido) {
-        toast.error("Informe o valor recebido em dinheiro em todas as linhas (deve cobrir o valor pago).");
-        setSaving(false); return;
+        toast.error(
+          "Informe o valor recebido em dinheiro em todas as linhas (deve cobrir o valor pago).",
+        );
+        setSaving(false);
+        return;
       }
       const total = validIdx.reduce((s, { i }) => s + linhasCalc[i].pago, 0);
       if (Math.abs(total - valorNum) > 0.01) {
-        toast.error(`Soma das formas (${formatBRL(total)}) difere do valor (${formatBRL(valorNum)})`);
-        setSaving(false); return;
+        toast.error(
+          `Soma das formas (${formatBRL(total)}) difere do valor (${formatBRL(valorNum)})`,
+        );
+        setSaving(false);
+        return;
       }
       formaFinal = "misto";
-      obsExtra = "Pagamento misto: " + validIdx.map(({ p, i }) => {
-        const { pago, troco } = linhasCalc[i];
-        const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(pago)}`;
-        if (p.forma === "dinheiro" && troco > 0) {
-          return `${base} (recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)})`;
-        }
-        return base;
-      }).join("; ");
+      obsExtra =
+        "Pagamento misto: " +
+        validIdx
+          .map(({ p, i }) => {
+            const { pago, troco } = linhasCalc[i];
+            const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(pago)}`;
+            if (p.forma === "dinheiro" && troco > 0) {
+              return `${base} (recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)})`;
+            }
+            return base;
+          })
+          .join("; ");
     } else if (formaPagamento === "dinheiro" && recebidoNum > 0) {
       obsExtra = `Recebido ${formatBRL(recebidoNum)}, troco ${formatBRL(trocoDinheiro)}`;
     }
     let descontoObs = "";
     if (descontoAtivo && descontoNum > 0) {
-      const tipoTxt = descontoTipo === "percentual"
-        ? `${Number(descontoInput).toLocaleString("pt-BR")}% = ${formatBRL(descontoNum)}`
-        : formatBRL(descontoNum);
-      descontoObs = `Desconto aplicado: ${tipoTxt} sobre ${formatBRL(origNum)} — Autorizado por: ${descontoAutorizado.trim()}`
-        + (descontoMotivo.trim() ? ` — Motivo: ${descontoMotivo.trim()}` : "");
+      const tipoTxt =
+        descontoTipo === "percentual"
+          ? `${Number(descontoInput).toLocaleString("pt-BR")}% = ${formatBRL(descontoNum)}`
+          : formatBRL(descontoNum);
+      descontoObs =
+        `Desconto aplicado: ${tipoTxt} sobre ${formatBRL(origNum)} — Autorizado por: ${descontoAutorizado.trim()}` +
+        (descontoMotivo.trim() ? ` — Motivo: ${descontoMotivo.trim()}` : "");
     }
-    const obsFinal = [observacoes.trim(), descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
+    const obsFinal =
+      [observacoes.trim(), descontoObs, obsExtra].filter(Boolean).join(" | ") || null;
     // Quando vinculado a um agendamento, busca medico_id e paciente_id
     // para que o repasse médico e os relatórios por paciente funcionem.
     let medicoId: string | null = null;
@@ -381,37 +466,55 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       medicoId = agPrefetch.medico_id ?? null;
       pacienteId = agPrefetch.paciente_id ?? null;
     }
-    const { data: lancInserido, error } = await supabase.from("fin_lancamentos").insert({
-      clinica_id: clinicaAtual.clinica_id,
-      tipo,
-      descricao: descricao.trim(),
-      valor: Number(valor),
-      data,
-      categoria_id: categoriaId || null,
-      conta_id: contaId || null,
-      forma_pagamento: formaFinal,
-      bandeira_cartao: isCredito ? bandeiraCartao : null,
-      parcelas: isCredito ? Number(parcelas) || 1 : null,
-      emitir_nfse: emitirNfse,
-      observacoes: obsFinal,
-      status: "confirmado",
-      agendamento_id: agendamentoId ?? null,
-      medico_id: medicoId,
-      paciente_id: pacienteId,
-      criado_por: user?.id ?? null,
-    } as never).select("id").single();
+    const { data: lancInserido, error } = await supabase
+      .from("fin_lancamentos")
+      .insert({
+        clinica_id: clinicaAtual.clinica_id,
+        tipo,
+        descricao: descricao.trim(),
+        valor: Number(valor),
+        data,
+        categoria_id: categoriaId || null,
+        conta_id: contaId || null,
+        forma_pagamento: formaFinal,
+        bandeira_cartao: isCredito ? bandeiraCartao : null,
+        parcelas: isCredito ? Number(parcelas) || 1 : null,
+        emitir_nfse: emitirNfse,
+        observacoes: obsFinal,
+        status: "confirmado",
+        agendamento_id: agendamentoId ?? null,
+        medico_id: medicoId,
+        paciente_id: pacienteId,
+        criado_por: user?.id ?? null,
+      } as never)
+      .select("id")
+      .single();
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
     // Sincroniza `tipo_atendimento` do agendamento com o que foi pago,
     // para que o check-in e relatórios reflitam a decisão final.
     if (agendamentoId && tipo === "receita") {
       try {
-        const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+        const norm = (s: string) =>
+          s
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim();
         const catEscolhida = categorias.find((c) => c.id === categoriaId) ?? null;
-        const catEhConvenio = !!(catEscolhida && convenioNome && norm(catEscolhida.nome) === norm(convenioNome));
+        const catEhConvenio = !!(
+          catEscolhida &&
+          convenioNome &&
+          norm(catEscolhida.nome) === norm(convenioNome)
+        );
         const formaEhConvenio = !pagamentoMisto && formaPagamento === "convenio";
-        const mistoTemConvenio = pagamentoMisto && pagamentos.some((p) => p.forma === "convenio" && Number(p.recebido || 0) > 0);
+        const mistoTemConvenio =
+          pagamentoMisto &&
+          pagamentos.some((p) => p.forma === "convenio" && Number(p.recebido || 0) > 0);
         const pagouComoConvenio = catEhConvenio || formaEhConvenio || mistoTemConvenio;
         const novoTipo = pagouComoConvenio ? "convenio" : "particular";
         if (novoTipo !== tipoAgendamento) {
@@ -431,10 +534,14 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     try {
       if (tipo === "receita" && lancInserido?.id && Number(valor) > 0) {
         const splits: Array<{
-          clinica_id: string; pagamento_id: string;
+          clinica_id: string;
+          pagamento_id: string;
           beneficiario_tipo: "medico" | "prestador" | "clinica";
-          medico_id: string | null; prestador_id: string | null;
-          rotulo: string | null; percentual: number | null; valor: number;
+          medico_id: string | null;
+          prestador_id: string | null;
+          rotulo: string | null;
+          percentual: number | null;
+          valor: number;
         }> = [];
         // 1) Regras específicas do procedimento (se cadastradas)
         let regrasAplicadas = false;
@@ -446,31 +553,40 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               .from("procedimentos")
               .select("id")
               .eq("clinica_id", clinicaAtual.clinica_id)
-              .ilike("nome", procNome).limit(1).maybeSingle();
+              .ilike("nome", procNome)
+              .limit(1)
+              .maybeSingle();
             const procId = (procRow as { id: string } | null)?.id;
             if (procId) {
               const { data: regras } = await supabase
                 .from("procedimento_split_regras")
-                .select("beneficiario_tipo, medico_id, prestador_id, rotulo, percentual, valor_fixo")
+                .select(
+                  "beneficiario_tipo, medico_id, prestador_id, rotulo, percentual, valor_fixo",
+                )
                 .eq("clinica_id", clinicaAtual.clinica_id)
                 .eq("procedimento_id", procId)
                 .eq("ativo", true);
               const lista = (regras ?? []) as Array<{
                 beneficiario_tipo: "medico" | "prestador" | "clinica";
-                medico_id: string | null; prestador_id: string | null;
-                rotulo: string | null; percentual: number | null; valor_fixo: number | null;
+                medico_id: string | null;
+                prestador_id: string | null;
+                rotulo: string | null;
+                percentual: number | null;
+                valor_fixo: number | null;
               }>;
               for (const reg of lista) {
-                const v = reg.valor_fixo != null
-                  ? Number(reg.valor_fixo)
-                  : reg.percentual != null
-                    ? +(Number(valor) * Number(reg.percentual) / 100).toFixed(2)
-                    : 0;
+                const v =
+                  reg.valor_fixo != null
+                    ? Number(reg.valor_fixo)
+                    : reg.percentual != null
+                      ? +((Number(valor) * Number(reg.percentual)) / 100).toFixed(2)
+                      : 0;
                 splits.push({
                   clinica_id: clinicaAtual.clinica_id,
                   pagamento_id: lancInserido.id,
                   beneficiario_tipo: reg.beneficiario_tipo,
-                  medico_id: reg.medico_id, prestador_id: reg.prestador_id,
+                  medico_id: reg.medico_id,
+                  prestador_id: reg.prestador_id,
                   rotulo: reg.rotulo,
                   percentual: reg.percentual != null ? Number(reg.percentual) : null,
                   valor: v,
@@ -485,20 +601,28 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           const { data: med } = await supabase
             .from("medicos")
             .select("tipo_repasse, percentual_repasse_padrao, valor_repasse_padrao")
-            .eq("id", medicoId).maybeSingle();
-          const m = med as { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null } | null;
+            .eq("id", medicoId)
+            .maybeSingle();
+          const m = med as {
+            tipo_repasse: string | null;
+            percentual_repasse_padrao: number | null;
+            valor_repasse_padrao: number | null;
+          } | null;
           if (m) {
-            const vMed = m.tipo_repasse === "valor_fixo" && m.valor_repasse_padrao != null
-              ? Number(m.valor_repasse_padrao)
-              : +(Number(valor) * Number(m.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+            const vMed =
+              m.tipo_repasse === "valor_fixo" && m.valor_repasse_padrao != null
+                ? Number(m.valor_repasse_padrao)
+                : +((Number(valor) * Number(m.percentual_repasse_padrao ?? 0)) / 100).toFixed(2);
             if (vMed > 0) {
               splits.push({
                 clinica_id: clinicaAtual.clinica_id,
                 pagamento_id: lancInserido.id,
                 beneficiario_tipo: "medico",
-                medico_id: medicoId, prestador_id: null,
+                medico_id: medicoId,
+                prestador_id: null,
                 rotulo: "Repasse médico",
-                percentual: m.tipo_repasse === "valor_fixo" ? null : Number(m.percentual_repasse_padrao ?? 0),
+                percentual:
+                  m.tipo_repasse === "valor_fixo" ? null : Number(m.percentual_repasse_padrao ?? 0),
                 valor: vMed,
               });
             }
@@ -512,14 +636,17 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
             clinica_id: clinicaAtual.clinica_id,
             pagamento_id: lancInserido.id,
             beneficiario_tipo: "clinica",
-            medico_id: null, prestador_id: null,
+            medico_id: null,
+            prestador_id: null,
             rotulo: "Clínica",
             percentual: null,
             valor: restoClinica,
           });
         }
         if (splits.length > 0) {
-          const { error: errSplit } = await supabase.from("pagamento_splits").insert(splits as never);
+          const { error: errSplit } = await supabase
+            .from("pagamento_splits")
+            .insert(splits as never);
           if (errSplit) console.error("Falha ao gravar splits:", errSplit);
         }
       }
@@ -580,7 +707,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     onSavedWithData?.({
       valor: Number(valor),
       forma_pagamento: formaFinal,
-      parcelas: isCredito ? (Number(parcelas) || 1) : null,
+      parcelas: isCredito ? Number(parcelas) || 1 : null,
       bandeira_cartao: isCredito ? bandeiraCartao : null,
       emitir_nfse: emitirNfse,
       pagamentos_detalhe: pagamentoMisto
@@ -594,9 +721,17 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
             .filter((x) => x.forma && x.pago > 0)
         : undefined,
     });
-    setDescricao(""); setValor(""); setObservacoes(""); setCategoriaId(""); setContaId(""); setFormaPagamento("");
-    setBandeiraCartao(""); setParcelas("1"); setEmitirNfse(false);
-    setValorRecebido(""); setPagamentoMisto(false);
+    setDescricao("");
+    setValor("");
+    setObservacoes("");
+    setCategoriaId("");
+    setContaId("");
+    setFormaPagamento("");
+    setBandeiraCartao("");
+    setParcelas("1");
+    setEmitirNfse(false);
+    setValorRecebido("");
+    setPagamentoMisto(false);
     setPagamentos([{ forma: "dinheiro", recebido: "" }]);
     onSaved?.();
     onOpenChange(false);
@@ -604,343 +739,461 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className={tipo === "receita" ? "text-success" : "text-destructive"}>
-            Nova {tipo === "receita" ? "Receita" : "Despesa"}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 overflow-y-auto pr-1 -mr-1 flex-1 min-h-0">
-          {bloqueioCartao?.bloqueado && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/5 text-destructive px-3 py-2 text-sm">
-              <strong>Cartão benefícios em atraso.</strong> Paciente tem{" "}
-              <strong>R$ {bloqueioCartao.totalAberto.toFixed(2)}</strong> em aberto
-              ({bloqueioCartao.qtdAtrasadas} parcela(s) vencida(s)). Este atendimento
-              só pode ser pago como <strong>Particular</strong> — não use a categoria
-              "{bloqueioCartao.convenioNome ?? "Convênio"}" nem a forma "Convênio".
-            </div>
-          )}
-          <div className="space-y-1.5">
-            <Label>Descrição *</Label>
-            <Input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex: Consulta João Silva" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className={tipo === "receita" ? "text-success" : "text-destructive"}>
+              Nova {tipo === "receita" ? "Receita" : "Despesa"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 overflow-y-auto pr-1 -mr-1 flex-1 min-h-0">
+            {bloqueioCartao?.bloqueado && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 text-destructive px-3 py-2 text-sm">
+                <strong>Cartão benefícios em atraso.</strong> Paciente tem{" "}
+                <strong>R$ {bloqueioCartao.totalAberto.toFixed(2)}</strong> em aberto (
+                {bloqueioCartao.qtdAtrasadas} parcela(s) vencida(s)). Este atendimento só pode ser
+                pago como <strong>Particular</strong> — não use a categoria "
+                {bloqueioCartao.convenioNome ?? "Convênio"}" nem a forma "Convênio".
+              </div>
+            )}
             <div className="space-y-1.5">
-              <Label>Valor *</Label>
-              <CurrencyInput
-                value={valor}
-                onChange={setValor}
-                disabled={!!initialValor}
-                readOnly={!!initialValor}
+              <Label>Descrição *</Label>
+              <Input
+                value={descricao}
+                onChange={(e) => setDescricao(e.target.value)}
+                placeholder="Ex: Consulta João Silva"
               />
-              {!!initialValor && (
-                <p className="text-xs text-muted-foreground">Definido pelo serviço</p>
-              )}
             </div>
-            <div className="space-y-1.5">
-              <Label>Data</Label>
-              <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
-            </div>
-          </div>
-          {tipo === "receita" && !!initialValor && (
-            <div className="space-y-2 rounded-md border border-dashed p-3 bg-muted/20">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="aplicar-desconto"
-                  checked={descontoAtivo}
-                  onCheckedChange={(v) => {
-                    if (!v) {
-                      setDescontoAtivo(false);
-                      setSupervisorInfo(null);
-                      setDescontoInput("");
-                      setDescontoAutorizado("");
-                      setDescontoMotivo("");
-                      return;
-                    }
-                    // Supervisores aplicam direto; demais precisam autorização.
-                    if (ehSupervisor) {
-                      setDescontoAtivo(true);
-                    } else {
-                      setSupervisorOpen(true);
-                    }
-                  }}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Valor *</Label>
+                <CurrencyInput
+                  value={valor}
+                  onChange={setValor}
+                  disabled={!!initialValor}
+                  readOnly={!!initialValor}
                 />
-                <Label htmlFor="aplicar-desconto" className="cursor-pointer">
-                  Aplicar desconto {ehSupervisor ? "" : "(exige autorização do supervisor)"}
-                </Label>
-                {supervisorInfo && (
-                  <span className="ml-auto text-xs text-success">✓ Autorizado por {supervisorInfo.nome}</span>
+                {!!initialValor && (
+                  <p className="text-xs text-muted-foreground">Definido pelo serviço</p>
                 )}
               </div>
-              {descontoAtivo && (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-[120px_1fr] gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Tipo</Label>
-                      <Select value={descontoTipo} onValueChange={(v) => setDescontoTipo(v as "valor" | "percentual")}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="valor">R$ (valor)</SelectItem>
-                          <SelectItem value="percentual">% (percentual)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">
-                        {descontoTipo === "percentual" ? "Percentual de desconto" : "Valor do desconto"}
-                      </Label>
-                      {descontoTipo === "percentual" ? (
-                        <Input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step="0.01"
-                          value={descontoInput}
-                          onChange={(e) => setDescontoInput(e.target.value)}
-                          placeholder="Ex: 10"
-                        />
-                      ) : (
-                        <CurrencyInput value={descontoInput} onChange={setDescontoInput} />
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Autorizado por *</Label>
-                    <Input
-                      value={descontoAutorizado}
-                      onChange={(e) => setDescontoAutorizado(e.target.value)}
-                      placeholder="Nome do supervisor ou financeiro"
-                      readOnly={!!supervisorInfo}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Motivo (opcional)</Label>
-                    <Input
-                      value={descontoMotivo}
-                      onChange={(e) => setDescontoMotivo(e.target.value)}
-                      placeholder="Ex: paciente recorrente"
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs pt-1 border-t">
-                    <span className="text-muted-foreground">Valor original: <strong>{formatBRL(origNum)}</strong></span>
-                    <span className="text-destructive">- {formatBRL(descontoNum)}</span>
-                    <span className="text-success font-medium">Total: {formatBRL(Math.max(0, origNum - descontoNum))}</span>
-                  </div>
+              <div className="space-y-1.5">
+                <Label>Data</Label>
+                <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
+              </div>
+            </div>
+            {tipo === "receita" && !!initialValor && (
+              <div className="space-y-2 rounded-md border border-dashed p-3 bg-muted/20">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="aplicar-desconto"
+                    checked={descontoAtivo}
+                    onCheckedChange={(v) => {
+                      if (!v) {
+                        setDescontoAtivo(false);
+                        setSupervisorInfo(null);
+                        setDescontoInput("");
+                        setDescontoAutorizado("");
+                        setDescontoMotivo("");
+                        return;
+                      }
+                      // Supervisores aplicam direto; demais precisam autorização.
+                      if (ehSupervisor) {
+                        setDescontoAtivo(true);
+                      } else {
+                        setSupervisorOpen(true);
+                      }
+                    }}
+                  />
+                  <Label htmlFor="aplicar-desconto" className="cursor-pointer">
+                    Aplicar desconto {ehSupervisor ? "" : "(exige autorização do supervisor)"}
+                  </Label>
+                  {supervisorInfo && (
+                    <span className="ml-auto text-xs text-success">
+                      ✓ Autorizado por {supervisorInfo.nome}
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
-          )}
-          <div className="space-y-1.5">
-            <Label>Categoria</Label>
-            <Select value={categoriaId} onValueChange={setCategoriaId} disabled={!!categoriaFixaNome}>
-              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                {categorias.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {categoriaFixaNome && !categorias.some((c) => c.id === categoriaId) && (
-              <p className="text-xs text-amber-600">
-                Categoria fixa "{categoriaFixaNome}" não encontrada — cadastre em Financeiro › Categorias.
-              </p>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Conta</Label>
-              <Select value={contaId} onValueChange={setContaId}>
-                <SelectTrigger><SelectValue placeholder="Conta" /></SelectTrigger>
-                <SelectContent>
-                  {contas.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Forma pgto</Label>
-              <Select
-                value={formaPagamento}
-                onValueChange={(v) => {
-                  setFormaPagamento(v);
-                  if (v !== "cartao_credito") { setBandeiraCartao(""); setParcelas("1"); }
-                  if (v !== "dinheiro") setValorRecebido("");
-                }}
-                disabled={pagamentoMisto}
-              >
-                <SelectTrigger><SelectValue placeholder="Forma" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                  <SelectItem value="pix">Pix</SelectItem>
-                  <SelectItem value="cartao_credito">Cartão Crédito</SelectItem>
-                  <SelectItem value="cartao_debito">Cartão Débito</SelectItem>
-                  <SelectItem value="boleto">Boleto</SelectItem>
-                  <SelectItem value="convenio">Convênio</SelectItem>
-                  <SelectItem value="transferencia">Transferência</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          {!pagamentoMisto && formaPagamento === "dinheiro" && (
-            <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3">
-              <div className="space-y-1.5">
-                <Label>Valor recebido</Label>
-                <CurrencyInput value={valorRecebido} onChange={setValorRecebido} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Troco</Label>
-                <Input value={formatBRL(trocoDinheiro)} disabled readOnly className="font-medium" />
-              </div>
-              {recebidoNum > 0 && recebidoNum < valorNum && (
-                <p className="col-span-2 text-xs text-destructive">
-                  Valor recebido é menor que o total. Faltam {formatBRL(valorNum - recebidoNum)}.
-                </p>
-              )}
-            </div>
-          )}
-          <div className="flex items-center gap-2 rounded-md border p-3">
-            <Checkbox
-              id="pgto-misto"
-              checked={pagamentoMisto}
-              onCheckedChange={(v) => {
-                const on = !!v;
-                setPagamentoMisto(on);
-                if (on) {
-                  setFormaPagamento("");
-                  setBandeiraCartao(""); setParcelas("1"); setValorRecebido("");
-                }
-              }}
-            />
-            <Label htmlFor="pgto-misto" className="cursor-pointer">Dividir em mais de uma forma de pagamento</Label>
-          </div>
-          {pagamentoMisto && (
-            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-              {pagamentos.map((p, idx) => {
-                const restanteAntes = Math.max(0, valorNum - linhasCalc.slice(0, idx).reduce((s, l) => s + l.pago, 0));
-                const trocoP = linhasCalc[idx].troco;
-                return (
-                  <div key={idx} className="space-y-2 rounded border bg-background p-2">
-                    <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                {descontoAtivo && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-[120px_1fr] gap-2">
                       <div className="space-y-1">
-                        <Label className="text-xs">Forma</Label>
+                        <Label className="text-xs">Tipo</Label>
                         <Select
-                          value={p.forma}
-                          onValueChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, forma: v } : q))}
+                          value={descontoTipo}
+                          onValueChange={(v) => setDescontoTipo(v as "valor" | "percentual")}
                         >
-                          <SelectTrigger><SelectValue placeholder="Forma" /></SelectTrigger>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
                           <SelectContent>
-                            {Object.entries(FORMAS_LABEL).map(([k, v]) => (
-                              <SelectItem key={k} value={k}>{v}</SelectItem>
-                            ))}
+                            <SelectItem value="valor">R$ (valor)</SelectItem>
+                            <SelectItem value="percentual">% (percentual)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">Recebido</Label>
-                        <CurrencyInput
-                          value={p.recebido}
-                          onChange={(v) => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, recebido: v } : q))}
-                          placeholder="0,00"
-                        />
-                      </div>
-                      <div className="flex gap-1">
-                        {restanteAntes > 0 && (
-                          <Button type="button" variant="outline" size="sm" onClick={() => setPagamentos((xs) => xs.map((q, i) => i === idx ? { ...q, recebido: restanteAntes.toFixed(2) } : q))}>
-                            Restante
-                          </Button>
-                        )}
-                        {pagamentos.length > 1 && (
-                          <Button type="button" variant="ghost" size="sm" onClick={() => setPagamentos((xs) => xs.filter((_, i) => i !== idx))}>×</Button>
+                        <Label className="text-xs">
+                          {descontoTipo === "percentual"
+                            ? "Percentual de desconto"
+                            : "Valor do desconto"}
+                        </Label>
+                        {descontoTipo === "percentual" ? (
+                          <Input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step="0.01"
+                            value={descontoInput}
+                            onChange={(e) => setDescontoInput(e.target.value)}
+                            placeholder="Ex: 10"
+                          />
+                        ) : (
+                          <CurrencyInput value={descontoInput} onChange={setDescontoInput} />
                         )}
                       </div>
                     </div>
-                    {p.forma === "dinheiro" && trocoP > 0 && (
-                      <div className="text-xs text-muted-foreground">
-                        Troco: <strong>{formatBRL(trocoP)}</strong>
-                      </div>
-                    )}
+                    <div className="space-y-1">
+                      <Label className="text-xs">Autorizado por *</Label>
+                      <Input
+                        value={descontoAutorizado}
+                        onChange={(e) => setDescontoAutorizado(e.target.value)}
+                        placeholder="Nome do supervisor ou financeiro"
+                        readOnly={!!supervisorInfo}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Motivo (opcional)</Label>
+                      <Input
+                        value={descontoMotivo}
+                        onChange={(e) => setDescontoMotivo(e.target.value)}
+                        placeholder="Ex: paciente recorrente"
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs pt-1 border-t">
+                      <span className="text-muted-foreground">
+                        Valor original: <strong>{formatBRL(origNum)}</strong>
+                      </span>
+                      <span className="text-destructive">- {formatBRL(descontoNum)}</span>
+                      <span className="text-success font-medium">
+                        Total: {formatBRL(Math.max(0, origNum - descontoNum))}
+                      </span>
+                    </div>
                   </div>
-                );
-              })}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setPagamentos((xs) => [...xs, { forma: "", recebido: "" }])}
-              >
-                + Adicionar forma
-              </Button>
-              <div className="flex justify-between text-sm pt-2 border-t">
-                <span>Total pago: <strong>{formatBRL(totalPagoMisto)}</strong></span>
-                <span className={restanteMisto > 0 ? "text-destructive font-medium" : "text-success font-medium"}>
-                  {restanteMisto > 0 ? `Falta: ${formatBRL(restanteMisto)}` : (totalPagoMisto > valorNum ? `Excedente: ${formatBRL(totalPagoMisto - valorNum)}` : "Quitado")}
-                </span>
+                )}
               </div>
-              {trocoMisto > 0 && (
-                <p className="text-xs text-muted-foreground">Troco total: {formatBRL(trocoMisto)}</p>
+            )}
+            <div className="space-y-1.5">
+              <Label>Categoria</Label>
+              <Select
+                value={categoriaId}
+                onValueChange={setCategoriaId}
+                disabled={!!categoriaFixaNome}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categorias.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {categoriaFixaNome && !categorias.some((c) => c.id === categoriaId) && (
+                <p className="text-xs text-amber-600">
+                  Categoria fixa "{categoriaFixaNome}" não encontrada — cadastre em Financeiro ›
+                  Categorias.
+                </p>
               )}
             </div>
-          )}
-          {formaPagamento === "cartao_credito" && (
-            <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Bandeira *</Label>
-                <Select value={bandeiraCartao} onValueChange={setBandeiraCartao}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <Label>Conta</Label>
+                <Select value={contaId} onValueChange={setContaId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Conta" />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="visa">Visa</SelectItem>
-                    <SelectItem value="mastercard">Mastercard</SelectItem>
-                    <SelectItem value="elo">Elo</SelectItem>
-                    <SelectItem value="amex">American Express</SelectItem>
-                    <SelectItem value="hipercard">Hipercard</SelectItem>
-                    <SelectItem value="diners">Diners</SelectItem>
-                    <SelectItem value="outra">Outra</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Parcelas</Label>
-                <Select value={parcelas} onValueChange={setParcelas}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
-                      <SelectItem key={n} value={String(n)}>{n}x {n === 1 ? "(à vista)" : `de ${(Number(valor || 0) / n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`}</SelectItem>
+                    {contas.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.nome}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1.5">
+                <Label>Forma pgto</Label>
+                <Select
+                  value={formaPagamento}
+                  onValueChange={(v) => {
+                    setFormaPagamento(v);
+                    if (v !== "cartao_credito") {
+                      setBandeiraCartao("");
+                      setParcelas("1");
+                    }
+                    if (v !== "dinheiro") setValorRecebido("");
+                  }}
+                  disabled={pagamentoMisto}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Forma" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                    <SelectItem value="pix">Pix</SelectItem>
+                    <SelectItem value="cartao_credito">Cartão Crédito</SelectItem>
+                    <SelectItem value="cartao_debito">Cartão Débito</SelectItem>
+                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="convenio">Convênio</SelectItem>
+                    <SelectItem value="transferencia">Transferência</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          )}
-          <div className="flex items-center gap-2 rounded-md border p-3">
-            <Checkbox id="emitir-nfse" checked={emitirNfse} onCheckedChange={(v) => setEmitirNfse(!!v)} />
-            <Label htmlFor="emitir-nfse" className="cursor-pointer">Emitir nota fiscal (NFS-e) para este lançamento</Label>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Observações</Label>
-            <Textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)} rows={2} />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving} className="gap-2">
-            {saving ? "Salvando..." : (
-              <>
-                <Printer className="h-4 w-4" />
-                Salvar e imprimir
-              </>
+            {!pagamentoMisto && formaPagamento === "dinheiro" && (
+              <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3">
+                <div className="space-y-1.5">
+                  <Label>Valor recebido</Label>
+                  <CurrencyInput value={valorRecebido} onChange={setValorRecebido} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Troco</Label>
+                  <Input
+                    value={formatBRL(trocoDinheiro)}
+                    disabled
+                    readOnly
+                    className="font-medium"
+                  />
+                </div>
+                {recebidoNum > 0 && recebidoNum < valorNum && (
+                  <p className="col-span-2 text-xs text-destructive">
+                    Valor recebido é menor que o total. Faltam {formatBRL(valorNum - recebidoNum)}.
+                  </p>
+                )}
+              </div>
             )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    <SupervisorAuthDialog
-      open={supervisorOpen}
-      onOpenChange={setSupervisorOpen}
-      acao="aplicar desconto"
-      onAuthorized={(info) => {
-        setSupervisorInfo({ userId: info.userId, nome: info.nome, role: info.role });
-        setDescontoAutorizado(info.nome);
-        setDescontoAtivo(true);
-      }}
-    />
+            <div className="flex items-center gap-2 rounded-md border p-3">
+              <Checkbox
+                id="pgto-misto"
+                checked={pagamentoMisto}
+                onCheckedChange={(v) => {
+                  const on = !!v;
+                  setPagamentoMisto(on);
+                  if (on) {
+                    setFormaPagamento("");
+                    setBandeiraCartao("");
+                    setParcelas("1");
+                    setValorRecebido("");
+                  }
+                }}
+              />
+              <Label htmlFor="pgto-misto" className="cursor-pointer">
+                Dividir em mais de uma forma de pagamento
+              </Label>
+            </div>
+            {pagamentoMisto && (
+              <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                {pagamentos.map((p, idx) => {
+                  const restanteAntes = Math.max(
+                    0,
+                    valorNum - linhasCalc.slice(0, idx).reduce((s, l) => s + l.pago, 0),
+                  );
+                  const trocoP = linhasCalc[idx].troco;
+                  return (
+                    <div key={idx} className="space-y-2 rounded border bg-background p-2">
+                      <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Forma</Label>
+                          <Select
+                            value={p.forma}
+                            onValueChange={(v) =>
+                              setPagamentos((xs) =>
+                                xs.map((q, i) => (i === idx ? { ...q, forma: v } : q)),
+                              )
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Forma" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(FORMAS_LABEL).map(([k, v]) => (
+                                <SelectItem key={k} value={k}>
+                                  {v}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Recebido</Label>
+                          <CurrencyInput
+                            value={p.recebido}
+                            onChange={(v) =>
+                              setPagamentos((xs) =>
+                                xs.map((q, i) => (i === idx ? { ...q, recebido: v } : q)),
+                              )
+                            }
+                            placeholder="0,00"
+                          />
+                        </div>
+                        <div className="flex gap-1">
+                          {restanteAntes > 0 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setPagamentos((xs) =>
+                                  xs.map((q, i) =>
+                                    i === idx ? { ...q, recebido: restanteAntes.toFixed(2) } : q,
+                                  ),
+                                )
+                              }
+                            >
+                              Restante
+                            </Button>
+                          )}
+                          {pagamentos.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setPagamentos((xs) => xs.filter((_, i) => i !== idx))}
+                            >
+                              ×
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      {p.forma === "dinheiro" && trocoP > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          Troco: <strong>{formatBRL(trocoP)}</strong>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPagamentos((xs) => [...xs, { forma: "", recebido: "" }])}
+                >
+                  + Adicionar forma
+                </Button>
+                <div className="flex justify-between text-sm pt-2 border-t">
+                  <span>
+                    Total pago: <strong>{formatBRL(totalPagoMisto)}</strong>
+                  </span>
+                  <span
+                    className={
+                      restanteMisto > 0
+                        ? "text-destructive font-medium"
+                        : "text-success font-medium"
+                    }
+                  >
+                    {restanteMisto > 0
+                      ? `Falta: ${formatBRL(restanteMisto)}`
+                      : totalPagoMisto > valorNum
+                        ? `Excedente: ${formatBRL(totalPagoMisto - valorNum)}`
+                        : "Quitado"}
+                  </span>
+                </div>
+                {trocoMisto > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Troco total: {formatBRL(trocoMisto)}
+                  </p>
+                )}
+              </div>
+            )}
+            {formaPagamento === "cartao_credito" && (
+              <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3">
+                <div className="space-y-1.5">
+                  <Label>Bandeira *</Label>
+                  <Select value={bandeiraCartao} onValueChange={setBandeiraCartao}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="visa">Visa</SelectItem>
+                      <SelectItem value="mastercard">Mastercard</SelectItem>
+                      <SelectItem value="elo">Elo</SelectItem>
+                      <SelectItem value="amex">American Express</SelectItem>
+                      <SelectItem value="hipercard">Hipercard</SelectItem>
+                      <SelectItem value="diners">Diners</SelectItem>
+                      <SelectItem value="outra">Outra</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Parcelas</Label>
+                  <Select value={parcelas} onValueChange={setParcelas}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n}x{" "}
+                          {n === 1
+                            ? "(à vista)"
+                            : `de ${(Number(valor || 0) / n).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            <div className="flex items-center gap-2 rounded-md border p-3">
+              <Checkbox
+                id="emitir-nfse"
+                checked={emitirNfse}
+                onCheckedChange={(v) => setEmitirNfse(!!v)}
+              />
+              <Label htmlFor="emitir-nfse" className="cursor-pointer">
+                Emitir nota fiscal (NFS-e) para este lançamento
+              </Label>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Observações</Label>
+              <Textarea
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value)}
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} disabled={saving} className="gap-2">
+              {saving ? (
+                "Salvando..."
+              ) : (
+                <>
+                  <Printer className="h-4 w-4" />
+                  Salvar e imprimir
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <SupervisorAuthDialog
+        open={supervisorOpen}
+        onOpenChange={setSupervisorOpen}
+        acao="aplicar desconto"
+        onAuthorized={(info) => {
+          setSupervisorInfo({ userId: info.userId, nome: info.nome, role: info.role });
+          setDescontoAutorizado(info.nome);
+          setDescontoAtivo(true);
+        }}
+      />
     </>
   );
 }

@@ -36,12 +36,39 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
@@ -166,7 +193,9 @@ function Page() {
   const [fFim, setFFim] = useState<string>(hoje);
   const [fStatus, setFStatus] = useState<"todos" | "aberto" | "pago">("aberto");
   const [fPaciente, setFPaciente] = useState<string>("");
-  const [fOrdem, setFOrdem] = useState<"data_desc" | "data_asc" | "gr" | "paciente_az" | "paciente_za">("data_desc");
+  const [fOrdem, setFOrdem] = useState<
+    "data_desc" | "data_asc" | "gr" | "paciente_az" | "paciente_za"
+  >("data_desc");
   const [fTipo, setFTipo] = useState<"todos" | "medico" | "clinica">("todos");
   const [contas, setContas] = useState<Conta[]>([]);
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -184,7 +213,10 @@ function Page() {
   // NFS-e
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
   const [emitenteId, setEmitenteId] = useState("");
-  const [nfseDialog, setNfseDialog] = useState<{ open: boolean; atend: Atend | null }>({ open: false, atend: null });
+  const [nfseDialog, setNfseDialog] = useState<{ open: boolean; atend: Atend | null }>({
+    open: false,
+    atend: null,
+  });
   const [nfseDesc, setNfseDesc] = useState("");
   const [nfseEmitting, setNfseEmitting] = useState(false);
   const emitirNfseFn = useServerFn(emitirNfse);
@@ -218,7 +250,9 @@ function Page() {
       return;
     }
     const pacNome = pacMap.get(a.paciente_id) ?? a.paciente_nome_extra ?? "";
-    setNfseDesc(`${a.procedimento ?? "Serviços médicos prestados"}${pacNome ? ` — ${pacNome}` : ""}`.trim());
+    setNfseDesc(
+      `${a.procedimento ?? "Serviços médicos prestados"}${pacNome ? ` — ${pacNome}` : ""}`.trim(),
+    );
     setNfseDialog({ open: true, atend: a });
   };
 
@@ -532,7 +566,10 @@ function Page() {
           if (med.tipo_repasse === "valor" && med.valor_repasse_padrao != null) {
             return { total: base, repasse: Math.min(Number(med.valor_repasse_padrao), base) };
           }
-          return { total: base, repasse: +((base * Number(med.percentual_repasse_padrao ?? 0)) / 100).toFixed(2) };
+          return {
+            total: base,
+            repasse: +((base * Number(med.percentual_repasse_padrao ?? 0)) / 100).toFixed(2),
+          };
         }
         return { total: base, repasse: 0 };
       }
@@ -589,7 +626,7 @@ function Page() {
       .eq("clinica_id", clinicaAtual.clinica_id)
       .gte("data", fIni)
       .lte("data", fFim);
-    let qAgenda = supabase
+    const qAgenda = supabase
       .from("fin_lancamentos")
       .select(
         "id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_forma_pagamento, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
@@ -691,7 +728,8 @@ function Page() {
     });
     // Filtro client-side por médico para os registros da agenda (cobre os
     // lançamentos cujo medico_id está nulo e vem do agendamento).
-    const agendFiltered = fMedico === "todos" ? agend : agend.filter((x) => x.medico_id === fMedico);
+    const agendFiltered =
+      fMedico === "todos" ? agend : agend.filter((x) => x.medico_id === fMedico);
     let unif = [...manuais, ...agendFiltered].sort((a, b) => (a.data < b.data ? 1 : -1));
     if (fStatus === "aberto") unif = unif.filter((x) => !x.repasse_pago);
     else if (fStatus === "pago") unif = unif.filter((x) => x.repasse_pago);
@@ -704,7 +742,9 @@ function Page() {
     const [m, p, c] = await Promise.all([
       supabase
         .from("medicos")
-        .select("id, nome, aceita_cartao_beneficios, cb_tipo_repasse, cb_valor_repasse, cb_percentual_repasse")
+        .select(
+          "id, nome, aceita_cartao_beneficios, cb_tipo_repasse, cb_valor_repasse, cb_percentual_repasse",
+        )
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true)
         .order("nome"),
@@ -722,10 +762,16 @@ function Page() {
         .eq("ativo", true)
         .order("nome"),
     ]);
-    const { data: rep } = await supabase.rpc("medicos_repasse_lista", { _clinica_id: clinicaAtual.clinica_id });
+    const { data: rep } = await supabase.rpc("medicos_repasse_lista", {
+      _clinica_id: clinicaAtual.clinica_id,
+    });
     const repMap = new Map<
       string,
-      { tipo_repasse: string; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }
+      {
+        tipo_repasse: string;
+        percentual_repasse_padrao: number | null;
+        valor_repasse_padrao: number | null;
+      }
     >();
     for (const r of (rep as any[] | null) ?? []) repMap.set(r.id, r);
     const merged: Medico[] = ((m.data ?? []) as any[]).map((x) => {
@@ -892,14 +938,19 @@ function Page() {
 
   const estornar = async (a: Atend) => {
     if (a.repasse_pago) {
-      toast.error("Repasse já pago — não é possível estornar. Estorne o pagamento do repasse primeiro.");
+      toast.error(
+        "Repasse já pago — não é possível estornar. Estorne o pagamento do repasse primeiro.",
+      );
       return;
     }
     if (a.origem !== "agenda") {
-      toast.error("Apenas atendimentos vindos da agenda podem ser estornados (voltam para 'Agendado').");
+      toast.error(
+        "Apenas atendimentos vindos da agenda podem ser estornados (voltam para 'Agendado').",
+      );
       return;
     }
-    if (!confirm("Estornar este atendimento? O agendamento voltará para o status 'Agendado'.")) return;
+    if (!confirm("Estornar este atendimento? O agendamento voltará para o status 'Agendado'."))
+      return;
     const { data: lanc, error: eLanc } = await supabase
       .from("fin_lancamentos")
       .select("agendamento_id, valor, descricao")
@@ -921,7 +972,10 @@ function Page() {
       .maybeSingle();
     // 1) Remove os movimentos de caixa associados a este lançamento
     //    (recebimento e eventual abertura automática não são tocados).
-    const { error: eMov } = await supabase.from("caixa_movimentos").delete().eq("lancamento_id", a.id);
+    const { error: eMov } = await supabase
+      .from("caixa_movimentos")
+      .delete()
+      .eq("lancamento_id", a.id);
     if (eMov) {
       mostrarErro(eMov, "falha ao reverter caixa");
       return;
@@ -963,7 +1017,9 @@ function Page() {
     } catch {
       /* auditoria best-effort */
     }
-    toast.success("Atendimento estornado — receita removida e agendamento liberado para nova cobrança.");
+    toast.success(
+      "Atendimento estornado — receita removida e agendamento liberado para nova cobrança.",
+    );
     await load();
   };
 
@@ -974,7 +1030,8 @@ function Page() {
     const base = !q
       ? items
       : items.filter((a) => {
-          const nome = (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "";
+          const nome =
+            (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "";
           return norm(nome).includes(q);
         });
     const baseTipo =
@@ -984,7 +1041,9 @@ function Page() {
           ? base.filter((a) => (Number(a.valor_medico) || 0) > 0)
           : base.filter((a) => (Number(a.valor_medico) || 0) === 0);
     const nomeDe = (a: Atend) =>
-      norm(((a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "").trim());
+      norm(
+        ((a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "").trim(),
+      );
     const grDe = (a: Atend) => a.agendamento_inicio ?? a.data ?? "";
     const arr = [...baseTipo];
     switch (fOrdem) {
@@ -1032,8 +1091,11 @@ function Page() {
 
   const isAtendido = (a: Atend) =>
     a.origem === "manual" ? a.status === "realizado" : a.agendamento_status === "realizado";
-  const selectables = filteredItems.filter((a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0 && isAtendido(a));
-  const allSelected = selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
+  const selectables = filteredItems.filter(
+    (a) => !a.repasse_pago && (a.valor_medico ?? 0) > 0 && isAtendido(a),
+  );
+  const allSelected =
+    selectables.length > 0 && selectables.every((a) => sel.has(`${a.origem}:${a.id}`));
   const toggleAll = () => {
     if (allSelected) setSel(new Set());
     else setSel(new Set(selectables.map((a) => `${a.origem}:${a.id}`)));
@@ -1092,7 +1154,9 @@ function Page() {
         }
       }
       // Mesma validação para atendimentos manuais (fin_atendimentos)
-      const manualBloq = selectedItems.filter((x) => x.origem === "manual" && x.status !== "realizado");
+      const manualBloq = selectedItems.filter(
+        (x) => x.origem === "manual" && x.status !== "realizado",
+      );
       if (manualBloq.length) {
         toast.error(
           `Não é possível pagar o repasse: ${manualBloq.length} atendimento(s) manual(is) não estão com status 'realizado'.`,
@@ -1177,7 +1241,9 @@ function Page() {
                     <div className="font-medium flex flex-wrap items-center gap-1.5">
                       <span>{s.paciente_nome ?? "—"}</span>
                       {s.valor != null && (
-                        <span className="text-muted-foreground font-normal">• {fmt(Number(s.valor))}</span>
+                        <span className="text-muted-foreground font-normal">
+                          • {fmt(Number(s.valor))}
+                        </span>
                       )}
                       <Badge
                         variant="outline"
@@ -1191,14 +1257,21 @@ function Page() {
                         {s.tipo === "devolucao" ? "Devolução" : "Erro de caixa"}
                       </Badge>
                     </div>
-                    {s.descricao && <div className="text-xs text-muted-foreground">{s.descricao}</div>}
+                    {s.descricao && (
+                      <div className="text-xs text-muted-foreground">{s.descricao}</div>
+                    )}
                     <div className="text-xs italic text-rose-800/80 mt-0.5">"{s.motivo}"</div>
                     {s.tipo === "devolucao" && (s.data_pagamento_original || s.data_estorno) && (
                       <div className="text-[10px] text-muted-foreground">
                         {s.data_pagamento_original && (
-                          <>Pago em {new Date(s.data_pagamento_original).toLocaleDateString("pt-BR")} • </>
+                          <>
+                            Pago em{" "}
+                            {new Date(s.data_pagamento_original).toLocaleDateString("pt-BR")} •{" "}
+                          </>
                         )}
-                        {s.data_estorno && <>Devolver em {new Date(s.data_estorno).toLocaleDateString("pt-BR")}</>}
+                        {s.data_estorno && (
+                          <>Devolver em {new Date(s.data_estorno).toLocaleDateString("pt-BR")}</>
+                        )}
                       </div>
                     )}
                     <div className="text-[10px] text-muted-foreground">
@@ -1209,7 +1282,12 @@ function Page() {
                     <Button size="sm" className="h-7 text-xs" onClick={() => aprovarSolicitacao(s)}>
                       <CheckCircle2 className="h-3 w-3 mr-1" /> Aprovar e estornar
                     </Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => rejeitarSolicitacao(s)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => rejeitarSolicitacao(s)}
+                    >
                       Recusar
                     </Button>
                   </div>
@@ -1277,7 +1355,8 @@ function Page() {
           {!isMedicoOnly && (
             <Button onClick={openPay} disabled={!selectedItems.length}>
               <Wallet className="h-4 w-4 mr-2" />
-              Pagar repasse{selectedItems.length ? ` (${selectedItems.length} • ${fmt(selectedTotal)})` : ""}
+              Pagar repasse
+              {selectedItems.length ? ` (${selectedItems.length} • ${fmt(selectedTotal)})` : ""}
             </Button>
           )}
           <Dialog open={open} onOpenChange={setOpen}>
@@ -1306,7 +1385,10 @@ function Page() {
                   </div>
                   <div className="space-y-2">
                     <Label>Status</Label>
-                    <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                    <Select
+                      value={form.status}
+                      onValueChange={(v) => setForm({ ...form, status: v })}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -1366,7 +1448,10 @@ function Page() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>Valor total *</Label>
-                    <CurrencyInput value={form.valor_total} onChange={(v) => setForm({ ...form, valor_total: v })} />
+                    <CurrencyInput
+                      value={form.valor_total}
+                      onChange={(v) => setForm({ ...form, valor_total: v })}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Forma de pagamento</Label>
@@ -1423,15 +1508,28 @@ function Page() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">De</Label>
-              <Input type="date" className="h-9" value={fIni} onChange={(e) => setFIni(e.target.value)} />
+              <Input
+                type="date"
+                className="h-9"
+                value={fIni}
+                onChange={(e) => setFIni(e.target.value)}
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Até</Label>
-              <Input type="date" className="h-9" value={fFim} onChange={(e) => setFFim(e.target.value)} />
+              <Input
+                type="date"
+                className="h-9"
+                value={fFim}
+                onChange={(e) => setFFim(e.target.value)}
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Status repasse</Label>
-              <Select value={fStatus} onValueChange={(v) => setFStatus(v as "todos" | "aberto" | "pago")}>
+              <Select
+                value={fStatus}
+                onValueChange={(v) => setFStatus(v as "todos" | "aberto" | "pago")}
+              >
                 <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
@@ -1444,7 +1542,10 @@ function Page() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Tipo</Label>
-              <Select value={fTipo} onValueChange={(v) => setFTipo(v as "todos" | "medico" | "clinica")}>
+              <Select
+                value={fTipo}
+                onValueChange={(v) => setFTipo(v as "todos" | "medico" | "clinica")}
+              >
                 <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
@@ -1476,13 +1577,19 @@ function Page() {
               <div className="flex gap-1.5 min-w-[140px]">
                 <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-primary/10 text-center h-9 flex items-center justify-center">
                   <div>
-                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">A receber</div>
-                    <div className="text-xs font-bold text-primary leading-tight">{fmt(totais.aReceber)}</div>
+                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">
+                      A receber
+                    </div>
+                    <div className="text-xs font-bold text-primary leading-tight">
+                      {fmt(totais.aReceber)}
+                    </div>
                   </div>
                 </div>
                 <div className="flex-1 rounded-lg border-2 px-2 py-1 text-center h-9 flex items-center justify-center">
                   <div>
-                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">Recebido</div>
+                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">
+                      Recebido
+                    </div>
                     <div className="text-xs font-bold leading-tight">{fmt(totais.pago)}</div>
                   </div>
                 </div>
@@ -1491,14 +1598,22 @@ function Page() {
               <div className="flex gap-1.5 min-w-[140px]">
                 <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-amber-500/10 text-center h-9 flex items-center justify-center">
                   <div>
-                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">A pagar</div>
-                    <div className="text-xs font-bold text-amber-600 leading-tight">{fmt(totais.aReceber)}</div>
+                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">
+                      A pagar
+                    </div>
+                    <div className="text-xs font-bold text-amber-600 leading-tight">
+                      {fmt(totais.aReceber)}
+                    </div>
                   </div>
                 </div>
                 <div className="flex-1 rounded-lg border-2 px-2 py-1 bg-emerald-500/10 text-center h-9 flex items-center justify-center">
                   <div>
-                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">Pago</div>
-                    <div className="text-xs font-bold text-emerald-600 leading-tight">{fmt(totais.pago)}</div>
+                    <div className="text-[8px] text-muted-foreground uppercase leading-tight">
+                      Pago
+                    </div>
+                    <div className="text-xs font-bold text-emerald-600 leading-tight">
+                      {fmt(totais.pago)}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1522,36 +1637,58 @@ function Page() {
                 <TableRow className="bg-muted/50">
                   {!isMedicoOnly && (
                     <TableHead className="w-8 px-2">
-                      <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
+                      <Checkbox
+                        checked={allSelected}
+                        onCheckedChange={toggleAll}
+                        aria-label="Selecionar todos"
+                      />
                     </TableHead>
                   )}
-                  <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">Data</TableHead>
+                  <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">
+                    Data
+                  </TableHead>
                   <TableHead className="text-[11px] font-medium px-2">Médico</TableHead>
                   <TableHead className="text-[11px] font-medium px-2">Paciente</TableHead>
                   <TableHead className="text-[11px] font-medium px-2">Serviço</TableHead>
-                  {!isMedicoOnly && <TableHead className="text-right text-[11px] font-medium px-2">Total</TableHead>}
+                  {!isMedicoOnly && (
+                    <TableHead className="text-right text-[11px] font-medium px-2">Total</TableHead>
+                  )}
                   <TableHead className="text-right text-[11px] font-medium px-2">
                     {isMedicoOnly ? "Repasse" : "Médico"}
                   </TableHead>
-                  {!isMedicoOnly && <TableHead className="text-right text-[11px] font-medium px-2">Clínica</TableHead>}
+                  {!isMedicoOnly && (
+                    <TableHead className="text-right text-[11px] font-medium px-2">
+                      Clínica
+                    </TableHead>
+                  )}
                   <TableHead className="text-center text-[11px] font-medium px-2">Status</TableHead>
                   <TableHead className="text-center text-[11px] font-medium px-2">Pgto</TableHead>
                   <TableHead className="text-center text-[11px] font-medium px-2">Laudo</TableHead>
-                  {!isMedicoOnly && <TableHead className="text-center text-[11px] font-medium px-2">Ações</TableHead>}
+                  {!isMedicoOnly && (
+                    <TableHead className="text-center text-[11px] font-medium px-2">
+                      Ações
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredItems.map((a, idx) => {
                   const medicoNome = a.medico_id ? (medMap.get(a.medico_id) ?? "—") : "—";
                   const pacienteNome =
-                    (a.paciente_id ? pacMap.get(a.paciente_id) : null) ?? a.paciente_nome_extra ?? "—";
+                    (a.paciente_id ? pacMap.get(a.paciente_id) : null) ??
+                    a.paciente_nome_extra ??
+                    "—";
                   const procedimentoNome = a.procedimento ?? "—";
 
                   // Define as cores das linhas para o efeito zebrado acompanhar a coluna fixa
-                  const rowBg = idx % 2 === 0 ? "bg-background" : "bg-slate-50 dark:bg-slate-900/40";
+                  const rowBg =
+                    idx % 2 === 0 ? "bg-background" : "bg-slate-50 dark:bg-slate-900/40";
 
                   return (
-                    <TableRow key={`${a.origem}:${a.id}`} className={cn("hover:bg-muted/30 transition-colors", rowBg)}>
+                    <TableRow
+                      key={`${a.origem}:${a.id}`}
+                      className={cn("hover:bg-muted/30 transition-colors", rowBg)}
+                    >
                       {!isMedicoOnly && (
                         <TableCell className="px-2">
                           {!a.repasse_pago && (a.valor_medico ?? 0) > 0 ? (
@@ -1563,7 +1700,10 @@ function Page() {
                                 className="h-4 w-4"
                               />
                             ) : (
-                              <span title="Aguardando atendimento" className="text-[10px] text-amber-600">
+                              <span
+                                title="Aguardando atendimento"
+                                className="text-[10px] text-amber-600"
+                              >
                                 ⏳
                               </span>
                             )
@@ -1578,7 +1718,10 @@ function Page() {
                       <TableCell className="text-xs max-w-[120px] truncate px-2" title={medicoNome}>
                         {medicoNome}
                       </TableCell>
-                      <TableCell className="text-xs font-medium max-w-[120px] truncate px-2" title={pacienteNome}>
+                      <TableCell
+                        className="text-xs font-medium max-w-[120px] truncate px-2"
+                        title={pacienteNome}
+                      >
                         {pacienteNome}
                       </TableCell>
                       <TableCell
@@ -1638,8 +1781,10 @@ function Page() {
                                 Emitido
                               </Badge>
                             );
-                          if (!exigeLaudo) return <span className="text-muted-foreground text-[10px]">—</span>;
-                          if (!podeEstornar) return <span className="text-amber-600 text-[10px]">Pendente</span>;
+                          if (!exigeLaudo)
+                            return <span className="text-muted-foreground text-[10px]">—</span>;
+                          if (!podeEstornar)
+                            return <span className="text-amber-600 text-[10px]">Pendente</span>;
                           return (
                             <Button
                               variant="outline"
@@ -1663,7 +1808,9 @@ function Page() {
                         >
                           {a.origem === "agenda" ? (
                             <div className="flex items-center justify-end gap-0.5">
-                              <span className="text-[9px] text-muted-foreground uppercase mr-1">Agenda</span>
+                              <span className="text-[9px] text-muted-foreground uppercase mr-1">
+                                Agenda
+                              </span>
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -1708,10 +1855,20 @@ function Page() {
                               >
                                 <Send className="h-3.5 w-3.5" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(a)}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => openEdit(a)}
+                              >
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => remove(a)}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => remove(a)}
+                              >
                                 <Trash2 className="h-3.5 w-3.5 text-destructive" />
                               </Button>
                             </div>
@@ -1808,7 +1965,8 @@ function Page() {
                     (laudoTarget.paciente_id ? pacMap.get(laudoTarget.paciente_id) : "—")}
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Serviço:</span> {laudoTarget.procedimento ?? "—"}
+                  <span className="text-muted-foreground">Serviço:</span>{" "}
+                  {laudoTarget.procedimento ?? "—"}
                 </div>
               </div>
             )}
@@ -1838,7 +1996,8 @@ function Page() {
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Ao confirmar, o sistema gera automaticamente um lançamento de repasse para o laudador no valor informado.
+              Ao confirmar, o sistema gera automaticamente um lançamento de repasse para o laudador
+              no valor informado.
             </p>
           </div>
           <DialogFooter>
@@ -1888,7 +2047,8 @@ function Page() {
                   </b>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Serviço:</span> {nfseDialog.atend.procedimento ?? "—"}
+                  <span className="text-muted-foreground">Serviço:</span>{" "}
+                  {nfseDialog.atend.procedimento ?? "—"}
                 </div>
                 <div>
                   <span className="text-muted-foreground">Valor:</span>{" "}
@@ -1968,7 +2128,9 @@ function MedicoCombobox({
                   setOpen(false);
                 }}
               >
-                <Check className={cn("mr-2 h-4 w-4", value === "todos" ? "opacity-100" : "opacity-0")} />
+                <Check
+                  className={cn("mr-2 h-4 w-4", value === "todos" ? "opacity-100" : "opacity-0")}
+                />
                 Todos os médicos
               </CommandItem>
               {medicos.map((m) => (
@@ -1981,7 +2143,9 @@ function MedicoCombobox({
                   }}
                   className="uppercase"
                 >
-                  <Check className={cn("mr-2 h-4 w-4", value === m.id ? "opacity-100" : "opacity-0")} />
+                  <Check
+                    className={cn("mr-2 h-4 w-4", value === m.id ? "opacity-100" : "opacity-0")}
+                  />
                   {m.nome}
                 </CommandItem>
               ))}

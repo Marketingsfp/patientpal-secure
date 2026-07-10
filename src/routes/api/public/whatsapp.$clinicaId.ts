@@ -8,7 +8,11 @@ import {
   gerarRespostaNina,
 } from "@/lib/whatsapp.server";
 
-function verifySignature(appSecret: string, rawBody: string, signatureHeader: string | null): boolean {
+function verifySignature(
+  appSecret: string,
+  rawBody: string,
+  signatureHeader: string | null,
+): boolean {
   if (!signatureHeader || !signatureHeader.startsWith("sha256=")) return false;
   const expected = createHmac("sha256", appSecret).update(rawBody).digest("hex");
   const received = signatureHeader.slice("sha256=".length);

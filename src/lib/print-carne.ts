@@ -53,33 +53,41 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
     { data: planoFallback },
     { data: dependentesRows },
   ] = await Promise.all([
-      supabase
-        .from("contrato_mensalidades")
-        .select("id, numero_parcela, vencimento, valor, status, pago_em, forma_pagamento")
-        .eq("contrato_id", contratoId)
-        .order("numero_parcela"),
-      supabase
-        .from("pacientes")
-        .select("nome, cpf, telefone")
-        .eq("id", contrato.paciente_id as string)
-        .maybeSingle(),
-      supabase
-        .from("clinicas")
-        .select("nome, cnpj, telefone, endereco, cidade, estado")
-        .eq("id", contrato.clinica_id as string)
-        .maybeSingle(),
-      contrato.convenio_id
-        ? supabase.from("cb_convenios").select("nome").eq("id", contrato.convenio_id as string).maybeSingle()
-        : Promise.resolve({ data: null as { nome: string | null } | null }),
-      contrato.plano_id
-        ? supabase.from("planos_assinatura").select("nome").eq("id", contrato.plano_id as string).maybeSingle()
-        : Promise.resolve({ data: null as { nome: string | null } | null }),
-      supabase
-        .from("contrato_dependentes")
-        .select("paciente_id, paciente_nome")
-        .eq("contrato_id", contratoId)
-        .eq("ativo", true),
-    ]);
+    supabase
+      .from("contrato_mensalidades")
+      .select("id, numero_parcela, vencimento, valor, status, pago_em, forma_pagamento")
+      .eq("contrato_id", contratoId)
+      .order("numero_parcela"),
+    supabase
+      .from("pacientes")
+      .select("nome, cpf, telefone")
+      .eq("id", contrato.paciente_id as string)
+      .maybeSingle(),
+    supabase
+      .from("clinicas")
+      .select("nome, cnpj, telefone, endereco, cidade, estado")
+      .eq("id", contrato.clinica_id as string)
+      .maybeSingle(),
+    contrato.convenio_id
+      ? supabase
+          .from("cb_convenios")
+          .select("nome")
+          .eq("id", contrato.convenio_id as string)
+          .maybeSingle()
+      : Promise.resolve({ data: null as { nome: string | null } | null }),
+    contrato.plano_id
+      ? supabase
+          .from("planos_assinatura")
+          .select("nome")
+          .eq("id", contrato.plano_id as string)
+          .maybeSingle()
+      : Promise.resolve({ data: null as { nome: string | null } | null }),
+    supabase
+      .from("contrato_dependentes")
+      .select("paciente_id, paciente_nome")
+      .eq("contrato_id", contratoId)
+      .eq("ativo", true),
+  ]);
 
   const convenioNome = convenio?.nome ?? planoFallback?.nome ?? "—";
   const depPacienteIds = (dependentesRows ?? [])
@@ -91,16 +99,18 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   const cpfMap = new Map((depPacientes ?? []).map((p: any) => [p.id, p.cpf as string | null]));
   const dependentes = (dependentesRows ?? []).map((d: any) => ({
     nome: d.paciente_nome as string,
-    cpf: d.paciente_id ? cpfMap.get(d.paciente_id) ?? null : null,
+    cpf: d.paciente_id ? (cpfMap.get(d.paciente_id) ?? null) : null,
   }));
   const pessoasConvenio = 1 + dependentes.length;
 
-  const titularNomes = `<span class="val">${esc(contrato.paciente_nome)}</span>` +
+  const titularNomes =
+    `<span class="val">${esc(contrato.paciente_nome)}</span>` +
     (dependentes.length
       ? `<span class="lab" style="margin-top:6px;">Dependentes</span>` +
         dependentes.map((d) => `<span class="val">${esc(d.nome)}</span>`).join("")
       : "");
-  const titularCpfs = `<span class="val">${esc(paciente?.cpf ?? "—")}</span>` +
+  const titularCpfs =
+    `<span class="val">${esc(paciente?.cpf ?? "—")}</span>` +
     (dependentes.length
       ? `<span class="lab" style="margin-top:6px;">&nbsp;</span>` +
         dependentes.map((d) => `<span class="val">${esc(d.cpf ?? "—")}</span>`).join("")
@@ -153,9 +163,11 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         </div>
         <div class="ficha-rodape">
           <div class="campo-manual">
-            ${p.status === "pago"
-              ? `<span class="val" style="font-weight:600;font-size:11px;">${fmtD(p.pago_em)}</span>`
-              : `<span class="linha-assin"></span>`}
+            ${
+              p.status === "pago"
+                ? `<span class="val" style="font-weight:600;font-size:11px;">${fmtD(p.pago_em)}</span>`
+                : `<span class="linha-assin"></span>`
+            }
             <span class="lab" style="text-align:center;display:block;margin-top:2px;">Data de pagamento</span>
           </div>
           <div class="campo-manual assinatura">
@@ -260,7 +272,8 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         if (!ini || isNaN(ini.getTime())) return "—";
         const fim = new Date(ini);
         fim.setMonth(fim.getMonth() + ((parcelas ?? []).length || 12));
-        const f = (d: Date) => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+        const f = (d: Date) =>
+          `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
         return `${f(ini)} à ${f(fim)}`;
       })()}</span></div>
       <div class="cell" style="display:flex;flex-direction:column;justify-content:flex-end;">

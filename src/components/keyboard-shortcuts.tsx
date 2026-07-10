@@ -97,7 +97,12 @@ export function KeyboardShortcuts() {
           return;
         }
         // Ctrl+F → buscar paciente (só fora de input)
-        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "f" && !isTyping(e.target)) {
+        if (
+          (e.ctrlKey || e.metaKey) &&
+          !e.shiftKey &&
+          e.key.toLowerCase() === "f" &&
+          !isTyping(e.target)
+        ) {
           if (focusQuickSearch()) e.preventDefault();
           return;
         }
@@ -105,7 +110,7 @@ export function KeyboardShortcuts() {
         if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "s") {
           const dialog = (e.target as HTMLElement | null)?.closest('[role="dialog"]');
           const primary = (dialog ?? document).querySelector<HTMLButtonElement>(
-            "button[data-primary]:not([disabled])"
+            "button[data-primary]:not([disabled])",
           );
           if (primary) {
             e.preventDefault();
@@ -124,12 +129,18 @@ export function KeyboardShortcuts() {
           return;
         }
         // Enter / Shift+Enter → navegar entre [data-turbo-field]
-        if ((e.key === "Enter") && (e.target instanceof HTMLElement) && e.target.hasAttribute("data-turbo-field")) {
+        if (
+          e.key === "Enter" &&
+          e.target instanceof HTMLElement &&
+          e.target.hasAttribute("data-turbo-field")
+        ) {
           // se o input está dentro de um combobox aberto, deixa o Enter selecionar
-          const inCombobox = e.target.closest('[role="combobox"], [role="listbox"], [aria-expanded="true"]');
+          const inCombobox = e.target.closest(
+            '[role="combobox"], [role="listbox"], [aria-expanded="true"]',
+          );
           if (!inCombobox) {
             const fields = Array.from(
-              document.querySelectorAll<HTMLElement>("[data-turbo-field]:not([disabled])")
+              document.querySelectorAll<HTMLElement>("[data-turbo-field]:not([disabled])"),
             );
             const idx = fields.indexOf(e.target);
             if (idx >= 0) {
@@ -149,7 +160,7 @@ export function KeyboardShortcuts() {
       if (e.altKey && !e.ctrlKey && !e.metaKey && e.key >= "1" && e.key <= "9") {
         const idx = Number(e.key) - 1;
         const links = Array.from(
-          document.querySelectorAll<HTMLAnchorElement>("aside [data-nav-to]")
+          document.querySelectorAll<HTMLAnchorElement>("aside [data-nav-to]"),
         );
         const target = links[idx];
         if (target?.dataset.navTo) {
@@ -169,7 +180,7 @@ export function KeyboardShortcuts() {
         // se já estiver focado num botão, deixa o comportamento padrão
         if (tgt.tagName === "BUTTON") return;
         const primary = dialog.querySelector<HTMLButtonElement>(
-          "button[data-primary]:not([disabled])"
+          "button[data-primary]:not([disabled])",
         );
         if (primary) {
           e.preventDefault();
@@ -237,9 +248,7 @@ function ShortcutsHelpDialog({
       },
       {
         title: "Recepção / Filas",
-        items: [
-          { keys: ["C"], desc: "Chamar próxima senha" },
-        ],
+        items: [{ keys: ["C"], desc: "Chamar próxima senha" }],
       },
       {
         title: "Caixa — Cobrança",
@@ -250,7 +259,7 @@ function ShortcutsHelpDialog({
         ],
       },
     ],
-    []
+    [],
   );
 
   return (
@@ -265,10 +274,7 @@ function ShortcutsHelpDialog({
               <h3 className="text-sm font-semibold mb-2">{g.title}</h3>
               <ul className="space-y-1.5">
                 {g.items.map((it, i) => (
-                  <li
-                    key={i}
-                    className="flex items-center justify-between text-sm"
-                  >
+                  <li key={i} className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">{it.desc}</span>
                     <span className="flex items-center gap-1">
                       {it.keys.map((k, j) => (

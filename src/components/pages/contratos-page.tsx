@@ -31,10 +31,30 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -59,7 +79,8 @@ import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { EditarPacienteRapidoDialog } from "@/components/contratos/editar-paciente-rapido-dialog";
 
-const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const BRL = (v: number) =>
+  Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) =>
   s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—";
 const TAXA_BOLETO = 3.5;
@@ -75,7 +96,13 @@ type Convenio = {
   vigencia_meses: number;
   beneficios: string | null;
 };
-type Faixa = { id: string; convenio_id: string; vidas_de: number; vidas_ate: number | null; valor_mensal: number };
+type Faixa = {
+  id: string;
+  convenio_id: string;
+  vidas_de: number;
+  vidas_ate: number | null;
+  valor_mensal: number;
+};
 type Beneficio = {
   id: string;
   convenio_id: string;
@@ -188,7 +215,9 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    const base = !s ? list : list.filter((c) => `${c.numero} ${c.paciente_nome}`.toLowerCase().includes(s));
+    const base = !s
+      ? list
+      : list.filter((c) => `${c.numero} ${c.paciente_nome}`.toLowerCase().includes(s));
     if (!sortPaciente) return base;
     const ordered = [...base].sort((a, b) =>
       a.paciente_nome.localeCompare(b.paciente_nome, "pt-BR", { sensitivity: "base" }),
@@ -257,7 +286,9 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
               <TableHead>
                 <button
                   type="button"
-                  onClick={() => setSortPaciente((s) => (s === "asc" ? "desc" : s === "desc" ? null : "asc"))}
+                  onClick={() =>
+                    setSortPaciente((s) => (s === "asc" ? "desc" : s === "desc" ? null : "asc"))
+                  }
                   className="inline-flex items-center gap-1 font-medium hover:text-primary"
                   title="Ordenar por paciente"
                 >
@@ -313,7 +344,9 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                   <Badge
                     variant={c.status === "ativo" ? "default" : "secondary"}
                     className={
-                      c.status === "cancelado" ? "bg-red-600 text-black hover:bg-red-600" : undefined
+                      c.status === "cancelado"
+                        ? "bg-red-600 text-black hover:bg-red-600"
+                        : undefined
                     }
                   >
                     {c.status}
@@ -414,8 +447,10 @@ function NovoContratoForm({
     const d = new Date(dataInicio + "T00:00:00").getTime();
     const hoje = new Date(dataHoje + "T00:00:00").getTime();
     const dias = (d - hoje) / 86400000;
-    if (dias < -7) return `Data de início está ${Math.abs(Math.round(dias))} dias no passado — confirme.`;
-    if (dias > 180) return `Data de início está muito no futuro (${Math.round(dias)} dias). Confirme.`;
+    if (dias < -7)
+      return `Data de início está ${Math.abs(Math.round(dias))} dias no passado — confirme.`;
+    if (dias > 180)
+      return `Data de início está muito no futuro (${Math.round(dias)} dias). Confirme.`;
     return null;
   })();
 
@@ -465,8 +500,17 @@ function NovoContratoForm({
         return;
       }
       const [fx, bn] = await Promise.all([
-        supabase.from("cb_convenio_faixas").select("*").eq("convenio_id", convenioId).order("vidas_de"),
-        supabase.from("cb_beneficios").select("*").eq("convenio_id", convenioId).eq("ativo", true).order("nome"),
+        supabase
+          .from("cb_convenio_faixas")
+          .select("*")
+          .eq("convenio_id", convenioId)
+          .order("vidas_de"),
+        supabase
+          .from("cb_beneficios")
+          .select("*")
+          .eq("convenio_id", convenioId)
+          .eq("ativo", true)
+          .order("nome"),
       ]);
       setFaixas((fx.data ?? []) as Faixa[]);
       setBeneficios((bn.data ?? []) as Beneficio[]);
@@ -483,7 +527,9 @@ function NovoContratoForm({
     }
     const vidasAtuais = (titular ? 1 : 0) + deps.length;
     const inicial =
-      faixas.find((f) => vidasAtuais >= f.vidas_de && (f.vidas_ate == null || vidasAtuais <= f.vidas_ate)) ?? faixas[0];
+      faixas.find(
+        (f) => vidasAtuais >= f.vidas_de && (f.vidas_ate == null || vidasAtuais <= f.vidas_ate),
+      ) ?? faixas[0];
     setFaixaId(inicial.id);
     setValor(Number(inicial.valor_mensal));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -511,7 +557,9 @@ function NovoContratoForm({
     const max = Number(convenio.max_dependentes ?? 0) || 0;
     if (deps.length >= max) {
       return toast.error(
-        max === 0 ? "Este convênio não permite dependentes." : `Limite de ${max} dependentes atingido.`,
+        max === 0
+          ? "Este convênio não permite dependentes."
+          : `Limite de ${max} dependentes atingido.`,
       );
     }
     if (deps.find((d) => d.id === p.id) || titular?.id === p.id) return;
@@ -529,7 +577,9 @@ function NovoContratoForm({
     const maxDep = Number(convenio.max_dependentes ?? 0) || 0;
     if (deps.length > maxDep) {
       return toast.error(
-        maxDep === 0 ? "Este convênio não permite dependentes." : `Limite de ${maxDep} dependentes excedido.`,
+        maxDep === 0
+          ? "Este convênio não permite dependentes."
+          : `Limite de ${maxDep} dependentes excedido.`,
       );
     }
     if (!emailValido(titular.email))
@@ -544,7 +594,9 @@ function NovoContratoForm({
     const semEmailDeps = deps.filter((d) => !d.email);
     if (
       semEmailDeps.length > 0 &&
-      !confirm(`${semEmailDeps.length} dependente(s) sem e-mail não conseguirão acessar o app. Continuar mesmo assim?`)
+      !confirm(
+        `${semEmailDeps.length} dependente(s) sem e-mail não conseguirão acessar o app. Continuar mesmo assim?`,
+      )
     )
       return;
     if (!titular.face_descriptor || titular.face_descriptor.length === 0) {
@@ -628,7 +680,9 @@ function NovoContratoForm({
     });
     const { error: mensErr } = await supabase.from("contrato_mensalidades").insert(parcelas);
     if (mensErr) {
-      toast.error(`Contrato #${contrato.numero} criado, mas as mensalidades não foram geradas: ${mensErr.message}`);
+      toast.error(
+        `Contrato #${contrato.numero} criado, mas as mensalidades não foram geradas: ${mensErr.message}`,
+      );
     }
 
     setSaving(false);
@@ -636,16 +690,15 @@ function NovoContratoForm({
 
     // Pós-criação: gerar carnê ou boletos com timeout de 15s (não trava UI)
     const withTimeout = <T,>(p: Promise<T>, ms: number) =>
-      Promise.race<T>([
-        p,
-        new Promise<T>((_, r) => setTimeout(() => r(new Error("TIMEOUT")), ms)),
-      ]);
+      Promise.race<T>([p, new Promise<T>((_, r) => setTimeout(() => r(new Error("TIMEOUT")), ms))]);
     if (tipoCobranca === "carne") {
       try {
         await withTimeout(gerarCarnePDF(contrato.id), 15000);
       } catch (e) {
         if ((e as Error).message === "TIMEOUT") {
-          toast.info("Geração do carnê demorou mais que o esperado — tente reimprimir na lista de contratos.");
+          toast.info(
+            "Geração do carnê demorou mais que o esperado — tente reimprimir na lista de contratos.",
+          );
         } else {
           mostrarErro(e);
         }
@@ -656,7 +709,9 @@ function NovoContratoForm({
         toast.info(res.mensagem);
       } catch (e) {
         if ((e as Error).message === "TIMEOUT") {
-          toast.info("Emissão dos boletos ainda está em processamento — verifique a lista de contratos em instantes.");
+          toast.info(
+            "Emissão dos boletos ainda está em processamento — verifique a lista de contratos em instantes.",
+          );
         } else {
           mostrarErro(e);
         }
@@ -810,7 +865,11 @@ function NovoContratoForm({
             </div>
             <div>
               <Label>Data início</Label>
-              <Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+              <Input
+                type="date"
+                value={dataInicio}
+                onChange={(e) => setDataInicio(e.target.value)}
+              />
               {dataAvisoExtrema ? (
                 <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" />
@@ -839,22 +898,30 @@ function NovoContratoForm({
                 {BRL(valor)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {faixas.length > 0 ? "Definido pela faixa de pessoas selecionada acima." : "Definido pelo convênio."}
+                {faixas.length > 0
+                  ? "Definido pela faixa de pessoas selecionada acima."
+                  : "Definido pelo convênio."}
                 {tipoCobranca === "boleto" ? (
                   <span className="block text-amber-600 font-medium">
-                    + {BRL(TAXA_BOLETO)} de taxa de boleto por parcela — total da parcela: {BRL(valor + TAXA_BOLETO)}
+                    + {BRL(TAXA_BOLETO)} de taxa de boleto por parcela — total da parcela:{" "}
+                    {BRL(valor + TAXA_BOLETO)}
                   </span>
                 ) : null}
               </p>
             </div>
             <div>
               <Label>Taxa de adesão</Label>
-              <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">{BRL(taxa)}</div>
-              <p className="text-xs text-muted-foreground mt-1">Cobrança única, definida pelo convênio.</p>
+              <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">
+                {BRL(taxa)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Cobrança única, definida pelo convênio.
+              </p>
             </div>
             <div className="col-span-2">
               <Label>
-                Tipo de cobrança <span className="text-muted-foreground font-normal">(opcional)</span>
+                Tipo de cobrança{" "}
+                <span className="text-muted-foreground font-normal">(opcional)</span>
               </Label>
               <div className="grid grid-cols-2 gap-3 mt-1">
                 {[
@@ -879,10 +946,14 @@ function NovoContratoForm({
                       key={opt.v}
                       onClick={() => setTipoCobranca(ativo ? null : opt.v)}
                       className={`text-left rounded-md border p-3 transition flex gap-3 items-start ${
-                        ativo ? "border-primary ring-2 ring-primary/30 bg-primary/5" : "border-border hover:bg-muted/50"
+                        ativo
+                          ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                          : "border-border hover:bg-muted/50"
                       }`}
                     >
-                      <Icon className={`h-5 w-5 mt-0.5 ${ativo ? "text-primary" : "text-muted-foreground"}`} />
+                      <Icon
+                        className={`h-5 w-5 mt-0.5 ${ativo ? "text-primary" : "text-muted-foreground"}`}
+                      />
                       <div className="flex-1">
                         <div className="font-semibold text-sm flex items-center gap-2">
                           {opt.title}
@@ -895,12 +966,14 @@ function NovoContratoForm({
                 })}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                A forma de pagamento real (Dinheiro / PIX / Cartão / etc.) será escolhida apenas na hora de baixar cada
-                parcela.
+                A forma de pagamento real (Dinheiro / PIX / Cartão / etc.) será escolhida apenas na
+                hora de baixar cada parcela.
               </p>
             </div>
             <div className="col-span-2 border-t pt-3">
-              <Label>Dependentes {convenio ? `(${deps.length}/${convenio.max_dependentes ?? 0})` : ""}</Label>
+              <Label>
+                Dependentes {convenio ? `(${deps.length}/${convenio.max_dependentes ?? 0})` : ""}
+              </Label>
               {convenio && deps.length >= (Number(convenio?.max_dependentes ?? 0) || 0) ? (
                 <div className="w-full mt-1 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
                   {(convenio.max_dependentes ?? 0) === 0
@@ -940,7 +1013,9 @@ function NovoContratoForm({
                       </span>
                       <Select
                         value={d.parentesco}
-                        onValueChange={(v) => setDeps(deps.map((x, j) => (j === i ? { ...x, parentesco: v } : x)))}
+                        onValueChange={(v) =>
+                          setDeps(deps.map((x, j) => (j === i ? { ...x, parentesco: v } : x)))
+                        }
                       >
                         <SelectTrigger className="col-span-3 h-8">
                           <SelectValue placeholder="Parentesco" />
@@ -954,8 +1029,15 @@ function NovoContratoForm({
                           <SelectItem value="Outro">Outro</SelectItem>
                         </SelectContent>
                       </Select>
-                      <div className="col-span-2 text-xs text-muted-foreground self-center">Dependente</div>
-                      <Button size="sm" variant="outline" className="col-span-2 h-8" onClick={() => setFaceOpen(i)}>
+                      <div className="col-span-2 text-xs text-muted-foreground self-center">
+                        Dependente
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="col-span-2 h-8"
+                        onClick={() => setFaceOpen(i)}
+                      >
                         <Camera className="h-3 w-3 mr-1" />
                         {d.face_descriptor?.length ? "Refazer" : "Foto"}
                       </Button>
@@ -1047,7 +1129,10 @@ function NovoContratoForm({
                   .eq("id", alvoId);
                 if (error) throw error;
                 if (isTitular) setTitular({ ...titular!, face_descriptor: descriptor });
-                else setDeps(deps.map((x, j) => (j === idx ? { ...x, face_descriptor: descriptor } : x)));
+                else
+                  setDeps(
+                    deps.map((x, j) => (j === idx ? { ...x, face_descriptor: descriptor } : x)),
+                  );
                 toast.success("Foto registrada");
               }}
             />
@@ -1075,7 +1160,9 @@ function NovoContratoForm({
                 const idx = editarPaciente.alvo;
                 setDeps((prev) =>
                   prev.map((x, j) =>
-                    j === idx ? { ...x, email: atualizado.email, telefone: atualizado.telefone } : x,
+                    j === idx
+                      ? { ...x, email: atualizado.email, telefone: atualizado.telefone }
+                      : x,
                   ),
                 );
               }
@@ -1097,7 +1184,10 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     </div>
   );
   const [mens, setMens] = useState<Mens[]>([]);
-  const [extraRecebido, setExtraRecebido] = useState<{ total: number; count: number }>({ total: 0, count: 0 });
+  const [extraRecebido, setExtraRecebido] = useState<{ total: number; count: number }>({
+    total: 0,
+    count: 0,
+  });
   const [drill, setDrill] = useState<null | "pagas" | "recebido" | "areceber">(null);
   const [deps, setDeps] = useState<Dep[]>([]);
   const [convenio, setConvenio] = useState<any>(null);
@@ -1125,7 +1215,9 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const [cancelMotivo, setCancelMotivo] = useState("");
   const [cancelSaving, setCancelSaving] = useState(false);
   const [canceladoEm, setCanceladoEm] = useState<string | null>(contrato.cancelado_em ?? null);
-  const [cancelMotivoAtual, setCancelMotivoAtual] = useState<string | null>(contrato.cancelamento_motivo ?? null);
+  const [cancelMotivoAtual, setCancelMotivoAtual] = useState<string | null>(
+    contrato.cancelamento_motivo ?? null,
+  );
   const cancelado = !!canceladoEm;
   // Valor mensal vigente (atualizado quando recalculamos as parcelas em aberto)
   const [valorMensalAtual, setValorMensalAtual] = useState<number>(Number(contrato.valor_mensal));
@@ -1134,7 +1226,9 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   }, [contrato.id]);
 
   // Edição manual de valor mensal e dia de vencimento (revisão contrato a contrato)
-  const [editValor, setEditValor] = useState<string>(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
+  const [editValor, setEditValor] = useState<string>(
+    String(Number(contrato.valor_mensal ?? 0).toFixed(2)),
+  );
   const [editDia, setEditDia] = useState<string>(String(contrato.dia_vencimento ?? 10));
   const [savingDados, setSavingDados] = useState(false);
   const [regerarFuturas, setRegerarFuturas] = useState(true);
@@ -1211,7 +1305,9 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       }
     }
     setSavingDados(false);
-    toast.success(regerarFuturas ? "Dados salvos e parcelas futuras atualizadas." : "Dados salvos.");
+    toast.success(
+      regerarFuturas ? "Dados salvos e parcelas futuras atualizadas." : "Dados salvos.",
+    );
     await load();
   };
 
@@ -1260,7 +1356,11 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const load = async () => {
     setLoading(true);
     const [m, d, cv, cl, pa, fx] = await Promise.all([
-      supabase.from("contrato_mensalidades").select("*").eq("contrato_id", contrato.id).order("numero_parcela"),
+      supabase
+        .from("contrato_mensalidades")
+        .select("*")
+        .eq("contrato_id", contrato.id)
+        .order("numero_parcela"),
       supabase
         .from("contrato_dependentes")
         .select("id, paciente_id, paciente_nome, parentesco, tipo, incluido_em, excluido_em, ativo")
@@ -1268,7 +1368,9 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       contrato.convenio_id
         ? supabase
             .from("cb_convenios")
-            .select("nome, modelo_contrato, termo_inclusao_html, vigencia_meses, fidelidade_meses, max_dependentes")
+            .select(
+              "nome, modelo_contrato, termo_inclusao_html, vigencia_meses, fidelidade_meses, max_dependentes",
+            )
             .eq("id", contrato.convenio_id)
             .maybeSingle()
         : Promise.resolve({ data: null }),
@@ -1279,11 +1381,17 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         .maybeSingle(),
       supabase
         .from("pacientes")
-        .select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep")
+        .select(
+          "cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep",
+        )
         .eq("id", (contrato as any).paciente_id ?? "")
         .maybeSingle(),
       contrato.convenio_id
-        ? supabase.from("cb_convenio_faixas").select("*").eq("convenio_id", contrato.convenio_id).order("vidas_de")
+        ? supabase
+            .from("cb_convenio_faixas")
+            .select("*")
+            .eq("convenio_id", contrato.convenio_id)
+            .order("vidas_de")
         : Promise.resolve({ data: [] }),
     ]);
     setMens((m.data ?? []) as Mens[]);
@@ -1391,11 +1499,15 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   const pagDiasAtraso = pagMens
     ? Math.max(
         0,
-        Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(pagMens.vencimento + "T00:00:00").getTime()) / 86400000),
+        Math.floor(
+          (new Date().setHours(0, 0, 0, 0) - new Date(pagMens.vencimento + "T00:00:00").getTime()) /
+            86400000,
+        ),
       )
     : 0;
   // Normaliza para os valores aceitos pelo LancamentoDialog (igual à Agenda)
-  const normalizarForma = (f: string) => (f === "credito" ? "cartao_credito" : f === "debito" ? "cartao_debito" : f);
+  const normalizarForma = (f: string) =>
+    f === "credito" ? "cartao_credito" : f === "debito" ? "cartao_debito" : f;
 
   const escolherForma = (forma: string) => {
     if (!pagMens) return;
@@ -1435,7 +1547,9 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
   };
 
   const pagas = mens.filter((m) => m.status === "pago").length;
-  const totalPagoMens = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
+  const totalPagoMens = mens
+    .filter((m) => m.status === "pago")
+    .reduce((s, m) => s + Number(m.valor), 0);
   const totalPago = totalPagoMens + extraRecebido.total;
   const pagasTotal = pagas + extraRecebido.count;
   const totalParcelas = mens.length + extraRecebido.count;
@@ -1454,7 +1568,8 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
         ? `${faixaAtual.vidas_de}+ pessoas`
         : faixaAtual.vidas_ate === faixaAtual.vidas_de
           ? `${faixaAtual.vidas_de} ${faixaAtual.vidas_de === 1 ? "pessoa" : "pessoas"}`
-          : `${faixaAtual.vidas_de} a ${faixaAtual.vidas_ate} pessoas`) + ` — ${BRL(Number(faixaAtual.valor_mensal))}`
+          : `${faixaAtual.vidas_de} a ${faixaAtual.vidas_ate} pessoas`) +
+      ` — ${BRL(Number(faixaAtual.valor_mensal))}`
     : "—";
   const formaLabelMap: Record<string, string> = {
     dinheiro: "Dinheiro",
@@ -1464,7 +1579,8 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     boleto: "Boleto",
     carne: "Carnê interno",
   };
-  const formaLabel = formaLabelMap[contrato.forma_pagamento ?? ""] ?? contrato.forma_pagamento ?? "—";
+  const formaLabel =
+    formaLabelMap[contrato.forma_pagamento ?? ""] ?? contrato.forma_pagamento ?? "—";
   const maxDep = Number(convenio?.max_dependentes ?? 0) || 0;
   const depsAtivos = deps.filter((d) => d.ativo);
 
@@ -1504,11 +1620,15 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
       TIPO_MOVIMENTO: movimento,
       DATA_MOVIMENTO: fmtDataExtenso(dataMov ?? new Date().toISOString().slice(0, 10)),
     };
-    let out = tpl.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_m: string, key: string, body: string) =>
-      vars[key] && String(vars[key]).trim() ? body : "",
+    let out = tpl.replace(
+      /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
+      (_m: string, key: string, body: string) =>
+        vars[key] && String(vars[key]).trim() ? body : "",
     );
-    out = out.replace(/\{\{\^(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_m: string, key: string, body: string) =>
-      vars[key] && String(vars[key]).trim() ? "" : body,
+    out = out.replace(
+      /\{\{\^(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
+      (_m: string, key: string, body: string) =>
+        vars[key] && String(vars[key]).trim() ? "" : body,
     );
     return out.replace(/\{\{(\w+)\}\}/g, (_m: string, k: string) => vars[k] ?? "");
   };
@@ -1519,7 +1639,10 @@ function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () 
     const safe = DOMPurify.sanitize(html);
     const titulo = `Termo de ${termoMovimento} — Contrato #${contrato.numero}`;
     const esc = (v: unknown) =>
-      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+      String(v ?? "").replace(
+        /[&<>"']/g,
+        (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+      );
     const doc = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
 <title>${esc(titulo)}</title>
 <style>
@@ -1565,11 +1688,16 @@ h1, h2, h3 { margin: 0 0 6mm; }
     const elegiveis = faixas.filter(
       (fx) => totalVidas >= fx.vidas_de && (fx.vidas_ate == null || totalVidas <= fx.vidas_ate),
     );
-    const f = elegiveis.length ? elegiveis.reduce((a, b) => (b.vidas_de > a.vidas_de ? b : a)) : null;
+    const f = elegiveis.length
+      ? elegiveis.reduce((a, b) => (b.vidas_de > a.vidas_de ? b : a))
+      : null;
     if (!f) return;
     const novoValor = Number(f.valor_mensal);
     if (novoValor !== Number(valorMensalAtual)) {
-      await supabase.from("contratos_assinatura").update({ valor_mensal: novoValor }).eq("id", contrato.id);
+      await supabase
+        .from("contratos_assinatura")
+        .update({ valor_mensal: novoValor })
+        .eq("id", contrato.id);
       setValorMensalAtual(novoValor);
       // Reflete imediatamente no objeto recebido por prop, para textos derivados
       (contrato as any).valor_mensal = novoValor;
@@ -1583,7 +1711,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
         return supabase.from("contrato_mensalidades").update({ valor: v }).eq("id", m.id);
       }),
     );
-    toast.success(`Parcelas em aberto recalculadas para ${BRL(novoValor)}/mês (${totalVidas} vidas)`);
+    toast.success(
+      `Parcelas em aberto recalculadas para ${BRL(novoValor)}/mês (${totalVidas} vidas)`,
+    );
   };
 
   const confirmarIncluir = async () => {
@@ -1593,7 +1723,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
     }
     if (depsAtivos.length >= maxDep) {
       toast.error(
-        maxDep === 0 ? "Este convênio não permite dependentes." : `Limite de ${maxDep} dependentes atingido.`,
+        maxDep === 0
+          ? "Este convênio não permite dependentes."
+          : `Limite de ${maxDep} dependentes atingido.`,
       );
       return;
     }
@@ -1675,7 +1807,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
     const _cl = clinica ?? {};
     const _pa = pacienteFull ?? {};
     const dependentesTxt = deps.length
-      ? deps.map((d, i) => `${i + 1}. ${d.paciente_nome} — ${d.parentesco ?? "—"} (${d.tipo})`).join("\n")
+      ? deps
+          .map((d, i) => `${i + 1}. ${d.paciente_nome} — ${d.parentesco ?? "—"} (${d.tipo})`)
+          .join("\n")
       : "(nenhum)";
     const enderecoPaciente = [
       _pa.logradouro,
@@ -1751,12 +1885,19 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <div className="text-sm">
                     <div className="font-semibold text-destructive">
                       Contrato Cancelado em{" "}
-                      {new Date(canceladoEm!).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                      {new Date(canceladoEm!).toLocaleString("pt-BR", {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })}
                     </div>
                     {cancelMotivoAtual ? (
-                      <div className="text-muted-foreground mt-0.5">Motivo: {cancelMotivoAtual}</div>
+                      <div className="text-muted-foreground mt-0.5">
+                        Motivo: {cancelMotivoAtual}
+                      </div>
                     ) : null}
-                    <div className="text-muted-foreground mt-0.5">O plano e todos os benefícios foram cancelados.</div>
+                    <div className="text-muted-foreground mt-0.5">
+                      O plano e todos os benefícios foram cancelados.
+                    </div>
                   </div>
                 </div>
               ) : null}
@@ -1770,7 +1911,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <div className="font-bold text-lg">
                     {pagasTotal}/{totalParcelas}
                   </div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    Clique para ver detalhes
+                  </div>
                 </button>
                 <button
                   type="button"
@@ -1779,7 +1922,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 >
                   <div className="text-muted-foreground text-xs">Recebido</div>
                   <div className="font-bold text-lg text-green-600">{BRL(totalPago)}</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    Clique para ver detalhes
+                  </div>
                 </button>
                 <button
                   type="button"
@@ -1788,7 +1933,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 >
                   <div className="text-muted-foreground text-xs">A receber</div>
                   <div className="font-bold text-lg text-orange-600">{BRL(aReceber)}</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    Clique para ver detalhes
+                  </div>
                 </button>
               </div>
               <div className="flex gap-2 flex-wrap">
@@ -1846,9 +1993,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
 
               {contrato.tabela_legada ? (
                 <div className="rounded-md border border-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-amber-900 dark:text-amber-100">
-                  <strong>Atenção:</strong> este contrato está na tabela <strong>antiga</strong> do Cartão Consulta.
-                  Avisar o titular e migrar para a tabela atual a partir de{" "}
-                  <strong>{contrato.migrar_apos ? fmtD(contrato.migrar_apos) : "01/07/2026"}</strong>.
+                  <strong>Atenção:</strong> este contrato está na tabela <strong>antiga</strong> do
+                  Cartão Consulta. Avisar o titular e migrar para a tabela atual a partir de{" "}
+                  <strong>
+                    {contrato.migrar_apos ? fmtD(contrato.migrar_apos) : "01/07/2026"}
+                  </strong>
+                  .
                 </div>
               ) : null}
 
@@ -1899,11 +2049,19 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           <TableCell>{fmtD(m.pago_em)}</TableCell>
                           <TableCell>
                             {m.status === "pago" ? (
-                              <Button size="sm" variant="outline" onClick={() => marcarPago(m.id, false)}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => marcarPago(m.id, false)}
+                              >
                                 Reverter
                               </Button>
                             ) : (
-                              <Button size="sm" disabled={cancelado} onClick={() => abrirFormaPag(m)}>
+                              <Button
+                                size="sm"
+                                disabled={cancelado}
+                                onClick={() => abrirFormaPag(m)}
+                              >
                                 <Check className="h-3 w-3 mr-1" />
                                 Pagar
                               </Button>
@@ -2014,11 +2172,19 @@ h1, h2, h3 { margin: 0 0 6mm; }
                               — Incluído: {fmtD(d.incluido_em)}
                             </span>
                             {d.excluido_em ? (
-                              <span className="text-destructive no-underline"> — Excluído: {fmtD(d.excluido_em)}</span>
+                              <span className="text-destructive no-underline">
+                                {" "}
+                                — Excluído: {fmtD(d.excluido_em)}
+                              </span>
                             ) : null}
                           </div>
                           {d.ativo ? (
-                            <Button size="sm" variant="ghost" disabled={cancelado} onClick={() => setExcAlvo(d)}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={cancelado}
+                              onClick={() => setExcAlvo(d)}
+                            >
                               <Trash2 className="h-3 w-3 text-destructive" />
                             </Button>
                           ) : null}
@@ -2028,7 +2194,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   )}
                 </div>
               </div>
-              {contrato.observacoes ? <DadosField label="Observações" value={contrato.observacoes} /> : null}
+              {contrato.observacoes ? (
+                <DadosField label="Observações" value={contrato.observacoes} />
+              ) : null}
             </TabsContent>
             <TabsContent value="contrato" className="mt-4">
               <div className="flex items-center justify-between mb-2">
@@ -2071,7 +2239,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
               {drill === "areceber" && `A receber — ${BRL(aReceber)}`}
             </DialogTitle>
             <DialogDescription>
-              {drill === "areceber" ? "Parcelas em aberto deste contrato." : "Demonstrativo detalhado das parcelas."}
+              {drill === "areceber"
+                ? "Parcelas em aberto deste contrato."
+                : "Demonstrativo detalhado das parcelas."}
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-md border max-h-[60vh] overflow-auto">
@@ -2117,7 +2287,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                 : "outline"
                           }
                         >
-                          {m.status === "pago" ? "Pago" : new Date(m.vencimento) < new Date() ? "Atrasado" : "Pendente"}
+                          {m.status === "pago"
+                            ? "Pago"
+                            : new Date(m.vencimento) < new Date()
+                              ? "Atrasado"
+                              : "Pendente"}
                         </Badge>
                       </TableCell>
                       <TableCell>{m.pago_em ? fmtD(m.pago_em) : "—"}</TableCell>
@@ -2129,7 +2303,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
           </div>
           {(drill === "recebido" || drill === "pagas") && extraRecebido.count > 0 ? (
             <div className="text-xs text-muted-foreground">
-              + {extraRecebido.count} recebimento(s) avulso(s) totalizando {BRL(extraRecebido.total)}.
+              + {extraRecebido.count} recebimento(s) avulso(s) totalizando{" "}
+              {BRL(extraRecebido.total)}.
             </div>
           ) : null}
           <DialogFooter>
@@ -2189,7 +2364,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <span className="font-semibold">{BRL(pagValorFinal)}</span>
               </Button>
             ))}
-            <Button variant="default" className="justify-center h-12 mt-1 bg-primary" onClick={escolherMisto}>
+            <Button
+              variant="default"
+              className="justify-center h-12 mt-1 bg-primary"
+              onClick={escolherMisto}
+            >
               <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border border-primary-foreground/40 bg-primary-foreground/10 text-xs font-mono mr-2">
                 {formaOpcoes.length + 1}
               </kbd>
@@ -2261,7 +2440,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 disabled={incLoadingPac}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={incLoadingPac ? "Carregando pacientes…" : "Selecione o paciente"} />
+                  <SelectValue
+                    placeholder={incLoadingPac ? "Carregando pacientes…" : "Selecione o paciente"}
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {(() => {
@@ -2269,7 +2450,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     const jaDep = new Set(depsAtivos.map((d) => d.paciente_id));
                     const list = incPacientes.filter((p) => p.id !== titularId && !jaDep.has(p.id));
                     if (list.length === 0) {
-                      return <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum paciente disponível</div>;
+                      return (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">
+                          Nenhum paciente disponível
+                        </div>
+                      );
                     }
                     return list.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
@@ -2313,7 +2498,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
             </div>
             {contrato.assinado_em && convenio?.termo_inclusao_html ? (
               <p className="text-xs text-muted-foreground">
-                Após incluir, será gerado o <strong>Termo de Inclusão</strong> para impressão/assinatura.
+                Após incluir, será gerado o <strong>Termo de Inclusão</strong> para
+                impressão/assinatura.
               </p>
             ) : null}
           </div>
@@ -2343,7 +2529,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
           </p>
           {contrato.assinado_em && convenio?.termo_inclusao_html ? (
             <p className="text-xs text-muted-foreground">
-              Após excluir, será gerado o <strong>Termo de Exclusão</strong> para impressão/assinatura.
+              Após excluir, será gerado o <strong>Termo de Exclusão</strong> para
+              impressão/assinatura.
             </p>
           ) : null}
           <DialogFooter>
@@ -2368,7 +2555,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
             {termoDep ? (
               <div
                 className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderTermo(termoDep, termoMovimento)) }}
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(renderTermo(termoDep, termoMovimento)),
+                }}
               />
             ) : null}
           </div>
@@ -2395,7 +2584,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <DialogHeader>
             <DialogTitle>Cancelar contrato</DialogTitle>
             <DialogDescription>
-              Esta ação cancela o plano e todos os benefícios deste contrato. Informe o motivo do cancelamento.
+              Esta ação cancela o plano e todos os benefícios deste contrato. Informe o motivo do
+              cancelamento.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">

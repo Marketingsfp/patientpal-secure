@@ -7,10 +7,19 @@ import { useClinica } from "@/hooks/use-clinica";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -49,11 +58,17 @@ export function EncerrarExpedienteButton() {
     if (!clinicaAtual) return;
     setLoading(true);
     const [{ data: meds }, { data: enc }] = await Promise.all([
-      supabase.from("medicos").select("id, nome")
-        .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("medico_expediente_encerramento")
+      supabase
+        .from("medicos")
+        .select("id, nome")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("ativo", true)
+        .order("nome"),
+      supabase
+        .from("medico_expediente_encerramento")
         .select("medico_id, encerrado_em, motivo")
-        .eq("clinica_id", clinicaAtual.clinica_id).eq("data", hojeISO()),
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("data", hojeISO()),
     ]);
     setMedicos((meds ?? []) as Medico[]);
     const m = new Map<string, Encerramento>();
@@ -89,7 +104,10 @@ export function EncerrarExpedienteButton() {
       motivo: motivoTxt.trim() || null,
     });
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success("Expediente encerrado para hoje.");
     setMotivo("");
     await carregar();
@@ -98,10 +116,17 @@ export function EncerrarExpedienteButton() {
   const reabrir = async (medicoId: string) => {
     if (!clinicaAtual) return;
     setSaving(true);
-    const { error } = await supabase.from("medico_expediente_encerramento").delete()
-      .eq("clinica_id", clinicaAtual.clinica_id).eq("medico_id", medicoId).eq("data", hojeISO());
+    const { error } = await supabase
+      .from("medico_expediente_encerramento")
+      .delete()
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("medico_id", medicoId)
+      .eq("data", hojeISO());
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success("Expediente reaberto.");
     await carregar();
   };
@@ -110,16 +135,25 @@ export function EncerrarExpedienteButton() {
   if (isMedicoOnly && meuMedicoId) {
     if (meuEncerramento) {
       return (
-        <Button size="sm" variant="outline" className="h-7 text-[11px] px-2"
-          onClick={() => void reabrir(meuMedicoId)} disabled={saving}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-[11px] px-2"
+          onClick={() => void reabrir(meuMedicoId)}
+          disabled={saving}
+        >
           <CheckCircle2 className="h-3 w-3 mr-1.5 text-emerald-600" />
           Expediente encerrado · Reabrir
         </Button>
       );
     }
     return (
-      <Button size="sm" variant="outline" className="h-7 text-[11px] px-2"
-        onClick={() => setOpen(true)}>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 text-[11px] px-2"
+        onClick={() => setOpen(true)}
+      >
         <PowerOff className="h-3 w-3 mr-1.5" /> Encerrar expediente
       </Button>
     );
@@ -127,8 +161,12 @@ export function EncerrarExpedienteButton() {
 
   return (
     <>
-      <Button size="sm" variant="outline" className="h-7 text-[11px] px-2"
-        onClick={() => setOpen(true)}>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 text-[11px] px-2"
+        onClick={() => setOpen(true)}
+      >
         <PowerOff className="h-3 w-3 mr-1.5" /> Encerrar expediente
         {encerrados.size > 0 && (
           <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">
@@ -142,24 +180,37 @@ export function EncerrarExpedienteButton() {
           <DialogHeader>
             <DialogTitle>Encerrar expediente do médico · Hoje</DialogTitle>
             <DialogDescription>
-              Sinaliza que o médico já terminou os atendimentos do dia. É possível reabrir a qualquer momento.
+              Sinaliza que o médico já terminou os atendimentos do dia. É possível reabrir a
+              qualquer momento.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Médico</label>
-              <Select value={selMedico} onValueChange={setSelMedico} disabled={isMedicoOnly || loading}>
-                <SelectTrigger><SelectValue placeholder="Selecione um médico" /></SelectTrigger>
+              <Select
+                value={selMedico}
+                onValueChange={setSelMedico}
+                disabled={isMedicoOnly || loading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um médico" />
+                </SelectTrigger>
                 <SelectContent>
                   {medicos.map((m) => {
                     const enc = encerrados.get(m.id);
                     return (
                       <SelectItem key={m.id} value={m.id}>
                         <span className="inline-flex items-center gap-2">
-                          {enc ? <CheckCircle2 className="h-3 w-3 text-emerald-600" /> : <XCircle className="h-3 w-3 text-muted-foreground" />}
+                          {enc ? (
+                            <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                          ) : (
+                            <XCircle className="h-3 w-3 text-muted-foreground" />
+                          )}
                           {m.nome}
-                          {enc && <span className="text-[10px] text-muted-foreground">(encerrado)</span>}
+                          {enc && (
+                            <span className="text-[10px] text-muted-foreground">(encerrado)</span>
+                          )}
                         </span>
                       </SelectItem>
                     );
@@ -184,7 +235,9 @@ export function EncerrarExpedienteButton() {
               </div>
             ) : (
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Motivo (opcional)</label>
+                <label className="text-xs font-medium text-muted-foreground">
+                  Motivo (opcional)
+                </label>
                 <Textarea
                   rows={2}
                   value={motivo}
@@ -196,16 +249,27 @@ export function EncerrarExpedienteButton() {
           </div>
 
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setOpen(false)}>Fechar</Button>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Fechar
+            </Button>
             {selMedico && encerrados.get(selMedico) ? (
-              <Button variant="outline" disabled={saving}
-                onClick={async () => { await reabrir(selMedico); }}>
+              <Button
+                variant="outline"
+                disabled={saving}
+                onClick={async () => {
+                  await reabrir(selMedico);
+                }}
+              >
                 {saving && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
                 Reabrir expediente
               </Button>
             ) : (
-              <Button disabled={!selMedico || saving}
-                onClick={async () => { await encerrar(selMedico, motivo); }}>
+              <Button
+                disabled={!selMedico || saving}
+                onClick={async () => {
+                  await encerrar(selMedico, motivo);
+                }}
+              >
                 {saving && <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />}
                 Encerrar expediente
               </Button>

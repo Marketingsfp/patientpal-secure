@@ -8,8 +8,7 @@ export function exportToExcel<T extends Record<string, unknown>>(
     return;
   }
   const cols =
-    headers ??
-    (Object.keys(rows[0]) as (keyof T)[]).map((k) => ({ key: k, label: String(k) }));
+    headers ?? (Object.keys(rows[0]) as (keyof T)[]).map((k) => ({ key: k, label: String(k) }));
 
   const escape = (v: unknown) => {
     if (v === null || v === undefined) return "";
@@ -18,9 +17,7 @@ export function exportToExcel<T extends Record<string, unknown>>(
   };
 
   const head = cols.map((c) => escape(c.label)).join(";");
-  const body = rows
-    .map((r) => cols.map((c) => escape(r[c.key])).join(";"))
-    .join("\n");
+  const body = rows.map((r) => cols.map((c) => escape(r[c.key])).join(";")).join("\n");
 
   const csv = "\uFEFF" + head + "\n" + body;
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });

@@ -15,13 +15,20 @@ export interface HhpPageHeaderProps {
 }
 
 export function HhpPageHeader({
-  title, eyebrow, leading, actions, children, className,
+  title,
+  eyebrow,
+  leading,
+  actions,
+  children,
+  className,
 }: HhpPageHeaderProps) {
   return (
-    <div className={cn(
-      "border-b border-slate-100 bg-white/80 backdrop-blur-sm px-3 md:px-6 py-3 md:py-5 space-y-3 md:space-y-5 shrink-0",
-      className,
-    )}>
+    <div
+      className={cn(
+        "border-b border-slate-100 bg-white/80 backdrop-blur-sm px-3 md:px-6 py-3 md:py-5 space-y-3 md:space-y-5 shrink-0",
+        className,
+      )}
+    >
       <div className="flex items-start justify-between gap-2 md:gap-4 flex-wrap">
         <div className="min-w-0 flex items-start gap-2">
           {leading}
@@ -39,11 +46,7 @@ export function HhpPageHeader({
             )}
           </div>
         </div>
-        {actions && (
-          <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
-            {actions}
-          </div>
-        )}
+        {actions && <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">{actions}</div>}
       </div>
       {children}
     </div>

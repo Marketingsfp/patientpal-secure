@@ -1,11 +1,13 @@
 import { useState } from "react";
-import {
-  ChevronDown, ChevronRight, ArrowUpRight, CalendarClock, DollarSign,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, ArrowUpRight, CalendarClock, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { TIPO_SESSAO_ESTILO, TIPO_SESSAO_LABEL, type TipoSessao } from "@/lib/agenda-v2/session-detect";
+import {
+  TIPO_SESSAO_ESTILO,
+  TIPO_SESSAO_LABEL,
+  type TipoSessao,
+} from "@/lib/agenda-v2/session-detect";
 import { HhpChip } from "@/design-system/hhp";
 
 // Chips de status — tom baixo, editorial.
@@ -127,24 +129,51 @@ export function SessionCard({
 
   const titulo = isLab
     ? `${data.items.length} ${data.items.length === 1 ? "exame" : "exames"} · coleta única`
-    : data.items[0]?.procedimento_nome ?? TIPO_SESSAO_LABEL[data.tipo];
+    : (data.items[0]?.procedimento_nome ?? TIPO_SESSAO_LABEL[data.tipo]);
 
   // Densidades:
   // confortavel: card alto ~ 96px, foto 56, nome 20
   // compacto:    mesma lógica, ~64px, foto 40, nome 15
   // foco:        112px, foto 72, nome 24
-  const dim = density === "compacto"
-    ? { padY: "py-3", padX: "px-4", photo: 40, name: "text-[15px]", time: "text-[13px]", gap: "gap-3", radius: "rounded-2xl" }
-    : density === "foco"
-    ? { padY: "py-5", padX: "px-6", photo: 72, name: "text-2xl", time: "text-[16px]", gap: "gap-5", radius: "rounded-3xl" }
-    : { padY: "py-4", padX: "px-5", photo: 56, name: "text-xl", time: "text-[14px]", gap: "gap-4", radius: "rounded-2xl" };
+  const dim =
+    density === "compacto"
+      ? {
+          padY: "py-3",
+          padX: "px-4",
+          photo: 40,
+          name: "text-[15px]",
+          time: "text-[13px]",
+          gap: "gap-3",
+          radius: "rounded-2xl",
+        }
+      : density === "foco"
+        ? {
+            padY: "py-5",
+            padX: "px-6",
+            photo: 72,
+            name: "text-2xl",
+            time: "text-[16px]",
+            gap: "gap-5",
+            radius: "rounded-3xl",
+          }
+        : {
+            padY: "py-4",
+            padX: "px-5",
+            photo: 56,
+            name: "text-xl",
+            time: "text-[14px]",
+            gap: "gap-4",
+            radius: "rounded-2xl",
+          };
 
   return (
     <div
       className={cn(
         "group relative bg-white border border-slate-200/70 transition-all",
         "hover:border-slate-300 hover:shadow-[0_4px_20px_-8px_rgba(15,23,42,0.08)]",
-        dim.radius, dim.padY, dim.padX,
+        dim.radius,
+        dim.padY,
+        dim.padX,
         isCurrent && "ring-1 ring-indigo-300/70 shadow-[0_0_0_4px_rgba(99,102,241,0.06)]",
       )}
     >
@@ -232,10 +261,26 @@ export function SessionCard({
               <JourneyBar
                 current={isCurrent}
                 steps={[
-                  { label: "Confirmado", done: !!data.confirmado || (data.status !== "agendado" && data.status !== "cancelado" && data.status !== "faltou") },
-                  { label: "Check-in", done: !!data.checkin || data.status === "em_atendimento" || data.status === "realizado" },
+                  {
+                    label: "Confirmado",
+                    done:
+                      !!data.confirmado ||
+                      (data.status !== "agendado" &&
+                        data.status !== "cancelado" &&
+                        data.status !== "faltou"),
+                  },
+                  {
+                    label: "Check-in",
+                    done:
+                      !!data.checkin ||
+                      data.status === "em_atendimento" ||
+                      data.status === "realizado",
+                  },
                   { label: "Pago", done: !!data.pago },
-                  { label: "Atendimento", done: data.status === "em_atendimento" || data.status === "realizado" },
+                  {
+                    label: "Atendimento",
+                    done: data.status === "em_atendimento" || data.status === "realizado",
+                  },
                 ]}
               />
               <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400">
@@ -245,11 +290,18 @@ export function SessionCard({
                 {multi && (
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpen((v) => !v);
+                    }}
                     className="inline-flex items-center gap-0.5 hover:text-slate-700"
                     aria-expanded={open}
                   >
-                    {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    {open ? (
+                      <ChevronDown className="h-3 w-3" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3" />
+                    )}
                     {open ? "recolher" : `+${data.items.length} exames`}
                   </button>
                 )}
@@ -298,7 +350,10 @@ export function SessionCard({
       )}
 
       {multi && open && density !== "compacto" && (
-        <ul className="mt-3 space-y-1 border-t border-slate-100 pt-3" style={{ paddingLeft: dim.photo + 16 }}>
+        <ul
+          className="mt-3 space-y-1 border-t border-slate-100 pt-3"
+          style={{ paddingLeft: dim.photo + 16 }}
+        >
           {data.items.map((it) => (
             <li key={it.id} className="flex items-center gap-2 text-xs text-slate-500">
               <span className="text-slate-300">›</span>
@@ -312,7 +367,9 @@ export function SessionCard({
 }
 
 function QuickAction({
-  icon, label, onClick,
+  icon,
+  label,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;

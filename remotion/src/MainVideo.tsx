@@ -45,33 +45,60 @@ export const MainVideo: React.FC = () => {
         <TransitionSeries.Sequence durationInFrames={D.intro}>
           <SceneIntro />
         </TransitionSeries.Sequence>
-        <TransitionSeries.Transition presentation={fade()} timing={springTiming({ config: { damping: 200 }, durationInFrames: T })} />
+        <TransitionSeries.Transition
+          presentation={fade()}
+          timing={springTiming({ config: { damping: 200 }, durationInFrames: T })}
+        />
         <TransitionSeries.Sequence durationInFrames={D.busca}>
           <SceneBusca />
         </TransitionSeries.Sequence>
-        <TransitionSeries.Transition presentation={slide({ direction: "from-right" })} timing={springTiming({ config: { damping: 200 }, durationInFrames: T })} />
+        <TransitionSeries.Transition
+          presentation={slide({ direction: "from-right" })}
+          timing={springTiming({ config: { damping: 200 }, durationInFrames: T })}
+        />
         <TransitionSeries.Sequence durationInFrames={D.agendar}>
           <SceneAgendar />
         </TransitionSeries.Sequence>
-        <TransitionSeries.Transition presentation={slide({ direction: "from-right" })} timing={springTiming({ config: { damping: 200 }, durationInFrames: T })} />
+        <TransitionSeries.Transition
+          presentation={slide({ direction: "from-right" })}
+          timing={springTiming({ config: { damping: 200 }, durationInFrames: T })}
+        />
         <TransitionSeries.Sequence durationInFrames={D.pagto}>
           <ScenePagamento />
         </TransitionSeries.Sequence>
-        <TransitionSeries.Transition presentation={slide({ direction: "from-right" })} timing={springTiming({ config: { damping: 200 }, durationInFrames: T })} />
+        <TransitionSeries.Transition
+          presentation={slide({ direction: "from-right" })}
+          timing={springTiming({ config: { damping: 200 }, durationInFrames: T })}
+        />
         <TransitionSeries.Sequence durationInFrames={D.fluxo}>
           <SceneFluxo />
         </TransitionSeries.Sequence>
-        <TransitionSeries.Transition presentation={fade()} timing={springTiming({ config: { damping: 200 }, durationInFrames: T })} />
+        <TransitionSeries.Transition
+          presentation={fade()}
+          timing={springTiming({ config: { damping: 200 }, durationInFrames: T })}
+        />
         <TransitionSeries.Sequence durationInFrames={D.final}>
           <SceneFinal />
         </TransitionSeries.Sequence>
       </TransitionSeries>
-      <Sequence from={START.intro + 8}><Audio src={staticFile("audio/intro.mp3")} volume={0.95} /></Sequence>
-      <Sequence from={START.busca + 8}><Audio src={staticFile("audio/busca.mp3")} volume={0.95} /></Sequence>
-      <Sequence from={START.agendar + 8}><Audio src={staticFile("audio/agendar.mp3")} volume={0.95} /></Sequence>
-      <Sequence from={START.pagto + 8}><Audio src={staticFile("audio/pagto.mp3")} volume={0.95} /></Sequence>
-      <Sequence from={START.fluxo + 8}><Audio src={staticFile("audio/fluxo.mp3")} volume={0.95} /></Sequence>
-      <Sequence from={START.final + 8}><Audio src={staticFile("audio/final.mp3")} volume={0.95} /></Sequence>
+      <Sequence from={START.intro + 8}>
+        <Audio src={staticFile("audio/intro.mp3")} volume={0.95} />
+      </Sequence>
+      <Sequence from={START.busca + 8}>
+        <Audio src={staticFile("audio/busca.mp3")} volume={0.95} />
+      </Sequence>
+      <Sequence from={START.agendar + 8}>
+        <Audio src={staticFile("audio/agendar.mp3")} volume={0.95} />
+      </Sequence>
+      <Sequence from={START.pagto + 8}>
+        <Audio src={staticFile("audio/pagto.mp3")} volume={0.95} />
+      </Sequence>
+      <Sequence from={START.fluxo + 8}>
+        <Audio src={staticFile("audio/fluxo.mp3")} volume={0.95} />
+      </Sequence>
+      <Sequence from={START.final + 8}>
+        <Audio src={staticFile("audio/final.mp3")} volume={0.95} />
+      </Sequence>
     </AbsoluteFill>
   );
 };

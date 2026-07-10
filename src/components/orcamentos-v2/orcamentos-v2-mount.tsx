@@ -18,8 +18,11 @@ export function OrcamentosV2Mount() {
     (async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return;
-      const { data } = await supabase.from("profiles")
-        .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
+      const { data } = await supabase
+        .from("profiles")
+        .select("preferencias_ui")
+        .eq("id", u.user.id)
+        .maybeSingle();
       const p = (data?.preferencias_ui ?? {}) as { orcamentos?: { compact?: boolean } };
       if (typeof p.orcamentos?.compact === "boolean") setCompact(p.orcamentos.compact);
     })();
@@ -29,11 +32,17 @@ export function OrcamentosV2Mount() {
     setCompact(v);
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    const { data } = await supabase.from("profiles")
-      .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
+    const { data } = await supabase
+      .from("profiles")
+      .select("preferencias_ui")
+      .eq("id", u.user.id)
+      .maybeSingle();
     const prev = (data?.preferencias_ui ?? {}) as Record<string, unknown>;
     const orcamentos = { ...((prev.orcamentos as object) ?? {}), compact: v };
-    await supabase.from("profiles").update({ preferencias_ui: { ...prev, orcamentos } }).eq("id", u.user.id);
+    await supabase
+      .from("profiles")
+      .update({ preferencias_ui: { ...prev, orcamentos } })
+      .eq("id", u.user.id);
   };
 
   return (

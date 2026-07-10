@@ -4,7 +4,7 @@ const KEY = "appshell:subsystem";
 const EVT = "subsystem-change";
 
 export const SUBSYSTEMS: Record<SubsystemId, { label: string; groups: string[] }> = {
-  "recepcao": {
+  recepcao: {
     label: "Gestor Clínico",
     groups: ["Operação", "Cartão Benefícios", "Inteligência", "Marketing", "Cadastros", "Gestão"],
   },

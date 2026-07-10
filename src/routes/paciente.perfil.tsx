@@ -35,7 +35,9 @@ function PerfilPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         navigate({ to: "/login", search: { redirect: "/paciente/perfil" } as never });
         return;
@@ -55,7 +57,7 @@ function PerfilPage() {
   }, [navigate]);
 
   function update(idx: number, patch: Partial<Paciente>) {
-    setPacientes(prev => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
+    setPacientes((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
   }
 
   async function salvar(p: Paciente) {
@@ -64,8 +66,12 @@ function PerfilPage() {
       .from("pacientes")
       .update({
         telefone: p.telefone,
-        cep: p.cep, logradouro: p.logradouro, numero: p.numero,
-        bairro: p.bairro, cidade: p.cidade, estado: p.estado,
+        cep: p.cep,
+        logradouro: p.logradouro,
+        numero: p.numero,
+        bairro: p.bairro,
+        cidade: p.cidade,
+        estado: p.estado,
       })
       .eq("id", p.id);
     setSaving(false);
@@ -91,11 +97,33 @@ function PerfilPage() {
           </Button>
         </div>
         <nav className="mx-auto max-w-2xl px-4 pb-2 flex gap-2 text-sm overflow-x-auto">
-          <Link to="/paciente" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Início</Link>
-          <Link to="/paciente/consultas" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Consultas</Link>
-          <Link to="/paciente/cartoes" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Cartões</Link>
-          <Link to="/paciente/financeiro" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">Financeiro</Link>
-          <Link to="/paciente/perfil" className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground whitespace-nowrap">Perfil</Link>
+          <Link to="/paciente" className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap">
+            Início
+          </Link>
+          <Link
+            to="/paciente/consultas"
+            className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap"
+          >
+            Consultas
+          </Link>
+          <Link
+            to="/paciente/cartoes"
+            className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap"
+          >
+            Cartões
+          </Link>
+          <Link
+            to="/paciente/financeiro"
+            className="px-3 py-1.5 rounded-md hover:bg-muted whitespace-nowrap"
+          >
+            Financeiro
+          </Link>
+          <Link
+            to="/paciente/perfil"
+            className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground whitespace-nowrap"
+          >
+            Perfil
+          </Link>
         </nav>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-4 space-y-4">
@@ -116,17 +144,60 @@ function PerfilPage() {
                 <Input value={p.nome} disabled />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>Telefone</Label><Input value={p.telefone ?? ""} onChange={e => update(idx, { telefone: e.target.value })} /></div>
-                <div className="space-y-1"><Label>CEP</Label><Input value={p.cep ?? ""} onChange={e => update(idx, { cep: e.target.value })} /></div>
+                <div className="space-y-1">
+                  <Label>Telefone</Label>
+                  <Input
+                    value={p.telefone ?? ""}
+                    onChange={(e) => update(idx, { telefone: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>CEP</Label>
+                  <Input
+                    value={p.cep ?? ""}
+                    onChange={(e) => update(idx, { cep: e.target.value })}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1 col-span-2"><Label>Logradouro</Label><Input value={p.logradouro ?? ""} onChange={e => update(idx, { logradouro: e.target.value })} /></div>
-                <div className="space-y-1"><Label>Número</Label><Input value={p.numero ?? ""} onChange={e => update(idx, { numero: e.target.value })} /></div>
+                <div className="space-y-1 col-span-2">
+                  <Label>Logradouro</Label>
+                  <Input
+                    value={p.logradouro ?? ""}
+                    onChange={(e) => update(idx, { logradouro: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Número</Label>
+                  <Input
+                    value={p.numero ?? ""}
+                    onChange={(e) => update(idx, { numero: e.target.value })}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1"><Label>Bairro</Label><Input value={p.bairro ?? ""} onChange={e => update(idx, { bairro: e.target.value })} /></div>
-                <div className="space-y-1"><Label>Cidade</Label><Input value={p.cidade ?? ""} onChange={e => update(idx, { cidade: e.target.value })} /></div>
-                <div className="space-y-1"><Label>UF</Label><Input value={p.estado ?? ""} maxLength={2} onChange={e => update(idx, { estado: e.target.value.toUpperCase() })} /></div>
+                <div className="space-y-1">
+                  <Label>Bairro</Label>
+                  <Input
+                    value={p.bairro ?? ""}
+                    onChange={(e) => update(idx, { bairro: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Cidade</Label>
+                  <Input
+                    value={p.cidade ?? ""}
+                    onChange={(e) => update(idx, { cidade: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>UF</Label>
+                  <Input
+                    value={p.estado ?? ""}
+                    maxLength={2}
+                    onChange={(e) => update(idx, { estado: e.target.value.toUpperCase() })}
+                  />
+                </div>
               </div>
               <Button onClick={() => salvar(p)} disabled={saving} className="w-full">
                 <Save className="h-4 w-4 mr-1" /> {saving ? "Salvando..." : "Salvar"}

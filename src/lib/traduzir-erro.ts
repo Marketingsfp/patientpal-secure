@@ -10,13 +10,25 @@ import { toast } from "sonner";
  */
 
 type QualquerErro =
-  | { message?: string; code?: string; hint?: string; details?: string; status?: number; error_description?: string }
+  | {
+      message?: string;
+      code?: string;
+      hint?: string;
+      details?: string;
+      status?: number;
+      error_description?: string;
+    }
   | string
   | null
   | undefined
   | unknown;
 
-function extrair(err: QualquerErro): { msg: string; code?: string; details?: string; hint?: string } {
+function extrair(err: QualquerErro): {
+  msg: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+} {
   if (!err) return { msg: "" };
   if (typeof err === "string") return { msg: err };
   const anyErr = err as any;
@@ -53,9 +65,7 @@ function traduzirPostgres(msg: string, code?: string, details?: string): string 
     case "23514":
       return "Um dos valores informados está fora do intervalo permitido.";
     case "23502":
-      return campo
-        ? `Preencha o campo ${campo}.`
-        : "Preencha todos os campos obrigatórios.";
+      return campo ? `Preencha o campo ${campo}.` : "Preencha todos os campos obrigatórios.";
     case "22001":
       return "Um dos textos informados é maior do que o permitido.";
     case "22003":
@@ -100,7 +110,11 @@ function traduzirAuth(msg: string): string | null {
 
 function traduzirRede(msg: string): string | null {
   const m = msg.toLowerCase();
-  if (m.includes("failed to fetch") || m.includes("networkerror") || m.includes("network request failed"))
+  if (
+    m.includes("failed to fetch") ||
+    m.includes("networkerror") ||
+    m.includes("network request failed")
+  )
     return "Sem conexão com o servidor. Verifique sua internet e tente novamente.";
   if (m.includes("timeout") || m.includes("timed out"))
     return "O servidor demorou para responder. Tente novamente.";
@@ -112,32 +126,39 @@ function traduzirStorage(msg: string): string | null {
   const m = msg.toLowerCase();
   if (m.includes("exceeded the maximum allowed size") || m.includes("payload too large"))
     return "Arquivo muito grande. Envie um arquivo menor.";
-  if (m.includes("bucket not found")) return "Local de armazenamento indisponível. Contate o suporte.";
+  if (m.includes("bucket not found"))
+    return "Local de armazenamento indisponível. Contate o suporte.";
   if (m.includes("mime type") || m.includes("invalid file type"))
     return "Tipo de arquivo não permitido.";
-  if (m.includes("duplicate") && m.includes("object"))
-    return "Já existe um arquivo com esse nome.";
+  if (m.includes("duplicate") && m.includes("object")) return "Já existe um arquivo com esse nome.";
   return null;
 }
 
 function traduzirFocusNfe(msg: string): string | null {
   const m = msg.toUpperCase();
-  if (m.includes("E0014")) return "Já existe uma nota com esse número (RPS). O sistema vai tentar novamente automaticamente.";
-  if (m.includes("E0120")) return "Inscrição municipal não informada ou inválida para este município.";
-  if (m.includes("E0160")) return "Regime tributário inválido. Verifique se o emitente está como Simples Nacional ou Normal.";
+  if (m.includes("E0014"))
+    return "Já existe uma nota com esse número (RPS). O sistema vai tentar novamente automaticamente.";
+  if (m.includes("E0120"))
+    return "Inscrição municipal não informada ou inválida para este município.";
+  if (m.includes("E0160"))
+    return "Regime tributário inválido. Verifique se o emitente está como Simples Nacional ou Normal.";
   if (m.includes("E0166")) return "Situação tributária do PIS/COFINS não informada.";
-  if (m.includes("E0310")) return "Código do serviço (Lista Nacional) inválido. Confira o item de serviço cadastrado.";
+  if (m.includes("E0310"))
+    return "Código do serviço (Lista Nacional) inválido. Confira o item de serviço cadastrado.";
   if (m.includes("E0539")) return "Exigibilidade do ISS não informada.";
   if (m.includes("E0712")) return "Falta o CPF/CNPJ ou razão social do tomador (paciente).";
   if (m.includes("E0713")) return "Faltam dados obrigatórios do tomador (paciente).";
-  if (/E\d{4}/.test(m)) return `A prefeitura rejeitou a nota (${m.match(/E\d{4}/)?.[0]}). Verifique os detalhes.`;
+  if (/E\d{4}/.test(m))
+    return `A prefeitura rejeitou a nota (${m.match(/E\d{4}/)?.[0]}). Verifique os detalhes.`;
   return null;
 }
 
 function pareceTecnico(msg: string): boolean {
   if (!msg) return true;
   return (
-    /(syntax error|relation ".+" does not exist|column ".+" of relation|null value in column|violates .+ constraint|invalid input syntax|does not exist)/i.test(msg) ||
+    /(syntax error|relation ".+" does not exist|column ".+" of relation|null value in column|violates .+ constraint|invalid input syntax|does not exist)/i.test(
+      msg,
+    ) ||
     /^[A-Z][a-zA-Z]+Error:/.test(msg) ||
     msg.includes("::") ||
     msg.length > 240
@@ -158,7 +179,8 @@ export function traduzirErro(err: QualquerErro, contexto?: string): string {
 
   if (!amigavel) {
     if (!msg) amigavel = "Não foi possível concluir a operação. Tente novamente.";
-    else if (pareceTecnico(msg)) amigavel = "Não foi possível concluir a operação. Tente novamente.";
+    else if (pareceTecnico(msg))
+      amigavel = "Não foi possível concluir a operação. Tente novamente.";
     else amigavel = msg; // já parece amigável (frase em PT-BR)
   }
 
@@ -182,7 +204,11 @@ export function mostrarErro(err: QualquerErro, contexto?: string) {
   const original = [code && `code=${code}`, msg, details, hint].filter(Boolean).join(" | ");
 
   // Log técnico completo para debug
-  try { console.error("[erro]", contexto ?? "", err); } catch { /* */ }
+  try {
+    console.error("[erro]", contexto ?? "", err);
+  } catch {
+    /* */
+  }
 
   if (original && original !== amigavel && pareceTecnico(msg)) {
     toast.error(amigavel, {
@@ -190,7 +216,11 @@ export function mostrarErro(err: QualquerErro, contexto?: string) {
       action: {
         label: "Ver detalhes",
         onClick: () => {
-          try { window.alert(original); } catch { /* */ }
+          try {
+            window.alert(original);
+          } catch {
+            /* */
+          }
         },
       },
     });

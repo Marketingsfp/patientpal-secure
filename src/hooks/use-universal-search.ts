@@ -3,8 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import type { CommandEntry } from "@/components/list-shell";
 
 export type UBTipo =
-  | "paciente" | "orcamento" | "agendamento" | "financeiro" | "nfse"
-  | "cartao_convenio" | "contrato_associado" | "medico" | "procedimento";
+  | "paciente"
+  | "orcamento"
+  | "agendamento"
+  | "financeiro"
+  | "nfse"
+  | "cartao_convenio"
+  | "contrato_associado"
+  | "medico"
+  | "procedimento";
 
 export interface UBRow {
   tipo: UBTipo;
@@ -88,7 +95,6 @@ export function useUniversalSearcher(opts: UseUniversalSearchOpts) {
         _limite: 24,
       });
       if (error) {
-        // eslint-disable-next-line no-console
         console.error("[ub] rpc", error);
         return [];
       }
@@ -107,7 +113,6 @@ export function useUniversalSearcher(opts: UseUniversalSearchOpts) {
       cacheRef.current.set(cacheKey, entries);
       return entries;
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error("[ub] catch", e);
       return [];
     }
@@ -115,7 +120,11 @@ export function useUniversalSearcher(opts: UseUniversalSearchOpts) {
 }
 
 /** Lê feature flag ub_v1 de profiles.preferencias_ui (default false). */
-export function useUBFlag(): { enabled: boolean; loading: boolean; setEnabled: (v: boolean) => Promise<void> } {
+export function useUBFlag(): {
+  enabled: boolean;
+  loading: boolean;
+  setEnabled: (v: boolean) => Promise<void>;
+} {
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const uidRef = useRef<string | null>(null);
@@ -124,25 +133,40 @@ export function useUBFlag(): { enabled: boolean; loading: boolean; setEnabled: (
     let alive = true;
     (async () => {
       const { data: u } = await supabase.auth.getUser();
-      if (!u.user) { if (alive) setLoading(false); return; }
+      if (!u.user) {
+        if (alive) setLoading(false);
+        return;
+      }
       uidRef.current = u.user.id;
-      const { data } = await supabase.from("profiles")
-        .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
+      const { data } = await supabase
+        .from("profiles")
+        .select("preferencias_ui")
+        .eq("id", u.user.id)
+        .maybeSingle();
       const prefs = (data?.preferencias_ui ?? {}) as { flags?: { ub_v1?: boolean } };
-      if (alive) { setEnabled(Boolean(prefs.flags?.ub_v1)); setLoading(false); }
+      if (alive) {
+        setEnabled(Boolean(prefs.flags?.ub_v1));
+        setLoading(false);
+      }
     })();
     const onChange = (e: Event) => {
       const ce = e as CustomEvent<{ ub_v1: boolean }>;
       if (alive && ce.detail) setEnabled(Boolean(ce.detail.ub_v1));
     };
     window.addEventListener("ub:flag-changed", onChange as EventListener);
-    return () => { alive = false; window.removeEventListener("ub:flag-changed", onChange as EventListener); };
+    return () => {
+      alive = false;
+      window.removeEventListener("ub:flag-changed", onChange as EventListener);
+    };
   }, []);
 
   const set = async (v: boolean) => {
     if (!uidRef.current) return;
-    const { data } = await supabase.from("profiles")
-      .select("preferencias_ui").eq("id", uidRef.current).maybeSingle();
+    const { data } = await supabase
+      .from("profiles")
+      .select("preferencias_ui")
+      .eq("id", uidRef.current)
+      .maybeSingle();
     const prev = (data?.preferencias_ui ?? {}) as Record<string, unknown>;
     const flags = { ...((prev.flags as object) ?? {}), ub_v1: v };
     const next = { ...prev, flags };

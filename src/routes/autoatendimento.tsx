@@ -35,14 +35,7 @@ function AutoatendimentoRoute() {
   );
 }
 
-type Hub =
-  | "home"
-  | "checkin"
-  | "agendar"
-  | "vagas"
-  | "pagamento"
-  | "ok-checkin"
-  | "ok-agendar";
+type Hub = "home" | "checkin" | "agendar" | "vagas" | "pagamento" | "ok-checkin" | "ok-agendar";
 type IdentMode = "cpf" | "facial" | null;
 
 type Vaga = {
@@ -212,7 +205,8 @@ function AutoatendimentoPage() {
       let melhor: { paciente_id: string; nome: string; dist: number } | null = null;
       for (const bio of ativas) {
         const d = euclidean(descritor, bio.descriptor);
-        if (!melhor || d < melhor.dist) melhor = { paciente_id: bio.paciente_id, nome: bio.nome, dist: d };
+        if (!melhor || d < melhor.dist)
+          melhor = { paciente_id: bio.paciente_id, nome: bio.nome, dist: d };
       }
       stopCamera();
       if (melhor && melhor.dist <= FACE_MATCH_THRESHOLD) {
@@ -265,10 +259,7 @@ function AutoatendimentoPage() {
     });
 
     if (a.fluxo_etapa !== "triagem" && a.fluxo_etapa !== "atendimento") {
-      await supabase
-        .from("agendamentos")
-        .update({ fluxo_etapa: "recepcao" })
-        .eq("id", a.id);
+      await supabase.from("agendamentos").update({ fluxo_etapa: "recepcao" }).eq("id", a.id);
     }
     setStep("ok-checkin");
   }
@@ -276,10 +267,7 @@ function AutoatendimentoPage() {
   // -------- Solicitar agendamento (gera senha N) --------
   async function carregarEspecialidades() {
     if (!clinicaAtual) return;
-    const { data } = await supabase
-      .from("especialidades")
-      .select("id, nome")
-      .order("nome");
+    const { data } = await supabase.from("especialidades").select("id, nome").order("nome");
     const filtradas = (data ?? []).filter((e) => {
       const n = (e.nome || "").toUpperCase();
       return !n.includes("CARTAO") && !n.includes("CARTÃO") && !n.includes("SEGURO");
@@ -327,7 +315,9 @@ function AutoatendimentoPage() {
 
       const { data: disps } = await supabase
         .from("medico_disponibilidades")
-        .select("medico_id, dia_semana, hora_inicio, hora_fim, intervalo_min, ativo, agenda_id, vigencia_inicio, vigencia_fim")
+        .select(
+          "medico_id, dia_semana, hora_inicio, hora_fim, intervalo_min, ativo, agenda_id, vigencia_inicio, vigencia_fim",
+        )
         .in("medico_id", medicoIds)
         .eq("dia_semana", diaSemana)
         .eq("ativo", true);
@@ -502,7 +492,11 @@ function AutoatendimentoPage() {
         </div>
         <div className="text-right text-sm text-muted-foreground">
           <div className="capitalize">
-            {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
+            {new Date().toLocaleDateString("pt-BR", {
+              weekday: "long",
+              day: "2-digit",
+              month: "long",
+            })}
           </div>
           <div className="text-2xl font-mono tabular-nums text-foreground">
             <Clock />
@@ -606,7 +600,12 @@ function AutoatendimentoPage() {
                   className="w-full h-20 px-6 text-3xl tracking-widest rounded-xl border bg-background text-center"
                 />
                 <div className="grid grid-cols-2 gap-3">
-                  <Button variant="outline" size="lg" className="h-14" onClick={() => setIdentMode(null)}>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="h-14"
+                    onClick={() => setIdentMode(null)}
+                  >
                     Voltar
                   </Button>
                   <Button
@@ -759,23 +758,23 @@ function AutoatendimentoPage() {
               <>
                 <div className="space-y-4 max-h-[460px] overflow-auto pr-1">
                   {Object.values(
-                    vagas.reduce<Record<string, { medico_id: string; medico_nome: string; horarios: Vaga[] }>>(
-                      (acc, v) => {
-                        if (!acc[v.medico_id]) {
-                          acc[v.medico_id] = { medico_id: v.medico_id, medico_nome: v.medico_nome, horarios: [] };
-                        }
-                        acc[v.medico_id].horarios.push(v);
-                        return acc;
-                      },
-                      {},
-                    ),
+                    vagas.reduce<
+                      Record<string, { medico_id: string; medico_nome: string; horarios: Vaga[] }>
+                    >((acc, v) => {
+                      if (!acc[v.medico_id]) {
+                        acc[v.medico_id] = {
+                          medico_id: v.medico_id,
+                          medico_nome: v.medico_nome,
+                          horarios: [],
+                        };
+                      }
+                      acc[v.medico_id].horarios.push(v);
+                      return acc;
+                    }, {}),
                   )
                     .sort((a, b) => a.medico_nome.localeCompare(b.medico_nome))
                     .map((grupo) => (
-                      <div
-                        key={grupo.medico_id}
-                        className="rounded-2xl border-2 p-4 bg-card/50"
-                      >
+                      <div key={grupo.medico_id} className="rounded-2xl border-2 p-4 bg-card/50">
                         <div className="mb-3">
                           <div className="text-sm text-muted-foreground">Dr(a).</div>
                           <div className="text-lg font-semibold">{grupo.medico_nome}</div>
@@ -821,9 +820,7 @@ function AutoatendimentoPage() {
               <p className="text-muted-foreground">
                 {vagaSel.medico_nome} · {vagaSel.hora_label}
               </p>
-              {procInfo && (
-                <p className="text-sm text-muted-foreground">{procInfo.nome}</p>
-              )}
+              {procInfo && <p className="text-sm text-muted-foreground">{procInfo.nome}</p>}
             </div>
             <div className="grid grid-cols-2 gap-3">
               {(["dinheiro", "pix", "cartao_credito", "cartao_debito"] as FormaPagto[]).map((f) => {

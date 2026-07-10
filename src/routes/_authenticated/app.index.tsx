@@ -54,11 +54,17 @@ function SubsystemChooser() {
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
-    supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle()
+    supabase
+      .from("profiles")
+      .select("nome")
+      .eq("id", user.id)
+      .maybeSingle()
       .then((res: { data: { nome: string | null } | null }) => {
         if (!cancelled && res.data?.nome) setNome(res.data.nome.split(" ")[0]);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [user?.id]);
 
   const saudacao = nome || (user?.email ? user.email.split("@")[0] : "");
@@ -85,9 +91,7 @@ function SubsystemChooser() {
       {/* Header escuro com saudação e busca */}
       <div className="text-white px-6 sm:px-10 pt-8 pb-16" style={{ backgroundColor: headerColor }}>
         <div className="mx-auto max-w-6xl">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
-            Olá, {saudacao}!
-          </h1>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Olá, {saudacao}!</h1>
         </div>
       </div>
 
@@ -104,7 +108,10 @@ function SubsystemChooser() {
               <Card className="p-6 h-full bg-white border shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all rounded-2xl">
                 <div
                   className="h-16 w-16 rounded-2xl flex items-center justify-center mb-5"
-                  style={{ backgroundColor: `color-mix(in oklab, ${c.accent} 12%, transparent)`, color: c.accent }}
+                  style={{
+                    backgroundColor: `color-mix(in oklab, ${c.accent} 12%, transparent)`,
+                    color: c.accent,
+                  }}
                 >
                   <c.icon className="h-8 w-8" strokeWidth={1.75} />
                 </div>

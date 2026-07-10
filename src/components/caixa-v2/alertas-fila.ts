@@ -16,13 +16,13 @@ export interface AlertaBadge {
 }
 
 export interface FilaAlertInput {
-  inicio: string;              // ISO — horário previsto/checkin
+  inicio: string; // ISO — horário previsto/checkin
   ja_pago: boolean;
   em_atendimento?: boolean;
   tem_orcamento_pendente?: boolean;
   paciente_cpf?: string | null;
   paciente_endereco?: string | null;
-  agora?: number;              // override p/ testes
+  agora?: number; // override p/ testes
 }
 
 export function detectarAlertas(f: FilaAlertInput): AlertaBadge[] {
@@ -31,7 +31,12 @@ export function detectarAlertas(f: FilaAlertInput): AlertaBadge[] {
   const out: AlertaBadge[] = [];
 
   if (!f.ja_pago && esperaMin > 20) {
-    out.push({ tipo: "espera-longa", label: `Espera ${esperaMin}min`, emoji: "⏱️", severity: "warn" });
+    out.push({
+      tipo: "espera-longa",
+      label: `Espera ${esperaMin}min`,
+      emoji: "⏱️",
+      severity: "warn",
+    });
   }
   if (f.ja_pago && !f.em_atendimento) {
     out.push({ tipo: "pago-aguardando", label: "Pago aguardando", emoji: "🟢", severity: "info" });
@@ -45,7 +50,12 @@ export function detectarAlertas(f: FilaAlertInput): AlertaBadge[] {
   const cpfOk = (f.paciente_cpf ?? "").replace(/\D/g, "").length === 11;
   const endOk = (f.paciente_endereco ?? "").trim().length > 3;
   if (!cpfOk || !endOk) {
-    out.push({ tipo: "cadastro-incompleto", label: "Cadastro incompleto", emoji: "📋", severity: "warn" });
+    out.push({
+      tipo: "cadastro-incompleto",
+      label: "Cadastro incompleto",
+      emoji: "📋",
+      severity: "warn",
+    });
   }
   return out;
 }

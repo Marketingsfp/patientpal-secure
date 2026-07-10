@@ -12,8 +12,22 @@ import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { Loader2, Sparkles, Save, Stethoscope, AlertTriangle, CheckCircle2, Bell, Upload, UserCheck } from "lucide-react";
-import { classificarResultadoExame, extrairTextoExameDeArquivo, type ClassificacaoExame } from "@/lib/exames-ia.functions";
+import {
+  Loader2,
+  Sparkles,
+  Save,
+  Stethoscope,
+  AlertTriangle,
+  CheckCircle2,
+  Bell,
+  Upload,
+  UserCheck,
+} from "lucide-react";
+import {
+  classificarResultadoExame,
+  extrairTextoExameDeArquivo,
+  type ClassificacaoExame,
+} from "@/lib/exames-ia.functions";
 
 export const Route = createFileRoute("/_authenticated/app/exames-resultados")({
   component: ExamesResultadosPage,
@@ -78,8 +92,14 @@ function ExamesResultadosPage() {
           .eq("ativo", true)
           .order("nome")
           .limit(2000),
-        supabase.from("exame_resultados").select("id,paciente_nome,tipo_exame,resultado_texto,status,ia_resumo,ia_recomendacao,ia_mensagem_paciente,created_at")
-          .eq("clinica_id", clinicaId).order("created_at", { ascending: false }).limit(50),
+        supabase
+          .from("exame_resultados")
+          .select(
+            "id,paciente_nome,tipo_exame,resultado_texto,status,ia_resumo,ia_recomendacao,ia_mensagem_paciente,created_at",
+          )
+          .eq("clinica_id", clinicaId)
+          .order("created_at", { ascending: false })
+          .limit(50),
         supabase
           .from("medicos")
           .select("especialidades(nome)")
@@ -89,11 +109,13 @@ function ExamesResultadosPage() {
       if (p.data) setPacientes(p.data as Paciente[]);
       if (r.data) setRows(r.data as Row[]);
       if (esp.data) {
-        const nomes = Array.from(new Set(
-          (esp.data as Array<{ especialidades: { nome: string } | null }>)
-            .map((r) => r.especialidades?.nome)
-            .filter((n): n is string => !!n),
-        )).sort();
+        const nomes = Array.from(
+          new Set(
+            (esp.data as Array<{ especialidades: { nome: string } | null }>)
+              .map((r) => r.especialidades?.nome)
+              .filter((n): n is string => !!n),
+          ),
+        ).sort();
         setEspecialidades(nomes);
       }
     })();
@@ -220,7 +242,9 @@ function ExamesResultadosPage() {
           ia_mensagem_paciente: analise?.mensagem_paciente ?? null,
           classificado_em: analise ? new Date().toISOString() : null,
         })
-        .select("id,paciente_nome,tipo_exame,resultado_texto,status,ia_resumo,ia_recomendacao,ia_mensagem_paciente,created_at")
+        .select(
+          "id,paciente_nome,tipo_exame,resultado_texto,status,ia_resumo,ia_recomendacao,ia_mensagem_paciente,created_at",
+        )
         .single();
       if (error) throw error;
 
@@ -243,7 +267,10 @@ function ExamesResultadosPage() {
         toast.success("Resultado salvo.");
       }
       setRows((r) => [ins as Row, ...r].slice(0, 50));
-      setTipo(""); setTexto(""); setContexto(""); setAnalise(null);
+      setTipo("");
+      setTexto("");
+      setContexto("");
+      setAnalise(null);
     } catch (e: unknown) {
       mostrarErro(e);
     } finally {
@@ -256,7 +283,9 @@ function ExamesResultadosPage() {
       <div className="flex items-center gap-2">
         <Stethoscope className="h-6 w-6 text-amber-600" />
         <h1 className="text-2xl font-bold">Resultados de Exames</h1>
-        <Badge variant="secondary" className="ml-2">IA classifica e dispara alerta para enfermagem</Badge>
+        <Badge variant="secondary" className="ml-2">
+          IA classifica e dispara alerta para enfermagem
+        </Badge>
       </div>
 
       <Card className="p-5 space-y-4">
@@ -274,12 +303,21 @@ function ExamesResultadosPage() {
           </div>
           <div className="space-y-1.5">
             <Label>Tipo de exame</Label>
-            <Input value={tipo} onChange={(e) => setTipo(e.target.value)} placeholder="Ex.: Hemograma completo, TSH, Glicemia de jejum…" />
+            <Input
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value)}
+              placeholder="Ex.: Hemograma completo, TSH, Glicemia de jejum…"
+            />
           </div>
         </div>
         <div className="space-y-1.5">
           <Label>Resultado (cole o texto do laudo)</Label>
-          <Textarea rows={8} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Cole aqui o resultado completo do exame…" />
+          <Textarea
+            rows={8}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder="Cole aqui o resultado completo do exame…"
+          />
           <div className="flex items-center gap-2 pt-1">
             <input
               ref={fileRef}
@@ -291,21 +329,41 @@ function ExamesResultadosPage() {
                 if (f) void handleArquivo(f);
               }}
             />
-            <Button type="button" variant="outline" size="sm" disabled={extraindo} onClick={() => fileRef.current?.click()}>
-              {extraindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={extraindo}
+              onClick={() => fileRef.current?.click()}
+            >
+              {extraindo ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4" />
+              )}
               Anexar laudo (imagem/PDF) — IA lê e classifica
             </Button>
-            <span className="text-xs text-muted-foreground">Suporta JPG, PNG ou PDF até 10 MB.</span>
+            <span className="text-xs text-muted-foreground">
+              Suporta JPG, PNG ou PDF até 10 MB.
+            </span>
           </div>
         </div>
         <div className="space-y-1.5">
           <Label>Contexto clínico (opcional)</Label>
-          <Input value={contexto} onChange={(e) => setContexto(e.target.value)} placeholder="Ex.: paciente diabético em uso de metformina" />
+          <Input
+            value={contexto}
+            onChange={(e) => setContexto(e.target.value)}
+            placeholder="Ex.: paciente diabético em uso de metformina"
+          />
         </div>
 
         <div className="flex flex-wrap gap-2">
           <Button onClick={handleClassificar} disabled={classificando} variant="default">
-            {classificando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {classificando ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
             Classificar com IA
           </Button>
           <Button onClick={handleSalvar} disabled={salvando} variant="secondary">
@@ -315,42 +373,76 @@ function ExamesResultadosPage() {
         </div>
 
         {analise && (
-          <Card className="p-4 border-l-4 space-y-2"
-            style={{ borderLeftColor: analise.status === "critico" ? "#dc2626" : analise.status === "alterado" ? "#d97706" : "#16a34a" }}>
+          <Card
+            className="p-4 border-l-4 space-y-2"
+            style={{
+              borderLeftColor:
+                analise.status === "critico"
+                  ? "#dc2626"
+                  : analise.status === "alterado"
+                    ? "#d97706"
+                    : "#16a34a",
+            }}
+          >
             <div className="flex items-center gap-2">
-              {analise.status === "normal" ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <AlertTriangle className="h-5 w-5 text-amber-600" />}
+              {analise.status === "normal" ? (
+                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              )}
               <span className="font-semibold uppercase tracking-wide">
                 {analise.status} · severidade {analise.severidade}
               </span>
-              {analise.precisa_contato && <Badge variant="destructive"><Bell className="h-3 w-3 mr-1" />contato necessário</Badge>}
+              {analise.precisa_contato && (
+                <Badge variant="destructive">
+                  <Bell className="h-3 w-3 mr-1" />
+                  contato necessário
+                </Badge>
+              )}
             </div>
             {analise.achados_relevantes.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {analise.achados_relevantes.map((a, i) => <Badge key={i} variant="outline">{a}</Badge>)}
+                {analise.achados_relevantes.map((a, i) => (
+                  <Badge key={i} variant="outline">
+                    {a}
+                  </Badge>
+                ))}
               </div>
             )}
-            {analise.resumo && <p className="text-sm"><strong>Resumo:</strong> {analise.resumo}</p>}
-            {analise.recomendacao && <p className="text-sm"><strong>Recomendação:</strong> {analise.recomendacao}</p>}
+            {analise.resumo && (
+              <p className="text-sm">
+                <strong>Resumo:</strong> {analise.resumo}
+              </p>
+            )}
+            {analise.recomendacao && (
+              <p className="text-sm">
+                <strong>Recomendação:</strong> {analise.recomendacao}
+              </p>
+            )}
             {analise.especialidade_indicada && (
               <div className="rounded-md border bg-primary/5 p-3 space-y-1">
                 <div className="flex items-center gap-2 text-sm">
                   <UserCheck className="h-4 w-4 text-primary" />
                   <span className="font-semibold">Encaminhamento sugerido:</span>
-                  <Badge variant="secondary" className="uppercase">{analise.especialidade_indicada}</Badge>
+                  <Badge variant="secondary" className="uppercase">
+                    {analise.especialidade_indicada}
+                  </Badge>
                   <Badge
                     className={
                       analise.urgencia_encaminhamento === "urgente"
                         ? "bg-red-500/15 text-red-700 dark:text-red-300 uppercase"
                         : analise.urgencia_encaminhamento === "prioritario"
-                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 uppercase"
-                        : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 uppercase"
+                          ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 uppercase"
+                          : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 uppercase"
                     }
                   >
                     {analise.urgencia_encaminhamento}
                   </Badge>
                 </div>
                 {analise.justificativa_especialidade && (
-                  <p className="text-xs text-muted-foreground">{analise.justificativa_especialidade}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {analise.justificativa_especialidade}
+                  </p>
                 )}
               </div>
             )}
@@ -367,14 +459,22 @@ function ExamesResultadosPage() {
       <div>
         <h2 className="text-lg font-semibold mb-3">Últimos 50 resultados</h2>
         <div className="space-y-2">
-          {rows.length === 0 && <p className="text-sm text-muted-foreground">Nenhum resultado registrado ainda.</p>}
+          {rows.length === 0 && (
+            <p className="text-sm text-muted-foreground">Nenhum resultado registrado ainda.</p>
+          )}
           {rows.map((r) => (
             <Card key={r.id} className="p-3 flex items-start gap-3">
               <Badge className={`uppercase ${STATUS_COR[r.status]}`}>{r.status}</Badge>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">{r.tipo_exame} — {r.paciente_nome ?? "—"}</div>
-                {r.ia_resumo && <div className="text-xs text-muted-foreground line-clamp-2">{r.ia_resumo}</div>}
-                <div className="text-[11px] text-muted-foreground mt-0.5">{new Date(r.created_at).toLocaleString("pt-BR")}</div>
+                <div className="text-sm font-medium truncate">
+                  {r.tipo_exame} — {r.paciente_nome ?? "—"}
+                </div>
+                {r.ia_resumo && (
+                  <div className="text-xs text-muted-foreground line-clamp-2">{r.ia_resumo}</div>
+                )}
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  {new Date(r.created_at).toLocaleString("pt-BR")}
+                </div>
               </div>
             </Card>
           ))}

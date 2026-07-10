@@ -14,13 +14,19 @@ const STEPS = [
   { key: "confirmar", label: "Confirmação", Icon: CheckCircle2 },
 ] as const;
 
-type StepKey = typeof STEPS[number]["key"];
+type StepKey = (typeof STEPS)[number]["key"];
 
 /**
  * Wizard visual — Fase A. Não cria agendamento real ainda (isso entra na Fase E).
  * Objetivo: validar a experiência de criação em 4 passos, sem formulário tradicional.
  */
-export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+export function NovoAgendamentoWizard({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
   const [stepIdx, setStepIdx] = useState(0);
   const step: StepKey = STEPS[stepIdx].key;
   const [paciente, setPaciente] = useState<string | null>(null);
@@ -29,10 +35,20 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
   const [horario, setHorario] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
 
-  const reset = () => { setStepIdx(0); setPaciente(null); setServico(null); setHorario(null); setBusca(""); };
+  const reset = () => {
+    setStepIdx(0);
+    setPaciente(null);
+    setServico(null);
+    setHorario(null);
+    setBusca("");
+  };
 
-  const pacientesMock = ["Ana Beatriz Costa", "Carlos Eduardo Lima", "Marina Souza", "Pedro Henrique Alves"]
-    .filter((p) => p.toLowerCase().includes(busca.toLowerCase()));
+  const pacientesMock = [
+    "Ana Beatriz Costa",
+    "Carlos Eduardo Lima",
+    "Marina Souza",
+    "Pedro Henrique Alves",
+  ].filter((p) => p.toLowerCase().includes(busca.toLowerCase()));
 
   const servicosMock = [
     { nome: "Consulta cardiológica", cor: "#4F46E5" },
@@ -41,7 +57,18 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
     { nome: "Retorno", cor: "#8B5CF6" },
   ];
 
-  const slotsMock = ["08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "14:00", "14:30", "15:00", "15:30"];
+  const slotsMock = [
+    "08:30",
+    "09:00",
+    "09:30",
+    "10:00",
+    "10:30",
+    "11:00",
+    "14:00",
+    "14:30",
+    "15:00",
+    "15:30",
+  ];
 
   const canNext =
     (step === "paciente" && !!paciente) ||
@@ -56,11 +83,19 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) reset();
+        onOpenChange(v);
+      }}
+    >
       <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[720px] max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-3xl border-slate-200 bg-white">
         <VisuallyHidden.Root>
           <DialogTitle>Novo agendamento</DialogTitle>
-          <DialogDescription>Assistente em 4 passos para criar um novo agendamento.</DialogDescription>
+          <DialogDescription>
+            Assistente em 4 passos para criar um novo agendamento.
+          </DialogDescription>
         </VisuallyHidden.Root>
         <div className="px-5 md:px-8 pt-6 md:pt-8 pb-4">
           <div className="text-[10px] font-semibold uppercase tracking-widest text-indigo-500">
@@ -116,7 +151,11 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
                   >
                     <Avatar className="h-9 w-9 border border-slate-200">
                       <AvatarFallback className="bg-slate-50 text-slate-500 text-xs font-semibold">
-                        {p.split(" ").slice(0, 2).map((s) => s[0]).join("")}
+                        {p
+                          .split(" ")
+                          .slice(0, 2)
+                          .map((s) => s[0])
+                          .join("")}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
@@ -150,7 +189,9 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
                 </button>
               ))}
               <div className="col-span-2 mt-3">
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Duração</div>
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
+                  Duração
+                </div>
                 <div className="flex gap-2">
                   {[15, 30, 45, 60, 90].map((d) => (
                     <button
@@ -174,7 +215,9 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
 
           {step === "horario" && (
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Hoje</div>
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
+                Hoje
+              </div>
               <div className="grid grid-cols-5 gap-2">
                 {slotsMock.map((h) => (
                   <button
@@ -192,18 +235,33 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
                   </button>
                 ))}
               </div>
-              <p className="mt-4 text-[11px] text-slate-400">Slots de exemplo · a integração com a disponibilidade real entra na Fase E.</p>
+              <p className="mt-4 text-[11px] text-slate-400">
+                Slots de exemplo · a integração com a disponibilidade real entra na Fase E.
+              </p>
             </div>
           )}
 
           {step === "confirmar" && (
             <div className="rounded-2xl border border-slate-200 bg-slate-50/40 p-6 space-y-3">
-              <div className="flex justify-between text-sm"><span className="text-slate-500">Paciente</span><span className="font-semibold text-slate-900">{paciente}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-slate-500">Serviço</span><span className="font-semibold text-slate-900">{servico}</span></div>
-              <div className="flex justify-between text-sm"><span className="text-slate-500">Duração</span><span className="font-semibold text-slate-900 tabular-nums">{duracao} min</span></div>
-              <div className="flex justify-between text-sm"><span className="text-slate-500">Horário</span><span className="font-semibold text-slate-900 tabular-nums">{horario}</span></div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Paciente</span>
+                <span className="font-semibold text-slate-900">{paciente}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Serviço</span>
+                <span className="font-semibold text-slate-900">{servico}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Duração</span>
+                <span className="font-semibold text-slate-900 tabular-nums">{duracao} min</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">Horário</span>
+                <span className="font-semibold text-slate-900 tabular-nums">{horario}</span>
+              </div>
               <p className="text-[11px] text-slate-400 pt-3 border-t border-slate-200">
-                Este resumo é apenas visual (Fase A). O agendamento real será criado pela Fase E, reutilizando as funções atuais.
+                Este resumo é apenas visual (Fase A). O agendamento real será criado pela Fase E,
+                reutilizando as funções atuais.
               </p>
             </div>
           )}
@@ -223,7 +281,9 @@ export function NovoAgendamentoWizard({ open, onOpenChange }: { open: boolean; o
             onClick={() => (stepIdx === STEPS.length - 1 ? finish() : setStepIdx((i) => i + 1))}
             className={cn(
               "inline-flex items-center gap-1.5 h-10 px-5 rounded-xl text-sm font-semibold transition-all",
-              canNext ? "bg-slate-900 text-white hover:bg-slate-800" : "bg-slate-200 text-slate-400 cursor-not-allowed",
+              canNext
+                ? "bg-slate-900 text-white hover:bg-slate-800"
+                : "bg-slate-200 text-slate-400 cursor-not-allowed",
             )}
           >
             {stepIdx === STEPS.length - 1 ? "Confirmar" : "Continuar"}

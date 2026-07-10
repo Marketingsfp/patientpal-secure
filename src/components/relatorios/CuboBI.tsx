@@ -5,23 +5,51 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { MiniBarChart } from "@/components/charts/MiniBarChart";
 import { MiniPieChart } from "@/components/charts/MiniPieChart";
 import { MiniLineChart } from "@/components/charts/MiniLineChart";
 import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { Download, Save, Trash2, BarChart3, PieChart, LineChart, Table as TableIcon, ChevronRight, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import {
+  Download,
+  Save,
+  Trash2,
+  BarChart3,
+  PieChart,
+  LineChart,
+  Table as TableIcon,
+  ChevronRight,
+  ChevronDown,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+} from "lucide-react";
 
 // ============================================================
 // Tipos
 // ============================================================
 type Row = Record<string, any>;
 type FieldKind = "string" | "number" | "date";
-interface Field { key: string; label: string; kind: FieldKind; }
+interface Field {
+  key: string;
+  label: string;
+  kind: FieldKind;
+}
 
 interface CubeSpec {
   id: string;
@@ -62,30 +90,43 @@ const CUBOS: CubeSpec[] = [
       { key: "paciente", label: "Paciente", kind: "string" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const rows = await fetchAllRows(() => supabase
-        .from("agendamentos")
-        .select("inicio, status, procedimento, paciente_nome, medico_id, paciente_id")
-        .eq("clinica_id", clinicaId)
-        .gte("inicio", ini)
-        .lte("inicio", fim + "T23:59:59")
-        .order("inicio", { ascending: true }));
+      const rows = await fetchAllRows(() =>
+        supabase
+          .from("agendamentos")
+          .select("inicio, status, procedimento, paciente_nome, medico_id, paciente_id")
+          .eq("clinica_id", clinicaId)
+          .gte("inicio", ini)
+          .lte("inicio", fim + "T23:59:59")
+          .order("inicio", { ascending: true }),
+      );
       const [medMap, pacMap, espPorProc, espPorMedico] = await Promise.all([
-        lookupNames("medicos", rows.map((r) => r.medico_id)),
-        lookupNames("pacientes", rows.map((r) => r.paciente_id)),
-        lookupEspecialidadePorProcedimento(clinicaId, rows.map((r) => r.procedimento)),
+        lookupNames(
+          "medicos",
+          rows.map((r) => r.medico_id),
+        ),
+        lookupNames(
+          "pacientes",
+          rows.map((r) => r.paciente_id),
+        ),
+        lookupEspecialidadePorProcedimento(
+          clinicaId,
+          rows.map((r) => r.procedimento),
+        ),
         lookupEspecialidadePorMedico(rows.map((r) => r.medico_id)),
       ]);
-      return rows.map((r) => transformDate(r.inicio, {
-        status: r.status ?? "—",
-        medico: medMap.get(r.medico_id) ?? "Sem médico",
-        especialidade:
-          extractEspFromProcNome(r.procedimento) ??
-          espPorProc.get(normalizeProcKey(r.procedimento)) ??
-          espPorMedico.get(r.medico_id) ??
-          "—",
-        procedimento: r.procedimento ?? "—",
-        paciente: pacMap.get(r.paciente_id) ?? r.paciente_nome ?? "—",
-      }));
+      return rows.map((r) =>
+        transformDate(r.inicio, {
+          status: r.status ?? "—",
+          medico: medMap.get(r.medico_id) ?? "Sem médico",
+          especialidade:
+            extractEspFromProcNome(r.procedimento) ??
+            espPorProc.get(normalizeProcKey(r.procedimento)) ??
+            espPorMedico.get(r.medico_id) ??
+            "—",
+          procedimento: r.procedimento ?? "—",
+          paciente: pacMap.get(r.paciente_id) ?? r.paciente_nome ?? "—",
+        }),
+      );
     },
   },
   {
@@ -109,31 +150,49 @@ const CUBOS: CubeSpec[] = [
       { key: "valor", label: "Valor (R$)", kind: "number" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const rows = await fetchAllRows(() => supabase
-        .from("fin_lancamentos")
-        .select("data, tipo, valor, status, forma_pagamento, categoria_id, conta_id, paciente_id, medico_id")
-        .eq("clinica_id", clinicaId)
-        .gte("data", ini)
-        .lte("data", fim)
-        .order("data", { ascending: true }));
+      const rows = await fetchAllRows(() =>
+        supabase
+          .from("fin_lancamentos")
+          .select(
+            "data, tipo, valor, status, forma_pagamento, categoria_id, conta_id, paciente_id, medico_id",
+          )
+          .eq("clinica_id", clinicaId)
+          .gte("data", ini)
+          .lte("data", fim)
+          .order("data", { ascending: true }),
+      );
       const [catMap, contMap, pacMap, medMap, espMap] = await Promise.all([
-        lookupNames("fin_categorias", rows.map((r) => r.categoria_id)),
-        lookupNames("fin_contas", rows.map((r) => r.conta_id)),
-        lookupNames("pacientes", rows.map((r) => r.paciente_id)),
-        lookupNames("medicos", rows.map((r) => r.medico_id)),
+        lookupNames(
+          "fin_categorias",
+          rows.map((r) => r.categoria_id),
+        ),
+        lookupNames(
+          "fin_contas",
+          rows.map((r) => r.conta_id),
+        ),
+        lookupNames(
+          "pacientes",
+          rows.map((r) => r.paciente_id),
+        ),
+        lookupNames(
+          "medicos",
+          rows.map((r) => r.medico_id),
+        ),
         lookupEspecialidadePorMedico(rows.map((r) => r.medico_id)),
       ]);
-      return rows.map((r) => transformDate(r.data, {
-        tipo: r.tipo ?? "—",
-        categoria: catMap.get(r.categoria_id) ?? "Sem categoria",
-        conta: contMap.get(r.conta_id) ?? "—",
-        forma_pagamento: r.forma_pagamento ?? "—",
-        status: r.status ?? "—",
-        medico: medMap.get(r.medico_id) ?? "—",
-        especialidade: espMap.get(r.medico_id) ?? "—",
-        paciente: pacMap.get(r.paciente_id) ?? "—",
-        valor: Number(r.valor) || 0,
-      }));
+      return rows.map((r) =>
+        transformDate(r.data, {
+          tipo: r.tipo ?? "—",
+          categoria: catMap.get(r.categoria_id) ?? "Sem categoria",
+          conta: contMap.get(r.conta_id) ?? "—",
+          forma_pagamento: r.forma_pagamento ?? "—",
+          status: r.status ?? "—",
+          medico: medMap.get(r.medico_id) ?? "—",
+          especialidade: espMap.get(r.medico_id) ?? "—",
+          paciente: pacMap.get(r.paciente_id) ?? "—",
+          valor: Number(r.valor) || 0,
+        }),
+      );
     },
   },
   {
@@ -151,23 +210,33 @@ const CUBOS: CubeSpec[] = [
       { key: "mes_nome", label: "Mês (Jan-Dez)", kind: "string" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const rows = await fetchAllRows(() => supabase
-        .from("prontuarios")
-        .select("data, medico_id, paciente_id")
-        .eq("clinica_id", clinicaId)
-        .gte("data", ini)
-        .lte("data", fim + "T23:59:59")
-        .order("data", { ascending: true }));
+      const rows = await fetchAllRows(() =>
+        supabase
+          .from("prontuarios")
+          .select("data, medico_id, paciente_id")
+          .eq("clinica_id", clinicaId)
+          .gte("data", ini)
+          .lte("data", fim + "T23:59:59")
+          .order("data", { ascending: true }),
+      );
       const [medMap, pacMap, espMap] = await Promise.all([
-        lookupNames("medicos", rows.map((r) => r.medico_id)),
-        lookupNames("pacientes", rows.map((r) => r.paciente_id)),
+        lookupNames(
+          "medicos",
+          rows.map((r) => r.medico_id),
+        ),
+        lookupNames(
+          "pacientes",
+          rows.map((r) => r.paciente_id),
+        ),
         lookupEspecialidadePorMedico(rows.map((r) => r.medico_id)),
       ]);
-      return rows.map((r) => transformDate(r.data, {
-        medico: medMap.get(r.medico_id) ?? "Sem médico",
-        especialidade: espMap.get(r.medico_id) ?? "—",
-        paciente: pacMap.get(r.paciente_id) ?? "—",
-      }));
+      return rows.map((r) =>
+        transformDate(r.data, {
+          medico: medMap.get(r.medico_id) ?? "Sem médico",
+          especialidade: espMap.get(r.medico_id) ?? "—",
+          paciente: pacMap.get(r.paciente_id) ?? "—",
+        }),
+      );
     },
   },
   {
@@ -181,11 +250,13 @@ const CUBOS: CubeSpec[] = [
       { key: "ativo", label: "Ativo", kind: "string" },
     ],
     load: async ({ clinicaId }) => {
-      const rows = await fetchAllRows(() => supabase
-        .from("pacientes")
-        .select("sexo, ativo, created_at")
-        .eq("clinica_id", clinicaId)
-        .order("created_at", { ascending: true }));
+      const rows = await fetchAllRows(() =>
+        supabase
+          .from("pacientes")
+          .select("sexo, ativo, created_at")
+          .eq("clinica_id", clinicaId)
+          .order("created_at", { ascending: true }),
+      );
       return rows.map((r: any) => {
         const d = (r.created_at ?? "").slice(0, 10);
         return {
@@ -213,26 +284,46 @@ const CUBOS: CubeSpec[] = [
       { key: "desconto", label: "Desconto (R$)", kind: "number" },
     ],
     load: async ({ clinicaId, ini, fim }) => {
-      const rows = await fetchAllRows(() => supabase
-        .from("orcamentos")
-        .select("created_at, status, valor_final, desconto, paciente_id")
-        .eq("clinica_id", clinicaId)
-        .gte("created_at", ini)
-        .lte("created_at", fim + "T23:59:59")
-        .order("created_at", { ascending: true }));
-      const pacMap = await lookupNames("pacientes", rows.map((r) => r.paciente_id));
-      return rows.map((r) => transformDate(r.created_at, {
-        status: r.status ?? "—",
-        paciente: pacMap.get(r.paciente_id) ?? "—",
-        valor_final: Number(r.valor_final) || 0,
-        desconto: Number(r.desconto) || 0,
-      }));
+      const rows = await fetchAllRows(() =>
+        supabase
+          .from("orcamentos")
+          .select("created_at, status, valor_final, desconto, paciente_id")
+          .eq("clinica_id", clinicaId)
+          .gte("created_at", ini)
+          .lte("created_at", fim + "T23:59:59")
+          .order("created_at", { ascending: true }),
+      );
+      const pacMap = await lookupNames(
+        "pacientes",
+        rows.map((r) => r.paciente_id),
+      );
+      return rows.map((r) =>
+        transformDate(r.created_at, {
+          status: r.status ?? "—",
+          paciente: pacMap.get(r.paciente_id) ?? "—",
+          valor_final: Number(r.valor_final) || 0,
+          desconto: Number(r.desconto) || 0,
+        }),
+      );
     },
   },
 ];
 
 const DIAS_SEMANA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-const MESES_NOMES = ["01-Jan", "02-Fev", "03-Mar", "04-Abr", "05-Mai", "06-Jun", "07-Jul", "08-Ago", "09-Set", "10-Out", "11-Nov", "12-Dez"];
+const MESES_NOMES = [
+  "01-Jan",
+  "02-Fev",
+  "03-Mar",
+  "04-Abr",
+  "05-Mai",
+  "06-Jun",
+  "07-Jul",
+  "08-Ago",
+  "09-Set",
+  "10-Out",
+  "11-Nov",
+  "12-Dez",
+];
 
 async function fetchAllRows(builder: () => any): Promise<any[]> {
   const PAGE_SIZE = 1000;
@@ -357,7 +448,17 @@ async function lookupEspecialidadePorProcedimento(
 }
 
 function transformDate(isoStr: string | null, base: Record<string, any>) {
-  if (!isoStr) return { ...base, dia: "", mes: "", mes_ano: "", ano: "", mes_nome: "", dia_semana: "", hora: "" };
+  if (!isoStr)
+    return {
+      ...base,
+      dia: "",
+      mes: "",
+      mes_ano: "",
+      ano: "",
+      mes_nome: "",
+      dia_semana: "",
+      hora: "",
+    };
   const d = new Date(isoStr);
   const mesIdx = Number(isoStr.slice(5, 7)) - 1;
   const ano = isoStr.slice(0, 4);
@@ -380,8 +481,10 @@ function sortLabels(labels: string[], fieldKey: string | null): string[] {
 
 function compareLabels(a: string, b: string, fieldKey: string | null): number {
   const collator = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true });
-  if (fieldKey === "mes" || fieldKey === "mes_nome") return monthNameToOrder(a) - monthNameToOrder(b);
-  if (fieldKey === "mes_ano" || fieldKey === "dia" || fieldKey === "ano" || fieldKey === "hora") return collator.compare(a, b);
+  if (fieldKey === "mes" || fieldKey === "mes_nome")
+    return monthNameToOrder(a) - monthNameToOrder(b);
+  if (fieldKey === "mes_ano" || fieldKey === "dia" || fieldKey === "ano" || fieldKey === "hora")
+    return collator.compare(a, b);
   return collator.compare(a, b);
 }
 
@@ -415,7 +518,13 @@ function pivot(
   colKey: string | null,
   measureField: string | null,
   measureAgg: AggKind,
-): { rowLabels: string[]; colLabels: string[]; matrix: number[][]; totalByRow: number[]; totalByCol: number[] } {
+): {
+  rowLabels: string[];
+  colLabels: string[];
+  matrix: number[][];
+  totalByRow: number[];
+  totalByCol: number[];
+} {
   const rowSet = new Map<string, Row[]>();
   for (const r of rows) {
     const k = String(r[rowKey] ?? "—");
@@ -434,17 +543,23 @@ function pivot(
       const aggregated = subset.some((r) => r.__aggregated);
       const vals = aggregated
         ? subset.map((r) => Number(r.__value) || 0)
-        : measureField ? subset.map((r) => Number(r[measureField]) || 0) : [];
-      matrix[ri][ci] = aggregated ? aggregate(subset, vals, measureAgg === "count" ? "sum" : measureAgg) : aggregate(subset, vals, measureAgg);
+        : measureField
+          ? subset.map((r) => Number(r[measureField]) || 0)
+          : [];
+      matrix[ri][ci] = aggregated
+        ? aggregate(subset, vals, measureAgg === "count" ? "sum" : measureAgg)
+        : aggregate(subset, vals, measureAgg);
     });
   });
   const totalByRow = matrix.map((r) => r.reduce((a, b) => a + b, 0));
   const totalByCol = colLabels.map((_, ci) => matrix.reduce((s, r) => s + r[ci], 0));
-  const order = totalByRow.map((_, i) => i).sort((a, b) => (
-    shouldSortDimensionChronologically(rowKey)
-      ? compareLabels(rowLabels[a], rowLabels[b], rowKey)
-      : totalByRow[b] - totalByRow[a]
-  ));
+  const order = totalByRow
+    .map((_, i) => i)
+    .sort((a, b) =>
+      shouldSortDimensionChronologically(rowKey)
+        ? compareLabels(rowLabels[a], rowLabels[b], rowKey)
+        : totalByRow[b] - totalByRow[a],
+    );
   return {
     rowLabels: order.map((i) => rowLabels[i]),
     colLabels,
@@ -454,8 +569,22 @@ function pivot(
   };
 }
 
-const PALETTE = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#84cc16", "#a855f7"];
-const fmtNum = (n: number) => Number.isInteger(n) ? n.toLocaleString("pt-BR") : n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+const PALETTE = [
+  "#3b82f6",
+  "#ef4444",
+  "#10b981",
+  "#f59e0b",
+  "#8b5cf6",
+  "#ec4899",
+  "#06b6d4",
+  "#f97316",
+  "#84cc16",
+  "#a855f7",
+];
+const fmtNum = (n: number) =>
+  Number.isInteger(n)
+    ? n.toLocaleString("pt-BR")
+    : n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 const fmtBRL = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 // ============================================================
@@ -475,7 +604,10 @@ interface CubeConfig {
   topN: number;
 }
 
-interface SavedView { name: string; config: CubeConfig; }
+interface SavedView {
+  name: string;
+  config: CubeConfig;
+}
 
 export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: string; fim: string }) {
   const STORAGE_KEY = `relatorios.cubo.views.${clinicaId ?? "default"}`;
@@ -509,7 +641,8 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
       case "este_ano":
         return { effIni: startOfYear(hoje.getFullYear()), effFim: fimISO };
       case "12m": {
-        const d = new Date(hoje); d.setMonth(d.getMonth() - 12);
+        const d = new Date(hoje);
+        d.setMonth(d.getMonth() - 12);
         return { effIni: d.toISOString().slice(0, 10), effFim: fimISO };
       }
       case "2anos":
@@ -528,7 +661,8 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
   function toggleExpand(label: string) {
     setExpanded((s) => {
       const next = new Set(s);
-      if (next.has(label)) next.delete(label); else next.add(label);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
       return next;
     });
   }
@@ -538,12 +672,22 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       setSaved(raw ? JSON.parse(raw) : []);
-    } catch { setSaved([]); }
+    } catch {
+      setSaved([]);
+    }
   }, [STORAGE_KEY]);
 
-  const financeLoadKey = cube.id === "financeiro"
-    ? [cfg.rowKey, cfg.subRowKey ?? "", cfg.subSubRowKey ?? "", cfg.colKey ?? "", cfg.measureField ?? "", cfg.measureAgg].join("|")
-    : "";
+  const financeLoadKey =
+    cube.id === "financeiro"
+      ? [
+          cfg.rowKey,
+          cfg.subRowKey ?? "",
+          cfg.subSubRowKey ?? "",
+          cfg.colKey ?? "",
+          cfg.measureField ?? "",
+          cfg.measureAgg,
+        ].join("|")
+      : "";
 
   // fetch data
   useEffect(() => {
@@ -551,14 +695,21 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     let cancel = false;
     setLoading(true);
     setRawRows([]);
-    const loadRows = cube.id === "financeiro"
-      ? loadFinanceiroAgregado(clinicaId, effIni, effFim, cfg)
-      : cube.load({ clinicaId, ini: effIni, fim: effFim });
+    const loadRows =
+      cube.id === "financeiro"
+        ? loadFinanceiroAgregado(clinicaId, effIni, effFim, cfg)
+        : cube.load({ clinicaId, ini: effIni, fim: effFim });
     loadRows
-      .then((rows) => { if (!cancel) setRawRows(rows); })
+      .then((rows) => {
+        if (!cancel) setRawRows(rows);
+      })
       .catch((e) => mostrarErro(e))
-      .finally(() => { if (!cancel) setLoading(false); });
-    return () => { cancel = true; };
+      .finally(() => {
+        if (!cancel) setLoading(false);
+      });
+    return () => {
+      cancel = true;
+    };
   }, [clinicaId, effIni, effFim, cube, financeLoadKey]);
 
   // when cube changes, validate fields
@@ -568,13 +719,22 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
       const numKeys = cube.fields.filter((f) => f.kind === "number").map((f) => f.key);
       const rowKey = keys.includes(c.rowKey) ? c.rowKey : (keys[0] ?? "");
       const colKey = c.colKey && keys.includes(c.colKey) ? c.colKey : null;
-      const subRowKey = c.subRowKey && keys.includes(c.subRowKey) && c.subRowKey !== rowKey ? c.subRowKey : null;
+      const subRowKey =
+        c.subRowKey && keys.includes(c.subRowKey) && c.subRowKey !== rowKey ? c.subRowKey : null;
       const subSubRowKey =
-        c.subSubRowKey && keys.includes(c.subSubRowKey) && c.subSubRowKey !== rowKey && c.subSubRowKey !== subRowKey
+        c.subSubRowKey &&
+        keys.includes(c.subSubRowKey) &&
+        c.subSubRowKey !== rowKey &&
+        c.subSubRowKey !== subRowKey
           ? c.subSubRowKey
           : null;
-      const measureField = c.measureField && numKeys.includes(c.measureField) ? c.measureField : null;
-      const measureAgg: AggKind = measureField ? (c.measureAgg === "count" ? "sum" : c.measureAgg) : "count";
+      const measureField =
+        c.measureField && numKeys.includes(c.measureField) ? c.measureField : null;
+      const measureAgg: AggKind = measureField
+        ? c.measureAgg === "count"
+          ? "sum"
+          : c.measureAgg
+        : "count";
       return { ...c, rowKey, subRowKey, subSubRowKey, colKey, measureField, measureAgg };
     });
   }, [cube]);
@@ -617,13 +777,19 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     });
   }
   function sortIcon(key: string) {
-    if (!sort || sort.key !== key) return <ArrowUpDown className="h-3 w-3 opacity-40 inline ml-1" />;
-    return sort.dir === "asc"
-      ? <ArrowUp className="h-3 w-3 inline ml-1" />
-      : <ArrowDown className="h-3 w-3 inline ml-1" />;
+    if (!sort || sort.key !== key)
+      return <ArrowUpDown className="h-3 w-3 opacity-40 inline ml-1" />;
+    return sort.dir === "asc" ? (
+      <ArrowUp className="h-3 w-3 inline ml-1" />
+    ) : (
+      <ArrowDown className="h-3 w-3 inline ml-1" />
+    );
   }
 
-  const isMonetary = cfg.measureField === "valor" || cfg.measureField === "valor_final" || cfg.measureField === "desconto";
+  const isMonetary =
+    cfg.measureField === "valor" ||
+    cfg.measureField === "valor_final" ||
+    cfg.measureField === "desconto";
   const fmt = isMonetary ? fmtBRL : fmtNum;
   const measureLabel = cfg.measureField
     ? `${labelFor(cfg.measureAgg)} de ${cube.fields.find((f) => f.key === cfg.measureField)?.label ?? cfg.measureField}`
@@ -638,7 +804,9 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
     if (!name) return;
     const next = [...saved.filter((s) => s.name !== name), { name, config: cfg }];
     setSaved(next);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch {}
     toast.success("Visualização salva");
   }
   function carregarView(name: string) {
@@ -648,14 +816,23 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
   function excluirView(name: string) {
     const next = saved.filter((s) => s.name !== name);
     setSaved(next);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch {}
   }
 
   function exportar() {
-    if (piv.rowLabels.length === 0) { toast.info("Sem dados para exportar"); return; }
+    if (piv.rowLabels.length === 0) {
+      toast.info("Sem dados para exportar");
+      return;
+    }
     const rows = piv.rowLabels.map((rl, ri) => {
-      const obj: Record<string, any> = { [cube.fields.find((f) => f.key === cfg.rowKey)?.label ?? cfg.rowKey]: rl };
-      piv.colLabels.forEach((cl, ci) => { obj[cl] = piv.matrix[ri][ci]; });
+      const obj: Record<string, any> = {
+        [cube.fields.find((f) => f.key === cfg.rowKey)?.label ?? cfg.rowKey]: rl,
+      };
+      piv.colLabels.forEach((cl, ci) => {
+        obj[cl] = piv.matrix[ri][ci];
+      });
       obj.Total = piv.totalByRow[ri];
       return obj;
     });
@@ -681,8 +858,13 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
           <div className="flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 p-2">
             <div className="space-y-1.5">
               <Label className="text-xs">Período (sobrepõe o do topo)</Label>
-              <Select value={periodoPreset || "__dash__"} onValueChange={(v) => setPeriodoPreset(v === "__dash__" ? "" : v)}>
-                <SelectTrigger className="w-[240px] h-9"><SelectValue /></SelectTrigger>
+              <Select
+                value={periodoPreset || "__dash__"}
+                onValueChange={(v) => setPeriodoPreset(v === "__dash__" ? "" : v)}
+              >
+                <SelectTrigger className="w-[240px] h-9">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__dash__">Usar período do dashboard</SelectItem>
                   <SelectItem value="este_ano">Este ano</SelectItem>
@@ -695,27 +877,40 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
               </Select>
             </div>
             <p className="text-xs text-muted-foreground">
-              Carregando de <span className="font-mono">{effIni}</span> até <span className="font-mono">{effFim}</span>
+              Carregando de <span className="font-mono">{effIni}</span> até{" "}
+              <span className="font-mono">{effFim}</span>
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1.5">
               <Label>Fonte de dados</Label>
               <Select value={cfg.cubeId} onValueChange={(v) => setField("cubeId", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {CUBOS.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
+                  {CUBOS.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Linhas (agrupar por)</Label>
               <Select value={cfg.rowKey} onValueChange={(v) => setField("rowKey", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {cube.fields.filter((f) => f.kind !== "number").map((f) => (
-                    <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
-                  ))}
+                  {cube.fields
+                    .filter((f) => f.kind !== "number")
+                    .map((f) => (
+                      <SelectItem key={f.key} value={f.key}>
+                        {f.label}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -725,12 +920,18 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                 value={cfg.subRowKey ?? "__none__"}
                 onValueChange={(v) => setField("subRowKey", v === "__none__" ? null : v)}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Nenhum</SelectItem>
-                  {cube.fields.filter((f) => f.kind !== "number" && f.key !== cfg.rowKey).map((f) => (
-                    <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
-                  ))}
+                  {cube.fields
+                    .filter((f) => f.kind !== "number" && f.key !== cfg.rowKey)
+                    .map((f) => (
+                      <SelectItem key={f.key} value={f.key}>
+                        {f.label}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -741,34 +942,54 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                 onValueChange={(v) => setField("subSubRowKey", v === "__none__" ? null : v)}
                 disabled={!cfg.subRowKey}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Nenhum</SelectItem>
                   {cube.fields
-                    .filter((f) => f.kind !== "number" && f.key !== cfg.rowKey && f.key !== cfg.subRowKey)
+                    .filter(
+                      (f) => f.kind !== "number" && f.key !== cfg.rowKey && f.key !== cfg.subRowKey,
+                    )
                     .map((f) => (
-                      <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
+                      <SelectItem key={f.key} value={f.key}>
+                        {f.label}
+                      </SelectItem>
                     ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Colunas (séries)</Label>
-              <Select value={cfg.colKey ?? "__none__"} onValueChange={(v) => setField("colKey", v === "__none__" ? null : v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={cfg.colKey ?? "__none__"}
+                onValueChange={(v) => setField("colKey", v === "__none__" ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Nenhuma</SelectItem>
-                  {cube.fields.filter((f) => f.kind !== "number" && f.key !== cfg.rowKey).map((f) => (
-                    <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
-                  ))}
+                  {cube.fields
+                    .filter((f) => f.kind !== "number" && f.key !== cfg.rowKey)
+                    .map((f) => (
+                      <SelectItem key={f.key} value={f.key}>
+                        {f.label}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Métrica</Label>
               <div className="flex gap-2">
-                <Select value={cfg.measureAgg} onValueChange={(v) => setField("measureAgg", v as AggKind)}>
-                  <SelectTrigger className="w-[110px] shrink-0"><SelectValue /></SelectTrigger>
+                <Select
+                  value={cfg.measureAgg}
+                  onValueChange={(v) => setField("measureAgg", v as AggKind)}
+                >
+                  <SelectTrigger className="w-[110px] shrink-0">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="count">Contar</SelectItem>
                     <SelectItem value="sum">Somar</SelectItem>
@@ -782,12 +1003,18 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                   onValueChange={(v) => setField("measureField", v === "__none__" ? null : v)}
                   disabled={cfg.measureAgg === "count"}
                 >
-                  <SelectTrigger className="min-w-0 flex-1"><SelectValue placeholder="campo" /></SelectTrigger>
+                  <SelectTrigger className="min-w-0 flex-1">
+                    <SelectValue placeholder="campo" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">— (registros)</SelectItem>
-                    {cube.fields.filter((f) => f.kind === "number").map((f) => (
-                      <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>
-                    ))}
+                    {cube.fields
+                      .filter((f) => f.kind === "number")
+                      .map((f) => (
+                        <SelectItem key={f.key} value={f.key}>
+                          {f.label}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -823,8 +1050,16 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="topn">Mostrar top</Label>
-              <Input id="topn" type="number" min={1} max={100} value={Math.min(100, Math.max(1, cfg.topN))}
-                onChange={(e) => setField("topN", Math.min(100, Math.max(1, Number(e.target.value) || 10)))} />
+              <Input
+                id="topn"
+                type="number"
+                min={1}
+                max={100}
+                value={Math.min(100, Math.max(1, cfg.topN))}
+                onChange={(e) =>
+                  setField("topN", Math.min(100, Math.max(1, Number(e.target.value) || 10)))
+                }
+              />
             </div>
           </div>
 
@@ -832,9 +1067,17 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             <div className="flex flex-wrap gap-2 pt-2 border-t">
               <span className="text-xs text-muted-foreground self-center">Salvos:</span>
               {saved.map((s) => (
-                <div key={s.name} className="flex items-center gap-1 border rounded-md pl-2 text-xs">
-                  <button onClick={() => carregarView(s.name)} className="py-1 hover:underline">{s.name}</button>
-                  <button onClick={() => excluirView(s.name)} className="p-1 hover:text-destructive">
+                <div
+                  key={s.name}
+                  className="flex items-center gap-1 border rounded-md pl-2 text-xs"
+                >
+                  <button onClick={() => carregarView(s.name)} className="py-1 hover:underline">
+                    {s.name}
+                  </button>
+                  <button
+                    onClick={() => excluirView(s.name)}
+                    className="p-1 hover:text-destructive"
+                  >
                     <Trash2 className="h-3 w-3" />
                   </button>
                 </div>
@@ -849,7 +1092,9 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
         <CardHeader>
           <CardTitle className="text-base">
             {measureLabel} por {cube.fields.find((f) => f.key === cfg.rowKey)?.label}
-            {cfg.colKey && cfg.viz !== "pizza" ? ` × ${cube.fields.find((f) => f.key === cfg.colKey)?.label}` : ""}
+            {cfg.colKey && cfg.viz !== "pizza"
+              ? ` × ${cube.fields.find((f) => f.key === cfg.colKey)?.label}`
+              : ""}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -865,20 +1110,33 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                 <TableHeader>
                   <TableRow>
                     <TableHead>
-                      <button type="button" onClick={() => toggleSort("__label__")} className="hover:underline inline-flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => toggleSort("__label__")}
+                        className="hover:underline inline-flex items-center"
+                      >
                         {cube.fields.find((f) => f.key === cfg.rowKey)?.label}
                         {sortIcon("__label__")}
                       </button>
                     </TableHead>
                     {piv.colLabels.map((c) => (
                       <TableHead key={c} className="text-right">
-                        <button type="button" onClick={() => toggleSort(c)} className="hover:underline inline-flex items-center">
-                          {c}{sortIcon(c)}
+                        <button
+                          type="button"
+                          onClick={() => toggleSort(c)}
+                          className="hover:underline inline-flex items-center"
+                        >
+                          {c}
+                          {sortIcon(c)}
                         </button>
                       </TableHead>
                     ))}
                     <TableHead className="text-right font-semibold">
-                      <button type="button" onClick={() => toggleSort("__total__")} className="hover:underline inline-flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => toggleSort("__total__")}
+                        className="hover:underline inline-flex items-center"
+                      >
                         Total{sortIcon("__total__")}
                       </button>
                     </TableHead>
@@ -890,7 +1148,13 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                     const subRows = cfg.subRowKey
                       ? (() => {
                           const subset = rawRows.filter((r) => String(r[cfg.rowKey] ?? "—") === rl);
-                          return pivot(subset, cfg.subRowKey!, cfg.colKey, cfg.measureField, cfg.measureAgg);
+                          return pivot(
+                            subset,
+                            cfg.subRowKey!,
+                            cfg.colKey,
+                            cfg.measureField,
+                            cfg.measureAgg,
+                          );
                         })()
                       : null;
                     return (
@@ -905,76 +1169,117 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
                                   className="p-0.5 hover:bg-muted rounded"
                                   aria-label={isOpen ? "Recolher" : "Expandir"}
                                 >
-                                  {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                                  {isOpen ? (
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                  )}
                                 </button>
                               ) : null}
                               <span>{rl}</span>
                             </div>
                           </TableCell>
                           {topRows.matrix[ri].map((v, ci) => (
-                            <TableCell key={ci} className="text-right">{fmt(v)}</TableCell>
+                            <TableCell key={ci} className="text-right">
+                              {fmt(v)}
+                            </TableCell>
                           ))}
-                          <TableCell className="text-right font-semibold">{fmt(topRows.totalByRow[ri])}</TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {fmt(topRows.totalByRow[ri])}
+                          </TableCell>
                         </TableRow>
-                        {isOpen && subRows ? subRows.rowLabels.map((srl, sri) => {
-                          const subKey = `${rl}::${srl}`;
-                          const isSubOpen = expanded.has(subKey);
-                          const subSubRows = cfg.subSubRowKey
-                            ? (() => {
-                                const subset = rawRows.filter(
-                                  (r) =>
-                                    String(r[cfg.rowKey] ?? "—") === rl &&
-                                    String(r[cfg.subRowKey!] ?? "—") === srl,
-                                );
-                                return pivot(subset, cfg.subSubRowKey!, cfg.colKey, cfg.measureField, cfg.measureAgg);
-                              })()
-                            : null;
-                          return (
-                            <Fragment key={subKey}>
-                              <TableRow className="bg-muted/20">
-                                <TableCell className="pl-10 text-sm text-muted-foreground">
-                                  <div className="flex items-center gap-1">
-                                    {cfg.subSubRowKey ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => toggleExpand(subKey)}
-                                        className="p-0.5 hover:bg-muted rounded"
-                                        aria-label={isSubOpen ? "Recolher" : "Expandir"}
-                                      >
-                                        {isSubOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                                      </button>
-                                    ) : null}
-                                    <span>{srl}</span>
-                                  </div>
-                                </TableCell>
-                                {piv.colLabels.map((cl, ci) => {
-                                  const idx = subRows.colLabels.indexOf(cl);
-                                  const v = idx >= 0 ? subRows.matrix[sri][idx] : 0;
-                                  return <TableCell key={ci} className="text-right text-sm">{fmt(v)}</TableCell>;
-                                })}
-                                <TableCell className="text-right text-sm font-medium">{fmt(subRows.totalByRow[sri])}</TableCell>
-                              </TableRow>
-                              {isSubOpen && subSubRows ? subSubRows.rowLabels.map((ssrl, ssri) => (
-                                <TableRow key={`${subKey}::${ssrl}`} className="bg-muted/30">
-                                  <TableCell className="pl-16 text-xs text-muted-foreground">{ssrl}</TableCell>
-                                  {piv.colLabels.map((cl, ci) => {
-                                    const idx = subSubRows.colLabels.indexOf(cl);
-                                    const v = idx >= 0 ? subSubRows.matrix[ssri][idx] : 0;
-                                    return <TableCell key={ci} className="text-right text-xs">{fmt(v)}</TableCell>;
-                                  })}
-                                  <TableCell className="text-right text-xs font-medium">{fmt(subSubRows.totalByRow[ssri])}</TableCell>
-                                </TableRow>
-                              )) : null}
-                            </Fragment>
-                          );
-                        }) : null}
+                        {isOpen && subRows
+                          ? subRows.rowLabels.map((srl, sri) => {
+                              const subKey = `${rl}::${srl}`;
+                              const isSubOpen = expanded.has(subKey);
+                              const subSubRows = cfg.subSubRowKey
+                                ? (() => {
+                                    const subset = rawRows.filter(
+                                      (r) =>
+                                        String(r[cfg.rowKey] ?? "—") === rl &&
+                                        String(r[cfg.subRowKey!] ?? "—") === srl,
+                                    );
+                                    return pivot(
+                                      subset,
+                                      cfg.subSubRowKey!,
+                                      cfg.colKey,
+                                      cfg.measureField,
+                                      cfg.measureAgg,
+                                    );
+                                  })()
+                                : null;
+                              return (
+                                <Fragment key={subKey}>
+                                  <TableRow className="bg-muted/20">
+                                    <TableCell className="pl-10 text-sm text-muted-foreground">
+                                      <div className="flex items-center gap-1">
+                                        {cfg.subSubRowKey ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleExpand(subKey)}
+                                            className="p-0.5 hover:bg-muted rounded"
+                                            aria-label={isSubOpen ? "Recolher" : "Expandir"}
+                                          >
+                                            {isSubOpen ? (
+                                              <ChevronDown className="h-3.5 w-3.5" />
+                                            ) : (
+                                              <ChevronRight className="h-3.5 w-3.5" />
+                                            )}
+                                          </button>
+                                        ) : null}
+                                        <span>{srl}</span>
+                                      </div>
+                                    </TableCell>
+                                    {piv.colLabels.map((cl, ci) => {
+                                      const idx = subRows.colLabels.indexOf(cl);
+                                      const v = idx >= 0 ? subRows.matrix[sri][idx] : 0;
+                                      return (
+                                        <TableCell key={ci} className="text-right text-sm">
+                                          {fmt(v)}
+                                        </TableCell>
+                                      );
+                                    })}
+                                    <TableCell className="text-right text-sm font-medium">
+                                      {fmt(subRows.totalByRow[sri])}
+                                    </TableCell>
+                                  </TableRow>
+                                  {isSubOpen && subSubRows
+                                    ? subSubRows.rowLabels.map((ssrl, ssri) => (
+                                        <TableRow
+                                          key={`${subKey}::${ssrl}`}
+                                          className="bg-muted/30"
+                                        >
+                                          <TableCell className="pl-16 text-xs text-muted-foreground">
+                                            {ssrl}
+                                          </TableCell>
+                                          {piv.colLabels.map((cl, ci) => {
+                                            const idx = subSubRows.colLabels.indexOf(cl);
+                                            const v = idx >= 0 ? subSubRows.matrix[ssri][idx] : 0;
+                                            return (
+                                              <TableCell key={ci} className="text-right text-xs">
+                                                {fmt(v)}
+                                              </TableCell>
+                                            );
+                                          })}
+                                          <TableCell className="text-right text-xs font-medium">
+                                            {fmt(subSubRows.totalByRow[ssri])}
+                                          </TableCell>
+                                        </TableRow>
+                                      ))
+                                    : null}
+                                </Fragment>
+                              );
+                            })
+                          : null}
                       </Fragment>
                     );
                   })}
                   <TableRow className="bg-muted/40">
                     <TableCell className="font-semibold">Total</TableCell>
                     {piv.totalByCol.map((v, ci) => (
-                      <TableCell key={ci} className="text-right font-semibold">{fmt(v)}</TableCell>
+                      <TableCell key={ci} className="text-right font-semibold">
+                        {fmt(v)}
+                      </TableCell>
                     ))}
                     <TableCell className="text-right font-semibold">
                       {fmt(piv.totalByCol.reduce((a, b) => a + b, 0))}
@@ -1002,7 +1307,10 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
             />
           ) : (
             <MiniPieChart
-              data={topRows.rowLabels.map((rl, ri) => ({ name: rl, value: topRows.totalByRow[ri] }))}
+              data={topRows.rowLabels.map((rl, ri) => ({
+                name: rl,
+                value: topRows.totalByRow[ri],
+              }))}
               formatValue={fmt}
             />
           )}
@@ -1013,5 +1321,13 @@ export function CuboBI({ clinicaId, ini, fim }: { clinicaId?: string; ini: strin
 }
 
 function labelFor(a: AggKind) {
-  return a === "count" ? "Contagem" : a === "sum" ? "Soma" : a === "avg" ? "Média" : a === "min" ? "Mínimo" : "Máximo";
+  return a === "count"
+    ? "Contagem"
+    : a === "sum"
+      ? "Soma"
+      : a === "avg"
+        ? "Média"
+        : a === "min"
+          ? "Mínimo"
+          : "Máximo";
 }

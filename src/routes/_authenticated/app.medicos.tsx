@@ -8,7 +8,14 @@ import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { MedicoFormDialog } from "@/components/medicos/MedicoFormDialog";
 
 export const Route = createFileRoute("/_authenticated/app/medicos")({
@@ -32,8 +39,7 @@ interface Medico {
   medico_especialidades: { especialidade: { id: string; nome: string } | null }[];
 }
 
-const limparPrefixoMedico = (nome: string) =>
-  nome.replace(/^(\s*(dr|dra)\.?\s+)+/i, "").trim();
+const limparPrefixoMedico = (nome: string) => nome.replace(/^(\s*(dr|dra)\.?\s+)+/i, "").trim();
 
 function MedicosPage() {
   const { clinicaAtual } = useClinica();
@@ -41,26 +47,53 @@ function MedicosPage() {
   const navigate = useNavigate();
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [busca, setBusca] = useState("");
-  const [dialog, setDialog] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
+  const [dialog, setDialog] = useState<{ open: boolean; id: string | null }>({
+    open: false,
+    id: null,
+  });
 
   const load = async () => {
     if (!clinicaAtual) return;
     const { data } = await supabase
       .from("medicos")
-      .select("id, nome, crm, crm_uf, ativo, medico_especialidades(especialidade:especialidades(id, nome))")
+      .select(
+        "id, nome, crm, crm_uf, ativo, medico_especialidades(especialidade:especialidades(id, nome))",
+      )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("nome");
     const base = ((data as unknown as Medico[]) ?? []).map((m) => ({
-      ...m, nome: limparPrefixoMedico(m.nome), tipo_repasse: null, percentual_repasse_padrao: null, valor_repasse_padrao: null,
+      ...m,
+      nome: limparPrefixoMedico(m.nome),
+      tipo_repasse: null,
+      percentual_repasse_padrao: null,
+      valor_repasse_padrao: null,
     }));
     // Repasse só visível a gestores (RPC restrita)
-    const { data: rep } = await supabase.rpc("medicos_repasse_lista", { _clinica_id: clinicaAtual.clinica_id });
-    const repMap = new Map<string, { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }>();
+    const { data: rep } = await supabase.rpc("medicos_repasse_lista", {
+      _clinica_id: clinicaAtual.clinica_id,
+    });
+    const repMap = new Map<
+      string,
+      {
+        tipo_repasse: string | null;
+        percentual_repasse_padrao: number | null;
+        valor_repasse_padrao: number | null;
+      }
+    >();
     for (const r of (rep as any[] | null) ?? []) repMap.set(r.id, r);
-    setMedicos(base.map((m) => {
-      const r = repMap.get(m.id);
-      return r ? { ...m, tipo_repasse: r.tipo_repasse as any, percentual_repasse_padrao: r.percentual_repasse_padrao, valor_repasse_padrao: r.valor_repasse_padrao } : m;
-    }));
+    setMedicos(
+      base.map((m) => {
+        const r = repMap.get(m.id);
+        return r
+          ? {
+              ...m,
+              tipo_repasse: r.tipo_repasse as any,
+              percentual_repasse_padrao: r.percentual_repasse_padrao,
+              valor_repasse_padrao: r.valor_repasse_padrao,
+            }
+          : m;
+      }),
+    );
   };
 
   useEffect(() => {
@@ -92,12 +125,19 @@ function MedicosPage() {
   };
 
   const handleExport = () => {
-    if (medicos.length === 0) { toast.info("Sem dados para exportar."); return; }
+    if (medicos.length === 0) {
+      toast.info("Sem dados para exportar.");
+      return;
+    }
     exportToExcel(
       medicos.map((m) => ({
         nome: m.nome,
         crm: `${m.crm}/${m.crm_uf}`,
-        especialidades: m.medico_especialidades?.map((me) => me.especialidade?.nome).filter(Boolean).join(", ") || "",
+        especialidades:
+          m.medico_especialidades
+            ?.map((me) => me.especialidade?.nome)
+            .filter(Boolean)
+            .join(", ") || "",
         repasse: fmtRepasse(m),
         ativo: m.ativo ? "Sim" : "Não",
       })),
@@ -119,7 +159,11 @@ function MedicosPage() {
   const medicosFiltrados = medicos.filter((m) => {
     const q = busca.trim().toLowerCase();
     if (!q) return true;
-    const especs = m.medico_especialidades?.map((me) => me.especialidade?.nome ?? "").join(" ").toLowerCase() ?? "";
+    const especs =
+      m.medico_especialidades
+        ?.map((me) => me.especialidade?.nome ?? "")
+        .join(" ")
+        .toLowerCase() ?? "";
     return (
       m.nome.toLowerCase().includes(q) ||
       `${m.crm}/${m.crm_uf}`.toLowerCase().includes(q) ||
@@ -145,10 +189,12 @@ function MedicosPage() {
       </div>
 
       {medicos.length === 0 ? (
-        <Card><CardContent className="py-12 text-center text-muted-foreground">
-          <Stethoscope className="h-8 w-8 mx-auto mb-2 opacity-50" />
-          Nenhum médico cadastrado nesta clínica.
-        </CardContent></Card>
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Stethoscope className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            Nenhum médico cadastrado nesta clínica.
+          </CardContent>
+        </Card>
       ) : (
         <Card>
           <div className="p-3 border-b">
@@ -173,11 +219,23 @@ function MedicosPage() {
               {medicosFiltrados.map((m) => (
                 <TableRow key={m.id}>
                   <TableCell className="font-medium">{m.nome}</TableCell>
-                  <TableCell>{m.crm}/{m.crm_uf}</TableCell>
-                  <TableCell>{m.medico_especialidades?.map((me) => me.especialidade?.nome).filter(Boolean).join(", ") || "—"}</TableCell>
+                  <TableCell>
+                    {m.crm}/{m.crm_uf}
+                  </TableCell>
+                  <TableCell>
+                    {m.medico_especialidades
+                      ?.map((me) => me.especialidade?.nome)
+                      .filter(Boolean)
+                      .join(", ") || "—"}
+                  </TableCell>
                   <TableCell className="text-right">{fmtRepasse(m)}</TableCell>
                   <TableCell className="text-right">
-                    <Button size="icon" variant="ghost" onClick={() => setDialog({ open: true, id: m.id })} aria-label="Editar">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setDialog({ open: true, id: m.id })}
+                      aria-label="Editar"
+                    >
                       <Pencil className="h-4 w-4" />
                     </Button>
                   </TableCell>

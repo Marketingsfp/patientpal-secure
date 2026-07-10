@@ -15,14 +15,52 @@ import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import {
-  Download, CalendarDays, Users, ClipboardList, FileText, DollarSign,
-  Stethoscope, Clock, Brain, FlaskConical, BellRing, FileHeart, Target,
-  CreditCard, ShieldCheck, Building2, BookOpen, MessageCircle, Bell, Workflow,
-  HeartPulse, LayoutDashboard, TrendingUp, TrendingDown, Wallet, Settings2, RotateCcw, Boxes, PhoneCall,
+  Download,
+  CalendarDays,
+  Users,
+  ClipboardList,
+  FileText,
+  DollarSign,
+  Stethoscope,
+  Clock,
+  Brain,
+  FlaskConical,
+  BellRing,
+  FileHeart,
+  Target,
+  CreditCard,
+  ShieldCheck,
+  Building2,
+  BookOpen,
+  MessageCircle,
+  Bell,
+  Workflow,
+  HeartPulse,
+  LayoutDashboard,
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  Settings2,
+  RotateCcw,
+  Boxes,
+  PhoneCall,
 } from "lucide-react";
 import { CuboBI } from "@/components/relatorios/CuboBI";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/app/relatorios")({
   component: RelatoriosPage,
@@ -35,7 +73,11 @@ type Relatorio = {
   icon: React.ComponentType<any>;
   cor: string;
   usaPeriodo?: boolean;
-  carregar: (ctx: { clinicaId: string; ini?: string; fim?: string }) => Promise<Record<string, unknown>[]>;
+  carregar: (ctx: {
+    clinicaId: string;
+    ini?: string;
+    fim?: string;
+  }) => Promise<Record<string, unknown>[]>;
 };
 
 const hoje = new Date().toISOString().slice(0, 10);
@@ -52,17 +94,24 @@ const RELATORIOS: Relatorio[] = [
     carregar: async ({ clinicaId, ini, fim }) => {
       const { data, error } = await supabase
         .from("agendamentos")
-        .select("inicio, fim, status, observacoes, procedimento, paciente_nome, pacientes(nome), medicos(nome)")
+        .select(
+          "inicio, fim, status, observacoes, procedimento, paciente_nome, pacientes(nome), medicos(nome)",
+        )
         .eq("clinica_id", clinicaId)
         .gte("inicio", ini!)
         .lte("inicio", fim! + "T23:59:59")
         .order("inicio");
-      if (error) { console.error("relatorio agendamentos:", error); throw error; }
+      if (error) {
+        console.error("relatorio agendamentos:", error);
+        throw error;
+      }
       return (data ?? []).map((r: any) => ({
-        Inicio: r.inicio, Fim: r.fim, Status: r.status,
+        Inicio: r.inicio,
+        Fim: r.fim,
+        Status: r.status,
         Paciente: r.pacientes?.nome ?? r.paciente_nome ?? "",
         Medico: r.medicos?.nome ?? "",
-        "Serviço": r.procedimento ?? "",
+        Serviço: r.procedimento ?? "",
         Observacao: r.observacoes ?? "",
       }));
     },
@@ -71,11 +120,14 @@ const RELATORIOS: Relatorio[] = [
     id: "pacientes",
     titulo: "Clientes / Pacientes",
     descricao: "Cadastro completo de pacientes.",
-    icon: Users, cor: "#c084fc",
+    icon: Users,
+    cor: "#c084fc",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase.from("pacientes")
+      const { data } = await supabase
+        .from("pacientes")
         .select("nome, cpf, telefone, email, data_nascimento, sexo, created_at")
-        .eq("clinica_id", clinicaId).order("nome");
+        .eq("clinica_id", clinicaId)
+        .order("nome");
       return (data ?? []) as any;
     },
   },
@@ -83,11 +135,14 @@ const RELATORIOS: Relatorio[] = [
     id: "procedimentos",
     titulo: "Serviços",
     descricao: "Catálogo de serviços e valores.",
-    icon: ClipboardList, cor: "#fb923c",
+    icon: ClipboardList,
+    cor: "#fb923c",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase.from("procedimentos")
+      const { data } = await supabase
+        .from("procedimentos")
         .select("nome, codigo, valor, duracao_min, ativo")
-        .eq("clinica_id", clinicaId).order("nome");
+        .eq("clinica_id", clinicaId)
+        .order("nome");
       return (data ?? []) as any;
     },
   },
@@ -95,17 +150,25 @@ const RELATORIOS: Relatorio[] = [
     id: "orcamentos",
     titulo: "Orçamentos",
     descricao: "Orçamentos emitidos no período.",
-    icon: FileText, cor: "#34d399",
+    icon: FileText,
+    cor: "#34d399",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data } = await supabase.from("orcamentos")
+      const { data } = await supabase
+        .from("orcamentos")
         .select("numero, status, valor_total, desconto, valor_final, created_at, pacientes(nome)")
         .eq("clinica_id", clinicaId)
-        .gte("created_at", ini!).lte("created_at", fim! + "T23:59:59")
+        .gte("created_at", ini!)
+        .lte("created_at", fim! + "T23:59:59")
         .order("created_at", { ascending: false });
       return (data ?? []).map((r: any) => ({
-        Numero: r.numero, Status: r.status, Paciente: r.pacientes?.nome ?? "",
-        Valor: r.valor_total, Desconto: r.desconto, Final: r.valor_final, Data: r.created_at,
+        Numero: r.numero,
+        Status: r.status,
+        Paciente: r.pacientes?.nome ?? "",
+        Valor: r.valor_total,
+        Desconto: r.desconto,
+        Final: r.valor_final,
+        Data: r.created_at,
       }));
     },
   },
@@ -113,15 +176,23 @@ const RELATORIOS: Relatorio[] = [
     id: "financeiro",
     titulo: "Financeiro — Lançamentos",
     descricao: "Receitas e despesas no período.",
-    icon: DollarSign, cor: "#facc15",
+    icon: DollarSign,
+    cor: "#facc15",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data, error } = await supabase.from("fin_lancamentos")
-        .select("data, tipo, descricao, valor, status, forma_pagamento, observacoes, fin_categorias(nome), fin_contas(nome), pacientes(nome), medicos(nome)")
+      const { data, error } = await supabase
+        .from("fin_lancamentos")
+        .select(
+          "data, tipo, descricao, valor, status, forma_pagamento, observacoes, fin_categorias(nome), fin_contas(nome), pacientes(nome), medicos(nome)",
+        )
         .eq("clinica_id", clinicaId)
-        .gte("data", ini!).lte("data", fim!)
+        .gte("data", ini!)
+        .lte("data", fim!)
         .order("data", { ascending: false });
-      if (error) { console.error("relatorio financeiro:", error); throw error; }
+      if (error) {
+        console.error("relatorio financeiro:", error);
+        throw error;
+      }
       return (data ?? []).map((r: any) => ({
         Data: r.data,
         Tipo: r.tipo,
@@ -141,15 +212,24 @@ const RELATORIOS: Relatorio[] = [
     id: "contratos",
     titulo: "Cartão Benefícios / Contratos",
     descricao: "Contratos de assinatura e mensalidades.",
-    icon: CreditCard, cor: "#22d3ee",
+    icon: CreditCard,
+    cor: "#22d3ee",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase.from("contratos_assinatura")
-        .select("numero, status, valor_mensal, data_inicio, data_fim, pacientes(nome), planos_assinatura(nome)")
-        .eq("clinica_id", clinicaId).order("data_inicio", { ascending: false });
+      const { data } = await supabase
+        .from("contratos_assinatura")
+        .select(
+          "numero, status, valor_mensal, data_inicio, data_fim, pacientes(nome), planos_assinatura(nome)",
+        )
+        .eq("clinica_id", clinicaId)
+        .order("data_inicio", { ascending: false });
       return (data ?? []).map((r: any) => ({
-        Numero: r.numero, Status: r.status, Paciente: r.pacientes?.nome ?? "",
-        Plano: r.planos_assinatura?.nome ?? "", ValorMensal: r.valor_mensal,
-        Inicio: r.data_inicio, Fim: r.data_fim,
+        Numero: r.numero,
+        Status: r.status,
+        Paciente: r.pacientes?.nome ?? "",
+        Plano: r.planos_assinatura?.nome ?? "",
+        ValorMensal: r.valor_mensal,
+        Inicio: r.data_inicio,
+        Fim: r.data_fim,
       }));
     },
   },
@@ -157,14 +237,21 @@ const RELATORIOS: Relatorio[] = [
     id: "crm",
     titulo: "CRM — Oportunidades",
     descricao: "Funil de vendas e oportunidades.",
-    icon: Target, cor: "#f472b6",
+    icon: Target,
+    cor: "#f472b6",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase.from("crm_oportunidades")
+      const { data } = await supabase
+        .from("crm_oportunidades")
         .select("titulo, valor, status, created_at, crm_etapas(nome), pacientes(nome)")
-        .eq("clinica_id", clinicaId).order("created_at", { ascending: false });
+        .eq("clinica_id", clinicaId)
+        .order("created_at", { ascending: false });
       return (data ?? []).map((r: any) => ({
-        Titulo: r.titulo, Etapa: r.crm_etapas?.nome ?? "", Status: r.status,
-        Valor: r.valor, Paciente: r.pacientes?.nome ?? "", Data: r.created_at,
+        Titulo: r.titulo,
+        Etapa: r.crm_etapas?.nome ?? "",
+        Status: r.status,
+        Valor: r.valor,
+        Paciente: r.pacientes?.nome ?? "",
+        Data: r.created_at,
       }));
     },
   },
@@ -172,11 +259,14 @@ const RELATORIOS: Relatorio[] = [
     id: "medicos",
     titulo: "Médicos",
     descricao: "Cadastro de médicos.",
-    icon: Stethoscope, cor: "#fda4af",
+    icon: Stethoscope,
+    cor: "#fda4af",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase.from("medicos")
+      const { data } = await supabase
+        .from("medicos")
         .select("nome, crm, uf_crm, telefone, email, ativo")
-        .eq("clinica_id", clinicaId).order("nome");
+        .eq("clinica_id", clinicaId)
+        .order("nome");
       return (data ?? []) as any;
     },
   },
@@ -184,10 +274,13 @@ const RELATORIOS: Relatorio[] = [
     id: "especialidades",
     titulo: "Especialidades",
     descricao: "Lista de especialidades.",
-    icon: Stethoscope, cor: "#f0abfc",
+    icon: Stethoscope,
+    cor: "#f0abfc",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase.from("especialidades")
-        .select("nome, descricao, ativo").order("nome");
+      const { data } = await supabase
+        .from("especialidades")
+        .select("nome, descricao, ativo")
+        .order("nome");
       void clinicaId;
       return (data ?? []) as any;
     },
@@ -196,15 +289,22 @@ const RELATORIOS: Relatorio[] = [
     id: "disponibilidades",
     titulo: "Horários médicos",
     descricao: "Disponibilidades cadastradas.",
-    icon: Clock, cor: "#a78bfa",
+    icon: Clock,
+    cor: "#a78bfa",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase.from("medico_disponibilidades")
-        .select("dia_semana, hora_inicio, hora_fim, intervalo_min, limite_pacientes_dia, medicos(nome)")
+      const { data } = await supabase
+        .from("medico_disponibilidades")
+        .select(
+          "dia_semana, hora_inicio, hora_fim, intervalo_min, limite_pacientes_dia, medicos(nome)",
+        )
         .eq("clinica_id", clinicaId);
       return (data ?? []).map((r: any) => ({
-        Medico: r.medicos?.nome ?? "", DiaSemana: r.dia_semana,
-        Inicio: r.hora_inicio, Fim: r.hora_fim,
-        IntervaloMin: r.intervalo_min, LimitePacientesDia: r.limite_pacientes_dia,
+        Medico: r.medicos?.nome ?? "",
+        DiaSemana: r.dia_semana,
+        Inicio: r.hora_inicio,
+        Fim: r.hora_fim,
+        IntervaloMin: r.intervalo_min,
+        LimitePacientesDia: r.limite_pacientes_dia,
       }));
     },
   },
@@ -212,17 +312,23 @@ const RELATORIOS: Relatorio[] = [
     id: "exames",
     titulo: "Resultados de Exames",
     descricao: "Resultados de exames registrados.",
-    icon: FlaskConical, cor: "#fde047",
+    icon: FlaskConical,
+    cor: "#fde047",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data } = await supabase.from("exame_resultados")
+      const { data } = await supabase
+        .from("exame_resultados")
         .select("tipo_exame, status, data_exame, observacoes, pacientes(nome)")
         .eq("clinica_id", clinicaId)
-        .gte("data_exame", ini!).lte("data_exame", fim!)
+        .gte("data_exame", ini!)
+        .lte("data_exame", fim!)
         .order("data_exame", { ascending: false });
       return (data ?? []).map((r: any) => ({
-        Paciente: r.pacientes?.nome ?? "", Exame: r.tipo_exame,
-        Status: r.status, Data: r.data_exame, Observacoes: r.observacoes ?? "",
+        Paciente: r.pacientes?.nome ?? "",
+        Exame: r.tipo_exame,
+        Status: r.status,
+        Data: r.data_exame,
+        Observacoes: r.observacoes ?? "",
       }));
     },
   },
@@ -230,14 +336,21 @@ const RELATORIOS: Relatorio[] = [
     id: "alertas",
     titulo: "Enfermeira IA — Alertas",
     descricao: "Alertas gerados pela IA.",
-    icon: BellRing, cor: "#ef4444",
+    icon: BellRing,
+    cor: "#ef4444",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase.from("alertas_enfermagem")
+      const { data } = await supabase
+        .from("alertas_enfermagem")
         .select("titulo, descricao, severidade, status, created_at, pacientes(nome)")
-        .eq("clinica_id", clinicaId).order("created_at", { ascending: false });
+        .eq("clinica_id", clinicaId)
+        .order("created_at", { ascending: false });
       return (data ?? []).map((r: any) => ({
-        Titulo: r.titulo, Severidade: r.severidade, Status: r.status,
-        Paciente: r.pacientes?.nome ?? "", Descricao: r.descricao, Data: r.created_at,
+        Titulo: r.titulo,
+        Severidade: r.severidade,
+        Status: r.status,
+        Paciente: r.pacientes?.nome ?? "",
+        Descricao: r.descricao,
+        Data: r.created_at,
       }));
     },
   },
@@ -245,18 +358,26 @@ const RELATORIOS: Relatorio[] = [
     id: "prontuarios",
     titulo: "Prontuários",
     descricao: "Prontuários e atendimentos.",
-    icon: FileHeart, cor: "#f9a8d4",
+    icon: FileHeart,
+    cor: "#f9a8d4",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data } = await supabase.from("prontuarios")
-        .select("data_atendimento, queixa_principal, hipotese_diagnostica, conduta, pacientes(nome), medicos(nome)")
+      const { data } = await supabase
+        .from("prontuarios")
+        .select(
+          "data_atendimento, queixa_principal, hipotese_diagnostica, conduta, pacientes(nome), medicos(nome)",
+        )
         .eq("clinica_id", clinicaId)
-        .gte("data_atendimento", ini!).lte("data_atendimento", fim! + "T23:59:59")
+        .gte("data_atendimento", ini!)
+        .lte("data_atendimento", fim! + "T23:59:59")
         .order("data_atendimento", { ascending: false });
       return (data ?? []).map((r: any) => ({
-        Data: r.data_atendimento, Paciente: r.pacientes?.nome ?? "",
-        Medico: r.medicos?.nome ?? "", Queixa: r.queixa_principal,
-        Hipotese: r.hipotese_diagnostica, Conduta: r.conduta,
+        Data: r.data_atendimento,
+        Paciente: r.pacientes?.nome ?? "",
+        Medico: r.medicos?.nome ?? "",
+        Queixa: r.queixa_principal,
+        Hipotese: r.hipotese_diagnostica,
+        Conduta: r.conduta,
       }));
     },
   },
@@ -264,14 +385,18 @@ const RELATORIOS: Relatorio[] = [
     id: "auditoria",
     titulo: "Auditoria",
     descricao: "Histórico de alterações.",
-    icon: ShieldCheck, cor: "#f87171",
+    icon: ShieldCheck,
+    cor: "#f87171",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data } = await supabase.from("audit_log")
+      const { data } = await supabase
+        .from("audit_log")
         .select("created_at, user_email, action, table_name, record_id")
         .eq("clinica_id", clinicaId)
-        .gte("created_at", ini!).lte("created_at", fim! + "T23:59:59")
-        .order("created_at", { ascending: false }).limit(5000);
+        .gte("created_at", ini!)
+        .lte("created_at", fim! + "T23:59:59")
+        .order("created_at", { ascending: false })
+        .limit(5000);
       return (data ?? []) as any;
     },
   },
@@ -279,17 +404,23 @@ const RELATORIOS: Relatorio[] = [
     id: "documentos",
     titulo: "Documentos emitidos",
     descricao: "Documentos gerados no período.",
-    icon: FileText, cor: "#34d399",
+    icon: FileText,
+    cor: "#34d399",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
-      const { data } = await supabase.from("documentos_emitidos")
+      const { data } = await supabase
+        .from("documentos_emitidos")
         .select("tipo, titulo, created_at, pacientes(nome), medicos(nome)")
         .eq("clinica_id", clinicaId)
-        .gte("created_at", ini!).lte("created_at", fim! + "T23:59:59")
+        .gte("created_at", ini!)
+        .lte("created_at", fim! + "T23:59:59")
         .order("created_at", { ascending: false });
       return (data ?? []).map((r: any) => ({
-        Data: r.created_at, Tipo: r.tipo, Titulo: r.titulo,
-        Paciente: r.pacientes?.nome ?? "", Medico: r.medicos?.nome ?? "",
+        Data: r.created_at,
+        Tipo: r.tipo,
+        Titulo: r.titulo,
+        Paciente: r.pacientes?.nome ?? "",
+        Medico: r.medicos?.nome ?? "",
       }));
     },
   },
@@ -297,14 +428,18 @@ const RELATORIOS: Relatorio[] = [
     id: "equipe",
     titulo: "Equipe",
     descricao: "Membros da clínica.",
-    icon: Users, cor: "#93c5fd",
+    icon: Users,
+    cor: "#93c5fd",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase.from("clinica_memberships")
+      const { data } = await supabase
+        .from("clinica_memberships")
         .select("role, created_at, profiles(nome, email)")
         .eq("clinica_id", clinicaId);
       return (data ?? []).map((r: any) => ({
-        Nome: r.profiles?.nome ?? "", Email: r.profiles?.email ?? "",
-        Papel: r.role, Desde: r.created_at,
+        Nome: r.profiles?.nome ?? "",
+        Email: r.profiles?.email ?? "",
+        Papel: r.role,
+        Desde: r.created_at,
       }));
     },
   },
@@ -312,10 +447,13 @@ const RELATORIOS: Relatorio[] = [
     id: "clinicas",
     titulo: "Clínicas",
     descricao: "Dados da clínica.",
-    icon: Building2, cor: "#22d3ee",
+    icon: Building2,
+    cor: "#22d3ee",
     carregar: async ({ clinicaId }) => {
-      const { data } = await supabase.from("clinicas")
-        .select("nome, cnpj, telefone, email, endereco, created_at").eq("id", clinicaId);
+      const { data } = await supabase
+        .from("clinicas")
+        .select("nome, cnpj, telefone, email, endereco, created_at")
+        .eq("id", clinicaId);
       return (data ?? []) as any;
     },
   },
@@ -323,12 +461,15 @@ const RELATORIOS: Relatorio[] = [
     id: "triagem-enfermagem",
     titulo: "Triagem — Enfermagem",
     descricao: "Atendimentos iniciais da enfermagem com sinais vitais, doenças e medicamentos.",
-    icon: HeartPulse, cor: "#ef4444",
+    icon: HeartPulse,
+    cor: "#ef4444",
     usaPeriodo: true,
     carregar: async ({ clinicaId, ini, fim }) => {
       const { data } = await supabase
         .from("triagens_enfermagem")
-        .select("created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes, pacientes(nome, cpf), agendamentos(inicio, procedimento)")
+        .select(
+          "created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes, pacientes(nome, cpf), agendamentos(inicio, procedimento)",
+        )
         .eq("clinica_id", clinicaId)
         .gte("created_at", ini! + "T00:00:00")
         .lte("created_at", fim! + "T23:59:59")
@@ -338,7 +479,7 @@ const RELATORIOS: Relatorio[] = [
         Paciente: r.pacientes?.nome ?? "",
         CPF: r.pacientes?.cpf ?? "",
         Agendamento: r.agendamentos?.inicio ?? "",
-        "Serviço": r.agendamentos?.procedimento ?? "",
+        Serviço: r.agendamentos?.procedimento ?? "",
         Enfermeira: r.enfermeira_nome ?? "",
         "Peso (kg)": r.peso_kg ?? "",
         "Altura (cm)": r.altura_cm ?? "",
@@ -411,12 +552,28 @@ function RelatoriosPage() {
           </TabsList>
           <div className="flex items-end gap-2">
             <div>
-              <Label htmlFor="ini" className="text-xs text-muted-foreground">De</Label>
-              <Input id="ini" type="date" value={ini} onChange={(e) => setIni(e.target.value)} className="h-9 w-36" />
+              <Label htmlFor="ini" className="text-xs text-muted-foreground">
+                De
+              </Label>
+              <Input
+                id="ini"
+                type="date"
+                value={ini}
+                onChange={(e) => setIni(e.target.value)}
+                className="h-9 w-36"
+              />
             </div>
             <div>
-              <Label htmlFor="fim" className="text-xs text-muted-foreground">Até</Label>
-              <Input id="fim" type="date" value={fim} onChange={(e) => setFim(e.target.value)} className="h-9 w-36" />
+              <Label htmlFor="fim" className="text-xs text-muted-foreground">
+                Até
+              </Label>
+              <Input
+                id="fim"
+                type="date"
+                value={fim}
+                onChange={(e) => setFim(e.target.value)}
+                className="h-9 w-36"
+              />
             </div>
           </div>
         </div>
@@ -435,34 +592,34 @@ function RelatoriosPage() {
 
         <TabsContent value="downloads" className="mt-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {RELATORIOS.map((r) => {
-          const Icon = r.icon;
-          return (
-            <Card key={r.id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <Icon className="h-5 w-5" color={r.cor} />
-                  <CardTitle className="text-base">{r.titulo}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">{r.descricao}</p>
-                {r.usaPeriodo && (
-                  <p className="text-xs text-muted-foreground">Usa o período acima.</p>
-                )}
-                <Button
-                  onClick={() => baixar(r)}
-                  disabled={loading === r.id}
-                  size="sm"
-                  className="w-full"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {loading === r.id ? "Gerando..." : "Baixar Excel"}
-                </Button>
-              </CardContent>
-            </Card>
-          );
-        })}
+            {RELATORIOS.map((r) => {
+              const Icon = r.icon;
+              return (
+                <Card key={r.id}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-5 w-5" color={r.cor} />
+                      <CardTitle className="text-base">{r.titulo}</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-muted-foreground">{r.descricao}</p>
+                    {r.usaPeriodo && (
+                      <p className="text-xs text-muted-foreground">Usa o período acima.</p>
+                    )}
+                    <Button
+                      onClick={() => baixar(r)}
+                      disabled={loading === r.id}
+                      size="sm"
+                      className="w-full"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {loading === r.id ? "Gerando..." : "Baixar Excel"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </TabsContent>
       </Tabs>
@@ -474,8 +631,7 @@ function RelatoriosPage() {
 // Dashboard view — KPIs e gráficos no período selecionado
 // ============================================================
 
-const fmtBRL = (n: number) =>
-  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const fmtBRL = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 interface DashboardData {
   totalAgend: number;
@@ -490,25 +646,34 @@ interface DashboardData {
 }
 
 interface RawData {
-  agend: Array<{ id: string; paciente_nome: string | null; procedimento: string | null; inicio: string; status: string | null; medico: string | null }>;
-  fin: Array<{ id: string; data: string; tipo: string; valor: number; descricao: string | null; categoria: string | null; status: string | null }>;
+  agend: Array<{
+    id: string;
+    paciente_nome: string | null;
+    procedimento: string | null;
+    inicio: string;
+    status: string | null;
+    medico: string | null;
+  }>;
+  fin: Array<{
+    id: string;
+    data: string;
+    tipo: string;
+    valor: number;
+    descricao: string | null;
+    categoria: string | null;
+    status: string | null;
+  }>;
   pacientes: Array<{ id: string; nome: string; created_at: string }>;
   prontuarios: Array<{ id: string; data_atendimento: string; paciente: string | null }>;
 }
 
-function DashboardView({
-  clinicaId,
-  ini,
-  fim,
-}: {
-  clinicaId?: string;
-  ini: string;
-  fim: string;
-}) {
+function DashboardView({ clinicaId, ini, fim }: { clinicaId?: string; ini: string; fim: string }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [raw, setRaw] = useState<RawData | null>(null);
-  const [drill, setDrill] = useState<null | "agend" | "novos" | "pront" | "saldo" | "receitas" | "despesas">(null);
+  const [drill, setDrill] = useState<
+    null | "agend" | "novos" | "pront" | "saldo" | "receitas" | "despesas"
+  >(null);
 
   useEffect(() => {
     if (!clinicaId) return;
@@ -552,9 +717,7 @@ function DashboardView({
           medicoMap.set(m, (medicoMap.get(m) ?? 0) + 1);
         });
 
-        const finRows = ((fin.data ?? []) as any[]).filter(
-          (r) => r.status !== "cancelado",
-        );
+        const finRows = ((fin.data ?? []) as any[]).filter((r) => r.status !== "cancelado");
         let receitas = 0;
         let despesas = 0;
         const catMap = new Map<string, number>();
@@ -586,15 +749,32 @@ function DashboardView({
         if (cancel) return;
         setRaw({
           agend: agendRows.map((r: any) => ({
-            id: r.id, paciente_nome: r.paciente_nome ?? null, procedimento: r.procedimento ?? null,
-            inicio: r.inicio, status: r.status ?? null, medico: r.medicos?.nome ?? null,
+            id: r.id,
+            paciente_nome: r.paciente_nome ?? null,
+            procedimento: r.procedimento ?? null,
+            inicio: r.inicio,
+            status: r.status ?? null,
+            medico: r.medicos?.nome ?? null,
           })),
           fin: finRows.map((r: any) => ({
-            id: r.id, data: r.data, tipo: r.tipo, valor: Number(r.valor) || 0,
-            descricao: r.descricao ?? null, categoria: r.fin_categorias?.nome ?? null, status: r.status ?? null,
+            id: r.id,
+            data: r.data,
+            tipo: r.tipo,
+            valor: Number(r.valor) || 0,
+            descricao: r.descricao ?? null,
+            categoria: r.fin_categorias?.nome ?? null,
+            status: r.status ?? null,
           })),
-          pacientes: ((pac.data ?? []) as any[]).map((p) => ({ id: p.id, nome: p.nome, created_at: p.created_at })),
-          prontuarios: ((pront.data ?? []) as any[]).map((p) => ({ id: p.id, data_atendimento: p.data_atendimento, paciente: p.pacientes?.nome ?? null })),
+          pacientes: ((pac.data ?? []) as any[]).map((p) => ({
+            id: p.id,
+            nome: p.nome,
+            created_at: p.created_at,
+          })),
+          prontuarios: ((pront.data ?? []) as any[]).map((p) => ({
+            id: p.id,
+            data_atendimento: p.data_atendimento,
+            paciente: p.pacientes?.nome ?? null,
+          })),
         });
         setData({
           totalAgend: agendRows.length,
@@ -623,10 +803,7 @@ function DashboardView({
     };
   }, [clinicaId, ini, fim]);
 
-  const saldo = useMemo(
-    () => (data ? data.receitas - data.despesas : 0),
-    [data],
-  );
+  const saldo = useMemo(() => (data ? data.receitas - data.despesas : 0), [data]);
 
   // ---------- widgets editáveis ----------
   const ALL_WIDGETS: { id: string; label: string; group: "kpi" | "chart" }[] = [
@@ -643,7 +820,8 @@ function DashboardView({
   ];
   const STORAGE_KEY = `relatorios.dashboard.widgets.${clinicaId ?? "default"}`;
   const [enabled, setEnabled] = useState<Record<string, boolean>>(() => {
-    if (typeof window === "undefined") return Object.fromEntries(ALL_WIDGETS.map((w) => [w.id, true]));
+    if (typeof window === "undefined")
+      return Object.fromEntries(ALL_WIDGETS.map((w) => [w.id, true]));
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) return JSON.parse(raw);
@@ -660,14 +838,18 @@ function DashboardView({
   function toggle(id: string, val: boolean) {
     setEnabled((prev) => {
       const next = { ...prev, [id]: val };
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch {}
       return next;
     });
   }
   function resetWidgets() {
     const next = Object.fromEntries(ALL_WIDGETS.map((w) => [w.id, true]));
     setEnabled(next);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch {}
   }
   const on = (id: string) => enabled[id] !== false;
 
@@ -707,7 +889,12 @@ function DashboardView({
           <PopoverContent align="end" className="w-80">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-medium">Itens exibidos</p>
-              <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={resetWidgets}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 gap-1 text-xs"
+                onClick={resetWidgets}
+              >
                 <RotateCcw className="h-3 w-3" /> Restaurar
               </Button>
             </div>
@@ -718,8 +905,14 @@ function DashboardView({
                     {g === "kpi" ? "Indicadores" : "Gráficos"}
                   </p>
                   {ALL_WIDGETS.filter((w) => w.group === g).map((w) => (
-                    <label key={w.id} className="flex items-center gap-2 py-1 cursor-pointer text-sm">
-                      <Checkbox checked={on(w.id)} onCheckedChange={(v) => toggle(w.id, v === true)} />
+                    <label
+                      key={w.id}
+                      className="flex items-center gap-2 py-1 cursor-pointer text-sm"
+                    >
+                      <Checkbox
+                        checked={on(w.id)}
+                        onCheckedChange={(v) => toggle(w.id, v === true)}
+                      />
                       <span>{w.label}</span>
                     </label>
                   ))}
@@ -733,28 +926,88 @@ function DashboardView({
       {/* KPIs */}
       {kpiVisible > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {on("kpi_agend") && <Kpi icon={<CalendarDays className="h-5 w-5" />} label="Agendamentos" value={data.totalAgend.toString()} tint="text-blue-600" onClick={() => setDrill("agend")} />}
-          {on("kpi_novos") && <Kpi icon={<Users className="h-5 w-5" />} label="Novos pacientes" value={data.novosPacientes.toString()} tint="text-purple-600" onClick={() => setDrill("novos")} />}
-          {on("kpi_pront") && <Kpi icon={<FileHeart className="h-5 w-5" />} label="Prontuários" value={data.prontuariosCount.toString()} tint="text-pink-600" onClick={() => setDrill("pront")} />}
-          {on("kpi_saldo") && <Kpi icon={<Wallet className="h-5 w-5" />} label="Saldo" value={fmtBRL(saldo)} tint={saldo >= 0 ? "text-emerald-600" : "text-red-600"} onClick={() => setDrill("saldo")} />}
-          {on("kpi_rec") && <Kpi icon={<TrendingUp className="h-5 w-5" />} label="Receitas" value={fmtBRL(data.receitas)} tint="text-emerald-600" onClick={() => setDrill("receitas")} />}
-          {on("kpi_desp") && <Kpi icon={<TrendingDown className="h-5 w-5" />} label="Despesas" value={fmtBRL(data.despesas)} tint="text-red-600" onClick={() => setDrill("despesas")} />}
+          {on("kpi_agend") && (
+            <Kpi
+              icon={<CalendarDays className="h-5 w-5" />}
+              label="Agendamentos"
+              value={data.totalAgend.toString()}
+              tint="text-blue-600"
+              onClick={() => setDrill("agend")}
+            />
+          )}
+          {on("kpi_novos") && (
+            <Kpi
+              icon={<Users className="h-5 w-5" />}
+              label="Novos pacientes"
+              value={data.novosPacientes.toString()}
+              tint="text-purple-600"
+              onClick={() => setDrill("novos")}
+            />
+          )}
+          {on("kpi_pront") && (
+            <Kpi
+              icon={<FileHeart className="h-5 w-5" />}
+              label="Prontuários"
+              value={data.prontuariosCount.toString()}
+              tint="text-pink-600"
+              onClick={() => setDrill("pront")}
+            />
+          )}
+          {on("kpi_saldo") && (
+            <Kpi
+              icon={<Wallet className="h-5 w-5" />}
+              label="Saldo"
+              value={fmtBRL(saldo)}
+              tint={saldo >= 0 ? "text-emerald-600" : "text-red-600"}
+              onClick={() => setDrill("saldo")}
+            />
+          )}
+          {on("kpi_rec") && (
+            <Kpi
+              icon={<TrendingUp className="h-5 w-5" />}
+              label="Receitas"
+              value={fmtBRL(data.receitas)}
+              tint="text-emerald-600"
+              onClick={() => setDrill("receitas")}
+            />
+          )}
+          {on("kpi_desp") && (
+            <Kpi
+              icon={<TrendingDown className="h-5 w-5" />}
+              label="Despesas"
+              value={fmtBRL(data.despesas)}
+              tint="text-red-600"
+              onClick={() => setDrill("despesas")}
+            />
+          )}
         </div>
       )}
 
       {/* Financeiro por dia */}
       {on("ch_fin_dia") && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Receitas vs Despesas (por dia)</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">Receitas vs Despesas (por dia)</CardTitle>
+          </CardHeader>
           <CardContent>
             {data.finPorDia.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">Sem lançamentos no período.</p>
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                Sem lançamentos no período.
+              </p>
             ) : (
               <MiniBarChart
                 labels={data.finPorDia.map((d) => d.label)}
                 series={[
-                  { name: "Receitas", color: "#10b981", values: data.finPorDia.map((d) => d.receita) },
-                  { name: "Despesas", color: "#ef4444", values: data.finPorDia.map((d) => d.despesa) },
+                  {
+                    name: "Receitas",
+                    color: "#10b981",
+                    values: data.finPorDia.map((d) => d.receita),
+                  },
+                  {
+                    name: "Despesas",
+                    color: "#ef4444",
+                    values: data.finPorDia.map((d) => d.despesa),
+                  },
                 ]}
                 formatY={(n) => "R$ " + Math.round(n).toLocaleString("pt-BR")}
               />
@@ -768,20 +1021,32 @@ function DashboardView({
         <div className="grid gap-4 lg:grid-cols-2">
           {on("ch_agend_status") && (
             <Card>
-              <CardHeader><CardTitle className="text-base">Agendamentos por status</CardTitle></CardHeader>
-              <CardContent><MiniPieChart data={data.agendPorStatus} /></CardContent>
+              <CardHeader>
+                <CardTitle className="text-base">Agendamentos por status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MiniPieChart data={data.agendPorStatus} />
+              </CardContent>
             </Card>
           )}
           {on("ch_agend_medico") && (
             <Card>
-              <CardHeader><CardTitle className="text-base">Agendamentos por médico (top 8)</CardTitle></CardHeader>
-              <CardContent><MiniPieChart data={data.agendPorMedico} /></CardContent>
+              <CardHeader>
+                <CardTitle className="text-base">Agendamentos por médico (top 8)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MiniPieChart data={data.agendPorMedico} />
+              </CardContent>
             </Card>
           )}
           {on("ch_fin_cat") && (
             <Card className="lg:col-span-2">
-              <CardHeader><CardTitle className="text-base">Financeiro por categoria (top 8)</CardTitle></CardHeader>
-              <CardContent><MiniPieChart data={data.finPorCategoria} formatValue={fmtBRL} /></CardContent>
+              <CardHeader>
+                <CardTitle className="text-base">Financeiro por categoria (top 8)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MiniPieChart data={data.finPorCategoria} formatValue={fmtBRL} />
+              </CardContent>
             </Card>
           )}
         </div>
@@ -795,7 +1060,12 @@ function DashboardView({
         </Card>
       )}
 
-      <Dialog open={!!drill} onOpenChange={(v) => { if (!v) setDrill(null); }}>
+      <Dialog
+        open={!!drill}
+        onOpenChange={(v) => {
+          if (!v) setDrill(null);
+        }}
+      >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>
@@ -806,41 +1076,110 @@ function DashboardView({
               {drill === "receitas" && "Receitas no período"}
               {drill === "despesas" && "Despesas no período"}
             </DialogTitle>
-            <DialogDescription>Detalhamento dos registros do período selecionado.</DialogDescription>
+            <DialogDescription>
+              Detalhamento dos registros do período selecionado.
+            </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-auto">
             {drill === "agend" && raw && (
               <Table>
-                <TableHeader><TableRow><TableHead>Início</TableHead><TableHead>Paciente</TableHead><TableHead>Médico</TableHead><TableHead>Procedimento</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-                <TableBody>{raw.agend.map((a) => (
-                  <TableRow key={a.id}><TableCell className="whitespace-nowrap">{new Date(a.inicio).toLocaleString("pt-BR")}</TableCell><TableCell>{a.paciente_nome ?? "—"}</TableCell><TableCell>{a.medico ?? "—"}</TableCell><TableCell>{a.procedimento ?? "—"}</TableCell><TableCell>{a.status ?? "—"}</TableCell></TableRow>
-                ))}</TableBody>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Início</TableHead>
+                    <TableHead>Paciente</TableHead>
+                    <TableHead>Médico</TableHead>
+                    <TableHead>Procedimento</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {raw.agend.map((a) => (
+                    <TableRow key={a.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {new Date(a.inicio).toLocaleString("pt-BR")}
+                      </TableCell>
+                      <TableCell>{a.paciente_nome ?? "—"}</TableCell>
+                      <TableCell>{a.medico ?? "—"}</TableCell>
+                      <TableCell>{a.procedimento ?? "—"}</TableCell>
+                      <TableCell>{a.status ?? "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
               </Table>
             )}
             {drill === "novos" && raw && (
               <Table>
-                <TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Cadastrado em</TableHead></TableRow></TableHeader>
-                <TableBody>{raw.pacientes.map((p) => (
-                  <TableRow key={p.id}><TableCell>{p.nome}</TableCell><TableCell>{new Date(p.created_at).toLocaleString("pt-BR")}</TableCell></TableRow>
-                ))}</TableBody>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Cadastrado em</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {raw.pacientes.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell>{p.nome}</TableCell>
+                      <TableCell>{new Date(p.created_at).toLocaleString("pt-BR")}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
               </Table>
             )}
             {drill === "pront" && raw && (
               <Table>
-                <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Paciente</TableHead></TableRow></TableHeader>
-                <TableBody>{raw.prontuarios.map((p) => (
-                  <TableRow key={p.id}><TableCell>{new Date(p.data_atendimento).toLocaleString("pt-BR")}</TableCell><TableCell>{p.paciente ?? "—"}</TableCell></TableRow>
-                ))}</TableBody>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Paciente</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {raw.prontuarios.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell>{new Date(p.data_atendimento).toLocaleString("pt-BR")}</TableCell>
+                      <TableCell>{p.paciente ?? "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
               </Table>
             )}
             {(drill === "saldo" || drill === "receitas" || drill === "despesas") && raw && (
               <Table>
-                <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Tipo</TableHead><TableHead>Descrição</TableHead><TableHead>Categoria</TableHead><TableHead className="text-right">Valor</TableHead></TableRow></TableHeader>
-                <TableBody>{raw.fin
-                  .filter((f) => drill === "saldo" ? true : drill === "receitas" ? f.tipo === "receita" : f.tipo === "despesa")
-                  .map((f) => (
-                  <TableRow key={f.id}><TableCell className="whitespace-nowrap">{f.data.slice(0,10).split("-").reverse().join("/")}</TableCell><TableCell>{f.tipo}</TableCell><TableCell>{f.descricao ?? "—"}</TableCell><TableCell>{f.categoria ?? "—"}</TableCell><TableCell className={`text-right font-semibold ${f.tipo === "receita" ? "text-emerald-600" : "text-rose-600"}`}>{f.tipo === "despesa" ? "-" : ""}{fmtBRL(f.valor)}</TableCell></TableRow>
-                ))}</TableBody>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {raw.fin
+                    .filter((f) =>
+                      drill === "saldo"
+                        ? true
+                        : drill === "receitas"
+                          ? f.tipo === "receita"
+                          : f.tipo === "despesa",
+                    )
+                    .map((f) => (
+                      <TableRow key={f.id}>
+                        <TableCell className="whitespace-nowrap">
+                          {f.data.slice(0, 10).split("-").reverse().join("/")}
+                        </TableCell>
+                        <TableCell>{f.tipo}</TableCell>
+                        <TableCell>{f.descricao ?? "—"}</TableCell>
+                        <TableCell>{f.categoria ?? "—"}</TableCell>
+                        <TableCell
+                          className={`text-right font-semibold ${f.tipo === "receita" ? "text-emerald-600" : "text-rose-600"}`}
+                        >
+                          {f.tipo === "despesa" ? "-" : ""}
+                          {fmtBRL(f.valor)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
               </Table>
             )}
           </div>
@@ -851,12 +1190,28 @@ function DashboardView({
 }
 
 function Kpi({
-  icon, label, value, tint, onClick,
-}: { icon: React.ReactNode; label: string; value: string; tint: string; onClick?: () => void }) {
+  icon,
+  label,
+  value,
+  tint,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  tint: string;
+  onClick?: () => void;
+}) {
   return (
-    <Card onClick={onClick} className={onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : undefined}>
+    <Card
+      onClick={onClick}
+      className={onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : undefined}
+    >
       <CardContent className="pt-6">
-        <div className={`flex items-center gap-2 ${tint}`}>{icon}<span className="text-sm text-muted-foreground">{label}</span></div>
+        <div className={`flex items-center gap-2 ${tint}`}>
+          {icon}
+          <span className="text-sm text-muted-foreground">{label}</span>
+        </div>
         <p className={`text-2xl font-semibold mt-1 ${tint}`}>{value}</p>
       </CardContent>
     </Card>
@@ -875,7 +1230,15 @@ type AgendDiaRow = {
   medico_id: string | null;
 };
 
-function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; ini: string; fim: string }) {
+function AgendamentosDiarioView({
+  clinicaId,
+  ini,
+  fim,
+}: {
+  clinicaId?: string;
+  ini: string;
+  fim: string;
+}) {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<AgendDiaRow[]>([]);
   const [profMap, setProfMap] = useState<Map<string, string>>(new Map());
@@ -892,15 +1255,21 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
         const fimISO = `${fim}T23:59:59`;
         const { data: ags, error } = await supabase
           .from("agendamentos")
-          .select("id, created_at, criado_por, paciente_nome, inicio, procedimento, status, medico_id")
+          .select(
+            "id, created_at, criado_por, paciente_nome, inicio, procedimento, status, medico_id",
+          )
           .eq("clinica_id", clinicaId)
           .gte("created_at", iniISO)
           .lte("created_at", fimISO)
           .order("created_at", { ascending: false });
         if (error) throw error;
         const list = (ags ?? []) as AgendDiaRow[];
-        const userIds = Array.from(new Set(list.map((r) => r.criado_por).filter(Boolean) as string[]));
-        const medIds = Array.from(new Set(list.map((r) => r.medico_id).filter(Boolean) as string[]));
+        const userIds = Array.from(
+          new Set(list.map((r) => r.criado_por).filter(Boolean) as string[]),
+        );
+        const medIds = Array.from(
+          new Set(list.map((r) => r.medico_id).filter(Boolean) as string[]),
+        );
         const [profsRes, contratosRes, medsRes] = await Promise.all([
           userIds.length
             ? supabase.from("profiles").select("id, nome").in("id", userIds)
@@ -928,10 +1297,15 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
         for (const c of ordered) {
           if (!userSetor.has(c.user_id)) userSetor.set(c.user_id, c.setor_id ?? null);
         }
-        const setorIds = Array.from(new Set(Array.from(userSetor.values()).filter(Boolean) as string[]));
+        const setorIds = Array.from(
+          new Set(Array.from(userSetor.values()).filter(Boolean) as string[]),
+        );
         const setorNome = new Map<string, string>();
         if (setorIds.length) {
-          const { data: secs } = await supabase.from("setores").select("id, nome").in("id", setorIds);
+          const { data: secs } = await supabase
+            .from("setores")
+            .select("id, nome")
+            .in("id", setorIds);
           ((secs ?? []) as any[]).forEach((s) => setorNome.set(s.id, s.nome ?? "—"));
         }
         const sMap = new Map<string, string>();
@@ -949,7 +1323,9 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
         if (!cancel) setLoading(false);
       }
     })();
-    return () => { cancel = true; };
+    return () => {
+      cancel = true;
+    };
   }, [clinicaId, ini, fim]);
 
   const agrupado = useMemo(() => {
@@ -990,15 +1366,28 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
         Status: r.status ?? "",
       };
     });
-    if (!flat.length) { toast.info("Nada para exportar."); return; }
+    if (!flat.length) {
+      toast.info("Nada para exportar.");
+      return;
+    }
     exportToExcel(flat, `agendamentos-diario-${ini}-a-${fim}`);
   }
 
   if (!clinicaId) {
-    return <Card><CardContent className="py-10 text-center text-muted-foreground">Selecione uma clínica.</CardContent></Card>;
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-muted-foreground">
+          Selecione uma clínica.
+        </CardContent>
+      </Card>
+    );
   }
   if (loading) {
-    return <Card><CardContent className="py-10 text-center text-muted-foreground">Carregando…</CardContent></Card>;
+    return (
+      <Card>
+        <CardContent className="py-10 text-center text-muted-foreground">Carregando…</CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -1007,8 +1396,8 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
         <div>
           <h2 className="text-xl font-semibold">Agendamentos criados no período</h2>
           <p className="text-sm text-muted-foreground">
-            Conta pelo dia em que o agendamento foi <b>registrado no sistema</b> (não pela data da consulta).
-            Agrupado por setor e atendente.
+            Conta pelo dia em que o agendamento foi <b>registrado no sistema</b> (não pela data da
+            consulta). Agrupado por setor e atendente.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -1023,56 +1412,70 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
       </div>
 
       {agrupado.length === 0 ? (
-        <Card><CardContent className="py-10 text-center text-muted-foreground">Nenhum agendamento registrado no período.</CardContent></Card>
-      ) : agrupado.map((g) => (
-        <Card key={g.setor}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-                {g.setor}
-              </CardTitle>
-              <span className="text-sm font-semibold">{g.total} agendamento{g.total === 1 ? "" : "s"}</span>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {g.atendentes.map((a) => (
-              <div key={a.nome} className="rounded-md border">
-                <div className="flex items-center justify-between bg-muted/40 px-3 py-2">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Users className="h-4 w-4 text-muted-foreground" /> {a.nome}
-                  </div>
-                  <span className="text-sm font-semibold">{a.lista.length}</span>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-40">Criado em</TableHead>
-                      <TableHead>Paciente</TableHead>
-                      <TableHead className="w-44">Data consulta</TableHead>
-                      <TableHead>Procedimento</TableHead>
-                      <TableHead>Médico</TableHead>
-                      <TableHead className="w-28">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {a.lista.map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell className="text-xs">{new Date(r.created_at).toLocaleString("pt-BR")}</TableCell>
-                        <TableCell className="text-sm">{r.paciente_nome ?? "—"}</TableCell>
-                        <TableCell className="text-xs">{new Date(r.inicio).toLocaleString("pt-BR")}</TableCell>
-                        <TableCell className="text-sm">{r.procedimento ?? "—"}</TableCell>
-                        <TableCell className="text-sm">{r.medico_id ? (medMap.get(r.medico_id) ?? "—") : "—"}</TableCell>
-                        <TableCell className="text-xs">{r.status ?? "—"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ))}
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            Nenhum agendamento registrado no período.
           </CardContent>
         </Card>
-      ))}
+      ) : (
+        agrupado.map((g) => (
+          <Card key={g.setor}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  {g.setor}
+                </CardTitle>
+                <span className="text-sm font-semibold">
+                  {g.total} agendamento{g.total === 1 ? "" : "s"}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {g.atendentes.map((a) => (
+                <div key={a.nome} className="rounded-md border">
+                  <div className="flex items-center justify-between bg-muted/40 px-3 py-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <Users className="h-4 w-4 text-muted-foreground" /> {a.nome}
+                    </div>
+                    <span className="text-sm font-semibold">{a.lista.length}</span>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-40">Criado em</TableHead>
+                        <TableHead>Paciente</TableHead>
+                        <TableHead className="w-44">Data consulta</TableHead>
+                        <TableHead>Procedimento</TableHead>
+                        <TableHead>Médico</TableHead>
+                        <TableHead className="w-28">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {a.lista.map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="text-xs">
+                            {new Date(r.created_at).toLocaleString("pt-BR")}
+                          </TableCell>
+                          <TableCell className="text-sm">{r.paciente_nome ?? "—"}</TableCell>
+                          <TableCell className="text-xs">
+                            {new Date(r.inicio).toLocaleString("pt-BR")}
+                          </TableCell>
+                          <TableCell className="text-sm">{r.procedimento ?? "—"}</TableCell>
+                          <TableCell className="text-sm">
+                            {r.medico_id ? (medMap.get(r.medico_id) ?? "—") : "—"}
+                          </TableCell>
+                          <TableCell className="text-xs">{r.status ?? "—"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ))
+      )}
     </div>
   );
 }

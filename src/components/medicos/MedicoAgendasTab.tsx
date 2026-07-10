@@ -10,8 +10,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 
-interface Agenda { id: string; nome: string; ativo: boolean; ordem: number }
-interface Procedimento { id: string; nome: string }
+interface Agenda {
+  id: string;
+  nome: string;
+  ativo: boolean;
+  ordem: number;
+}
+interface Procedimento {
+  id: string;
+  nome: string;
+}
 
 export function MedicoAgendasTab({
   clinicaId,
@@ -31,15 +39,27 @@ export function MedicoAgendasTab({
 
   const load = async () => {
     const [a, mp] = await Promise.all([
-      supabase.from("medico_agendas").select("id, nome, ativo, ordem").eq("medico_id", medicoId).eq("clinica_id", clinicaId).order("ordem").order("nome"),
+      supabase
+        .from("medico_agendas")
+        .select("id, nome, ativo, ordem")
+        .eq("medico_id", medicoId)
+        .eq("clinica_id", clinicaId)
+        .order("ordem")
+        .order("nome"),
       supabase.from("medico_procedimentos").select("procedimento_id").eq("medico_id", medicoId),
     ]);
-    let ags = ((a.data as Agenda[]) ?? []);
+    let ags = (a.data as Agenda[]) ?? [];
     // C-1: garante agenda padrão para todo médico (necessária para FK de medico_disponibilidades).
     if (ags.length === 0 && medicoId && clinicaId) {
       const { data: novaAg, error: errAg } = await supabase
         .from("medico_agendas")
-        .insert({ clinica_id: clinicaId, medico_id: medicoId, nome: "AGENDA", ordem: 0, ativo: true } as never)
+        .insert({
+          clinica_id: clinicaId,
+          medico_id: medicoId,
+          nome: "AGENDA",
+          ordem: 0,
+          ativo: true,
+        } as never)
         .select("id, nome, ativo, ordem")
         .single();
       if (errAg) {
@@ -64,7 +84,7 @@ export function MedicoAgendasTab({
         .in("id", idsPermitidos)
         .order("nome");
       if (pe) mostrarErro(pe);
-      setProcs(((ps as Procedimento[]) ?? []));
+      setProcs((ps as Procedimento[]) ?? []);
     } else {
       setProcs([]);
     }
@@ -72,7 +92,10 @@ export function MedicoAgendasTab({
       const { data: vincs } = await supabase
         .from("medico_agenda_procedimentos")
         .select("agenda_id, procedimento_id")
-        .in("agenda_id", ags.map((x) => x.id));
+        .in(
+          "agenda_id",
+          ags.map((x) => x.id),
+        );
       const map = new Map<string, Set<string>>();
       for (const v of (vincs ?? []) as { agenda_id: string; procedimento_id: string }[]) {
         if (!map.has(v.agenda_id)) map.set(v.agenda_id, new Set());
@@ -84,17 +107,25 @@ export function MedicoAgendasTab({
     }
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [medicoId, clinicaId, procedimentoIdsKey]);
+  useEffect(() => {
+    void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [medicoId, clinicaId, procedimentoIdsKey]);
 
   const criar = async () => {
     const nome = nova.trim();
-    if (!nome) { toast.error("Informe o nome"); return; }
+    if (!nome) {
+      toast.error("Informe o nome");
+      return;
+    }
     const { data, error } = await supabase
       .from("medico_agendas")
       .insert({ clinica_id: clinicaId, medico_id: medicoId, nome, ordem: agendas.length } as never)
       .select("id")
       .single();
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     setNova("");
     await load();
   };
@@ -103,24 +134,39 @@ export function MedicoAgendasTab({
     const nome = novoNome.trim();
     if (!nome || nome === a.nome) return;
     const { error } = await supabase.from("medico_agendas").update({ nome }).eq("id", a.id);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     void load();
   };
 
   const toggleAtivo = async (a: Agenda) => {
-    const { error } = await supabase.from("medico_agendas").update({ ativo: !a.ativo }).eq("id", a.id);
-    if (error) { mostrarErro(error); return; }
+    const { error } = await supabase
+      .from("medico_agendas")
+      .update({ ativo: !a.ativo })
+      .eq("id", a.id);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     void load();
   };
 
   const remover = async (a: Agenda) => {
-    if (!confirm(
-      `Remover agenda "${a.nome}"?\n\n` +
-      `- Os horários semanais (disponibilidades) desta agenda serão removidos.\n` +
-      `- Consultas já agendadas NÃO serão excluídas, mas perderão o vínculo com esta agenda.`
-    )) return;
+    if (
+      !confirm(
+        `Remover agenda "${a.nome}"?\n\n` +
+          `- Os horários semanais (disponibilidades) desta agenda serão removidos.\n` +
+          `- Consultas já agendadas NÃO serão excluídas, mas perderão o vínculo com esta agenda.`,
+      )
+    )
+      return;
     const { error } = await supabase.from("medico_agendas").delete().eq("id", a.id);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     void load();
   };
 
@@ -130,7 +176,8 @@ export function MedicoAgendasTab({
     setVinculos((prev) => {
       const next = new Map(prev);
       const set = new Set(next.get(agendaId) ?? new Set<string>());
-      if (checked) set.add(procId); else set.delete(procId);
+      if (checked) set.add(procId);
+      else set.delete(procId);
       next.set(agendaId, set);
       return next;
     });
@@ -141,14 +188,22 @@ export function MedicoAgendasTab({
           { clinica_id: clinicaId, agenda_id: agendaId, procedimento_id: procId } as never,
           { onConflict: "agenda_id,procedimento_id", ignoreDuplicates: true } as never,
         );
-      if (error) { mostrarErro(error); void load(); return; }
+      if (error) {
+        mostrarErro(error);
+        void load();
+        return;
+      }
     } else {
       const { error } = await supabase
         .from("medico_agenda_procedimentos")
         .delete()
         .eq("agenda_id", agendaId)
         .eq("procedimento_id", procId);
-      if (error) { mostrarErro(error); void load(); return; }
+      if (error) {
+        mostrarErro(error);
+        void load();
+        return;
+      }
     }
     void load();
   };
@@ -164,7 +219,8 @@ export function MedicoAgendasTab({
           <div>
             <Label className="text-sm">Este médico possui mais de uma agenda</Label>
             <p className="text-xs text-muted-foreground">
-              Por padrão, o médico tem uma única agenda para tudo. Ative apenas se ele atende em agendas separadas (ex.: "Consultas" e "Exames").
+              Por padrão, o médico tem uma única agenda para tudo. Ative apenas se ele atende em
+              agendas separadas (ex.: "Consultas" e "Exames").
             </p>
           </div>
           <Switch
@@ -182,7 +238,8 @@ export function MedicoAgendasTab({
 
       {!multipla && (
         <p className="text-sm text-muted-foreground">
-          O médico utilizará uma única agenda padrão para todos os atendimentos. Nada mais a configurar aqui.
+          O médico utilizará uma única agenda padrão para todos os atendimentos. Nada mais a
+          configurar aqui.
         </p>
       )}
 
@@ -259,7 +316,8 @@ export function MedicoAgendasTab({
                 className="max-w-xs uppercase"
               />
               <Button type="button" onClick={() => void criar()}>
-                <Plus className="h-4 w-4 mr-1" />Adicionar agenda
+                <Plus className="h-4 w-4 mr-1" />
+                Adicionar agenda
               </Button>
             </CardContent>
           </Card>

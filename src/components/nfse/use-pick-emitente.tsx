@@ -2,12 +2,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 
 type Emitente = { id: string; nome: string; cnpj: string; razao_social: string | null };
@@ -26,7 +35,10 @@ export function usePickEmitente() {
   const resolverRef = useRef<((v: string | null) => void) | null>(null);
 
   useEffect(() => {
-    if (!clinicaAtual?.clinica_id) { setEmitentes([]); return; }
+    if (!clinicaAtual?.clinica_id) {
+      setEmitentes([]);
+      return;
+    }
     void supabase
       .from("nfse_emitentes")
       .select("id, nome, cnpj, razao_social")
@@ -54,7 +66,8 @@ export function usePickEmitente() {
     if (!list.length) return null;
     if (list.length === 1) return list[0].id;
     return new Promise<string | null>((resolve) => {
-      const padrao = list.find((e) => (e as Emitente & { padrao?: boolean }).padrao)?.id ?? list[0].id;
+      const padrao =
+        list.find((e) => (e as Emitente & { padrao?: boolean }).padrao)?.id ?? list[0].id;
       setSelected(padrao);
       resolverRef.current = resolve;
       setOpen(true);
@@ -62,27 +75,38 @@ export function usePickEmitente() {
   }, [emitentes, clinicaAtual?.clinica_id]);
 
   const confirm = () => {
-    const r = resolverRef.current; resolverRef.current = null;
+    const r = resolverRef.current;
+    resolverRef.current = null;
     setOpen(false);
     r?.(selected || null);
   };
   const cancel = () => {
-    const r = resolverRef.current; resolverRef.current = null;
+    const r = resolverRef.current;
+    resolverRef.current = null;
     setOpen(false);
     r?.(null);
   };
 
   const dialog = (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) cancel(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) cancel();
+      }}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Em qual empresa emitir a NFS-e?</DialogTitle>
-          <DialogDescription>Selecione o emitente (CNPJ) que assinará esta nota fiscal.</DialogDescription>
+          <DialogDescription>
+            Selecione o emitente (CNPJ) que assinará esta nota fiscal.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
           <Label>Emitente</Label>
           <Select value={selected} onValueChange={setSelected}>
-            <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione..." />
+            </SelectTrigger>
             <SelectContent>
               {emitentes.map((e) => (
                 <SelectItem key={e.id} value={e.id}>
@@ -93,8 +117,12 @@ export function usePickEmitente() {
           </Select>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={cancel}>Cancelar</Button>
-          <Button onClick={confirm} disabled={!selected}>Emitir nesta empresa</Button>
+          <Button variant="outline" onClick={cancel}>
+            Cancelar
+          </Button>
+          <Button onClick={confirm} disabled={!selected}>
+            Emitir nesta empresa
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

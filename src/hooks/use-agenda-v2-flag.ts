@@ -16,25 +16,40 @@ export function useAgendaV2Flag() {
     let alive = true;
     (async () => {
       const { data: u } = await supabase.auth.getUser();
-      if (!u.user) { if (alive) setLoading(false); return; }
+      if (!u.user) {
+        if (alive) setLoading(false);
+        return;
+      }
       uidRef.current = u.user.id;
-      const { data } = await supabase.from("profiles")
-        .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
+      const { data } = await supabase
+        .from("profiles")
+        .select("preferencias_ui")
+        .eq("id", u.user.id)
+        .maybeSingle();
       const prefs = (data?.preferencias_ui ?? {}) as { flags?: { agenda_v2?: boolean } };
-      if (alive) { setEnabled(Boolean(prefs.flags?.agenda_v2)); setLoading(false); }
+      if (alive) {
+        setEnabled(Boolean(prefs.flags?.agenda_v2));
+        setLoading(false);
+      }
     })();
     const onChange = (e: Event) => {
       const ce = e as CustomEvent<{ agenda_v2: boolean }>;
       if (ce.detail) setEnabled(Boolean(ce.detail.agenda_v2));
     };
     window.addEventListener(EVT, onChange as EventListener);
-    return () => { alive = false; window.removeEventListener(EVT, onChange as EventListener); };
+    return () => {
+      alive = false;
+      window.removeEventListener(EVT, onChange as EventListener);
+    };
   }, []);
 
   const set = useCallback(async (v: boolean) => {
     if (!uidRef.current) return;
-    const { data } = await supabase.from("profiles")
-      .select("preferencias_ui").eq("id", uidRef.current).maybeSingle();
+    const { data } = await supabase
+      .from("profiles")
+      .select("preferencias_ui")
+      .eq("id", uidRef.current)
+      .maybeSingle();
     const prev = (data?.preferencias_ui ?? {}) as Record<string, unknown>;
     const flags = { ...((prev.flags as object) ?? {}), agenda_v2: v };
     const next = { ...prev, flags };

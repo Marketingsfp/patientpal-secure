@@ -85,7 +85,9 @@ export function ClinicaProvider({ children }: { children: ReactNode }) {
     if (showLoading) setLoading(true);
     const { data, error } = await supabase
       .from("clinica_memberships")
-      .select("id, clinica_id, role, clinica:clinicas(id, nome, cidade, estado, branding, base_importada)")
+      .select(
+        "id, clinica_id, role, clinica:clinicas(id, nome, cidade, estado, branding, base_importada)",
+      )
       .eq("user_id", user.id)
       .eq("ativo", true);
     if (!error && data) {
@@ -114,8 +116,13 @@ export function ClinicaProvider({ children }: { children: ReactNode }) {
       }
       setMemberships(next);
       try {
-        window.localStorage.setItem(MEMBERSHIPS_CACHE_KEY, JSON.stringify({ userId: user.id, memberships: next }));
-      } catch { /* ignore quota */ }
+        window.localStorage.setItem(
+          MEMBERSHIPS_CACHE_KEY,
+          JSON.stringify({ userId: user.id, memberships: next }),
+        );
+      } catch {
+        /* ignore quota */
+      }
     }
     setLoading(false);
   };

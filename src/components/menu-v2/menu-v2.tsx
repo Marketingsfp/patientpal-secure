@@ -1,26 +1,53 @@
 import { useMemo, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  ChevronDown, ChevronRight, Star, Heart, Clock, Search as SearchIcon,
-  Pin, X,
+  ChevronDown,
+  ChevronRight,
+  Star,
+  Heart,
+  Clock,
+  Search as SearchIcon,
+  Pin,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CENTROS, PERFIL_DEFAULTS, findItem, type Centro, type MenuItem, type PerfilKey } from "./menu-catalog";
+import {
+  CENTROS,
+  PERFIL_DEFAULTS,
+  findItem,
+  type Centro,
+  type MenuItem,
+  type PerfilKey,
+} from "./menu-catalog";
 import { useMenuPrefs } from "@/hooks/use-menu-prefs";
 
 const MAX_INLINE = 6;
 
 function IconBtn({
-  active, onClick, title, children, pressed,
-}: { active?: boolean; onClick: () => void; title: string; children: React.ReactNode; pressed?: boolean }) {
+  active,
+  onClick,
+  title,
+  children,
+  pressed,
+}: {
+  active?: boolean;
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
+  pressed?: boolean;
+}) {
   return (
     <button
       type="button"
-      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick(); }}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClick();
+      }}
       title={title}
       aria-label={title}
       aria-pressed={pressed}
@@ -38,10 +65,19 @@ function IconBtn({
 }
 
 function Row({
-  item, active, pinned, favorited, onTogglePin, onToggleFav,
+  item,
+  active,
+  pinned,
+  favorited,
+  onTogglePin,
+  onToggleFav,
 }: {
-  item: MenuItem; active: boolean; pinned: boolean; favorited: boolean;
-  onTogglePin: () => void; onToggleFav: () => void;
+  item: MenuItem;
+  active: boolean;
+  pinned: boolean;
+  favorited: boolean;
+  onTogglePin: () => void;
+  onToggleFav: () => void;
 }) {
   const Icon = item.icon;
   return (
@@ -57,10 +93,20 @@ function Row({
         <span className="truncate">{item.label}</span>
       </Link>
       <div className="flex items-center gap-0.5">
-        <IconBtn active={pinned} pressed={pinned} onClick={onTogglePin} title={pinned ? "Desfixar" : "Fixar"}>
+        <IconBtn
+          active={pinned}
+          pressed={pinned}
+          onClick={onTogglePin}
+          title={pinned ? "Desfixar" : "Fixar"}
+        >
           <Pin className={cn("h-3.5 w-3.5", pinned && "fill-primary")} />
         </IconBtn>
-        <IconBtn active={favorited} pressed={favorited} onClick={onToggleFav} title={favorited ? "Remover favorito" : "Favoritar"}>
+        <IconBtn
+          active={favorited}
+          pressed={favorited}
+          onClick={onToggleFav}
+          title={favorited ? "Remover favorito" : "Favoritar"}
+        >
           <Heart className={cn("h-3.5 w-3.5", favorited && "fill-primary")} />
         </IconBtn>
       </div>
@@ -69,11 +115,21 @@ function Row({
 }
 
 function CentroGroup({
-  centro, currentPath, open, onToggleOpen, prefs, onPin, onFav,
+  centro,
+  currentPath,
+  open,
+  onToggleOpen,
+  prefs,
+  onPin,
+  onFav,
 }: {
-  centro: Centro; currentPath: string; open: boolean; onToggleOpen: () => void;
+  centro: Centro;
+  currentPath: string;
+  open: boolean;
+  onToggleOpen: () => void;
   prefs: { pinned: string[]; favorites: string[] };
-  onPin: (p: string) => void; onFav: (p: string) => void;
+  onPin: (p: string) => void;
+  onFav: (p: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const visible = centro.items.slice(0, MAX_INLINE);
@@ -147,7 +203,9 @@ function CentroGroup({
                     />
                   ))}
                   {filtered.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-6">Nada encontrado.</p>
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      Nada encontrado.
+                    </p>
                   )}
                 </div>
               </SheetContent>

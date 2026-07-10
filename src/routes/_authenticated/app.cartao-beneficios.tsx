@@ -3,7 +3,10 @@ import { CreditCard, FileSignature, BarChart3, ShieldCheck, Users, Gift } from "
 
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios")({
   beforeLoad: ({ location }) => {
-    if (location.pathname === "/app/cartao-beneficios" || location.pathname === "/app/cartao-beneficios/") {
+    if (
+      location.pathname === "/app/cartao-beneficios" ||
+      location.pathname === "/app/cartao-beneficios/"
+    ) {
       throw redirect({ to: "/app/cartao-beneficios/contratos" });
     }
   },

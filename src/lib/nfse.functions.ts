@@ -29,7 +29,13 @@ async function pollFocusTerminal(
   token: string,
   maxAttempts = 8,
   intervalMs = 1500,
-): Promise<{ status?: string; erros?: Array<{ codigo?: string; mensagem?: string }>; mensagem?: string } & Record<string, unknown>> {
+): Promise<
+  {
+    status?: string;
+    erros?: Array<{ codigo?: string; mensagem?: string }>;
+    mensagem?: string;
+  } & Record<string, unknown>
+> {
   let last: Record<string, unknown> = {};
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise((r) => setTimeout(r, intervalMs));
@@ -84,28 +90,30 @@ async function buscarCodigoMunicipioPorCep(cep: string | null | undefined) {
 export const emitirNfse = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
-    z.object({
-      emitenteId: z.string().uuid(),
-      pacienteId: z.string().uuid().optional(),
-      pagamentoId: z.string().uuid().optional(),
-      agendamentoId: z.string().uuid().optional(),
-      valorServicos: z.number().positive(),
-      descricaoServicos: z.string().min(1).max(2000),
-      tomador: z.object({
-        nome: z.string().min(2),
-        cpfCnpj: z.string().optional(),
-        email: z.string().email().optional(),
-        cep: z.string().optional(),
-        logradouro: z.string().optional(),
-        numero: z.string().optional(),
-        bairro: z.string().optional(),
-        municipio: z.string().optional(),
-        codigoMunicipio: z.string().optional(),
-        uf: z.string().optional(),
-      }),
-      aliquotaIssOverride: z.number().min(0).max(1).optional(),
-      itemListaOverride: z.string().optional(),
-    }).parse(input),
+    z
+      .object({
+        emitenteId: z.string().uuid(),
+        pacienteId: z.string().uuid().optional(),
+        pagamentoId: z.string().uuid().optional(),
+        agendamentoId: z.string().uuid().optional(),
+        valorServicos: z.number().positive(),
+        descricaoServicos: z.string().min(1).max(2000),
+        tomador: z.object({
+          nome: z.string().min(2),
+          cpfCnpj: z.string().optional(),
+          email: z.string().email().optional(),
+          cep: z.string().optional(),
+          logradouro: z.string().optional(),
+          numero: z.string().optional(),
+          bairro: z.string().optional(),
+          municipio: z.string().optional(),
+          codigoMunicipio: z.string().optional(),
+          uf: z.string().optional(),
+        }),
+        aliquotaIssOverride: z.number().min(0).max(1).optional(),
+        itemListaOverride: z.string().optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -125,7 +133,10 @@ export const emitirNfse = createServerFn({ method: "POST" })
     // Exames vão para MA IMAGENS (CNPJ 57.786.061/0001-43).
     const EXAME_CNPJ = "57786061000143";
     const desc = (data.descricaoServicos ?? "").toLowerCase();
-    const ehExame = /\bexam|ultrassom|ultra-?som|raio.?x|raio x|radiograf|tomograf|ressonan|mamograf|densitometr|ecocardio|eletrocardio|\becg\b|\beeg\b|holter|endoscop|colonoscop|doppler|ecograf/i.test(desc);
+    const ehExame =
+      /\bexam|ultrassom|ultra-?som|raio.?x|raio x|radiograf|tomograf|ressonan|mamograf|densitometr|ecocardio|eletrocardio|\becg\b|\beeg\b|holter|endoscop|colonoscop|doppler|ecograf/i.test(
+        desc,
+      );
 
     const alvoCnpj = ehExame ? EXAME_CNPJ : ehConsulta ? CONSULTA_CNPJ : null;
     const alvoCnpjFormatado = ehExame ? "57.786.061/0001-43" : "31.919.483/0003-18";
@@ -151,7 +162,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
     const token =
       emitente.focus_ambiente === "producao"
         ? process.env.FOCUS_NFE_TOKEN_PROD
-        : process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD;
+        : (process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD);
     if (!token) throw new Error("Token Focus NFe não configurado");
 
     const aliquota = data.aliquotaIssOverride ?? Number(emitente.aliquota_iss ?? 0.02);
@@ -169,17 +180,27 @@ export const emitirNfse = createServerFn({ method: "POST" })
     })();
 
     const itemListaServico = only(data.itemListaOverride ?? emitente.item_lista_servico);
-    if (!itemListaServico) throw new Error("Informe o código nacional do serviço para emissão da NFS-e.");
-    const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(emitente.codigo_tributario_municipio);
+    if (!itemListaServico)
+      throw new Error("Informe o código nacional do serviço para emissão da NFS-e.");
+    const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(
+      emitente.codigo_tributario_municipio,
+    );
 
     const imRaw = only(emitente.inscricao_municipal ?? "");
     const imLower = (emitente.inscricao_municipal ?? "").trim().toLowerCase();
-    const inscricaoMunicipal = imRaw && imLower !== "isento" && imLower !== "insento" ? imRaw : undefined;
+    const inscricaoMunicipal =
+      imRaw && imLower !== "isento" && imLower !== "insento" ? imRaw : undefined;
     const tomadorCodigoMunicipio = data.tomador.logradouro
-      ? (await buscarCodigoMunicipioPorCep(data.tomador.cep)) ?? data.tomador.codigoMunicipio ?? emitente.codigo_municipio
+      ? ((await buscarCodigoMunicipioPorCep(data.tomador.cep)) ??
+        data.tomador.codigoMunicipio ??
+        emitente.codigo_municipio)
       : undefined;
     const regimeTributario = (emitente.regime_tributario ?? "").toLowerCase();
-    const codigoOpcaoSimplesNacional = emitente.optante_simples ? (regimeTributario === "mei" ? 2 : 3) : 1;
+    const codigoOpcaoSimplesNacional = emitente.optante_simples
+      ? regimeTributario === "mei"
+        ? 2
+        : 3
+      : 1;
 
     const payloadMunicipal = {
       data_emissao: dataEmissaoBR,
@@ -189,8 +210,14 @@ export const emitirNfse = createServerFn({ method: "POST" })
         codigo_municipio: emitente.codigo_municipio,
       },
       tomador: {
-        cpf: data.tomador.cpfCnpj && only(data.tomador.cpfCnpj).length === 11 ? only(data.tomador.cpfCnpj) : undefined,
-        cnpj: data.tomador.cpfCnpj && only(data.tomador.cpfCnpj).length === 14 ? only(data.tomador.cpfCnpj) : undefined,
+        cpf:
+          data.tomador.cpfCnpj && only(data.tomador.cpfCnpj).length === 11
+            ? only(data.tomador.cpfCnpj)
+            : undefined,
+        cnpj:
+          data.tomador.cpfCnpj && only(data.tomador.cpfCnpj).length === 14
+            ? only(data.tomador.cpfCnpj)
+            : undefined,
         razao_social: data.tomador.nome,
         email: data.tomador.email,
         endereco: data.tomador.logradouro
@@ -259,7 +286,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
       razao_social_tomador: data.tomador.nome,
       codigo_municipio_prestacao: Number(tomadorCodMun),
       codigo_tributacao_nacional_iss: itemListaServico,
-      ...(codigoTributarioMunicipio ? { codigo_tributacao_municipio: codigoTributarioMunicipio } : {}),
+      ...(codigoTributarioMunicipio
+        ? { codigo_tributacao_municipio: codigoTributarioMunicipio }
+        : {}),
       descricao_servico: data.descricaoServicos,
       valor_servico: data.valorServicos,
       tributacao_iss: 1,
@@ -331,9 +360,14 @@ export const emitirNfse = createServerFn({ method: "POST" })
     const MAX_RPS_RETRIES = 10;
 
     let currentRef = ref;
-    let currentNumero = (payloadNacional as { numero_dps?: number }).numero_dps ?? (emitente.rps_proximo_numero ?? 1);
+    let currentNumero =
+      (payloadNacional as { numero_dps?: number }).numero_dps ?? emitente.rps_proximo_numero ?? 1;
     let resp: Response;
-    let body: { status?: string; erros?: Array<{ codigo?: string; mensagem?: string }>; mensagem?: string } = {};
+    let body: {
+      status?: string;
+      erros?: Array<{ codigo?: string; mensagem?: string }>;
+      mensagem?: string;
+    } = {};
     let attempts = 0;
     let bumpedTo = currentNumero;
 
@@ -387,15 +421,20 @@ export const emitirNfse = createServerFn({ method: "POST" })
           status: "erro",
           focus_ref: currentRef,
           focus_status: body?.status ?? "erro",
-          erro_mensagem:
-            (e0014Final
-              ? `Após ${attempts} tentativas a prefeitura ainda recusou (E0014 — DPS já existente). Ajuste manualmente o "Próx. nº RPS" do emitente.`
-              : body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`),
+          erro_mensagem: e0014Final
+            ? `Após ${attempts} tentativas a prefeitura ainda recusou (E0014 — DPS já existente). Ajuste manualmente o "Próx. nº RPS" do emitente.`
+            : (body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`),
           payload_envio: payload,
           payload_resposta: body,
         })
         .eq("id", nota.id);
-      return { ok: false, id: nota.id, error: body?.mensagem ?? `HTTP ${resp.status}`, body, tentativas: attempts };
+      return {
+        ok: false,
+        id: nota.id,
+        error: body?.mensagem ?? `HTTP ${resp.status}`,
+        body,
+        tentativas: attempts,
+      };
     }
 
     await supabase
@@ -432,7 +471,7 @@ export const consultarNfse = createServerFn({ method: "POST" })
     const token =
       emitente?.focus_ambiente === "producao"
         ? process.env.FOCUS_NFE_TOKEN_PROD
-        : process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD;
+        : (process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD);
     if (!token) throw new Error("Token Focus NFe não configurado");
 
     const resp = await fetch(`${focusNfseBase(emitente)}/${nota.focus_ref}`, {
@@ -455,15 +494,21 @@ export const consultarNfse = createServerFn({ method: "POST" })
         (body?.caminho_danfse ? `https://api.focusnfe.com.br${body?.caminho_danfse}` : null);
       updates.url_xml =
         body?.url_xml_nota_fiscal ??
-        (body?.caminho_xml_nota_fiscal ? `https://api.focusnfe.com.br${body?.caminho_xml_nota_fiscal}` : null);
+        (body?.caminho_xml_nota_fiscal
+          ? `https://api.focusnfe.com.br${body?.caminho_xml_nota_fiscal}`
+          : null);
     } else if (body?.status === "cancelado") {
       updates.status = "cancelada";
     } else if (body?.status === "erro_autorizacao" || body?.status === "erro") {
       updates.status = "erro";
-      updates.erro_mensagem = body?.mensagem_sefaz ?? body?.mensagem ?? body?.erros?.[0]?.mensagem ?? null;
+      updates.erro_mensagem =
+        body?.mensagem_sefaz ?? body?.mensagem ?? body?.erros?.[0]?.mensagem ?? null;
     }
 
-    await supabase.from("nfse").update(updates as never).eq("id", nota.id);
+    await supabase
+      .from("nfse")
+      .update(updates as never)
+      .eq("id", nota.id);
     return { ok: true, status: body?.status ?? null, body };
   });
 
@@ -489,7 +534,7 @@ export const cancelarNfse = createServerFn({ method: "POST" })
     const token =
       emitente?.focus_ambiente === "producao"
         ? process.env.FOCUS_NFE_TOKEN_PROD
-        : process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD;
+        : (process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD);
     if (!token) throw new Error("Token Focus NFe não configurado");
 
     const resp = await fetch(`${focusNfseBase(emitente)}/${nota.focus_ref}`, {
@@ -540,7 +585,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     const token =
       emitente.focus_ambiente === "producao"
         ? process.env.FOCUS_NFE_TOKEN_PROD
-        : process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD;
+        : (process.env.FOCUS_NFE_TOKEN_HML ?? process.env.FOCUS_NFE_TOKEN_PROD);
     if (!token) throw new Error("Token Focus NFe não configurado");
 
     const aliquota = Number(nota.aliquota_iss ?? emitente.aliquota_iss ?? 0.02);
@@ -555,18 +600,26 @@ export const reenviarNfse = createServerFn({ method: "POST" })
 
     const itemListaServico = only(emitente.item_lista_servico);
     if (!itemListaServico) throw new Error("Informe o código nacional do serviço no emitente.");
-    const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(emitente.codigo_tributario_municipio);
+    const codigoTributarioMunicipio = normalizeCodigoTributarioMunicipio(
+      emitente.codigo_tributario_municipio,
+    );
 
     const cpfCnpj = only(nota.tomador_documento ?? "");
     const imRaw2 = only(emitente.inscricao_municipal ?? "");
     const imLower2 = (emitente.inscricao_municipal ?? "").trim().toLowerCase();
-    const inscricaoMunicipal2 = imRaw2 && imLower2 !== "isento" && imLower2 !== "insento" ? imRaw2 : undefined;
+    const inscricaoMunicipal2 =
+      imRaw2 && imLower2 !== "isento" && imLower2 !== "insento" ? imRaw2 : undefined;
     const tomadorCep = only(String(tomadorEndereco.cep ?? ""));
     const tomadorCodigoMunicipio = tomadorEndereco?.logradouro
-      ? (await buscarCodigoMunicipioPorCep(tomadorCep)) ?? String(tomadorEndereco.codigoMunicipio ?? emitente.codigo_municipio)
+      ? ((await buscarCodigoMunicipioPorCep(tomadorCep)) ??
+        String(tomadorEndereco.codigoMunicipio ?? emitente.codigo_municipio))
       : undefined;
     const regimeTributario = (emitente.regime_tributario ?? "").toLowerCase();
-    const codigoOpcaoSimplesNacional = emitente.optante_simples ? (regimeTributario === "mei" ? 2 : 3) : 1;
+    const codigoOpcaoSimplesNacional = emitente.optante_simples
+      ? regimeTributario === "mei"
+        ? 2
+        : 3
+      : 1;
     const payloadMunicipal = {
       data_emissao: dataEmissaoBR,
       prestador: {
@@ -630,7 +683,9 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       razao_social_tomador: nota.tomador_nome,
       codigo_municipio_prestacao: Number(tomadorCodMun),
       codigo_tributacao_nacional_iss: itemListaServico,
-      ...(codigoTributarioMunicipio ? { codigo_tributacao_municipio: codigoTributarioMunicipio } : {}),
+      ...(codigoTributarioMunicipio
+        ? { codigo_tributacao_municipio: codigoTributarioMunicipio }
+        : {}),
       descricao_servico: nota.descricao_servicos,
       valor_servico: valorServicos,
       tributacao_iss: 1,
@@ -664,9 +719,14 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     const isNacional = !!emitente.usar_ambiente_nacional;
     const MAX_RPS_RETRIES = 10;
     let currentRef = ref;
-    let currentNumero = (payloadNacional as { numero_dps?: number }).numero_dps ?? (emitente.rps_proximo_numero ?? 1);
+    let currentNumero =
+      (payloadNacional as { numero_dps?: number }).numero_dps ?? emitente.rps_proximo_numero ?? 1;
     let resp: Response;
-    let body: { status?: string; erros?: Array<{ codigo?: string; mensagem?: string }>; mensagem?: string } = {};
+    let body: {
+      status?: string;
+      erros?: Array<{ codigo?: string; mensagem?: string }>;
+      mensagem?: string;
+    } = {};
     let attempts = 0;
     let bumpedTo = currentNumero;
 
@@ -713,11 +773,17 @@ export const reenviarNfse = createServerFn({ method: "POST" })
           focus_status: body?.status ?? "erro",
           erro_mensagem: e0014Final
             ? `Após ${attempts} tentativas a prefeitura ainda recusou (E0014 — DPS já existente). Ajuste manualmente o "Próx. nº RPS" do emitente.`
-            : body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`,
+            : (body?.mensagem ?? body?.erros?.[0]?.mensagem ?? `HTTP ${resp.status}`),
           payload_resposta: body,
         })
         .eq("id", nota.id);
-      return { ok: false, id: nota.id, error: body?.mensagem ?? `HTTP ${resp.status}`, body, tentativas: attempts };
+      return {
+        ok: false,
+        id: nota.id,
+        error: body?.mensagem ?? `HTTP ${resp.status}`,
+        body,
+        tentativas: attempts,
+      };
     }
 
     await supabase
@@ -738,10 +804,12 @@ export const reenviarNfse = createServerFn({ method: "POST" })
 export const extrairNfseDeImagem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({
-      arquivo_base64: z.string().min(20).max(15_000_000),
-      mime: z.string().min(3).max(100),
-    }).parse(i),
+    z
+      .object({
+        arquivo_base64: z.string().min(20).max(15_000_000),
+        mime: z.string().min(3).max(100),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const key = process.env.LOVABLE_API_KEY;
@@ -793,15 +861,32 @@ Não invente. Datas devem virar YYYY-MM-DD. Valor em número (ex: 60.00).`;
     }
     const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
     const content = json.choices?.[0]?.message?.content ?? "{}";
-    const cleaned = content.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+    const cleaned = content
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/```\s*$/i, "")
+      .trim();
     const start = cleaned.indexOf("{");
     const end = cleaned.lastIndexOf("}");
     if (start < 0 || end < 0) throw new Error("IA não devolveu JSON válido");
     const parsed = JSON.parse(cleaned.slice(start, end + 1)) as Record<string, unknown>;
 
-    const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" ? Number(v.replace(/[^\d.,-]/g, "").replace(/\.(?=\d{3})/g, "").replace(",", ".")) : null);
+    const num = (v: unknown) =>
+      typeof v === "number"
+        ? v
+        : typeof v === "string"
+          ? Number(
+              v
+                .replace(/[^\d.,-]/g, "")
+                .replace(/\.(?=\d{3})/g, "")
+                .replace(",", "."),
+            )
+          : null;
     const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
-    const digits = (v: unknown) => { const s = str(v); return s ? s.replace(/\D/g, "") : null; };
+    const digits = (v: unknown) => {
+      const s = str(v);
+      return s ? s.replace(/\D/g, "") : null;
+    };
 
     return {
       numero: str(parsed.numero),
@@ -822,10 +907,12 @@ Não invente. Datas devem virar YYYY-MM-DD. Valor em número (ex: 60.00).`;
 export const baixarNfseArquivo = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) =>
-    z.object({
-      nfseId: z.string().uuid(),
-      tipo: z.enum(["pdf", "xml"]).default("pdf"),
-    }).parse(i),
+    z
+      .object({
+        nfseId: z.string().uuid(),
+        tipo: z.enum(["pdf", "xml"]).default("pdf"),
+      })
+      .parse(i),
   )
   .handler(async ({ data, context }) => {
     const { supabase } = context;

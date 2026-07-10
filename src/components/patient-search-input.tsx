@@ -58,7 +58,9 @@ function normalizarBusca(s: string) {
 // Tenta interpretar o termo como uma data de nascimento.
 // Aceita: DD/MM/AAAA, DD-MM-AAAA, DDMMAAAA, AAAA-MM-DD, DD/MM (ano qualquer).
 // Retorna { iso?: "YYYY-MM-DD", partial?: { dia, mes } } ou null.
-function parseDataBusca(term: string): { iso?: string; partial?: { dia: string; mes: string } } | null {
+function parseDataBusca(
+  term: string,
+): { iso?: string; partial?: { dia: string; mes: string } } | null {
   const t = term.trim();
   // AAAA-MM-DD
   let m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -128,7 +130,6 @@ export function PatientSearchInput({
         _limite: 20,
       });
       if (error) {
-        // eslint-disable-next-line no-console
         console.error("[patient-search] rpc error", { term, scope, error });
       }
       if (myReq !== reqIdRef.current) return;
@@ -136,7 +137,7 @@ export function PatientSearchInput({
       let base = todas;
       if (dataBusca?.partial) {
         const { dia, mes } = dataBusca.partial;
-        base = todas.filter(p => {
+        base = todas.filter((p) => {
           if (!p.data_nascimento) return false;
           const [, m2, d2] = p.data_nascimento.split("-");
           return m2 === mes && d2 === dia;
@@ -216,75 +217,73 @@ export function PatientSearchInput({
       )}
       {open && query.trim().length >= 2 && (
         <div className="absolute z-50 mt-1 w-full rounded-md border border-input bg-popover shadow-lg max-h-72 overflow-auto">
-          {loading && (
-            <div className="px-3 py-2 text-sm text-muted-foreground">Buscando…</div>
-          )}
+          {loading && <div className="px-3 py-2 text-sm text-muted-foreground">Buscando…</div>}
           {!loading && options.length === 0 && (
             <div className="px-3 py-2 text-sm text-muted-foreground">
               Nenhum paciente encontrado.
             </div>
           )}
-          {!loading && options.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => {
-                onSelect(p);
-                setQuery(p.nome);
-                setOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-start gap-2"
-            >
-              <User className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                  <span className="font-medium truncate">{p.nome}</span>
-                  {p.codigo_prontuario && (
-                    <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
-                      Prontuário {p.codigo_prontuario}
-                    </span>
-                  )}
-                  {p.numero_pasta && (
-                    <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
-                      Pasta {p.numero_pasta}
-                    </span>
-                  )}
-                  {p.associado_convenio ? (
-                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
-                      Associado — {p.associado_convenio}
-                    </span>
-                  ) : (
-                    <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                      Particular
-                    </span>
-                  )}
-                  <span className="text-xs text-muted-foreground">
-                    CPF: {formatCPFMasked(p.cpf) ?? "—"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    Nasc.: {p.data_nascimento
-                      ? p.data_nascimento.split("-").reverse().join("/")
-                      : "—"}
-                  </span>
-                  {p.ultima_consulta && (
+          {!loading &&
+            options.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  onSelect(p);
+                  setQuery(p.nome);
+                  setOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-start gap-2"
+              >
+                <User className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                    <span className="font-medium truncate">{p.nome}</span>
+                    {p.codigo_prontuario && (
+                      <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
+                        Prontuário {p.codigo_prontuario}
+                      </span>
+                    )}
+                    {p.numero_pasta && (
+                      <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted">
+                        Pasta {p.numero_pasta}
+                      </span>
+                    )}
+                    {p.associado_convenio ? (
+                      <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+                        Associado — {p.associado_convenio}
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        Particular
+                      </span>
+                    )}
                     <span className="text-xs text-muted-foreground">
-                      Última: {p.ultima_consulta.split("-").reverse().join("/")}
+                      CPF: {formatCPFMasked(p.cpf) ?? "—"}
                     </span>
+                    <span className="text-xs text-muted-foreground">
+                      Nasc.:{" "}
+                      {p.data_nascimento ? p.data_nascimento.split("-").reverse().join("/") : "—"}
+                    </span>
+                    {p.ultima_consulta && (
+                      <span className="text-xs text-muted-foreground">
+                        Última: {p.ultima_consulta.split("-").reverse().join("/")}
+                      </span>
+                    )}
+                  </div>
+                  {p.telefone && (
+                    <div className="text-xs text-muted-foreground truncate">
+                      {formatTelMasked(p.telefone)}
+                    </div>
+                  )}
+                  {p.cadastro_incompleto && (
+                    <div className="text-[11px] mt-0.5 text-amber-700 dark:text-amber-400">
+                      ⚠ Cadastro incompleto — clique para completar
+                    </div>
                   )}
                 </div>
-                {p.telefone && (
-                  <div className="text-xs text-muted-foreground truncate">
-                    {formatTelMasked(p.telefone)}
-                  </div>
-                )}
-                {p.cadastro_incompleto && (
-                  <div className="text-[11px] mt-0.5 text-amber-700 dark:text-amber-400">
-                    ⚠ Cadastro incompleto — clique para completar
-                  </div>
-                )}
-              </div>
-            </button>
-          ))}
+              </button>
+            ))}
         </div>
       )}
     </div>

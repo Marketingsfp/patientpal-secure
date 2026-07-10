@@ -7,14 +7,36 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import {
-  ShieldCheck, ConciergeBell, Wallet, DollarSign, HeartPulse, Stethoscope, Briefcase,
-  ChevronDown, ChevronRight, Save, Loader2,
+  ShieldCheck,
+  ConciergeBell,
+  Wallet,
+  DollarSign,
+  HeartPulse,
+  Stethoscope,
+  Briefcase,
+  ChevronDown,
+  ChevronRight,
+  Save,
+  Loader2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/perfis")({
@@ -35,37 +57,43 @@ const PERFIS: Array<{
     key: "admin",
     nome: "ADMIN",
     icon: ShieldCheck,
-    descricao: "Acesso total ao sistema. Pode gerenciar unidades, equipe, perfis, configurações e todas as áreas operacionais e financeiras.",
+    descricao:
+      "Acesso total ao sistema. Pode gerenciar unidades, equipe, perfis, configurações e todas as áreas operacionais e financeiras.",
   },
   {
     key: "gestor",
     nome: "GESTOR",
     icon: Briefcase,
-    descricao: "Gestão operacional da unidade: acompanha indicadores, equipe, agenda e financeiro, sem acesso a configurações sensíveis.",
+    descricao:
+      "Gestão operacional da unidade: acompanha indicadores, equipe, agenda e financeiro, sem acesso a configurações sensíveis.",
   },
   {
     key: "medico",
     nome: "MÉDICO",
     icon: Stethoscope,
-    descricao: "Profissional clínico: realiza atendimentos, prontuários, prescrições e visualiza seus repasses.",
+    descricao:
+      "Profissional clínico: realiza atendimentos, prontuários, prescrições e visualiza seus repasses.",
   },
   {
     key: "recepcao",
     nome: "RECEPÇÃO",
     icon: ConciergeBell,
-    descricao: "Atendimento de pacientes na recepção: agendamentos, check-in, filas e cadastro de clientes.",
+    descricao:
+      "Atendimento de pacientes na recepção: agendamentos, check-in, filas e cadastro de clientes.",
   },
   {
     key: "caixa",
     nome: "CAIXA",
     icon: Wallet,
-    descricao: "Operação de caixa diário: recebimentos, pagamentos no balcão e fechamento de caixa.",
+    descricao:
+      "Operação de caixa diário: recebimentos, pagamentos no balcão e fechamento de caixa.",
   },
   {
     key: "financeiro",
     nome: "FINANCEIRO",
     icon: DollarSign,
-    descricao: "Gestão financeira completa: contas a pagar/receber, conciliação bancária, relatórios e BI.",
+    descricao:
+      "Gestão financeira completa: contas a pagar/receber, conciliação bancária, relatórios e BI.",
   },
   {
     key: "enfermeiro",
@@ -94,7 +122,11 @@ const GRUPOS: Grupo[] = [
       { key: "triagem-enfermagem", nome: "Triagem - Enfermagem", descricao: "Triagem inicial" },
       { key: "cartao-beneficios", nome: "Cartão Benefícios", descricao: "Planos e contratos" },
       { key: "painel", nome: "Painel de Senhas", descricao: "Painel público de chamadas" },
-      { key: "documentos", nome: "Documentos do paciente", descricao: "Anexos e arquivos clínicos" },
+      {
+        key: "documentos",
+        nome: "Documentos do paciente",
+        descricao: "Anexos e arquivos clínicos",
+      },
     ],
   },
   {
@@ -102,7 +134,11 @@ const GRUPOS: Grupo[] = [
     modulos: [
       { key: "atendimento-ia", nome: "Atendimento médico", descricao: "Atendimento com IA" },
       { key: "crm", nome: "CRM", descricao: "Oportunidades e leads" },
-      { key: "alertas-enfermagem", nome: "Enfermeira IA — Alertas", descricao: "Alertas automáticos" },
+      {
+        key: "alertas-enfermagem",
+        nome: "Enfermeira IA — Alertas",
+        descricao: "Alertas automáticos",
+      },
       { key: "consulta-rapida", nome: "Informações rápidas", descricao: "Consulta a tabelas" },
       { key: "nina", nome: "Nina — WhatsApp", descricao: "Conversas WhatsApp" },
       { key: "odontologia", nome: "Odontologia", descricao: "Odontograma e plano" },
@@ -125,7 +161,11 @@ const GRUPOS: Grupo[] = [
     label: "Cadastros",
     modulos: [
       { key: "equipe", nome: "Equipe", descricao: "Usuários do sistema" },
-      { key: "especialidades", nome: "Serviços", descricao: "Especialidades, tipos de serviço, procedimentos e recursos de enfermagem" },
+      {
+        key: "especialidades",
+        nome: "Serviços",
+        descricao: "Especialidades, tipos de serviço, procedimentos e recursos de enfermagem",
+      },
       { key: "disponibilidades", nome: "Horários médicos", descricao: "Agenda dos médicos" },
       { key: "prontuario-modelos", nome: "Modelos de Prontuário", descricao: "Templates clínicos" },
       { key: "perfis", nome: "Perfis de acesso", descricao: "Perfis e permissões" },
@@ -134,7 +174,11 @@ const GRUPOS: Grupo[] = [
       { key: "procedimentos", nome: "Procedimentos", descricao: "Tabela de procedimentos" },
       { key: "planos", nome: "Planos / Convênios", descricao: "Planos de saúde e convênios" },
       { key: "estoque", nome: "Estoque", descricao: "Produtos e movimentos" },
-      { key: "modelos-documentos", nome: "Modelos de Documentos", descricao: "Templates de documentos" },
+      {
+        key: "modelos-documentos",
+        nome: "Modelos de Documentos",
+        descricao: "Templates de documentos",
+      },
       { key: "clinicas", nome: "Clínicas", descricao: "Cadastro de clínicas (multi-empresa)" },
     ],
   },
@@ -153,15 +197,31 @@ const GRUPOS: Grupo[] = [
     label: "Gestão",
     modulos: [
       { key: "cargos", nome: "Cargos", descricao: "Cargos e funções" },
-      { key: "financeiro", nome: "Financeiro", descricao: "Financeiro completo (BI, contas, lembretes, regras-IA)" },
-      { key: "funcionarios", nome: "Funcionários", descricao: "Listagem operacional de funcionários" },
+      {
+        key: "financeiro",
+        nome: "Financeiro",
+        descricao: "Financeiro completo (BI, contas, lembretes, regras-IA)",
+      },
+      {
+        key: "funcionarios",
+        nome: "Funcionários",
+        descricao: "Listagem operacional de funcionários",
+      },
       { key: "relatorios", nome: "Relatórios", descricao: "Relatórios e BI" },
       { key: "auditoria", nome: "Segurança & Compliance", descricao: "Auditoria, logs e LGPD" },
       { key: "setores", nome: "Setores", descricao: "Setores da clínica" },
       { key: "boletos", nome: "Boletos", descricao: "Emissão e gestão de boletos" },
-      { key: "contratos", nome: "Contratos de assinatura", descricao: "Cartão Benefícios e mensalidades" },
+      {
+        key: "contratos",
+        nome: "Contratos de assinatura",
+        descricao: "Cartão Benefícios e mensalidades",
+      },
       { key: "nfse", nome: "NFS-e", descricao: "Notas fiscais de serviço" },
-      { key: "integration-secrets", nome: "Integrações", descricao: "Chaves e integrações externas" },
+      {
+        key: "integration-secrets",
+        nome: "Integrações",
+        descricao: "Chaves e integrações externas",
+      },
       { key: "lgpd", nome: "LGPD", descricao: "Gestão de privacidade" },
     ],
   },
@@ -179,50 +239,123 @@ const TODOS_MODULOS = GRUPOS.flatMap((g) => g.modulos.map((m) => m.key));
 const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
   admin: Object.fromEntries(TODOS_MODULOS.map((k) => [k, "write" as Acesso])),
   gestor: {
-    dashboard: "write", agenda: "write", fluxo: "write", clientes: "write",
-    chat: "write", checkin: "read", recepcao: "read", orcamentos: "read",
-    caixa: "read", financeiro: "read", boletos: "read", contratos: "read",
-    nfse: "read", relatorios: "write", auditoria: "read", lgpd: "read",
-    equipe: "write", "hr-contratos": "read", "hr-ponto": "read",
-    "hr-ferias": "read", "hr-holerites": "read", treinamentos: "read",
-    cargos: "read", setores: "read", unidades: "read", medicos: "read",
-    especialidades: "read", procedimentos: "read", disponibilidades: "write",
-    "prontuario-modelos": "read", "modelos-documentos": "read", planos: "read",
-    estoque: "read", crm: "read", campanhas: "read", "mkt-leads": "read",
-    "consulta-rapida": "read", "alertas-enfermagem": "read",
-    "cartao-beneficios": "read", painel: "read", "perfil-proprio": "write",
+    dashboard: "write",
+    agenda: "write",
+    fluxo: "write",
+    clientes: "write",
+    chat: "write",
+    checkin: "read",
+    recepcao: "read",
+    orcamentos: "read",
+    caixa: "read",
+    financeiro: "read",
+    boletos: "read",
+    contratos: "read",
+    nfse: "read",
+    relatorios: "write",
+    auditoria: "read",
+    lgpd: "read",
+    equipe: "write",
+    "hr-contratos": "read",
+    "hr-ponto": "read",
+    "hr-ferias": "read",
+    "hr-holerites": "read",
+    treinamentos: "read",
+    cargos: "read",
+    setores: "read",
+    unidades: "read",
+    medicos: "read",
+    especialidades: "read",
+    procedimentos: "read",
+    disponibilidades: "write",
+    "prontuario-modelos": "read",
+    "modelos-documentos": "read",
+    planos: "read",
+    estoque: "read",
+    crm: "read",
+    campanhas: "read",
+    "mkt-leads": "read",
+    "consulta-rapida": "read",
+    "alertas-enfermagem": "read",
+    "cartao-beneficios": "read",
+    painel: "read",
+    "perfil-proprio": "write",
   },
   medico: {
-    agenda: "write", "atendimento-ia": "write", "exames-resultados": "read",
-    "consulta-rapida": "read", "perfil-proprio": "write", "prontuario-modelos": "read",
-    odontologia: "write", prontuarios: "write", anamneses: "write",
-    documentos: "write", clientes: "read", chat: "write",
+    agenda: "write",
+    "atendimento-ia": "write",
+    "exames-resultados": "read",
+    "consulta-rapida": "read",
+    "perfil-proprio": "write",
+    "prontuario-modelos": "read",
+    odontologia: "write",
+    prontuarios: "write",
+    anamneses: "write",
+    documentos: "write",
+    clientes: "read",
+    chat: "write",
   },
   recepcao: {
-    agenda: "write", recepcao: "write", clientes: "write", fluxo: "write",
-    orcamentos: "write", "consulta-rapida": "read", "perfil-proprio": "write",
-    checkin: "write", painel: "write", anamneses: "write", documentos: "read",
-    chat: "write", "cartao-beneficios": "read", caixa: "read",
+    agenda: "write",
+    recepcao: "write",
+    clientes: "write",
+    fluxo: "write",
+    orcamentos: "write",
+    "consulta-rapida": "read",
+    "perfil-proprio": "write",
+    checkin: "write",
+    painel: "write",
+    anamneses: "write",
+    documentos: "read",
+    chat: "write",
+    "cartao-beneficios": "read",
+    caixa: "read",
   },
   caixa: {
-    caixa: "write", clientes: "read", recepcao: "read", financeiro: "read",
-    "consulta-rapida": "read", "perfil-proprio": "write",
-    boletos: "write", nfse: "read", contratos: "read",
-    "cartao-beneficios": "read", chat: "write",
+    caixa: "write",
+    clientes: "read",
+    recepcao: "read",
+    financeiro: "read",
+    "consulta-rapida": "read",
+    "perfil-proprio": "write",
+    boletos: "write",
+    nfse: "read",
+    contratos: "read",
+    "cartao-beneficios": "read",
+    chat: "write",
   },
   financeiro: {
-    financeiro: "write", caixa: "read", relatorios: "write", orcamentos: "read",
-    clientes: "read", "cartao-beneficios": "write", "perfil-proprio": "write",
-    boletos: "write", nfse: "write", contratos: "write", planos: "read",
-    "hr-holerites": "read", "hr-contratos": "read", auditoria: "read",
-    "integration-secrets": "read", chat: "write", dashboard: "read",
+    financeiro: "write",
+    caixa: "read",
+    relatorios: "write",
+    orcamentos: "read",
+    clientes: "read",
+    "cartao-beneficios": "write",
+    "perfil-proprio": "write",
+    boletos: "write",
+    nfse: "write",
+    contratos: "write",
+    planos: "read",
+    "hr-holerites": "read",
+    "hr-contratos": "read",
+    auditoria: "read",
+    "integration-secrets": "read",
+    chat: "write",
+    dashboard: "read",
   },
   enfermeiro: {
-    "triagem-enfermagem": "write", "alertas-enfermagem": "write",
-    agenda: "read", clientes: "read", "consulta-rapida": "read",
-    "atendimento-ia": "read", "perfil-proprio": "write",
-    anamneses: "write", prontuarios: "read", estoque: "read",
-    documentos: "read", chat: "write",
+    "triagem-enfermagem": "write",
+    "alertas-enfermagem": "write",
+    agenda: "read",
+    clientes: "read",
+    "consulta-rapida": "read",
+    "atendimento-ia": "read",
+    "perfil-proprio": "write",
+    anamneses: "write",
+    prontuarios: "read",
+    estoque: "read",
+    documentos: "read",
+    chat: "write",
   },
 };
 
@@ -230,9 +363,7 @@ function buildInitialState(): Record<PerfilKey, Record<string, Acesso>> {
   const out = {} as Record<PerfilKey, Record<string, Acesso>>;
   for (const p of PERFIS) {
     const preset = PRESETS[p.key];
-    out[p.key] = Object.fromEntries(
-      TODOS_MODULOS.map((k) => [k, (preset[k] ?? "none") as Acesso]),
-    );
+    out[p.key] = Object.fromEntries(TODOS_MODULOS.map((k) => [k, (preset[k] ?? "none") as Acesso]));
   }
   return out;
 }
@@ -242,11 +373,14 @@ function PerfisPage() {
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const [tab, setTab] = useState<"perfis" | "permissoes">("perfis");
   const [perfilSel, setPerfilSel] = useState<PerfilKey>("admin");
-  const [matriz, setMatriz] = useState<Record<PerfilKey, Record<string, Acesso>>>(buildInitialState);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(GRUPOS.map((g) => [g.label, true])),
+  const [matriz, setMatriz] =
+    useState<Record<PerfilKey, Record<string, Acesso>>>(buildInitialState);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(GRUPOS.map((g) => [g.label, true])),
   );
-  const [perfilIds, setPerfilIds] = useState<Record<PerfilKey, string>>({} as Record<PerfilKey, string>);
+  const [perfilIds, setPerfilIds] = useState<Record<PerfilKey, string>>(
+    {} as Record<PerfilKey, string>,
+  );
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const loadedClinicRef = useRef<string | null>(null);
@@ -405,14 +539,23 @@ function PerfisPage() {
                       <TableRow
                         key={p.key}
                         className="cursor-pointer"
-                        onClick={() => { setPerfilSel(p.key); setTab("permissoes"); }}
+                        onClick={() => {
+                          setPerfilSel(p.key);
+                          setTab("permissoes");
+                        }}
                       >
-                        <TableCell><Icon className="h-5 w-5 text-primary" /></TableCell>
+                        <TableCell>
+                          <Icon className="h-5 w-5 text-primary" />
+                        </TableCell>
                         <TableCell className="font-medium">{p.nome}</TableCell>
                         <TableCell>
-                          <Badge variant="secondary" className="font-mono text-xs">{p.key}</Badge>
+                          <Badge variant="secondary" className="font-mono text-xs">
+                            {p.key}
+                          </Badge>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{p.descricao}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {p.descricao}
+                        </TableCell>
                         <TableCell className="text-right text-sm">
                           <span className="font-medium">{contagens[p.key]}</span>
                           <span className="text-muted-foreground"> / {totalModulos}</span>
@@ -431,25 +574,61 @@ function PerfisPage() {
             <CardHeader className="pb-3">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">Perfil</Label>
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Perfil
+                  </Label>
                   <Select value={perfilSel} onValueChange={(v) => setPerfilSel(v as PerfilKey)}>
-                    <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-64">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {PERFIS.map((p) => (
-                        <SelectItem key={p.key} value={p.key}>{p.nome}</SelectItem>
+                        <SelectItem key={p.key} value={p.key}>
+                          {p.nome}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-sm">
-                    Acessos: <span className="ml-1 font-semibold">{acessosPerfil}</span> / {totalModulos}
+                    Acessos: <span className="ml-1 font-semibold">{acessosPerfil}</span> /{" "}
+                    {totalModulos}
                   </Badge>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("read")} disabled={loading || saving}>Tudo Leitura</Button>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("write")} disabled={loading || saving}>Tudo Edição</Button>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("none")} disabled={loading || saving}>Limpar</Button>
-                  <Button size="sm" onClick={salvar} disabled={loading || saving || !perfilIds[perfilSel]}>
-                    {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => aplicarTodos("read")}
+                    disabled={loading || saving}
+                  >
+                    Tudo Leitura
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => aplicarTodos("write")}
+                    disabled={loading || saving}
+                  >
+                    Tudo Edição
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => aplicarTodos("none")}
+                    disabled={loading || saving}
+                  >
+                    Limpar
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={salvar}
+                    disabled={loading || saving || !perfilIds[perfilSel]}
+                  >
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
                     Salvar
                   </Button>
                 </div>
@@ -472,7 +651,11 @@ function PerfisPage() {
                       className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        {open ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
                         <span className="font-semibold">{grupo.label}</span>
                       </div>
                       <Badge variant="secondary" className="text-xs">
@@ -495,7 +678,9 @@ function PerfisPage() {
                           return (
                             <TableRow key={m.key}>
                               <TableCell className="font-medium">{m.nome}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{m.descricao}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {m.descricao}
+                              </TableCell>
                               <TableCell>
                                 <RadioGroup
                                   value={val}

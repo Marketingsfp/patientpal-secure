@@ -7,7 +7,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,7 +47,10 @@ interface Dependente {
 export function PacienteCartoesBeneficios({
   pacienteId,
   clinicaId,
-}: { pacienteId: string; clinicaId: string }) {
+}: {
+  pacienteId: string;
+  clinicaId: string;
+}) {
   const [titulares, setTitulares] = useState<Contrato[]>([]);
   const [dependeDe, setDependeDe] = useState<(Contrato & { parentesco: string | null })[]>([]);
   const [deps, setDeps] = useState<Record<string, Dependente[]>>({});
@@ -67,7 +74,9 @@ export function PacienteCartoesBeneficios({
     // 2. Contratos onde é dependente
     const { data: dRows } = await supabase
       .from("contrato_dependentes")
-      .select("id, contrato_id, parentesco, ativo, contratos_assinatura!inner(id, numero, convenio_id, status, data_inicio, valor_mensal, clinica_id, cb_convenios(nome))")
+      .select(
+        "id, contrato_id, parentesco, ativo, contratos_assinatura!inner(id, numero, convenio_id, status, data_inicio, valor_mensal, clinica_id, cb_convenios(nome))",
+      )
       .eq("paciente_id", pacienteId)
       .eq("ativo", true);
 
@@ -78,14 +87,19 @@ export function PacienteCartoesBeneficios({
     ];
 
     // 3. Mensalidades em aberto/vencidas para esses contratos
-    let abertas: Record<string, { vencidas: number; total: number }> = {};
+    const abertas: Record<string, { vencidas: number; total: number }> = {};
     if (contratoIdsAll.length) {
       const { data: ms } = await supabase
         .from("contrato_mensalidades")
         .select("contrato_id, valor, status, vencimento")
         .in("contrato_id", contratoIdsAll)
         .in("status", ["pendente", "aberto", "atrasado", "vencida", "vencido"]);
-      for (const m of (ms ?? []) as Array<{ contrato_id: string; valor: number; status: string; vencimento: string }>) {
+      for (const m of (ms ?? []) as Array<{
+        contrato_id: string;
+        valor: number;
+        status: string;
+        vencimento: string;
+      }>) {
         const cur = (abertas[m.contrato_id] ??= { vencidas: 0, total: 0 });
         if (m.vencimento < hoje) {
           cur.vencidas++;
@@ -107,29 +121,63 @@ export function PacienteCartoesBeneficios({
       }
     }
 
-    setTitulares(((cTit ?? []) as Array<{ id: string; numero: number; convenio_id: string | null; status: string; data_inicio: string; valor_mensal: number; cb_convenios?: { nome?: string } | null }>).map((c) => ({
-      id: c.id, numero: c.numero, convenio_id: c.convenio_id,
-      convenio_nome: c.cb_convenios?.nome ?? "Cartão",
-      status: c.status, data_inicio: c.data_inicio, valor_mensal: Number(c.valor_mensal),
-      vencidas: abertas[c.id]?.vencidas ?? 0, total_aberto: abertas[c.id]?.total ?? 0,
-    })));
-    setDependeDe(((dRows ?? []) as Array<{ parentesco: string | null; contratos_assinatura: { id: string; numero: number; convenio_id: string | null; status: string; data_inicio: string; valor_mensal: number; cb_convenios?: { nome?: string } | null } }>).map((d) => ({
-      id: d.contratos_assinatura.id,
-      numero: d.contratos_assinatura.numero,
-      convenio_id: d.contratos_assinatura.convenio_id,
-      convenio_nome: d.contratos_assinatura.cb_convenios?.nome ?? "Cartão",
-      status: d.contratos_assinatura.status,
-      data_inicio: d.contratos_assinatura.data_inicio,
-      valor_mensal: Number(d.contratos_assinatura.valor_mensal),
-      vencidas: abertas[d.contratos_assinatura.id]?.vencidas ?? 0,
-      total_aberto: abertas[d.contratos_assinatura.id]?.total ?? 0,
-      parentesco: d.parentesco,
-    })));
+    setTitulares(
+      (
+        (cTit ?? []) as Array<{
+          id: string;
+          numero: number;
+          convenio_id: string | null;
+          status: string;
+          data_inicio: string;
+          valor_mensal: number;
+          cb_convenios?: { nome?: string } | null;
+        }>
+      ).map((c) => ({
+        id: c.id,
+        numero: c.numero,
+        convenio_id: c.convenio_id,
+        convenio_nome: c.cb_convenios?.nome ?? "Cartão",
+        status: c.status,
+        data_inicio: c.data_inicio,
+        valor_mensal: Number(c.valor_mensal),
+        vencidas: abertas[c.id]?.vencidas ?? 0,
+        total_aberto: abertas[c.id]?.total ?? 0,
+      })),
+    );
+    setDependeDe(
+      (
+        (dRows ?? []) as Array<{
+          parentesco: string | null;
+          contratos_assinatura: {
+            id: string;
+            numero: number;
+            convenio_id: string | null;
+            status: string;
+            data_inicio: string;
+            valor_mensal: number;
+            cb_convenios?: { nome?: string } | null;
+          };
+        }>
+      ).map((d) => ({
+        id: d.contratos_assinatura.id,
+        numero: d.contratos_assinatura.numero,
+        convenio_id: d.contratos_assinatura.convenio_id,
+        convenio_nome: d.contratos_assinatura.cb_convenios?.nome ?? "Cartão",
+        status: d.contratos_assinatura.status,
+        data_inicio: d.contratos_assinatura.data_inicio,
+        valor_mensal: Number(d.contratos_assinatura.valor_mensal),
+        vencidas: abertas[d.contratos_assinatura.id]?.vencidas ?? 0,
+        total_aberto: abertas[d.contratos_assinatura.id]?.total ?? 0,
+        parentesco: d.parentesco,
+      })),
+    );
     setDeps(depsMap);
     setLoading(false);
   };
 
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [pacienteId, clinicaId]);
+  useEffect(() => {
+    void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [pacienteId, clinicaId]);
 
   const adicionar = async () => {
     if (!openAdd || !novoDep) return;
@@ -142,9 +190,14 @@ export function PacienteCartoesBeneficios({
       ativo: true,
     });
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success("Dependente adicionado.");
-    setOpenAdd(null); setNovoDep(null); setParentesco("");
+    setOpenAdd(null);
+    setNovoDep(null);
+    setParentesco("");
     await load();
   };
 
@@ -152,9 +205,12 @@ export function PacienteCartoesBeneficios({
     if (!confirm("Excluir este dependente do contrato?")) return;
     const { error } = await supabase
       .from("contrato_dependentes")
-      .update({ ativo: false, excluido_em: new Date().toISOString().slice(0,10) })
+      .update({ ativo: false, excluido_em: new Date().toISOString().slice(0, 10) })
       .eq("id", depId);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success("Dependente removido.");
     await load();
   };
@@ -177,7 +233,11 @@ export function PacienteCartoesBeneficios({
           <p className="text-sm text-muted-foreground">
             Este paciente não está vinculado a nenhum cartão benefícios.
             <br />
-            Para incluí-lo, abra <Link to="/app/cartao-beneficios/contratos" className="text-primary underline">Cartão Benefícios → Vendas</Link>.
+            Para incluí-lo, abra{" "}
+            <Link to="/app/cartao-beneficios/contratos" className="text-primary underline">
+              Cartão Benefícios → Vendas
+            </Link>
+            .
           </p>
         ) : (
           <>
@@ -196,34 +256,58 @@ export function PacienteCartoesBeneficios({
                         {c.vencidas} vencida(s) — R$ {c.total_aberto.toFixed(2)}
                       </Badge>
                     )}
-                    <Link to="/app/cartao-beneficios/contratos" search={{ contratoId: c.id }} className="text-xs text-primary underline flex items-center gap-1">
+                    <Link
+                      to="/app/cartao-beneficios/contratos"
+                      search={{ contratoId: c.id }}
+                      className="text-xs text-primary underline flex items-center gap-1"
+                    >
                       <ExternalLink className="h-3 w-3" /> Abrir
                     </Link>
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  R$ {c.valor_mensal.toFixed(2)}/mês · início {c.data_inicio.split("-").reverse().join("/")}
+                  R$ {c.valor_mensal.toFixed(2)}/mês · início{" "}
+                  {c.data_inicio.split("-").reverse().join("/")}
                 </div>
                 <div className="pt-1">
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <span className="text-xs font-semibold text-muted-foreground">
                       Dependentes ({deps[c.id]?.length ?? 0})
                     </span>
-                    <Button size="sm" variant="outline" onClick={() => setOpenAdd(c.id)} className="h-7 text-xs">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setOpenAdd(c.id)}
+                      className="h-7 text-xs"
+                    >
                       <Plus className="h-3 w-3 mr-1" /> Adicionar
                     </Button>
                   </div>
                   {(deps[c.id] ?? []).length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nenhum dependente cadastrado neste contrato.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Nenhum dependente cadastrado neste contrato.
+                    </p>
                   ) : (
                     <ul className="space-y-1">
                       {deps[c.id]!.map((d) => (
-                        <li key={d.id} className="flex items-center justify-between text-sm px-2 py-1 rounded bg-muted/30">
+                        <li
+                          key={d.id}
+                          className="flex items-center justify-between text-sm px-2 py-1 rounded bg-muted/30"
+                        >
                           <span>
                             {d.paciente_nome}
-                            {d.parentesco && <span className="text-xs text-muted-foreground ml-2">({d.parentesco})</span>}
+                            {d.parentesco && (
+                              <span className="text-xs text-muted-foreground ml-2">
+                                ({d.parentesco})
+                              </span>
+                            )}
                           </span>
-                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => remover(d.id)}>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6"
+                            onClick={() => remover(d.id)}
+                          >
                             <Trash2 className="h-3 w-3 text-destructive" />
                           </Button>
                         </li>
@@ -237,13 +321,16 @@ export function PacienteCartoesBeneficios({
               <div key={`dep-${c.id}`} className="rounded-md border p-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary">DEPENDENTE{c.parentesco ? ` (${c.parentesco})` : ""}</Badge>
+                    <Badge variant="secondary">
+                      DEPENDENTE{c.parentesco ? ` (${c.parentesco})` : ""}
+                    </Badge>
                     <span className="font-medium">{c.convenio_nome}</span>
                     <span className="text-xs text-muted-foreground">#{c.numero}</span>
                   </div>
                   {c.vencidas > 0 && (
                     <Badge variant="destructive" className="gap-1">
-                      <AlertTriangle className="h-3 w-3" /> Titular com {c.vencidas} mens. vencida(s)
+                      <AlertTriangle className="h-3 w-3" /> Titular com {c.vencidas} mens.
+                      vencida(s)
                     </Badge>
                   )}
                 </div>
@@ -253,9 +340,20 @@ export function PacienteCartoesBeneficios({
         )}
       </div>
 
-      <Dialog open={openAdd !== null} onOpenChange={(o) => { if (!o) { setOpenAdd(null); setNovoDep(null); setParentesco(""); } }}>
+      <Dialog
+        open={openAdd !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setOpenAdd(null);
+            setNovoDep(null);
+            setParentesco("");
+          }
+        }}
+      >
         <DialogContent>
-          <DialogHeader><DialogTitle>Adicionar dependente</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Adicionar dependente</DialogTitle>
+          </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label>Paciente</Label>
@@ -263,11 +361,17 @@ export function PacienteCartoesBeneficios({
             </div>
             <div className="space-y-1.5">
               <Label>Parentesco</Label>
-              <Input value={parentesco} onChange={(e) => setParentesco(e.target.value)} placeholder="Filho(a), Cônjuge, Pai/Mãe..." />
+              <Input
+                value={parentesco}
+                onChange={(e) => setParentesco(e.target.value)}
+                placeholder="Filho(a), Cônjuge, Pai/Mãe..."
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenAdd(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setOpenAdd(null)}>
+              Cancelar
+            </Button>
             <Button onClick={adicionar} disabled={!novoDep || saving}>
               {saving ? "Salvando…" : "Adicionar"}
             </Button>

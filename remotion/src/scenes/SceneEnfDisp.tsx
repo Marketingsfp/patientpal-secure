@@ -14,10 +14,31 @@ export const SceneEnfDisp: React.FC = () => {
       <div style={{ fontSize: 24, color: C.sub, marginBottom: 20, fontFamily: dm }}>
         Defina os dias e horários em que o recurso "Curativo" atende
       </div>
-      <div style={{ background: "#fff", borderRadius: 16, padding: 24, border: `1px solid ${C.line}` }}>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
+      <div
+        style={{ background: "#fff", borderRadius: 16, padding: 24, border: `1px solid ${C.line}` }}
+      >
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            marginBottom: 16,
+            flexWrap: "wrap",
+          }}
+        >
           <span style={{ fontSize: 20, color: C.sub }}>Recurso:</span>
-          <span style={{ background: C.primarySoft, color: C.primary, fontWeight: 600, padding: "8px 14px", borderRadius: 10, fontSize: 20 }}>Curativo</span>
+          <span
+            style={{
+              background: C.primarySoft,
+              color: C.primary,
+              fontWeight: 600,
+              padding: "8px 14px",
+              borderRadius: 10,
+              fontSize: 20,
+            }}
+          >
+            Curativo
+          </span>
         </div>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 20, fontFamily: dm }}>
           <thead>
@@ -33,7 +54,14 @@ export const SceneEnfDisp: React.FC = () => {
             {DIAS.map((d, i) => {
               const s = spring({ frame: f - 30 - i * 6, fps, config: { damping: 18 } });
               return (
-                <tr key={d} style={{ borderTop: `1px solid ${C.line}`, opacity: s, transform: `translateY(${(1 - s) * 8}px)` }}>
+                <tr
+                  key={d}
+                  style={{
+                    borderTop: `1px solid ${C.line}`,
+                    opacity: s,
+                    transform: `translateY(${(1 - s) * 8}px)`,
+                  }}
+                >
                   <td style={{ padding: "12px", fontWeight: 600 }}>{d}</td>
                   <td style={{ padding: "12px" }}>08:00</td>
                   <td style={{ padding: "12px" }}>12:00</td>

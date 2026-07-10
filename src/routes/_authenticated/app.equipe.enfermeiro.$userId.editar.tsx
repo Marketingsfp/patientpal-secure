@@ -17,7 +17,8 @@ function EditarEnfermeiroPage() {
 
   const voltar = () => navigate({ to: "/app/equipe", search: { tab: "enfermagem" } });
 
-  if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
+  if (!clinicaAtual)
+    return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
 
   return (
     <div className="space-y-4">
@@ -34,7 +35,9 @@ function EditarEnfermeiroPage() {
           <EnfermeiroFormDialog
             asPage
             open
-            onOpenChange={(o) => { if (!o) voltar(); }}
+            onOpenChange={(o) => {
+              if (!o) voltar();
+            }}
             clinicaId={clinicaAtual.clinica_id}
             editingUserId={userId}
             onSaved={voltar}

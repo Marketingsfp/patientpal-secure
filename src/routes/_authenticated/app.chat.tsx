@@ -7,7 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -56,7 +63,10 @@ function ChatPage() {
   useEffect(() => {
     if (!clinicaId || !user) return;
     (async () => {
-      const { data: mems } = await supabase.from("chat_membros").select("canal_id").eq("user_id", user.id);
+      const { data: mems } = await supabase
+        .from("chat_membros")
+        .select("canal_id")
+        .eq("user_id", user.id);
 
       const ids = (mems ?? []).map((m: any) => m.canal_id);
       if (ids.length === 0) {
@@ -84,7 +94,10 @@ function ChatPage() {
 
         if (outrosMembros && outrosMembros.length > 0) {
           const outrosIds = Array.from(new Set(outrosMembros.map((m: any) => m.user_id)));
-          const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", outrosIds);
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("id, nome")
+            .in("id", outrosIds);
 
           const profsMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p.nome]));
           const novosNomesDiretos: Record<string, string> = {};
@@ -149,7 +162,12 @@ function ChatPage() {
       .channel(`chat:${canalSel}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_mensagens", filter: `canal_id=eq.${canalSel}` },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_mensagens",
+          filter: `canal_id=eq.${canalSel}`,
+        },
         async (payload) => {
           const m = payload.new as Mensagem;
           setMensagens((prev) => [...prev, m]);
@@ -315,11 +333,14 @@ function ChatPage() {
           </Dialog>
         </div>
         <div className="flex-1 overflow-auto space-y-1 pr-1">
-          {canais.length === 0 && <p className="text-xs text-muted-foreground p-2">Sem conversas ainda</p>}
+          {canais.length === 0 && (
+            <p className="text-xs text-muted-foreground p-2">Sem conversas ainda</p>
+          )}
           {canais.map((c) => {
             const ativo = c.id === canalSel;
             const Icon = c.tipo === "direto" ? UserIcon : c.tipo === "setor" ? Hash : Users;
-            const nomeDisplay = c.tipo === "direto" ? (nomesDiretos[c.id] ?? "Conversa direta") : (c.nome ?? "Grupo");
+            const nomeDisplay =
+              c.tipo === "direto" ? (nomesDiretos[c.id] ?? "Conversa direta") : (c.nome ?? "Grupo");
 
             return (
               <div
@@ -357,7 +378,11 @@ function ChatPage() {
             <div className="px-4 py-3 border-b flex items-center justify-between bg-muted/30">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                  {canalAtual.tipo === "direto" ? <UserIcon className="h-5 w-5" /> : <Users className="h-5 w-5" />}
+                  {canalAtual.tipo === "direto" ? (
+                    <UserIcon className="h-5 w-5" />
+                  ) : (
+                    <Users className="h-5 w-5" />
+                  )}
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm leading-none mb-1">{nomeAtual}</h3>
@@ -383,7 +408,11 @@ function ChatPage() {
                     <div
                       className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm ${meu ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-muted border rounded-bl-sm"}`}
                     >
-                      {!meu && <p className="text-[11px] font-bold opacity-80 mb-1">{autores[m.autor_id] ?? "…"}</p>}
+                      {!meu && (
+                        <p className="text-[11px] font-bold opacity-80 mb-1">
+                          {autores[m.autor_id] ?? "…"}
+                        </p>
+                      )}
                       <p className="whitespace-pre-wrap break-words leading-relaxed">{m.texto}</p>
                       <p
                         className={`text-[10px] mt-1 text-right ${meu ? "text-primary-foreground/70" : "text-muted-foreground"}`}

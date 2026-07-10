@@ -1,7 +1,11 @@
 import { useMemo } from "react";
 import { Clock, Sun, Moon, Sunrise, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { TIPO_SESSAO_ESTILO, TIPO_SESSAO_LABEL, type TipoSessao } from "@/lib/agenda-v2/session-detect";
+import {
+  TIPO_SESSAO_ESTILO,
+  TIPO_SESSAO_LABEL,
+  type TipoSessao,
+} from "@/lib/agenda-v2/session-detect";
 import type { SessionCardData } from "./session-card";
 
 interface RecursoOcup {
@@ -27,7 +31,12 @@ function turnoInfo(d: Date) {
 }
 
 function initials(n: string) {
-  return n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
+  return n
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnline }: Props) {
@@ -44,7 +53,8 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
   const usadosRecursos = recursos.reduce((a, r) => a + r.usados, 0);
   const ocupacao = totalRecursos > 0 ? Math.round((usadosRecursos / totalRecursos) * 100) : 0;
 
-  const cardCls = "rounded-2xl border border-slate-200/70 bg-white/80 backdrop-blur-sm px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)]";
+  const cardCls =
+    "rounded-2xl border border-slate-200/70 bg-white/80 backdrop-blur-sm px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)]";
   const labelCls = "text-[10px] font-semibold uppercase tracking-widest text-slate-400";
 
   return (
@@ -69,22 +79,31 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
         <section className={cardCls}>
           <div className="flex items-center justify-between mb-3">
             <span className={labelCls}>Turno</span>
-            <span className={cn("inline-flex items-center gap-1 text-[11px] font-semibold", turno.tone)}>
+            <span
+              className={cn("inline-flex items-center gap-1 text-[11px] font-semibold", turno.tone)}
+            >
               <TurnoIcon className="h-3 w-3" /> {turno.label}
             </span>
           </div>
           <div className="flex items-end justify-between">
             <div>
-              <div className="text-2xl font-semibold text-slate-800 tabular-nums leading-none">{sessoes.length}</div>
+              <div className="text-2xl font-semibold text-slate-800 tabular-nums leading-none">
+                {sessoes.length}
+              </div>
               <div className="text-[10px] text-slate-400 mt-1.5">sessões</div>
             </div>
             <div className="text-right">
-              <div className="text-xl font-semibold text-emerald-600 tabular-nums leading-none">{ocupacao}%</div>
+              <div className="text-xl font-semibold text-emerald-600 tabular-nums leading-none">
+                {ocupacao}%
+              </div>
               <div className="text-[10px] text-slate-400 mt-1.5">ocupação</div>
             </div>
           </div>
           <div className="mt-3 h-1 rounded-full bg-slate-100 overflow-hidden">
-            <div className="h-full bg-emerald-400/80 transition-all" style={{ width: `${ocupacao}%` }} />
+            <div
+              className="h-full bg-emerald-400/80 transition-all"
+              style={{ width: `${ocupacao}%` }}
+            />
           </div>
         </section>
 
@@ -92,9 +111,7 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
         <section className={cardCls}>
           <div className={cn(labelCls, "mb-3")}>Sessões</div>
           <ul className="space-y-2">
-            {porTipo.length === 0 && (
-              <li className="text-xs text-slate-400">Nenhuma sessão</li>
-            )}
+            {porTipo.length === 0 && <li className="text-xs text-slate-400">Nenhuma sessão</li>}
             {porTipo.map(([tipo, n]) => {
               const est = TIPO_SESSAO_ESTILO[tipo];
               return (
@@ -119,15 +136,21 @@ export function AgendaV2Sidebar({ clinicaNome, dia, sessoes, recursos, equipeOnl
             )}
             {recursos.slice(0, 6).map((r) => {
               const pct = r.total > 0 ? Math.round((r.usados / r.total) * 100) : 0;
-              const tone = pct >= 90 ? "bg-rose-400" : pct >= 60 ? "bg-amber-400" : "bg-emerald-400";
+              const tone =
+                pct >= 90 ? "bg-rose-400" : pct >= 60 ? "bg-amber-400" : "bg-emerald-400";
               return (
                 <li key={r.id}>
                   <div className="flex items-center justify-between text-[11px] mb-1">
                     <span className="text-slate-600 truncate mr-2">{r.nome}</span>
-                    <span className="tabular-nums text-slate-400 shrink-0">{r.usados}/{r.total}</span>
+                    <span className="tabular-nums text-slate-400 shrink-0">
+                      {r.usados}/{r.total}
+                    </span>
                   </div>
                   <div className="h-[3px] rounded-full bg-slate-100 overflow-hidden">
-                    <div className={cn("h-full transition-all", tone)} style={{ width: `${pct}%` }} />
+                    <div
+                      className={cn("h-full transition-all", tone)}
+                      style={{ width: `${pct}%` }}
+                    />
                   </div>
                 </li>
               );

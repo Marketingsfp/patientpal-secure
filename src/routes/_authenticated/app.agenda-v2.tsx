@@ -63,8 +63,8 @@ function AgendaV2Page() {
           <Shield className="h-10 w-10 mx-auto text-muted-foreground" />
           <h1 className="text-lg font-semibold">Agenda V2 — Piloto restrito</h1>
           <p className="text-sm text-muted-foreground">
-            O piloto da Agenda V2 está liberado apenas para <b>admin</b> e <b>gestor</b>.
-            A agenda clássica continua disponível normalmente.
+            O piloto da Agenda V2 está liberado apenas para <b>admin</b> e <b>gestor</b>. A agenda
+            clássica continua disponível normalmente.
           </p>
           <Button asChild variant="outline">
             <Link to="/app/agenda">Voltar para /app/agenda</Link>
@@ -84,7 +84,9 @@ function AgendaV2Page() {
             <code>/app/agenda</code> continua intacta.
           </span>
           {toggleMs !== null && (
-            <span className="ml-2 text-[10px] text-slate-400 tabular-nums">toggle {toggleMs}ms</span>
+            <span className="ml-2 text-[10px] text-slate-400 tabular-nums">
+              toggle {toggleMs}ms
+            </span>
           )}
         </div>
         <div className="flex items-center gap-3">
@@ -116,12 +118,12 @@ function AgendaV2Page() {
             <div className="max-w-md text-center space-y-3">
               <h2 className="text-lg font-semibold">Agenda V2 desligada</h2>
               <p className="text-sm text-muted-foreground">
-                Ative a flag <code>agenda_v2</code> acima para pré-visualizar. Isso não afeta
-                nenhum outro usuário nem a rota <code>/app/agenda</code>.
+                Ative a flag <code>agenda_v2</code> acima para pré-visualizar. Isso não afeta nenhum
+                outro usuário nem a rota <code>/app/agenda</code>.
               </p>
               <p className="text-xs text-muted-foreground">
-                Fase 1 — visual e operacional (Timeline · Lista · Cards · KPIs · Filtros ·
-                Drawer de linha do tempo · Sessão de Coleta agrupada · Sem migration).
+                Fase 1 — visual e operacional (Timeline · Lista · Cards · KPIs · Filtros · Drawer de
+                linha do tempo · Sessão de Coleta agrupada · Sem migration).
               </p>
             </div>
           </div>

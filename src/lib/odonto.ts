@@ -1,6 +1,14 @@
 export type OdontoStatus =
-  | "higido" | "cariado" | "restaurado" | "ausente" | "extracao_indicada"
-  | "tratamento_canal" | "coroa" | "implante" | "protese" | "fratura";
+  | "higido"
+  | "cariado"
+  | "restaurado"
+  | "ausente"
+  | "extracao_indicada"
+  | "tratamento_canal"
+  | "coroa"
+  | "implante"
+  | "protese"
+  | "fratura";
 
 export const STATUS_COR: Record<OdontoStatus, string> = {
   higido: "hsl(var(--muted))",

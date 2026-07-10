@@ -38,7 +38,9 @@ export function HistoricoOrcamentoDialog({ open, onClose, orcamentoId, clinicaId
     setLoading(true);
     void (async () => {
       const { data: itens } = await supabase
-        .from("orcamento_itens").select("id").eq("orcamento_id", orcamentoId);
+        .from("orcamento_itens")
+        .select("id")
+        .eq("orcamento_id", orcamentoId);
       const itemIds = (itens ?? []).map((i) => i.id);
       const ids = [orcamentoId, ...itemIds];
       const { data, error } = await supabase
@@ -50,14 +52,29 @@ export function HistoricoOrcamentoDialog({ open, onClose, orcamentoId, clinicaId
         .limit(500);
       if (cancel) return;
       setLoading(false);
-      if (error) { mostrarErro(error); return; }
+      if (error) {
+        mostrarErro(error);
+        return;
+      }
       setRows((data as unknown as AuditRow[]) ?? []);
     })();
-    return () => { cancel = true; };
+    return () => {
+      cancel = true;
+    };
   }, [open, orcamentoId, clinicaId]);
 
-  const label = (a: string) => a === "INSERT" ? "Criou" : a === "UPDATE" ? "Alterou" : a === "DELETE" ? "Excluiu"
-    : a === "blocked_UPDATE" ? "Tentou alterar (bloqueado)" : a === "blocked_DELETE" ? "Tentou excluir (bloqueado)" : a;
+  const label = (a: string) =>
+    a === "INSERT"
+      ? "Criou"
+      : a === "UPDATE"
+        ? "Alterou"
+        : a === "DELETE"
+          ? "Excluiu"
+          : a === "blocked_UPDATE"
+            ? "Tentou alterar (bloqueado)"
+            : a === "blocked_DELETE"
+              ? "Tentou excluir (bloqueado)"
+              : a;
 
   const diff = (r: AuditRow): string[] => {
     if (!r.dados_antes || !r.dados_depois) return [];
@@ -75,8 +92,13 @@ export function HistoricoOrcamentoDialog({ open, onClose, orcamentoId, clinicaId
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto" data-testid="orcamento-historico-dialog">
-        <DialogHeader><DialogTitle>Histórico do orçamento</DialogTitle></DialogHeader>
+      <DialogContent
+        className="max-w-3xl max-h-[85vh] overflow-y-auto"
+        data-testid="orcamento-historico-dialog"
+      >
+        <DialogHeader>
+          <DialogTitle>Histórico do orçamento</DialogTitle>
+        </DialogHeader>
         {loading ? (
           <p className="py-8 text-center text-muted-foreground">Carregando…</p>
         ) : rows.length === 0 ? (
@@ -88,10 +110,15 @@ export function HistoricoOrcamentoDialog({ open, onClose, orcamentoId, clinicaId
               const isItem = r.table_name === "orcamento_itens";
               const changes = diff(r);
               return (
-                <div key={r.id} className={`border rounded p-3 text-sm ${isBlocked ? "border-rose-300 bg-rose-50" : ""}`}>
+                <div
+                  key={r.id}
+                  className={`border rounded p-3 text-sm ${isBlocked ? "border-rose-300 bg-rose-50" : ""}`}
+                >
                   <div className="flex justify-between items-start gap-2">
                     <div>
-                      <div className="font-medium">{label(r.action)} {isItem ? "item" : "orçamento"}</div>
+                      <div className="font-medium">
+                        {label(r.action)} {isItem ? "item" : "orçamento"}
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         {r.user_email ?? "—"} · {new Date(r.created_at).toLocaleString("pt-BR")}
                         {r.ip_address ? ` · IP ${r.ip_address}` : ""}
@@ -100,7 +127,9 @@ export function HistoricoOrcamentoDialog({ open, onClose, orcamentoId, clinicaId
                   </div>
                   {changes.length > 0 && (
                     <ul className="mt-2 text-xs font-mono text-muted-foreground space-y-0.5">
-                      {changes.map((c, i) => <li key={i}>• {c}</li>)}
+                      {changes.map((c, i) => (
+                        <li key={i}>• {c}</li>
+                      ))}
                     </ul>
                   )}
                 </div>

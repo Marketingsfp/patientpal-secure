@@ -9,7 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { toast } from "sonner";
 
@@ -73,7 +80,9 @@ function AtendimentoIaPage() {
       const cid = clinicaAtual.clinica_id;
       const { data, error } = await supabase
         .from("medicos")
-        .select("id, nome, email, user_id, especialidade_id, ativo, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
+        .select(
+          "id, nome, email, user_id, especialidade_id, ativo, especialidades:especialidades!medicos_especialidade_id_fkey(nome)",
+        )
         .eq("clinica_id", cid)
         .eq("ativo", true)
         .order("nome");
@@ -97,8 +106,20 @@ function AtendimentoIaPage() {
       const idsAtivos = new Set(ativos.map((m) => m.id));
       const idsExtras = Array.from(
         new Set(
-          ((pendAll ?? []) as Array<{ medico_id: string | null; paciente_id: string | null; paciente_nome: string | null }>)
-            .filter((r) => r.medico_id && r.paciente_id && (r.paciente_nome ?? "").toUpperCase() !== "DISPONIVEL" && (r.paciente_nome ?? "").toUpperCase() !== "DISPONÍVEL")
+          (
+            (pendAll ?? []) as Array<{
+              medico_id: string | null;
+              paciente_id: string | null;
+              paciente_nome: string | null;
+            }>
+          )
+            .filter(
+              (r) =>
+                r.medico_id &&
+                r.paciente_id &&
+                (r.paciente_nome ?? "").toUpperCase() !== "DISPONIVEL" &&
+                (r.paciente_nome ?? "").toUpperCase() !== "DISPONÍVEL",
+            )
             .map((r) => r.medico_id as string)
             .filter((id) => !idsAtivos.has(id)),
         ),
@@ -107,7 +128,9 @@ function AtendimentoIaPage() {
       if (idsExtras.length > 0) {
         const { data: extras } = await supabase
           .from("medicos")
-          .select("id, nome, email, user_id, especialidade_id, ativo, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
+          .select(
+            "id, nome, email, user_id, especialidade_id, ativo, especialidades:especialidades!medicos_especialidade_id_fkey(nome)",
+          )
           .in("id", idsExtras);
         inativos = ((extras ?? []) as unknown as Medico[]).map((m) => ({ ...m, ativo: false }));
       }
@@ -115,14 +138,16 @@ function AtendimentoIaPage() {
       setMedicos(meds);
       const emailLogado = user?.email?.toLowerCase() ?? null;
       const meu = user?.id
-        ? meds.find((x) => x.user_id === user.id)
-          ?? (emailLogado ? meds.find((x) => x.email?.toLowerCase() === emailLogado) : null)
+        ? (meds.find((x) => x.user_id === user.id) ??
+          (emailLogado ? meds.find((x) => x.email?.toLowerCase() === emailLogado) : null))
         : null;
       if (meu) setMedicoId(meu.id);
       else if (meds.length && !medicoId) {
-        const comFila = ((pendAll ?? []) as Array<{ medico_id: string | null; fluxo_etapa: string }>)
-          .find((r) => r.medico_id && (r.fluxo_etapa === "triagem" || r.fluxo_etapa === "atendimento"))
-          ?.medico_id as string | undefined;
+        const comFila = (
+          (pendAll ?? []) as Array<{ medico_id: string | null; fluxo_etapa: string }>
+        ).find(
+          (r) => r.medico_id && (r.fluxo_etapa === "triagem" || r.fluxo_etapa === "atendimento"),
+        )?.medico_id as string | undefined;
         const escolhido = comFila && meds.find((x) => x.id === comFila) ? comFila : meds[0].id;
         setMedicoId(escolhido);
       }
@@ -134,15 +159,18 @@ function AtendimentoIaPage() {
     [medicos, medicoId],
   );
   const medicoLogado = Boolean(
-    medicoSelecionado && user && (
-      medicoSelecionado.user_id === user.id
-      || medicoSelecionado.email?.toLowerCase() === user.email?.toLowerCase()
-    ),
+    medicoSelecionado &&
+    user &&
+    (medicoSelecionado.user_id === user.id ||
+      medicoSelecionado.email?.toLowerCase() === user.email?.toLowerCase()),
   );
   const especialidadeMedico = medicoSelecionado?.especialidades?.nome ?? "";
 
   const carregarFila = async (medId: string) => {
-    if (!clinicaAtual || !medId) { setFila([]); return; }
+    if (!clinicaAtual || !medId) {
+      setFila([]);
+      return;
+    }
     const hoje = new Date().toISOString().slice(0, 10);
     const { data } = await supabase
       .from("agendamentos")
@@ -153,20 +181,31 @@ function AtendimentoIaPage() {
       .lte("inicio", `${hoje}T23:59:59`)
       .in("fluxo_etapa", ["aguardando_recepcao", "recepcao", "caixa", "triagem", "atendimento"])
       .order("inicio");
-    setFila(((data ?? []) as unknown as FilaItem[]).filter((item) => item.paciente_id && item.paciente_nome !== "DISPONÍVEL"));
+    setFila(
+      ((data ?? []) as unknown as FilaItem[]).filter(
+        (item) => item.paciente_id && item.paciente_nome !== "DISPONÍVEL",
+      ),
+    );
   };
 
-  useEffect(() => { void carregarFila(medicoId); }, [medicoId, clinicaAtual?.clinica_id]);
+  useEffect(() => {
+    void carregarFila(medicoId);
+  }, [medicoId, clinicaAtual?.clinica_id]);
 
   const filaIdsKey = fila.map((f) => f.id).join(",");
   useEffect(() => {
     let cancel = false;
     (async () => {
       const ids = fila.map((f) => f.id);
-      if (ids.length === 0) { setTriagens({}); return; }
+      if (ids.length === 0) {
+        setTriagens({});
+        return;
+      }
       const { data } = await supabase
         .from("triagens_enfermagem")
-        .select("agendamento_id, enfermeira_nome, created_at, queixa_principal, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, peso_kg, altura_cm, imc, doencas, medicamentos, alergias, observacoes")
+        .select(
+          "agendamento_id, enfermeira_nome, created_at, queixa_principal, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, peso_kg, altura_cm, imc, doencas, medicamentos, alergias, observacoes",
+        )
         .in("agendamento_id", ids)
         .order("created_at", { ascending: false });
       if (cancel) return;
@@ -176,21 +215,33 @@ function AtendimentoIaPage() {
       }
       setTriagens(map);
     })();
-    return () => { cancel = true; };
+    return () => {
+      cancel = true;
+    };
   }, [filaIdsKey, triagensTick]);
 
   useEffect(() => {
     if (!clinicaAtual || !medicoId) return;
     const ch = supabase
       .channel(`atend-fila-${medicoId}`)
-      .on("postgres_changes",
+      .on(
+        "postgres_changes",
         { event: "*", schema: "public", table: "agendamentos", filter: `medico_id=eq.${medicoId}` },
-        () => { void carregarFila(medicoId); })
-      .on("postgres_changes",
+        () => {
+          void carregarFila(medicoId);
+        },
+      )
+      .on(
+        "postgres_changes",
         { event: "*", schema: "public", table: "triagens_enfermagem" },
-        () => { setTriagensTick((t) => t + 1); })
+        () => {
+          setTriagensTick((t) => t + 1);
+        },
+      )
       .subscribe();
-    return () => { void supabase.removeChannel(ch); };
+    return () => {
+      void supabase.removeChannel(ch);
+    };
   }, [medicoId, clinicaAtual?.clinica_id]);
 
   const filaOrdenada = useMemo(() => {
@@ -213,7 +264,9 @@ function AtendimentoIaPage() {
         <Brain className="h-6 w-6 text-primary" />
         <div>
           <h1 className="text-xl font-semibold">Atendimento médico</h1>
-          <p className="text-sm text-muted-foreground">Selecione um paciente na fila para iniciar o atendimento.</p>
+          <p className="text-sm text-muted-foreground">
+            Selecione um paciente na fila para iniciar o atendimento.
+          </p>
         </div>
       </div>
 
@@ -245,7 +298,9 @@ function AtendimentoIaPage() {
         </div>
 
         <div className="space-y-2">
-          <Label className="flex items-center gap-1.5"><Users className="h-4 w-4" /> Fila de atendimento ({filaOrdenada.length})</Label>
+          <Label className="flex items-center gap-1.5">
+            <Users className="h-4 w-4" /> Fila de atendimento ({filaOrdenada.length})
+          </Label>
           {filaOrdenada.length === 0 ? (
             <div className="text-xs text-muted-foreground border border-dashed rounded-md p-4 text-center">
               Nenhum paciente na fila para hoje.
@@ -266,17 +321,23 @@ function AtendimentoIaPage() {
                 </TableHeader>
                 <TableBody>
                   {filaOrdenada.map((it, idx) => {
-                    const hora = new Date(it.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-                    const prioCls = it.prioridade === "urgente"
-                      ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200"
-                      : it.prioridade === "prioritario"
-                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
-                      : "";
+                    const hora = new Date(it.inicio).toLocaleTimeString("pt-BR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+                    const prioCls =
+                      it.prioridade === "urgente"
+                        ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200"
+                        : it.prioridade === "prioritario"
+                          ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200"
+                          : "";
                     const temRegistroTriagem = Boolean(triagens[it.id]);
                     const triagemFeita = temRegistroTriagem || it.fluxo_etapa === "atendimento";
                     return (
                       <TableRow key={it.id}>
-                        <TableCell className="tabular-nums text-xs text-muted-foreground">{idx + 1}</TableCell>
+                        <TableCell className="tabular-nums text-xs text-muted-foreground">
+                          {idx + 1}
+                        </TableCell>
                         <TableCell className="tabular-nums text-xs">{hora}</TableCell>
                         <TableCell className="font-medium uppercase">{it.paciente_nome}</TableCell>
                         <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
@@ -286,12 +347,19 @@ function AtendimentoIaPage() {
                           {triagemFeita ? (
                             <span
                               className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                              title={temRegistroTriagem ? "Triagem realizada" : "Paciente avançou no fluxo (sem registro formal de triagem)"}
+                              title={
+                                temRegistroTriagem
+                                  ? "Triagem realizada"
+                                  : "Paciente avançou no fluxo (sem registro formal de triagem)"
+                              }
                             >
                               <Check className="h-3.5 w-3.5" />
                             </span>
                           ) : (
-                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300" title="Triagem pendente">
+                            <span
+                              className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
+                              title="Triagem pendente"
+                            >
                               <X className="h-3.5 w-3.5" />
                             </span>
                           )}
@@ -323,7 +391,8 @@ function AtendimentoIaPage() {
                                   );
                                 }
                                 const sv: string[] = [];
-                                if (t.pa_sistolica && t.pa_diastolica) sv.push(`PA ${t.pa_sistolica}/${t.pa_diastolica}`);
+                                if (t.pa_sistolica && t.pa_diastolica)
+                                  sv.push(`PA ${t.pa_sistolica}/${t.pa_diastolica}`);
                                 if (t.freq_cardiaca) sv.push(`FC ${t.freq_cardiaca}`);
                                 if (t.temperatura) sv.push(`T ${t.temperatura}°`);
                                 if (t.saturacao) sv.push(`SatO₂ ${t.saturacao}%`);
@@ -340,30 +409,64 @@ function AtendimentoIaPage() {
                                       </div>
                                     </div>
                                     {t.enfermeira_nome && (
-                                      <div className="text-[11px] text-muted-foreground">Por {t.enfermeira_nome}</div>
+                                      <div className="text-[11px] text-muted-foreground">
+                                        Por {t.enfermeira_nome}
+                                      </div>
                                     )}
                                     {sv.length > 0 && (
-                                      <div className="rounded-md bg-muted/50 px-2 py-1.5 text-[11px] leading-relaxed">{sv.join(" · ")}</div>
+                                      <div className="rounded-md bg-muted/50 px-2 py-1.5 text-[11px] leading-relaxed">
+                                        {sv.join(" · ")}
+                                      </div>
                                     )}
                                     {t.queixa_principal && (
-                                      <div><span className="text-[10px] uppercase text-muted-foreground">Queixa</span><div>{t.queixa_principal}</div></div>
+                                      <div>
+                                        <span className="text-[10px] uppercase text-muted-foreground">
+                                          Queixa
+                                        </span>
+                                        <div>{t.queixa_principal}</div>
+                                      </div>
                                     )}
                                     {t.doencas && t.doencas.length > 0 && (
                                       <div>
-                                        <span className="text-[10px] uppercase text-muted-foreground">Doenças</span>
+                                        <span className="text-[10px] uppercase text-muted-foreground">
+                                          Doenças
+                                        </span>
                                         <div className="flex flex-wrap gap-1 mt-0.5">
-                                          {t.doencas.map((d, i) => <Badge key={i} variant="outline" className="text-[10px]">{d}</Badge>)}
+                                          {t.doencas.map((d, i) => (
+                                            <Badge
+                                              key={i}
+                                              variant="outline"
+                                              className="text-[10px]"
+                                            >
+                                              {d}
+                                            </Badge>
+                                          ))}
                                         </div>
                                       </div>
                                     )}
                                     {t.medicamentos && (
-                                      <div><span className="text-[10px] uppercase text-muted-foreground">Medicamentos</span><div>{t.medicamentos}</div></div>
+                                      <div>
+                                        <span className="text-[10px] uppercase text-muted-foreground">
+                                          Medicamentos
+                                        </span>
+                                        <div>{t.medicamentos}</div>
+                                      </div>
                                     )}
                                     {t.alergias && (
-                                      <div><span className="text-[10px] uppercase text-muted-foreground">Alergias</span><div>{t.alergias}</div></div>
+                                      <div>
+                                        <span className="text-[10px] uppercase text-muted-foreground">
+                                          Alergias
+                                        </span>
+                                        <div>{t.alergias}</div>
+                                      </div>
                                     )}
                                     {t.observacoes && (
-                                      <div><span className="text-[10px] uppercase text-muted-foreground">Observações</span><div className="whitespace-pre-wrap">{t.observacoes}</div></div>
+                                      <div>
+                                        <span className="text-[10px] uppercase text-muted-foreground">
+                                          Observações
+                                        </span>
+                                        <div className="whitespace-pre-wrap">{t.observacoes}</div>
+                                      </div>
                                     )}
                                   </>
                                 );

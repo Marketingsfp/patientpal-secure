@@ -10,7 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { CurrencyInput } from "@/components/ui/currency-input";
 
 export const Route = createFileRoute("/_authenticated/app/nfse/testar")({
@@ -39,9 +45,20 @@ function TestarNfse() {
   const [valor, setValor] = useState("1.00");
   const [descricao, setDescricao] = useState("Consulta médica — teste de emissão");
   const [loading, setLoading] = useState(false);
-  const [resultado, setResultado] = useState<{ id: string; ref?: string; ok: boolean; error?: string; focus?: unknown } | null>(null);
+  const [resultado, setResultado] = useState<{
+    id: string;
+    ref?: string;
+    ok: boolean;
+    error?: string;
+    focus?: unknown;
+  } | null>(null);
   const [notaId, setNotaId] = useState<string | null>(null);
-  const [statusInfo, setStatusInfo] = useState<{ status: string | null; numero?: string | null; url_pdf?: string | null; erro?: string | null } | null>(null);
+  const [statusInfo, setStatusInfo] = useState<{
+    status: string | null;
+    numero?: string | null;
+    url_pdf?: string | null;
+    erro?: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -127,25 +144,33 @@ function TestarNfse() {
         </h1>
         <p className="text-sm text-muted-foreground">
           Use esta tela para validar a integração com o Focus NFe.{" "}
-          <Link to="/app/configuracoes/nfse" className="text-primary underline">Cadastrar emitente</Link>
+          <Link to="/app/configuracoes/nfse" className="text-primary underline">
+            Cadastrar emitente
+          </Link>
         </p>
       </div>
 
       {emitentes.length === 0 ? (
         <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/20 border-amber-300 p-4 text-sm">
           Nenhum emitente cadastrado.{" "}
-          <Link to="/app/configuracoes/nfse" className="text-primary underline font-medium">Cadastre um agora</Link>.
+          <Link to="/app/configuracoes/nfse" className="text-primary underline font-medium">
+            Cadastre um agora
+          </Link>
+          .
         </div>
       ) : (
         <div className="rounded-lg border bg-card p-5 space-y-4">
           <div className="space-y-1">
             <Label>Emitente (CNPJ)</Label>
             <Select value={emitenteId} onValueChange={setEmitenteId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {emitentes.map((e) => (
                   <SelectItem key={e.id} value={e.id}>
-                    {e.nome} — {e.cnpj} <span className="text-xs opacity-60">({e.focus_ambiente})</span>
+                    {e.nome} — {e.cnpj}{" "}
+                    <span className="text-xs opacity-60">({e.focus_ambiente})</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -153,26 +178,55 @@ function TestarNfse() {
           </div>
 
           <div className="grid grid-cols-[2fr_1fr] gap-3">
-            <div className="space-y-1"><Label>Nome do tomador</Label><Input value={nome} onChange={(e) => setNome(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Valor (R$)</Label><CurrencyInput value={valor} onChange={setValor} /></div>
+            <div className="space-y-1">
+              <Label>Nome do tomador</Label>
+              <Input value={nome} onChange={(e) => setNome(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Valor (R$)</Label>
+              <CurrencyInput value={valor} onChange={setValor} />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>CPF/CNPJ *</Label><Input value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="só números (11 ou 14 dígitos)" required /></div>
-            <div className="space-y-1"><Label>E-mail (opcional)</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+            <div className="space-y-1">
+              <Label>CPF/CNPJ *</Label>
+              <Input
+                value={cpf}
+                onChange={(e) => setCpf(e.target.value)}
+                placeholder="só números (11 ou 14 dígitos)"
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>E-mail (opcional)</Label>
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
           </div>
 
-          <div className="space-y-1"><Label>Descrição dos serviços</Label><Textarea rows={3} value={descricao} onChange={(e) => setDescricao(e.target.value)} /></div>
+          <div className="space-y-1">
+            <Label>Descrição dos serviços</Label>
+            <Textarea rows={3} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
+          </div>
 
           <div className="flex gap-2">
             <Button
               onClick={onEmitir}
               disabled={
                 loading ||
-                !((cpf || "").replace(/\D/g, "").length === 11 || (cpf || "").replace(/\D/g, "").length === 14)
+                !(
+                  (cpf || "").replace(/\D/g, "").length === 11 ||
+                  (cpf || "").replace(/\D/g, "").length === 14
+                )
               }
             >
-              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Enviando…</> : "Emitir NFS-e"}
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Enviando…
+                </>
+              ) : (
+                "Emitir NFS-e"
+              )}
             </Button>
             {notaId && (
               <Button variant="outline" onClick={() => void onConsultar()}>
@@ -184,8 +238,12 @@ function TestarNfse() {
       )}
 
       {resultado && (
-        <div className={`rounded-lg border p-4 text-sm ${resultado.ok ? "bg-green-50 border-green-300 dark:bg-green-950/20" : "bg-red-50 border-red-300 dark:bg-red-950/20"}`}>
-          <p className="font-medium mb-1">{resultado.ok ? "✅ Enviada ao Focus NFe" : "❌ Falhou"}</p>
+        <div
+          className={`rounded-lg border p-4 text-sm ${resultado.ok ? "bg-green-50 border-green-300 dark:bg-green-950/20" : "bg-red-50 border-red-300 dark:bg-red-950/20"}`}
+        >
+          <p className="font-medium mb-1">
+            {resultado.ok ? "✅ Enviada ao Focus NFe" : "❌ Falhou"}
+          </p>
           {resultado.ref && <p className="font-mono text-xs">ref: {resultado.ref}</p>}
           {resultado.error && <p className="text-destructive">{resultado.error}</p>}
         </div>
@@ -193,16 +251,32 @@ function TestarNfse() {
 
       {statusInfo && (
         <div className="rounded-lg border bg-card p-4 text-sm space-y-1">
-          <p><strong>Status Focus:</strong> <span className="font-mono">{statusInfo.status ?? "—"}</span></p>
-          {statusInfo.numero && <p><strong>Número NFS-e:</strong> {statusInfo.numero}</p>}
+          <p>
+            <strong>Status Focus:</strong>{" "}
+            <span className="font-mono">{statusInfo.status ?? "—"}</span>
+          </p>
+          {statusInfo.numero && (
+            <p>
+              <strong>Número NFS-e:</strong> {statusInfo.numero}
+            </p>
+          )}
           {statusInfo.url_pdf && (
             <p>
-              <a href={statusInfo.url_pdf} target="_blank" rel="noreferrer" className="text-primary underline inline-flex items-center gap-1">
+              <a
+                href={statusInfo.url_pdf}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary underline inline-flex items-center gap-1"
+              >
                 Abrir DANFSe (PDF) <ExternalLink className="h-3 w-3" />
               </a>
             </p>
           )}
-          {statusInfo.erro && <p className="text-destructive"><strong>Erro:</strong> {statusInfo.erro}</p>}
+          {statusInfo.erro && (
+            <p className="text-destructive">
+              <strong>Erro:</strong> {statusInfo.erro}
+            </p>
+          )}
         </div>
       )}
     </div>

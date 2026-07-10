@@ -1,6 +1,19 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2, ArrowLeft, HeartPulse, CheckCircle2, Printer } from "lucide-react";
+import {
+  Brain,
+  Sparkles,
+  FileHeart,
+  Stethoscope,
+  Save,
+  Loader2,
+  History,
+  Wand2,
+  ArrowLeft,
+  HeartPulse,
+  CheckCircle2,
+  Printer,
+} from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -68,7 +81,14 @@ const SOAP_KEYS = [
   ["prescricao", "Prescrição", 4],
 ] as const;
 type Soap = Record<(typeof SOAP_KEYS)[number][0], string>;
-const EMPTY: Soap = { queixa_principal: "", historia_doenca: "", exame_fisico: "", hipotese_diagnostica: "", conduta: "", prescricao: "" };
+const EMPTY: Soap = {
+  queixa_principal: "",
+  historia_doenca: "",
+  exame_fisico: "",
+  hipotese_diagnostica: "",
+  conduta: "",
+  prescricao: "",
+};
 
 function AtendimentoEditorPage() {
   const { agendamentoId } = Route.useParams();
@@ -78,7 +98,14 @@ function AtendimentoEditorPage() {
   const sugerir = useServerFn(sugerirCondutaClinica);
   const resumir = useServerFn(resumirHistoricoPaciente);
 
-  const [agendamento, setAgendamento] = useState<{ id: string; paciente_id: string | null; paciente_nome: string; medico_id: string | null; procedimento: string | null; fluxo_etapa: string } | null>(null);
+  const [agendamento, setAgendamento] = useState<{
+    id: string;
+    paciente_id: string | null;
+    paciente_nome: string;
+    medico_id: string | null;
+    procedimento: string | null;
+    fluxo_etapa: string;
+  } | null>(null);
   const [medico, setMedico] = useState<Medico | null>(null);
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [triagem, setTriagem] = useState<Triagem | null>(null);
@@ -86,49 +113,74 @@ function AtendimentoEditorPage() {
 
   const [transcricao, setTranscricao] = useState("");
   const [soap, setSoap] = useState<Soap>(EMPTY);
-  const [sugestoes, setSugestoes] = useState<{ cids: { codigo: string; descricao: string }[]; exames: string[]; prescricao: string } | null>(null);
+  const [sugestoes, setSugestoes] = useState<{
+    cids: { codigo: string; descricao: string }[];
+    exames: string[];
+    prescricao: string;
+  } | null>(null);
   const [resumo, setResumo] = useState<string>("");
   const [resumoOpen, setResumoOpen] = useState(false);
-  const [loading, setLoading] = useState<"estruturar" | "sugerir" | "resumir" | "salvar" | null>(null);
+  const [loading, setLoading] = useState<"estruturar" | "sugerir" | "resumir" | "salvar" | null>(
+    null,
+  );
   const [salvo, setSalvo] = useState<{ valorMedico: number } | null>(null);
 
   // Carrega agendamento + médico + pagamento (usado no mount e no realtime).
   const carregarAgendamento = useCallback(async () => {
     if (!clinicaAtual || !agendamentoId) return;
     const { data: ag, error } = await supabase
-        .from("agendamentos")
-        .select("id, paciente_id, paciente_nome, medico_id, procedimento, fluxo_etapa")
-        .eq("id", agendamentoId)
+      .from("agendamentos")
+      .select("id, paciente_id, paciente_nome, medico_id, procedimento, fluxo_etapa")
+      .eq("id", agendamentoId)
+      .maybeSingle();
+    if (error || !ag) {
+      toast.error("Agendamento não encontrado");
+      navigate({ to: "/app/atendimento-ia" });
+      return;
+    }
+    setAgendamento(ag as never);
+
+    // Pagamento ANTES da consulta — bloqueia avanço enquanto pendente.
+    const status = await agendamentoStatusPagamento(ag.id);
+    setPagamento(status);
+
+    if (ag.medico_id) {
+      const { data: med } = await supabase
+        .from("medicos")
+        .select(
+          "id, nome, email, user_id, especialidade_id, especialidades:especialidades!medicos_especialidade_id_fkey(nome)",
+        )
+        .eq("id", ag.medico_id)
         .maybeSingle();
-      if (error || !ag) { toast.error("Agendamento não encontrado"); navigate({ to: "/app/atendimento-ia" }); return; }
-      setAgendamento(ag as never);
-
-      // Pagamento ANTES da consulta — bloqueia avanço enquanto pendente.
-      const status = await agendamentoStatusPagamento(ag.id);
-      setPagamento(status);
-
-      if (ag.medico_id) {
-        const { data: med } = await supabase
-          .from("medicos")
-          .select("id, nome, email, user_id, especialidade_id, especialidades:especialidades!medicos_especialidade_id_fkey(nome)")
-          .eq("id", ag.medico_id)
-          .maybeSingle();
-        if (med) {
-          let sens: any = {};
-          try {
-            const { data: s } = await supabase.rpc("medico_dados_sensiveis", { _medico_id: ag.medico_id });
-            sens = (s as any) ?? {};
-          } catch { sens = {}; }
-          setMedico({ ...(med as any), tipo_repasse: sens.tipo_repasse ?? null, percentual_repasse_padrao: sens.percentual_repasse_padrao ?? null, valor_repasse_padrao: sens.valor_repasse_padrao ?? null } as never);
+      if (med) {
+        let sens: any = {};
+        try {
+          const { data: s } = await supabase.rpc("medico_dados_sensiveis", {
+            _medico_id: ag.medico_id,
+          });
+          sens = (s as any) ?? {};
+        } catch {
+          sens = {};
         }
+        setMedico({
+          ...(med as any),
+          tipo_repasse: sens.tipo_repasse ?? null,
+          percentual_repasse_padrao: sens.percentual_repasse_padrao ?? null,
+          valor_repasse_padrao: sens.valor_repasse_padrao ?? null,
+        } as never);
       }
+    }
 
-      // move para "atendimento" se ainda não estiver (apenas se já estiver pago)
-      if (status.pago && ag.fluxo_etapa !== "atendimento") {
-        void supabase.from("agendamentos")
-          .update({ fluxo_etapa: "atendimento", fluxo_atualizado_em: new Date().toISOString() } as never)
-          .eq("id", ag.id);
-      }
+    // move para "atendimento" se ainda não estiver (apenas se já estiver pago)
+    if (status.pago && ag.fluxo_etapa !== "atendimento") {
+      void supabase
+        .from("agendamentos")
+        .update({
+          fluxo_etapa: "atendimento",
+          fluxo_atualizado_em: new Date().toISOString(),
+        } as never)
+        .eq("id", ag.id);
+    }
   }, [agendamentoId, clinicaAtual?.clinica_id, navigate]);
 
   useEffect(() => {
@@ -156,12 +208,14 @@ function AtendimentoEditorPage() {
   const carregarTriagem = useCallback(async () => {
     if (!agendamentoId) return;
     const { data } = await supabase
-        .from("triagens_enfermagem")
-        .select("id, created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes")
-        .eq("agendamento_id", agendamentoId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      .from("triagens_enfermagem")
+      .select(
+        "id, created_at, enfermeira_nome, peso_kg, altura_cm, imc, pa_sistolica, pa_diastolica, freq_cardiaca, temperatura, saturacao, glicemia, queixa_principal, doencas, medicamentos, alergias, observacoes",
+      )
+      .eq("agendamento_id", agendamentoId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
     setTriagem((data as unknown as Triagem) ?? null);
   }, [agendamentoId]);
 
@@ -205,7 +259,9 @@ function AtendimentoEditorPage() {
         queixa_principal: s.queixa_principal || t.queixa_principal || "",
         exame_fisico: jaContem
           ? s.exame_fisico
-          : (s.exame_fisico ? `${s.exame_fisico}\n${txt}` : txt),
+          : s.exame_fisico
+            ? `${s.exame_fisico}\n${txt}`
+            : txt,
       };
     });
   }
@@ -226,10 +282,15 @@ function AtendimentoEditorPage() {
   const pacienteNome = agendamento?.paciente_nome ?? "";
 
   async function handleEstruturar() {
-    if (!transcricao.trim()) { toast.error("Grave ou cole a transcrição primeiro"); return; }
+    if (!transcricao.trim()) {
+      toast.error("Grave ou cole a transcrição primeiro");
+      return;
+    }
     setLoading("estruturar");
     try {
-      const out = await estruturar({ data: { transcricao, especialidade, promptExtra: modelo?.prompt_ia ?? undefined } });
+      const out = await estruturar({
+        data: { transcricao, especialidade, promptExtra: modelo?.prompt_ia ?? undefined },
+      });
       setSoap((s) => ({
         queixa_principal: out.queixa_principal || s.queixa_principal,
         historia_doenca: out.historia_doenca || s.historia_doenca,
@@ -239,8 +300,11 @@ function AtendimentoEditorPage() {
         prescricao: out.prescricao || s.prescricao,
       }));
       toast.success("Anamnese estruturada");
-    } catch (e) { mostrarErro(e); }
-    finally { setLoading(null); }
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setLoading(null);
+    }
   }
 
   async function handleSugerir() {
@@ -249,24 +313,36 @@ function AtendimentoEditorPage() {
       const out = await sugerir({ data: { ...soap, especialidade } });
       setSugestoes(out);
       toast.success("Sugestões geradas");
-    } catch (e) { mostrarErro(e); }
-    finally { setLoading(null); }
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setLoading(null);
+    }
   }
 
   async function handleResumir() {
-    if (!pacienteId) { toast.error("Paciente não identificado"); return; }
+    if (!pacienteId) {
+      toast.error("Paciente não identificado");
+      return;
+    }
     setLoading("resumir");
     try {
       const out = await resumir({ data: { pacienteId } });
       setResumo(out.resumo);
       setResumoOpen(true);
       if (out.total === 0) toast.info("Sem prontuários anteriores");
-    } catch (e) { mostrarErro(e); }
-    finally { setLoading(null); }
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setLoading(null);
+    }
   }
 
   async function handleSalvar() {
-    if (!clinicaAtual || !pacienteId) { toast.error("Paciente não identificado"); return; }
+    if (!clinicaAtual || !pacienteId) {
+      toast.error("Paciente não identificado");
+      return;
+    }
     if (pagamento && !pagamento.pago) {
       toast.error("Pagamento pendente — finalize no caixa antes de salvar o prontuário.");
       return;
@@ -294,9 +370,12 @@ function AtendimentoEditorPage() {
       let lancamentoId: string | null = null;
       if (procNome) {
         const { data: proc } = await supabase
-          .from("procedimentos").select("valor_padrao, valor_dinheiro")
-          .eq("clinica_id", cid).ilike("nome", procNome).maybeSingle();
-        valorTotal = Number((proc?.valor_dinheiro ?? proc?.valor_padrao) ?? 0);
+          .from("procedimentos")
+          .select("valor_padrao, valor_dinheiro")
+          .eq("clinica_id", cid)
+          .ilike("nome", procNome)
+          .maybeSingle();
+        valorTotal = Number(proc?.valor_dinheiro ?? proc?.valor_padrao ?? 0);
       }
       let valorMedico = 0;
       if (medico && valorTotal > 0) {
@@ -309,8 +388,10 @@ function AtendimentoEditorPage() {
       const valorClinica = Math.max(0, valorTotal - valorMedico);
 
       const { data: lancExist } = await supabase
-        .from("fin_lancamentos").select("id, valor")
-        .eq("agendamento_id", agendamentoId).maybeSingle();
+        .from("fin_lancamentos")
+        .select("id, valor")
+        .eq("agendamento_id", agendamentoId)
+        .maybeSingle();
       if (lancExist) {
         lancamentoId = lancExist.id;
         if (!valorTotal) valorTotal = Number(lancExist.valor ?? 0);
@@ -331,30 +412,49 @@ function AtendimentoEditorPage() {
         } as never);
       }
 
-      await supabase.from("agendamentos")
-        .update({ fluxo_etapa: "finalizado", status: "realizado", fluxo_atualizado_em: new Date().toISOString() } as never)
+      await supabase
+        .from("agendamentos")
+        .update({
+          fluxo_etapa: "finalizado",
+          status: "realizado",
+          fluxo_atualizado_em: new Date().toISOString(),
+        } as never)
         .eq("id", agendamentoId);
 
-      toast.success(valorMedico > 0
-        ? `Prontuário salvo · Repasse médico: R$ ${valorMedico.toFixed(2)}`
-        : "Prontuário salvo");
+      toast.success(
+        valorMedico > 0
+          ? `Prontuário salvo · Repasse médico: R$ ${valorMedico.toFixed(2)}`
+          : "Prontuário salvo",
+      );
       setSalvo({ valorMedico });
-    } catch (e) { mostrarErro(e); }
-    finally { setLoading(null); }
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setLoading(null);
+    }
   }
 
   function addToHipotese(t: string) {
-    setSoap((s) => ({ ...s, hipotese_diagnostica: s.hipotese_diagnostica ? `${s.hipotese_diagnostica} ${t}` : t }));
+    setSoap((s) => ({
+      ...s,
+      hipotese_diagnostica: s.hipotese_diagnostica ? `${s.hipotese_diagnostica} ${t}` : t,
+    }));
   }
 
   function imprimirDocumento(tipo: "Conduta" | "Prescrição") {
     const conteudo = tipo === "Conduta" ? soap.conduta : soap.prescricao;
-    if (!conteudo?.trim()) { toast.error(`Preencha o campo ${tipo} antes de imprimir`); return; }
+    if (!conteudo?.trim()) {
+      toast.error(`Preencha o campo ${tipo} antes de imprimir`);
+      return;
+    }
     const clinicaNome = clinicaAtual?.clinica?.nome ?? "";
     const dataStr = new Date().toLocaleDateString("pt-BR");
     const horaStr = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     const esc = (v: unknown) =>
-      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+      String(v ?? "").replace(
+        /[&<>"']/g,
+        (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+      );
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(tipo)} — ${esc(pacienteNome)}</title>
 <style>
   @page { size: A4; margin: 20mm; }
@@ -392,7 +492,10 @@ function AtendimentoEditorPage() {
   <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 500); };</script>
 </body></html>`;
     const w = window.open("", "_blank", "width=900,height=700");
-    if (!w) { toast.error("Permita pop-ups para imprimir"); return; }
+    if (!w) {
+      toast.error("Permita pop-ups para imprimir");
+      return;
+    }
     w.document.open();
     w.document.write(html);
     w.document.close();
@@ -405,8 +508,15 @@ function AtendimentoEditorPage() {
           <CheckCircle2 className="h-14 w-14 text-emerald-500 mx-auto" />
           <h1 className="text-xl font-semibold">Prontuário salvo</h1>
           <p className="text-sm text-muted-foreground">
-            O atendimento de <b className="text-foreground uppercase">{pacienteNome}</b> foi registrado.
-            {salvo.valorMedico > 0 && <> Repasse médico: <b className="text-foreground">R$ {salvo.valorMedico.toFixed(2)}</b>.</>}
+            O atendimento de <b className="text-foreground uppercase">{pacienteNome}</b> foi
+            registrado.
+            {salvo.valorMedico > 0 && (
+              <>
+                {" "}
+                Repasse médico: <b className="text-foreground">R$ {salvo.valorMedico.toFixed(2)}</b>
+                .
+              </>
+            )}
           </p>
           <Button size="lg" onClick={() => navigate({ to: "/app/atendimento-ia" })}>
             <ArrowLeft className="h-4 w-4" /> Voltar para fila de atendimento
@@ -427,8 +537,8 @@ function AtendimentoEditorPage() {
                 Pagamento pendente — consulta requer pagamento antecipado
               </div>
               <p className="text-sm text-amber-800/80 dark:text-amber-200/80">
-                Envie o paciente ao caixa antes de iniciar o atendimento.
-                O prontuário fica disponível somente após a confirmação do pagamento.
+                Envie o paciente ao caixa antes de iniciar o atendimento. O prontuário fica
+                disponível somente após a confirmação do pagamento.
               </p>
               <div className="mt-2 flex gap-2">
                 <Button size="sm" asChild>
@@ -450,20 +560,37 @@ function AtendimentoEditorPage() {
               Atendimento — <span className="uppercase">{pacienteNome || "…"}</span>
             </h1>
             <p className="text-sm text-muted-foreground">
-              {medico?.nome ? <>Profissional: <b className="text-foreground uppercase">{medico.nome}</b></> : "Carregando…"}
+              {medico?.nome ? (
+                <>
+                  Profissional: <b className="text-foreground uppercase">{medico.nome}</b>
+                </>
+              ) : (
+                "Carregando…"
+              )}
               {especialidadeMedico && <> · {especialidadeMedico}</>}
             </p>
           </div>
         </div>
         <Button variant="outline" asChild>
-          <Link to="/app/atendimento-ia"><ArrowLeft className="h-4 w-4" /> Voltar para fila</Link>
+          <Link to="/app/atendimento-ia">
+            <ArrowLeft className="h-4 w-4" /> Voltar para fila
+          </Link>
         </Button>
       </div>
 
       <Card className="p-4">
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={handleResumir} disabled={loading === "resumir" || !pacienteId}>
-            {loading === "resumir" ? <Loader2 className="h-4 w-4 animate-spin" /> : <History className="h-4 w-4" />}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleResumir}
+            disabled={loading === "resumir" || !pacienteId}
+          >
+            {loading === "resumir" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <History className="h-4 w-4" />
+            )}
             Resumir histórico
           </Button>
         </div>
@@ -476,7 +603,9 @@ function AtendimentoEditorPage() {
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">{resumo}</div>
+              <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
+                {resumo}
+              </div>
             </CollapsibleContent>
           </Collapsible>
         )}
@@ -489,7 +618,9 @@ function AtendimentoEditorPage() {
               <HeartPulse className="h-5 w-5 text-rose-500" />
               <h2 className="font-semibold">Triagem da enfermagem</h2>
               {triagem.enfermeira_nome && (
-                <Badge variant="secondary" className="text-[10px]">Por {triagem.enfermeira_nome}</Badge>
+                <Badge variant="secondary" className="text-[10px]">
+                  Por {triagem.enfermeira_nome}
+                </Badge>
               )}
             </div>
             <span className="text-xs text-muted-foreground">
@@ -501,34 +632,82 @@ function AtendimentoEditorPage() {
               ["Peso", triagem.peso_kg, "kg"],
               ["Altura", triagem.altura_cm, "cm"],
               ["IMC", triagem.imc, ""],
-              ["PA", triagem.pa_sistolica && triagem.pa_diastolica ? `${triagem.pa_sistolica}/${triagem.pa_diastolica}` : null, "mmHg"],
+              [
+                "PA",
+                triagem.pa_sistolica && triagem.pa_diastolica
+                  ? `${triagem.pa_sistolica}/${triagem.pa_diastolica}`
+                  : null,
+                "mmHg",
+              ],
               ["FC", triagem.freq_cardiaca, "bpm"],
               ["Temp.", triagem.temperatura, "°C"],
               ["SatO₂", triagem.saturacao, "%"],
               ["Glicemia", triagem.glicemia, "mg/dL"],
-            ].filter(([, v]) => v !== null && v !== undefined && v !== "").map(([label, value, unit]) => (
-              <div key={String(label)} className="rounded-md border bg-muted/30 p-2">
-                <div className="text-[10px] uppercase text-muted-foreground">{label as string}</div>
-                <div className="font-semibold tabular-nums">{String(value)} <span className="text-xs font-normal text-muted-foreground">{unit as string}</span></div>
-              </div>
-            ))}
+            ]
+              .filter(([, v]) => v !== null && v !== undefined && v !== "")
+              .map(([label, value, unit]) => (
+                <div key={String(label)} className="rounded-md border bg-muted/30 p-2">
+                  <div className="text-[10px] uppercase text-muted-foreground">
+                    {label as string}
+                  </div>
+                  <div className="font-semibold tabular-nums">
+                    {String(value)}{" "}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {unit as string}
+                    </span>
+                  </div>
+                </div>
+              ))}
           </div>
-          {(triagem.queixa_principal || (triagem.doencas && triagem.doencas.length) || triagem.medicamentos || triagem.alergias || triagem.observacoes) && (
+          {(triagem.queixa_principal ||
+            (triagem.doencas && triagem.doencas.length) ||
+            triagem.medicamentos ||
+            triagem.alergias ||
+            triagem.observacoes) && (
             <div className="grid sm:grid-cols-2 gap-2 text-sm">
               {triagem.queixa_principal && (
-                <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Queixa principal</div><div>{triagem.queixa_principal}</div></div>
+                <div className="rounded-md border p-2">
+                  <div className="text-[10px] uppercase text-muted-foreground">
+                    Queixa principal
+                  </div>
+                  <div>{triagem.queixa_principal}</div>
+                </div>
               )}
               {triagem.doencas && triagem.doencas.length > 0 && (
-                <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Doenças pré-existentes</div><div className="flex flex-wrap gap-1 mt-1">{triagem.doencas.map((d, i) => <Badge key={i} variant="outline" className="text-[10px]">{d}</Badge>)}</div></div>
+                <div className="rounded-md border p-2">
+                  <div className="text-[10px] uppercase text-muted-foreground">
+                    Doenças pré-existentes
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {triagem.doencas.map((d, i) => (
+                      <Badge key={i} variant="outline" className="text-[10px]">
+                        {d}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
               )}
               {triagem.medicamentos && (
-                <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Medicamentos em uso</div><div>{triagem.medicamentos}</div></div>
+                <div className="rounded-md border p-2">
+                  <div className="text-[10px] uppercase text-muted-foreground">
+                    Medicamentos em uso
+                  </div>
+                  <div>{triagem.medicamentos}</div>
+                </div>
               )}
               {triagem.alergias && (
-                <div className="rounded-md border p-2"><div className="text-[10px] uppercase text-muted-foreground">Alergias</div><div>{triagem.alergias}</div></div>
+                <div className="rounded-md border p-2">
+                  <div className="text-[10px] uppercase text-muted-foreground">Alergias</div>
+                  <div>{triagem.alergias}</div>
+                </div>
               )}
               {triagem.observacoes && (
-                <div className="rounded-md border p-2 sm:col-span-2"><div className="text-[10px] uppercase text-muted-foreground">Observações da enfermagem</div><div className="whitespace-pre-wrap">{triagem.observacoes}</div></div>
+                <div className="rounded-md border p-2 sm:col-span-2">
+                  <div className="text-[10px] uppercase text-muted-foreground">
+                    Observações da enfermagem
+                  </div>
+                  <div className="whitespace-pre-wrap">{triagem.observacoes}</div>
+                </div>
               )}
             </div>
           )}
@@ -562,7 +741,11 @@ function AtendimentoEditorPage() {
             placeholder="Clique no microfone para gravar a consulta, ou cole/digite aqui o relato…"
           />
           <Button onClick={handleEstruturar} disabled={loading === "estruturar"} className="w-full">
-            {loading === "estruturar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+            {loading === "estruturar" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Wand2 className="h-4 w-4" />
+            )}
             Estruturar prontuário com IA
           </Button>
         </Card>
@@ -607,22 +790,41 @@ function AtendimentoEditorPage() {
             <Sparkles className="h-5 w-5 text-amber-500" />
             <h2 className="font-semibold">Sugestões clínicas</h2>
           </div>
-          <Button variant="outline" size="sm" onClick={handleSugerir} disabled={loading === "sugerir"}>
-            {loading === "sugerir" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSugerir}
+            disabled={loading === "sugerir"}
+          >
+            {loading === "sugerir" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Wand2 className="h-4 w-4" />
+            )}
             Sugerir CID, exames e prescrição
           </Button>
         </div>
         {!sugestoes ? (
-          <p className="text-sm text-muted-foreground">Preencha o prontuário e clique em "Sugerir" para a IA propor CIDs, exames e prescrição.</p>
+          <p className="text-sm text-muted-foreground">
+            Preencha o prontuário e clique em "Sugerir" para a IA propor CIDs, exames e prescrição.
+          </p>
         ) : (
           <div className="space-y-4">
             <div>
-              <Label className="text-xs uppercase text-muted-foreground">CIDs sugeridos (clique para adicionar)</Label>
+              <Label className="text-xs uppercase text-muted-foreground">
+                CIDs sugeridos (clique para adicionar)
+              </Label>
               <div className="flex gap-2 flex-wrap mt-1">
-                {sugestoes.cids.length === 0 && <span className="text-xs text-muted-foreground">—</span>}
+                {sugestoes.cids.length === 0 && (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
                 {sugestoes.cids.map((c, i) => (
-                  <Badge key={i} variant="secondary" className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
-                    onClick={() => addToHipotese(`[CID ${c.codigo} — ${c.descricao}]`)}>
+                  <Badge
+                    key={i}
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                    onClick={() => addToHipotese(`[CID ${c.codigo} — ${c.descricao}]`)}
+                  >
                     {c.codigo} · {c.descricao}
                   </Badge>
                 ))}
@@ -631,19 +833,38 @@ function AtendimentoEditorPage() {
             <div>
               <Label className="text-xs uppercase text-muted-foreground">Exames sugeridos</Label>
               <ul className="list-disc pl-5 text-sm space-y-0.5 mt-1">
-                {sugestoes.exames.map((e, i) => <li key={i}>{e}</li>)}
+                {sugestoes.exames.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
               </ul>
               {sugestoes.exames.length > 0 && (
-                <Button size="sm" variant="outline" className="mt-2" onClick={() => setSoap((s) => ({ ...s, conduta: `${s.conduta}${s.conduta ? "\n" : ""}Solicito: ${sugestoes.exames.join(", ")}.` }))}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() =>
+                    setSoap((s) => ({
+                      ...s,
+                      conduta: `${s.conduta}${s.conduta ? "\n" : ""}Solicito: ${sugestoes.exames.join(", ")}.`,
+                    }))
+                  }
+                >
                   Adicionar à conduta
                 </Button>
               )}
             </div>
             <div>
               <Label className="text-xs uppercase text-muted-foreground">Prescrição sugerida</Label>
-              <pre className="text-sm whitespace-pre-wrap rounded-md bg-muted/30 p-3 mt-1 border">{sugestoes.prescricao || "—"}</pre>
+              <pre className="text-sm whitespace-pre-wrap rounded-md bg-muted/30 p-3 mt-1 border">
+                {sugestoes.prescricao || "—"}
+              </pre>
               {sugestoes.prescricao && (
-                <Button size="sm" variant="outline" className="mt-2" onClick={() => setSoap((s) => ({ ...s, prescricao: sugestoes.prescricao }))}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => setSoap((s) => ({ ...s, prescricao: sugestoes.prescricao }))}
+                >
                   Usar como prescrição
                 </Button>
               )}
@@ -653,10 +874,20 @@ function AtendimentoEditorPage() {
       </Card>
 
       <div className="flex justify-end gap-2 flex-wrap">
-        <Button variant="outline" size="lg" onClick={() => imprimirDocumento("Conduta")} disabled={!soap.conduta.trim()}>
+        <Button
+          variant="outline"
+          size="lg"
+          onClick={() => imprimirDocumento("Conduta")}
+          disabled={!soap.conduta.trim()}
+        >
           <Printer className="h-4 w-4" /> Imprimir conduta
         </Button>
-        <Button variant="outline" size="lg" onClick={() => imprimirDocumento("Prescrição")} disabled={!soap.prescricao.trim()}>
+        <Button
+          variant="outline"
+          size="lg"
+          onClick={() => imprimirDocumento("Prescrição")}
+          disabled={!soap.prescricao.trim()}
+        >
           <Printer className="h-4 w-4" /> Imprimir prescrição
         </Button>
         <Button
@@ -665,7 +896,11 @@ function AtendimentoEditorPage() {
           disabled={loading === "salvar" || !pacienteId || (pagamento ? !pagamento.pago : false)}
           title={pagamento && !pagamento.pago ? "Pagamento pendente" : undefined}
         >
-          {loading === "salvar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          {loading === "salvar" ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
           Salvar prontuário
         </Button>
       </div>

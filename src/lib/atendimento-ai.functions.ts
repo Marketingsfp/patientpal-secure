@@ -24,7 +24,11 @@ async function callAI(body: Record<string, unknown>) {
 }
 
 function extractJson(text: string): unknown {
-  const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+  const cleaned = text
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
   if (start < 0 || end < 0) throw new Error("Resposta IA não é JSON");
@@ -93,7 +97,9 @@ NÃO substitua o julgamento clínico do médico. Use português do Brasil.`;
       data.historia_doenca && `HDA: ${data.historia_doenca}`,
       data.exame_fisico && `Exame: ${data.exame_fisico}`,
       data.hipotese_diagnostica && `Hipótese atual: ${data.hipotese_diagnostica}`,
-    ].filter(Boolean).join("\n\n");
+    ]
+      .filter(Boolean)
+      .join("\n\n");
     if (!ctx) throw new Error("Forneça ao menos um dado clínico");
     const json = await callAI({
       messages: [
@@ -103,7 +109,11 @@ NÃO substitua o julgamento clínico do médico. Use português do Brasil.`;
       response_format: { type: "json_object" },
     });
     const content = json.choices?.[0]?.message?.content ?? "{}";
-    const parsed = extractJson(content) as { cids?: Array<{ codigo?: string; descricao?: string }>; exames?: string[]; prescricao?: string };
+    const parsed = extractJson(content) as {
+      cids?: Array<{ codigo?: string; descricao?: string }>;
+      exames?: string[];
+      prescricao?: string;
+    };
     return {
       cids: Array.isArray(parsed.cids)
         ? parsed.cids
@@ -135,15 +145,21 @@ export const resumirHistoricoPaciente = createServerFn({ method: "POST" })
       return { resumo: "Sem prontuários anteriores registrados para este paciente.", total: 0 };
     }
     const ctx = pron
-      .map((p, i) => `Consulta ${i + 1} (${p.data?.slice(0, 10) ?? ""}):
+      .map(
+        (p, i) => `Consulta ${i + 1} (${p.data?.slice(0, 10) ?? ""}):
 Queixa: ${p.queixa_principal ?? "-"}
 Hipótese: ${p.hipotese_diagnostica ?? "-"}
 Conduta: ${p.conduta ?? "-"}
-Prescrição: ${p.prescricao ?? "-"}`)
+Prescrição: ${p.prescricao ?? "-"}`,
+      )
       .join("\n\n");
     const json = await callAI({
       messages: [
-        { role: "system", content: "Resuma o histórico clínico abaixo em até 8 bullets em markdown, destacando padrões, comorbidades e medicações em uso. Português do Brasil. Seja conciso e objetivo." },
+        {
+          role: "system",
+          content:
+            "Resuma o histórico clínico abaixo em até 8 bullets em markdown, destacando padrões, comorbidades e medicações em uso. Português do Brasil. Seja conciso e objetivo.",
+        },
         { role: "user", content: ctx },
       ],
     });

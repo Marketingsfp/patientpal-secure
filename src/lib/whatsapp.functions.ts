@@ -18,22 +18,24 @@ async function assertManager(userId: string, clinicaId: string) {
     _clinica_id: clinicaId,
   });
   if (error) throw new Error(error.message);
-  if (!data) throw new Error("Apenas administradores/gestores podem alterar a configuração do WhatsApp");
+  if (!data)
+    throw new Error("Apenas administradores/gestores podem alterar a configuração do WhatsApp");
 }
 
 /** Retorna a config sem expor o access_token nem o app_secret (apenas flags). */
 export const obterWhatsappConfig = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ clinicaId: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
     let cfg = await loadWhatsAppConfig(data.clinicaId);
     if (!cfg) {
       const { error: upsertError } = await supabaseAdmin
         .from("whatsapp_configs")
-        .upsert({ clinica_id: data.clinicaId }, { onConflict: "clinica_id", ignoreDuplicates: true });
+        .upsert(
+          { clinica_id: data.clinicaId },
+          { onConflict: "clinica_id", ignoreDuplicates: true },
+        );
       if (upsertError) throw new Error(upsertError.message);
       cfg = await loadWhatsAppConfig(data.clinicaId);
       if (!cfg) throw new Error("Falha ao carregar configuração do WhatsApp");
@@ -63,8 +65,14 @@ const SalvarSchema = z.object({
   waba_id: z.string().trim().max(64).optional(),
   display_name: z.string().trim().max(120).optional(),
   welcome_message: z.string().trim().max(1000).optional(),
-  horario_inicio: z.string().regex(/^\d{2}:\d{2}$/).optional(),
-  horario_fim: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  horario_inicio: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .optional(),
+  horario_fim: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .optional(),
   access_token: z.string().trim().max(2000).optional(), // vazio = manter atual
   app_secret: z.string().trim().max(200).optional(),
   ativo: z.boolean().optional(),
@@ -96,9 +104,7 @@ export const salvarWhatsappConfig = createServerFn({ method: "POST" })
 
 export const testarConexaoWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ clinicaId: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
     const cfg = await loadWhatsAppConfig(data.clinicaId);
@@ -117,7 +123,11 @@ export const testarConexaoWhatsapp = createServerFn({ method: "POST" })
           ativo: true,
         })
         .eq("clinica_id", data.clinicaId);
-      return { ok: true, display_phone_number: info.display_phone_number ?? "", verified_name: info.verified_name ?? "" };
+      return {
+        ok: true,
+        display_phone_number: info.display_phone_number ?? "",
+        verified_name: info.verified_name ?? "",
+      };
     } catch (e: any) {
       await supabaseAdmin
         .from("whatsapp_configs")
@@ -137,7 +147,12 @@ export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
     z
       .object({
         clinicaId: z.string().uuid(),
-        to: z.string().trim().min(8).max(20).regex(/^\+?\d+$/),
+        to: z
+          .string()
+          .trim()
+          .min(8)
+          .max(20)
+          .regex(/^\+?\d+$/),
         text: z.string().trim().min(1).max(3500),
       })
       .parse(input),
@@ -174,15 +189,14 @@ export const enviarMensagemWhatsapp = createServerFn({ method: "POST" })
 async function getWabaCreds(clinicaId: string) {
   const cfg = await loadWhatsAppConfig(clinicaId);
   if (!cfg?.waba_id) throw new Error("WABA ID não configurado. Preencha em Configuração.");
-  if (!cfg?.access_token) throw new Error("Access Token não configurado. Preencha em Configuração.");
+  if (!cfg?.access_token)
+    throw new Error("Access Token não configurado. Preencha em Configuração.");
   return { wabaId: cfg.waba_id, accessToken: cfg.access_token };
 }
 
 export const listarTemplatesWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ clinicaId: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ clinicaId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);
     const { wabaId, accessToken } = await getWabaCreds(data.clinicaId);
@@ -240,10 +254,12 @@ export const criarTemplateWhatsapp = createServerFn({ method: "POST" })
 export const excluirTemplateWhatsapp = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({
-      clinicaId: z.string().uuid(),
-      name: z.string().trim().min(1).max(512),
-    }).parse(input),
+    z
+      .object({
+        clinicaId: z.string().uuid(),
+        name: z.string().trim().min(1).max(512),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     await assertManager(context.userId, data.clinicaId);

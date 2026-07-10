@@ -14,7 +14,7 @@ export interface CbRegra {
   ativo?: boolean;
   limite_qtd?: number | null;
   limite_periodo?: string | null; // "dia" | "semana" | "mes"
-  limite_escopo?: string | null;  // "contrato" | "paciente"
+  limite_escopo?: string | null; // "contrato" | "paciente"
   excedente_modo?: string | null; // "percentual_particular" | "valor_fixo" | "particular" | "bloquear"
   excedente_percentual?: number | null;
   excedente_valor?: number | null;
@@ -57,15 +57,15 @@ export function findRegra(
       return true;
     }
     if (r.especialidade_id && r.especialidade_id !== espId) return false;
-    if (r.tipo && (r.tipo.toLowerCase() !== tipoNorm)) return false;
+    if (r.tipo && r.tipo.toLowerCase() !== tipoNorm) return false;
     return true;
   });
   if (candidates.length === 0) return null;
   const score = (r: CbRegra) =>
-    (r.procedimento_id ? 100 : 0)
-    + (r.especialidade_id ? 10 : 0)
-    + (r.tipo ? 5 : 0)
-    + (r.prioridade || 0) * 0.01;
+    (r.procedimento_id ? 100 : 0) +
+    (r.especialidade_id ? 10 : 0) +
+    (r.tipo ? 5 : 0) +
+    (r.prioridade || 0) * 0.01;
   return candidates.slice().sort((a, b) => score(b) - score(a))[0];
 }
 

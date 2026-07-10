@@ -12,9 +12,20 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/contas")({
   component: Page,
@@ -22,8 +33,14 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/contas")({
 });
 
 interface Conta {
-  id: string; nome: string; tipo: string; banco: string | null;
-  agencia: string | null; conta: string | null; saldo_inicial: number; ativo: boolean;
+  id: string;
+  nome: string;
+  tipo: string;
+  banco: string | null;
+  agencia: string | null;
+  conta: string | null;
+  saldo_inicial: number;
+  ativo: boolean;
 }
 const EMPTY = { nome: "", tipo: "banco", banco: "", agencia: "", conta: "", saldo_inicial: "0" };
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -38,103 +55,203 @@ function Page() {
   const [form, setForm] = useState(EMPTY);
 
   const load = async () => {
-    if (!clinicaAtual) { setItems([]); setLoading(false); return; }
+    if (!clinicaAtual) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const { data, error } = await supabase
-      .from("fin_contas").select("id, nome, tipo, banco, agencia, conta, saldo_inicial, ativo")
-      .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome");
-    if (error) mostrarErro(error); else setItems((data ?? []) as Conta[]);
+      .from("fin_contas")
+      .select("id, nome, tipo, banco, agencia, conta, saldo_inicial, ativo")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true)
+      .order("nome");
+    if (error) mostrarErro(error);
+    else setItems((data ?? []) as Conta[]);
     setLoading(false);
   };
-  useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
+  useEffect(() => {
+    void load();
+  }, [clinicaAtual?.clinica_id]);
 
-  const openNew = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
-  const openEdit = (c: Conta) => { setEditing(c); setForm({
-    nome: c.nome, tipo: c.tipo, banco: c.banco ?? "", agencia: c.agencia ?? "",
-    conta: c.conta ?? "", saldo_inicial: String(c.saldo_inicial),
-  }); setOpen(true); };
+  const openNew = () => {
+    setEditing(null);
+    setForm(EMPTY);
+    setOpen(true);
+  };
+  const openEdit = (c: Conta) => {
+    setEditing(c);
+    setForm({
+      nome: c.nome,
+      tipo: c.tipo,
+      banco: c.banco ?? "",
+      agencia: c.agencia ?? "",
+      conta: c.conta ?? "",
+      saldo_inicial: String(c.saldo_inicial),
+    });
+    setOpen(true);
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
     setSaving(true);
     const payload = {
-      clinica_id: clinicaAtual.clinica_id, nome: form.nome.trim(), tipo: form.tipo as "banco" | "caixa" | "cartao" | "maquininha" | "outro",
-      banco: form.banco.trim() || null, agencia: form.agencia.trim() || null,
-      conta: form.conta.trim() || null, saldo_inicial: Number(form.saldo_inicial || 0),
+      clinica_id: clinicaAtual.clinica_id,
+      nome: form.nome.trim(),
+      tipo: form.tipo as "banco" | "caixa" | "cartao" | "maquininha" | "outro",
+      banco: form.banco.trim() || null,
+      agencia: form.agencia.trim() || null,
+      conta: form.conta.trim() || null,
+      saldo_inicial: Number(form.saldo_inicial || 0),
     };
     const { error } = editing
       ? await supabase.from("fin_contas").update(payload).eq("id", editing.id)
       : await supabase.from("fin_contas").insert(payload);
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
-    toast.success("Salvo"); setOpen(false); await load();
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    toast.success("Salvo");
+    setOpen(false);
+    await load();
   };
 
   const remove = async (c: Conta) => {
     if (!confirm(`Excluir "${c.nome}"?`)) return;
     const { error } = await supabase.from("fin_contas").update({ ativo: false }).eq("id", c.id);
-    if (error) mostrarErro(error); else { toast.success("Removida"); await load(); }
+    if (error) mostrarErro(error);
+    else {
+      toast.success("Removida");
+      await load();
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-semibold">Contas</h1>
-          <p className="text-sm text-muted-foreground">Contas bancárias, caixa e cartões</p></div>
+        <div>
+          <h1 className="text-2xl font-semibold">Contas</h1>
+          <p className="text-sm text-muted-foreground">Contas bancárias, caixa e cartões</p>
+        </div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Nova conta</Button></DialogTrigger>
+          <DialogTrigger asChild>
+            <Button onClick={openNew} disabled={!clinicaAtual}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova conta
+            </Button>
+          </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>{editing ? "Editar" : "Nova"} conta</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>{editing ? "Editar" : "Nova"} conta</DialogTitle>
+            </DialogHeader>
             <form onSubmit={submit} className="space-y-4">
-              <div className="space-y-2"><Label>Nome *</Label>
-                <Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
+              <div className="space-y-2">
+                <Label>Nome *</Label>
+                <Input
+                  required
+                  value={form.nome}
+                  onChange={(e) => setForm({ ...form, nome: e.target.value })}
+                />
+              </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Tipo</Label>
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
                   <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="banco">Banco</SelectItem>
                       <SelectItem value="caixa">Caixa</SelectItem>
                       <SelectItem value="cartao">Cartão</SelectItem>
                       <SelectItem value="outro">Outro</SelectItem>
                     </SelectContent>
-                  </Select></div>
-                <div className="space-y-2"><Label>Saldo inicial</Label>
-                  <CurrencyInput value={form.saldo_inicial} onChange={(v) => setForm({ ...form, saldo_inicial: v })} /></div>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Saldo inicial</Label>
+                  <CurrencyInput
+                    value={form.saldo_inicial}
+                    onChange={(v) => setForm({ ...form, saldo_inicial: v })}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-2"><Label>Banco</Label>
-                  <Input value={form.banco} onChange={(e) => setForm({ ...form, banco: e.target.value })} /></div>
-                <div className="space-y-2"><Label>Agência</Label>
-                  <Input value={form.agencia} onChange={(e) => setForm({ ...form, agencia: e.target.value })} /></div>
-                <div className="space-y-2"><Label>Conta</Label>
-                  <Input value={form.conta} onChange={(e) => setForm({ ...form, conta: e.target.value })} /></div>
+                <div className="space-y-2">
+                  <Label>Banco</Label>
+                  <Input
+                    value={form.banco}
+                    onChange={(e) => setForm({ ...form, banco: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Agência</Label>
+                  <Input
+                    value={form.agencia}
+                    onChange={(e) => setForm({ ...form, agencia: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Conta</Label>
+                  <Input
+                    value={form.conta}
+                    onChange={(e) => setForm({ ...form, conta: e.target.value })}
+                  />
+                </div>
               </div>
-              <DialogFooter><Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button></DialogFooter>
+              <DialogFooter>
+                <Button type="submit" disabled={saving}>
+                  {saving ? "Salvando..." : "Salvar"}
+                </Button>
+              </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
       </div>
       {loading ? (
-        <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando...</CardContent></Card>
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Carregando...
+          </CardContent>
+        </Card>
       ) : items.length === 0 ? (
-        <Card><CardContent className="py-12 text-center text-muted-foreground">Nenhuma conta cadastrada.</CardContent></Card>
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Nenhuma conta cadastrada.
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {items.map((c) => (
             <Card key={c.id}>
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"><Wallet className="h-5 w-5" /></div>
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <Wallet className="h-5 w-5" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold truncate">{c.nome}</h3>
-                    <Badge variant="secondary" className="mt-1">{c.tipo}</Badge>
-                    {c.banco && <p className="text-sm text-muted-foreground mt-2">{c.banco} {c.agencia && `Ag. ${c.agencia}`} {c.conta && `Cc. ${c.conta}`}</p>}
-                    <p className="text-sm mt-2">Saldo inicial: <strong>{fmt(Number(c.saldo_inicial))}</strong></p>
+                    <Badge variant="secondary" className="mt-1">
+                      {c.tipo}
+                    </Badge>
+                    {c.banco && (
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {c.banco} {c.agencia && `Ag. ${c.agencia}`} {c.conta && `Cc. ${c.conta}`}
+                      </p>
+                    )}
+                    <p className="text-sm mt-2">
+                      Saldo inicial: <strong>{fmt(Number(c.saldo_inicial))}</strong>
+                    </p>
                     <div className="mt-3 flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => remove(c)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(c)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => remove(c)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </div>
                   </div>
                 </div>

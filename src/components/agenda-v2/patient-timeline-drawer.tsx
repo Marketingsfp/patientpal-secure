@@ -1,8 +1,6 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import {
-  Check, Clock, User, Stethoscope, TestTube, FileText, LogOut, Info,
-} from "lucide-react";
+import { Check, Clock, User, Stethoscope, TestTube, FileText, LogOut, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ETAPAS = [
@@ -23,7 +21,9 @@ export interface TimelineData {
 }
 
 export function PatientTimelineDrawer({
-  open, onOpenChange, data,
+  open,
+  onOpenChange,
+  data,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -31,9 +31,7 @@ export function PatientTimelineDrawer({
 }) {
   const currentIdx = data ? ETAPAS.findIndex((e) => e.key === data.etapa_atual) : -1;
 
-  const progresso = currentIdx >= 0
-    ? Math.round(((currentIdx + 1) / ETAPAS.length) * 100)
-    : 0;
+  const progresso = currentIdx >= 0 ? Math.round(((currentIdx + 1) / ETAPAS.length) * 100) : 0;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -44,9 +42,7 @@ export function PatientTimelineDrawer({
             <div className="text-[11px] uppercase tracking-wider text-primary font-semibold">
               Linha do tempo do paciente
             </div>
-            <SheetTitle className="text-xl">
-              {data?.paciente_nome ?? "—"}
-            </SheetTitle>
+            <SheetTitle className="text-xl">{data?.paciente_nome ?? "—"}</SheetTitle>
           </SheetHeader>
           {data && (
             <div className="mt-4">
@@ -81,9 +77,13 @@ export function PatientTimelineDrawer({
                       <div
                         className={cn(
                           "h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-all",
-                          past && "bg-emerald-500 text-white shadow-[0_2px_8px_rgba(16,185,129,0.35)]",
-                          current && "bg-primary text-primary-foreground shadow-[0_2px_10px_hsl(var(--primary)/0.4)] ring-4 ring-primary/15",
-                          !past && !current && "bg-muted text-muted-foreground/60 border border-border/60",
+                          past &&
+                            "bg-emerald-500 text-white shadow-[0_2px_8px_rgba(16,185,129,0.35)]",
+                          current &&
+                            "bg-primary text-primary-foreground shadow-[0_2px_10px_hsl(var(--primary)/0.4)] ring-4 ring-primary/15",
+                          !past &&
+                            !current &&
+                            "bg-muted text-muted-foreground/60 border border-border/60",
                         )}
                       >
                         {past ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
@@ -98,10 +98,16 @@ export function PatientTimelineDrawer({
                       )}
                     </div>
                     <div className="flex-1 pb-5 pt-1">
-                      <div className={cn(
-                        "text-sm flex items-center gap-2",
-                        current ? "font-semibold text-foreground" : past ? "font-medium text-foreground/90" : "font-medium text-muted-foreground",
-                      )}>
+                      <div
+                        className={cn(
+                          "text-sm flex items-center gap-2",
+                          current
+                            ? "font-semibold text-foreground"
+                            : past
+                              ? "font-medium text-foreground/90"
+                              : "font-medium text-muted-foreground",
+                        )}
+                      >
                         {etapa.label}
                         {current && (
                           <Badge className="text-[10px] px-1.5 h-4 bg-primary/15 text-primary hover:bg-primary/15 border-0">
@@ -109,7 +115,10 @@ export function PatientTimelineDrawer({
                           </Badge>
                         )}
                         {past && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 h-4 bg-emerald-50 text-emerald-700 border-emerald-200">
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 h-4 bg-emerald-50 text-emerald-700 border-emerald-200"
+                          >
                             concluído
                           </Badge>
                         )}

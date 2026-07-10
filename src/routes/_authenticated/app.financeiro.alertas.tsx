@@ -15,7 +15,11 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/alertas")({
 });
 
 interface Alerta {
-  id: string; tipo_alerta: string; mensagem: string; data_alerta: string; lido: boolean;
+  id: string;
+  tipo_alerta: string;
+  mensagem: string;
+  data_alerta: string;
+  lido: boolean;
 }
 
 function Page() {
@@ -24,50 +28,87 @@ function Page() {
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
-    if (!clinicaAtual) { setItems([]); setLoading(false); return; }
+    if (!clinicaAtual) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    const { data, error } = await supabase.from("fin_alertas")
+    const { data, error } = await supabase
+      .from("fin_alertas")
       .select("id, tipo_alerta, mensagem, data_alerta, lido")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("lido").order("data_alerta", { ascending: false });
-    if (error) mostrarErro(error); else setItems((data ?? []) as Alerta[]);
+      .order("lido")
+      .order("data_alerta", { ascending: false });
+    if (error) mostrarErro(error);
+    else setItems((data ?? []) as Alerta[]);
     setLoading(false);
   };
-  useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
+  useEffect(() => {
+    void load();
+  }, [clinicaAtual?.clinica_id]);
 
   const marcar = async (a: Alerta) => {
     const { error } = await supabase.from("fin_alertas").update({ lido: !a.lido }).eq("id", a.id);
-    if (error) mostrarErro(error); else await load();
+    if (error) mostrarErro(error);
+    else await load();
   };
   const remove = async (a: Alerta) => {
     if (!confirm("Excluir alerta?")) return;
     const { error } = await supabase.from("fin_alertas").delete().eq("id", a.id);
-    if (error) mostrarErro(error); else { toast.success("Removido"); await load(); }
+    if (error) mostrarErro(error);
+    else {
+      toast.success("Removido");
+      await load();
+    }
   };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Alertas</h1>
-        <p className="text-sm text-muted-foreground">Notificações automáticas do sistema financeiro</p>
+        <p className="text-sm text-muted-foreground">
+          Notificações automáticas do sistema financeiro
+        </p>
       </div>
-      {loading ? <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando...</CardContent></Card>
-        : items.length === 0 ? <Card><CardContent className="py-12 text-center text-muted-foreground">Nenhum alerta no momento.</CardContent></Card>
-        : <div className="space-y-2">{items.map((a) => (
-          <Card key={a.id} className={a.lido ? "opacity-60" : ""}>
-            <CardContent className="pt-4 pb-4 flex items-center gap-3">
-              <AlertTriangle className={`h-5 w-5 ${a.lido ? "text-muted-foreground" : "text-amber-500"}`} />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium">{a.mensagem}</p>
-                <p className="text-xs text-muted-foreground">{new Date(a.data_alerta).toLocaleDateString("pt-BR")}</p>
-              </div>
-              <Badge variant="outline">{a.tipo_alerta}</Badge>
-              <Button variant="ghost" size="icon" onClick={() => marcar(a)}>
-                <CheckCircle2 className={`h-4 w-4 ${a.lido ? "text-green-600" : ""}`} />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => remove(a)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-            </CardContent>
-          </Card>))}</div>}
+      {loading ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Carregando...
+          </CardContent>
+        </Card>
+      ) : items.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Nenhum alerta no momento.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {items.map((a) => (
+            <Card key={a.id} className={a.lido ? "opacity-60" : ""}>
+              <CardContent className="pt-4 pb-4 flex items-center gap-3">
+                <AlertTriangle
+                  className={`h-5 w-5 ${a.lido ? "text-muted-foreground" : "text-amber-500"}`}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium">{a.mensagem}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(a.data_alerta).toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+                <Badge variant="outline">{a.tipo_alerta}</Badge>
+                <Button variant="ghost" size="icon" onClick={() => marcar(a)}>
+                  <CheckCircle2 className={`h-4 w-4 ${a.lido ? "text-green-600" : ""}`} />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => remove(a)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -44,7 +50,11 @@ type PacienteRow = {
 };
 
 export function PatientQuickCompleteSheet({
-  pacienteId, open, onOpenChange, onSaved, requireNfse,
+  pacienteId,
+  open,
+  onOpenChange,
+  onSaved,
+  requireNfse,
 }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -56,9 +66,13 @@ export function PatientQuickCompleteSheet({
     setLoading(true);
     (async () => {
       const [{ data: p }, { data: pd }] = await Promise.all([
-        supabase.from("pacientes").select(
-          "id,nome,cpf,telefone,email,data_nascimento,cep,logradouro,numero,complemento,bairro,cidade,estado",
-        ).eq("id", pacienteId).maybeSingle(),
+        supabase
+          .from("pacientes")
+          .select(
+            "id,nome,cpf,telefone,email,data_nascimento,cep,logradouro,numero,complemento,bairro,cidade,estado",
+          )
+          .eq("id", pacienteId)
+          .maybeSingle(),
         supabase.rpc("paciente_pendencias_cadastro", { _paciente_id: pacienteId }),
       ]);
       setRow((p as PacienteRow) ?? null);
@@ -69,7 +83,7 @@ export function PatientQuickCompleteSheet({
   }, [open, pacienteId]);
 
   function set<K extends keyof PacienteRow>(k: K, v: PacienteRow[K]) {
-    setRow(r => r ? { ...r, [k]: v } : r);
+    setRow((r) => (r ? { ...r, [k]: v } : r));
   }
 
   async function buscarCep() {
@@ -79,48 +93,70 @@ export function PatientQuickCompleteSheet({
       const r = await fetch(`https://viacep.com.br/ws/${d}/json/`);
       const j = await r.json();
       if (j?.erro) return;
-      setRow(prev => prev ? {
-        ...prev,
-        logradouro: prev.logradouro || j.logradouro || "",
-        bairro: prev.bairro || j.bairro || "",
-        cidade: prev.cidade || j.localidade || "",
-        estado: prev.estado || j.uf || "",
-      } : prev);
-    } catch { /* silencioso */ }
+      setRow((prev) =>
+        prev
+          ? {
+              ...prev,
+              logradouro: prev.logradouro || j.logradouro || "",
+              bairro: prev.bairro || j.bairro || "",
+              cidade: prev.cidade || j.localidade || "",
+              estado: prev.estado || j.uf || "",
+            }
+          : prev,
+      );
+    } catch {
+      /* silencioso */
+    }
   }
 
   async function salvar() {
     if (!row || !pacienteId) return;
     const tel = somenteDigitos(row.telefone ?? "");
-    if (tel.length < 10) { toast.error("Telefone é obrigatório (DDD + número)"); return; }
-    if (row.cpf && !isCPFValido(row.cpf)) { toast.error("CPF inválido"); return; }
+    if (tel.length < 10) {
+      toast.error("Telefone é obrigatório (DDD + número)");
+      return;
+    }
+    if (row.cpf && !isCPFValido(row.cpf)) {
+      toast.error("CPF inválido");
+      return;
+    }
     setSaving(true);
     try {
-      const { error } = await supabase.from("pacientes").update({
-        telefone: tel,
-        email: row.email?.trim() || null,
-        cpf: row.cpf ? somenteDigitos(row.cpf) : null,
-        data_nascimento: row.data_nascimento || null,
-        cep: row.cep ? somenteDigitos(row.cep) : null,
-        logradouro: row.logradouro?.trim() || null,
-        numero: row.numero?.trim() || null,
-        complemento: row.complemento?.trim() || null,
-        bairro: row.bairro?.trim() || null,
-        cidade: row.cidade?.trim() || null,
-        estado: row.estado?.trim()?.toUpperCase() || null,
-      }).eq("id", pacienteId);
+      const { error } = await supabase
+        .from("pacientes")
+        .update({
+          telefone: tel,
+          email: row.email?.trim() || null,
+          cpf: row.cpf ? somenteDigitos(row.cpf) : null,
+          data_nascimento: row.data_nascimento || null,
+          cep: row.cep ? somenteDigitos(row.cep) : null,
+          logradouro: row.logradouro?.trim() || null,
+          numero: row.numero?.trim() || null,
+          complemento: row.complemento?.trim() || null,
+          bairro: row.bairro?.trim() || null,
+          cidade: row.cidade?.trim() || null,
+          estado: row.estado?.trim()?.toUpperCase() || null,
+        })
+        .eq("id", pacienteId);
       if (error) throw error;
       toast.success("Cadastro atualizado");
       onSaved?.();
       onOpenChange(false);
-    } catch (e) { mostrarErro(e); }
-    finally { setSaving(false); }
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setSaving(false);
+    }
   }
 
   const faltantes = pend?.faltantes ?? [];
   const showCont = faltantes.includes("telefone") || faltantes.includes("email") || requireNfse;
   const showDoc = faltantes.includes("cpf") || faltantes.includes("data_nascimento");
-  const showEnd = requireNfse || ["cep","logradouro","numero","bairro","cidade","estado"].some(f => faltantes.includes(f));
+  const showEnd =
+    requireNfse ||
+    ["cep", "logradouro", "numero", "bairro", "cidade", "estado"].some((f) =>
+      faltantes.includes(f),
+    );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -130,7 +166,11 @@ export function PatientQuickCompleteSheet({
           <SheetDescription>
             {row?.nome ? <span className="font-medium">{row.nome}</span> : null}
             <div className="mt-1 flex flex-wrap gap-1">
-              {faltantes.map(f => <Badge key={f} variant="secondary" className="text-[10px]">{f}</Badge>)}
+              {faltantes.map((f) => (
+                <Badge key={f} variant="secondary" className="text-[10px]">
+                  {f}
+                </Badge>
+              ))}
             </div>
           </SheetDescription>
         </SheetHeader>
@@ -148,11 +188,19 @@ export function PatientQuickCompleteSheet({
                 </div>
                 <div>
                   <Label>Telefone *</Label>
-                  <Input value={row.telefone ?? ""} onChange={e => set("telefone", e.target.value)} placeholder="(00) 00000-0000" />
+                  <Input
+                    value={row.telefone ?? ""}
+                    onChange={(e) => set("telefone", e.target.value)}
+                    placeholder="(00) 00000-0000"
+                  />
                 </div>
                 <div>
                   <Label>E-mail {requireNfse && "*"}</Label>
-                  <Input type="email" value={row.email ?? ""} onChange={e => set("email", e.target.value)} />
+                  <Input
+                    type="email"
+                    value={row.email ?? ""}
+                    onChange={(e) => set("email", e.target.value)}
+                  />
                 </div>
               </section>
             )}
@@ -164,11 +212,19 @@ export function PatientQuickCompleteSheet({
                 </div>
                 <div>
                   <Label>CPF {requireNfse && "*"}</Label>
-                  <Input value={row.cpf ?? ""} onChange={e => set("cpf", e.target.value)} placeholder="000.000.000-00" />
+                  <Input
+                    value={row.cpf ?? ""}
+                    onChange={(e) => set("cpf", e.target.value)}
+                    placeholder="000.000.000-00"
+                  />
                 </div>
                 <div>
                   <Label>Data de nascimento {requireNfse && "*"}</Label>
-                  <Input type="date" value={row.data_nascimento ?? ""} onChange={e => set("data_nascimento", e.target.value)} />
+                  <Input
+                    type="date"
+                    value={row.data_nascimento ?? ""}
+                    onChange={(e) => set("data_nascimento", e.target.value)}
+                  />
                 </div>
               </section>
             )}
@@ -181,31 +237,54 @@ export function PatientQuickCompleteSheet({
                 <div className="grid grid-cols-3 gap-2">
                   <div className="col-span-1">
                     <Label>CEP</Label>
-                    <Input value={row.cep ?? ""} onChange={e => set("cep", e.target.value)} onBlur={buscarCep} />
+                    <Input
+                      value={row.cep ?? ""}
+                      onChange={(e) => set("cep", e.target.value)}
+                      onBlur={buscarCep}
+                    />
                   </div>
                   <div className="col-span-2">
                     <Label>Logradouro</Label>
-                    <Input value={row.logradouro ?? ""} onChange={e => set("logradouro", e.target.value)} />
+                    <Input
+                      value={row.logradouro ?? ""}
+                      onChange={(e) => set("logradouro", e.target.value)}
+                    />
                   </div>
                   <div>
                     <Label>Número</Label>
-                    <Input value={row.numero ?? ""} onChange={e => set("numero", e.target.value)} />
+                    <Input
+                      value={row.numero ?? ""}
+                      onChange={(e) => set("numero", e.target.value)}
+                    />
                   </div>
                   <div className="col-span-2">
                     <Label>Complemento</Label>
-                    <Input value={row.complemento ?? ""} onChange={e => set("complemento", e.target.value)} />
+                    <Input
+                      value={row.complemento ?? ""}
+                      onChange={(e) => set("complemento", e.target.value)}
+                    />
                   </div>
                   <div className="col-span-2">
                     <Label>Bairro</Label>
-                    <Input value={row.bairro ?? ""} onChange={e => set("bairro", e.target.value)} />
+                    <Input
+                      value={row.bairro ?? ""}
+                      onChange={(e) => set("bairro", e.target.value)}
+                    />
                   </div>
                   <div>
                     <Label>UF</Label>
-                    <Input value={row.estado ?? ""} maxLength={2} onChange={e => set("estado", e.target.value.toUpperCase())} />
+                    <Input
+                      value={row.estado ?? ""}
+                      maxLength={2}
+                      onChange={(e) => set("estado", e.target.value.toUpperCase())}
+                    />
                   </div>
                   <div className="col-span-3">
                     <Label>Cidade</Label>
-                    <Input value={row.cidade ?? ""} onChange={e => set("cidade", e.target.value)} />
+                    <Input
+                      value={row.cidade ?? ""}
+                      onChange={(e) => set("cidade", e.target.value)}
+                    />
                   </div>
                 </div>
               </section>
@@ -219,8 +298,12 @@ export function PatientQuickCompleteSheet({
             )}
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
-              <Button onClick={salvar} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={salvar} disabled={saving}>
+                {saving ? "Salvando…" : "Salvar"}
+              </Button>
             </div>
           </div>
         )}

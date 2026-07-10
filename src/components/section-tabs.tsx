@@ -44,7 +44,24 @@ export function SectionTabs({ title, icon: TitleIcon, tabs }: SectionTabsProps) 
   );
 }
 
-import { Megaphone, Send, Sparkles, Users, Filter, Clock, Palmtree, FileText, GraduationCap, BookOpen, HeartPulse, LayoutGrid, ClipboardList, ShieldCheck, KeyRound, Stethoscope } from "lucide-react";
+import {
+  Megaphone,
+  Send,
+  Sparkles,
+  Users,
+  Filter,
+  Clock,
+  Palmtree,
+  FileText,
+  GraduationCap,
+  BookOpen,
+  HeartPulse,
+  LayoutGrid,
+  ClipboardList,
+  ShieldCheck,
+  KeyRound,
+  Stethoscope,
+} from "lucide-react";
 
 export const MARKETING_TABS: ReadonlyArray<SectionTab> = [
   { to: "/app/mkt-leads", label: "Leads", icon: Users },

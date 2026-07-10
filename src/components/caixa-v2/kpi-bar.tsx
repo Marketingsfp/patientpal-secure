@@ -23,14 +23,27 @@ export function KpiBar({ data }: { data: KpiData }) {
       className="text-[11px] text-muted-foreground border-t bg-muted/30 px-3 py-1.5 flex flex-wrap gap-x-4 gap-y-1 tabular-nums"
       data-testid="caixa-kpi-bar"
     >
-      <span>Tempo até pgto: <b className="text-foreground">{fmtMin(data.tempoMedioPagamentoMin)}</b></span>
-      <span>Maior fila: <b className="text-foreground">
-        {data.maiorFila ? `${data.maiorFila.qtd} (${data.maiorFila.hora})` : "—"}
-      </b></span>
-      <span>Tempo em caixa: <b className="text-foreground">{fmtMin(data.tempoMedioCaixaMin)}</b></span>
-      <span>Receita sessão: <b className="text-foreground">{brl(data.receitaSessao)}</b></span>
-      <span>Receita hoje: <b className="text-foreground">{brl(data.receitaHoje)}</b></span>
-      <span>Atendimentos: <b className="text-foreground">{data.atendimentos}</b></span>
+      <span>
+        Tempo até pgto: <b className="text-foreground">{fmtMin(data.tempoMedioPagamentoMin)}</b>
+      </span>
+      <span>
+        Maior fila:{" "}
+        <b className="text-foreground">
+          {data.maiorFila ? `${data.maiorFila.qtd} (${data.maiorFila.hora})` : "—"}
+        </b>
+      </span>
+      <span>
+        Tempo em caixa: <b className="text-foreground">{fmtMin(data.tempoMedioCaixaMin)}</b>
+      </span>
+      <span>
+        Receita sessão: <b className="text-foreground">{brl(data.receitaSessao)}</b>
+      </span>
+      <span>
+        Receita hoje: <b className="text-foreground">{brl(data.receitaHoje)}</b>
+      </span>
+      <span>
+        Atendimentos: <b className="text-foreground">{data.atendimentos}</b>
+      </span>
     </div>
   );
 }

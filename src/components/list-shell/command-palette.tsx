@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  CommandDialog, CommandEmpty, CommandGroup, CommandInput,
-  CommandItem, CommandList, CommandSeparator, CommandShortcut,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
 } from "@/components/ui/command";
 
 export interface CommandEntry {
@@ -30,7 +36,11 @@ interface CommandPaletteProps {
  * regras do cartão, empresas associadas, financeiro, NFS-e, telas e ações.
  */
 export function CommandPalette({
-  entries, asyncSearch, open, onOpenChange, placeholder = "Buscar telas, pacientes, orçamentos, ações…",
+  entries,
+  asyncSearch,
+  open,
+  onOpenChange,
+  placeholder = "Buscar telas, pacientes, orçamentos, ações…",
 }: CommandPaletteProps) {
   const [term, setTerm] = useState("");
   const [asyncResults, setAsyncResults] = useState<CommandEntry[]>([]);
@@ -39,13 +49,18 @@ export function CommandPalette({
   useEffect(() => {
     if (!asyncSearch) return;
     const q = term.trim();
-    if (q.length < 2) { setAsyncResults([]); return; }
+    if (q.length < 2) {
+      setAsyncResults([]);
+      return;
+    }
     setLoading(true);
     const t = setTimeout(async () => {
       try {
         const r = await asyncSearch(q);
         setAsyncResults(r);
-      } finally { setLoading(false); }
+      } finally {
+        setLoading(false);
+      }
     }, 180);
     return () => clearTimeout(t);
   }, [term, asyncSearch]);
@@ -56,14 +71,15 @@ export function CommandPalette({
     // Nesse caso filtramos manualmente as `entries` de navegação por termo,
     // para que a lista de telas não fique inteira poluindo a busca.
     const q = term.trim().toLowerCase();
-    const localEntries = !asyncSearch || q.length < 2
-      ? entries
-      : entries.filter((e) => {
-          const hay = `${e.label} ${e.hint ?? ""} ${(e.keywords ?? []).join(" ")}`.toLowerCase();
-          // ignora prefixo tipo "o:" para casar telas também
-          const bare = /^[a-z]:(.*)$/i.exec(q)?.[1]?.trim() ?? q;
-          return bare.length >= 2 && hay.includes(bare);
-        });
+    const localEntries =
+      !asyncSearch || q.length < 2
+        ? entries
+        : entries.filter((e) => {
+            const hay = `${e.label} ${e.hint ?? ""} ${(e.keywords ?? []).join(" ")}`.toLowerCase();
+            // ignora prefixo tipo "o:" para casar telas também
+            const bare = /^[a-z]:(.*)$/i.exec(q)?.[1]?.trim() ?? q;
+            return bare.length >= 2 && hay.includes(bare);
+          });
     const all = [...localEntries, ...asyncResults];
     const map = new Map<string, CommandEntry[]>();
     for (const e of all) {
@@ -86,7 +102,10 @@ export function CommandPalette({
                 <CommandItem
                   key={e.id}
                   value={`${e.label} ${e.hint ?? ""} ${(e.keywords ?? []).join(" ")}`}
-                  onSelect={() => { e.onSelect(); onOpenChange(false); }}
+                  onSelect={() => {
+                    e.onSelect();
+                    onOpenChange(false);
+                  }}
                 >
                   <div className="flex flex-col">
                     <span>{e.label}</span>
@@ -123,9 +142,16 @@ export function useCommandPaletteToggle(): [boolean, (v: boolean) => void] {
 export function useDefaultScreenEntries(): CommandEntry[] {
   const navigate = useNavigate();
   return useMemo(() => {
-    const nav = (to: string) => () => { void navigate({ to: to as never }); };
+    const nav = (to: string) => () => {
+      void navigate({ to: to as never });
+    };
     const mk = (label: string, to: string, hint?: string, keywords?: string[]): CommandEntry => ({
-      id: `nav:${to}`, label, hint, group: "Telas", keywords, onSelect: nav(to),
+      id: `nav:${to}`,
+      label,
+      hint,
+      group: "Telas",
+      keywords,
+      onSelect: nav(to),
     });
     return [
       mk("Início", "/app", "Painel inicial"),
@@ -147,7 +173,12 @@ export function useDefaultScreenEntries(): CommandEntry[] {
       mk("Regras do Cartão", "/app/cartao-beneficios/beneficios", "Regras dos benefícios"),
       mk("Modelos de Cartão", "/app/cartao-beneficios/modelos"),
       mk("Contratos do Cartão", "/app/cartao-beneficios/contratos"),
-      mk("Empresas associadas", "/app/cartao-beneficios/convenios", "Empresas / entidades associadas", ["empresa","associada","grupos"]),
+      mk(
+        "Empresas associadas",
+        "/app/cartao-beneficios/convenios",
+        "Empresas / entidades associadas",
+        ["empresa", "associada", "grupos"],
+      ),
       mk("Financeiro — Movimento", "/app/financeiro/movimento"),
       mk("Financeiro — Atendimentos", "/app/financeiro/atendimentos"),
       mk("Financeiro — Notas", "/app/financeiro/notas"),

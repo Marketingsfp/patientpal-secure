@@ -21,7 +21,12 @@ interface QuickFiltersProps<V extends string> {
  * multi=true permite múltipla seleção; senão, comportamento radio.
  */
 export function QuickFilters<V extends string>({
-  options, value, onChange, multi = false, className, ariaLabel = "Filtros rápidos",
+  options,
+  value,
+  onChange,
+  multi = false,
+  className,
+  ariaLabel = "Filtros rápidos",
 }: QuickFiltersProps<V>) {
   const toggle = (v: V) => {
     if (!multi) {
@@ -32,7 +37,11 @@ export function QuickFilters<V extends string>({
   };
   const hasAny = value.length > 0;
   return (
-    <div role="group" aria-label={ariaLabel} className={cn("flex flex-wrap items-center gap-1.5", className)}>
+    <div
+      role="group"
+      aria-label={ariaLabel}
+      className={cn("flex flex-wrap items-center gap-1.5", className)}
+    >
       {options.map((opt) => {
         const active = value.includes(opt.value);
         return (
@@ -50,8 +59,12 @@ export function QuickFilters<V extends string>({
           >
             <span>{opt.label}</span>
             {typeof opt.count === "number" && (
-              <span className={cn("rounded-full px-1.5 py-0 text-[10px] tabular-nums",
-                active ? "bg-primary-foreground/20" : "bg-muted")}>
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0 text-[10px] tabular-nums",
+                  active ? "bg-primary-foreground/20" : "bg-muted",
+                )}
+              >
                 {opt.count.toLocaleString("pt-BR")}
               </span>
             )}

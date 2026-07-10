@@ -107,7 +107,9 @@ export function VoiceInput({
   if (autoStart && !startedRef.current && !recording && !loading) {
     startedRef.current = true;
     // dispara fora do ciclo de render
-    setTimeout(() => { void start(); }, 0);
+    setTimeout(() => {
+      void start();
+    }, 0);
   }
   if (!autoStart) startedRef.current = false;
 

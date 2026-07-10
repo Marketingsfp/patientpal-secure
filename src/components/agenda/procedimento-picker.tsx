@@ -36,12 +36,20 @@ interface Props {
 
 function normalizar(s: string) {
   return (s ?? "")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase().trim();
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 }
 
 export function ProcedimentoPicker({
-  clinicaId, especialidadeId, tipo, value, onSelect, placeholder, className,
+  clinicaId,
+  especialidadeId,
+  tipo,
+  value,
+  onSelect,
+  placeholder,
+  className,
 }: Props) {
   const [busca, setBusca] = useState("");
   const [lista, setLista] = useState<ProcedimentoOption[]>([]);
@@ -69,7 +77,7 @@ export function ProcedimentoPicker({
           .select("procedimento_id")
           .eq("especialidade_id", especialidadeId);
         const ids = new Set((pe ?? []).map((r: any) => r.procedimento_id));
-        if (ids.size > 0) arr = arr.filter(p => ids.has(p.id));
+        if (ids.size > 0) arr = arr.filter((p) => ids.has(p.id));
       }
       setLista(arr);
       setLoading(false);
@@ -99,12 +107,14 @@ export function ProcedimentoPicker({
 
   const filtradas = useMemo(() => {
     const n = normalizar(busca);
-    return lista.filter(p => {
-      if (grupoFiltro && p.grupo !== grupoFiltro) return false;
-      if (!n) return true;
-      const alvo = normalizar(`${p.nome} ${p.codigo ?? ""} ${p.grupo ?? ""}`);
-      return alvo.includes(n);
-    }).slice(0, 200);
+    return lista
+      .filter((p) => {
+        if (grupoFiltro && p.grupo !== grupoFiltro) return false;
+        if (!n) return true;
+        const alvo = normalizar(`${p.nome} ${p.codigo ?? ""} ${p.grupo ?? ""}`);
+        return alvo.includes(n);
+      })
+      .slice(0, 200);
   }, [lista, busca, grupoFiltro]);
 
   return (
@@ -118,7 +128,9 @@ export function ProcedimentoPicker({
               {value.duracao_minutos ? ` · ${value.duracao_minutos}min` : ""}
             </div>
           </div>
-          <Button size="sm" variant="ghost" onClick={() => onSelect(null)}>Trocar</Button>
+          <Button size="sm" variant="ghost" onClick={() => onSelect(null)}>
+            Trocar
+          </Button>
         </div>
       ) : (
         <div className="space-y-2">
@@ -128,17 +140,21 @@ export function ProcedimentoPicker({
                 <Star className="h-3 w-3" /> Mais solicitados
               </div>
               <div className="flex flex-wrap gap-1">
-                {top.map(t => {
-                  const p = lista.find(x => x.id === t.procedimento_id);
+                {top.map((t) => {
+                  const p = lista.find((x) => x.id === t.procedimento_id);
                   if (!p) return null;
                   return (
                     <Button
                       key={t.procedimento_id}
-                      size="sm" variant="outline" className="h-7 text-xs"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
                       onClick={() => onSelect(p)}
                     >
                       {p.nome}
-                      <Badge variant="secondary" className="ml-1 text-[10px] px-1 py-0">{t.quantidade}</Badge>
+                      <Badge variant="secondary" className="ml-1 text-[10px] px-1 py-0">
+                        {t.quantidade}
+                      </Badge>
                     </Button>
                   );
                 })}
@@ -151,7 +167,7 @@ export function ProcedimentoPicker({
             <Input
               autoFocus
               value={busca}
-              onChange={e => setBusca(e.target.value)}
+              onChange={(e) => setBusca(e.target.value)}
               placeholder={placeholder ?? "Buscar exame ou procedimento…"}
               className="pl-9"
             />
@@ -159,9 +175,24 @@ export function ProcedimentoPicker({
 
           {grupos.length > 1 && (
             <div className="flex flex-wrap gap-1">
-              <Button size="sm" variant={grupoFiltro === null ? "default" : "outline"} className="h-6 text-[11px]" onClick={() => setGrupoFiltro(null)}>Todos</Button>
-              {grupos.map(g => (
-                <Button key={g} size="sm" variant={grupoFiltro === g ? "default" : "outline"} className="h-6 text-[11px]" onClick={() => setGrupoFiltro(g)}>{g}</Button>
+              <Button
+                size="sm"
+                variant={grupoFiltro === null ? "default" : "outline"}
+                className="h-6 text-[11px]"
+                onClick={() => setGrupoFiltro(null)}
+              >
+                Todos
+              </Button>
+              {grupos.map((g) => (
+                <Button
+                  key={g}
+                  size="sm"
+                  variant={grupoFiltro === g ? "default" : "outline"}
+                  className="h-6 text-[11px]"
+                  onClick={() => setGrupoFiltro(g)}
+                >
+                  {g}
+                </Button>
               ))}
             </div>
           )}
@@ -173,24 +204,33 @@ export function ProcedimentoPicker({
               </div>
             )}
             {!loading && filtradas.length === 0 && (
-              <div className="p-3 text-sm text-muted-foreground">Nenhum procedimento encontrado.</div>
+              <div className="p-3 text-sm text-muted-foreground">
+                Nenhum procedimento encontrado.
+              </div>
             )}
-            {!loading && filtradas.map(p => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => onSelect(p)}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-accent border-b last:border-b-0"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium truncate">{p.nome}</span>
-                  {p.codigo && <span className="text-[10px] font-mono text-muted-foreground">{p.codigo}</span>}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {[p.grupo, p.tipo, p.duracao_minutos ? `${p.duracao_minutos}min` : null].filter(Boolean).join(" · ")}
-                </div>
-              </button>
-            ))}
+            {!loading &&
+              filtradas.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => onSelect(p)}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-accent border-b last:border-b-0"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium truncate">{p.nome}</span>
+                    {p.codigo && (
+                      <span className="text-[10px] font-mono text-muted-foreground">
+                        {p.codigo}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {[p.grupo, p.tipo, p.duracao_minutos ? `${p.duracao_minutos}min` : null]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </div>
+                </button>
+              ))}
           </div>
         </div>
       )}

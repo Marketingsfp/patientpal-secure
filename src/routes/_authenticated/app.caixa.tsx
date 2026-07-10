@@ -2,8 +2,24 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
-  Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
-  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight, Undo2, Printer,
+  Wallet,
+  PlusCircle,
+  MinusCircle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Lock,
+  Unlock,
+  Eye,
+  FileDown,
+  Users,
+  Receipt,
+  ChevronRight,
+  Trash2,
+  Plus,
+  HandCoins,
+  ArrowRight,
+  Undo2,
+  Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -20,13 +36,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
@@ -58,15 +88,27 @@ function CaixaRouteDispatcher() {
 
 type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento";
 interface Sessao {
-  id: string; clinica_id: string; user_id: string; user_nome: string | null;
-  aberto_em: string; valor_abertura: number;
-  fechado_em: string | null; valor_fechamento_informado: number | null;
-  valor_fechamento_calculado: number | null; diferenca: number | null;
-  status: "aberto" | "fechado"; observacoes: string | null;
+  id: string;
+  clinica_id: string;
+  user_id: string;
+  user_nome: string | null;
+  aberto_em: string;
+  valor_abertura: number;
+  fechado_em: string | null;
+  valor_fechamento_informado: number | null;
+  valor_fechamento_calculado: number | null;
+  diferenca: number | null;
+  status: "aberto" | "fechado";
+  observacoes: string | null;
 }
 interface Mov {
-  id: string; sessao_id: string; user_id: string; tipo: MovTipo;
-  valor: number; descricao: string | null; forma_pagamento: string | null;
+  id: string;
+  sessao_id: string;
+  user_id: string;
+  tipo: MovTipo;
+  valor: number;
+  descricao: string | null;
+  forma_pagamento: string | null;
   created_at: string;
   lancamento_id?: string | null;
 }
@@ -88,27 +130,49 @@ const fmtDT = (s: string | null) =>
   s ? new Date(s).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
 
 const TIPO_LABEL: Record<MovTipo, string> = {
-  abertura: "Abertura", sangria: "Sangria", suprimento: "Suprimento",
-  recebimento: "Recebimento", despesa: "Despesa", fechamento: "Fechamento",
+  abertura: "Abertura",
+  sangria: "Sangria",
+  suprimento: "Suprimento",
+  recebimento: "Recebimento",
+  despesa: "Despesa",
+  fechamento: "Fechamento",
 };
 const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
-  abertura: 1, suprimento: 1, recebimento: 1,
-  sangria: -1, despesa: -1, fechamento: 0,
+  abertura: 1,
+  suprimento: 1,
+  recebimento: 1,
+  sangria: -1,
+  despesa: -1,
+  fechamento: 0,
 };
 const TIPO_CLASS: Record<MovTipo, string> = {
-  abertura: "bg-sky-100 text-sky-700 border-sky-300 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800",
-  suprimento: "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
-  recebimento: "bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-300 dark:border-green-800",
-  sangria: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
-  despesa: "bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800",
-  fechamento: "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700",
+  abertura:
+    "bg-sky-100 text-sky-700 border-sky-300 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800",
+  suprimento:
+    "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
+  recebimento:
+    "bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-300 dark:border-green-800",
+  sangria:
+    "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
+  despesa:
+    "bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800",
+  fechamento:
+    "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700",
 };
 
-const SESSAO_FIELDS = "id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, valor_fechamento_informado, valor_fechamento_calculado, diferenca, status, observacoes";
-const MOV_FIELDS = "id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id";
+const SESSAO_FIELDS =
+  "id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, valor_fechamento_informado, valor_fechamento_calculado, diferenca, status, observacoes";
+const MOV_FIELDS =
+  "id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id";
 
 const BANDEIRAS_CARTAO = [
-  "Visa", "Mastercard", "Elo", "Hipercard", "American Express", "Diners", "Outra",
+  "Visa",
+  "Mastercard",
+  "Elo",
+  "Hipercard",
+  "American Express",
+  "Diners",
+  "Outra",
 ];
 
 function montarSufixoCartao(forma: string, bandeira: string, parcelas: string): string {
@@ -127,13 +191,25 @@ function Page() {
 
   const [tab, setTab] = useState<"meu" | "todos" | "repasse">("meu");
   const [estornoFor, setEstornoFor] = useState<Mov | null>(null);
-  const [caixaDrill, setCaixaDrill] = useState<null | "saldo" | "abertura" | "entradas" | "saidas">(null);
+  const [caixaDrill, setCaixaDrill] = useState<null | "saldo" | "abertura" | "entradas" | "saidas">(
+    null,
+  );
 
   // ====== Resumo de repasse do dia (para a aba "Repasse") ======
-  const [repHoje, setRepHoje] = useState<{ pendente: number; pago: number; medicos: number; qtd_pend: number }>({
-    pendente: 0, pago: 0, medicos: 0, qtd_pend: 0,
+  const [repHoje, setRepHoje] = useState<{
+    pendente: number;
+    pago: number;
+    medicos: number;
+    qtd_pend: number;
+  }>({
+    pendente: 0,
+    pago: 0,
+    medicos: 0,
+    qtd_pend: 0,
   });
-  const [repPagosHoje, setRepPagosHoje] = useState<Array<{ id: string; medico: string; valor: number; forma: string | null; hora: string | null }>>([]);
+  const [repPagosHoje, setRepPagosHoje] = useState<
+    Array<{ id: string; medico: string; valor: number; forma: string | null; hora: string | null }>
+  >([]);
   const loadRepasseHoje = useCallback(async () => {
     if (!clinicaAtual) return;
     const hoje = new Date().toISOString().slice(0, 10);
@@ -146,13 +222,23 @@ function Page() {
       .lte("data", hoje)
       .not("agendamento_id", "is", null);
     if (error) return;
-    const rows = (data ?? []) as Array<{ valor: number | null; medico_id: string | null; repasse_pago: boolean | null }>;
-    let pendente = 0, pago = 0, qtd_pend = 0;
+    const rows = (data ?? []) as Array<{
+      valor: number | null;
+      medico_id: string | null;
+      repasse_pago: boolean | null;
+    }>;
+    let pendente = 0,
+      pago = 0,
+      qtd_pend = 0;
     const medSet = new Set<string>();
     for (const r of rows) {
       const v = Number(r.valor) || 0;
       if (r.repasse_pago) pago += v;
-      else { pendente += v; qtd_pend++; if (r.medico_id) medSet.add(r.medico_id); }
+      else {
+        pendente += v;
+        qtd_pend++;
+        if (r.medico_id) medSet.add(r.medico_id);
+      }
     }
     setRepHoje({ pendente, pago, medicos: medSet.size, qtd_pend });
     // Lista de pagamentos de repasse realizados hoje (despesas "Repasse médico — ...")
@@ -164,22 +250,42 @@ function Page() {
       .eq("data", hoje)
       .ilike("descricao", "Repasse médico%")
       .order("created_at", { ascending: false });
-    const pagosRows = (pagos ?? []) as Array<{ id: string; valor: number | null; medico_id: string | null; descricao: string | null; forma_pagamento: string | null; created_at: string | null }>;
-    const medIds = Array.from(new Set(pagosRows.map((p) => p.medico_id).filter(Boolean) as string[]));
+    const pagosRows = (pagos ?? []) as Array<{
+      id: string;
+      valor: number | null;
+      medico_id: string | null;
+      descricao: string | null;
+      forma_pagamento: string | null;
+      created_at: string | null;
+    }>;
+    const medIds = Array.from(
+      new Set(pagosRows.map((p) => p.medico_id).filter(Boolean) as string[]),
+    );
     const medMap = new Map<string, string>();
     if (medIds.length) {
       const { data: meds } = await supabase.from("medicos").select("id, nome").in("id", medIds);
       for (const m of (meds ?? []) as Array<{ id: string; nome: string }>) medMap.set(m.id, m.nome);
     }
-    setRepPagosHoje(pagosRows.map((p) => ({
-      id: p.id,
-      medico: p.medico_id ? (medMap.get(p.medico_id) ?? "—") : (p.descricao?.replace(/^Repasse médico\s*—\s*/, "").replace(/\s*\(.*\)$/, "") || "—"),
-      valor: Number(p.valor) || 0,
-      forma: p.forma_pagamento,
-      hora: p.created_at ? new Date(p.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : null,
-    })));
+    setRepPagosHoje(
+      pagosRows.map((p) => ({
+        id: p.id,
+        medico: p.medico_id
+          ? (medMap.get(p.medico_id) ?? "—")
+          : p.descricao?.replace(/^Repasse médico\s*—\s*/, "").replace(/\s*\(.*\)$/, "") || "—",
+        valor: Number(p.valor) || 0,
+        forma: p.forma_pagamento,
+        hora: p.created_at
+          ? new Date(p.created_at).toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : null,
+      })),
+    );
   }, [clinicaAtual]);
-  useEffect(() => { if (tab === "repasse") void loadRepasseHoje(); }, [tab, loadRepasseHoje]);
+  useEffect(() => {
+    if (tab === "repasse") void loadRepasseHoje();
+  }, [tab, loadRepasseHoje]);
   const [loading, setLoading] = useState(true);
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
@@ -234,7 +340,12 @@ function Page() {
   const [filaCaixa, setFilaCaixa] = useState<FilaCaixa[]>([]);
   const [openCobranca, setOpenCobranca] = useState<FilaCaixa | null>(null);
   type LinhaPag = { forma: string; valor: string; bandeira: string; parcelas: string };
-  const linhaVazia = (): LinhaPag => ({ forma: "dinheiro", valor: "0", bandeira: "", parcelas: "1" });
+  const linhaVazia = (): LinhaPag => ({
+    forma: "dinheiro",
+    valor: "0",
+    bandeira: "",
+    parcelas: "1",
+  });
   const [cobrancaLinhas, setCobrancaLinhas] = useState<LinhaPag[]>([linhaVazia()]);
 
   // Formularios
@@ -255,12 +366,13 @@ function Page() {
     const formas = ["dinheiro", "pix", "debito", "credito"] as const;
     const onKey = (e: KeyboardEvent) => {
       const tgt = e.target as HTMLElement | null;
-      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable)) return;
+      if (tgt && (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" || tgt.isContentEditable))
+        return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key >= "1" && e.key <= "4") {
         e.preventDefault();
         const forma = formas[Number(e.key) - 1];
-        setCobrancaLinhas(prev => {
+        setCobrancaLinhas((prev) => {
           const next = [...prev];
           const i = next.length - 1;
           next[i] = { ...next[i], forma, bandeira: "", parcelas: "1" };
@@ -268,7 +380,7 @@ function Page() {
         });
       } else if (e.key === "5") {
         e.preventDefault();
-        setCobrancaLinhas(prev => {
+        setCobrancaLinhas((prev) => {
           if (!openCobranca) return [...prev, linhaVazia()];
           const next = [...prev];
           if (prev.length === 1) {
@@ -292,14 +404,14 @@ function Page() {
     // Sessao aberta do usuario
     const [abertaRes, histRes] = await Promise.all([
       supabase
-      .from("caixa_sessoes")
-      .select(SESSAO_FIELDS)
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("user_id", user.id)
-      .eq("status", "aberto")
-      .order("aberto_em", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+        .from("caixa_sessoes")
+        .select(SESSAO_FIELDS)
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("user_id", user.id)
+        .eq("status", "aberto")
+        .order("aberto_em", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
       supabase
         .from("caixa_sessoes")
         .select(SESSAO_FIELDS)
@@ -354,22 +466,26 @@ function Page() {
       ja_pago: boolean;
       desconto_origem: string | null;
     }>;
-    setFilaCaixa(rows.map((r) => ({
-      id: r.id,
-      paciente_id: r.paciente_id,
-      paciente_nome: r.paciente_nome,
-      procedimento: r.desconto_origem
-        ? `${r.procedimento} (${r.desconto_origem})`
-        : r.procedimento,
-      inicio: r.inicio,
-      medico_nome: r.medico_nome,
-      valor: Number(r.valor ?? 0),
-      valor_cartao: Number(r.valor_cartao ?? 0),
-      ja_pago: r.ja_pago,
-    })));
+    setFilaCaixa(
+      rows.map((r) => ({
+        id: r.id,
+        paciente_id: r.paciente_id,
+        paciente_nome: r.paciente_nome,
+        procedimento: r.desconto_origem
+          ? `${r.procedimento} (${r.desconto_origem})`
+          : r.procedimento,
+        inicio: r.inicio,
+        medico_nome: r.medico_nome,
+        valor: Number(r.valor ?? 0),
+        valor_cartao: Number(r.valor_cartao ?? 0),
+        ja_pago: r.ja_pago,
+      })),
+    );
   }, [clinicaAtual]);
 
-  useEffect(() => { if (minhaSessao) void loadFilaCaixa(); }, [minhaSessao, loadFilaCaixa]);
+  useEffect(() => {
+    if (minhaSessao) void loadFilaCaixa();
+  }, [minhaSessao, loadFilaCaixa]);
 
   // Consome ?receber=<agendamentoId> vindo do CaixaShellV2:
   // abre a cobrança do paciente correto assim que a fila carregar.
@@ -395,18 +511,31 @@ function Page() {
       return;
     }
     setOpenCobranca(item);
-    setCobrancaLinhas([{ forma: "dinheiro", valor: String(item.valor || 0), bandeira: "", parcelas: "1" }]);
+    setCobrancaLinhas([
+      { forma: "dinheiro", valor: String(item.valor || 0), bandeira: "", parcelas: "1" },
+    ]);
   }, [minhaSessao, filaCaixa]);
 
   useEffect(() => {
     if (!clinicaAtual || !minhaSessao) return;
     const ch = supabase
       .channel(`caixa-fila-${clinicaAtual.clinica_id}`)
-      .on("postgres_changes",
-        { event: "*", schema: "public", table: "agendamentos", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
-        () => { void loadFilaCaixa(); })
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "agendamentos",
+          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
+        },
+        () => {
+          void loadFilaCaixa();
+        },
+      )
       .subscribe();
-    return () => { void supabase.removeChannel(ch); };
+    return () => {
+      void supabase.removeChannel(ch);
+    };
   }, [clinicaAtual, minhaSessao, loadFilaCaixa]);
 
   // Executa cobrança: insere movimento caixa + lançamento financeiro + avança fluxo
@@ -414,16 +543,33 @@ function Page() {
     e.preventDefault();
     if (!clinicaAtual || !user || !minhaSessao || !openCobranca) return;
     // Valida cada linha
-    const linhasValidadas: Array<{ forma: string; valor: number; bandeira: string; parcelas: string }> = [];
+    const linhasValidadas: Array<{
+      forma: string;
+      valor: number;
+      bandeira: string;
+      parcelas: string;
+    }> = [];
     for (const l of cobrancaLinhas) {
       const v = Number(l.valor) || 0;
-      if (v <= 0) { toast.error("Cada forma de pagamento precisa ter valor maior que zero"); return; }
-      if ((l.forma === "credito" || l.forma === "debito") && !l.bandeira) {
-        toast.error("Selecione a bandeira do cartão em todas as linhas"); return;
+      if (v <= 0) {
+        toast.error("Cada forma de pagamento precisa ter valor maior que zero");
+        return;
       }
-      linhasValidadas.push({ forma: l.forma, valor: v, bandeira: l.bandeira, parcelas: l.parcelas });
+      if ((l.forma === "credito" || l.forma === "debito") && !l.bandeira) {
+        toast.error("Selecione a bandeira do cartão em todas as linhas");
+        return;
+      }
+      linhasValidadas.push({
+        forma: l.forma,
+        valor: v,
+        bandeira: l.bandeira,
+        parcelas: l.parcelas,
+      });
     }
-    if (linhasValidadas.length === 0) { toast.error("Adicione ao menos uma forma de pagamento"); return; }
+    if (linhasValidadas.length === 0) {
+      toast.error("Adicione ao menos uma forma de pagamento");
+      return;
+    }
     setSaving(true);
     try {
       // Re-checa server-side se já foi pago (anti dupla cobrança / race)
@@ -476,17 +622,21 @@ function Page() {
         } as never);
         if (e2) throw e2;
       }
-      const { error: e3 } = await supabase.from("agendamentos")
+      const { error: e3 } = await supabase
+        .from("agendamentos")
         .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
         .eq("id", openCobranca.id);
       if (e3) throw e3;
       toast.success("Cobrança registrada · paciente enviado à triagem");
       setOpenCobranca(null);
       setCobrancaLinhas([linhaVazia()]);
-      void load(); void loadFilaCaixa();
+      void load();
+      void loadFilaCaixa();
     } catch (err) {
       mostrarErro(err);
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const loadTodos = useCallback(async () => {
@@ -518,49 +668,67 @@ function Page() {
 
     // Lista de operadores que abriram caixa
     const nomes = new Map<string, string>();
-    sess.forEach((s) => { if (s.user_id) nomes.set(s.user_id, s.user_nome || s.user_id.slice(0, 8)); });
+    sess.forEach((s) => {
+      if (s.user_id) nomes.set(s.user_id, s.user_nome || s.user_id.slice(0, 8));
+    });
     setUsersList(Array.from(nomes.entries()).map(([user_id, nome]) => ({ user_id, nome })));
   }, [clinicaAtual, isManager, fIni, fFim, fUserId]);
 
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => { if (tab === "todos") void loadTodos(); }, [tab, loadTodos]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  useEffect(() => {
+    if (tab === "todos") void loadTodos();
+  }, [tab, loadTodos]);
 
   // Calculos
   const saldoAtual = useMemo(() => {
     if (!minhaSessao) return 0;
-    return minhasMovs.reduce(
-      (acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0),
-      0,
-    );
+    return minhasMovs.reduce((acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0), 0);
   }, [minhaSessao, minhasMovs]);
 
   const resumoTipos = useMemo(() => {
     const r: Record<MovTipo, number> = {
-      abertura: 0, sangria: 0, suprimento: 0,
-      recebimento: 0, despesa: 0, fechamento: 0,
+      abertura: 0,
+      sangria: 0,
+      suprimento: 0,
+      recebimento: 0,
+      despesa: 0,
+      fechamento: 0,
     };
-    minhasMovs.forEach((m) => { r[m.tipo] += Number(m.valor || 0); });
+    minhasMovs.forEach((m) => {
+      r[m.tipo] += Number(m.valor || 0);
+    });
     return r;
   }, [minhasMovs]);
 
   // Calculo por sessao (todos)
-  const calcSaldoSessao = useCallback((sid: string) => {
-    return todosMovs
-      .filter((m) => m.sessao_id === sid)
-      .reduce((acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0), 0);
-  }, [todosMovs]);
+  const calcSaldoSessao = useCallback(
+    (sid: string) => {
+      return todosMovs
+        .filter((m) => m.sessao_id === sid)
+        .reduce((acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0), 0);
+    },
+    [todosMovs],
+  );
 
   // Totais auxiliares por sessao
-  const calcSangriaSessao = useCallback((sid: string) => {
-    return todosMovs
-      .filter((m) => m.sessao_id === sid && m.tipo === "sangria")
-      .reduce((acc, m) => acc + Number(m.valor || 0), 0);
-  }, [todosMovs]);
-  const calcEstornoSessao = useCallback((sid: string) => {
-    return todosMovs
-      .filter((m) => m.sessao_id === sid && (m.descricao ?? "").toLowerCase().includes("estorno"))
-      .reduce((acc, m) => acc + Number(m.valor || 0), 0);
-  }, [todosMovs]);
+  const calcSangriaSessao = useCallback(
+    (sid: string) => {
+      return todosMovs
+        .filter((m) => m.sessao_id === sid && m.tipo === "sangria")
+        .reduce((acc, m) => acc + Number(m.valor || 0), 0);
+    },
+    [todosMovs],
+  );
+  const calcEstornoSessao = useCallback(
+    (sid: string) => {
+      return todosMovs
+        .filter((m) => m.sessao_id === sid && (m.descricao ?? "").toLowerCase().includes("estorno"))
+        .reduce((acc, m) => acc + Number(m.valor || 0), 0);
+    },
+    [todosMovs],
+  );
 
   // Acoes
   const abrirCaixa = async (e: FormEvent) => {
@@ -622,10 +790,14 @@ function Page() {
     e.preventDefault();
     if (!clinicaAtual || !user || !minhaSessao || !openMov) return;
     const v = Number(movValor) || 0;
-    if (v <= 0) { toast.error("Informe um valor"); return; }
+    if (v <= 0) {
+      toast.error("Informe um valor");
+      return;
+    }
     const ehPagto = openMov.tipo === "recebimento" || openMov.tipo === "despesa";
     if (ehPagto && (movForma === "credito" || movForma === "debito") && !movBandeira) {
-      toast.error("Selecione a bandeira do cartão"); return;
+      toast.error("Selecione a bandeira do cartão");
+      return;
     }
     const sufixoCartao = ehPagto ? montarSufixoCartao(movForma, movBandeira, movParcelas) : "";
     setSaving(true);
@@ -639,10 +811,16 @@ function Page() {
       forma_pagamento: ehPagto ? movForma : null,
     });
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     setOpenMov(null);
-    setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
-    setMovBandeira(""); setMovParcelas("1");
+    setMovValor("");
+    setMovDesc("");
+    setMovForma("dinheiro");
+    setMovBandeira("");
+    setMovParcelas("1");
     toast.success(`${TIPO_LABEL[openMov.tipo]} registrada`);
     void load();
   };
@@ -677,9 +855,13 @@ function Page() {
       });
     }
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     setOpenFechar(false);
-    setValorInformado(""); setObsFechamento("");
+    setValorInformado("");
+    setObsFechamento("");
     toast.success("Caixa fechado");
     void load();
   };
@@ -714,7 +896,10 @@ function Page() {
     if (!openDetalhe) return;
     const rows = detalheMovs.map((m) => ({
       Data: new Date(m.created_at).toLocaleDateString("pt-BR"),
-      Hora: new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      Hora: new Date(m.created_at).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
       Tipo: TIPO_LABEL[m.tipo],
       Descricao: m.descricao ?? "",
       Forma: m.forma_pagamento ?? "",
@@ -728,8 +913,13 @@ function Page() {
     if (!openDetalhe) return;
     const s = openDetalhe;
     const esc = (v: unknown) =>
-      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-    const linhas = detalheMovs.map((m) => `
+      String(v ?? "").replace(
+        /[&<>"']/g,
+        (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
+      );
+    const linhas = detalheMovs
+      .map(
+        (m) => `
       <tr>
         <td>${new Date(m.created_at).toLocaleDateString("pt-BR")}</td>
         <td>${new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</td>
@@ -737,7 +927,9 @@ function Page() {
         <td>${esc(m.descricao ?? "")}</td>
         <td>${esc(m.forma_pagamento ?? "—")}</td>
         <td style="text-align:right;">${TIPO_SINAL[m.tipo] < 0 ? "-" : ""}${fmt(m.valor)}</td>
-      </tr>`).join("");
+      </tr>`,
+      )
+      .join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"/>
       <title>Sessão de caixa</title>
       <style>
@@ -764,7 +956,10 @@ function Page() {
       <script>window.onload=()=>{window.print();}</script>
       </body></html>`;
     const w = window.open("", "_blank", "width=900,height=700");
-    if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
+    if (!w) {
+      toast.error("Bloqueador de pop-up impediu a impressão");
+      return;
+    }
     w.document.write(html);
     w.document.close();
   };
@@ -785,8 +980,14 @@ function Page() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as "meu" | "todos" | "repasse")}>
         <TabsList>
           <TabsTrigger value="meu">Meu caixa</TabsTrigger>
-          {isManager && <TabsTrigger value="todos"><Users className="h-4 w-4 mr-1" /> Todos (Financeiro)</TabsTrigger>}
-          <TabsTrigger value="repasse"><HandCoins className="h-4 w-4 mr-1" /> Repasse médico</TabsTrigger>
+          {isManager && (
+            <TabsTrigger value="todos">
+              <Users className="h-4 w-4 mr-1" /> Todos (Financeiro)
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="repasse">
+            <HandCoins className="h-4 w-4 mr-1" /> Repasse médico
+          </TabsTrigger>
         </TabsList>
 
         {/* ===================== MEU CAIXA ===================== */}
@@ -808,22 +1009,44 @@ function Page() {
           {!loading && minhaSessao && (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setCaixaDrill("saldo")}>
-                  <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Saldo atual</CardTitle></CardHeader>
-                  <CardContent className="text-2xl font-bold text-primary">{fmt(saldoAtual)}</CardContent>
+                <Card
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => setCaixaDrill("saldo")}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-muted-foreground">Saldo atual</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-2xl font-bold text-primary">
+                    {fmt(saldoAtual)}
+                  </CardContent>
                 </Card>
-                <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setCaixaDrill("abertura")}>
-                  <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Abertura</CardTitle></CardHeader>
+                <Card
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => setCaixaDrill("abertura")}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-muted-foreground">Abertura</CardTitle>
+                  </CardHeader>
                   <CardContent className="text-lg">{fmt(minhaSessao.valor_abertura)}</CardContent>
                 </Card>
-                <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setCaixaDrill("entradas")}>
-                  <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Entradas</CardTitle></CardHeader>
+                <Card
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => setCaixaDrill("entradas")}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-muted-foreground">Entradas</CardTitle>
+                  </CardHeader>
                   <CardContent className="text-lg text-emerald-600">
                     {fmt(resumoTipos.suprimento + resumoTipos.recebimento)}
                   </CardContent>
                 </Card>
-                <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setCaixaDrill("saidas")}>
-                  <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Saídas</CardTitle></CardHeader>
+                <Card
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => setCaixaDrill("saidas")}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs text-muted-foreground">Saídas</CardTitle>
+                  </CardHeader>
                   <CardContent className="text-lg text-rose-600">
                     {fmt(resumoTipos.sangria + resumoTipos.despesa)}
                   </CardContent>
@@ -844,7 +1067,13 @@ function Page() {
                   <MinusCircle className="h-4 w-4 mr-2 text-rose-600" /> Despesa
                 </Button>
                 <div className="flex-1" />
-                <Button variant="destructive" onClick={() => { setValorInformado(saldoAtual.toFixed(2)); setOpenFechar(true); }}>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setValorInformado(saldoAtual.toFixed(2));
+                    setOpenFechar(true);
+                  }}
+                >
                   <Lock className="h-4 w-4 mr-2" /> Fechar caixa
                 </Button>
               </div>
@@ -859,24 +1088,39 @@ function Page() {
                 </CardHeader>
                 <CardContent>
                   {filaCaixa.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">Nenhum paciente aguardando cobrança hoje.</p>
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Nenhum paciente aguardando cobrança hoje.
+                    </p>
                   ) : (
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-80 overflow-auto pr-1">
                       {filaCaixa.map((f) => {
-                        const hora = new Date(f.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                        const hora = new Date(f.inicio).toLocaleTimeString("pt-BR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
                         return (
-                          <div key={f.id} className={`rounded-md border p-2.5 text-sm space-y-1 ${f.ja_pago ? "opacity-60" : ""}`}>
+                          <div
+                            key={f.id}
+                            className={`rounded-md border p-2.5 text-sm space-y-1 ${f.ja_pago ? "opacity-60" : ""}`}
+                          >
                             <div className="flex items-center justify-between">
-                              <span className="text-xs text-muted-foreground tabular-nums">{hora}</span>
+                              <span className="text-xs text-muted-foreground tabular-nums">
+                                {hora}
+                              </span>
                               {f.ja_pago ? (
-                                <Badge variant="secondary" className="text-[10px]">PAGO</Badge>
+                                <Badge variant="secondary" className="text-[10px]">
+                                  PAGO
+                                </Badge>
                               ) : (
                                 <span className="font-semibold text-primary">{fmt(f.valor)}</span>
                               )}
                             </div>
-                            <div className="font-medium uppercase leading-tight line-clamp-1">{f.paciente_nome}</div>
+                            <div className="font-medium uppercase leading-tight line-clamp-1">
+                              {f.paciente_nome}
+                            </div>
                             <div className="text-[11px] text-muted-foreground line-clamp-1">
-                              {f.procedimento ?? "—"}{f.medico_nome ? ` · ${f.medico_nome}` : ""}
+                              {f.procedimento ?? "—"}
+                              {f.medico_nome ? ` · ${f.medico_nome}` : ""}
                             </div>
                             {!f.ja_pago && (
                               <Button
@@ -884,10 +1128,18 @@ function Page() {
                                 className="w-full h-7 text-xs"
                                 onClick={() => {
                                   setOpenCobranca(f);
-                                  setCobrancaLinhas([{ forma: "dinheiro", valor: String(f.valor || 0), bandeira: "", parcelas: "1" }]);
+                                  setCobrancaLinhas([
+                                    {
+                                      forma: "dinheiro",
+                                      valor: String(f.valor || 0),
+                                      bandeira: "",
+                                      parcelas: "1",
+                                    },
+                                  ]);
                                 }}
                               >
-                                <Receipt className="h-3 w-3 mr-1" /> Cobrar <ChevronRight className="h-3 w-3 ml-auto" />
+                                <Receipt className="h-3 w-3 mr-1" /> Cobrar{" "}
+                                <ChevronRight className="h-3 w-3 ml-auto" />
                               </Button>
                             )}
                           </div>
@@ -907,7 +1159,10 @@ function Page() {
                     <div className="flex items-end gap-2 flex-wrap">
                       <div>
                         <Label className="text-xs">Período</Label>
-                        <Select value={meuPeriodo} onValueChange={(v) => setMeuPeriodo(v as typeof meuPeriodo)}>
+                        <Select
+                          value={meuPeriodo}
+                          onValueChange={(v) => setMeuPeriodo(v as typeof meuPeriodo)}
+                        >
                           <SelectTrigger className="h-8 w-[160px]">
                             <SelectValue />
                           </SelectTrigger>
@@ -967,37 +1222,51 @@ function Page() {
                       {minhasMovsFiltrados.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={7} className="text-center text-muted-foreground">
-                            {isManager
-                              ? "Sem movimentos no período"
-                              : "Sem movimentos hoje"}
+                            {isManager ? "Sem movimentos no período" : "Sem movimentos hoje"}
                           </TableCell>
                         </TableRow>
-                      ) : minhasMovsFiltrados.map((m) => (
-                        <TableRow key={m.id}>
-                          <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
-                          <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
-                          <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
-                          <TableCell>{m.descricao || "—"}</TableCell>
-                          <TableCell>{m.forma_pagamento || "—"}</TableCell>
-                          <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
-                            {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {m.tipo === "recebimento" && (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
-                                title="Solicitar estorno ao financeiro"
-                                onClick={() => setEstornoFor(m)}
-                              >
-                                <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      ) : (
+                        minhasMovsFiltrados.map((m) => (
+                          <TableRow key={m.id}>
+                            <TableCell className="whitespace-nowrap">
+                              {new Date(m.created_at).toLocaleDateString("pt-BR")}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {new Date(m.created_at).toLocaleTimeString("pt-BR", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>
+                                {TIPO_LABEL[m.tipo]}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{m.descricao || "—"}</TableCell>
+                            <TableCell>{m.forma_pagamento || "—"}</TableCell>
+                            <TableCell
+                              className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
+                            >
+                              {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
+                              {fmt(m.valor)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {m.tipo === "recebimento" && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+                                  title="Solicitar estorno ao financeiro"
+                                  onClick={() => setEstornoFor(m)}
+                                >
+                                  <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -1007,7 +1276,9 @@ function Page() {
 
           {minhasSessoes.length > 0 && (
             <Card>
-              <CardHeader><CardTitle className="text-base">Meu histórico</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle className="text-base">Meu histórico</CardTitle>
+              </CardHeader>
               <CardContent className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -1027,14 +1298,24 @@ function Page() {
                         <TableCell>{fmtDT(s.aberto_em)}</TableCell>
                         <TableCell>{fmtDT(s.fechado_em)}</TableCell>
                         <TableCell>
-                          <Badge variant={s.status === "aberto" ? "default" : "secondary"}>{s.status}</Badge>
+                          <Badge variant={s.status === "aberto" ? "default" : "secondary"}>
+                            {s.status}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right">{fmt(s.valor_abertura)}</TableCell>
-                        <TableCell className="text-right">{fmt(s.valor_fechamento_informado)}</TableCell>
-                        <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
+                        <TableCell className="text-right">
+                          {fmt(s.valor_fechamento_informado)}
+                        </TableCell>
+                        <TableCell
+                          className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}
+                        >
                           {fmt(s.diferenca)}
                         </TableCell>
-                        <TableCell><Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}><Eye className="h-4 w-4" /></Button></TableCell>
+                        <TableCell>
+                          <Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1059,18 +1340,27 @@ function Page() {
                 </div>
                 <div className="min-w-[200px]">
                   <Label className="text-xs">Operador</Label>
-                  <Select value={fUserId || "all"} onValueChange={(v) => setFUserId(v === "all" ? "" : v)}>
-                    <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <Select
+                    value={fUserId || "all"}
+                    onValueChange={(v) => setFUserId(v === "all" ? "" : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>
                       {usersList.map((u) => (
-                        <SelectItem key={u.user_id} value={u.user_id} className="uppercase">{u.nome?.toUpperCase()}</SelectItem>
+                        <SelectItem key={u.user_id} value={u.user_id} className="uppercase">
+                          {u.nome?.toUpperCase()}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <Button onClick={() => void loadTodos()}>Filtrar</Button>
-                <Button variant="outline" onClick={exportarTodos}><FileDown className="h-4 w-4 mr-2" /> Excel</Button>
+                <Button variant="outline" onClick={exportarTodos}>
+                  <FileDown className="h-4 w-4 mr-2" /> Excel
+                </Button>
               </CardContent>
             </Card>
 
@@ -1094,7 +1384,11 @@ function Page() {
                   </TableHeader>
                   <TableBody>
                     {todasSessoes.length === 0 && (
-                      <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">Sem sessões no período</TableCell></TableRow>
+                      <TableRow>
+                        <TableCell colSpan={11} className="text-center text-muted-foreground">
+                          Sem sessões no período
+                        </TableCell>
+                      </TableRow>
                     )}
                     {todasSessoes.map((s) => {
                       const calc = calcSaldoSessao(s.id);
@@ -1102,19 +1396,41 @@ function Page() {
                       const estorno = calcEstornoSessao(s.id);
                       return (
                         <TableRow key={s.id}>
-                          <TableCell className="font-medium uppercase">{(s.user_nome || s.user_id.slice(0, 8)).toUpperCase()}</TableCell>
+                          <TableCell className="font-medium uppercase">
+                            {(s.user_nome || s.user_id.slice(0, 8)).toUpperCase()}
+                          </TableCell>
                           <TableCell>{fmtDT(s.aberto_em)}</TableCell>
                           <TableCell>{fmtDT(s.fechado_em)}</TableCell>
-                          <TableCell><Badge variant={s.status === "aberto" ? "default" : "secondary"}>{s.status}</Badge></TableCell>
+                          <TableCell>
+                            <Badge variant={s.status === "aberto" ? "default" : "secondary"}>
+                              {s.status}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="text-right">{fmt(s.valor_abertura)}</TableCell>
                           <TableCell className="text-right">{fmt(calc)}</TableCell>
-                          <TableCell className="text-right">{fmt(s.valor_fechamento_informado)}</TableCell>
-                          <TableCell className={`text-right ${sangria > 0 ? "text-amber-700" : "text-muted-foreground"}`}>{fmt(sangria)}</TableCell>
-                          <TableCell className={`text-right ${estorno > 0 ? "text-rose-700" : "text-muted-foreground"}`}>{fmt(estorno)}</TableCell>
-                          <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
+                          <TableCell className="text-right">
+                            {fmt(s.valor_fechamento_informado)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right ${sangria > 0 ? "text-amber-700" : "text-muted-foreground"}`}
+                          >
+                            {fmt(sangria)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right ${estorno > 0 ? "text-rose-700" : "text-muted-foreground"}`}
+                          >
+                            {fmt(estorno)}
+                          </TableCell>
+                          <TableCell
+                            className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}
+                          >
                             {fmt(s.diferenca)}
                           </TableCell>
-                          <TableCell><Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}><Eye className="h-4 w-4" /></Button></TableCell>
+                          <TableCell>
+                            <Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       );
                     })}
@@ -1138,34 +1454,53 @@ function Page() {
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-lg border bg-rose-50 dark:bg-rose-950/30 p-4">
                   <p className="text-xs text-muted-foreground">A repassar hoje</p>
-                  <p className="text-2xl font-bold text-rose-700 dark:text-rose-400">{fmt(repHoje.pendente)}</p>
+                  <p className="text-2xl font-bold text-rose-700 dark:text-rose-400">
+                    {fmt(repHoje.pendente)}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {repHoje.qtd_pend} atendimento{repHoje.qtd_pend === 1 ? "" : "s"} · {repHoje.medicos} médico{repHoje.medicos === 1 ? "" : "s"}
+                    {repHoje.qtd_pend} atendimento{repHoje.qtd_pend === 1 ? "" : "s"} ·{" "}
+                    {repHoje.medicos} médico{repHoje.medicos === 1 ? "" : "s"}
                   </p>
                 </div>
                 <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/30 p-4">
                   <p className="text-xs text-muted-foreground">Já repassado hoje</p>
-                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{fmt(repHoje.pago)}</p>
+                  <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+                    {fmt(repHoje.pago)}
+                  </p>
                 </div>
                 <div className="rounded-lg border bg-sky-50 dark:bg-sky-950/30 p-4">
                   <p className="text-xs text-muted-foreground">Total movimentado</p>
-                  <p className="text-2xl font-bold text-sky-700 dark:text-sky-400">{fmt(repHoje.pendente + repHoje.pago)}</p>
+                  <p className="text-2xl font-bold text-sky-700 dark:text-sky-400">
+                    {fmt(repHoje.pendente + repHoje.pago)}
+                  </p>
                 </div>
               </div>
 
               <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
                 <h4 className="font-medium">Como funciona</h4>
                 <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-5">
-                  <li>O sistema calcula o repasse automaticamente para cada atendimento pago (% ou valor fixo do cadastro do médico).</li>
-                  <li>Selecione vários atendimentos e use <strong>"Pagar repasse selecionados"</strong> — o sistema agrupa por médico e gera <strong>uma despesa por médico</strong>.</li>
-                  <li>O lançamento entra como <strong>despesa em dinheiro</strong> no financeiro, vinculado ao seu caixa do dia.</li>
+                  <li>
+                    O sistema calcula o repasse automaticamente para cada atendimento pago (% ou
+                    valor fixo do cadastro do médico).
+                  </li>
+                  <li>
+                    Selecione vários atendimentos e use{" "}
+                    <strong>"Pagar repasse selecionados"</strong> — o sistema agrupa por médico e
+                    gera <strong>uma despesa por médico</strong>.
+                  </li>
+                  <li>
+                    O lançamento entra como <strong>despesa em dinheiro</strong> no financeiro,
+                    vinculado ao seu caixa do dia.
+                  </li>
                 </ul>
               </div>
 
               <div className="rounded-lg border">
                 <div className="px-4 py-3 border-b bg-muted/30">
                   <h4 className="font-medium">Repasses realizados hoje</h4>
-                  <p className="text-xs text-muted-foreground">Lista de pagamentos efetuados no dia, por médico.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Lista de pagamentos efetuados no dia, por médico.
+                  </p>
                 </div>
                 {repPagosHoje.length === 0 ? (
                   <div className="p-6 text-center text-sm text-muted-foreground">
@@ -1187,12 +1522,18 @@ function Page() {
                           <TableCell className="text-muted-foreground">{r.hora ?? "—"}</TableCell>
                           <TableCell className="font-medium">{r.medico}</TableCell>
                           <TableCell className="capitalize">{r.forma ?? "—"}</TableCell>
-                          <TableCell className="text-right font-semibold text-emerald-700 dark:text-emerald-400">{fmt(r.valor)}</TableCell>
+                          <TableCell className="text-right font-semibold text-emerald-700 dark:text-emerald-400">
+                            {fmt(r.valor)}
+                          </TableCell>
                         </TableRow>
                       ))}
                       <TableRow>
-                        <TableCell colSpan={3} className="text-right font-medium">Total</TableCell>
-                        <TableCell className="text-right font-bold">{fmt(repPagosHoje.reduce((s, r) => s + r.valor, 0))}</TableCell>
+                        <TableCell colSpan={3} className="text-right font-medium">
+                          Total
+                        </TableCell>
+                        <TableCell className="text-right font-bold">
+                          {fmt(repPagosHoje.reduce((s, r) => s + r.valor, 0))}
+                        </TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
@@ -1219,7 +1560,9 @@ function Page() {
       {/* === Modal Abrir === */}
       <Dialog open={openAbrir} onOpenChange={setOpenAbrir}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Abrir caixa</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Abrir caixa</DialogTitle>
+          </DialogHeader>
           <form onSubmit={abrirCaixa} className="space-y-3">
             <div>
               <Label>Valor de abertura (fundo de troco)</Label>
@@ -1230,17 +1573,27 @@ function Page() {
               <Textarea value={obsAbertura} onChange={(e) => setObsAbertura(e.target.value)} />
             </div>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setOpenAbrir(false)}>Cancelar</Button>
-              <Button type="submit" disabled={saving} data-primary>Abrir</Button>
+              <Button type="button" variant="ghost" onClick={() => setOpenAbrir(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={saving} data-primary>
+                Abrir
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       {/* === Modal Movimento === */}
-      <Dialog open={!!openMov} onOpenChange={(o) => { if (!o) setOpenMov(null); }}>
+      <Dialog
+        open={!!openMov}
+        onOpenChange={(o) => {
+          if (!o) setOpenMov(null);
+        }}
+      >
         <DialogContent>
-          <DialogHeader><DialogTitle>{openMov ? TIPO_LABEL[openMov.tipo] : ""}</DialogTitle>
+          <DialogHeader>
+            <DialogTitle>{openMov ? TIPO_LABEL[openMov.tipo] : ""}</DialogTitle>
             <DialogDescription>
               {openMov?.tipo === "sangria" && "Retirada de dinheiro do caixa."}
               {openMov?.tipo === "suprimento" && "Adição de dinheiro ao caixa."}
@@ -1255,13 +1608,19 @@ function Page() {
             </div>
             <div>
               <Label>Descrição</Label>
-              <Input value={movDesc} onChange={(e) => setMovDesc(e.target.value)} placeholder="Motivo / referência" />
+              <Input
+                value={movDesc}
+                onChange={(e) => setMovDesc(e.target.value)}
+                placeholder="Motivo / referência"
+              />
             </div>
             {openMov && (openMov.tipo === "recebimento" || openMov.tipo === "despesa") && (
               <div>
                 <Label>Forma de pagamento</Label>
                 <Select value={movForma} onValueChange={setMovForma}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="dinheiro">Dinheiro</SelectItem>
                     <SelectItem value="pix">PIX</SelectItem>
@@ -1273,35 +1632,51 @@ function Page() {
                 </Select>
               </div>
             )}
-            {openMov && (openMov.tipo === "recebimento" || openMov.tipo === "despesa") && (movForma === "credito" || movForma === "debito") && (
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label>Bandeira *</Label>
-                  <Select value={movBandeira} onValueChange={setMovBandeira}>
-                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                    <SelectContent>
-                      {BANDEIRAS_CARTAO.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {movForma === "credito" && (
+            {openMov &&
+              (openMov.tipo === "recebimento" || openMov.tipo === "despesa") &&
+              (movForma === "credito" || movForma === "debito") && (
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label>Parcelas</Label>
-                    <Select value={movParcelas} onValueChange={setMovParcelas}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Label>Bandeira *</Label>
+                    <Select value={movBandeira} onValueChange={setMovBandeira}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
                       <SelectContent>
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
-                          <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                        {BANDEIRAS_CARTAO.map((b) => (
+                          <SelectItem key={b} value={b}>
+                            {b}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                )}
-              </div>
-            )}
+                  {movForma === "credito" && (
+                    <div>
+                      <Label>Parcelas</Label>
+                      <Select value={movParcelas} onValueChange={setMovParcelas}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                            <SelectItem key={n} value={String(n)}>
+                              {n}x
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              )}
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setOpenMov(null)}>Cancelar</Button>
-              <Button type="submit" disabled={saving} data-primary>Lançar</Button>
+              <Button type="button" variant="ghost" onClick={() => setOpenMov(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={saving} data-primary>
+                Lançar
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -1310,8 +1685,11 @@ function Page() {
       {/* === Modal Fechar === */}
       <Dialog open={openFechar} onOpenChange={setOpenFechar}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Fechar caixa</DialogTitle>
-            <DialogDescription>Saldo calculado: <strong>{fmt(saldoAtual)}</strong></DialogDescription>
+          <DialogHeader>
+            <DialogTitle>Fechar caixa</DialogTitle>
+            <DialogDescription>
+              Saldo calculado: <strong>{fmt(saldoAtual)}</strong>
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={fecharCaixa} className="space-y-3">
             <div>
@@ -1323,15 +1701,24 @@ function Page() {
               <Textarea value={obsFechamento} onChange={(e) => setObsFechamento(e.target.value)} />
             </div>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setOpenFechar(false)}>Cancelar</Button>
-              <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
+              <Button type="button" variant="ghost" onClick={() => setOpenFechar(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="destructive" disabled={saving} data-primary>
+                Confirmar fechamento
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       {/* === Modal Cobrança === */}
-      <Dialog open={!!openCobranca} onOpenChange={(o) => { if (!o) setOpenCobranca(null); }}>
+      <Dialog
+        open={!!openCobranca}
+        onOpenChange={(o) => {
+          if (!o) setOpenCobranca(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Cobrar paciente</DialogTitle>
@@ -1344,20 +1731,34 @@ function Page() {
           </DialogHeader>
           <form onSubmit={cobrar} className="space-y-3">
             <p className="text-[11px] text-muted-foreground -mt-2">
-              Atalhos: <kbd className="px-1 border rounded">1</kbd> dinheiro · <kbd className="px-1 border rounded">2</kbd> PIX · <kbd className="px-1 border rounded">3</kbd> débito · <kbd className="px-1 border rounded">4</kbd> crédito · <kbd className="px-1 border rounded">5</kbd> adicionar forma · <kbd className="px-1 border rounded">Enter</kbd> confirmar
+              Atalhos: <kbd className="px-1 border rounded">1</kbd> dinheiro ·{" "}
+              <kbd className="px-1 border rounded">2</kbd> PIX ·{" "}
+              <kbd className="px-1 border rounded">3</kbd> débito ·{" "}
+              <kbd className="px-1 border rounded">4</kbd> crédito ·{" "}
+              <kbd className="px-1 border rounded">5</kbd> adicionar forma ·{" "}
+              <kbd className="px-1 border rounded">Enter</kbd> confirmar
             </p>
             {(() => {
               const total = cobrancaLinhas.reduce((a, l) => a + (Number(l.valor) || 0), 0);
               const multi = cobrancaLinhas.length > 1;
-              const sugerido = openCobranca ? (multi ? openCobranca.valor_cartao : openCobranca.valor) : 0;
+              const sugerido = openCobranca
+                ? multi
+                  ? openCobranca.valor_cartao
+                  : openCobranca.valor
+                : 0;
               const dif = total - sugerido;
               return (
                 <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs flex items-center justify-between">
                   <span className="text-muted-foreground">
-                    Sugerido <b className="text-foreground">({multi ? "cartão" : "dinheiro/PIX"})</b>: <b>{fmt(sugerido)}</b>
+                    Sugerido{" "}
+                    <b className="text-foreground">({multi ? "cartão" : "dinheiro/PIX"})</b>:{" "}
+                    <b>{fmt(sugerido)}</b>
                   </span>
                   <span>
-                    Soma: <b className={Math.abs(dif) < 0.01 ? "text-emerald-600" : "text-amber-600"}>{fmt(total)}</b>
+                    Soma:{" "}
+                    <b className={Math.abs(dif) < 0.01 ? "text-emerald-600" : "text-amber-600"}>
+                      {fmt(total)}
+                    </b>
                   </span>
                 </div>
               );
@@ -1366,10 +1767,19 @@ function Page() {
               {cobrancaLinhas.map((l, idx) => (
                 <div key={idx} className="rounded-md border p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">Pagamento {idx + 1}</span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Pagamento {idx + 1}
+                    </span>
                     {cobrancaLinhas.length > 1 && (
-                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-rose-600"
-                        onClick={() => setCobrancaLinhas(prev => prev.filter((_, i) => i !== idx))}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-rose-600"
+                        onClick={() =>
+                          setCobrancaLinhas((prev) => prev.filter((_, i) => i !== idx))
+                        }
+                      >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     )}
@@ -1377,8 +1787,19 @@ function Page() {
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <Label>Forma</Label>
-                      <Select value={l.forma} onValueChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, forma: v, bandeira: "", parcelas: "1" } : x))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                      <Select
+                        value={l.forma}
+                        onValueChange={(v) =>
+                          setCobrancaLinhas((prev) =>
+                            prev.map((x, i) =>
+                              i === idx ? { ...x, forma: v, bandeira: "", parcelas: "1" } : x,
+                            ),
+                          )
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="dinheiro">Dinheiro</SelectItem>
                           <SelectItem value="pix">PIX</SelectItem>
@@ -1390,28 +1811,59 @@ function Page() {
                     </div>
                     <div>
                       <Label>Valor</Label>
-                      <CurrencyInput value={l.valor} onChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, valor: v } : x))} />
+                      <CurrencyInput
+                        value={l.valor}
+                        onChange={(v) =>
+                          setCobrancaLinhas((prev) =>
+                            prev.map((x, i) => (i === idx ? { ...x, valor: v } : x)),
+                          )
+                        }
+                      />
                     </div>
                   </div>
                   {(l.forma === "credito" || l.forma === "debito") && (
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <Label>Bandeira *</Label>
-                        <Select value={l.bandeira} onValueChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, bandeira: v } : x))}>
-                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                        <Select
+                          value={l.bandeira}
+                          onValueChange={(v) =>
+                            setCobrancaLinhas((prev) =>
+                              prev.map((x, i) => (i === idx ? { ...x, bandeira: v } : x)),
+                            )
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
                           <SelectContent>
-                            {BANDEIRAS_CARTAO.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                            {BANDEIRAS_CARTAO.map((b) => (
+                              <SelectItem key={b} value={b}>
+                                {b}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
                       {l.forma === "credito" && (
                         <div>
                           <Label>Parcelas</Label>
-                          <Select value={l.parcelas} onValueChange={(v) => setCobrancaLinhas(prev => prev.map((x, i) => i === idx ? { ...x, parcelas: v } : x))}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
+                          <Select
+                            value={l.parcelas}
+                            onValueChange={(v) =>
+                              setCobrancaLinhas((prev) =>
+                                prev.map((x, i) => (i === idx ? { ...x, parcelas: v } : x)),
+                              )
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
                             <SelectContent>
-                              {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
-                                <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                              {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                                <SelectItem key={n} value={String(n)}>
+                                  {n}x
+                                </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -1422,9 +1874,12 @@ function Page() {
                 </div>
               ))}
               <Button
-                type="button" variant="outline" size="sm" className="w-full"
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
                 onClick={() => {
-                  setCobrancaLinhas(prev => {
+                  setCobrancaLinhas((prev) => {
                     // ao passar para multi-forma, ajusta a primeira linha (se ainda no valor original em dinheiro)
                     // para usar o valor de cartão sugerido, e adiciona linha nova com valor 0
                     if (!openCobranca) return [...prev, linhaVazia()];
@@ -1444,18 +1899,31 @@ function Page() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Será criado: movimento de caixa + lançamento financeiro (receita) + paciente avança para <b>triagem</b>.
+              Será criado: movimento de caixa + lançamento financeiro (receita) + paciente avança
+              para <b>triagem</b>.
             </p>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setOpenCobranca(null)}>Cancelar</Button>
-              <Button type="submit" disabled={saving} data-primary>Confirmar cobrança</Button>
+              <Button type="button" variant="ghost" onClick={() => setOpenCobranca(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={saving} data-primary>
+                Confirmar cobrança
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       {/* === Modal Detalhe === */}
-      <Dialog open={!!openDetalhe} onOpenChange={(o) => { if (!o) { setOpenDetalhe(null); setDetalheMovs([]); } }}>
+      <Dialog
+        open={!!openDetalhe}
+        onOpenChange={(o) => {
+          if (!o) {
+            setOpenDetalhe(null);
+            setDetalheMovs([]);
+          }
+        }}
+      >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <div className="flex items-center justify-between gap-2 pr-8">
@@ -1473,7 +1941,8 @@ function Page() {
             </div>
             {openDetalhe && (
               <DialogDescription>
-                {openDetalhe.user_nome || "—"} · {fmtDT(openDetalhe.aberto_em)} → {fmtDT(openDetalhe.fechado_em)}
+                {openDetalhe.user_nome || "—"} · {fmtDT(openDetalhe.aberto_em)} →{" "}
+                {fmtDT(openDetalhe.fechado_em)}
               </DialogDescription>
             )}
           </DialogHeader>
@@ -1484,8 +1953,10 @@ function Page() {
                 let qtdReceb = 0;
                 detalheMovs.forEach((m) => {
                   const v = Number(m.valor || 0);
-                  if (m.tipo === "recebimento") { tot.recebimento += v; qtdReceb++; }
-                  else if (m.tipo === "sangria") tot.sangria += v;
+                  if (m.tipo === "recebimento") {
+                    tot.recebimento += v;
+                    qtdReceb++;
+                  } else if (m.tipo === "sangria") tot.sangria += v;
                   if ((m.descricao ?? "").toLowerCase().includes("estorno")) tot.estorno += v;
                 });
                 const diff = Number(openDetalhe.diferenca || 0);
@@ -1494,34 +1965,68 @@ function Page() {
                   <>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                       <div className="rounded-lg border bg-slate-50 dark:bg-slate-900/40 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Abertura</p>
-                        <p className="text-base font-bold text-slate-700 dark:text-slate-200">{fmt(openDetalhe.valor_abertura)}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Abertura
+                        </p>
+                        <p className="text-base font-bold text-slate-700 dark:text-slate-200">
+                          {fmt(openDetalhe.valor_abertura)}
+                        </p>
                       </div>
                       <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/30 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Recebimentos</p>
-                        <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{fmt(tot.recebimento)}</p>
-                        <p className="text-[11px] text-muted-foreground">{qtdReceb} lançamento{qtdReceb === 1 ? "" : "s"}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Recebimentos
+                        </p>
+                        <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">
+                          {fmt(tot.recebimento)}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {qtdReceb} lançamento{qtdReceb === 1 ? "" : "s"}
+                        </p>
                       </div>
                       <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/30 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Sangrias</p>
-                        <p className="text-base font-bold text-amber-700 dark:text-amber-400">{fmt(tot.sangria)}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Sangrias
+                        </p>
+                        <p className="text-base font-bold text-amber-700 dark:text-amber-400">
+                          {fmt(tot.sangria)}
+                        </p>
                       </div>
                       <div className="rounded-lg border bg-sky-50 dark:bg-sky-950/30 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Média / atendimento</p>
-                        <p className="text-base font-bold text-sky-700 dark:text-sky-400">{fmt(media)}</p>
-                        <p className="text-[11px] text-muted-foreground">{qtdReceb} atendimento{qtdReceb === 1 ? "" : "s"}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Média / atendimento
+                        </p>
+                        <p className="text-base font-bold text-sky-700 dark:text-sky-400">
+                          {fmt(media)}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {qtdReceb} atendimento{qtdReceb === 1 ? "" : "s"}
+                        </p>
                       </div>
                       <div className="rounded-lg border bg-fuchsia-50 dark:bg-fuchsia-950/30 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Estornos</p>
-                        <p className="text-base font-bold text-fuchsia-700 dark:text-fuchsia-400">{fmt(tot.estorno)}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          Estornos
+                        </p>
+                        <p className="text-base font-bold text-fuchsia-700 dark:text-fuchsia-400">
+                          {fmt(tot.estorno)}
+                        </p>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm rounded-lg border bg-muted/30 p-3">
-                      <div><span className="text-muted-foreground">Calculado:</span> <strong>{fmt(openDetalhe.valor_fechamento_calculado)}</strong></div>
-                      <div><span className="text-muted-foreground">Informado:</span> <strong>{fmt(openDetalhe.valor_fechamento_informado)}</strong></div>
+                      <div>
+                        <span className="text-muted-foreground">Calculado:</span>{" "}
+                        <strong>{fmt(openDetalhe.valor_fechamento_calculado)}</strong>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Informado:</span>{" "}
+                        <strong>{fmt(openDetalhe.valor_fechamento_informado)}</strong>
+                      </div>
                       <div>
                         <span className="text-muted-foreground">Diferença:</span>{" "}
-                        <strong className={diff < 0 ? "text-rose-600" : diff > 0 ? "text-amber-600" : ""}>{fmt(diff)}</strong>
+                        <strong
+                          className={diff < 0 ? "text-rose-600" : diff > 0 ? "text-amber-600" : ""}
+                        >
+                          {fmt(diff)}
+                        </strong>
                       </div>
                     </div>
                   </>
@@ -1542,13 +2047,27 @@ function Page() {
                   <TableBody>
                     {detalheMovs.map((m) => (
                       <TableRow key={m.id}>
-                        <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
-                        <TableCell>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
-                        <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {new Date(m.created_at).toLocaleDateString("pt-BR")}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(m.created_at).toLocaleTimeString("pt-BR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>
+                            {TIPO_LABEL[m.tipo]}
+                          </Badge>
+                        </TableCell>
                         <TableCell>{m.descricao || "—"}</TableCell>
                         <TableCell>{m.forma_pagamento || "—"}</TableCell>
-                        <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
-                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+                        <TableCell
+                          className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}
+                        >
+                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
+                          {fmt(m.valor)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1561,7 +2080,9 @@ function Page() {
       </Dialog>
       <SolicitarEstornoDialog
         open={!!estornoFor}
-        onOpenChange={(v) => { if (!v) setEstornoFor(null); }}
+        onOpenChange={(v) => {
+          if (!v) setEstornoFor(null);
+        }}
         descricao={estornoFor?.descricao ?? null}
         valor={estornoFor?.valor ?? null}
         lancamentoId={estornoFor?.lancamento_id ?? null}
@@ -1572,7 +2093,12 @@ function Page() {
           return idx > 0 ? d.slice(0, idx).trim() : null;
         })()}
       />
-      <Dialog open={!!caixaDrill} onOpenChange={(v) => { if (!v) setCaixaDrill(null); }}>
+      <Dialog
+        open={!!caixaDrill}
+        onOpenChange={(v) => {
+          if (!v) setCaixaDrill(null);
+        }}
+      >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>
@@ -1590,10 +2116,24 @@ function Page() {
           </DialogHeader>
           {caixaDrill === "abertura" && minhaSessao && (
             <div className="space-y-2 text-sm">
-              <div><span className="text-muted-foreground">Aberto em:</span> {fmtDT(minhaSessao.aberto_em)}</div>
-              <div><span className="text-muted-foreground">Valor de abertura:</span> <span className="font-semibold">{fmt(minhaSessao.valor_abertura)}</span></div>
-              <div><span className="text-muted-foreground">Operador:</span> {minhaSessao.user_nome ?? "—"}</div>
-              {minhaSessao.observacoes && <div><span className="text-muted-foreground">Observações:</span> {minhaSessao.observacoes}</div>}
+              <div>
+                <span className="text-muted-foreground">Aberto em:</span>{" "}
+                {fmtDT(minhaSessao.aberto_em)}
+              </div>
+              <div>
+                <span className="text-muted-foreground">Valor de abertura:</span>{" "}
+                <span className="font-semibold">{fmt(minhaSessao.valor_abertura)}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Operador:</span>{" "}
+                {minhaSessao.user_nome ?? "—"}
+              </div>
+              {minhaSessao.observacoes && (
+                <div>
+                  <span className="text-muted-foreground">Observações:</span>{" "}
+                  {minhaSessao.observacoes}
+                </div>
+              )}
             </div>
           )}
           {caixaDrill && caixaDrill !== "abertura" && (
@@ -1611,18 +2151,27 @@ function Page() {
                 <TableBody>
                   {minhasMovs
                     .filter((m) => {
-                      if (caixaDrill === "entradas") return m.tipo === "suprimento" || m.tipo === "recebimento";
-                      if (caixaDrill === "saidas") return m.tipo === "sangria" || m.tipo === "despesa";
+                      if (caixaDrill === "entradas")
+                        return m.tipo === "suprimento" || m.tipo === "recebimento";
+                      if (caixaDrill === "saidas")
+                        return m.tipo === "sangria" || m.tipo === "despesa";
                       return true;
                     })
                     .map((m) => (
                       <TableRow key={m.id}>
                         <TableCell className="whitespace-nowrap">{fmtDT(m.created_at)}</TableCell>
-                        <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>
+                            {TIPO_LABEL[m.tipo]}
+                          </Badge>
+                        </TableCell>
                         <TableCell>{m.descricao ?? "—"}</TableCell>
                         <TableCell>{m.forma_pagamento ?? "—"}</TableCell>
-                        <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
-                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+                        <TableCell
+                          className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}
+                        >
+                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}
+                          {fmt(m.valor)}
                         </TableCell>
                       </TableRow>
                     ))}

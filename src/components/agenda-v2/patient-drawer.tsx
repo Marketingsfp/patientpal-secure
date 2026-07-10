@@ -6,9 +6,20 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
-  Check, FileText, CalendarClock, Wallet, FileSignature,
-  MessageCircle, History, Stethoscope, Sparkles, AlertTriangle,
-  Coffee, DollarSign, Clock, ClipboardCheck,
+  Check,
+  FileText,
+  CalendarClock,
+  Wallet,
+  FileSignature,
+  MessageCircle,
+  History,
+  Stethoscope,
+  Sparkles,
+  AlertTriangle,
+  Coffee,
+  DollarSign,
+  Clock,
+  ClipboardCheck,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -21,7 +32,7 @@ export interface DrawerPatientData {
   medico_nome?: string | null;
   especialidade?: string | null;
   status?: string | null;
-  chegou_em?: string | null;         // "09:28"
+  chegou_em?: string | null; // "09:28"
   etapa_atual: string | null;
   historico: Array<{ etapa: string; timestamp: string }>;
   proc_titulo?: string | null;
@@ -50,7 +61,12 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 function initials(name: string) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 function idadeFromDob(dob: string | null | undefined): number | null {
@@ -74,7 +90,9 @@ function idadeFromDob(dob: string | null | undefined): number | null {
  * - Abertura instantânea; detalhes do paciente carregam em segundo plano.
  */
 export function PatientDrawer({
-  open, onOpenChange, data,
+  open,
+  onOpenChange,
+  data,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -121,7 +139,9 @@ export function PatientDrawer({
       >
         <VisuallyHidden.Root>
           <SheetTitle>{data?.paciente_nome ?? "Paciente"}</SheetTitle>
-          <SheetDescription>Centro de Atendimento do paciente: jornada, ações rápidas e sugestões.</SheetDescription>
+          <SheetDescription>
+            Centro de Atendimento do paciente: jornada, ações rápidas e sugestões.
+          </SheetDescription>
         </VisuallyHidden.Root>
         {data && (
           <div className="animate-in fade-in duration-150">
@@ -129,7 +149,9 @@ export function PatientDrawer({
             <div className="px-6 pt-7 pb-5 border-b border-slate-100">
               <div className="flex items-start gap-4">
                 <Avatar className="h-24 w-24 border border-slate-200/80 shadow-sm shrink-0">
-                  {data.paciente_avatar_url && <AvatarImage src={data.paciente_avatar_url} alt={data.paciente_nome} />}
+                  {data.paciente_avatar_url && (
+                    <AvatarImage src={data.paciente_avatar_url} alt={data.paciente_nome} />
+                  )}
                   <AvatarFallback className="bg-slate-50 text-slate-500 text-2xl font-semibold">
                     {initials(data.paciente_nome)}
                   </AvatarFallback>
@@ -137,12 +159,17 @@ export function PatientDrawer({
                 <div className="min-w-0 flex-1 pt-0.5">
                   <h2
                     className="text-[22px] leading-tight font-semibold text-slate-900 truncate"
-                    style={{ fontFamily: "'Inter Tight', Inter, sans-serif", letterSpacing: "-0.01em" }}
+                    style={{
+                      fontFamily: "'Inter Tight', Inter, sans-serif",
+                      letterSpacing: "-0.01em",
+                    }}
                   >
                     {data.paciente_nome}
                   </h2>
                   <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
-                    <MetaChip label={idade === null ? (detalhesQuery.isLoading ? "…" : "—") : `${idade}a`} />
+                    <MetaChip
+                      label={idade === null ? (detalhesQuery.isLoading ? "…" : "—") : `${idade}a`}
+                    />
                     <MetaChip label={/* convênio: placeholder */ "Particular"} muted />
                     {data.medico_nome && <MetaChip label={data.medico_nome} />}
                     {data.especialidade && <MetaChip label={data.especialidade} />}
@@ -216,13 +243,15 @@ export function PatientDrawer({
             {/* 3 + tabs: Painel rápido + demais abas (conteúdo pesado só ao trocar de aba) */}
             <div className="px-6 py-4">
               <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-4">
-                {([
-                  { key: "resumo", label: "Resumo" },
-                  { key: "financeiro", label: "Financeiro" },
-                  { key: "docs", label: "Docs" },
-                  { key: "historico", label: "Histórico" },
-                  { key: "prontuario", label: "Prontuário" },
-                ] as const).map((t) => (
+                {(
+                  [
+                    { key: "resumo", label: "Resumo" },
+                    { key: "financeiro", label: "Financeiro" },
+                    { key: "docs", label: "Docs" },
+                    { key: "historico", label: "Histórico" },
+                    { key: "prontuario", label: "Prontuário" },
+                  ] as const
+                ).map((t) => (
                   <button
                     key={t.key}
                     type="button"
@@ -241,12 +270,17 @@ export function PatientDrawer({
 
               <div className="min-h-[180px]">
                 {tab === "resumo" && <ResumoPanel proc={data.proc_titulo ?? null} />}
-                {tab === "financeiro" && <TabPlaceholder title="Financeiro">
-                  Total previsto, pago e em aberto — conectado no roadmap sem alterar as regras do módulo Financeiro clássico.
-                </TabPlaceholder>}
-                {tab === "docs" && <TabPlaceholder title="Documentos">
-                  Anamneses, receitas e atestados serão listados aqui.
-                </TabPlaceholder>}
+                {tab === "financeiro" && (
+                  <TabPlaceholder title="Financeiro">
+                    Total previsto, pago e em aberto — conectado no roadmap sem alterar as regras do
+                    módulo Financeiro clássico.
+                  </TabPlaceholder>
+                )}
+                {tab === "docs" && (
+                  <TabPlaceholder title="Documentos">
+                    Anamneses, receitas e atestados serão listados aqui.
+                  </TabPlaceholder>
+                )}
                 {tab === "historico" && (
                   <div className="rounded-xl border border-slate-100 bg-slate-50/40 p-4">
                     {data.historico.length === 0 ? (
@@ -256,16 +290,20 @@ export function PatientDrawer({
                         {data.historico.map((h, i) => (
                           <li key={i} className="flex justify-between text-xs">
                             <span className="text-slate-600">{h.etapa.replace(/_/g, " ")}</span>
-                            <span className="text-slate-400 tabular-nums">{new Date(h.timestamp).toLocaleString("pt-BR")}</span>
+                            <span className="text-slate-400 tabular-nums">
+                              {new Date(h.timestamp).toLocaleString("pt-BR")}
+                            </span>
                           </li>
                         ))}
                       </ol>
                     )}
                   </div>
                 )}
-                {tab === "prontuario" && <TabPlaceholder title="Prontuário">
-                  Últimas evoluções, exames e sinais vitais.
-                </TabPlaceholder>}
+                {tab === "prontuario" && (
+                  <TabPlaceholder title="Prontuário">
+                    Últimas evoluções, exames e sinais vitais.
+                  </TabPlaceholder>
+                )}
               </div>
             </div>
 
@@ -289,13 +327,23 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function MetaChip({ label, muted, tabular }: { label: string; muted?: boolean; tabular?: boolean }) {
+function MetaChip({
+  label,
+  muted,
+  tabular,
+}: {
+  label: string;
+  muted?: boolean;
+  tabular?: boolean;
+}) {
   return (
-    <span className={cn(
-      "inline-flex items-center px-1.5 rounded",
-      tabular && "tabular-nums",
-      muted ? "text-slate-400" : "text-slate-600",
-    )}>
+    <span
+      className={cn(
+        "inline-flex items-center px-1.5 rounded",
+        tabular && "tabular-nums",
+        muted ? "text-slate-400" : "text-slate-600",
+      )}
+    >
       {label}
     </span>
   );
@@ -310,27 +358,40 @@ function JourneyLine({ currentIdx }: { currentIdx: number }) {
       {currentIdx > 0 && (
         <div
           className="absolute top-3 left-3 h-px bg-emerald-400/70 transition-all"
-          style={{ width: `calc(${(currentIdx / (ETAPAS.length - 1)) * 100}% - 24px * ${currentIdx / (ETAPAS.length - 1)})` }}
+          style={{
+            width: `calc(${(currentIdx / (ETAPAS.length - 1)) * 100}% - 24px * ${currentIdx / (ETAPAS.length - 1)})`,
+          }}
         />
       )}
-      <div className="relative grid" style={{ gridTemplateColumns: `repeat(${ETAPAS.length}, 1fr)` }}>
+      <div
+        className="relative grid"
+        style={{ gridTemplateColumns: `repeat(${ETAPAS.length}, 1fr)` }}
+      >
         {ETAPAS.map((e, i) => {
           const past = i < currentIdx;
           const current = i === currentIdx;
           return (
             <div key={e.key} className="flex flex-col items-center gap-2">
-              <div className={cn(
-                "h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-semibold z-10",
-                past && "bg-emerald-500 text-white",
-                current && "bg-indigo-500 text-white ring-4 ring-indigo-100",
-                !past && !current && "bg-white text-slate-400 border border-slate-200",
-              )}>
+              <div
+                className={cn(
+                  "h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-[10px] font-semibold z-10",
+                  past && "bg-emerald-500 text-white",
+                  current && "bg-indigo-500 text-white ring-4 ring-indigo-100",
+                  !past && !current && "bg-white text-slate-400 border border-slate-200",
+                )}
+              >
                 {past ? <Check className="h-3 w-3" /> : i + 1}
               </div>
-              <div className={cn(
-                "text-[10px] leading-tight text-center max-w-full truncate px-1",
-                current ? "font-semibold text-slate-900" : past ? "text-slate-600" : "text-slate-400",
-              )}>
+              <div
+                className={cn(
+                  "text-[10px] leading-tight text-center max-w-full truncate px-1",
+                  current
+                    ? "font-semibold text-slate-900"
+                    : past
+                      ? "text-slate-600"
+                      : "text-slate-400",
+                )}
+              >
                 {e.label}
               </div>
             </div>
@@ -347,7 +408,8 @@ function QuickAction({ icon, label }: { icon: React.ReactNode; label: string }) 
       type="button"
       onClick={() =>
         toast.info(label, {
-          description: "Ação será integrada nas próximas fases sem alterar as regras dos módulos existentes.",
+          description:
+            "Ação será integrada nas próximas fases sem alterar as regras dos módulos existentes.",
         })
       }
       className="flex flex-col items-center justify-center gap-1 h-14 rounded-xl border border-slate-200/70 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors text-slate-600 hover:text-slate-900"
@@ -359,7 +421,10 @@ function QuickAction({ icon, label }: { icon: React.ReactNode; label: string }) 
 }
 
 function AiChip({
-  icon, label, hint, tone,
+  icon,
+  label,
+  hint,
+  tone,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -367,13 +432,13 @@ function AiChip({
   tone: "info" | "warn" | "danger";
 }) {
   const toneCls =
-    tone === "warn" ? "bg-amber-50/60 border-amber-200/60 text-amber-800"
-    : tone === "danger" ? "bg-rose-50/60 border-rose-200/60 text-rose-800"
-    : "bg-slate-50 border-slate-200/60 text-slate-700";
+    tone === "warn"
+      ? "bg-amber-50/60 border-amber-200/60 text-amber-800"
+      : tone === "danger"
+        ? "bg-rose-50/60 border-rose-200/60 text-rose-800"
+        : "bg-slate-50 border-slate-200/60 text-slate-700";
   const iconCls =
-    tone === "warn" ? "text-amber-500"
-    : tone === "danger" ? "text-rose-500"
-    : "text-indigo-500";
+    tone === "warn" ? "text-amber-500" : tone === "danger" ? "text-rose-500" : "text-indigo-500";
   return (
     <div className={cn("flex items-start gap-2 rounded-xl border px-3 py-2", toneCls)}>
       <span className={cn("mt-0.5", iconCls)}>{icon}</span>
@@ -402,22 +467,42 @@ function TabPlaceholder({ title, children }: { title: string; children: React.Re
 function ResumoPanel({ proc }: { proc: string | null }) {
   return (
     <div className="grid grid-cols-2 gap-2">
-      <PanelCard icon={<ClipboardCheck className="h-3.5 w-3.5" />} title="Observações" body="Sem observações registradas." />
-      <PanelCard icon={<AlertTriangle className="h-3.5 w-3.5 text-rose-500" />} title="Alergias" body="Nenhuma alergia informada." tone="danger" />
-      <PanelCard icon={<Wallet className="h-3.5 w-3.5" />} title="Pendências" body="Sem pendências no momento." />
+      <PanelCard
+        icon={<ClipboardCheck className="h-3.5 w-3.5" />}
+        title="Observações"
+        body="Sem observações registradas."
+      />
+      <PanelCard
+        icon={<AlertTriangle className="h-3.5 w-3.5 text-rose-500" />}
+        title="Alergias"
+        body="Nenhuma alergia informada."
+        tone="danger"
+      />
+      <PanelCard
+        icon={<Wallet className="h-3.5 w-3.5" />}
+        title="Pendências"
+        body="Sem pendências no momento."
+      />
       <PanelCard icon={<FileText className="h-3.5 w-3.5" />} title="Documentos" body="0 anexos" />
       <PanelCard
         icon={<Coffee className="h-3.5 w-3.5" />}
         title="Preparo do exame"
         body={proc ? `${proc} — verificar preparo.` : "Sem preparo específico."}
       />
-      <PanelCard icon={<CalendarClock className="h-3.5 w-3.5" />} title="Retorno previsto" body="Sem retorno agendado." />
+      <PanelCard
+        icon={<CalendarClock className="h-3.5 w-3.5" />}
+        title="Retorno previsto"
+        body="Sem retorno agendado."
+      />
     </div>
   );
 }
 
 function PanelCard({
-  icon, title, body, tone,
+  icon,
+  title,
+  body,
+  tone,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -425,10 +510,12 @@ function PanelCard({
   tone?: "danger";
 }) {
   return (
-    <div className={cn(
-      "rounded-xl border p-3 space-y-1",
-      tone === "danger" ? "border-rose-100 bg-rose-50/30" : "border-slate-100 bg-white",
-    )}>
+    <div
+      className={cn(
+        "rounded-xl border p-3 space-y-1",
+        tone === "danger" ? "border-rose-100 bg-rose-50/30" : "border-slate-100 bg-white",
+      )}
+    >
       <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
         <span className="text-slate-500">{icon}</span> {title}
       </div>

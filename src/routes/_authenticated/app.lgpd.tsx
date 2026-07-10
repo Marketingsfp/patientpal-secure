@@ -8,9 +8,28 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ShieldCheck, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -22,8 +41,13 @@ export const Route = createFileRoute("/_authenticated/app/lgpd")({
 });
 
 interface Solicitacao {
-  id: string; tipo: string; descricao: string | null; status: string;
-  resposta: string | null; respondido_em: string | null; created_at: string;
+  id: string;
+  tipo: string;
+  descricao: string | null;
+  status: string;
+  resposta: string | null;
+  respondido_em: string | null;
+  created_at: string;
 }
 
 const TIPOS: Record<string, string> = {
@@ -64,13 +88,20 @@ function LgpdPage() {
     else setRows((data ?? []) as Solicitacao[]);
     setLoading(false);
   }
-  useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
+  useEffect(() => {
+    void load();
+  }, [clinicaAtual?.clinica_id]);
 
   async function criarSolicitacao() {
     if (!clinicaAtual) return;
-    if (!form.descricao.trim()) { toast.error("Descreva sua solicitação"); return; }
+    if (!form.descricao.trim()) {
+      toast.error("Descreva sua solicitação");
+      return;
+    }
     setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const { error } = await supabase.from("lgpd_solicitacoes").insert({
       clinica_id: clinicaAtual.clinica_id,
       user_id: user?.id,
@@ -78,7 +109,10 @@ function LgpdPage() {
       descricao: form.descricao.trim(),
     });
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success("Solicitação registrada");
     setOpen(false);
     setForm({ tipo: "acesso", descricao: "" });
@@ -87,14 +121,22 @@ function LgpdPage() {
 
   async function responder() {
     if (!respondendo) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from("lgpd_solicitacoes").update({
-      status: respostaForm.status,
-      resposta: respostaForm.resposta.trim() || null,
-      respondido_em: new Date().toISOString(),
-      respondido_por: user?.id,
-    }).eq("id", respondendo.id);
-    if (error) { mostrarErro(error); return; }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from("lgpd_solicitacoes")
+      .update({
+        status: respostaForm.status,
+        resposta: respostaForm.resposta.trim() || null,
+        respondido_em: new Date().toISOString(),
+        respondido_por: user?.id,
+      })
+      .eq("id", respondendo.id);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
     toast.success("Solicitação atualizada");
     setRespondendo(null);
     void load();
@@ -106,15 +148,23 @@ function LgpdPage() {
         <ShieldCheck className="h-6 w-6 text-primary" />
         <div className="flex-1">
           <h1 className="text-xl font-bold">LGPD — Lei Geral de Proteção de Dados</h1>
-          <p className="text-sm text-muted-foreground">Gerencie consentimentos e solicitações dos titulares de dados.</p>
+          <p className="text-sm text-muted-foreground">
+            Gerencie consentimentos e solicitações dos titulares de dados.
+          </p>
         </div>
-        <Button onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" /> Nova solicitação</Button>
+        <Button onClick={() => setOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" /> Nova solicitação
+        </Button>
       </div>
 
       <Card className="p-4">
         <h2 className="font-semibold mb-2">Direitos do titular (LGPD)</h2>
         <p className="text-sm text-muted-foreground">
-          De acordo com a Lei nº 13.709/2018, o titular dos dados pode solicitar a qualquer momento: confirmação da existência de tratamento, acesso aos dados, correção de dados incompletos ou desatualizados, anonimização, bloqueio ou eliminação de dados desnecessários, portabilidade, eliminação dos dados tratados com o consentimento, informação sobre compartilhamento e revogação do consentimento.
+          De acordo com a Lei nº 13.709/2018, o titular dos dados pode solicitar a qualquer momento:
+          confirmação da existência de tratamento, acesso aos dados, correção de dados incompletos
+          ou desatualizados, anonimização, bloqueio ou eliminação de dados desnecessários,
+          portabilidade, eliminação dos dados tratados com o consentimento, informação sobre
+          compartilhamento e revogação do consentimento.
         </p>
       </Card>
 
@@ -131,64 +181,113 @@ function LgpdPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">Carregando…</TableCell></TableRow>
-            ) : rows.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">Nenhuma solicitação registrada.</TableCell></TableRow>
-            ) : rows.map(r => (
-              <TableRow key={r.id}>
-                <TableCell className="text-sm">{formatDateTime(r.created_at)}</TableCell>
-                <TableCell>{TIPOS[r.tipo] ?? r.tipo}</TableCell>
-                <TableCell className="text-sm text-muted-foreground line-clamp-2 max-w-md">{r.descricao}</TableCell>
-                <TableCell><Badge variant={STATUS_COLORS[r.status] ?? "secondary"}>{r.status}</Badge></TableCell>
-                <TableCell className="text-right">
-                  <Button size="sm" variant="ghost" onClick={() => { setRespondendo(r); setRespostaForm({ status: r.status, resposta: r.resposta ?? "" }); }}>
-                    Responder
-                  </Button>
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                  Carregando…
                 </TableCell>
               </TableRow>
-            ))}
+            ) : rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                  Nenhuma solicitação registrada.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="text-sm">{formatDateTime(r.created_at)}</TableCell>
+                  <TableCell>{TIPOS[r.tipo] ?? r.tipo}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground line-clamp-2 max-w-md">
+                    {r.descricao}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={STATUS_COLORS[r.status] ?? "secondary"}>{r.status}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setRespondendo(r);
+                        setRespostaForm({ status: r.status, resposta: r.resposta ?? "" });
+                      }}
+                    >
+                      Responder
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Nova solicitação LGPD</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Nova solicitação LGPD</DialogTitle>
+          </DialogHeader>
           <div className="space-y-3">
             <div>
               <Label>Tipo</Label>
-              <Select value={form.tipo} onValueChange={v => setForm({ ...form, tipo: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(TIPOS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                  {Object.entries(TIPOS).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>
+                      {v}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Descrição *</Label>
-              <Textarea rows={4} value={form.descricao} onChange={e => setForm({ ...form, descricao: e.target.value })} placeholder="Descreva detalhadamente sua solicitação..." />
+              <Textarea
+                rows={4}
+                value={form.descricao}
+                onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+                placeholder="Descreva detalhadamente sua solicitação..."
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={criarSolicitacao} disabled={saving}>{saving ? "Enviando…" : "Enviar"}</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={criarSolicitacao} disabled={saving}>
+              {saving ? "Enviando…" : "Enviar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!respondendo} onOpenChange={v => !v && setRespondendo(null)}>
+      <Dialog open={!!respondendo} onOpenChange={(v) => !v && setRespondendo(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Responder solicitação</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Responder solicitação</DialogTitle>
+          </DialogHeader>
           {respondendo && (
             <div className="space-y-3">
               <div className="text-sm bg-muted p-3 rounded">
-                <div><strong>Tipo:</strong> {TIPOS[respondendo.tipo] ?? respondendo.tipo}</div>
-                <div className="mt-1"><strong>Solicitação:</strong> {respondendo.descricao}</div>
+                <div>
+                  <strong>Tipo:</strong> {TIPOS[respondendo.tipo] ?? respondendo.tipo}
+                </div>
+                <div className="mt-1">
+                  <strong>Solicitação:</strong> {respondendo.descricao}
+                </div>
               </div>
               <div>
                 <Label>Status</Label>
-                <Select value={respostaForm.status} onValueChange={v => setRespostaForm({ ...respostaForm, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={respostaForm.status}
+                  onValueChange={(v) => setRespostaForm({ ...respostaForm, status: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pendente">Pendente</SelectItem>
                     <SelectItem value="em_andamento">Em andamento</SelectItem>
@@ -199,12 +298,18 @@ function LgpdPage() {
               </div>
               <div>
                 <Label>Resposta</Label>
-                <Textarea rows={4} value={respostaForm.resposta} onChange={e => setRespostaForm({ ...respostaForm, resposta: e.target.value })} />
+                <Textarea
+                  rows={4}
+                  value={respostaForm.resposta}
+                  onChange={(e) => setRespostaForm({ ...respostaForm, resposta: e.target.value })}
+                />
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRespondendo(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setRespondendo(null)}>
+              Cancelar
+            </Button>
             <Button onClick={responder}>Salvar</Button>
           </DialogFooter>
         </DialogContent>

@@ -1,8 +1,19 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import {
-  LayoutDashboard, ArrowLeftRight, BarChart3, LineChart, Stethoscope,
-  Building, FileText, FileBarChart, PieChart, Bell, Tag, Wallet,
-  Sparkles, AlertTriangle,
+  LayoutDashboard,
+  ArrowLeftRight,
+  BarChart3,
+  LineChart,
+  Stethoscope,
+  Building,
+  FileText,
+  FileBarChart,
+  PieChart,
+  Bell,
+  Tag,
+  Wallet,
+  Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 
@@ -32,7 +43,9 @@ function FinLayout() {
   const location = useLocation();
   const { isMedicoOnly } = useMedicoContext();
   const visibleSubnav = isMedicoOnly
-    ? subnav.filter((i) => i.to === "/app/financeiro/atendimentos").map((i) => ({ ...i, label: "Repasse" }))
+    ? subnav
+        .filter((i) => i.to === "/app/financeiro/atendimentos")
+        .map((i) => ({ ...i, label: "Repasse" }))
     : subnav;
   return (
     <div className="flex gap-3 -m-4 h-[calc(100vh-4rem)]">
@@ -42,9 +55,10 @@ function FinLayout() {
         </p>
         <nav className="space-y-0.5">
           {visibleSubnav.map((item) => {
-            const active = "exact" in item && item.exact
-              ? location.pathname === item.to
-              : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
+            const active =
+              "exact" in item && item.exact
+                ? location.pathname === item.to
+                : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
             return (
               <Link
                 key={item.to}

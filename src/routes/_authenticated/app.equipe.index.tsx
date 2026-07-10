@@ -8,10 +8,29 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { FuncionarioFormDialog } from "@/components/funcionarios/FuncionarioFormDialog";
 import { MedicoFormDialog } from "@/components/medicos/MedicoFormDialog";
 import { EnfermeiroFormDialog } from "@/components/funcionarios/EnfermeiroFormDialog";
@@ -43,14 +62,17 @@ interface Medico {
   especialidades?: string[];
 }
 
-const limparPrefixoMedico = (nome: string) =>
-  nome.replace(/^(\s*(dr|dra)\.?\s+)+/i, "").trim();
+const limparPrefixoMedico = (nome: string) => nome.replace(/^(\s*(dr|dra)\.?\s+)+/i, "").trim();
 
 function EquipePage() {
   const { clinicaAtual } = useClinica();
   const { tab: tabFromUrl } = Route.useSearch();
-  const [tab, setTab] = useState<"funcionarios" | "medicos" | "enfermagem">(tabFromUrl ?? "funcionarios");
-  useEffect(() => { if (tabFromUrl) setTab(tabFromUrl); }, [tabFromUrl]);
+  const [tab, setTab] = useState<"funcionarios" | "medicos" | "enfermagem">(
+    tabFromUrl ?? "funcionarios",
+  );
+  useEffect(() => {
+    if (tabFromUrl) setTab(tabFromUrl);
+  }, [tabFromUrl]);
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [enfermeiros, setEnfermeiros] = useState<Array<Funcionario & { agendas: string[] }>>([]);
@@ -58,9 +80,18 @@ function EquipePage() {
   const [openChooser, setOpenChooser] = useState(false);
   const [busca, setBusca] = useState("");
   const [medicoStatus, setMedicoStatus] = useState<"ativos" | "inativos" | "todos">("ativos");
-  const [funcDialog, setFuncDialog] = useState<{ open: boolean; userId?: string | null }>({ open: false, userId: null });
-  const [medicoDialog, setMedicoDialog] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
-  const [enfDialog, setEnfDialog] = useState<{ open: boolean; userId?: string | null }>({ open: false, userId: null });
+  const [funcDialog, setFuncDialog] = useState<{ open: boolean; userId?: string | null }>({
+    open: false,
+    userId: null,
+  });
+  const [medicoDialog, setMedicoDialog] = useState<{ open: boolean; id: string | null }>({
+    open: false,
+    id: null,
+  });
+  const [enfDialog, setEnfDialog] = useState<{ open: boolean; userId?: string | null }>({
+    open: false,
+    userId: null,
+  });
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -78,7 +109,12 @@ function EquipePage() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .order("nome"),
     ]).then(async ([f, m]) => {
-      const mems = (f.data ?? []) as Array<{ id: string; user_id: string; role: string; ativo: boolean }>;
+      const mems = (f.data ?? []) as Array<{
+        id: string;
+        user_id: string;
+        role: string;
+        ativo: boolean;
+      }>;
       const ids = Array.from(new Set(mems.map((x) => x.user_id)));
       const nomeMap = new Map<string, string>();
       if (ids.length) {
@@ -97,7 +133,7 @@ function EquipePage() {
       setFuncionarios(allRows.filter((r) => r.role !== "enfermeiro"));
 
       // Carrega vínculos de agendas para enfermeiros
-      let agendasMap = new Map<string, string[]>();
+      const agendasMap = new Map<string, string[]>();
       if (enfRows.length) {
         const userIds = enfRows.map((e) => e.user_id);
         const { data: vinc } = await supabase
@@ -105,7 +141,10 @@ function EquipePage() {
           .select("user_id, recurso:enfermagem_recursos(nome)")
           .eq("clinica_id", clinicaAtual.clinica_id)
           .in("user_id", userIds);
-        for (const r of (vinc ?? []) as Array<{ user_id: string; recurso: { nome: string } | null }>) {
+        for (const r of (vinc ?? []) as Array<{
+          user_id: string;
+          recurso: { nome: string } | null;
+        }>) {
           const nome = r.recurso?.nome;
           if (!nome) continue;
           const arr = agendasMap.get(r.user_id) ?? [];
@@ -125,7 +164,10 @@ function EquipePage() {
           .from("medico_especialidades")
           .select("medico_id, especialidade:especialidades(nome)")
           .in("medico_id", medicoIds);
-        for (const v of (vincs ?? []) as Array<{ medico_id: string; especialidade: { nome: string } | null }>) {
+        for (const v of (vincs ?? []) as Array<{
+          medico_id: string;
+          especialidade: { nome: string } | null;
+        }>) {
           const nome = v.especialidade?.nome;
           if (!nome) continue;
           const arr = espMap.get(v.medico_id) ?? [];
@@ -151,14 +193,17 @@ function EquipePage() {
     setEnfDialog({ open: true, userId: null });
   };
 
-  if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
+  if (!clinicaAtual)
+    return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
 
   const q = busca.trim().toLowerCase();
   const funcsFiltrados = q
-    ? funcionarios.filter((f) => f.nome.toLowerCase().includes(q) || f.role.toLowerCase().includes(q))
+    ? funcionarios.filter(
+        (f) => f.nome.toLowerCase().includes(q) || f.role.toLowerCase().includes(q),
+      )
     : funcionarios;
   const medicosPorStatus = medicos.filter((m) =>
-    medicoStatus === "todos" ? true : medicoStatus === "ativos" ? m.ativo : !m.ativo
+    medicoStatus === "todos" ? true : medicoStatus === "ativos" ? m.ativo : !m.ativo,
   );
   const medicosFiltrados = q
     ? medicosPorStatus.filter((m) => m.nome.toLowerCase().includes(q) || (m.crm ?? "").includes(q))
@@ -166,9 +211,10 @@ function EquipePage() {
   const medicosAtivosCount = medicos.filter((m) => m.ativo).length;
   const medicosInativosCount = medicos.length - medicosAtivosCount;
   const enfermeirosFiltrados = q
-    ? enfermeiros.filter((e) =>
-        e.nome.toLowerCase().includes(q) ||
-        e.agendas.some((a) => a.toLowerCase().includes(q)))
+    ? enfermeiros.filter(
+        (e) =>
+          e.nome.toLowerCase().includes(q) || e.agendas.some((a) => a.toLowerCase().includes(q)),
+      )
     : enfermeiros;
 
   return (
@@ -177,7 +223,8 @@ function EquipePage() {
         <div>
           <h1 className="text-2xl font-semibold">Equipe</h1>
           <p className="text-sm text-muted-foreground">
-            Funcionários e médicos de {clinicaAtual.clinica.nome}. Aqui você cadastra a equipe e libera acesso ao sistema.
+            Funcionários e médicos de {clinicaAtual.clinica.nome}. Aqui você cadastra a equipe e
+            libera acesso ao sistema.
           </p>
         </div>
         <Button onClick={() => setOpenChooser(true)}>
@@ -185,20 +232,29 @@ function EquipePage() {
         </Button>
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "funcionarios" | "medicos" | "enfermagem")}>
+      <Tabs
+        value={tab}
+        onValueChange={(v) => setTab(v as "funcionarios" | "medicos" | "enfermagem")}
+      >
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <TabsList>
             <TabsTrigger value="funcionarios">
               <Users className="h-4 w-4 mr-2" /> Funcionários
-              <Badge variant="secondary" className="ml-2">{funcionarios.length}</Badge>
+              <Badge variant="secondary" className="ml-2">
+                {funcionarios.length}
+              </Badge>
             </TabsTrigger>
             <TabsTrigger value="medicos">
               <Stethoscope className="h-4 w-4 mr-2" /> Médicos
-              <Badge variant="secondary" className="ml-2">{medicosAtivosCount}</Badge>
+              <Badge variant="secondary" className="ml-2">
+                {medicosAtivosCount}
+              </Badge>
             </TabsTrigger>
             <TabsTrigger value="enfermagem">
               <HeartPulse className="h-4 w-4 mr-2" /> Enfermagem
-              <Badge variant="secondary" className="ml-2">{enfermeiros.length}</Badge>
+              <Badge variant="secondary" className="ml-2">
+                {enfermeiros.length}
+              </Badge>
             </TabsTrigger>
           </TabsList>
           <Input
@@ -211,31 +267,46 @@ function EquipePage() {
 
         <TabsContent value="funcionarios" className="mt-4">
           {loading ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent></Card>
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Carregando…
+              </CardContent>
+            </Card>
           ) : funcsFiltrados.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">
-              <Users className="h-8 w-8 mx-auto mb-2 opacity-50" /> Nenhum funcionário cadastrado.
-            </CardContent></Card>
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <Users className="h-8 w-8 mx-auto mb-2 opacity-50" /> Nenhum funcionário cadastrado.
+              </CardContent>
+            </Card>
           ) : (
             <Card>
               <Table>
-                <TableHeader><TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Função</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-16 text-right">Ações</TableHead>
-                </TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Função</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-16 text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {funcsFiltrados.map((f) => (
                     <TableRow key={f.id}>
                       <TableCell>{f.nome}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground capitalize">{f.role}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground capitalize">
+                        {f.role}
+                      </TableCell>
                       <TableCell>
-                        <Badge variant={f.ativo ? "default" : "outline"}>{f.ativo ? "Ativo" : "Inativo"}</Badge>
+                        <Badge variant={f.ativo ? "default" : "outline"}>
+                          {f.ativo ? "Ativo" : "Inativo"}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <Button size="icon" variant="ghost" asChild>
-                          <Link to="/app/equipe/funcionario/$userId/editar" params={{ userId: f.user_id }}>
+                          <Link
+                            to="/app/equipe/funcionario/$userId/editar"
+                            params={{ userId: f.user_id }}
+                          >
                             <Pencil className="h-4 w-4" />
                           </Link>
                         </Button>
@@ -251,8 +322,13 @@ function EquipePage() {
         <TabsContent value="medicos" className="mt-4">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground mr-1">Status:</span>
-            <Select value={medicoStatus} onValueChange={(v) => setMedicoStatus(v as typeof medicoStatus)}>
-              <SelectTrigger className="w-[200px] h-9"><SelectValue /></SelectTrigger>
+            <Select
+              value={medicoStatus}
+              onValueChange={(v) => setMedicoStatus(v as typeof medicoStatus)}
+            >
+              <SelectTrigger className="w-[200px] h-9">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ativos">Ativos ({medicosAtivosCount})</SelectItem>
                 <SelectItem value="inativos">Inativos ({medicosInativosCount})</SelectItem>
@@ -261,43 +337,63 @@ function EquipePage() {
             </Select>
           </div>
           {loading ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent></Card>
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Carregando…
+              </CardContent>
+            </Card>
           ) : medicosFiltrados.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">
-              <Stethoscope className="h-8 w-8 mx-auto mb-2 opacity-50" /> Nenhum médico cadastrado.
-            </CardContent></Card>
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <Stethoscope className="h-8 w-8 mx-auto mb-2 opacity-50" /> Nenhum médico
+                cadastrado.
+              </CardContent>
+            </Card>
           ) : (
             <Card>
               <Table>
-                <TableHeader><TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>CRM</TableHead>
-                  <TableHead>Especialidade</TableHead>
-                  <TableHead>Telefone</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-16 text-right">Ações</TableHead>
-                </TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>CRM</TableHead>
+                    <TableHead>Especialidade</TableHead>
+                    <TableHead>Telefone</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-16 text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {medicosFiltrados.map((m) => (
                     <TableRow key={m.id}>
                       <TableCell>{m.nome}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{m.crm ? `${m.crm}/${m.crm_uf ?? ""}` : "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {m.crm ? `${m.crm}/${m.crm_uf ?? ""}` : "—"}
+                      </TableCell>
                       <TableCell className="text-sm">
                         {m.especialidades && m.especialidades.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {m.especialidades.map((e, i) => (
-                              <Badge key={i} variant="outline">{e}</Badge>
+                              <Badge key={i} variant="outline">
+                                {e}
+                              </Badge>
                             ))}
                           </div>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{m.telefone ?? "—"}</TableCell>
-                      <TableCell>{m.ativo ? <Badge>Ativo</Badge> : <Badge variant="outline">Inativo</Badge>}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {m.telefone ?? "—"}
+                      </TableCell>
+                      <TableCell>
+                        {m.ativo ? <Badge>Ativo</Badge> : <Badge variant="outline">Inativo</Badge>}
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button size="icon" variant="ghost" asChild>
-                          <Link to="/app/equipe/medico/$medicoId/editar" params={{ medicoId: m.id }}>
+                          <Link
+                            to="/app/equipe/medico/$medicoId/editar"
+                            params={{ medicoId: m.id }}
+                          >
                             <Pencil className="h-4 w-4" />
                           </Link>
                         </Button>
@@ -312,20 +408,29 @@ function EquipePage() {
 
         <TabsContent value="enfermagem" className="mt-4">
           {loading ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent></Card>
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Carregando…
+              </CardContent>
+            </Card>
           ) : enfermeirosFiltrados.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">
-              <HeartPulse className="h-8 w-8 mx-auto mb-2 opacity-50" /> Nenhum enfermeiro cadastrado.
-            </CardContent></Card>
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <HeartPulse className="h-8 w-8 mx-auto mb-2 opacity-50" /> Nenhum enfermeiro
+                cadastrado.
+              </CardContent>
+            </Card>
           ) : (
             <Card>
               <Table>
-                <TableHeader><TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Agendas</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-16 text-right">Ações</TableHead>
-                </TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Agendas</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-16 text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {enfermeirosFiltrados.map((e) => (
                     <TableRow key={e.id}>
@@ -336,17 +441,24 @@ function EquipePage() {
                         ) : (
                           <div className="flex flex-wrap gap-1">
                             {e.agendas.map((a, idx) => (
-                              <Badge key={idx} variant="outline">{a}</Badge>
+                              <Badge key={idx} variant="outline">
+                                {a}
+                              </Badge>
                             ))}
                           </div>
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={e.ativo ? "default" : "outline"}>{e.ativo ? "Ativo" : "Inativo"}</Badge>
+                        <Badge variant={e.ativo ? "default" : "outline"}>
+                          {e.ativo ? "Ativo" : "Inativo"}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <Button size="icon" variant="ghost" asChild>
-                          <Link to="/app/equipe/enfermeiro/$userId/editar" params={{ userId: e.user_id }}>
+                          <Link
+                            to="/app/equipe/enfermeiro/$userId/editar"
+                            params={{ userId: e.user_id }}
+                          >
                             <Pencil className="h-4 w-4" />
                           </Link>
                         </Button>
@@ -376,7 +488,9 @@ function EquipePage() {
             >
               <Users className="h-8 w-8 text-primary" />
               <span className="font-medium">Funcionário</span>
-              <span className="text-xs text-muted-foreground">Administrativo, recepção, financeiro…</span>
+              <span className="text-xs text-muted-foreground">
+                Administrativo, recepção, financeiro…
+              </span>
             </button>
             <button
               type="button"
@@ -394,7 +508,9 @@ function EquipePage() {
             >
               <HeartPulse className="h-8 w-8 text-primary" />
               <span className="font-medium">Enfermagem</span>
-              <span className="text-xs text-muted-foreground">Vinculado às agendas de enfermagem</span>
+              <span className="text-xs text-muted-foreground">
+                Vinculado às agendas de enfermagem
+              </span>
             </button>
           </div>
         </DialogContent>

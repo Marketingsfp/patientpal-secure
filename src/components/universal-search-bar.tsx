@@ -30,7 +30,9 @@ export function UniversalSearchBar() {
   );
   const searcher = useUniversalSearcher({
     clinicaIds,
-    navigate: (to) => { void navigate({ to: to as never }); },
+    navigate: (to) => {
+      void navigate({ to: to as never });
+    },
   });
 
   if (!ubEnabled || !allowed) return null;
@@ -48,7 +50,9 @@ export function UniversalSearchBar() {
         <span className="truncate flex-1 text-left">
           Buscar pacientes, orçamentos, agenda, NFS-e…
         </span>
-        <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-background border">Ctrl K</kbd>
+        <kbd className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-background border">
+          Ctrl K
+        </kbd>
       </button>
       <button
         type="button"

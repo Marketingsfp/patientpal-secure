@@ -46,7 +46,11 @@ function applyTemplate(tpl: string, vars: Record<string, string>): string {
 }
 
 export async function printContrato(contratoId: string) {
-  const { data: c, error } = await supabase.from("contratos_assinatura").select("*").eq("id", contratoId).maybeSingle();
+  const { data: c, error } = await supabase
+    .from("contratos_assinatura")
+    .select("*")
+    .eq("id", contratoId)
+    .maybeSingle();
   if (error || !c) throw new Error(error?.message ?? "Contrato não encontrado");
 
   const [{ data: pl }, { data: cl }, { data: pa }] = await Promise.all([
@@ -67,7 +71,9 @@ export async function printContrato(contratoId: string) {
     (c as any).paciente_id
       ? supabase
           .from("pacientes")
-          .select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep")
+          .select(
+            "cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep",
+          )
           .eq("id", (c as any).paciente_id)
           .maybeSingle()
       : Promise.resolve({ data: null as any }),
@@ -82,7 +88,7 @@ export async function printContrato(contratoId: string) {
   const deps = depsRaw ?? [];
 
   const pids = deps.map((d: any) => d.paciente_id).filter(Boolean);
-  let pacsMap: Record<string, any> = {};
+  const pacsMap: Record<string, any> = {};
   if (pids.length > 0) {
     const { data: pacsData } = await supabase
       .from("pacientes")
@@ -118,7 +124,9 @@ export async function printContrato(contratoId: string) {
     depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
     depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
     depSlotVars[`DEPENDENTE_${idx}_CPF`] = pac?.cpf ?? "";
-    depSlotVars[`DEPENDENTE_${idx}_NASCIMENTO`] = pac?.data_nascimento ? fmtData(pac.data_nascimento) : "";
+    depSlotVars[`DEPENDENTE_${idx}_NASCIMENTO`] = pac?.data_nascimento
+      ? fmtData(pac.data_nascimento)
+      : "";
     depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = pac?.telefone ?? d?.telefone ?? "";
   }
 

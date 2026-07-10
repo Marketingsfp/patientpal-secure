@@ -1,19 +1,38 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { cadastrarUsuario, getFuncionarioLogin, definirSenhaFuncionario } from "@/lib/equipe.functions";
+import {
+  cadastrarUsuario,
+  getFuncionarioLogin,
+  definirSenhaFuncionario,
+} from "@/lib/equipe.functions";
 import { salvarVinculosAgendas, listarVinculosAgendas } from "@/lib/enfermagem-equipe.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 
-interface Ref { id: string; nome: string }
+interface Ref {
+  id: string;
+  nome: string;
+}
 
 interface Props {
   open: boolean;
@@ -37,7 +56,14 @@ const emptyForm = (clinicaId: string) => ({
   senha: "",
 });
 
-export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUserId, onSaved, asPage = false }: Props) {
+export function EnfermeiroFormDialog({
+  open,
+  onOpenChange,
+  clinicaId,
+  editingUserId,
+  onSaved,
+  asPage = false,
+}: Props) {
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
   const getLoginFn = useServerFn(getFuncionarioLogin);
   const definirSenhaFn = useServerFn(definirSenhaFuncionario);
@@ -45,7 +71,9 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
   const listarVinculosFn = useServerFn(listarVinculosAgendas);
 
   const [setores, setSetores] = useState<Ref[]>([]);
-  const [disponiveis, setDisponiveis] = useState<Array<{ id: string; nome: string; setor_id: string | null; status: string }>>([]);
+  const [disponiveis, setDisponiveis] = useState<
+    Array<{ id: string; nome: string; setor_id: string | null; status: string }>
+  >([]);
   const [recursos, setRecursos] = useState<Ref[]>([]);
   const [recursosSelecionados, setRecursosSelecionados] = useState<Set<string>>(new Set());
   const [form, setForm] = useState(() => emptyForm(clinicaId));
@@ -63,20 +91,34 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
     if (!open || !clinicaId) return;
     void (async () => {
       const [st, disp, rec] = await Promise.all([
-        supabase.from("setores").select("id,nome").eq("clinica_id", clinicaId).eq("ativo", true).order("nome"),
-        supabase.from("hr_contratos")
+        supabase
+          .from("setores")
+          .select("id,nome")
+          .eq("clinica_id", clinicaId)
+          .eq("ativo", true)
+          .order("nome"),
+        supabase
+          .from("hr_contratos")
           .select("id, nome:funcionario_nome, setor_id, status")
           .eq("clinica_id", clinicaId)
           .is("user_id", null)
           .order("funcionario_nome"),
-        supabase.from("enfermagem_recursos")
+        supabase
+          .from("enfermagem_recursos")
           .select("id, nome")
           .eq("clinica_id", clinicaId)
           .eq("ativo", true)
           .order("nome"),
       ]);
       setSetores((st.data ?? []) as Ref[]);
-      setDisponiveis((disp.data ?? []) as Array<{ id: string; nome: string; setor_id: string | null; status: string }>);
+      setDisponiveis(
+        (disp.data ?? []) as Array<{
+          id: string;
+          nome: string;
+          setor_id: string | null;
+          status: string;
+        }>,
+      );
       setRecursos((rec.data ?? []) as Ref[]);
     })();
   }, [open, clinicaId]);
@@ -94,12 +136,25 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
     void (async () => {
       setLoading(true);
       const [{ data: contrato }, { data: prof }] = await Promise.all([
-        supabase.from("hr_contratos").select("*").eq("clinica_id", clinicaId).eq("user_id", editingUserId).maybeSingle(),
-        supabase.from("profiles").select("nome, telefone, telefone2").eq("id", editingUserId).maybeSingle(),
+        supabase
+          .from("hr_contratos")
+          .select("*")
+          .eq("clinica_id", clinicaId)
+          .eq("user_id", editingUserId)
+          .maybeSingle(),
+        supabase
+          .from("profiles")
+          .select("nome, telefone, telefone2")
+          .eq("id", editingUserId)
+          .maybeSingle(),
       ]);
-      const nome = (contrato?.funcionario_nome as string | undefined) ?? (prof?.nome as string | undefined) ?? "";
+      const nome =
+        (contrato?.funcionario_nome as string | undefined) ??
+        (prof?.nome as string | undefined) ??
+        "";
       const telefone = (prof?.telefone as string | undefined) ?? "";
-      const telefone2 = ((prof as { telefone2?: string | null } | null)?.telefone2 as string | undefined) ?? "";
+      const telefone2 =
+        ((prof as { telefone2?: string | null } | null)?.telefone2 as string | undefined) ?? "";
       if (contrato) {
         setEditingContratoId(contrato.id as string);
         setPrefillUserId(null);
@@ -111,7 +166,9 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
           telefone2,
           setor_id: (contrato.setor_id as string) ?? "",
           status: (contrato.status as string) ?? "ativo",
-          criar_login: false, email: "", senha: "",
+          criar_login: false,
+          email: "",
+          senha: "",
         });
       } else {
         setEditingContratoId(null);
@@ -121,11 +178,15 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
       try {
         const res = await getLoginFn({ data: { clinicaId, userId: editingUserId } });
         setExistingEmail((res as { email?: string | null })?.email ?? null);
-      } catch { setExistingEmail(null); }
+      } catch {
+        setExistingEmail(null);
+      }
       try {
         const ids = await listarVinculosFn({ data: { clinicaId, userId: editingUserId } });
         setRecursosSelecionados(new Set(ids as string[]));
-      } catch { setRecursosSelecionados(new Set()); }
+      } catch {
+        setRecursosSelecionados(new Set());
+      }
       setShowSenha(false);
       setNovaSenha("");
       setConfirmarSenha("");
@@ -136,15 +197,22 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
   function toggleRecurso(id: string, checked: boolean) {
     setRecursosSelecionados((prev) => {
       const next = new Set(prev);
-      if (checked) next.add(id); else next.delete(id);
+      if (checked) next.add(id);
+      else next.delete(id);
       return next;
     });
   }
 
   async function salvarNovaSenha() {
     if (!editingUserId) return;
-    if (novaSenha.length < 6) { toast.error("Senha deve ter pelo menos 6 caracteres"); return; }
-    if (novaSenha !== confirmarSenha) { toast.error("As senhas não conferem"); return; }
+    if (novaSenha.length < 6) {
+      toast.error("Senha deve ter pelo menos 6 caracteres");
+      return;
+    }
+    if (novaSenha !== confirmarSenha) {
+      toast.error("As senhas não conferem");
+      return;
+    }
     setSavingSenha(true);
     try {
       await definirSenhaFn({ data: { clinicaId, userId: editingUserId, novaSenha } });
@@ -160,13 +228,28 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
   }
 
   async function salvar() {
-    if (!form.clinica_id) { toast.error("Clínica não definida"); return; }
+    if (!form.clinica_id) {
+      toast.error("Clínica não definida");
+      return;
+    }
     const isNew = !editingContratoId && !prefillUserId;
-    if (isNew && !form.contrato_id) { toast.error("Selecione um funcionário"); return; }
-    if (!isNew && !form.funcionario_nome.trim()) { toast.error("Informe o nome"); return; }
+    if (isNew && !form.contrato_id) {
+      toast.error("Selecione um funcionário");
+      return;
+    }
+    if (!isNew && !form.funcionario_nome.trim()) {
+      toast.error("Informe o nome");
+      return;
+    }
     if (form.criar_login && isNew) {
-      if (!form.email.trim()) { toast.error("Informe o e-mail do login"); return; }
-      if (form.senha.length < 6) { toast.error("Senha deve ter pelo menos 6 caracteres"); return; }
+      if (!form.email.trim()) {
+        toast.error("Informe o e-mail do login");
+        return;
+      }
+      if (form.senha.length < 6) {
+        toast.error("Senha deve ter pelo menos 6 caracteres");
+        return;
+      }
     }
     setSaving(true);
     let userId: string | null = null;
@@ -219,12 +302,20 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
       });
       error = e;
     }
-    if (error) { setSaving(false); mostrarErro(error); return; }
+    if (error) {
+      setSaving(false);
+      mostrarErro(error);
+      return;
+    }
 
     const targetUserId = editingUserId ?? userId ?? prefillUserId ?? null;
     if (targetUserId) {
-      await supabase.from("profiles")
-        .update({ telefone: form.telefone.trim() || null, telefone2: form.telefone2.trim() || null })
+      await supabase
+        .from("profiles")
+        .update({
+          telefone: form.telefone.trim() || null,
+          telefone2: form.telefone2.trim() || null,
+        })
         .eq("id", targetUserId);
       try {
         await salvarVinculosFn({
@@ -242,7 +333,9 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
     }
 
     setSaving(false);
-    toast.success(editingContratoId || prefillUserId ? "Enfermeiro atualizado" : "Enfermeiro cadastrado");
+    toast.success(
+      editingContratoId || prefillUserId ? "Enfermeiro atualizado" : "Enfermeiro cadastrado",
+    );
     onOpenChange(false);
     onSaved?.();
   }
@@ -250,7 +343,9 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
   const isEditingExisting = !!editingUserId;
   const title = isEditingExisting ? "Editar enfermeiro" : "Novo enfermeiro";
 
-  const tabClass = asPage ? "space-y-3 pt-4" : "space-y-3 min-h-[480px] max-h-[70vh] overflow-y-auto pr-1";
+  const tabClass = asPage
+    ? "space-y-3 pt-4"
+    : "space-y-3 min-h-[480px] max-h-[70vh] overflow-y-auto pr-1";
 
   const body = (
     <>
@@ -285,11 +380,19 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
                     }}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={disponiveis.length === 0 ? "Nenhum funcionário disponível — cadastre em Gestão de Pessoas" : "Selecione um funcionário"} />
+                      <SelectValue
+                        placeholder={
+                          disponiveis.length === 0
+                            ? "Nenhum funcionário disponível — cadastre em Gestão de Pessoas"
+                            : "Selecione um funcionário"
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {disponiveis.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>{d.nome}</SelectItem>
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.nome}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -297,15 +400,28 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
               </div>
               <div>
                 <Label>Setor</Label>
-                <Select value={form.setor_id} onValueChange={v => setForm({ ...form, setor_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                  <SelectContent>{setores.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}</SelectContent>
+                <Select
+                  value={form.setor_id}
+                  onValueChange={(v) => setForm({ ...form, setor_id: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="—" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {setores.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label>Status</Label>
-                <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ativo">Ativo</SelectItem>
                     <SelectItem value="afastado">Afastado</SelectItem>
@@ -316,11 +432,19 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
               </div>
               <div>
                 <Label>Telefone</Label>
-                <Input value={form.telefone} onChange={e => setForm({ ...form, telefone: e.target.value })} placeholder="Telefone principal" />
+                <Input
+                  value={form.telefone}
+                  onChange={(e) => setForm({ ...form, telefone: e.target.value })}
+                  placeholder="Telefone principal"
+                />
               </div>
               <div>
                 <Label>Telefone 2</Label>
-                <Input value={form.telefone2} onChange={e => setForm({ ...form, telefone2: e.target.value })} placeholder="Telefone secundário (opcional)" />
+                <Input
+                  value={form.telefone2}
+                  onChange={(e) => setForm({ ...form, telefone2: e.target.value })}
+                  placeholder="Telefone secundário (opcional)"
+                />
               </div>
             </div>
           </TabsContent>
@@ -331,7 +455,8 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
             </p>
             {recursos.length === 0 ? (
               <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-                Nenhuma agenda de enfermagem cadastrada. Cadastre em <span className="font-medium">Enfermagem → Recursos</span>.
+                Nenhuma agenda de enfermagem cadastrada. Cadastre em{" "}
+                <span className="font-medium">Enfermagem → Recursos</span>.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -363,13 +488,23 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
             {isEditingExisting ? (
               <div className="space-y-4 py-2 text-sm">
                 {existingEmail ? (
-                  <p><span className="text-muted-foreground">E-mail de login:</span> <span className="font-medium">{existingEmail}</span></p>
+                  <p>
+                    <span className="text-muted-foreground">E-mail de login:</span>{" "}
+                    <span className="font-medium">{existingEmail}</span>
+                  </p>
                 ) : (
-                  <p className="text-muted-foreground">Não foi possível recuperar o e-mail de login deste enfermeiro.</p>
+                  <p className="text-muted-foreground">
+                    Não foi possível recuperar o e-mail de login deste enfermeiro.
+                  </p>
                 )}
                 <div className="border-t pt-4 space-y-3">
                   {!showSenha ? (
-                    <Button type="button" variant="outline" size="sm" onClick={() => setShowSenha(true)}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowSenha(true)}
+                    >
                       Trocar senha
                     </Button>
                   ) : (
@@ -378,18 +513,41 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <Label>Nova senha *</Label>
-                          <Input type="text" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} placeholder="Mín. 6 caracteres" />
+                          <Input
+                            type="text"
+                            value={novaSenha}
+                            onChange={(e) => setNovaSenha(e.target.value)}
+                            placeholder="Mín. 6 caracteres"
+                          />
                         </div>
                         <div>
                           <Label>Confirmar senha *</Label>
-                          <Input type="text" value={confirmarSenha} onChange={e => setConfirmarSenha(e.target.value)} />
+                          <Input
+                            type="text"
+                            value={confirmarSenha}
+                            onChange={(e) => setConfirmarSenha(e.target.value)}
+                          />
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button type="button" size="sm" onClick={salvarNovaSenha} disabled={savingSenha}>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={salvarNovaSenha}
+                          disabled={savingSenha}
+                        >
                           {savingSenha ? "Salvando…" : "Salvar nova senha"}
                         </Button>
-                        <Button type="button" size="sm" variant="ghost" onClick={() => { setShowSenha(false); setNovaSenha(""); setConfirmarSenha(""); }}>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setShowSenha(false);
+                            setNovaSenha("");
+                            setConfirmarSenha("");
+                          }}
+                        >
                           Cancelar
                         </Button>
                       </div>
@@ -404,15 +562,37 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
                     type="checkbox"
                     className="h-4 w-4 accent-primary"
                     checked={form.criar_login}
-                    onChange={e => setForm({ ...form, criar_login: e.target.checked })}
+                    onChange={(e) => setForm({ ...form, criar_login: e.target.checked })}
                   />
                   Criar login de acesso ao sistema para este enfermeiro
                 </label>
-                <fieldset disabled={!form.criar_login} className="grid grid-cols-2 gap-3 disabled:opacity-60">
-                  <div><Label>E-mail (login) *</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} disabled={!form.criar_login} /></div>
-                  <div><Label>Senha inicial *</Label><Input type="text" value={form.senha} onChange={e => setForm({ ...form, senha: e.target.value })} placeholder="Mín. 6 caracteres" disabled={!form.criar_login} /></div>
+                <fieldset
+                  disabled={!form.criar_login}
+                  className="grid grid-cols-2 gap-3 disabled:opacity-60"
+                >
+                  <div>
+                    <Label>E-mail (login) *</Label>
+                    <Input
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      disabled={!form.criar_login}
+                    />
+                  </div>
+                  <div>
+                    <Label>Senha inicial *</Label>
+                    <Input
+                      type="text"
+                      value={form.senha}
+                      onChange={(e) => setForm({ ...form, senha: e.target.value })}
+                      placeholder="Mín. 6 caracteres"
+                      disabled={!form.criar_login}
+                    />
+                  </div>
                 </fieldset>
-                <p className="text-xs text-muted-foreground">Perfil: <span className="font-medium">Enfermeiro</span></p>
+                <p className="text-xs text-muted-foreground">
+                  Perfil: <span className="font-medium">Enfermeiro</span>
+                </p>
               </div>
             )}
           </TabsContent>
@@ -423,8 +603,12 @@ export function EnfermeiroFormDialog({ open, onOpenChange, clinicaId, editingUse
 
   const footer = (
     <>
-      <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-      <Button onClick={salvar} disabled={saving || loading}>{saving ? "Salvando…" : "Salvar"}</Button>
+      <Button variant="outline" onClick={() => onOpenChange(false)}>
+        Cancelar
+      </Button>
+      <Button onClick={salvar} disabled={saving || loading}>
+        {saving ? "Salvando…" : "Salvar"}
+      </Button>
     </>
   );
 

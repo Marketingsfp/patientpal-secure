@@ -16,9 +16,11 @@ function Background() {
   const f = useCurrentFrame();
   const a = interpolate(f, [0, ENFERMAGEM_DURATION], [0, 1]);
   return (
-    <AbsoluteFill style={{
-      background: `radial-gradient(1200px 800px at ${20 + a * 30}% ${30 + a * 20}%, #1a2a4a 0%, ${C.bg} 60%)`,
-    }} />
+    <AbsoluteFill
+      style={{
+        background: `radial-gradient(1200px 800px at ${20 + a * 30}% ${30 + a * 20}%, #1a2a4a 0%, ${C.bg} 60%)`,
+      }}
+    />
   );
 }
 
@@ -27,13 +29,30 @@ export const EnfermagemVideo: React.FC = () => {
     <AbsoluteFill style={{ fontFamily: inter, background: C.bg }}>
       <Background />
       <TransitionSeries>
-        <TransitionSeries.Sequence durationInFrames={D.recursos}><SceneEnfRecursos /></TransitionSeries.Sequence>
-        <TransitionSeries.Transition presentation={slide({ direction: "from-right" })} timing={springTiming({ config: { damping: 200 }, durationInFrames: T })} />
-        <TransitionSeries.Sequence durationInFrames={D.disp}><SceneEnfDisp /></TransitionSeries.Sequence>
-        <TransitionSeries.Transition presentation={fade()} timing={springTiming({ config: { damping: 200 }, durationInFrames: T })} />
-        <TransitionSeries.Sequence durationInFrames={D.gerar}><SceneEnfGerar /></TransitionSeries.Sequence>
-        <TransitionSeries.Transition presentation={slide({ direction: "from-right" })} timing={springTiming({ config: { damping: 200 }, durationInFrames: T })} />
-        <TransitionSeries.Sequence durationInFrames={D.agendar}><SceneEnfAgendar /></TransitionSeries.Sequence>
+        <TransitionSeries.Sequence durationInFrames={D.recursos}>
+          <SceneEnfRecursos />
+        </TransitionSeries.Sequence>
+        <TransitionSeries.Transition
+          presentation={slide({ direction: "from-right" })}
+          timing={springTiming({ config: { damping: 200 }, durationInFrames: T })}
+        />
+        <TransitionSeries.Sequence durationInFrames={D.disp}>
+          <SceneEnfDisp />
+        </TransitionSeries.Sequence>
+        <TransitionSeries.Transition
+          presentation={fade()}
+          timing={springTiming({ config: { damping: 200 }, durationInFrames: T })}
+        />
+        <TransitionSeries.Sequence durationInFrames={D.gerar}>
+          <SceneEnfGerar />
+        </TransitionSeries.Sequence>
+        <TransitionSeries.Transition
+          presentation={slide({ direction: "from-right" })}
+          timing={springTiming({ config: { damping: 200 }, durationInFrames: T })}
+        />
+        <TransitionSeries.Sequence durationInFrames={D.agendar}>
+          <SceneEnfAgendar />
+        </TransitionSeries.Sequence>
       </TransitionSeries>
     </AbsoluteFill>
   );
