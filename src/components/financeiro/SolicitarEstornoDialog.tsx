@@ -48,25 +48,28 @@ export function SolicitarEstornoDialog({
     if (txt.length < 5) { toast.error("Descreva o motivo (mínimo 5 caracteres)"); return; }
     setSaving(true);
     // Evita duplicidade: se já existe uma solicitação pendente ou aprovada
-    // para o mesmo lançamento, não cria outra.
-    if (lancamentoId) {
-      const { data: exist } = await supabase
+    // para o mesmo lançamento ou agendamento, não cria outra.
+    if (lancamentoId || agendamentoId) {
+      let q = supabase
         .from("estorno_solicitacoes")
         .select("id, status")
         .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("lancamento_id", lancamentoId)
-        .in("status", ["pendente", "aprovado"])
-        .limit(1);
+        .in("status", ["pendente", "aprovado"]);
+      if (lancamentoId && agendamentoId) {
+        q = q.or(`lancamento_id.eq.${lancamentoId},agendamento_id.eq.${agendamentoId}`);
+      } else if (lancamentoId) {
+        q = q.eq("lancamento_id", lancamentoId);
+      } else if (agendamentoId) {
+        q = q.eq("agendamento_id", agendamentoId);
+      }
+      const { data: exist } = await q.limit(1);
       if (exist && exist.length > 0) {
         setSaving(false);
         toast.error(
           exist[0].status === "pendente"
-            ? "Já existe uma solicitação pendente para este lançamento."
-            : "Este lançamento já foi estornado.",
+            ? "Já existe uma solicitação de estorno pendente para este item."
+            : "Este item já foi estornado.",
         );
-        // Sincroniza a UI: fecha o diálogo e força o pai a recarregar o
-        // estado das solicitações para que o botão exiba corretamente
-        // "Aguardando aprovação" ou "Estornado".
         onOpenChange(false);
         onCreated?.();
         return;
