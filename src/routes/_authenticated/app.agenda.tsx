@@ -479,6 +479,30 @@ async function obterInfoConvenioPaciente(params: {
       } else {
         agsFiltrados = (agsDia ?? []) as Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null; inicio?: string | null }>;
       }
+      // Grupo de gratuidade compartilhada: se a regra pertence a um grupo,
+      // a cota é dividida entre todos os procedimentos do grupo. Filtramos os
+      // agendamentos por nome do procedimento (agendamentos.procedimento é
+      // texto) usando os nomes dos procedimentos vinculados ao mesmo grupo.
+      if (beneficioEscolhido.grupo_gratuidade) {
+        const grupoProcIds = Array.from(new Set(
+          (regrasCb as Array<{ grupo_gratuidade: string | null; procedimento_id: string | null }>)
+            .filter((r) => r.grupo_gratuidade === beneficioEscolhido.grupo_gratuidade && r.procedimento_id)
+            .map((r) => r.procedimento_id as string),
+        ));
+        if (grupoProcIds.length) {
+          const { data: procsNomes } = await supabase
+            .from("procedimentos")
+            .select("nome")
+            .in("id", grupoProcIds);
+          const normProc = (s: string | null | undefined) =>
+            (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+          const nomesSet = new Set(
+            ((procsNomes ?? []) as Array<{ nome: string | null }>).map((p) => normProc(p.nome)),
+          );
+          const agsWithProc = agsFiltrados as Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null; inicio?: string | null; procedimento?: string | null }>;
+          agsFiltrados = agsWithProc.filter((a) => nomesSet.has(normProc(a.procedimento)));
+        }
+      }
       // Regra: o limite só é consumido quando o agendamento efetivamente foi
       // pago. O status na tabela `agendamentos` nem sempre muda para
       // "realizado" após a cobrança no caixa — o sinal mais confiável é a
