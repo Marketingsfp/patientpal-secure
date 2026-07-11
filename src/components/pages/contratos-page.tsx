@@ -314,10 +314,10 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                 <button
                   type="button"
                   onClick={() => setSortPaciente((s) => (s === "asc" ? "desc" : s === "desc" ? null : "asc"))}
-                  className="inline-flex items-center gap-1 font-medium hover:text-primary"
+                  className="inline-flex items-center gap-1 font-bold uppercase tracking-wide hover:opacity-80"
                   title="Ordenar por paciente"
                 >
-                  Paciente
+                  PACIENTE
                   <span className="text-[10px] text-muted-foreground">
                     {sortPaciente === "asc" ? "A→Z" : sortPaciente === "desc" ? "Z→A" : "↕"}
                   </span>
