@@ -601,7 +601,13 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // Integração com Caixa: registra movimento na sessão aberta do usuário.
     // Se não houver sessão aberta, abre uma automaticamente com valor 0.
     try {
-      if (user?.id && Number(valor) > 0) {
+      // Registra em `caixa_movimentos` sempre que houver usuário (para aparecer
+      // em "Meu caixa > Movimentos"). Antes só entrava quando valor > 0, o que
+      // escondia gratuidades e atendimentos sem cobrança (valor 0) do caixa.
+      const registraNoCaixa =
+        !!user?.id &&
+        (Number(valor) > 0 || formaFinal === "convenio_gratuidade" || !!agendamentoId);
+      if (registraNoCaixa) {
         // Pode existir mais de uma sessão aberta por histórico — pega a mais recente
         // em vez de usar maybeSingle() (que retorna erro/null quando há múltiplas)
         // e acabar abrindo uma nova a cada lançamento.
