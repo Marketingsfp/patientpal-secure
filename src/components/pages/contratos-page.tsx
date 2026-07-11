@@ -65,6 +65,17 @@ const fmtD = (s?: string | null) =>
   s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—";
 const TAXA_BOLETO = 3.5;
 
+// Parcela só é "Atrasado" a partir do dia seguinte ao vencimento (comparação em data local).
+const isAtrasado = (vencimento?: string | null) => {
+  if (!vencimento) return false;
+  const [y, m, d] = vencimento.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return false;
+  const venc = new Date(y, m - 1, d);
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  return hoje.getTime() > venc.getTime();
+};
+
 type Convenio = {
   id: string;
   nome: string;
