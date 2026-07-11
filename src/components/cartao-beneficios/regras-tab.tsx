@@ -595,6 +595,16 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         procOpts={procOpts}
         onSaved={async () => { setNovoOpen(false); await load(); }}
       />
+      <NovaRegraDialog
+        open={editRegra != null}
+        onClose={() => setEditRegra(null)}
+        convenioId={convenioId}
+        clinicaId={clinicaId}
+        espOpts={espOpts}
+        procOpts={procOpts}
+        regra={editRegra}
+        onSaved={async () => { setEditRegra(null); await load(); }}
+      />
     </div>
   );
 }
