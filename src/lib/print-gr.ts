@@ -833,7 +833,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const [agsRes, cliRes, procsRes, lancsRes] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento")
+      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, tipo_atendimento")
       .in("id", ids),
     supabase
       .from("clinicas")
