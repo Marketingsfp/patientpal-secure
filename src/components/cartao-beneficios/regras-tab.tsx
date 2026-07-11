@@ -1018,7 +1018,18 @@ function NovaRegraDialog({
               <Label className="text-xs">Categoria</Label>
               <Select
                 value={r.tipo ?? "__any__"}
-                onValueChange={(v) => upd({ tipo: v === "__any__" ? null : v })}
+                onValueChange={(v) => {
+                  const novoTipo = v === "__any__" ? null : v;
+                  const patch: Partial<CbRegra> = { tipo: novoTipo };
+                  // Se o serviço atual não pertencer à nova categoria, limpa
+                  if (r.procedimento_id && novoTipo) {
+                    const p = procOpts.find(o => o.value === r.procedimento_id);
+                    if (p && (p.tipo ?? "").toLowerCase() !== novoTipo.toLowerCase()) {
+                      patch.procedimento_id = null;
+                    }
+                  }
+                  upd(patch);
+                }}
                 disabled={!!r.procedimento_id}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1033,7 +1044,7 @@ function NovaRegraDialog({
           <div className="space-y-1.5">
             <Label className="text-xs">Serviço específico (opcional)</Label>
             <SearchableSelect
-              options={procOpts}
+              options={procOptsFiltrados}
               value={r.procedimento_id ?? "__any__"}
               onChange={(v) => upd({
                 procedimento_id: v === "__any__" ? null : v,
@@ -1041,7 +1052,10 @@ function NovaRegraDialog({
               })}
               placeholder="Qualquer serviço"
             />
-            <p className="text-[11px] text-muted-foreground">Quando escolhido, esta regra vale apenas para este serviço.</p>
+            <p className="text-[11px] text-muted-foreground">
+              Quando escolhido, esta regra vale apenas para este serviço.
+              {r.tipo ? ` Mostrando apenas serviços da categoria "${r.tipo}".` : ""}
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t pt-3">
