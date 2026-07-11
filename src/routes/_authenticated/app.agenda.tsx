@@ -3259,96 +3259,38 @@ function AgendaPage() {
         setAvisoConvenio({ tom: "error", mensagem: "Não foi possível registrar: agendamento sem identificador. Recarregue a agenda e tente novamente." });
         return;
       }
-      const { data: lancInserido, error: errSC } = await supabase.from("fin_lancamentos").insert({
-        clinica_id: clinicaAtual.clinica_id,
-        tipo: "receita" as const,
-        descricao: desc,
-        valor: 0,
-        data: new Date().toISOString().slice(0, 10),
-        status: "confirmado" as const,
-        agendamento_id: a.id,
-        forma_pagamento: isGrat ? "convenio_gratuidade" : null,
-        observacoes: isGrat
-          ? `Gratuidade pelo convênio ${info?.convenioNome ?? ""}.`.trim()
-          : "Atendimento sem cobrança (procedimento sem valor).",
-      } as never).select("id").single();
-      if (errSC) {
-        mostrarErro(errSC, isGrat ? "falha ao registrar gratuidade" : "falha ao registrar atendimento sem cobrança");
-        return;
-      }
-      // Espelha o lançamento em `caixa_movimentos` para que gratuidades e
-      // atendimentos sem cobrança apareçam em "Meu caixa > Movimentos".
-      // Se o caixa falhar, revertemos o lançamento (correção do bug crítico:
-      // receita "confirmado" sem movimento de caixa).
-      let caixaOk = true;
-      let caixaErrMsg = "";
-      try {
-        if (user?.id) {
-          let { data: sess } = await supabase
-            .from("caixa_sessoes")
-            .select("id")
-            .eq("clinica_id", clinicaAtual.clinica_id)
-            .eq("user_id", user.id)
-            .eq("status", "aberto")
-            .order("aberto_em", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (!sess) {
-            const nome = (user.user_metadata as { nome?: string } | null)?.nome ?? user.email ?? null;
-            const { data: novaSess, error: errSess } = await supabase
-              .from("caixa_sessoes")
-              .insert({
-                clinica_id: clinicaAtual.clinica_id,
-                user_id: user.id,
-                user_nome: nome,
-                valor_abertura: 0,
-                status: "aberto",
-                observacoes: "Aberto automaticamente pelo sistema",
-              } as never)
-              .select("id")
-              .single();
-            if (errSess) throw errSess;
-            sess = novaSess;
-            if (sess?.id) {
-              const { error: errAb } = await supabase.from("caixa_movimentos").insert({
-                sessao_id: sess.id,
-                clinica_id: clinicaAtual.clinica_id,
-                user_id: user.id,
-                tipo: "abertura",
-                valor: 0,
-                descricao: "Abertura automática",
-              } as never);
-              if (errAb) throw errAb;
-            }
-          }
-          if (sess?.id) {
-            const { error: errMov } = await supabase.from("caixa_movimentos").insert({
-              sessao_id: sess.id,
-              clinica_id: clinicaAtual.clinica_id,
+      // Abordagem B (RPC atômica): banco garante em uma única transação a
+      // criação do lançamento + movimento (e a abertura automática da sessão
+      // de caixa quando necessário). Se qualquer etapa falhar, tudo é
+      // revertido pelo Postgres — não há mais janela para lançamento órfão.
+      const nomeUsuario = (user?.user_metadata as { nome?: string } | null)?.nome ?? user?.email ?? null;
+      const { error: errRpc } = await supabase.rpc("fn_registrar_lancamento_e_caixa", {
+        p_lancamento: {
+          clinica_id: clinicaAtual.clinica_id,
+          tipo: "receita",
+          descricao: desc,
+          valor: 0,
+          data: new Date().toISOString().slice(0, 10),
+          status: "confirmado",
+          agendamento_id: a.id,
+          forma_pagamento: isGrat ? "convenio_gratuidade" : null,
+          observacoes: isGrat
+            ? `Gratuidade pelo convênio ${info?.convenioNome ?? ""}.`.trim()
+            : "Atendimento sem cobrança (procedimento sem valor).",
+        },
+        p_movimento: user?.id
+          ? {
               user_id: user.id,
+              user_nome: nomeUsuario,
               tipo: "recebimento",
               valor: 0,
               descricao: desc,
               forma_pagamento: isGrat ? "convenio_gratuidade" : "sem_cobranca",
-              lancamento_id: (lancInserido as { id?: string } | null)?.id ?? null,
-            } as never);
-            if (errMov) throw errMov;
-          }
-        }
-      } catch (e) {
-        caixaOk = false;
-        caixaErrMsg = e instanceof Error ? e.message : String(e);
-        console.error("Falha ao registrar gratuidade/sem-cobrança no caixa — revertendo lançamento:", e);
-      }
-      if (!caixaOk) {
-        const lancId = (lancInserido as { id?: string } | null)?.id;
-        try {
-          if (lancId) await supabase.from("fin_lancamentos").delete().eq("id", lancId);
-          setAvisoConvenio({ tom: "error", mensagem: `Não foi possível registrar no caixa. Lançamento revertido. Detalhe: ${caixaErrMsg}` });
-        } catch (rbErr) {
-          console.error("Falha no rollback:", rbErr);
-          setAvisoConvenio({ tom: "error", mensagem: `ERRO CRÍTICO: caixa falhou e o lançamento (id ${lancId ?? "?"}) não pôde ser revertido. Contate o suporte.` });
-        }
+            }
+          : null,
+      });
+      if (errRpc) {
+        mostrarErro(errRpc, isGrat ? "falha ao registrar gratuidade" : "falha ao registrar atendimento sem cobrança");
         return;
       }
       setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
