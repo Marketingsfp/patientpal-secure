@@ -1022,6 +1022,18 @@ function NovaRegraDialog({
                 )}
               </div>
             )}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Grupo de gratuidade (opcional)</Label>
+              <Input
+                value={r.grupo_gratuidade ?? ""}
+                onChange={(e) => upd({ grupo_gratuidade: e.target.value })}
+                placeholder='Ex.: "mama-preventivo"'
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Regras com o mesmo grupo dividem a mesma cota (ex.: 1 exame grátis
+                que pode ser Mamografia OU USG Mama).
+              </p>
+            </div>
           </div>
 
           <div className="border-t pt-3 text-xs text-muted-foreground">
