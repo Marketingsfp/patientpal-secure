@@ -979,6 +979,14 @@ function AgendaPage() {
   // Aviso do convênio (limite/gratuidade/bloqueio) — modal persistente que
   // o atendente precisa fechar para continuar o atendimento.
   const [avisoConvenio, setAvisoConvenio] = useState<{ tom: "warning" | "error"; mensagem: string } | null>(null);
+  // Modal de confirmação da gratuidade — pergunta "usar agora ou depois"
+  // antes de aplicar o benefício. Se "depois", cobra particular.
+  const [gratuidadePrompt, setGratuidadePrompt] = useState<{
+    convenioNome: string;
+    resolve: (choice: "agora" | "depois" | "cancel") => void;
+  } | null>(null);
+  const perguntarGratuidade = (convenioNome: string): Promise<"agora" | "depois" | "cancel"> =>
+    new Promise((resolve) => setGratuidadePrompt({ convenioNome, resolve }));
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
