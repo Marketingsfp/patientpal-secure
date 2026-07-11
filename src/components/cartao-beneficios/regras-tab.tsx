@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Plus, Trash2, RefreshCw, Timer, Pencil, Check } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Trash2, RefreshCw, Timer, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,7 +58,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [progress, setProgress] = useState<string>("");
   const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
   const [novoOpen, setNovoOpen] = useState(false);
-  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editRegra, setEditRegra] = useState<CbRegra | null>(null);
   const [filtroGratuito, setFiltroGratuito] = useState<"todos" | "sim" | "nao">("todos");
   const [filtroCarencia, setFiltroCarencia] = useState<string>("todos");
   const [filtroLimite, setFiltroLimite] = useState<"todos" | "com" | "sem">("todos");
@@ -319,19 +319,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       setReapplying(false);
       setProgress("");
     }
-  };
-
-  // Pré-visualização: aplica primeira regra encontrada num serviço fictício
-  const sample = (r: CbRegra): ReactNode => {
-    const v = computeValor(r, 100, 100);
-    if (!v) return "—";
-    if (r.modo === "valor_fixo") return `R$ ${v.dinheiro.toFixed(2)}`;
-    return (
-      <>
-        <div>de R$ 100</div>
-        <div>→ R$ {v.dinheiro.toFixed(2)}</div>
-      </>
-    );
   };
 
   if (!convenioId) {
