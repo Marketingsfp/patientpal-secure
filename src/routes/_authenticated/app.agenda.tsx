@@ -286,7 +286,12 @@ async function obterInfoConvenioPaciente(params: {
   const mensalidadesPagas = pagasCount ?? 0;
 
   // 3) Busca procedimento_id e especialidade do médico
-  const procNorm = (procedimentoNome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  // Remove sufixo de desambiguação " (ESPECIALIDADE)" para casar com o cadastro
+  // — a agenda grava o serviço como "CONSULTA (GINECOLOGIA)" mas o cadastro tem
+  // só "CONSULTA". Sem isso, procedimentoTipo/procedimentoId ficavam null e
+  // regras por tipo/especialidade não eram aplicadas.
+  const procNomeBase = (procedimentoNome ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim();
+  const procNorm = procNomeBase.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const { data: procs } = await supabase
     .from("procedimentos")
     .select("id,nome,tipo")
