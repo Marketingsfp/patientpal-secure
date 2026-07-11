@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, RefreshCw, Timer, Gift } from "lucide-react";
+import { Plus, Trash2, RefreshCw, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -419,8 +419,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                 { c: "min-w-[140px]", l: "Exemplo" },
                 { c: "", l: "Limite" },
                 { c: "", l: "Carência" },
-                { c: "text-center", l: "Gratuito" },
-                { c: "w-10", l: "" },
+                { c: "text-center w-16 px-1", l: "Gratuito" },
+                { c: "w-8 px-0", l: "" },
               ].map((h, i) => (
                 <TableHead
                   key={i}
@@ -543,8 +543,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     </SelectContent>
                   </Select>
                 </TableCell>
-                <TableCell className="text-center">
-                  <div className="flex items-center justify-center gap-1" title="Marca como cortesia (valor 0, exibido como Gratuito)">
+                <TableCell className="text-center w-16 px-1">
+                  <div className="flex items-center justify-center" title="Marca como cortesia (valor 0, exibido como Gratuito)">
                     <Checkbox
                       checked={!!r.gratuito}
                       onCheckedChange={(v) => {
@@ -554,11 +554,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                           : { gratuito: false });
                       }}
                     />
-                    {r.gratuito && <Gift className="h-3.5 w-3.5 text-emerald-600" />}
                   </div>
                 </TableCell>
-                <TableCell>
-                  <Button size="sm" variant="ghost" onClick={() => remove(idx)}>
+                <TableCell className="w-8 px-0">
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => remove(idx)}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </TableCell>
@@ -915,10 +914,7 @@ function NovaRegraDialog({
                       : { gratuito: false });
                   }}
                 />
-                <span className="text-sm flex items-center gap-1">
-                  {r.gratuito && <Gift className="h-3.5 w-3.5 text-emerald-600" />}
-                  Gratuito (valor 0)
-                </span>
+                <span className="text-sm">Gratuito (valor 0)</span>
               </div>
             </div>
           </div>
