@@ -366,7 +366,6 @@ function NovoContratoForm({
   const [convenioId, setConvenioId] = useState(convenios[0]?.id ?? "");
   const convenio = convenios.find((c) => c.id === convenioId);
   const [faixas, setFaixas] = useState<Faixa[]>([]);
-  const [beneficios, setBeneficios] = useState<Beneficio[]>([]);
   const [titular, setTitular] = useState<Paciente | null>(null);
   const [clientes, setClientes] = useState<Paciente[]>([]);
   const [titularOpen, setTitularOpen] = useState(false);
