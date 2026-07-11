@@ -400,6 +400,15 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
             <RefreshCw className={`h-4 w-4 mr-1 ${reapplying ? "animate-spin" : ""}`} />
             {reapplying ? (progress || "Aplicando…") : "Reaplicar a todos os serviços"}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setApagarTodasOpen(true)}
+            disabled={regras.length === 0 || reapplying}
+          >
+            <Trash2 className="h-4 w-4 mr-1" /> Apagar todas as regras
+          </Button>
         </div>
       </div>
 
