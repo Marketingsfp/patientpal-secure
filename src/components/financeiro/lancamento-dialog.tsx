@@ -472,9 +472,9 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       paciente_id: pacienteId,
       criado_por: user?.id ?? null,
     } as never).select("id").single();
-    setSaving(false);
-    if (error) { mostrarErro(error); return; }
-    toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
+    if (error) { setSaving(false); mostrarErro(error); return; }
+    // NÃO exibir toast.success ainda — só depois do caixa confirmar (correção
+    // do bug crítico: lançamento confirmado sem movimento de caixa).
     // Sincroniza `tipo_atendimento` do agendamento com o que foi pago,
     // para que o check-in e relatórios reflitam a decisão final.
     if (agendamentoId && tipo === "receita") {
