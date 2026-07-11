@@ -201,6 +201,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           ? Number(r.excedente_valor ?? 0) : null,
         carencia_mensalidades: Number(r.carencia_mensalidades ?? 0) || 0,
         gratuito: !!r.gratuito,
+        grupo_gratuidade: r.grupo_gratuidade?.trim() ? r.grupo_gratuidade.trim() : null,
       };
       if (r.id.startsWith("new-")) {
         const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
