@@ -187,6 +187,9 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
   const [filtroMensal, setFiltroMensal] = useState<"todos" | "zero" | "ate100" | "100a200" | "acima200">("todos");
   const [filtroVendedor, setFiltroVendedor] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [filtroConvenio, setFiltroConvenio] = useState<string>("todos");
+  const [pagina, setPagina] = useState(1);
+  const POR_PAGINA = 50;
 
   // Termo com debounce para acionar busca server-side sem bater a cada tecla.
   const [qDebounced, setQDebounced] = useState("");
