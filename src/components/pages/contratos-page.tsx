@@ -405,7 +405,7 @@ function NovoContratoForm({
   convenios: Convenio[];
   clinicaId: string;
   userId: string | null;
-  onCreated: () => void;
+  onCreated: (contratoId: string) => void;
 }) {
   const [convenioId, setConvenioId] = useState(convenios[0]?.id ?? "");
   const convenio = convenios.find((c) => c.id === convenioId);
