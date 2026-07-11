@@ -1039,6 +1039,12 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
+  const convLabelAgrupada = await resolveConvLabel(
+    (ags[0] as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
+    pacIdRef ?? null,
+    clinicaId,
+  );
+
   // Cabeçalho da clínica (reutilizado em cada GR)
   const headerClinica = `
     <div class="center bold">${esc(c?.nome ?? "")}</div>
@@ -1052,6 +1058,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
+    ${convLabelAgrupada ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabelAgrupada)}</span></div>` : ""}
   `;
 
   const gruposArr = Array.from(grupos.values());
