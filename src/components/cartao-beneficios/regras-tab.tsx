@@ -111,6 +111,46 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     [procedimentos],
   );
 
+  const procById = useMemo(() => {
+    const m = new Map<string, string>();
+    procedimentos.forEach(p => m.set(p.id, p.nome));
+    return m;
+  }, [procedimentos]);
+  const espById = useMemo(() => {
+    const m = new Map<string, string>();
+    especialidades.forEach(e => m.set(e.id, e.nome));
+    return m;
+  }, [especialidades]);
+
+  const regrasFiltradas = useMemo(() => {
+    const HIGH = "\uffff";
+    const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const items = regras
+      .map((r, idx) => ({ r, idx }))
+      .filter(({ r }) => {
+        if (filtroGratuito === "sim" && !r.gratuito) return false;
+        if (filtroGratuito === "nao" && r.gratuito) return false;
+        if (filtroCarencia !== "todos" && Number(r.carencia_mensalidades ?? 0) !== Number(filtroCarencia)) return false;
+        const hasLimit = r.limite_qtd != null && Number(r.limite_qtd) > 0;
+        if (filtroLimite === "com" && !hasLimit) return false;
+        if (filtroLimite === "sem" && hasLimit) return false;
+        return true;
+      });
+    items.sort((a, b) => {
+      const sa = a.r.procedimento_id ? norm(procById.get(a.r.procedimento_id) ?? "") : HIGH;
+      const sb = b.r.procedimento_id ? norm(procById.get(b.r.procedimento_id) ?? "") : HIGH;
+      if (sa !== sb) return sa < sb ? -1 : 1;
+      const ea = a.r.especialidade_id ? norm(espById.get(a.r.especialidade_id) ?? "") : HIGH;
+      const eb = b.r.especialidade_id ? norm(espById.get(b.r.especialidade_id) ?? "") : HIGH;
+      if (ea !== eb) return ea < eb ? -1 : 1;
+      const ta = a.r.tipo ? norm(a.r.tipo) : HIGH;
+      const tb = b.r.tipo ? norm(b.r.tipo) : HIGH;
+      if (ta !== tb) return ta < tb ? -1 : 1;
+      return 0;
+    });
+    return items;
+  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, procById, espById]);
+
   const addRegra = () => {
     if (!convenioId) return;
     setNovoOpen(true);
