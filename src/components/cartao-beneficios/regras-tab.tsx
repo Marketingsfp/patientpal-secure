@@ -17,6 +17,16 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
 
@@ -59,6 +69,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
   const [novoOpen, setNovoOpen] = useState(false);
   const [editRegra, setEditRegra] = useState<CbRegra | null>(null);
+  const [apagarTodasOpen, setApagarTodasOpen] = useState(false);
+  const [apagandoTodas, setApagandoTodas] = useState(false);
   const [filtroGratuito, setFiltroGratuito] = useState<"todos" | "sim" | "nao">("todos");
   const [filtroCarencia, setFiltroCarencia] = useState<string>("todos");
   const [filtroLimite, setFiltroLimite] = useState<"todos" | "com" | "sem">("todos");
@@ -198,6 +210,23 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       if (error) { mostrarErro(error); return; }
     }
     setRegras(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const apagarTodas = async () => {
+    if (!convenioId) return;
+    setApagandoTodas(true);
+    try {
+      const { error } = await (supabase as any)
+        .from("cb_convenio_regras")
+        .delete()
+        .eq("convenio_id", convenioId);
+      if (error) { mostrarErro(error); return; }
+      setRegras([]);
+      toast.success("Todas as regras foram apagadas.");
+      setApagarTodasOpen(false);
+    } finally {
+      setApagandoTodas(false);
+    }
   };
 
   const salvar = async () => {
@@ -370,6 +399,15 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           <Button variant="outline" size="sm" onClick={reaplicar} disabled={reapplying || regras.length === 0}>
             <RefreshCw className={`h-4 w-4 mr-1 ${reapplying ? "animate-spin" : ""}`} />
             {reapplying ? (progress || "Aplicando…") : "Reaplicar a todos os serviços"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setApagarTodasOpen(true)}
+            disabled={regras.length === 0 || reapplying}
+          >
+            <Trash2 className="h-4 w-4 mr-1" /> Apagar todas as regras
           </Button>
         </div>
       </div>
@@ -700,6 +738,28 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         regra={editRegra}
         onSaved={async () => { setEditRegra(null); await load(); }}
       />
+      <AlertDialog open={apagarTodasOpen} onOpenChange={setApagarTodasOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar todas as regras?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação vai remover permanentemente as <strong>{regras.length}</strong> regra(s) de preço do convênio
+              <strong> "{convenioNome}"</strong>. Os valores já aplicados aos serviços não serão alterados, mas nenhuma nova
+              regra ficará disponível até que você cadastre outras. Esta operação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={apagandoTodas}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); void apagarTodas(); }}
+              disabled={apagandoTodas}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {apagandoTodas ? "Apagando…" : "Sim, apagar tudo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
