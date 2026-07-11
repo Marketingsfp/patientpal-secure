@@ -605,6 +605,40 @@ async function obterInfoConvenioPaciente(params: {
           avisoLimite = consumidorTxt
             ? `${consumidorTxt}Cobrando ${100 - pct}% do valor particular neste atendimento.`
             : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — cobrando ${100 - pct}% do valor particular.`;
+        } else if (modo === "regra_padrao_convenio") {
+          // Fallback: procura a próxima regra do mesmo convênio para este
+          // procedimento excluindo regras gratuitas. Aplica o desconto dessa
+          // regra como se o benefício gratuito não existisse.
+          let fallback: any = null;
+          for (const eid of espsTentativa) {
+            const r = findRegra(regrasCb as any, eid, procedimentoTipo, procedimentoId, { excludeGratuito: true });
+            if (r) { fallback = r; break; }
+          }
+          if (fallback) {
+            if (fallback.modo === "valor_fixo") {
+              const v = Number(fallback.valor) || 0;
+              desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };
+              avisoLimite = consumidorTxt
+                ? `${consumidorTxt}Aplicando o desconto padrão do convênio (R$ ${v.toFixed(2)}).`
+                : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — aplicando desconto padrão do convênio (R$ ${v.toFixed(2)}).`;
+            } else if (fallback.modo === "percentual_desconto") {
+              const p = Number(fallback.percentual) || 0;
+              desconto = { tipo: "percentual", valor: p };
+              avisoLimite = consumidorTxt
+                ? `${consumidorTxt}Aplicando o desconto padrão do convênio (${p}% off).`
+                : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — aplicando desconto padrão do convênio (${p}% off).`;
+            } else {
+              desconto = null;
+              avisoLimite = consumidorTxt
+                ? `${consumidorTxt}Sem regra padrão configurada — cobrando particular.`
+                : `Limite atingido e sem regra padrão do convênio — cobrando valor particular.`;
+            }
+          } else {
+            desconto = null;
+            avisoLimite = consumidorTxt
+              ? `${consumidorTxt}Não há regra padrão do convênio para este procedimento — cobrando valor particular.`
+              : `Limite atingido e não há regra padrão do convênio — cobrando valor particular.`;
+          }
         }
       } else if (agsPendentes.length >= 1) {
         // Cota ainda não consumida, mas existem outros agendamentos pendentes
