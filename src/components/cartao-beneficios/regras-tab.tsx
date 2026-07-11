@@ -62,6 +62,11 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [filtroGratuito, setFiltroGratuito] = useState<"todos" | "sim" | "nao">("todos");
   const [filtroCarencia, setFiltroCarencia] = useState<string>("todos");
   const [filtroLimite, setFiltroLimite] = useState<"todos" | "com" | "sem">("todos");
+  const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
+  const [filtroTipo, setFiltroTipo] = useState<string>("todos");
+  const [filtroProcedimento, setFiltroProcedimento] = useState<string>("todos");
+  const [filtroModo, setFiltroModo] = useState<string>("todos");
+  const [filtroPrioridade, setFiltroPrioridade] = useState<string>("todos");
 
   const load = async () => {
     if (!convenioId) return;
@@ -139,6 +144,20 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         const hasLimit = r.limite_qtd != null && Number(r.limite_qtd) > 0;
         if (filtroLimite === "com" && !hasLimit) return false;
         if (filtroLimite === "sem" && hasLimit) return false;
+        if (filtroEspecialidade !== "todos") {
+          if (filtroEspecialidade === "__any__") { if (r.especialidade_id) return false; }
+          else if (r.especialidade_id !== filtroEspecialidade) return false;
+        }
+        if (filtroTipo !== "todos") {
+          if (filtroTipo === "__any__") { if (r.tipo) return false; }
+          else if ((r.tipo ?? "").toLowerCase() !== filtroTipo) return false;
+        }
+        if (filtroProcedimento !== "todos") {
+          if (filtroProcedimento === "__any__") { if (r.procedimento_id) return false; }
+          else if (r.procedimento_id !== filtroProcedimento) return false;
+        }
+        if (filtroModo !== "todos" && r.modo !== filtroModo) return false;
+        if (filtroPrioridade !== "todos" && Number(r.prioridade) !== Number(filtroPrioridade)) return false;
         return true;
       });
     items.sort((a, b) => {
@@ -154,7 +173,13 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       return 0;
     });
     return items;
-  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, procById, espById]);
+  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, filtroEspecialidade, filtroTipo, filtroProcedimento, filtroModo, filtroPrioridade, procById, espById]);
+
+  const prioridadesUsadas = useMemo(() => {
+    const s = new Set<number>();
+    regras.forEach(r => s.add(Number(r.prioridade) || 0));
+    return Array.from(s).sort((a, b) => b - a);
+  }, [regras]);
 
   const addRegra = () => {
     if (!convenioId) return;
