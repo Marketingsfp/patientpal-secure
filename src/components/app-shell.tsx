@@ -729,6 +729,85 @@ export function AppShell() {
         </Suspense>
       )}
       <KeyboardShortcuts />
+      {!isChooser && (
+        <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+          <SheetContent
+            side="left"
+            className="w-[280px] p-0 border-0 text-white overflow-y-auto md:hidden"
+            style={{ backgroundColor: clinicColor }}
+          >
+            <SheetHeader className="px-4 py-3 border-b border-white/10 text-left">
+              <SheetTitle className="text-white flex items-center gap-2 text-base">
+                <Activity className="h-5 w-5" />
+                ClinicaOS
+              </SheetTitle>
+            </SheetHeader>
+            <nav className="px-2 py-3 space-y-4">
+              {visibleNavRows.map((row) => (
+                <div key={row.label} className="space-y-1">
+                  <div className="px-3 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">
+                    {row.label}
+                  </div>
+                  {row.items.map((item) => {
+                    if (isParent(item)) {
+                      return (
+                        <div key={item.label} className="space-y-0.5">
+                          <div className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white/70">
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{item.label}</span>
+                          </div>
+                          {item.children.map((child) => {
+                            const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
+                            return (
+                              <a
+                                key={`${child.to}#${child.hash ?? ""}`}
+                                href={href}
+                                onClick={(e) => {
+                                  if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+                                  e.preventDefault();
+                                  setMobileNavOpen(false);
+                                  window.location.assign(href);
+                                }}
+                                className="flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-full text-sm text-white/85 hover:bg-white/10 hover:text-white"
+                              >
+                                <child.icon className="h-4 w-4 shrink-0" />
+                                <span className="truncate">{child.label}</span>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      );
+                    }
+                    const active =
+                      location.pathname === item.to ||
+                      (item.to !== "/app" && location.pathname.startsWith(item.to));
+                    return (
+                      <a
+                        key={item.to}
+                        href={item.to}
+                        onClick={(e) => {
+                          if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+                          e.preventDefault();
+                          setMobileNavOpen(false);
+                          window.location.assign(item.to);
+                        }}
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-full text-sm font-medium ${
+                          active
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-white/85 hover:bg-white/10 hover:text-white"
+                        }`}
+                      >
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{item.label}</span>
+                      </a>
+                    );
+                  })}
+                </div>
+              ))}
+            </nav>
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }
