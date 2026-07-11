@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins, FileBarChart2 } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins, FileBarChart2, Menu as MenuIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -48,6 +48,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 const VoiceInput = lazy(() => import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })));
 const ChangePasswordDialog = lazy(() =>
@@ -201,6 +202,9 @@ export function AppShell() {
 
   const [profileName, setProfileName] = useState<string>("");
   const [pwOpen, setPwOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Fecha o drawer mobile ao navegar
+  useEffect(() => { setMobileNavOpen(false); }, [location.pathname, location.hash]);
   useEffect(() => {
     if (!user?.id) { setProfileName(""); return; }
     let cancelled = false;
@@ -450,11 +454,13 @@ export function AppShell() {
   return (
     <div className="h-screen flex bg-background overflow-hidden">
       {!isChooser && useMenuV2 && (
-        <MenuV2 perfil={perfilV2} clinicColor={clinicColor} />
+        <div className="hidden md:flex h-screen">
+          <MenuV2 perfil={perfilV2} clinicColor={clinicColor} />
+        </div>
       )}
       {!isChooser && !useMenuV2 && (
       <aside
-        className={`${collapsed ? "w-16" : "w-64"} transition-all duration-200 shrink-0 text-white h-screen overflow-hidden flex flex-col`}
+        className={`${collapsed ? "w-16" : "w-64"} transition-all duration-200 shrink-0 text-white h-screen overflow-hidden hidden md:flex flex-col`}
         style={{ backgroundColor: clinicColor }}
       >
         <div className="px-3 py-3 border-b border-white/10 flex items-center justify-between gap-2">
@@ -617,6 +623,17 @@ export function AppShell() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-30 h-[50px] bg-card/80 backdrop-blur border-b flex items-center gap-2 px-3 sm:px-5">
+          {!isChooser && (
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              className="md:hidden h-9 w-9 -ml-1 rounded-md flex items-center justify-center hover:bg-muted shrink-0"
+              aria-label="Abrir menu"
+              title="Menu"
+            >
+              <MenuIcon className="h-5 w-5" />
+            </button>
+          )}
           <div className="flex items-center gap-2 min-w-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -661,7 +678,7 @@ export function AppShell() {
                 else setClinicaAtual(v);
               }}
             >
-              <SelectTrigger className="w-full min-w-0 max-w-[260px] sm:w-[220px] md:w-[260px] h-8 text-xs shrink">
+              <SelectTrigger className="w-[120px] sm:w-[180px] md:w-[240px] max-w-full min-w-0 h-8 text-xs shrink">
                 <SelectValue placeholder="Selecione a clínica" />
               </SelectTrigger>
               <SelectContent>
@@ -712,6 +729,85 @@ export function AppShell() {
         </Suspense>
       )}
       <KeyboardShortcuts />
+      {!isChooser && (
+        <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+          <SheetContent
+            side="left"
+            className="w-[280px] p-0 border-0 text-white overflow-y-auto md:hidden"
+            style={{ backgroundColor: clinicColor }}
+          >
+            <SheetHeader className="px-4 py-3 border-b border-white/10 text-left">
+              <SheetTitle className="text-white flex items-center gap-2 text-base">
+                <Activity className="h-5 w-5" />
+                ClinicaOS
+              </SheetTitle>
+            </SheetHeader>
+            <nav className="px-2 py-3 space-y-4">
+              {visibleNavRows.map((row) => (
+                <div key={row.label} className="space-y-1">
+                  <div className="px-3 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">
+                    {row.label}
+                  </div>
+                  {row.items.map((item) => {
+                    if (isParent(item)) {
+                      return (
+                        <div key={item.label} className="space-y-0.5">
+                          <div className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white/70">
+                            <item.icon className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{item.label}</span>
+                          </div>
+                          {item.children.map((child) => {
+                            const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
+                            return (
+                              <a
+                                key={`${child.to}#${child.hash ?? ""}`}
+                                href={href}
+                                onClick={(e) => {
+                                  if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+                                  e.preventDefault();
+                                  setMobileNavOpen(false);
+                                  window.location.assign(href);
+                                }}
+                                className="flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-full text-sm text-white/85 hover:bg-white/10 hover:text-white"
+                              >
+                                <child.icon className="h-4 w-4 shrink-0" />
+                                <span className="truncate">{child.label}</span>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      );
+                    }
+                    const active =
+                      location.pathname === item.to ||
+                      (item.to !== "/app" && location.pathname.startsWith(item.to));
+                    return (
+                      <a
+                        key={item.to}
+                        href={item.to}
+                        onClick={(e) => {
+                          if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+                          e.preventDefault();
+                          setMobileNavOpen(false);
+                          window.location.assign(item.to);
+                        }}
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-full text-sm font-medium ${
+                          active
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-white/85 hover:bg-white/10 hover:text-white"
+                        }`}
+                      >
+                        <item.icon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{item.label}</span>
+                      </a>
+                    );
+                  })}
+                </div>
+              ))}
+            </nav>
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }
