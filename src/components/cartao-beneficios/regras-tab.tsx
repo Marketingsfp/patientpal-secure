@@ -427,7 +427,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                 { c: "w-[100px]", l: "Limite" },
                 { c: "w-[92px]", l: "Carência" },
                 { c: "text-center w-[52px] !px-1", l: "Gratuito" },
-                { c: "w-[32px] !px-0", l: "" },
+                { c: "w-[64px] !px-0", l: "" },
               ].map((h, i) => (
                 <TableHead
                   key={i}
