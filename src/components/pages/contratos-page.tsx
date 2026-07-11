@@ -705,7 +705,7 @@ function NovoContratoForm({
         }
       }
     }
-    onCreated();
+    onCreated(contrato.id);
   };
 
   return (
