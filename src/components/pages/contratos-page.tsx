@@ -500,7 +500,23 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                   </span>
                 </button>
               </TableHead>
-              <TableHead>TIPO DE CONVÊNIO</TableHead>
+              <TableHead>
+                <Select value={filtroConvenio} onValueChange={setFiltroConvenio}>
+                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                    <span className="inline-flex items-center gap-1">
+                      TIPO DE CONVÊNIO
+                      {filtroConvenio !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="sem">Sem convênio</SelectItem>
+                    {convenios.map((cv) => (
+                      <SelectItem key={cv.id} value={cv.id}>{cv.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TableHead>
               <TableHead>
                 <Select value={filtroInicio} onValueChange={(v) => setFiltroInicio(v as typeof filtroInicio)}>
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
