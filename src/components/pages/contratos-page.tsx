@@ -2287,14 +2287,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
                               variant={
                                 m.status === "pago"
                                   ? "default"
-                                  : new Date(m.vencimento) < new Date()
+                                  : isAtrasado(m.vencimento)
                                     ? "destructive"
                                     : "outline"
                               }
                             >
                               {m.status === "pago"
                                 ? "Pago"
-                                : new Date(m.vencimento) < new Date()
+                                : isAtrasado(m.vencimento)
                                   ? "Atrasado"
                                   : "Pendente"}
                             </Badge>
@@ -2660,12 +2660,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           variant={
                             m.status === "pago"
                               ? "default"
-                              : new Date(m.vencimento) < new Date()
+                              : isAtrasado(m.vencimento)
                                 ? "destructive"
                                 : "outline"
                           }
                         >
-                          {m.status === "pago" ? "Pago" : new Date(m.vencimento) < new Date() ? "Atrasado" : "Pendente"}
+                          {m.status === "pago" ? "Pago" : isAtrasado(m.vencimento) ? "Atrasado" : "Pendente"}
                         </Badge>
                       </TableCell>
                       <TableCell>{m.pago_em ? fmtD(m.pago_em) : "—"}</TableCell>
