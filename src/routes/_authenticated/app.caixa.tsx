@@ -761,7 +761,10 @@ function Page() {
     }
     if (linhasValidadas.length === 0) { toast.error("Adicione ao menos uma forma de pagamento"); return; }
     setSaving(true);
-    // Escopo externo ao try para permitir rollback no catch.
+    // Escopo externo ao try para permitir rollback inter-linhas no catch.
+    // Cada par (lançamento + movimento) é atômico via RPC no banco
+    // (Abordagem B). Estas listas apenas rastreiam pares JÁ confirmados
+    // pelo banco para desfazê-los caso uma linha POSTERIOR falhe.
     const movimentosInseridos: string[] = [];
     const lancamentosInseridos: string[] = [];
     try {
@@ -788,37 +791,41 @@ function Page() {
         .maybeSingle();
       const medicoId = (ag as { medico_id: string | null } | null)?.medico_id ?? null;
       const hoje = new Date().toISOString().slice(0, 10);
-      // Rastreio para rollback: se qualquer lançamento falhar, apagamos os
-      // movimentos de caixa já inseridos neste ciclo (bug crítico corrigido:
-      // caixa registrado sem lançamento correspondente ou vice-versa).
+      // Cada linha vira um par atômico (lançamento + movimento) via RPC.
+      // Se a inserção do movimento falhar dentro do banco, o lançamento
+      // é revertido automaticamente pela transação Postgres — não há mais
+      // janela para lançamento órfão sem movimento correspondente.
       for (const l of linhasValidadas) {
         const sufixoCartao = montarSufixoCartao(l.forma, l.bandeira, l.parcelas);
-        const { data: movRow, error: e1 } = await supabase.from("caixa_movimentos").insert({
-          sessao_id: minhaSessao.id,
-          clinica_id: clinicaAtual.clinica_id,
-          user_id: user.id,
-          tipo: "recebimento",
-          valor: l.valor,
-          descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}`,
-          forma_pagamento: l.forma,
-        }).select("id").single();
-        if (e1) throw e1;
-        if (movRow?.id) movimentosInseridos.push(movRow.id);
-        const { data: lancRow, error: e2 } = await supabase.from("fin_lancamentos").insert({
-          clinica_id: clinicaAtual.clinica_id,
-          tipo: "receita",
-          descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})${sufixoCartao}`,
-          valor: l.valor,
-          data: hoje,
-          status: "confirmado",
-          forma_pagamento: l.forma,
-          paciente_id: openCobranca.paciente_id,
-          agendamento_id: openCobranca.id,
-          medico_id: medicoId,
-          criado_por: user.id,
-        } as never).select("id").single();
-        if (e2) throw e2;
-        if ((lancRow as { id?: string } | null)?.id) lancamentosInseridos.push((lancRow as { id: string }).id);
+        const { data: rpcData, error: rpcErr } = await supabase.rpc(
+          "fn_registrar_lancamento_e_caixa",
+          {
+            p_lancamento: {
+              clinica_id: clinicaAtual.clinica_id,
+              tipo: "receita",
+              descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})${sufixoCartao}`,
+              valor: l.valor,
+              data: hoje,
+              status: "confirmado",
+              forma_pagamento: l.forma,
+              paciente_id: openCobranca.paciente_id,
+              agendamento_id: openCobranca.id,
+              medico_id: medicoId,
+              criado_por: user.id,
+            },
+            p_movimento: {
+              user_id: user.id,
+              tipo: "recebimento",
+              valor: l.valor,
+              descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}`,
+              forma_pagamento: l.forma,
+            },
+          },
+        );
+        if (rpcErr) throw rpcErr;
+        const ids = (rpcData ?? {}) as { lancamento_id?: string; movimento_id?: string };
+        if (ids.lancamento_id) lancamentosInseridos.push(ids.lancamento_id);
+        if (ids.movimento_id) movimentosInseridos.push(ids.movimento_id);
       }
       const { error: e3 } = await supabase.from("agendamentos")
         .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
