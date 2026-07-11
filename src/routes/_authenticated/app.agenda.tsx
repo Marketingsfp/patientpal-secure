@@ -5120,12 +5120,12 @@ function AgendaPage() {
                     <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
                   </TableCell>
                   <TableCell className="font-mono text-sm">{fichaNum}</TableCell>
-                  <TableCell className="text-sm">{fmtDiaSemana(a.inicio)}</TableCell>
-                  <TableCell className="text-sm">{fmtData(a.inicio)}</TableCell>
+                  <TableCell className="text-sm hidden md:table-cell">{fmtDiaSemana(a.inicio)}</TableCell>
+                  <TableCell className="text-sm hidden md:table-cell">{fmtData(a.inicio)}</TableCell>
                   <TableCell>
                      <span className="text-emerald-600 font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
-                  <TableCell className="pr-1 align-middle max-w-[220px]">
+                  <TableCell className="pr-1 align-middle max-w-[220px] hidden lg:table-cell">
                     {(() => {
                       const m = medicos.find((x) => x.id === a.medico_id);
                       const label = medicoNomeAgendamento(a);
