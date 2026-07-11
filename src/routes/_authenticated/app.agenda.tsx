@@ -3000,7 +3000,7 @@ function AgendaPage() {
     // Roda em paralelo: checagem de pago + lista de procedimentos (cache)
     // + info de convênio do paciente. Antes era serial (3-5s); agora ~= a
     // chamada mais lenta.
-    const [{ data: jaPagos }, lista, info] = await Promise.all([
+    let [{ data: jaPagos }, lista, info] = await Promise.all([
       supabase
         .from("fin_lancamentos")
         .select("id")
