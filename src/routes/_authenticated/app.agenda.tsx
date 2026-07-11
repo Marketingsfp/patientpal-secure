@@ -2999,8 +2999,12 @@ function AgendaPage() {
     // de pagamento normalmente para o operador digitar o valor.
     const algumProcCasou = (procsIndividuais as any[]).some((p) => p != null);
     const ehLab = medicoEhLaboratorioFormulario(a.medico_id);
-    if (!opcoesOrc && totalOpcoes <= 0 && algumProcCasou && !ehLab) {
-      const desc = `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix} — SEM COBRANÇA`;
+    const ehGratuidadeConvenio = info?.desconto?.tipo === "gratuidade" && !opcoesOrc;
+    if (!opcoesOrc && totalOpcoes <= 0 && (algumProcCasou || ehGratuidadeConvenio) && !ehLab) {
+      const isGrat = ehGratuidadeConvenio;
+      const desc = isGrat
+        ? `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`
+        : `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix} — SEM COBRANÇA`;
       const { error: errSC } = await supabase.from("fin_lancamentos").insert({
         clinica_id: clinicaAtual.clinica_id,
         tipo: "receita" as const,
@@ -3009,10 +3013,13 @@ function AgendaPage() {
         data: new Date().toISOString().slice(0, 10),
         status: "confirmado" as const,
         agendamento_id: a.id,
-        observacoes: "Atendimento sem cobrança (procedimento sem valor).",
-      });
+        forma_pagamento: isGrat ? "convenio_gratuidade" : null,
+        observacoes: isGrat
+          ? `Gratuidade pelo convênio ${info?.convenioNome ?? ""}.`.trim()
+          : "Atendimento sem cobrança (procedimento sem valor).",
+      } as never);
       if (errSC) {
-        mostrarErro(errSC, "falha ao registrar atendimento sem cobrança");
+        mostrarErro(errSC, isGrat ? "falha ao registrar gratuidade" : "falha ao registrar atendimento sem cobrança");
         return;
       }
       setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
@@ -3033,7 +3040,31 @@ function AgendaPage() {
       } catch (err) {
         mostrarErro(err);
       }
-      toast.success("Atendimento sem cobrança registrado.");
+      if (isGrat) {
+        toast.success(`Gratuidade aplicada pelo convênio ${info?.convenioNome ?? ""}.`);
+        // Imprime GR normalmente com forma "Convênio Gratuidade".
+        try {
+          const fichaStr = fichaPorId.get(a.id);
+          const fichaNumero = fichaStr && fichaStr !== "—" ? Number(fichaStr) : undefined;
+          await printGuiaAtendimento({
+            agendamentoId: a.id,
+            clinicaId: clinicaAtual.clinica_id,
+            usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+            usuarioId: user?.id ?? null,
+            pagamento: {
+              valor: 0,
+              forma_pagamento: "convenio_gratuidade",
+              parcelas: null,
+              bandeira_cartao: null,
+            },
+            fichaNumero,
+          });
+        } catch (err) {
+          mostrarErro(err);
+        }
+      } else {
+        toast.success("Atendimento sem cobrança registrado.");
+      }
       return;
     }
     setFormaPagOpcoes(opcoes);
