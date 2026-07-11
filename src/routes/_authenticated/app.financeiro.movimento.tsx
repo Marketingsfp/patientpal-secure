@@ -53,7 +53,10 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 function Page() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("financeiro");
-  const podeEstornar = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
+  // Estorno segue a matriz de Perfis de Acesso normalmente (módulo "financeiro"),
+  // não mais uma lista fixa de papéis — qualquer perfil com "Financeiro: edição"
+  // pode estornar.
+  const podeEstornar = podeEscrever;
   const [estornando, setEstornando] = useState<string | null>(null);
   const [items, setItems] = useState<Lanc[]>([]);
   const [cats, setCats] = useState<Opt[]>([]);

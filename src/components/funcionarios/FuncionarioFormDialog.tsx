@@ -11,6 +11,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 
+// "Supervisor" foi removido: não correspondia a nenhum perfil configurável em
+// Perfis de Acesso (sem preset definido, travava o usuário sem acesso algum),
+// e o conceito real de "supervisor" usado no sistema (autorizar desconto/
+// estorno) já é calculado a partir de admin/gestor/financeiro, não de um
+// perfil próprio.
 const PERFIS = [
   { value: "admin", label: "Administrador" },
   { value: "gestor", label: "Gestor" },
@@ -19,7 +24,6 @@ const PERFIS = [
   { value: "recepcao", label: "Recepção" },
   { value: "caixa", label: "Caixa" },
   { value: "financeiro", label: "Financeiro" },
-  { value: "supervisor", label: "Supervisor" },
 ] as const;
 
 interface Ref { id: string; nome: string }

@@ -66,8 +66,11 @@ function StatusBadge({ status }: { status: string }) {
 
 function Page() {
   const { clinicaAtual } = useClinica();
-  const podeEstornar = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
   const podeEscrever = usePodeEscrever("financeiro");
+  // Estorno segue a matriz de Perfis de Acesso normalmente (módulo "financeiro"),
+  // não mais uma lista fixa de papéis — qualquer perfil com "Financeiro: edição"
+  // pode estornar.
+  const podeEstornar = podeEscrever;
   const [items, setItems] = useState<Solic[]>([]);
   const [nomesUsuarios, setNomesUsuarios] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);

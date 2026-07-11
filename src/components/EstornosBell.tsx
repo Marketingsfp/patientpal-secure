@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -28,7 +29,9 @@ export function EstornosBell() {
   const [items, setItems] = useState<Solic[]>([]);
   const [open, setOpen] = useState(false);
 
-  const podeAprovar = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
+  // Segue a matriz de Perfis de Acesso (módulo "financeiro"), não mais uma
+  // lista fixa de papéis.
+  const podeAprovar = usePodeEscrever("financeiro");
 
   const load = useCallback(async () => {
     if (!clinicaAtual) { setItems([]); return; }

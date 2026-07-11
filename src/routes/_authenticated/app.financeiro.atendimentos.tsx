@@ -160,8 +160,11 @@ function FormaPagamentoIcon({ forma }: { forma: string | null | undefined }) {
 function Page() {
   const { clinicaAtual } = useClinica();
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
-  const podeEstornar = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
   const podeEscrever = usePodeEscrever("financeiro");
+  // Estorno segue a matriz de Perfis de Acesso normalmente (módulo "financeiro"),
+  // não mais uma lista fixa de papéis — qualquer perfil com "Financeiro: edição"
+  // pode estornar.
+  const podeEstornar = podeEscrever;
   const [items, setItems] = useState<Atend[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [pacientes, setPacientes] = useState<Pac[]>([]);
