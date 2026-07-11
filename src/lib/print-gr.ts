@@ -116,6 +116,44 @@ function numViasGR(pag?: {
 
 const VIA_LABELS = ["1ª VIA — MÉDICO", "2ª VIA — FINANCEIRO"];
 
+/**
+ * Resolve o rótulo do campo "CONV." da GR a partir do tipo_atendimento do
+ * agendamento. Para "convenio", busca o nome do convênio do contrato ativo
+ * do paciente (titular ou dependente). Para "particular", retorna "PARTICULAR".
+ * Retorna null quando não deve renderizar a linha.
+ */
+async function resolveConvLabel(
+  tipoAtendimento: string | null | undefined,
+  pacienteId: string | null | undefined,
+  clinicaId: string,
+): Promise<string | null> {
+  if (tipoAtendimento === "particular") return "PARTICULAR";
+  if (tipoAtendimento !== "convenio") return null;
+  if (!pacienteId) return "CONVÊNIO";
+  try {
+    const { data: titular } = await supabase
+      .from("contratos_assinatura")
+      .select("id, cb_convenios(nome)")
+      .eq("clinica_id", clinicaId)
+      .eq("status", "ativo")
+      .eq("paciente_id", pacienteId)
+      .limit(1);
+    const t0 = ((titular ?? []) as any[])[0];
+    if (t0?.cb_convenios?.nome) return String(t0.cb_convenios.nome).toUpperCase();
+    const { data: deps } = await supabase
+      .from("contrato_dependentes")
+      .select("contratos_assinatura!inner(id,clinica_id,status,cb_convenios(nome))")
+      .eq("paciente_id", pacienteId)
+      .eq("ativo", true)
+      .limit(5);
+    const cand = ((deps ?? []) as any[])
+      .map((d) => d.contratos_assinatura)
+      .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
+    if (cand?.cb_convenios?.nome) return String(cand.cb_convenios.nome).toUpperCase();
+  } catch { /* fallback */ }
+  return "CONVÊNIO";
+}
+
 // Duplica o HTML de um ou mais tickets para emitir N vias com quebra de
 // página entre elas e um rótulo identificando a via.
 function multiplicarVias(ticketsHtml: string, nVias: number): string {
@@ -245,7 +283,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const [ag, cli] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero")
+      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero, tipo_atendimento")
       .eq("id", agendamentoId)
       .maybeSingle(),
     supabase
@@ -612,6 +650,12 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
+  const convLabel = await resolveConvLabel(
+    (a as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
+    a.paciente_id ?? null,
+    clinicaId,
+  );
+
   const ticketHtml = `
   <div class="ticket">
     <div class="center bold">${esc(c?.nome ?? "")}</div>
@@ -628,6 +672,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
+    ${convLabel ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabel)}</span></div>` : ""}
 
     <div class="sep"></div>
 
@@ -795,7 +840,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const [agsRes, cliRes, procsRes, lancsRes] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento")
+      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, tipo_atendimento")
       .in("id", ids),
     supabase
       .from("clinicas")
@@ -994,6 +1039,12 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
+  const convLabelAgrupada = await resolveConvLabel(
+    (ags[0] as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
+    pacIdRef ?? null,
+    clinicaId,
+  );
+
   // Cabeçalho da clínica (reutilizado em cada GR)
   const headerClinica = `
     <div class="center bold">${esc(c?.nome ?? "")}</div>
@@ -1007,6 +1058,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
+    ${convLabelAgrupada ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabelAgrupada)}</span></div>` : ""}
   `;
 
   const gruposArr = Array.from(grupos.values());

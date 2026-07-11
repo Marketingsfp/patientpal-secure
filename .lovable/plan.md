@@ -1,54 +1,50 @@
-## Diagnóstico
+## Objetivo
 
-Analisei o banco e o código. Encontrei duas causas distintas.
+Adicionar o campo **CONV.** na GUIA DE ATENDIMENTO (GR térmica 80mm) logo abaixo da linha **NASC**, mostrando automaticamente a opção selecionada em "Tipo de atendimento" do agendamento.
 
-### 1. Gratuidades não aparecem nas movimentações do caixa
+## Comportamento
 
-Quando o operador aplica gratuidade / atendimento sem cobrança na agenda, o sistema grava a linha em `fin_lancamentos` (financeiro), mas **não grava nada em `caixa_movimentos`**. A aba "Movimentos da sessão" do "Meu caixa" lê exclusivamente `caixa_movimentos` — por isso a gratuidade fica invisível ali, mesmo estando registrada no financeiro.
+- `tipo_atendimento = "convenio"` → `CONV: <NOME DO CONVÊNIO>` (ex.: `CONV: CARTÃO CONSULTA + SEGUROS`), usando o nome do convênio do contrato ativo do paciente (`cartao_beneficios_contratos` → `cb_convenios.nome`).
+- `tipo_atendimento = "particular"` → `CONV: PARTICULAR`.
+- Sem `tipo_atendimento` ou sem contrato de convênio válido → não renderiza a linha (mantém a GR limpa em vez de mostrar “—”).
+- A linha fica **numa linha só** (mesmo estilo `center sm` das linhas PRONTUÁRIO/CPF/FONE/NASC, `word-break` já herdado — para nomes curtos como “CARTÃO CONSULTA + SEGUROS” não haverá quebra).
 
-Todos os pagamentos "normais" (dinheiro, pix, cartão, misto) passam pelo `LancamentoDialog`, que dispara um insert paralelo em `caixa_movimentos`. O caminho de gratuidade/valor-zero da agenda pula esse dispositivo.
+## Arquivo alterado
 
-### 2. A gratuidade "sumiu" da agenda da Tuane
+`src/lib/print-gr.ts` — layout individual e agrupado (as duas ocorrências da linha `NASC`, ~L630 e ~L1009).
 
-Consultando `fin_lancamentos` da Tuane em 10/07/2026:
+## Implementação técnica
 
-- Dois registros com **valor 9,99** e `agendamento_id` corretamente preenchido → aparecem no caixa e como pagos na agenda.
-- Dois registros com **valor 0,00 / "SEM COBRANÇA"** e `agendamento_id = NULL` → não aparecem no caixa (bug 1) e, por não terem `agendamento_id`, o `pagosSet` da agenda não consegue marcá-los como pagos (o botão $ volta a vermelho).
+1. Incluir `tipo_atendimento` no `.select` de `agendamentos` (L248 e L836).
+2. Após buscar o paciente, quando `tipo_atendimento === "convenio"` e houver `paciente_id`, buscar o contrato ativo:
+   ```
+   supabase
+     .from("cartao_beneficios_contratos")
+     .select("cb_convenios(nome)")
+     .eq("paciente_id", ...)
+     .eq("status", "ativo")
+     .maybeSingle()
+   ```
+   Fallback: se não achar, usar `"CONVÊNIO"` (rótulo genérico) — evita GR sem informação quando o vínculo foi apagado depois do agendamento.
+3. Calcular `convLabel`:
+   - `"convenio"` → `nome.toUpperCase()` do contrato (ou `"CONVÊNIO"` de fallback).
+   - `"particular"` → `"PARTICULAR"`.
+   - outros/nulo → não renderiza.
+4. Inserir logo após a linha NASC:
+   ```html
+   <div class="center sm">CONV: <span class="v">${esc(convLabel)}</span></div>
+   ```
+   Aplicar nos dois blocos de HTML (individual e agrupada).
 
-O `agendamento_id` deveria ter sido setado na hora do insert. A investigação vai focar em duas hipóteses: `a.id` indefinido no fluxo `cobrarAgendamento` para procedimentos com valor 0 sem match no cadastro, ou o `LancamentoDialog` sendo chamado sem `agendamentoId` no fluxo de gratuidade.
+## Fora de escopo
 
-Como esses registros existem mas ficaram órfãos, o consumo do benefício do dia é contado de outras formas (data + paciente + convênio), então o alerta de gratuidade continua disparando na próxima tentativa de pagamento, e o operador não tem como "reverter" pelo botão pago.
+- Não alteramos a lógica de repasse/valores da GR.
+- Não alteramos a UI da Agenda nem o schema.
+- Não mexemos no comprovante de agendamento nem no contrato/carnê.
 
-## Plano de correção
+## Análise dos 4 eixos
 
-### A. Refletir gratuidade / sem cobrança no "Movimentos do caixa"
-
-Em `src/routes/_authenticated/app.agenda.tsx`, no bloco que insere o `fin_lancamentos` de valor zero (gratuidade e SEM COBRANÇA — linhas ~3094-3110), após o insert bem-sucedido:
-
-- Buscar a sessão de caixa aberta do operador (`caixa_sessoes` do usuário atual, sem `data_fechamento`).
-- Inserir uma linha em `caixa_movimentos` com `tipo = 'recebimento'`, `valor = 0`, `forma_pagamento = 'convenio_gratuidade'` (ou `'sem_cobranca'`), `sessao_id`, `lancamento_id` (id retornado do insert), `descricao` idêntica, `criado_por` = usuário atual, `agendamento_id = a.id`.
-- Se não houver sessão aberta, exibir alerta modal orientando abrir o caixa antes de registrar a gratuidade — igual ao padrão que já bloqueia recebimentos normais.
-
-Ajustar também o `LancamentoDialog` para não deixar de gravar `caixa_movimentos` quando `valor = 0` (se hoje há um filtro `> 0`, revê-lo — a gratuidade legítima deve aparecer).
-
-### B. Garantir `agendamento_id` no lançamento de gratuidade
-
-- Adicionar defesa no insert: se `a.id` estiver ausente, abortar com erro visível em vez de gravar linha órfã.
-- No fluxo do `LancamentoDialog` iniciado a partir da agenda, garantir que `pagamentoAgId` esteja setado antes do salvamento (não permitir salvar sem `agendamentoId` quando o dialog foi aberto por um agendamento).
-
-### C. Detecção de consumo do benefício
-
-Em `obterInfoConvenioPaciente`, restringir a contagem de "gratuidades já usadas" a lançamentos com `agendamento_id NOT NULL` do mesmo paciente. Isso impede que registros órfãos futuros (caso qualquer outro fluxo escape) travem novos agendamentos.
-
-### D. Limpar os registros órfãos da Tuane
-
-Depois que a mecânica estiver corrigida, remover (via migration/insert-only tool não cobre delete — será feito como um lançamento de estorno) ou re-vincular os dois `fin_lancamentos` de R$ 0,00 da Tuane que estão sem `agendamento_id`. Preciso confirmar com você antes de mexer nesses dados:
-
-- **Opção 1**: apagar os dois lançamentos órfãos (eles são "sombras" de valor zero, não afetam saldo).
-- **Opção 2**: re-vincular manualmente cada um ao agendamento correto (cardio 08:10 e ginecologia 12:00, por ex.).
-
-## Detalhes técnicos
-
-- **Arquivos alterados**: `src/routes/_authenticated/app.agenda.tsx` (inserção em `caixa_movimentos`, guard de `agendamento_id`); `src/lib/agenda/obter-info-convenio.functions.ts` (filtro `agendamento_id NOT NULL` na contagem de benefício usado); `src/components/financeiro/lancamento-dialog.tsx` (permitir/emitir movimento de caixa com valor 0 quando for gratuidade).
-- **Sem migration de schema**: as tabelas `caixa_movimentos` e `fin_lancamentos` já têm todas as colunas necessárias.
-- **Limpeza de dados**: feita via migration com `DELETE` restrito aos IDs órfãos (ou `UPDATE` para setar `agendamento_id`), após sua confirmação sobre qual opção seguir no item D.
+- 💰 Financeiro: neutro (apenas informativo na GR).
+- ⏱️ Operacional: recepção/médico identificam na hora o convênio que cobriu o atendimento sem abrir a agenda.
+- 😊 Experiência: paciente enxerga na guia impressa o tipo de atendimento contratado.
+- 🛡️ Segurança/Auditoria: nenhum dado sensível novo; a GR já é impressa localmente.
