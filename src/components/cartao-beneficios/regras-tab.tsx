@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Plus, Trash2, RefreshCw, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -320,7 +320,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   };
 
   // Pré-visualização: aplica primeira regra encontrada num serviço fictício
-  const sample = (r: CbRegra): React.ReactNode => {
+  const sample = (r: CbRegra): ReactNode => {
     const v = computeValor(r, 100, 100);
     if (!v) return "—";
     if (r.modo === "valor_fixo") return `R$ ${v.dinheiro.toFixed(2)}`;
