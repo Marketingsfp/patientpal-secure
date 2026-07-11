@@ -487,15 +487,14 @@ function NovoContratoForm({
     (async () => {
       if (!convenioId) {
         setFaixas([]);
-        setBeneficios([]);
         return;
       }
-      const [fx, bn] = await Promise.all([
-        supabase.from("cb_convenio_faixas").select("*").eq("convenio_id", convenioId).order("vidas_de"),
-        supabase.from("cb_beneficios").select("*").eq("convenio_id", convenioId).eq("ativo", true).order("nome"),
-      ]);
+      const fx = await supabase
+        .from("cb_convenio_faixas")
+        .select("*")
+        .eq("convenio_id", convenioId)
+        .order("vidas_de");
       setFaixas((fx.data ?? []) as Faixa[]);
-      setBeneficios((bn.data ?? []) as Beneficio[]);
     })();
   }, [convenioId]);
 
