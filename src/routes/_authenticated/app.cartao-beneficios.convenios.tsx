@@ -617,7 +617,7 @@ function ConveniosPage() {
                     <Plus className="h-4 w-4 mr-1" /> Adicionar Faixa
                   </Button>
                 </div>
-                <div className="border rounded-md overflow-hidden">
+                <div className="border rounded-md overflow-hidden max-w-xl">
                   <Table>
                     <TableHeader>
                       <TableRow>
