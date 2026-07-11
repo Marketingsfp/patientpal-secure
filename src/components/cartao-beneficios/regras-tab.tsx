@@ -423,7 +423,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       </div>
 
       <div className="border rounded-md w-fit max-w-full">
-        <Table className="w-auto [&_th]:px-2 [&_td]:px-2 [&_th:first-child]:pl-3 [&_td:first-child]:pl-3 [&_th:last-child]:pr-2 [&_td:last-child]:pr-2 [&_th]:border-r-0 [&_td]:border-r-0 [&_.lucide-chevron-down]:hidden [&_.lucide-chevrons-up-down]:hidden">
+        <Table className="w-auto [&_th]:px-2 [&_td]:px-2 [&_th:first-child]:pl-3 [&_td:first-child]:pl-3 [&_th:last-child]:pr-2 [&_td:last-child]:pr-2 [&_th]:border-r-0 [&_td]:border-r-0 [&_tbody_.lucide-chevron-down]:hidden [&_tbody_.lucide-chevrons-up-down]:hidden [&_thead_.lucide-chevron-down]:opacity-70">
           <TableHeader className="sticky top-0 z-10">
             <TableRow>
               <TableHead className="w-[160px]">
