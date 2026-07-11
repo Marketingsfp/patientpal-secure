@@ -149,10 +149,14 @@ type Dep = {
   ativo: boolean;
 };
 
-export function ContratosPage({ initialContratoId }: { initialContratoId?: string } = {}) {
+export function ContratosPage({ initialContratoId, modulo = "contratos" }: { initialContratoId?: string; modulo?: string } = {}) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
-  const podeEscrever = usePodeEscrever("contratos");
+  // Esta tela é reaproveitada em duas rotas com módulos de permissão
+  // diferentes: /app/contratos (módulo "contratos") e
+  // /app/cartao-beneficios/contratos (módulo "cartao-beneficios") — cada
+  // rota informa o módulo certo via prop, propagado aos componentes filhos.
+  const podeEscrever = usePodeEscrever(modulo);
   const [list, setList] = useState<Contrato[]>([]);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   // Map criado_por (uuid) → nome do vendedor. Preenchido em load().
@@ -359,6 +363,7 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
         convenios={convenios}
         clinicaId={clinicaAtual!.clinica_id}
         userId={user?.id ?? null}
+        modulo={modulo}
         onCreated={async (contratoId) => {
           setView("list");
           const { data } = await supabase
@@ -381,6 +386,7 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
       <DetalheContrato
         contrato={detail}
         initialTab={detailInitialTab}
+        modulo={modulo}
         onBack={() => {
           setDetail(null);
           setDetailInitialTab("resumo");
@@ -639,14 +645,16 @@ function NovoContratoForm({
   clinicaId,
   userId,
   onCreated,
+  modulo = "contratos",
 }: {
   onBack: () => void;
   convenios: Convenio[];
+  modulo?: string;
   clinicaId: string;
   userId: string | null;
   onCreated: (contratoId: string) => void;
 }) {
-  const podeEscrever = usePodeEscrever("contratos");
+  const podeEscrever = usePodeEscrever(modulo);
   const [convenioId, setConvenioId] = useState(convenios[0]?.id ?? "");
   const convenio = convenios.find((c) => c.id === convenioId);
   const [faixas, setFaixas] = useState<Faixa[]>([]);
@@ -1458,14 +1466,16 @@ function DetalheContrato({
   contrato,
   onBack,
   initialTab = "resumo",
+  modulo = "contratos",
 }: {
   contrato: Contrato;
   onBack: () => void;
   initialTab?: "resumo" | "dados" | "contrato";
+  modulo?: string;
 }) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
-  const podeEscrever = usePodeEscrever("contratos");
+  const podeEscrever = usePodeEscrever(modulo);
   const DadosField = ({ label, value }: { label: string; value: React.ReactNode }) => (
     <div className="space-y-1">
       <div className="text-sm font-medium">{label}</div>

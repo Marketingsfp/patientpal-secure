@@ -33,9 +33,12 @@ type Plano = {
   ativo: boolean;
 };
 
-export function PlanosPage() {
+export function PlanosPage({ modulo = "planos" }: { modulo?: string } = {}) {
   const { clinicaAtual } = useClinica();
-  const podeEscrever = usePodeEscrever("planos");
+  // Esta tela é reaproveitada em duas rotas com módulos de permissão
+  // diferentes: /app/planos (módulo "planos") e /app/cartao-beneficios/modelos
+  // (módulo "cartao-beneficios") — cada rota informa o módulo certo via prop.
+  const podeEscrever = usePodeEscrever(modulo);
   const [list, setList] = useState<Plano[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Plano | null>(null);

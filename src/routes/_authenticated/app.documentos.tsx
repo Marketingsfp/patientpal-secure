@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { FileSignature } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,6 +25,7 @@ interface Form { titulo: string; tipo: Tipo; conteudo: string; assinado: boolean
 
 function DocumentosPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("documentos");
   const [medicos, setMedicos] = useState<{ id: string; nome: string }[]>([]);
   const [modelos, setModelos] = useState<{ id: string; nome: string; tipo: Tipo; conteudo: string }[]>([]);
   const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
@@ -44,6 +46,7 @@ function DocumentosPage() {
       subtitle="Atestados, receitas e laudos gerados para pacientes."
       icon={<FileSignature className="h-6 w-6 text-primary" />}
       searchFields={["titulo"]}
+      readOnly={!podeEscrever}
       columns={[
         { key: "tit", header: "Título", render: r => <span className="font-medium">{r.titulo}</span> },
         { key: "tipo", header: "Tipo", className: "w-32", render: r => <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{TIPO_LABEL[r.tipo]}</span> },
