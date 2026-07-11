@@ -150,12 +150,18 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   // Map criado_por (uuid) → nome do vendedor. Preenchido em load().
   const [vendedores, setVendedores] = useState<Record<string, string>>({});
+  // Agregado de parcelas por contrato (pagas / total / tem atrasada)
+  const [parcAgg, setParcAgg] = useState<Record<string, { pagas: number; total: number; temAtrasada: boolean }>>({});
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [view, setView] = useState<"list" | "new">("list");
   const [detail, setDetail] = useState<Contrato | null>(null);
   const [detailInitialTab, setDetailInitialTab] = useState<"resumo" | "dados" | "contrato">("resumo");
   const [sortPaciente, setSortPaciente] = useState<null | "asc" | "desc">(null);
+  // Filtros
+  const [filtroSituacao, setFiltroSituacao] = useState<"todas" | "em_dia" | "pendente">("todas");
+  const [filtroTermino, setFiltroTermino] = useState<"todos" | "vencidos" | "30d" | "90d" | "sem_data">("todos");
+  const [filtroProgresso, setFiltroProgresso] = useState<"todas" | "sem_pag" | "andamento" | "quitadas">("todas");
 
   // Termo com debounce para acionar busca server-side sem bater a cada tecla.
   const [qDebounced, setQDebounced] = useState("");
@@ -197,6 +203,27 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
     if (cs.error) mostrarErro(cs.error);
     setList((cs.data ?? []) as Contrato[]);
     setConvenios((cv.data ?? []) as Convenio[]);
+    // Agregar parcelas dos contratos carregados
+    const contratoIds = ((cs.data ?? []) as Array<{ id: string }>).map((c) => c.id);
+    if (contratoIds.length > 0) {
+      const { data: mens } = await supabase
+        .from("contrato_mensalidades")
+        .select("contrato_id, status, vencimento")
+        .in("contrato_id", contratoIds);
+      const hojeStr = new Date().toISOString().slice(0, 10);
+      const agg: Record<string, { pagas: number; total: number; temAtrasada: boolean }> = {};
+      for (const id of contratoIds) agg[id] = { pagas: 0, total: 0, temAtrasada: false };
+      for (const m of (mens ?? []) as Array<{ contrato_id: string; status: string; vencimento: string }>) {
+        const a = agg[m.contrato_id];
+        if (!a) continue;
+        a.total += 1;
+        if (m.status === "pago") a.pagas += 1;
+        else if (m.vencimento && m.vencimento < hojeStr) a.temAtrasada = true;
+      }
+      setParcAgg(agg);
+    } else {
+      setParcAgg({});
+    }
     // Buscar nomes dos usuários que criaram os contratos (vendedores).
     const ids = Array.from(
       new Set(
@@ -234,12 +261,40 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     const base = !s ? list : list.filter((c) => `${c.numero} ${c.paciente_nome}`.toLowerCase().includes(s));
-    if (!sortPaciente) return base;
-    const ordered = [...base].sort((a, b) =>
+    const hojeStr = new Date().toISOString().slice(0, 10);
+    const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+    const in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
+    const withFilters = base.filter((c) => {
+      const a = parcAgg[c.id];
+      // Situação
+      if (filtroSituacao !== "todas") {
+        const emDia = !a || !a.temAtrasada;
+        if (filtroSituacao === "em_dia" && !emDia) return false;
+        if (filtroSituacao === "pendente" && emDia) return false;
+      }
+      // Término
+      if (filtroTermino !== "todos") {
+        const fim = c.data_fim?.slice(0, 10) ?? null;
+        if (filtroTermino === "sem_data" && fim) return false;
+        if (filtroTermino === "vencidos" && (!fim || fim >= hojeStr)) return false;
+        if (filtroTermino === "30d" && (!fim || fim < hojeStr || fim > in30)) return false;
+        if (filtroTermino === "90d" && (!fim || fim < hojeStr || fim > in90)) return false;
+      }
+      // Progresso
+      if (filtroProgresso !== "todas") {
+        if (!a) return false;
+        if (filtroProgresso === "sem_pag" && a.pagas !== 0) return false;
+        if (filtroProgresso === "andamento" && (a.pagas === 0 || a.pagas >= a.total)) return false;
+        if (filtroProgresso === "quitadas" && (a.total === 0 || a.pagas < a.total)) return false;
+      }
+      return true;
+    });
+    if (!sortPaciente) return withFilters;
+    const ordered = [...withFilters].sort((a, b) =>
       a.paciente_nome.localeCompare(b.paciente_nome, "pt-BR", { sensitivity: "base" }),
     );
     return sortPaciente === "asc" ? ordered : ordered.reverse();
-  }, [list, q, sortPaciente]);
+  }, [list, q, sortPaciente, parcAgg, filtroSituacao, filtroTermino, filtroProgresso]);
 
   if (view === "new") {
     return (
