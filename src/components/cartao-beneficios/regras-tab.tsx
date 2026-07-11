@@ -995,6 +995,7 @@ function NovaRegraDialog({
                       <SelectItem value="percentual_particular">% do valor particular</SelectItem>
                       <SelectItem value="valor_fixo">Valor fixo (R$)</SelectItem>
                       <SelectItem value="particular">Valor particular cheio</SelectItem>
+                      <SelectItem value="regra_padrao_convenio">Aplicar regra padrão do convênio</SelectItem>
                       <SelectItem value="bloquear">Bloquear agendamento</SelectItem>
                     </SelectContent>
                   </Select>
