@@ -162,6 +162,10 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
   const [filtroSituacao, setFiltroSituacao] = useState<"todas" | "em_dia" | "pendente">("todas");
   const [filtroTermino, setFiltroTermino] = useState<"todos" | "vencidos" | "30d" | "90d" | "sem_data">("todos");
   const [filtroProgresso, setFiltroProgresso] = useState<"todas" | "sem_pag" | "andamento" | "quitadas">("todas");
+  const [filtroInicio, setFiltroInicio] = useState<"todos" | "30d" | "90d" | "ano" | "anterior">("todos");
+  const [filtroMensal, setFiltroMensal] = useState<"todos" | "zero" | "ate100" | "100a200" | "acima200">("todos");
+  const [filtroVendedor, setFiltroVendedor] = useState<string>("todos");
+  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
 
   // Termo com debounce para acionar busca server-side sem bater a cada tecla.
   const [qDebounced, setQDebounced] = useState("");
@@ -264,8 +268,37 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
     const hojeStr = new Date().toISOString().slice(0, 10);
     const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
     const in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
+    const dHoje = new Date(hojeStr + "T00:00:00").getTime();
+    const anoAtual = new Date().getFullYear();
     const withFilters = base.filter((c) => {
       const a = parcAgg[c.id];
+      // Início
+      if (filtroInicio !== "todos") {
+        const ini = c.data_inicio?.slice(0, 10) ?? null;
+        if (!ini) return false;
+        const dIni = new Date(ini + "T00:00:00").getTime();
+        const dias = (dHoje - dIni) / 86400000;
+        if (filtroInicio === "30d" && dias > 30) return false;
+        if (filtroInicio === "90d" && dias > 90) return false;
+        if (filtroInicio === "ano" && new Date(ini + "T00:00:00").getFullYear() !== anoAtual) return false;
+        if (filtroInicio === "anterior" && new Date(ini + "T00:00:00").getFullYear() >= anoAtual) return false;
+      }
+      // Mensal
+      if (filtroMensal !== "todos") {
+        const v = Number(c.valor_mensal) || 0;
+        if (filtroMensal === "zero" && v !== 0) return false;
+        if (filtroMensal === "ate100" && !(v > 0 && v <= 100)) return false;
+        if (filtroMensal === "100a200" && !(v > 100 && v <= 200)) return false;
+        if (filtroMensal === "acima200" && !(v > 200)) return false;
+      }
+      // Vendedor
+      if (filtroVendedor !== "todos") {
+        if (filtroVendedor === "sem") {
+          if (c.criado_por && vendedores[c.criado_por]) return false;
+        } else if (c.criado_por !== filtroVendedor) return false;
+      }
+      // Status
+      if (filtroStatus !== "todos" && c.status !== filtroStatus) return false;
       // Situação
       if (filtroSituacao !== "todas") {
         const emDia = !a || !a.temAtrasada;
@@ -294,7 +327,23 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
       a.paciente_nome.localeCompare(b.paciente_nome, "pt-BR", { sensitivity: "base" }),
     );
     return sortPaciente === "asc" ? ordered : ordered.reverse();
-  }, [list, q, sortPaciente, parcAgg, filtroSituacao, filtroTermino, filtroProgresso]);
+  }, [list, q, sortPaciente, parcAgg, vendedores, filtroSituacao, filtroTermino, filtroProgresso, filtroInicio, filtroMensal, filtroVendedor, filtroStatus]);
+
+  // Opções dinâmicas
+  const vendedorOpcoes = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const c of list) {
+      if (c.criado_por && vendedores[c.criado_por] && !seen.has(c.criado_por)) {
+        seen.set(c.criado_por, vendedores[c.criado_por]);
+      }
+    }
+    return Array.from(seen.entries()).sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+  }, [list, vendedores]);
+  const statusOpcoes = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of list) if (c.status) s.add(c.status);
+    return Array.from(s).sort();
+  }, [list]);
 
   if (view === "new") {
     return (
@@ -378,7 +427,23 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                   </span>
                 </button>
               </TableHead>
-              <TableHead>Início</TableHead>
+              <TableHead>
+                <Select value={filtroInicio} onValueChange={(v) => setFiltroInicio(v as typeof filtroInicio)}>
+                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                    <span className="inline-flex items-center gap-1">
+                      INÍCIO
+                      {filtroInicio !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                    <SelectItem value="90d">Últimos 90 dias</SelectItem>
+                    <SelectItem value="ano">Este ano</SelectItem>
+                    <SelectItem value="anterior">Anos anteriores</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableHead>
               <TableHead>
                 <Select value={filtroTermino} onValueChange={(v) => setFiltroTermino(v as typeof filtroTermino)}>
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
@@ -396,7 +461,23 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                   </SelectContent>
                 </Select>
               </TableHead>
-              <TableHead>Mensal</TableHead>
+              <TableHead>
+                <Select value={filtroMensal} onValueChange={(v) => setFiltroMensal(v as typeof filtroMensal)}>
+                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                    <span className="inline-flex items-center gap-1">
+                      MENSAL
+                      {filtroMensal !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="zero">R$ 0,00</SelectItem>
+                    <SelectItem value="ate100">Até R$ 100</SelectItem>
+                    <SelectItem value="100a200">R$ 100 a R$ 200</SelectItem>
+                    <SelectItem value="acima200">Acima de R$ 200</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableHead>
               <TableHead>
                 <Select value={filtroProgresso} onValueChange={(v) => setFiltroProgresso(v as typeof filtroProgresso)}>
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
@@ -428,8 +509,39 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                   </SelectContent>
                 </Select>
               </TableHead>
-              <TableHead>Vendedor</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>
+                <Select value={filtroVendedor} onValueChange={setFiltroVendedor}>
+                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                    <span className="inline-flex items-center gap-1">
+                      VENDEDOR
+                      {filtroVendedor !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="sem">Sem vendedor</SelectItem>
+                    {vendedorOpcoes.map(([id, nome]) => (
+                      <SelectItem key={id} value={id}>{nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead>
+                <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                    <span className="inline-flex items-center gap-1">
+                      STATUS
+                      {filtroStatus !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    {statusOpcoes.map((s) => (
+                      <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
