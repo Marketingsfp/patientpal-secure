@@ -207,7 +207,7 @@ function Page() {
     // Busca lançamento
     const { data: lanc, error: eLanc } = await supabase
       .from("fin_lancamentos")
-      .select("id, agendamento_id, valor, descricao")
+      .select("id, agendamento_id, valor, descricao, repasse_pago")
       .eq("id", s.lancamento_id)
       .maybeSingle();
     if (eLanc) {
@@ -217,14 +217,16 @@ function Page() {
     if (!lanc) {
       return { executado: false, resposta: "Aprovado manualmente (lançamento não encontrado)" };
     }
-    // Pré-checagens equivalentes ao estornar() da aba Atendimentos.
-    // "origem = agenda" corresponde a lançamentos com agendamento_id preenchido.
+    // Pré-checagem: repasse já pago bloqueia o estorno.
+    // Bug histórico: só olhávamos fin_atendimentos, mas repasses de agenda
+    // são gravados em fin_lancamentos.repasse_pago (298 registros em prod
+    // eram falso-negativo). Checamos as DUAS tabelas.
     const { data: atd } = await supabase
       .from("fin_atendimentos")
       .select("id, repasse_pago")
       .eq("lancamento_id", s.lancamento_id)
       .maybeSingle();
-    if (atd?.repasse_pago) {
+    if (atd?.repasse_pago || (lanc as { repasse_pago?: boolean }).repasse_pago) {
       toast.error("Repasse já pago — estorne o pagamento do repasse primeiro.");
       return null;
     }

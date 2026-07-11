@@ -485,7 +485,7 @@ function Page() {
     try {
       const { data: lanc, error: eLanc } = await supabase
         .from("fin_lancamentos")
-        .select("id, agendamento_id, valor, descricao")
+        .select("id, agendamento_id, valor, descricao, repasse_pago")
         .eq("id", l.id)
         .maybeSingle();
       if (eLanc) { mostrarErro(eLanc); return; }
@@ -494,7 +494,9 @@ function Page() {
         .select("id, repasse_pago")
         .eq("lancamento_id", l.id)
         .maybeSingle();
-      if (atd?.repasse_pago) {
+      // Checa as DUAS tabelas: repasses de agenda são marcados em
+      // fin_lancamentos.repasse_pago (não em fin_atendimentos).
+      if (atd?.repasse_pago || (lanc as { repasse_pago?: boolean } | null)?.repasse_pago) {
         toast.error("Repasse já pago — estorne o pagamento do repasse primeiro.");
         return;
       }
