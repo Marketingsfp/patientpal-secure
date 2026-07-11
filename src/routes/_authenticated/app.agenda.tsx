@@ -4535,7 +4535,7 @@ function AgendaPage() {
         }}
       >
         <DialogContent
-          className="max-w-md"
+          className="max-w-lg w-[calc(100vw-2rem)]"
           onEscapeKeyDown={(e) => e.preventDefault()}
           onPointerDownOutside={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
@@ -4550,9 +4550,10 @@ function AgendaPage() {
             <br />
             Deseja usar agora ou guardar para uma próxima consulta?
           </div>
-          <DialogFooter className="gap-2 sm:justify-end">
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:flex-wrap">
             <Button
               variant="ghost"
+              size="sm"
               onClick={() => {
                 gratuidadePrompt?.resolve("cancel");
                 setGratuidadePrompt(null);
@@ -4562,14 +4563,16 @@ function AgendaPage() {
             </Button>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => {
                 gratuidadePrompt?.resolve("depois");
                 setGratuidadePrompt(null);
               }}
             >
-              Cobrar particular (usar depois)
+              Usar depois
             </Button>
             <Button
+              size="sm"
               onClick={() => {
                 gratuidadePrompt?.resolve("agora");
                 setGratuidadePrompt(null);
