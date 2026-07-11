@@ -1743,7 +1743,13 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
   // -----------------------------------------------------------------
   // 6) Monta um único documento com as duas GRs, separadas por espaço.
   // -----------------------------------------------------------------
-  const espacador = `<div style="height:10mm"></div>`;
+  // Linha de corte entre as duas GRs (tracejada, com legenda ✂).
+  const linhaCorte = `
+    <div style="margin:6mm 0; text-align:center; font-size:8pt; color:#000;">
+      <div style="border-top:1px dashed #000; position:relative; height:0;">
+        <span style="position:relative; top:-7px; background:#fff; padding:0 4px;">✂ &nbsp; corte aqui &nbsp; ✂</span>
+      </div>
+    </div>`;
   const html = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(tituloPac)}</title>
@@ -1752,7 +1758,7 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
 </style></head>
 <body>
   ${ticketMens}
-  ${espacador}
+  ${linhaCorte}
   ${ticketTaxa}
 </body></html>`;
 
