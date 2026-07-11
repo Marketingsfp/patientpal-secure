@@ -31,7 +31,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
 
 type EspOpt = { id: string; nome: string };
-type ProcOpt = { id: string; nome: string; codigo: string | null };
+type ProcOpt = { id: string; nome: string; codigo: string | null; tipo: string | null };
 
 interface Props {
   clinicaId: string;
@@ -99,7 +99,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabase
         .from("procedimentos")
-        .select("id,nome,codigo")
+        .select("id,nome,codigo,tipo")
         .eq("clinica_id", clinicaId)
         .eq("ativo", true)
         .order("nome")
@@ -127,8 +127,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
 
   const procOpts = useMemo(
     () => [
-      { value: "__any__", label: "Qualquer serviço" },
-      ...procedimentos.map(p => ({ value: p.id, label: p.codigo ? `${p.codigo} — ${p.nome}` : p.nome })),
+      { value: "__any__", label: "Qualquer serviço", tipo: null as string | null },
+      ...procedimentos.map(p => ({
+        value: p.id,
+        label: p.codigo ? `${p.codigo} — ${p.nome}` : p.nome,
+        tipo: p.tipo,
+      })),
     ],
     [procedimentos],
   );
@@ -909,7 +913,7 @@ function NovaRegraDialog({
   convenioId: string;
   clinicaId: string;
   espOpts: Array<{ value: string; label: string }>;
-  procOpts: Array<{ value: string; label: string }>;
+  procOpts: Array<{ value: string; label: string; tipo: string | null }>;
   onSaved: () => void | Promise<void>;
   regra?: CbRegra | null;
 }) {
@@ -944,6 +948,12 @@ function NovaRegraDialog({
   }, [open, convenioId, regra]);
 
   const upd = (patch: Partial<CbRegra>) => setR(prev => ({ ...prev, ...patch }));
+
+  const procOptsFiltrados = useMemo(() => {
+    if (!r.tipo) return procOpts;
+    const t = r.tipo.toLowerCase();
+    return procOpts.filter(o => o.value === "__any__" || (o.tipo ?? "").toLowerCase() === t);
+  }, [procOpts, r.tipo]);
   const hasLimit = r.limite_qtd != null && Number(r.limite_qtd) > 0;
   const excModo = r.excedente_modo ?? "percentual_particular";
 
@@ -1014,7 +1024,18 @@ function NovaRegraDialog({
               <Label className="text-xs">Categoria</Label>
               <Select
                 value={r.tipo ?? "__any__"}
-                onValueChange={(v) => upd({ tipo: v === "__any__" ? null : v })}
+                onValueChange={(v) => {
+                  const novoTipo = v === "__any__" ? null : v;
+                  const patch: Partial<CbRegra> = { tipo: novoTipo };
+                  // Se o serviço atual não pertencer à nova categoria, limpa
+                  if (r.procedimento_id && novoTipo) {
+                    const p = procOpts.find(o => o.value === r.procedimento_id);
+                    if (p && (p.tipo ?? "").toLowerCase() !== novoTipo.toLowerCase()) {
+                      patch.procedimento_id = null;
+                    }
+                  }
+                  upd(patch);
+                }}
                 disabled={!!r.procedimento_id}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1029,7 +1050,7 @@ function NovaRegraDialog({
           <div className="space-y-1.5">
             <Label className="text-xs">Serviço específico (opcional)</Label>
             <SearchableSelect
-              options={procOpts}
+              options={procOptsFiltrados}
               value={r.procedimento_id ?? "__any__"}
               onChange={(v) => upd({
                 procedimento_id: v === "__any__" ? null : v,
@@ -1037,7 +1058,10 @@ function NovaRegraDialog({
               })}
               placeholder="Qualquer serviço"
             />
-            <p className="text-[11px] text-muted-foreground">Quando escolhido, esta regra vale apenas para este serviço.</p>
+            <p className="text-[11px] text-muted-foreground">
+              Quando escolhido, esta regra vale apenas para este serviço.
+              {r.tipo ? ` Mostrando apenas serviços da categoria "${r.tipo}".` : ""}
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t pt-3">
