@@ -1,32 +1,24 @@
-Todas as mudanças ficam em `src/components/pages/contratos-page.tsx` (frontend). Nenhum arquivo de permissões é tocado.
+## Objetivo
+Ao criar/editar uma regra de benefício, quando o usuário escolher uma **Categoria** (campo `tipo` do procedimento), o dropdown "Serviço específico" deve mostrar apenas os serviços daquela categoria.
 
-## 1. Filtro por Tipo de Convênio (cabeçalho da lista)
+## Arquivo
+- `src/components/cartao-beneficios/regras-tab.tsx`
 
-- Trocar o `<TableHead>TIPO DE CONVÊNIO</TableHead>` estático por um `Select` no mesmo padrão visual dos demais (`INÍCIO`, `TÉRMINO`, `MENSAL`, etc.), com a setinha para baixo e o pontinho azul quando ativo.
-- Novo state: `filtroConvenio` (string), default `"todos"`. Opções: `Todos` + um item por convênio ativo carregado em `convenios` (usa `id` como value e `nome` como label). Além disso, uma opção `Sem convênio` para contratos com `convenio_id` nulo.
-- Aplicar o filtro dentro do `filtered = useMemo(...)` existente, antes dos demais.
+## Mudanças
 
-## 2. Paginação — 50 contratos por página
+1. **Carregar `tipo` dos procedimentos** — no `load()` (linha ~102), incluir `tipo` no `select` de `procedimentos` e adicionar `tipo` no tipo `ProcOpt`.
 
-- Novo state: `pagina` (number, default 1). Constante `POR_PAGINA = 50`.
-- Derivar `totalPaginas = Math.max(1, Math.ceil(filtered.length / 50))` e `paginados = filtered.slice((pagina-1)*50, pagina*50)`.
-- Renderizar `paginados` no `filtered.map(...)` (substituir a variável usada no map por `paginados`).
-- Rodapé simples da tabela com: contagem total, controles "Anterior / Próxima" e "Página X de Y". Layout minimalista, consistente com o resto (botões `variant="outline" size="sm"`).
-- Resetar `pagina` para 1 sempre que qualquer filtro, busca ou ordenação mudar (`useEffect` com dependências dos filtros).
+2. **Filtrar `procOpts` por categoria selecionada** — trocar o `useMemo` atual (linhas 128–134) por uma função/memo que, dado o `r.tipo` atualmente selecionado no modal, filtre a lista:
+   - Se `r.tipo` estiver definido → só procedimentos cujo `tipo` (case-insensitive) bate com ele.
+   - Se `r.tipo` for null/"__any__" → lista completa (comportamento atual).
+   
+   Como `procOpts` hoje é global ao componente e o modal é filho, mover o filtro para o próprio modal: passar `procedimentos` (bruto) ao modal e derivar `procOpts` lá dentro com `useMemo` dependente de `r.tipo`. Ou, mais simples: manter `procOpts` no pai como função `getProcOpts(tipo)` e chamar no modal. Vou optar por derivar dentro do modal (menor refactor de props se o modal já recebe `procedimentos`; caso contrário, adiciono a prop).
 
-## 3. Contagem de resultados sempre visível
+3. **Reset ao trocar de categoria** — no `onValueChange` da Categoria (linha 1017), se o `procedimento_id` atual não pertencer à nova categoria, limpar `procedimento_id` junto com `tipo`.
 
-- Acima da tabela (ou logo abaixo do campo de busca), exibir um resumo: `"Mostrando A–B de N contratos"` quando não há filtro/busca ativo; `"N resultado(s) — filtros ativos: …"` quando houver.
-- `filtrosAtivos` = lista das dimensões alteradas (situação, término, início, mensal, parcelas, vendedor, status, convênio, busca). Se pelo menos uma estiver diferente do default, entra no rótulo em PT-BR curto (ex.: `"Convênio", "Situação"`), separada por vírgula. Objetivo é atender o pedido: "sempre que utilizar um filtro quero que apareça a contagem do resultado".
-- Botão "Limpar filtros" ao lado da contagem, aparece só quando há pelo menos um filtro ativo. Reseta todos os states de filtro para o default e volta para a página 1.
+4. **Mesma lógica ao trocar Especialidade?** — o usuário só pediu categoria; não vou mexer em especialidade para respeitar o escopo.
 
-## 4. Ajustes de detalhe
-
-- `colSpan` dos estados vazios permanece 11 (não muda).
-- Contagem também exibida no rodapé junto da paginação, refletindo o total após filtros (`filtered.length`) — evita a impressão de "sumiram registros" quando o usuário está apenas em outra página.
-
-## Fora de escopo
-
-- Não muda nenhum outro filtro existente.
-- Não altera lógica de carregamento server-side (busca por termo continua igual, com o limite atual de 500 mais recentes / 200 quando há termo).
-- Não persiste a página nem os filtros na URL (mantém comportamento atual em memória).
+## Comportamento resultante
+- Categoria vazia → todos os serviços aparecem (como hoje).
+- Categoria = "consulta" → dropdown de serviço mostra só procedimentos com `tipo = 'consulta'`.
+- Trocar categoria com serviço já escolhido incompatível → serviço volta para "Qualquer serviço".
