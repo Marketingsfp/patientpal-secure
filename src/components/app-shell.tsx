@@ -202,6 +202,9 @@ export function AppShell() {
 
   const [profileName, setProfileName] = useState<string>("");
   const [pwOpen, setPwOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Fecha o drawer mobile ao navegar
+  useEffect(() => { setMobileNavOpen(false); }, [location.pathname, location.hash]);
   useEffect(() => {
     if (!user?.id) { setProfileName(""); return; }
     let cancelled = false;
