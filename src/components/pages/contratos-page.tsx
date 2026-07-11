@@ -136,6 +136,8 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
   const { user } = useAuth();
   const [list, setList] = useState<Contrato[]>([]);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
+  // Map criado_por (uuid) → nome do vendedor. Preenchido em load().
+  const [vendedores, setVendedores] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [view, setView] = useState<"list" | "new">("list");
@@ -182,6 +184,27 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
     if (cs.error) mostrarErro(cs.error);
     setList((cs.data ?? []) as Contrato[]);
     setConvenios((cv.data ?? []) as Convenio[]);
+    // Buscar nomes dos usuários que criaram os contratos (vendedores).
+    const ids = Array.from(
+      new Set(
+        ((cs.data ?? []) as Array<{ criado_por: string | null }>)
+          .map((r) => r.criado_por)
+          .filter((x): x is string => !!x),
+      ),
+    );
+    if (ids.length > 0) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id,nome")
+        .in("id", ids);
+      const map: Record<string, string> = {};
+      for (const p of (profs ?? []) as Array<{ id: string; nome: string | null }>) {
+        if (p.nome) map[p.id] = p.nome;
+      }
+      setVendedores(map);
+    } else {
+      setVendedores({});
+    }
     setLoading(false);
   };
   useEffect(() => {
@@ -279,6 +302,7 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
               <TableHead>Início</TableHead>
               <TableHead>Mensal</TableHead>
               <TableHead>Pagamento</TableHead>
+              <TableHead>Vendedor</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Assinado</TableHead>
               <TableHead></TableHead>
@@ -287,14 +311,14 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-6">
                   Carregando…
                 </TableCell>
               </TableRow>
             ) : null}
             {!loading && filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-6">
                   Nenhum contrato.
                 </TableCell>
               </TableRow>
@@ -318,6 +342,13 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                 <TableCell>{fmtD(c.data_inicio)}</TableCell>
                 <TableCell>{BRL(c.valor_mensal)}</TableCell>
                 <TableCell>{c.forma_pagamento ?? "—"}</TableCell>
+                <TableCell>
+                  {c.criado_por && vendedores[c.criado_por] ? (
+                    <span>{vendedores[c.criado_por]}</span>
+                  ) : (
+                    <span className="text-muted-foreground/60">—</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   <Badge
                     variant={c.status === "ativo" ? "default" : "secondary"}
