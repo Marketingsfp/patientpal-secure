@@ -345,7 +345,7 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                 <TableCell>{c.forma_pagamento ?? "—"}</TableCell>
                 <TableCell>
                   {c.criado_por && vendedores[c.criado_por] ? (
-                    <span>{vendedores[c.criado_por]}</span>
+                    <span>{vendedores[c.criado_por].trim().split(/\s+/).slice(0, 2).join(" ")}</span>
                   ) : (
                     <span className="text-muted-foreground/60">—</span>
                   )}
