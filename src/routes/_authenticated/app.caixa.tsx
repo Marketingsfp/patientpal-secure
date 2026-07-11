@@ -761,6 +761,9 @@ function Page() {
     }
     if (linhasValidadas.length === 0) { toast.error("Adicione ao menos uma forma de pagamento"); return; }
     setSaving(true);
+    // Escopo externo ao try para permitir rollback no catch.
+    const movimentosInseridos: string[] = [];
+    const lancamentosInseridos: string[] = [];
     try {
       // Re-checa server-side se já foi pago (anti dupla cobrança / race)
       const { data: jaPago } = await supabase
@@ -785,11 +788,9 @@ function Page() {
         .maybeSingle();
       const medicoId = (ag as { medico_id: string | null } | null)?.medico_id ?? null;
       const hoje = new Date().toISOString().slice(0, 10);
-      // Rastreio para rollback: se qualquer lançamento falhar, precisamos
-      // apagar os movimentos de caixa já inseridos neste ciclo (bug crítico:
-      // caixa registrado sem lançamento correspondente).
-      const movimentosInseridos: string[] = [];
-      const lancamentosInseridos: string[] = [];
+      // Rastreio para rollback: se qualquer lançamento falhar, apagamos os
+      // movimentos de caixa já inseridos neste ciclo (bug crítico corrigido:
+      // caixa registrado sem lançamento correspondente ou vice-versa).
       for (const l of linhasValidadas) {
         const sufixoCartao = montarSufixoCartao(l.forma, l.bandeira, l.parcelas);
         const { data: movRow, error: e1 } = await supabase.from("caixa_movimentos").insert({
@@ -828,15 +829,20 @@ function Page() {
       setCobrancaLinhas([linhaVazia()]);
       void load(); void loadFilaCaixa();
     } catch (err) {
-      // Rollback dos movimentos/lançamentos já inseridos neste ciclo, para
-      // evitar caixa órfão sem lançamento (ou vice-versa).
+      // Rollback dos inserts já feitos neste ciclo para evitar orfãos
+      // (caixa sem lançamento ou lançamento sem caixa).
       try {
-        // Nota: variáveis do try acima não estão em escopo aqui — usamos closure
-        // via re-consulta pelo par (sessao_id, agendamento_id) já registrado.
-        // Mais simples: apaga por lancamento_id null ainda não existe — então
-        // dependemos das listas acumuladas via ref externa. Reescrevendo:
+        if (lancamentosInseridos.length > 0) {
+          await supabase.from("fin_lancamentos").delete().in("id", lancamentosInseridos);
+        }
+        if (movimentosInseridos.length > 0) {
+          await supabase.from("caixa_movimentos").delete().in("id", movimentosInseridos);
+        }
       } catch (rbErr) {
-        console.error("Falha no rollback:", rbErr);
+        console.error("Falha no rollback da cobrança:", rbErr);
+        toast.error(
+          `ERRO CRÍTICO: cobrança falhou e o rollback também. Registros parciais podem ter permanecido — contate o suporte. Mov: [${movimentosInseridos.join(",")}] Lanc: [${lancamentosInseridos.join(",")}]`,
+        );
       }
       mostrarErro(err);
     } finally { setSaving(false); }
