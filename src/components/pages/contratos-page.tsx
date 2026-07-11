@@ -382,7 +382,10 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
               <TableHead>
                 <Select value={filtroTermino} onValueChange={(v) => setFiltroTermino(v as typeof filtroTermino)}>
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
-                    <SelectValue placeholder="TÉRMINO" />
+                    <span className="inline-flex items-center gap-1">
+                      TÉRMINO
+                      {filtroTermino !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todos</SelectItem>
@@ -397,7 +400,10 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
               <TableHead>
                 <Select value={filtroProgresso} onValueChange={(v) => setFiltroProgresso(v as typeof filtroProgresso)}>
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
-                    <SelectValue placeholder="PARCELAS" />
+                    <span className="inline-flex items-center gap-1">
+                      PARCELAS
+                      {filtroProgresso !== "todas" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todas">Todas</SelectItem>
@@ -410,7 +416,10 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
               <TableHead>
                 <Select value={filtroSituacao} onValueChange={(v) => setFiltroSituacao(v as typeof filtroSituacao)}>
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
-                    <SelectValue placeholder="SITUAÇÃO" />
+                    <span className="inline-flex items-center gap-1">
+                      SITUAÇÃO
+                      {filtroSituacao !== "todas" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todas">Todas</SelectItem>
