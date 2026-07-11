@@ -674,7 +674,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                 </TableCell>
               </TableRow>
             ) : null}
-            {filtered.map((c) => {
+            {paginados.map((c) => {
               const agg = parcAgg[c.id];
               const emDia = !agg || !agg.temAtrasada;
               return (
@@ -736,6 +736,39 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
             })}
           </TableBody>
         </Table>
+        {filtered.length > 0 ? (
+          <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-sm text-muted-foreground">
+            <span>
+              {filtered.length} contrato{filtered.length === 1 ? "" : "s"}
+              {filtered.length > POR_PAGINA ? (
+                <> — exibindo {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, filtered.length)}</>
+              ) : null}
+            </span>
+            {totalPaginas > 1 ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={paginaAtual <= 1}
+                  onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                >
+                  Anterior
+                </Button>
+                <span className="tabular-nums">
+                  Página {paginaAtual} de {totalPaginas}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={paginaAtual >= totalPaginas}
+                  onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                >
+                  Próxima
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
