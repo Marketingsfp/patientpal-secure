@@ -320,11 +320,16 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   };
 
   // Pré-visualização: aplica primeira regra encontrada num serviço fictício
-  const sample = (r: CbRegra): string => {
+  const sample = (r: CbRegra): React.ReactNode => {
     const v = computeValor(r, 100, 100);
     if (!v) return "—";
     if (r.modo === "valor_fixo") return `R$ ${v.dinheiro.toFixed(2)}`;
-    return `de R$100 → R$ ${v.dinheiro.toFixed(2)}`;
+    return (
+      <>
+        <div>de R$ 100</div>
+        <div>→ R$ {v.dinheiro.toFixed(2)}</div>
+      </>
+    );
   };
 
   if (!convenioId) {
@@ -512,7 +517,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     onChange={(e) => update(idx, { prioridade: parseInt(e.target.value) || 1 })}
                   />
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground leading-tight min-w-[110px] whitespace-nowrap">{sample(r)}</TableCell>
+                <TableCell className="text-xs text-muted-foreground leading-tight w-[90px] whitespace-nowrap">{sample(r)}</TableCell>
                 <TableCell>
                   <Button
                     size="sm"
