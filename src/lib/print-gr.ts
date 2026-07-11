@@ -283,7 +283,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const [ag, cli] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero")
+      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero, tipo_atendimento")
       .eq("id", agendamentoId)
       .maybeSingle(),
     supabase
