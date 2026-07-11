@@ -4419,6 +4419,30 @@ function AgendaPage() {
         }}
       />
 
+      {/* Aviso do convênio — persistente; o atendente precisa fechar. */}
+      <Dialog open={avisoConvenio !== null} onOpenChange={(o) => { if (!o) setAvisoConvenio(null); }}>
+        <DialogContent
+          className="max-w-md"
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className={avisoConvenio?.tom === "error" ? "text-destructive" : "text-amber-600"}>
+              Aviso do convênio
+            </DialogTitle>
+          </DialogHeader>
+          <div className="whitespace-pre-line text-sm leading-relaxed">
+            {avisoConvenio?.mensagem}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setAvisoConvenio(null)} variant={avisoConvenio?.tom === "error" ? "destructive" : "default"}>
+              Entendi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Diálogo de desconto (acionado pelo botão no formulário de agendamento). */}
       <Dialog open={descontoDlgOpen} onOpenChange={setDescontoDlgOpen}>
         <DialogContent className="max-w-sm">
