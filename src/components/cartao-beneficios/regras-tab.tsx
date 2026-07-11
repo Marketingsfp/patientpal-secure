@@ -54,6 +54,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [progress, setProgress] = useState<string>("");
   const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
   const [novoOpen, setNovoOpen] = useState(false);
+  const [filtroGratuito, setFiltroGratuito] = useState<"todos" | "sim" | "nao">("todos");
+  const [filtroCarencia, setFiltroCarencia] = useState<string>("todos");
+  const [filtroLimite, setFiltroLimite] = useState<"todos" | "com" | "sem">("todos");
 
   const load = async () => {
     if (!convenioId) return;
@@ -107,6 +110,46 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     ],
     [procedimentos],
   );
+
+  const procById = useMemo(() => {
+    const m = new Map<string, string>();
+    procedimentos.forEach(p => m.set(p.id, p.nome));
+    return m;
+  }, [procedimentos]);
+  const espById = useMemo(() => {
+    const m = new Map<string, string>();
+    especialidades.forEach(e => m.set(e.id, e.nome));
+    return m;
+  }, [especialidades]);
+
+  const regrasFiltradas = useMemo(() => {
+    const HIGH = "\uffff";
+    const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const items = regras
+      .map((r, idx) => ({ r, idx }))
+      .filter(({ r }) => {
+        if (filtroGratuito === "sim" && !r.gratuito) return false;
+        if (filtroGratuito === "nao" && r.gratuito) return false;
+        if (filtroCarencia !== "todos" && Number(r.carencia_mensalidades ?? 0) !== Number(filtroCarencia)) return false;
+        const hasLimit = r.limite_qtd != null && Number(r.limite_qtd) > 0;
+        if (filtroLimite === "com" && !hasLimit) return false;
+        if (filtroLimite === "sem" && hasLimit) return false;
+        return true;
+      });
+    items.sort((a, b) => {
+      const sa = a.r.procedimento_id ? norm(procById.get(a.r.procedimento_id) ?? "") : HIGH;
+      const sb = b.r.procedimento_id ? norm(procById.get(b.r.procedimento_id) ?? "") : HIGH;
+      if (sa !== sb) return sa < sb ? -1 : 1;
+      const ea = a.r.especialidade_id ? norm(espById.get(a.r.especialidade_id) ?? "") : HIGH;
+      const eb = b.r.especialidade_id ? norm(espById.get(b.r.especialidade_id) ?? "") : HIGH;
+      if (ea !== eb) return ea < eb ? -1 : 1;
+      const ta = a.r.tipo ? norm(a.r.tipo) : HIGH;
+      const tb = b.r.tipo ? norm(b.r.tipo) : HIGH;
+      if (ta !== tb) return ta < tb ? -1 : 1;
+      return 0;
+    });
+    return items;
+  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, procById, espById]);
 
   const addRegra = () => {
     if (!convenioId) return;
@@ -308,21 +351,80 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         </div>
       </div>
 
+      <div className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-2">
+        <div className="space-y-1">
+          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Gratuito</Label>
+          <Select value={filtroGratuito} onValueChange={(v) => setFiltroGratuito(v as any)}>
+            <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="sim">Sim</SelectItem>
+              <SelectItem value="nao">Não</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Carência</Label>
+          <Select value={filtroCarencia} onValueChange={setFiltroCarencia}>
+            <SelectTrigger className="h-8 w-52 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas</SelectItem>
+              {CARENCIA_GROUPS.map(g => (
+                <SelectItem key={g.value} value={String(g.value)}>{g.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Limite</Label>
+          <Select value={filtroLimite} onValueChange={(v) => setFiltroLimite(v as any)}>
+            <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="com">Com limite</SelectItem>
+              <SelectItem value="sem">Sem limite</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {(filtroGratuito !== "todos" || filtroCarencia !== "todos" || filtroLimite !== "todos") && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-xs"
+            onClick={() => { setFiltroGratuito("todos"); setFiltroCarencia("todos"); setFiltroLimite("todos"); }}
+          >
+            Limpar filtros
+          </Button>
+        )}
+        <div className="ml-auto text-xs text-muted-foreground self-center">
+          {regrasFiltradas.length} de {regras.length} regra(s)
+        </div>
+      </div>
+
       <div className="border rounded-md overflow-x-auto max-w-full">
         <Table className="min-w-[1400px]">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="min-w-[200px]">Especialidade</TableHead>
-              <TableHead>Categoria</TableHead>
-              <TableHead className="min-w-[220px]">Serviço</TableHead>
-              <TableHead>Modo</TableHead>
-              <TableHead className="text-right">Valor / %</TableHead>
-              <TableHead className="w-20">Prioridade</TableHead>
-              <TableHead>Exemplo</TableHead>
-              <TableHead>Limite</TableHead>
-              <TableHead>Carência</TableHead>
-              <TableHead className="text-center">Gratuito</TableHead>
-              <TableHead className="w-10"></TableHead>
+          <TableHeader className="bg-muted sticky top-0 z-10 [&_tr]:border-b-0">
+            <TableRow className="hover:bg-muted border-b-2 border-border">
+              {[
+                { c: "min-w-[200px]", l: "Especialidade" },
+                { c: "", l: "Categoria" },
+                { c: "min-w-[220px]", l: "Serviço" },
+                { c: "", l: "Modo" },
+                { c: "text-right", l: "Valor / %" },
+                { c: "w-20", l: "Prioridade" },
+                { c: "", l: "Exemplo" },
+                { c: "", l: "Limite" },
+                { c: "", l: "Carência" },
+                { c: "text-center", l: "Gratuito" },
+                { c: "w-10", l: "" },
+              ].map((h, i) => (
+                <TableHead
+                  key={i}
+                  className={`font-semibold text-foreground uppercase text-[11px] tracking-wide ${h.c}`}
+                >
+                  {h.l}
+                </TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -330,36 +432,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
             ) : regras.length === 0 ? (
               <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
-            ) : (() => {
-              // Agrupa regras (mantendo o índice original em `regras`) pela carência.
-              const buckets = new Map<number, Array<{ r: CbRegra; idx: number }>>();
-              regras.forEach((r, idx) => {
-                const key = Number(r.carencia_mensalidades ?? 0) || 0;
-                if (!buckets.has(key)) buckets.set(key, []);
-                buckets.get(key)!.push({ r, idx });
-              });
-              // Ordem: presets primeiro (0,1,2,3,6,12), depois qualquer valor extra.
-              const orderedKeys = [
-                ...CARENCIA_GROUPS.map(g => g.value).filter(k => buckets.has(k)),
-                ...Array.from(buckets.keys())
-                  .filter(k => !CARENCIA_GROUPS.some(g => g.value === k))
-                  .sort((a, b) => a - b),
-              ];
-              return orderedKeys.flatMap((key) => {
-                const items = buckets.get(key)!;
-                return [
-                  <TableRow key={`grp-${key}`} className="bg-muted/60 hover:bg-muted/60">
-                    <TableCell colSpan={11} className="py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      <span className="inline-flex items-center gap-2">
-                        <Timer className="h-3.5 w-3.5" />
-                        {carenciaLabel(key)}
-                        <span className="text-[10px] font-normal normal-case text-muted-foreground/80">
-                          — {items.length} {items.length === 1 ? "regra" : "regras"}
-                        </span>
-                      </span>
-                    </TableCell>
-                  </TableRow>,
-                  ...items.map(({ r, idx }) => (
+            ) : regrasFiltradas.length === 0 ? (
+              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Nenhuma regra corresponde aos filtros.</TableCell></TableRow>
+            ) : (
+              regrasFiltradas.map(({ r, idx }) => (
               <TableRow key={r.id}>
                 <TableCell>
                   <SearchableSelect
@@ -479,10 +555,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   </Button>
                 </TableCell>
               </TableRow>
-                  )),
-                ];
-              });
-            })()}
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
