@@ -108,6 +108,7 @@ type Contrato = {
   cancelamento_motivo?: string | null;
   tabela_legada?: boolean | null;
   migrar_apos?: string | null;
+  criado_por?: string | null;
 };
 type Mens = {
   id: string;
