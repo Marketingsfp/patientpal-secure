@@ -5042,7 +5042,7 @@ function AgendaPage() {
       </div>
 
       {/* Tabela */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="rounded-lg border border-border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
@@ -5056,12 +5056,12 @@ function AgendaPage() {
                 />
               </TableHead>
               <TableHead className="w-16">Ficha</TableHead>
-              <TableHead className="w-14">Dia</TableHead>
-              <TableHead className="w-24">Data</TableHead>
+              <TableHead className="w-14 hidden md:table-cell">Dia</TableHead>
+              <TableHead className="w-24 hidden md:table-cell">Data</TableHead>
               <TableHead className="w-24">Intervalo</TableHead>
-              <TableHead className="w-[220px] max-w-[220px]">Profissional</TableHead>
+              <TableHead className="w-[220px] max-w-[220px] hidden lg:table-cell">Profissional</TableHead>
               <TableHead className="w-[220px] max-w-[220px]">Cliente</TableHead>
-              <TableHead className="w-40">Serviço</TableHead>
+              <TableHead className="w-40 hidden md:table-cell">Serviço</TableHead>
               <TableHead className="w-28 text-center">Alertas</TableHead>
               <TableHead className="w-32 text-right">Ações</TableHead>
             </TableRow>
