@@ -351,14 +351,43 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
           Cadastre um convênio antes em <strong>Cartão de Benefícios → Convênios</strong>.
         </div>
       ) : null}
-      <div className="relative max-w-md">
-        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          className="pl-8"
-          placeholder="Buscar por número ou paciente…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full max-w-md">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            className="pl-8"
+            placeholder="Buscar por número ou paciente…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        <Select value={filtroSituacao} onValueChange={(v) => setFiltroSituacao(v as typeof filtroSituacao)}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Situação" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Situação: todas</SelectItem>
+            <SelectItem value="em_dia">Em dia</SelectItem>
+            <SelectItem value="pendente">Pendente</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filtroTermino} onValueChange={(v) => setFiltroTermino(v as typeof filtroTermino)}>
+          <SelectTrigger className="w-[190px]"><SelectValue placeholder="Término" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Término: todos</SelectItem>
+            <SelectItem value="vencidos">Vencidos</SelectItem>
+            <SelectItem value="30d">Vencem em 30 dias</SelectItem>
+            <SelectItem value="90d">Vencem em 90 dias</SelectItem>
+            <SelectItem value="sem_data">Sem data</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filtroProgresso} onValueChange={(v) => setFiltroProgresso(v as typeof filtroProgresso)}>
+          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Progresso" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Parcelas: todas</SelectItem>
+            <SelectItem value="sem_pag">Sem pagamentos</SelectItem>
+            <SelectItem value="andamento">Em andamento</SelectItem>
+            <SelectItem value="quitadas">Quitadas</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="rounded-md border bg-card">
         <Table>
@@ -379,30 +408,34 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                 </button>
               </TableHead>
               <TableHead>Início</TableHead>
+              <TableHead>Término</TableHead>
               <TableHead>Mensal</TableHead>
-              <TableHead>Pagamento</TableHead>
+              <TableHead>Parcelas</TableHead>
+              <TableHead>Situação</TableHead>
               <TableHead>Vendedor</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Assinado</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-6">
                   Carregando…
                 </TableCell>
               </TableRow>
             ) : null}
             {!loading && filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-6">
                   Nenhum contrato.
                 </TableCell>
               </TableRow>
             ) : null}
-            {filtered.map((c) => (
+            {filtered.map((c) => {
+              const agg = parcAgg[c.id];
+              const emDia = !agg || !agg.temAtrasada;
+              return (
               <TableRow key={c.id} className="cursor-pointer" onClick={() => setDetail(c)}>
                 <TableCell className="font-semibold">{c.numero}</TableCell>
                 <TableCell>
@@ -419,8 +452,20 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                   </div>
                 </TableCell>
                 <TableCell>{fmtD(c.data_inicio)}</TableCell>
+                <TableCell>{fmtD(c.data_fim)}</TableCell>
                 <TableCell>{BRL(c.valor_mensal)}</TableCell>
-                <TableCell>{c.forma_pagamento ?? "—"}</TableCell>
+                <TableCell className="tabular-nums">
+                  {agg ? `${agg.pagas} / ${agg.total}` : "—"}
+                </TableCell>
+                <TableCell>
+                  {c.status === "cancelado" ? (
+                    <Badge variant="outline" className="text-muted-foreground">—</Badge>
+                  ) : emDia ? (
+                    <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white">Em dia</Badge>
+                  ) : (
+                    <Badge className="bg-amber-500 hover:bg-amber-500 text-white">Pendente</Badge>
+                  )}
+                </TableCell>
                 <TableCell>
                   {c.criado_por && vendedores[c.criado_por] ? (
                     <span>{vendedores[c.criado_por].trim().split(/\s+/).slice(0, 2).join(" ")}</span>
@@ -439,20 +484,11 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {c.assinado_em ? (
-                    <Badge variant="default">
-                      <Check className="h-3 w-3 mr-1" />
-                      Sim
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline">Pendente</Badge>
-                  )}
-                </TableCell>
-                <TableCell>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>
