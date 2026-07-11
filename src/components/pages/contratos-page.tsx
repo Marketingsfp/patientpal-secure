@@ -482,6 +482,30 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           onChange={(e) => setQ(e.target.value)}
         />
       </div>
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div>
+          {filtered.length === 0 ? (
+            <span>Nenhum contrato{temFiltroAtivo ? " com os filtros atuais" : ""}.</span>
+          ) : temFiltroAtivo ? (
+            <span>
+              <strong className="text-foreground">{filtered.length}</strong> resultado{filtered.length === 1 ? "" : "s"}
+              {" — filtros ativos: "}
+              <span className="text-foreground">{filtrosAtivos.join(", ")}</span>
+            </span>
+          ) : (
+            <span>
+              Mostrando{" "}
+              <strong className="text-foreground">
+                {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, filtered.length)}
+              </strong>{" "}
+              de <strong className="text-foreground">{filtered.length}</strong> contratos
+            </span>
+          )}
+        </div>
+        {temFiltroAtivo ? (
+          <Button variant="ghost" size="sm" onClick={limparFiltros}>Limpar filtros</Button>
+        ) : null}
+      </div>
       <div className="rounded-md border bg-card">
         <Table>
           <TableHeader>
