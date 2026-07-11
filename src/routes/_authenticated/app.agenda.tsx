@@ -2796,7 +2796,7 @@ function AgendaPage() {
         opcoes = opcoesOrc;
       } else if (info) {
         if (!info.emDia) {
-          toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
+          setAvisoConvenio({ tom: "error", mensagem: `Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.` });
           descSuffix = ` — ${info.convenioNome} EM ATRASO`;
         } else if (info.bloquear) {
           setAvisoConvenio({ tom: "error", mensagem: info.avisoLimite ?? "Limite do convênio atingido — agendamento bloqueado." });
@@ -2818,7 +2818,7 @@ function AgendaPage() {
           setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
           descSuffix = ` — ${info.convenioNome} (limite atingido)`;
         } else {
-          toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
+          setAvisoConvenio({ tom: "warning", mensagem: `Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.` });
         }
       }
       setFormaPagOpcoes(opcoes);
