@@ -2800,6 +2800,13 @@ function AgendaPage() {
       ];
       let descSuffix = "";
       const opcoesOrc = payload.orcamento_id ? await opcoesPagamentoDeOrcamento(payload.orcamento_id) : null;
+      // Gratuidade: pergunta se o paciente quer usar agora ou depois.
+      // Se "depois", zera o desconto para cobrar particular nesta cobrança.
+      if (info?.desconto?.tipo === "gratuidade" && !opcoesOrc) {
+        const escolha = await perguntarGratuidade(info.convenioNome);
+        if (escolha === "cancel") return;
+        if (escolha === "depois") info = { ...info, desconto: null };
+      }
       if (opcoesOrc) {
         opcoes = opcoesOrc;
       } else if (info) {
