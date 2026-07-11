@@ -2764,7 +2764,7 @@ function AgendaPage() {
     setSaving(false);
     toast.success("Salvo"); setOpen(false); await load();
     if (irParaPagamento && novoId) {
-      const [lista, info] = await Promise.all([
+      let [lista, info] = await Promise.all([
         getProcedimentosComValor(clinicaAtual.clinica_id),
         obterInfoConvenioPaciente({
           clinicaId: clinicaAtual.clinica_id,
