@@ -268,8 +268,37 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
     const hojeStr = new Date().toISOString().slice(0, 10);
     const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
     const in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
+    const dHoje = new Date(hojeStr + "T00:00:00").getTime();
+    const anoAtual = new Date().getFullYear();
     const withFilters = base.filter((c) => {
       const a = parcAgg[c.id];
+      // Início
+      if (filtroInicio !== "todos") {
+        const ini = c.data_inicio?.slice(0, 10) ?? null;
+        if (!ini) return false;
+        const dIni = new Date(ini + "T00:00:00").getTime();
+        const dias = (dHoje - dIni) / 86400000;
+        if (filtroInicio === "30d" && dias > 30) return false;
+        if (filtroInicio === "90d" && dias > 90) return false;
+        if (filtroInicio === "ano" && new Date(ini + "T00:00:00").getFullYear() !== anoAtual) return false;
+        if (filtroInicio === "anterior" && new Date(ini + "T00:00:00").getFullYear() >= anoAtual) return false;
+      }
+      // Mensal
+      if (filtroMensal !== "todos") {
+        const v = Number(c.valor_mensal) || 0;
+        if (filtroMensal === "zero" && v !== 0) return false;
+        if (filtroMensal === "ate100" && !(v > 0 && v <= 100)) return false;
+        if (filtroMensal === "100a200" && !(v > 100 && v <= 200)) return false;
+        if (filtroMensal === "acima200" && !(v > 200)) return false;
+      }
+      // Vendedor
+      if (filtroVendedor !== "todos") {
+        if (filtroVendedor === "sem") {
+          if (c.criado_por && vendedores[c.criado_por]) return false;
+        } else if (c.criado_por !== filtroVendedor) return false;
+      }
+      // Status
+      if (filtroStatus !== "todos" && c.status !== filtroStatus) return false;
       // Situação
       if (filtroSituacao !== "todas") {
         const emDia = !a || !a.temAtrasada;
@@ -298,7 +327,23 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
       a.paciente_nome.localeCompare(b.paciente_nome, "pt-BR", { sensitivity: "base" }),
     );
     return sortPaciente === "asc" ? ordered : ordered.reverse();
-  }, [list, q, sortPaciente, parcAgg, filtroSituacao, filtroTermino, filtroProgresso]);
+  }, [list, q, sortPaciente, parcAgg, vendedores, filtroSituacao, filtroTermino, filtroProgresso, filtroInicio, filtroMensal, filtroVendedor, filtroStatus]);
+
+  // Opções dinâmicas
+  const vendedorOpcoes = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const c of list) {
+      if (c.criado_por && vendedores[c.criado_por] && !seen.has(c.criado_por)) {
+        seen.set(c.criado_por, vendedores[c.criado_por]);
+      }
+    }
+    return Array.from(seen.entries()).sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+  }, [list, vendedores]);
+  const statusOpcoes = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of list) if (c.status) s.add(c.status);
+    return Array.from(s).sort();
+  }, [list]);
 
   if (view === "new") {
     return (
