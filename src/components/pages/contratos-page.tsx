@@ -605,6 +605,9 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                     ) : null}
                   </div>
                 </TableCell>
+                <TableCell>
+                  {convenios.find((cv) => cv.id === c.convenio_id)?.nome ?? "—"}
+                </TableCell>
                 <TableCell>{fmtD(c.data_inicio)}</TableCell>
                 <TableCell>{fmtD(c.data_fim ?? addUmAno(c.data_inicio))}</TableCell>
                 <TableCell>{BRL(c.valor_mensal)}</TableCell>
