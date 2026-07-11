@@ -64,6 +64,16 @@ import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog"
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) =>
   s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—";
+// Adiciona 1 ano à data inicial (formato ISO YYYY-MM-DD). Retorna null se inválida.
+const addUmAno = (s?: string | null): string | null => {
+  if (!s) return null;
+  const iso = s.slice(0, 10);
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const dt = new Date(y + 1, m - 1, d);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+};
 const TAXA_BOLETO = 3.5;
 
 // Parcela só é "Atrasado" a partir do dia seguinte ao vencimento (comparação em data local).
