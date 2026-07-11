@@ -1187,7 +1187,15 @@ function NovoContratoForm({
   );
 }
 
-function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () => void }) {
+function DetalheContrato({
+  contrato,
+  onBack,
+  initialTab = "resumo",
+}: {
+  contrato: Contrato;
+  onBack: () => void;
+  initialTab?: "resumo" | "dados" | "contrato";
+}) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const DadosField = ({ label, value }: { label: string; value: React.ReactNode }) => (
@@ -2078,7 +2086,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
       </div>
       <Card>
         <CardContent className="p-6 space-y-4">
-          <Tabs defaultValue="resumo">
+          <Tabs defaultValue={initialTab}>
             <TabsList>
               <TabsTrigger value="resumo">Resumo</TabsTrigger>
               <TabsTrigger value="dados">Dados</TabsTrigger>
