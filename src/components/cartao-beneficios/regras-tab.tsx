@@ -54,6 +54,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [progress, setProgress] = useState<string>("");
   const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
   const [novoOpen, setNovoOpen] = useState(false);
+  const [filtroGratuito, setFiltroGratuito] = useState<"todos" | "sim" | "nao">("todos");
+  const [filtroCarencia, setFiltroCarencia] = useState<string>("todos");
+  const [filtroLimite, setFiltroLimite] = useState<"todos" | "com" | "sem">("todos");
 
   const load = async () => {
     if (!convenioId) return;
