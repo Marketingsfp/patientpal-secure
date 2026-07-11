@@ -434,7 +434,7 @@ async function obterInfoConvenioPaciente(params: {
     if (pacientesCota.length > 0) {
       let q = supabase
         .from("agendamentos")
-        .select("id,medico_id,procedimento,paciente_id,status", { count: "exact" })
+        .select("id,medico_id,procedimento,paciente_id,status,inicio", { count: "exact" })
         .eq("clinica_id", clinicaId)
         .in("paciente_id", pacientesCota)
         .neq("status", "cancelado");
@@ -446,7 +446,7 @@ async function obterInfoConvenioPaciente(params: {
       // Se o benefício é por especialidade, filtra pelos agendamentos cujo
       // médico tem a mesma especialidade.
       let usados = 0;
-      let agsFiltrados: Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null }> = [];
+      let agsFiltrados: Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null; inicio?: string | null }> = [];
       if (beneficioEscolhido.escopo === "especialidade" && beneficioEscolhido.especialidade_id) {
         const medicoIds = Array.from(new Set(((agsDia ?? []) as Array<{ medico_id: string | null }>).map((a) => a.medico_id).filter((x): x is string => !!x)));
         if (medicoIds.length) {
@@ -469,14 +469,14 @@ async function obterInfoConvenioPaciente(params: {
             if (m.especialidade_id) s.add(m.especialidade_id);
             espByMed.set(m.medico_id, s);
           });
-          agsFiltrados = ((agsDia ?? []) as Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null }>).filter((a) => {
+          agsFiltrados = ((agsDia ?? []) as Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null; inicio?: string | null }>).filter((a) => {
             if (!a.medico_id) return false;
             const s = espByMed.get(a.medico_id);
             return s ? s.has(beneficioEscolhido.especialidade_id) : false;
           });
         }
       } else {
-        agsFiltrados = (agsDia ?? []) as Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null }>;
+        agsFiltrados = (agsDia ?? []) as Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null; inicio?: string | null }>;
       }
       // Regra: o limite só é consumido quando o agendamento efetivamente foi
       // pago. O status na tabela `agendamentos` nem sempre muda para
