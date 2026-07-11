@@ -574,14 +574,14 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-6">
                   Carregando…
                 </TableCell>
               </TableRow>
             ) : null}
             {!loading && filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-6">
                   Nenhum contrato.
                 </TableCell>
               </TableRow>
@@ -606,7 +606,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                   </div>
                 </TableCell>
                 <TableCell>{fmtD(c.data_inicio)}</TableCell>
-                <TableCell>{fmtD(c.data_fim)}</TableCell>
+                <TableCell>{fmtD(c.data_fim ?? addUmAno(c.data_inicio))}</TableCell>
                 <TableCell>{BRL(c.valor_mensal)}</TableCell>
                 <TableCell className="tabular-nums">
                   {agg ? `${agg.pagas} / ${agg.total}` : "—"}
