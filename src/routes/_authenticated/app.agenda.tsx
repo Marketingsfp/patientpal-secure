@@ -446,7 +446,7 @@ async function obterInfoConvenioPaciente(params: {
       // Se o benefício é por especialidade, filtra pelos agendamentos cujo
       // médico tem a mesma especialidade.
       let usados = 0;
-      let agsFiltrados: Array<{ medico_id: string | null; paciente_id?: string | null; status?: string | null }> = [];
+      let agsFiltrados: Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null }> = [];
       if (beneficioEscolhido.escopo === "especialidade" && beneficioEscolhido.especialidade_id) {
         const medicoIds = Array.from(new Set(((agsDia ?? []) as Array<{ medico_id: string | null }>).map((a) => a.medico_id).filter((x): x is string => !!x)));
         if (medicoIds.length) {
@@ -469,22 +469,38 @@ async function obterInfoConvenioPaciente(params: {
             if (m.especialidade_id) s.add(m.especialidade_id);
             espByMed.set(m.medico_id, s);
           });
-          agsFiltrados = ((agsDia ?? []) as Array<{ medico_id: string | null; paciente_id?: string | null; status?: string | null }>).filter((a) => {
+          agsFiltrados = ((agsDia ?? []) as Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null }>).filter((a) => {
             if (!a.medico_id) return false;
             const s = espByMed.get(a.medico_id);
             return s ? s.has(beneficioEscolhido.especialidade_id) : false;
           });
         }
       } else {
-        agsFiltrados = (agsDia ?? []) as Array<{ medico_id: string | null; paciente_id?: string | null; status?: string | null }>;
+        agsFiltrados = (agsDia ?? []) as Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null }>;
       }
       // Regra: o limite só é consumido quando o agendamento efetivamente foi
-      // pago/atendido (status "realizado" ou "pago"). Agendamentos apenas
-      // marcados ("agendado"/"confirmado") não consomem cota — apenas geram
-      // aviso informativo.
-      const isPago = (s: string | null | undefined) => s === "realizado" || s === "pago";
-      const agsPagos = agsFiltrados.filter((a) => isPago(a.status));
-      const agsPendentes = agsFiltrados.filter((a) => !isPago(a.status));
+      // pago. O status na tabela `agendamentos` nem sempre muda para
+      // "realizado" após a cobrança no caixa — o sinal mais confiável é a
+      // existência de um `fin_lancamentos` (receita, confirmado) vinculado ao
+      // agendamento. Combinamos ambos.
+      const idsFiltrados = agsFiltrados.map((a) => a.id).filter(Boolean);
+      const pagosIds = new Set<string>();
+      if (idsFiltrados.length > 0) {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("agendamento_id")
+          .eq("clinica_id", clinicaId)
+          .eq("tipo", "receita")
+          .eq("status", "confirmado")
+          .in("agendamento_id", idsFiltrados);
+        ((lancs ?? []) as Array<{ agendamento_id: string | null }>).forEach((l) => {
+          if (l.agendamento_id) pagosIds.add(l.agendamento_id);
+        });
+      }
+      const isPago = (a: { id: string; status?: string | null }) =>
+        a.status === "realizado" || a.status === "pago" || pagosIds.has(a.id);
+      const agsPagos = agsFiltrados.filter((a) => isPago(a));
+      const agsPendentes = agsFiltrados.filter((a) => !isPago(a));
       usados = agsPagos.length;
 
       // Escopo "titular ou dependente (exclusivo)": se qualquer OUTRO paciente

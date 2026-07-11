@@ -1,32 +1,33 @@
-## Problema
+## Diagnóstico
 
-Em `src/routes/_authenticated/app.agenda.tsx` (função que calcula o benefício do convênio, linhas ~388-519), o sistema conta como "usados" **todos os agendamentos não cancelados** da paciente no dia. Isso faz com que, quando existem 2 agendamentos apenas marcados (nenhum pago ainda), o segundo já dispare o excedente ("cobrando 50% do valor particular") na tela de cobrança do primeiro.
+O ajuste anterior contava como "consumido" apenas agendamentos com `status = 'realizado'`. Mas o fluxo de pagamento na agenda **não altera o status** do agendamento — ele apenas:
+- cria um `fin_lancamentos` (receita, confirmado) com `agendamento_id`
+- seta `fluxo_etapa = 'triagem'`
+- (o `data_pagamento` só é gravado se preenchido manualmente no formulário)
 
-A regra correta: o limite só é consumido quando um agendamento é **efetivamente pago/realizado**. Se houver apenas agendamentos pendentes, mostrar aviso informativo.
+Ou seja, após pagar o 1º agendamento, ele continua `status = 'agendado'` e cai no bucket "pendente" da minha lógica → o 2º não vê ninguém pago e mantém o benefício.
 
-## Mudanças
+## Correção
 
-### 1. `src/routes/_authenticated/app.agenda.tsx` — contagem só considera pagos
-Na consulta de `agendamentos` para o cálculo do limite (linhas ~435-482):
-- Filtrar `agsFiltrados` para contar apenas os que já foram cobrados/atendidos: `status === "realizado"` (o status "pago" existe em telas legadas mas na tabela `agendamentos` os que já foram pagos ficam como `realizado`).
-- Manter também um segundo array `agsPendentes` (mesmos filtros de especialidade/paciente, mas com `status IN ('agendado','confirmado')`, excluindo o próprio agendamento sendo cobrado agora) para gerar o aviso informativo.
+Em `src/routes/_authenticated/app.agenda.tsx`, no bloco de cálculo de limite (função que gera `beneficioInfo`, linhas ~434-520):
 
-O `esgotadoExclusivo` (titular_ou_dependente) também passa a olhar só para agendamentos realizados.
+1. Após buscar `agsFiltrados` (agendamentos do dia na cota), consultar `fin_lancamentos`:
+   ```
+   supabase.from("fin_lancamentos")
+     .select("agendamento_id")
+     .eq("clinica_id", clinicaId)
+     .eq("tipo", "receita")
+     .eq("status", "confirmado")
+     .in("agendamento_id", agsFiltrados.map(a=>a.id))
+   ```
+   Montar `Set<string> pagosIds`.
 
-### 2. Novo aviso informativo (não é excedente)
-Quando:
-- `usados < limite_qtd` (limite ainda não consumido de fato), E
-- `agsPendentes.length >= 1` (há outros agendamentos pendentes no dia que compartilham a cota)
+2. Redefinir "pago": `isPago(a) = a.status === 'realizado' || a.status === 'pago' || pagosIds.has(a.id)`. Isso pega tanto atendimentos já concluídos pelo médico quanto agendamentos que apenas foram cobrados no caixa.
 
-...adicionar um `avisoLimite` do tipo **informativo** com texto:
-> "Existem X agendamento(s) para hoje com este benefício. Apenas 1 será cobrado como benefício; os demais sairão com 50% de desconto (ou regra do excedente configurado)."
+3. `agsPagos` e `agsPendentes` usam esse novo critério. `usados = agsPagos.length` e a checagem de excedente / aviso informativo continuam como estão.
 
-O texto do excedente é derivado do `excedente_modo` da regra (particular, valor_fixo, percentual_particular ou bloquear), sem aplicar o desconto de excedente **neste** agendamento — ele continua como benefício normal. Não altera `desconto` nem `bloquear`.
-
-### 3. Dobrar o tempo do toast
-Sonner default = 4s. Passar `{ duration: 8000 }` nas chamadas de `toast.warning(info.avisoLimite)` e `toast.error(info.avisoLimite ...)` relacionadas a limite de convênio (linhas ~2716, 2729, 2732, 2969, 2982, 2985). Não altera outros toasts do arquivo.
+4. Para a query do passo 1 funcionar, incluir `id` no `.select()` de `agendamentos` (já vem `id`, mas garantir que `agsFiltrados` carregue `id`) — ajustar tipo local para incluir `id`.
 
 ## Fora do escopo
-- Não muda schema nem regras cadastradas.
-- Não altera fluxos de pagamento/GR.
-- Ao pagar o 1º agendamento (vira `realizado`), a próxima cobrança do 2º agendamento continuará disparando o excedente (50%) normalmente — comportamento correto.
+- Não alterar o fluxo de pagamento (não vamos passar a gravar `status='realizado'` na agenda — quebraria outros lugares).
+- Não mexer em regras cadastradas nem no aviso informativo/duração do toast (já corretos).
