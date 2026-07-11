@@ -8164,6 +8164,10 @@ export type Database = {
           total: number
         }[]
       }
+      fn_registrar_lancamento_e_caixa: {
+        Args: { p_lancamento: Json; p_movimento?: Json }
+        Returns: Json
+      }
       fn_regras_procedimento: {
         Args: { p_procedimento_id: string; p_unidade_id?: string }
         Returns: Json
