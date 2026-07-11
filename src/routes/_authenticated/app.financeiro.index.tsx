@@ -193,8 +193,8 @@ function KpiCard({ icon: Icon, label, value, accent, onClick }: { icon: React.El
           <Icon className="h-6 w-6" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground truncate">{label}</p>
-          <p className="text-xl lg:text-2xl font-semibold tabular-nums break-words leading-tight" title={value}>{value}</p>
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground leading-tight line-clamp-2">{label}</p>
+          <p className="mt-1 text-lg xl:text-xl font-semibold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis leading-tight" title={value}>{value}</p>
         </div>
       </CardContent>
     </Card>
