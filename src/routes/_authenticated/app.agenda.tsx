@@ -329,55 +329,58 @@ async function obterInfoConvenioPaciente(params: {
     if (!especialidadeId && extras[0]) especialidadeId = extras[0];
   }
 
-  // 4) Benefícios aplicáveis para o convênio
-  const { data: beneficios } = await supabase
-    .from("cb_beneficios")
-    .select("escopo,procedimento_id,especialidade_id,tipo_desconto,valor_desconto,valor_outros,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor")
-    .eq("clinica_id", clinicaId)
+  // 4) Fonte única de regras de desconto: cb_convenio_regras (aba Regras de Preço).
+  //    A Agenda passou a ler exatamente as mesmas regras que o Caixa usa —
+  //    a aba antiga "Benefícios (regras)" (cb_beneficios) foi removida.
+  const { data: regrasRaw } = await (supabase as any)
+    .from("cb_convenio_regras")
+    .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor")
     .eq("convenio_id", contrato.convenio_id)
     .eq("ativo", true);
-  const aplicaveis = ((beneficios ?? []) as any[]).filter((b) => {
-    if (b.escopo === "servico") return procedimentoId && b.procedimento_id === procedimentoId;
-    if (b.escopo === "especialidade") {
-      return b.especialidade_id && especialidadesMedico.includes(b.especialidade_id);
-    }
-    return false;
-  });
+  const regrasCb = ((regrasRaw ?? []) as any[]);
+  const { findRegra, carenciaCumprida } = await import("@/lib/cb-regras");
 
-  // Prioridade: gratuidade > maior percentual > maior valor absoluto
+  // Escolhe a regra mais específica dentre as especialidades possíveis do médico.
+  const espsTentativa: (string | null)[] = especialidadesMedico.length
+    ? [...especialidadesMedico, null]
+    : [null];
+  let regraMatch: any = null;
+  for (const eid of espsTentativa) {
+    const r = findRegra(regrasCb as any, eid, procedimentoTipo, procedimentoId);
+    if (r) { regraMatch = r; break; }
+  }
+
+  // Deriva desconto a partir da regra escolhida (gratuidade > modo).
   let desconto: DescontoConvenio | null = null;
   let beneficioEscolhido: any = null;
-  const grat = aplicaveis.find((b) => b.tipo_desconto === "gratuidade");
-  if (grat) {
-    desconto = { tipo: "gratuidade", valor: 0 };
-    beneficioEscolhido = grat;
-  } else {
-    const fixo = aplicaveis.find((b) => b.tipo_desconto === "valor_fixo");
-    if (fixo) {
-      desconto = {
-        tipo: "valor_fixo",
-        valor: Number(fixo.valor_desconto) || 0,
-        valorOutros: Number(fixo.valor_outros ?? fixo.valor_desconto) || 0,
-      };
-      beneficioEscolhido = fixo;
-    } else {
-    const perc = aplicaveis.filter((b) => b.tipo_desconto === "percentual");
-    const vals = aplicaveis.filter((b) => b.tipo_desconto === "valor");
-    const maiorPerc = perc.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
-    const maiorVal = vals.reduce((m, b) => Math.max(m, Number(b.valor_desconto) || 0), 0);
-    if (maiorPerc > 0) {
-      desconto = { tipo: "percentual", valor: maiorPerc };
-      beneficioEscolhido = perc.find((b) => Number(b.valor_desconto) === maiorPerc) ?? null;
-    } else if (maiorVal > 0) {
-      desconto = { tipo: "valor", valor: maiorVal };
-      beneficioEscolhido = vals.find((b) => Number(b.valor_desconto) === maiorVal) ?? null;
-    }
+  if (regraMatch) {
+    beneficioEscolhido = {
+      ...regraMatch,
+      // Campos derivados para compatibilidade com o resto do fluxo (limite/excedente).
+      escopo: regraMatch.procedimento_id ? "servico" : "especialidade",
+    };
+    if (regraMatch.gratuito) {
+      desconto = { tipo: "gratuidade", valor: 0 };
+    } else if (regraMatch.modo === "valor_fixo") {
+      const v = Number(regraMatch.valor) || 0;
+      desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };
+    } else if (regraMatch.modo === "percentual_desconto") {
+      desconto = { tipo: "percentual", valor: Number(regraMatch.percentual) || 0 };
     }
   }
 
-  // 5) Checa limite de uso do benefício escolhido (ex.: "1 consulta R$9,99/dia/contrato")
+  // 4b) Carência: se o contrato não cumpriu a carência mínima, suspende o desconto
+  //     (paga particular). Já era feito antes, agora fica junto com o resto.
   let avisoLimite: string | undefined;
   let bloquear = false;
+  if (regraMatch && !carenciaCumprida(regraMatch, mensalidadesPagas)) {
+    const n = Number(regraMatch.carencia_mensalidades) || 0;
+    desconto = null;
+    beneficioEscolhido = null;
+    avisoLimite = `Convênio ${convenioNome}: benefício disponível somente após a ${n}ª mensalidade paga (contrato tem ${mensalidadesPagas} paga(s)). Cobrando valor particular.`;
+  }
+
+  // 5) Checa limite de uso do benefício escolhido (ex.: "1 consulta R$9,99/dia/contrato")
   if (beneficioEscolhido && beneficioEscolhido.limite_qtd && emDia) {
     const dataBase = dataRef ? new Date(dataRef) : new Date();
     const periodo = (beneficioEscolhido.limite_periodo ?? "dia") as string;
@@ -509,44 +512,6 @@ async function obterInfoConvenioPaciente(params: {
         }
       }
     }
-  }
-
-  // 6) Checa carência / gratuidade configuradas nas regras do convênio
-  //    (aba Regras/Valores do lápis). A regra mais específica para
-  //    especialidade+tipo vence. Se a carência não foi cumprida, o desconto
-  //    do convênio é suspenso (paga particular). Se a regra está marcada
-  //    como "gratuito", força o benefício a gratuidade.
-  try {
-    const { data: regrasRaw } = await (supabase as any)
-      .from("cb_convenio_regras")
-      .select("id,convenio_id,especialidade_id,tipo,modo,valor,percentual,prioridade,ativo,carencia_mensalidades,gratuito")
-      .eq("convenio_id", contrato.convenio_id)
-      .eq("ativo", true);
-    const regrasCb = (regrasRaw ?? []) as any[];
-    if (regrasCb.length) {
-      const { findRegra: findR, carenciaCumprida } = await import("@/lib/cb-regras");
-      // Tenta cada especialidade possível do médico; usa a mais específica
-      const espsTentativa: (string | null)[] = especialidadesMedico.length
-        ? [...especialidadesMedico, null]
-        : [null];
-      let regraMatch: any = null;
-      for (const eid of espsTentativa) {
-        const r = findR(regrasCb, eid, procedimentoTipo);
-        if (r) { regraMatch = r; break; }
-      }
-      if (regraMatch) {
-        if (!carenciaCumprida(regraMatch, mensalidadesPagas)) {
-          const n = Number(regraMatch.carencia_mensalidades) || 0;
-          desconto = null;
-          bloquear = false;
-          avisoLimite = `Convênio ${convenioNome}: benefício disponível somente após a ${n}ª mensalidade paga (contrato tem ${mensalidadesPagas} paga(s)). Cobrando valor particular.`;
-        } else if (regraMatch.gratuito) {
-          desconto = { tipo: "gratuidade", valor: 0 };
-        }
-      }
-    }
-  } catch {
-    // silencioso — se a checagem de carência falhar, mantém o comportamento anterior
   }
 
   return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear };

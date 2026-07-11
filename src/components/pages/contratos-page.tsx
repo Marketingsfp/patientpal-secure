@@ -77,19 +77,6 @@ type Convenio = {
   beneficios: string | null;
 };
 type Faixa = { id: string; convenio_id: string; vidas_de: number; vidas_ate: number | null; valor_mensal: number };
-type Beneficio = {
-  id: string;
-  convenio_id: string;
-  nome: string;
-  descricao: string | null;
-  escopo: string;
-  tipo_desconto: string;
-  valor_desconto: number | null;
-  inicio_a_partir: number;
-  limite_uso: string;
-  periodicidade: string;
-  pessoa: string;
-};
 type Paciente = {
   id: string;
   nome: string;
@@ -379,7 +366,6 @@ function NovoContratoForm({
   const [convenioId, setConvenioId] = useState(convenios[0]?.id ?? "");
   const convenio = convenios.find((c) => c.id === convenioId);
   const [faixas, setFaixas] = useState<Faixa[]>([]);
-  const [beneficios, setBeneficios] = useState<Beneficio[]>([]);
   const [titular, setTitular] = useState<Paciente | null>(null);
   const [clientes, setClientes] = useState<Paciente[]>([]);
   const [titularOpen, setTitularOpen] = useState(false);
@@ -487,15 +473,14 @@ function NovoContratoForm({
     (async () => {
       if (!convenioId) {
         setFaixas([]);
-        setBeneficios([]);
         return;
       }
-      const [fx, bn] = await Promise.all([
-        supabase.from("cb_convenio_faixas").select("*").eq("convenio_id", convenioId).order("vidas_de"),
-        supabase.from("cb_beneficios").select("*").eq("convenio_id", convenioId).eq("ativo", true).order("nome"),
-      ]);
+      const fx = await supabase
+        .from("cb_convenio_faixas")
+        .select("*")
+        .eq("convenio_id", convenioId)
+        .order("vidas_de");
       setFaixas((fx.data ?? []) as Faixa[]);
-      setBeneficios((bn.data ?? []) as Beneficio[]);
     })();
   }, [convenioId]);
 
