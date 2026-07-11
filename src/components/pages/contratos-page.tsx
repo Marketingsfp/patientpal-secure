@@ -50,7 +50,7 @@ import { ChevronsUpDown } from "lucide-react";
 import { printContrato } from "@/lib/print-contrato";
 import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
-import { printGuiaMensalidade, printGuiaTaxaAdesao } from "@/lib/print-gr";
+import { printGuiaMensalidade, printGuiaMensalidadeComTaxa } from "@/lib/print-gr";
 import { gerarCarnePDF } from "@/lib/print-carne";
 import { gerarBoletosContrato } from "@/lib/boleto.functions";
 import { useServerFn } from "@tanstack/react-start";
@@ -2772,21 +2772,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
           const taxaAdesao = Number(pagMens.taxa_adesao ?? 0) || 0;
           await marcarPago(mensId, true, dados.forma_pagamento ?? "misto");
           try {
-            await printGuiaMensalidade({
-              mensalidadeId: mensId,
-              clinicaId: clinicaAtual.clinica_id,
-              usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
-              usuarioId: user?.id ?? null,
-              pagamento: {
-                valor: dados.valor,
-                forma_pagamento: dados.forma_pagamento,
-                parcelas: dados.parcelas,
-                bandeira_cartao: dados.bandeira_cartao,
-                detalhe: dados.pagamentos_detalhe,
-              },
-            });
             // Se a parcela carrega a taxa de adesão (apenas a 1ª parcela),
-            // gera um lançamento financeiro separado + GR própria.
+            // gera um lançamento financeiro separado e imprime UMA GR única
+            // combinando mensalidade + taxa (em vez de dois pop-ups).
             if (taxaAdesao > 0) {
               try {
                 // 1) Busca categoria "TAXA DE ADESAO CARTAO" (seed feito na migration).
@@ -2847,25 +2835,39 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   }
                 }
 
-                // 4) Imprime a GR da taxa de adesão.
-                await printGuiaTaxaAdesao({
+                // 4) Imprime UMA GR única com mensalidade + taxa de adesão.
+                await printGuiaMensalidadeComTaxa({
                   mensalidadeId: mensId,
                   clinicaId: clinicaAtual.clinica_id,
                   valorTaxa: taxaAdesao,
                   usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
                   usuarioId: user?.id ?? null,
                   pagamento: {
+                    valor: dados.valor,
                     forma_pagamento: dados.forma_pagamento,
                     parcelas: dados.parcelas,
                     bandeira_cartao: dados.bandeira_cartao,
                     detalhe: dados.pagamentos_detalhe,
                   },
                 });
-                toast.success("Pagamento registrado. GRs de mensalidade e taxa de adesão enviadas para impressão.");
+                toast.success("Pagamento registrado. GR única (mensalidade + taxa de adesão) enviada para impressão.");
               } catch (err) {
                 mostrarErro(err);
               }
             } else {
+              await printGuiaMensalidade({
+                mensalidadeId: mensId,
+                clinicaId: clinicaAtual.clinica_id,
+                usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+                usuarioId: user?.id ?? null,
+                pagamento: {
+                  valor: dados.valor,
+                  forma_pagamento: dados.forma_pagamento,
+                  parcelas: dados.parcelas,
+                  bandeira_cartao: dados.bandeira_cartao,
+                  detalhe: dados.pagamentos_detalhe,
+                },
+              });
               toast.success("Pagamento registrado e GR enviado para impressão.");
             }
           } catch (err) {
