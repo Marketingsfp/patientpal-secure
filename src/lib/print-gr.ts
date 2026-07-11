@@ -89,6 +89,7 @@ const FORMA_LABEL: Record<string, string> = {
   cartao_debito: "CARTÃO DÉBITO",
   boleto: "BOLETO",
   convenio: "CONVÊNIO",
+  convenio_gratuidade: "CONVÊNIO GRATUIDADE",
   transferencia: "TRANSFERÊNCIA",
 };
 
