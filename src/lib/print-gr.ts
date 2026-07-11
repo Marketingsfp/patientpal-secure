@@ -202,7 +202,10 @@ function imprimirViaIframe(html: string): void {
   doc.write(html);
   doc.close();
   const cleanup = () => { try { document.body.removeChild(iframe); } catch { /* noop */ } };
+  let jaImprimiu = false;
   const dispararPrint = () => {
+    if (jaImprimiu) return;
+    jaImprimiu = true;
     try {
       cw.focus();
       cw.print();
