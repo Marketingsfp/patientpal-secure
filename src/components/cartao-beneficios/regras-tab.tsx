@@ -68,7 +68,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     const [{ data: r, error: e1 }, { data: e, error: e2 }] = await Promise.all([
       (supabase as any)
         .from("cb_convenio_regras")
-        .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito")
+        .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito,grupo_gratuidade")
         .eq("convenio_id", convenioId)
         .order("prioridade", { ascending: false }),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
@@ -201,6 +201,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           ? Number(r.excedente_valor ?? 0) : null,
         carencia_mensalidades: Number(r.carencia_mensalidades ?? 0) || 0,
         gratuito: !!r.gratuito,
+        grupo_gratuidade: r.grupo_gratuidade?.trim() ? r.grupo_gratuidade.trim() : null,
       };
       if (r.id.startsWith("new-")) {
         const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
@@ -686,6 +687,7 @@ function LimiteDialog({
                     <SelectItem value="percentual_particular">% do valor particular</SelectItem>
                     <SelectItem value="valor_fixo">Valor fixo (R$)</SelectItem>
                     <SelectItem value="particular">Valor particular cheio (100%)</SelectItem>
+                    <SelectItem value="regra_padrao_convenio">Aplicar regra padrão do convênio</SelectItem>
                     <SelectItem value="bloquear">Bloquear agendamento</SelectItem>
                   </SelectContent>
                 </Select>
@@ -714,6 +716,19 @@ function LimiteDialog({
               )}
             </div>
           )}
+          <div className="border-t pt-3 space-y-1.5">
+            <Label className="text-xs">Grupo de gratuidade (opcional)</Label>
+            <Input
+              value={r.grupo_gratuidade ?? ""}
+              onChange={(e) => onChange({ grupo_gratuidade: e.target.value })}
+              placeholder='Ex.: "mama-preventivo"'
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Regras com o mesmo grupo dividem a mesma cota. Ex.: uma regra grátis
+              para Mamografia e outra para USG Mama, ambas com grupo
+              "mama-preventivo" e limite 1/contrato → usar uma consome a outra.
+            </p>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
@@ -756,6 +771,7 @@ function NovaRegraDialog({
     excedente_valor: null,
     carencia_mensalidades: 0,
     gratuito: false,
+    grupo_gratuidade: null,
   });
   const [r, setR] = useState<CbRegra>(emptyRegra());
   const [saving, setSaving] = useState(false);
@@ -796,6 +812,7 @@ function NovaRegraDialog({
         ? Number(r.excedente_valor ?? 0) : null,
       carencia_mensalidades: Number(r.carencia_mensalidades ?? 0) || 0,
       gratuito: !!r.gratuito,
+      grupo_gratuidade: r.grupo_gratuidade?.trim() ? r.grupo_gratuidade.trim() : null,
     };
     const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
     setSaving(false);
@@ -978,6 +995,7 @@ function NovaRegraDialog({
                       <SelectItem value="percentual_particular">% do valor particular</SelectItem>
                       <SelectItem value="valor_fixo">Valor fixo (R$)</SelectItem>
                       <SelectItem value="particular">Valor particular cheio</SelectItem>
+                      <SelectItem value="regra_padrao_convenio">Aplicar regra padrão do convênio</SelectItem>
                       <SelectItem value="bloquear">Bloquear agendamento</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1004,6 +1022,18 @@ function NovaRegraDialog({
                 )}
               </div>
             )}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Grupo de gratuidade (opcional)</Label>
+              <Input
+                value={r.grupo_gratuidade ?? ""}
+                onChange={(e) => upd({ grupo_gratuidade: e.target.value })}
+                placeholder='Ex.: "mama-preventivo"'
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Regras com o mesmo grupo dividem a mesma cota (ex.: 1 exame grátis
+                que pode ser Mamografia OU USG Mama).
+              </p>
+            </div>
           </div>
 
           <div className="border-t pt-3 text-xs text-muted-foreground">

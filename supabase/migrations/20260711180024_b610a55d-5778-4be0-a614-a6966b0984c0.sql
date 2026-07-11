@@ -1,0 +1,11 @@
+-- desfaz coluna criada no lugar errado
+DROP INDEX IF EXISTS public.idx_cb_beneficios_grupo_gratuidade;
+ALTER TABLE public.cb_beneficios DROP COLUMN IF EXISTS grupo_gratuidade;
+
+-- cria na tabela realmente usada pela aba Benefícios
+ALTER TABLE public.cb_convenio_regras ADD COLUMN IF NOT EXISTS grupo_gratuidade text;
+CREATE INDEX IF NOT EXISTS idx_cb_convenio_regras_grupo_gratuidade
+  ON public.cb_convenio_regras (clinica_id, convenio_id, grupo_gratuidade)
+  WHERE grupo_gratuidade IS NOT NULL;
+COMMENT ON COLUMN public.cb_convenio_regras.grupo_gratuidade IS
+  'Identificador do grupo de gratuidade compartilhada. Regras com o mesmo valor dividem a mesma cota (limite_qtd) no contrato — ex.: mama-preventivo cobre Mamografia OU USG Mama. NULL = sem compartilhamento.';
