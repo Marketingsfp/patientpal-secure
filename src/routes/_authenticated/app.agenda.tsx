@@ -979,6 +979,14 @@ function AgendaPage() {
   // Aviso do convênio (limite/gratuidade/bloqueio) — modal persistente que
   // o atendente precisa fechar para continuar o atendimento.
   const [avisoConvenio, setAvisoConvenio] = useState<{ tom: "warning" | "error"; mensagem: string } | null>(null);
+  // Modal de confirmação da gratuidade — pergunta "usar agora ou depois"
+  // antes de aplicar o benefício. Se "depois", cobra particular.
+  const [gratuidadePrompt, setGratuidadePrompt] = useState<{
+    convenioNome: string;
+    resolve: (choice: "agora" | "depois" | "cancel") => void;
+  } | null>(null);
+  const perguntarGratuidade = (convenioNome: string): Promise<"agora" | "depois" | "cancel"> =>
+    new Promise((resolve) => setGratuidadePrompt({ convenioNome, resolve }));
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
@@ -2756,7 +2764,7 @@ function AgendaPage() {
     setSaving(false);
     toast.success("Salvo"); setOpen(false); await load();
     if (irParaPagamento && novoId) {
-      const [lista, info] = await Promise.all([
+      let [lista, info] = await Promise.all([
         getProcedimentosComValor(clinicaAtual.clinica_id),
         obterInfoConvenioPaciente({
           clinicaId: clinicaAtual.clinica_id,
@@ -2792,6 +2800,13 @@ function AgendaPage() {
       ];
       let descSuffix = "";
       const opcoesOrc = payload.orcamento_id ? await opcoesPagamentoDeOrcamento(payload.orcamento_id) : null;
+      // Gratuidade: pergunta se o paciente quer usar agora ou depois.
+      // Se "depois", zera o desconto para cobrar particular nesta cobrança.
+      if (info?.desconto?.tipo === "gratuidade" && !opcoesOrc) {
+        const escolha = await perguntarGratuidade(info.convenioNome);
+        if (escolha === "cancel") return;
+        if (escolha === "depois") info = { ...info, desconto: null };
+      }
       if (opcoesOrc) {
         opcoes = opcoesOrc;
       } else if (info) {
@@ -2992,7 +3007,7 @@ function AgendaPage() {
     // Roda em paralelo: checagem de pago + lista de procedimentos (cache)
     // + info de convênio do paciente. Antes era serial (3-5s); agora ~= a
     // chamada mais lenta.
-    const [{ data: jaPagos }, lista, info] = await Promise.all([
+    let [{ data: jaPagos }, lista, info] = await Promise.all([
       supabase
         .from("fin_lancamentos")
         .select("id")
@@ -3043,6 +3058,13 @@ function AgendaPage() {
       { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
     ];
     let descSuffix = "";
+    // Gratuidade: pergunta se quer usar agora ou depois (antes de qualquer
+    // registro). "Depois" → cobra particular sem consumir o benefício.
+    if (info?.desconto?.tipo === "gratuidade" && !opcoesOrc) {
+      const escolha = await perguntarGratuidade(info.convenioNome);
+      if (escolha === "cancel") return;
+      if (escolha === "depois") info = { ...info, desconto: null };
+    }
     if (opcoesOrc) {
       // Valores do orçamento já consideram desconto/convênio definidos na hora
       // de gerar o orçamento — não aplicamos nada por cima.
@@ -4497,6 +4519,63 @@ function AgendaPage() {
           <DialogFooter>
             <Button onClick={() => setAvisoConvenio(null)} variant={avisoConvenio?.tom === "error" ? "destructive" : "default"}>
               Entendi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmação de gratuidade: usar agora (aplica o benefício) ou depois (cobra particular). */}
+      <Dialog
+        open={gratuidadePrompt !== null}
+        onOpenChange={(o) => {
+          if (!o && gratuidadePrompt) {
+            gratuidadePrompt.resolve("cancel");
+            setGratuidadePrompt(null);
+          }
+        }}
+      >
+        <DialogContent
+          className="max-w-md"
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-emerald-700">Gratuidade disponível</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm leading-relaxed">
+            Este paciente tem direito a <b>GRATUIDADE</b> pelo convênio{" "}
+            <b>{gratuidadePrompt?.convenioNome}</b> para este atendimento.
+            <br />
+            <br />
+            Deseja usar agora ou guardar para uma próxima consulta?
+          </div>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                gratuidadePrompt?.resolve("cancel");
+                setGratuidadePrompt(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                gratuidadePrompt?.resolve("depois");
+                setGratuidadePrompt(null);
+              }}
+            >
+              Cobrar particular (usar depois)
+            </Button>
+            <Button
+              onClick={() => {
+                gratuidadePrompt?.resolve("agora");
+                setGratuidadePrompt(null);
+              }}
+            >
+              Usar agora
             </Button>
           </DialogFooter>
         </DialogContent>
