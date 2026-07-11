@@ -427,7 +427,23 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                   </span>
                 </button>
               </TableHead>
-              <TableHead>Início</TableHead>
+              <TableHead>
+                <Select value={filtroInicio} onValueChange={(v) => setFiltroInicio(v as typeof filtroInicio)}>
+                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                    <span className="inline-flex items-center gap-1">
+                      INÍCIO
+                      {filtroInicio !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                    <SelectItem value="90d">Últimos 90 dias</SelectItem>
+                    <SelectItem value="ano">Este ano</SelectItem>
+                    <SelectItem value="anterior">Anos anteriores</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableHead>
               <TableHead>
                 <Select value={filtroTermino} onValueChange={(v) => setFiltroTermino(v as typeof filtroTermino)}>
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
@@ -445,7 +461,23 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                   </SelectContent>
                 </Select>
               </TableHead>
-              <TableHead>Mensal</TableHead>
+              <TableHead>
+                <Select value={filtroMensal} onValueChange={(v) => setFiltroMensal(v as typeof filtroMensal)}>
+                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                    <span className="inline-flex items-center gap-1">
+                      MENSAL
+                      {filtroMensal !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="zero">R$ 0,00</SelectItem>
+                    <SelectItem value="ate100">Até R$ 100</SelectItem>
+                    <SelectItem value="100a200">R$ 100 a R$ 200</SelectItem>
+                    <SelectItem value="acima200">Acima de R$ 200</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableHead>
               <TableHead>
                 <Select value={filtroProgresso} onValueChange={(v) => setFiltroProgresso(v as typeof filtroProgresso)}>
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
@@ -477,8 +509,39 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                   </SelectContent>
                 </Select>
               </TableHead>
-              <TableHead>Vendedor</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>
+                <Select value={filtroVendedor} onValueChange={setFiltroVendedor}>
+                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                    <span className="inline-flex items-center gap-1">
+                      VENDEDOR
+                      {filtroVendedor !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="sem">Sem vendedor</SelectItem>
+                    {vendedorOpcoes.map(([id, nome]) => (
+                      <SelectItem key={id} value={id}>{nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead>
+                <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                    <span className="inline-flex items-center gap-1">
+                      STATUS
+                      {filtroStatus !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    {statusOpcoes.map((s) => (
+                      <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
