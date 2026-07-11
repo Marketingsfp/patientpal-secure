@@ -65,6 +65,17 @@ const fmtD = (s?: string | null) =>
   s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—";
 const TAXA_BOLETO = 3.5;
 
+// Parcela só é "Atrasado" a partir do dia seguinte ao vencimento (comparação em data local).
+const isAtrasado = (vencimento?: string | null) => {
+  if (!vencimento) return false;
+  const [y, m, d] = vencimento.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return false;
+  const venc = new Date(y, m - 1, d);
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  return hoje.getTime() > venc.getTime();
+};
+
 type Convenio = {
   id: string;
   nome: string;
@@ -2276,14 +2287,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
                               variant={
                                 m.status === "pago"
                                   ? "default"
-                                  : new Date(m.vencimento) < new Date()
+                                  : isAtrasado(m.vencimento)
                                     ? "destructive"
                                     : "outline"
                               }
                             >
                               {m.status === "pago"
                                 ? "Pago"
-                                : new Date(m.vencimento) < new Date()
+                                : isAtrasado(m.vencimento)
                                   ? "Atrasado"
                                   : "Pendente"}
                             </Badge>
@@ -2649,12 +2660,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           variant={
                             m.status === "pago"
                               ? "default"
-                              : new Date(m.vencimento) < new Date()
+                              : isAtrasado(m.vencimento)
                                 ? "destructive"
                                 : "outline"
                           }
                         >
-                          {m.status === "pago" ? "Pago" : new Date(m.vencimento) < new Date() ? "Atrasado" : "Pendente"}
+                          {m.status === "pago" ? "Pago" : isAtrasado(m.vencimento) ? "Atrasado" : "Pendente"}
                         </Badge>
                       </TableCell>
                       <TableCell>{m.pago_em ? fmtD(m.pago_em) : "—"}</TableCell>
