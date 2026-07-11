@@ -472,9 +472,9 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       paciente_id: pacienteId,
       criado_por: user?.id ?? null,
     } as never).select("id").single();
-    setSaving(false);
-    if (error) { mostrarErro(error); return; }
-    toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
+    if (error) { setSaving(false); mostrarErro(error); return; }
+    // NÃO exibir toast.success ainda — só depois do caixa confirmar (correção
+    // do bug crítico: lançamento confirmado sem movimento de caixa).
     // Sincroniza `tipo_atendimento` do agendamento com o que foi pago,
     // para que o check-in e relatórios reflitam a decisão final.
     if (agendamentoId && tipo === "receita") {
@@ -646,7 +646,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
             descricao: "Abertura automática",
           } as never);
         }
-        await supabase.from("caixa_movimentos").insert({
+        const { error: errMov } = await supabase.from("caixa_movimentos").insert({
           sessao_id: sess!.id,
           clinica_id: clinicaAtual.clinica_id,
           user_id: user.id,
@@ -656,14 +656,34 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           forma_pagamento: formaFinal,
           lancamento_id: lancInserido?.id ?? null,
         } as never);
+        if (errMov) throw errMov;
       }
     } catch (e) {
-      console.error("Falha ao registrar no caixa:", e);
+      // ROLLBACK: caixa falhou → apaga o lançamento para evitar receita/despesa
+      // confirmada sem contrapartida no caixa (bug crítico corrigido).
+      console.error("Falha ao registrar no caixa — revertendo lançamento:", e);
       const msg = e instanceof Error ? e.message : String(e);
-      toast.warning(
-        `Lançamento salvo, mas não foi possível registrar em Movimentos da Sessão: ${msg}`,
-      );
+      try {
+        if (lancInserido?.id) {
+          // Remove splits antes do lançamento (FK).
+          await supabase.from("pagamento_splits").delete().eq("pagamento_id", lancInserido.id);
+          await supabase.from("fin_lancamentos").delete().eq("id", lancInserido.id);
+        }
+        toast.error(
+          `Não foi possível registrar no caixa. Lançamento revertido. Detalhe: ${msg}`,
+        );
+      } catch (rbErr) {
+        console.error("Falha no rollback do lançamento:", rbErr);
+        toast.error(
+          `ERRO CRÍTICO: caixa falhou e não foi possível reverter o lançamento (id ${lancInserido?.id ?? "?"}). Contate o suporte. Detalhe: ${msg}`,
+        );
+      }
+      setSaving(false);
+      return;
     }
+    // Ambos confirmaram — agora sim exibe sucesso.
+    setSaving(false);
+    toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
     onSavedWithData?.({
       valor: Number(valor),
       forma_pagamento: formaFinal,

@@ -3276,9 +3276,12 @@ function AgendaPage() {
         mostrarErro(errSC, isGrat ? "falha ao registrar gratuidade" : "falha ao registrar atendimento sem cobrança");
         return;
       }
-      setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
       // Espelha o lançamento em `caixa_movimentos` para que gratuidades e
       // atendimentos sem cobrança apareçam em "Meu caixa > Movimentos".
+      // Se o caixa falhar, revertemos o lançamento (correção do bug crítico:
+      // receita "confirmado" sem movimento de caixa).
+      let caixaOk = true;
+      let caixaErrMsg = "";
       try {
         if (user?.id) {
           let { data: sess } = await supabase
@@ -3292,7 +3295,7 @@ function AgendaPage() {
             .maybeSingle();
           if (!sess) {
             const nome = (user.user_metadata as { nome?: string } | null)?.nome ?? user.email ?? null;
-            const { data: novaSess } = await supabase
+            const { data: novaSess, error: errSess } = await supabase
               .from("caixa_sessoes")
               .insert({
                 clinica_id: clinicaAtual.clinica_id,
@@ -3304,9 +3307,10 @@ function AgendaPage() {
               } as never)
               .select("id")
               .single();
+            if (errSess) throw errSess;
             sess = novaSess;
             if (sess?.id) {
-              await supabase.from("caixa_movimentos").insert({
+              const { error: errAb } = await supabase.from("caixa_movimentos").insert({
                 sessao_id: sess.id,
                 clinica_id: clinicaAtual.clinica_id,
                 user_id: user.id,
@@ -3314,10 +3318,11 @@ function AgendaPage() {
                 valor: 0,
                 descricao: "Abertura automática",
               } as never);
+              if (errAb) throw errAb;
             }
           }
           if (sess?.id) {
-            await supabase.from("caixa_movimentos").insert({
+            const { error: errMov } = await supabase.from("caixa_movimentos").insert({
               sessao_id: sess.id,
               clinica_id: clinicaAtual.clinica_id,
               user_id: user.id,
@@ -3327,11 +3332,26 @@ function AgendaPage() {
               forma_pagamento: isGrat ? "convenio_gratuidade" : "sem_cobranca",
               lancamento_id: (lancInserido as { id?: string } | null)?.id ?? null,
             } as never);
+            if (errMov) throw errMov;
           }
         }
       } catch (e) {
-        console.error("Falha ao registrar gratuidade/sem-cobrança no caixa:", e);
+        caixaOk = false;
+        caixaErrMsg = e instanceof Error ? e.message : String(e);
+        console.error("Falha ao registrar gratuidade/sem-cobrança no caixa — revertendo lançamento:", e);
       }
+      if (!caixaOk) {
+        const lancId = (lancInserido as { id?: string } | null)?.id;
+        try {
+          if (lancId) await supabase.from("fin_lancamentos").delete().eq("id", lancId);
+          setAvisoConvenio({ tom: "error", mensagem: `Não foi possível registrar no caixa. Lançamento revertido. Detalhe: ${caixaErrMsg}` });
+        } catch (rbErr) {
+          console.error("Falha no rollback:", rbErr);
+          setAvisoConvenio({ tom: "error", mensagem: `ERRO CRÍTICO: caixa falhou e o lançamento (id ${lancId ?? "?"}) não pôde ser revertido. Contate o suporte.` });
+        }
+        return;
+      }
+      setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
       // Auto check-in apenas se o atendimento for do mesmo dia.
       try {
         const hoje = new Date().toISOString().slice(0, 10);

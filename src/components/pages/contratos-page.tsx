@@ -3267,6 +3267,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 if (errLanc) throw errLanc;
 
                 // 3) Registra movimento no caixa (sessão aberta do usuário).
+                // Se o caixa falhar, revertemos o lançamento da taxa (bug
+                // crítico: taxa "confirmado" sem movimento de caixa).
+                let caixaTaxaOk = true;
+                let caixaTaxaErr = "";
                 if (user?.id) {
                   const { data: sess } = await supabase
                     .from("caixa_sessoes")
@@ -3278,7 +3282,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     .limit(1)
                     .maybeSingle();
                   if (sess?.id) {
-                    await supabase.from("caixa_movimentos").insert({
+                    const { error: errMovTaxa } = await supabase.from("caixa_movimentos").insert({
                       sessao_id: sess.id,
                       clinica_id: clinicaAtual.clinica_id,
                       user_id: user.id,
@@ -3288,7 +3292,22 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       forma_pagamento: dados.forma_pagamento,
                       lancamento_id: (lancTaxa as { id: string } | null)?.id ?? null,
                     } as never);
+                    if (errMovTaxa) {
+                      caixaTaxaOk = false;
+                      caixaTaxaErr = errMovTaxa.message ?? String(errMovTaxa);
+                    }
                   }
+                }
+                if (!caixaTaxaOk) {
+                  const lancId = (lancTaxa as { id?: string } | null)?.id;
+                  try {
+                    if (lancId) await supabase.from("fin_lancamentos").delete().eq("id", lancId);
+                    toast.error(`Taxa de adesão: caixa falhou. Lançamento revertido. Detalhe: ${caixaTaxaErr}`);
+                  } catch (rbErr) {
+                    console.error("Falha no rollback da taxa de adesão:", rbErr);
+                    toast.error(`ERRO CRÍTICO: taxa de adesão (lançamento ${lancId ?? "?"}) sem caixa e sem rollback. Contate o suporte.`);
+                  }
+                  return;
                 }
 
                 // 4) Imprime UMA GR única com mensalidade + taxa de adesão.
