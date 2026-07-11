@@ -1813,7 +1813,6 @@ export type Database = {
           excedente_modo: string | null
           excedente_percentual: number | null
           excedente_valor: number | null
-          grupo_gratuidade: string | null
           id: string
           inicio_a_partir: number
           limite_escopo: string | null
@@ -1842,7 +1841,6 @@ export type Database = {
           excedente_modo?: string | null
           excedente_percentual?: number | null
           excedente_valor?: number | null
-          grupo_gratuidade?: string | null
           id?: string
           inicio_a_partir?: number
           limite_escopo?: string | null
@@ -1871,7 +1869,6 @@ export type Database = {
           excedente_modo?: string | null
           excedente_percentual?: number | null
           excedente_valor?: number | null
-          grupo_gratuidade?: string | null
           id?: string
           inicio_a_partir?: number
           limite_escopo?: string | null
@@ -1970,6 +1967,7 @@ export type Database = {
           excedente_percentual: number | null
           excedente_valor: number | null
           gratuito: boolean
+          grupo_gratuidade: string | null
           id: string
           limite_escopo: string | null
           limite_periodo: string | null
@@ -1994,6 +1992,7 @@ export type Database = {
           excedente_percentual?: number | null
           excedente_valor?: number | null
           gratuito?: boolean
+          grupo_gratuidade?: string | null
           id?: string
           limite_escopo?: string | null
           limite_periodo?: string | null
@@ -2018,6 +2017,7 @@ export type Database = {
           excedente_percentual?: number | null
           excedente_valor?: number | null
           gratuito?: boolean
+          grupo_gratuidade?: string | null
           id?: string
           limite_escopo?: string | null
           limite_periodo?: string | null
