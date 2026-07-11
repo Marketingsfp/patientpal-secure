@@ -375,6 +375,45 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     return Array.from(s).sort();
   }, [list]);
 
+  // Filtros ativos (para contagem/rótulo/limpar)
+  const filtrosAtivos = useMemo(() => {
+    const arr: string[] = [];
+    if (q.trim()) arr.push("Busca");
+    if (filtroConvenio !== "todos") arr.push("Convênio");
+    if (filtroInicio !== "todos") arr.push("Início");
+    if (filtroTermino !== "todos") arr.push("Término");
+    if (filtroMensal !== "todos") arr.push("Mensal");
+    if (filtroProgresso !== "todas") arr.push("Parcelas");
+    if (filtroSituacao !== "todas") arr.push("Situação");
+    if (filtroVendedor !== "todos") arr.push("Vendedor");
+    if (filtroStatus !== "todos") arr.push("Status");
+    return arr;
+  }, [q, filtroConvenio, filtroInicio, filtroTermino, filtroMensal, filtroProgresso, filtroSituacao, filtroVendedor, filtroStatus]);
+  const temFiltroAtivo = filtrosAtivos.length > 0;
+
+  const limparFiltros = () => {
+    setQ("");
+    setFiltroConvenio("todos");
+    setFiltroInicio("todos");
+    setFiltroTermino("todos");
+    setFiltroMensal("todos");
+    setFiltroProgresso("todas");
+    setFiltroSituacao("todas");
+    setFiltroVendedor("todos");
+    setFiltroStatus("todos");
+    setPagina(1);
+  };
+
+  // Paginação
+  const totalPaginas = Math.max(1, Math.ceil(filtered.length / POR_PAGINA));
+  const paginaAtual = Math.min(pagina, totalPaginas);
+  const inicioIdx = (paginaAtual - 1) * POR_PAGINA;
+  const paginados = filtered.slice(inicioIdx, inicioIdx + POR_PAGINA);
+  // Reset página ao mudar filtros/busca/ordem
+  useEffect(() => {
+    setPagina(1);
+  }, [q, sortPaciente, filtroConvenio, filtroInicio, filtroTermino, filtroMensal, filtroProgresso, filtroSituacao, filtroVendedor, filtroStatus]);
+
   if (view === "new") {
     return (
       <NovoContratoForm
