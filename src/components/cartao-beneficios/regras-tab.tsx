@@ -399,19 +399,19 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         </div>
       </div>
 
-      <div className="border rounded-md max-w-full">
-        <Table className="[&_th]:px-2 [&_td]:px-2 [&_th:first-child]:pl-3 [&_td:first-child]:pl-3 [&_th:last-child]:pr-2 [&_td:last-child]:pr-2">
+      <div className="border rounded-md w-fit max-w-full">
+        <Table className="w-auto [&_th]:px-2 [&_td]:px-2 [&_th:first-child]:pl-3 [&_td:first-child]:pl-3 [&_th:last-child]:pr-2 [&_td:last-child]:pr-2 [&_th]:border-r-0 [&_td]:border-r-0 [&_.lucide-chevron-down]:hidden [&_.lucide-chevrons-up-down]:hidden">
           <TableHeader className="sticky top-0 z-10">
             <TableRow>
               {[
-                { c: "", l: "Especialidade" },
-                { c: "", l: "Categoria" },
-                { c: "", l: "Serviço" },
-                { c: "", l: "Modo" },
-                { c: "text-right w-[80px]", l: "Valor / %" },
-                { c: "w-[60px] text-center", l: "Prioridade" },
+                { c: "w-[160px]", l: "Especialidade" },
+                { c: "w-[90px]", l: "Categoria" },
+                { c: "w-[220px]", l: "Serviço" },
+                { c: "w-[100px]", l: "Modo" },
+                { c: "text-right w-[70px]", l: "Valor / %" },
+                { c: "w-[52px] text-center", l: "Prioridade" },
                 { c: "w-[100px]", l: "Limite" },
-                { c: "w-[92px]", l: "Carência" },
+                { c: "w-[88px]", l: "Carência" },
                 { c: "text-center w-[52px] !px-1", l: "Gratuito" },
                 { c: "w-[64px] !px-0", l: "" },
               ].map((h, i) => (
