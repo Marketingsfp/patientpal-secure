@@ -650,6 +650,12 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
+  const convLabel = await resolveConvLabel(
+    (a as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
+    a.paciente_id ?? null,
+    clinicaId,
+  );
+
   const ticketHtml = `
   <div class="ticket">
     <div class="center bold">${esc(c?.nome ?? "")}</div>
@@ -666,6 +672,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
+    ${convLabel ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabel)}</span></div>` : ""}
 
     <div class="sep"></div>
 
