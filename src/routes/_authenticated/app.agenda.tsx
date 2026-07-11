@@ -434,7 +434,7 @@ async function obterInfoConvenioPaciente(params: {
     if (pacientesCota.length > 0) {
       let q = supabase
         .from("agendamentos")
-        .select("id,medico_id,procedimento,paciente_id,status", { count: "exact" })
+        .select("id,medico_id,procedimento,paciente_id,status,inicio", { count: "exact" })
         .eq("clinica_id", clinicaId)
         .in("paciente_id", pacientesCota)
         .neq("status", "cancelado");
@@ -446,7 +446,7 @@ async function obterInfoConvenioPaciente(params: {
       // Se o benefício é por especialidade, filtra pelos agendamentos cujo
       // médico tem a mesma especialidade.
       let usados = 0;
-      let agsFiltrados: Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null }> = [];
+      let agsFiltrados: Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null; inicio?: string | null }> = [];
       if (beneficioEscolhido.escopo === "especialidade" && beneficioEscolhido.especialidade_id) {
         const medicoIds = Array.from(new Set(((agsDia ?? []) as Array<{ medico_id: string | null }>).map((a) => a.medico_id).filter((x): x is string => !!x)));
         if (medicoIds.length) {
@@ -469,14 +469,14 @@ async function obterInfoConvenioPaciente(params: {
             if (m.especialidade_id) s.add(m.especialidade_id);
             espByMed.set(m.medico_id, s);
           });
-          agsFiltrados = ((agsDia ?? []) as Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null }>).filter((a) => {
+          agsFiltrados = ((agsDia ?? []) as Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null; inicio?: string | null }>).filter((a) => {
             if (!a.medico_id) return false;
             const s = espByMed.get(a.medico_id);
             return s ? s.has(beneficioEscolhido.especialidade_id) : false;
           });
         }
       } else {
-        agsFiltrados = (agsDia ?? []) as Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null }>;
+        agsFiltrados = (agsDia ?? []) as Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null; inicio?: string | null }>;
       }
       // Regra: o limite só é consumido quando o agendamento efetivamente foi
       // pago. O status na tabela `agendamentos` nem sempre muda para
@@ -518,24 +518,68 @@ async function obterInfoConvenioPaciente(params: {
             ? "titular-ou-dependente"
             : "contrato";
         const periodoTxt = periodo === "semana" ? "semana" : periodo === "mes" ? "mês" : periodo === "contrato" ? "contrato" : "dia";
+        // Se a regra é gratuita e o limite já foi consumido, monta um texto
+        // detalhado com data/paciente/médico do consumidor (pode ser o
+        // titular ou dependente do mesmo contrato).
+        let consumidorTxt = "";
+        if (beneficioEscolhido.gratuito && agsPagos.length > 0) {
+          const consumidor = agsPagos
+            .slice()
+            .sort((a, b) => {
+              const ta = a.inicio ? new Date(a.inicio).getTime() : 0;
+              const tb = b.inicio ? new Date(b.inicio).getTime() : 0;
+              return tb - ta;
+            })[0];
+          let medicoNome = "";
+          let pacienteNome = "";
+          if (consumidor?.medico_id) {
+            const { data: m } = await supabase
+              .from("medicos")
+              .select("nome")
+              .eq("id", consumidor.medico_id)
+              .maybeSingle();
+            medicoNome = (m as { nome?: string } | null)?.nome ?? "";
+          }
+          if (consumidor?.paciente_id) {
+            const { data: p } = await supabase
+              .from("pacientes")
+              .select("nome")
+              .eq("id", consumidor.paciente_id)
+              .maybeSingle();
+            pacienteNome = (p as { nome?: string } | null)?.nome ?? "";
+          }
+          const dt = consumidor?.inicio ? new Date(consumidor.inicio) : null;
+          const dtTxt = dt
+            ? `${dt.toLocaleDateString("pt-BR")} às ${dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+            : "";
+          consumidorTxt = `Gratuidade de ${procedimentoNome} deste convênio já foi utilizada${dtTxt ? ` em ${dtTxt}` : ""}${pacienteNome ? ` por ${pacienteNome}` : ""}${medicoNome ? ` com Dr(a). ${medicoNome}` : ""}.\n`;
+        }
         if (modo === "bloquear") {
           bloquear = true;
           desconto = null;
-          avisoLimite = esgotadoExclusivo
-            ? `Cota exclusiva já usada por outro membro do contrato — agendamento bloqueado pelo convênio.`
-            : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — agendamento bloqueado pelo convênio.`;
+          avisoLimite = consumidorTxt
+            ? `${consumidorTxt}Este atendimento fica bloqueado pelo convênio.`
+            : (esgotadoExclusivo
+              ? `Cota exclusiva já usada por outro membro do contrato — agendamento bloqueado pelo convênio.`
+              : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — agendamento bloqueado pelo convênio.`);
         } else if (modo === "particular") {
           desconto = null;
-          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — cobrando valor particular cheio.`;
+          avisoLimite = consumidorTxt
+            ? `${consumidorTxt}Cobrando valor particular cheio neste atendimento.`
+            : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — cobrando valor particular cheio.`;
         } else if (modo === "valor_fixo") {
           const v = Number(beneficioEscolhido.excedente_valor) || 0;
           desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };
-          avisoLimite = `Limite atingido — cobrando valor fixo excedente R$ ${v.toFixed(2)}.`;
+          avisoLimite = consumidorTxt
+            ? `${consumidorTxt}Cobrando valor fixo excedente de R$ ${v.toFixed(2)} neste atendimento.`
+            : `Limite atingido — cobrando valor fixo excedente R$ ${v.toFixed(2)}.`;
         } else if (modo === "percentual_particular") {
           const pct = Number(beneficioEscolhido.excedente_percentual) || 0;
           // pct = desconto sobre o particular; ex.: 50 → paga 50% do particular
           desconto = { tipo: "percentual", valor: pct };
-          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — cobrando ${100 - pct}% do valor particular.`;
+          avisoLimite = consumidorTxt
+            ? `${consumidorTxt}Cobrando ${100 - pct}% do valor particular neste atendimento.`
+            : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — cobrando ${100 - pct}% do valor particular.`;
         }
       } else if (agsPendentes.length >= 1) {
         // Cota ainda não consumida, mas existem outros agendamentos pendentes
@@ -932,6 +976,9 @@ function AgendaPage() {
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [formaPagOpcoes, setFormaPagOpcoes] = useState<FormaOpcao[]>([]);
   const [formaPagCtx, setFormaPagCtx] = useState<{ agId: string; desc: string; paciente?: string; procedimento?: string; medico?: string; especialidade?: string } | null>(null);
+  // Aviso do convênio (limite/gratuidade/bloqueio) — modal persistente que
+  // o atendente precisa fechar para continuar o atendimento.
+  const [avisoConvenio, setAvisoConvenio] = useState<{ tom: "warning" | "error"; mensagem: string } | null>(null);
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
@@ -2752,7 +2799,7 @@ function AgendaPage() {
           toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
           descSuffix = ` — ${info.convenioNome} EM ATRASO`;
         } else if (info.bloquear) {
-          toast.error(info.avisoLimite ?? "Limite do convênio atingido — agendamento bloqueado.", { duration: 8000 });
+          setAvisoConvenio({ tom: "error", mensagem: info.avisoLimite ?? "Limite do convênio atingido — agendamento bloqueado." });
           descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
         } else if (info.desconto) {
           opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
@@ -2765,10 +2812,10 @@ function AgendaPage() {
                   ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
                   : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
           descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
-          if (info.avisoLimite) toast.warning(info.avisoLimite, { duration: 8000 });
+          if (info.avisoLimite) setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
           else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
         } else if (info.avisoLimite) {
-          toast.warning(info.avisoLimite, { duration: 8000 });
+          setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
           descSuffix = ` — ${info.convenioNome} (limite atingido)`;
         } else {
           toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
@@ -3005,7 +3052,7 @@ function AgendaPage() {
         toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
         descSuffix = ` — ${info.convenioNome} EM ATRASO`;
       } else if (info.bloquear) {
-        toast.error(info.avisoLimite ?? "Limite do convênio atingido — cobrança bloqueada.", { duration: 8000 });
+        setAvisoConvenio({ tom: "error", mensagem: info.avisoLimite ?? "Limite do convênio atingido — cobrança bloqueada." });
         descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
       } else if (info.desconto) {
         opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
@@ -3018,10 +3065,10 @@ function AgendaPage() {
                 ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
                 : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
         descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
-        if (info.avisoLimite) toast.warning(info.avisoLimite, { duration: 8000 });
+        if (info.avisoLimite) setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
         else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
       } else if (info.avisoLimite) {
-        toast.warning(info.avisoLimite, { duration: 8000 });
+        setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
         descSuffix = ` — ${info.convenioNome} (limite atingido)`;
       } else {
         toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
@@ -4371,6 +4418,30 @@ function AgendaPage() {
           }
         }}
       />
+
+      {/* Aviso do convênio — persistente; o atendente precisa fechar. */}
+      <Dialog open={avisoConvenio !== null} onOpenChange={(o) => { if (!o) setAvisoConvenio(null); }}>
+        <DialogContent
+          className="max-w-md"
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className={avisoConvenio?.tom === "error" ? "text-destructive" : "text-amber-600"}>
+              Aviso do convênio
+            </DialogTitle>
+          </DialogHeader>
+          <div className="whitespace-pre-line text-sm leading-relaxed">
+            {avisoConvenio?.mensagem}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setAvisoConvenio(null)} variant={avisoConvenio?.tom === "error" ? "destructive" : "default"}>
+              Entendi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Diálogo de desconto (acionado pelo botão no formulário de agendamento). */}
       <Dialog open={descontoDlgOpen} onOpenChange={setDescontoDlgOpen}>

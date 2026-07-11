@@ -1,33 +1,27 @@
-## Diagnóstico
+## Mudanças
 
-O ajuste anterior contava como "consumido" apenas agendamentos com `status = 'realizado'`. Mas o fluxo de pagamento na agenda **não altera o status** do agendamento — ele apenas:
-- cria um `fin_lancamentos` (receita, confirmado) com `agendamento_id`
-- seta `fluxo_etapa = 'triagem'`
-- (o `data_pagamento` só é gravado se preenchido manualmente no formulário)
+### 1. Aviso persistente (modal) em vez de toast
+Em `src/routes/_authenticated/app.agenda.tsx`:
+- Adicionar estado `avisoConvenio` = `{ titulo, mensagem, tom: "warning"|"error" } | null`.
+- Renderizar um `AlertDialog` (shadcn) com esse estado, título fixo "Aviso do convênio", mensagem em `whitespace-pre-line`, e um único botão "Entendi" que fecha (`onOpenChange`/`onClick` → `setAvisoConvenio(null)`).
+- Substituir os `toast.warning(info.avisoLimite, { duration: 8000 })` e o `toast.error(info.avisoLimite ?? …, { duration: 8000 })` dos dois fluxos (linhas ~2716-2732 no `formaPagOpen` normal e ~2969-2985 na cobrança agrupada) por `setAvisoConvenio({ tom, titulo, mensagem: info.avisoLimite })`. Toasts de "cobrança bloqueada"/"limite atingido" quando `info.avisoLimite` está vazio viram fallback do mesmo modal. Os outros toasts (`info.emDia === false`, `desconto aplicado`, etc.) continuam como toasts.
 
-Ou seja, após pagar o 1º agendamento, ele continua `status = 'agendado'` e cai no bucket "pendente" da minha lógica → o 2º não vê ninguém pago e mantém o benefício.
+### 2. Mensagem enriquecida quando a regra é `gratuito`
+No bloco de limite em `obterInfoConvenioPaciente` (linhas ~505-540), quando `beneficioEscolhido.gratuito === true` E `usados >= limite_qtd` (ou `esgotadoExclusivo`):
+- Pegar o consumidor mais recente da cota: `agsPagos.sort((a,b) => new Date(b.inicio) - new Date(a.inicio))[0]` (incluir `id, inicio, medico_id, paciente_id` no SELECT da query de `agendamentos` — já tem `id, medico_id, paciente_id`, faltando `inicio`).
+- Buscar nomes: `medicos.nome` do `medico_id` e `pacientes.nome` do `paciente_id` do consumidor (2 selects `.maybeSingle()`).
+- Formatar `avisoLimite`:
+  > "Gratuidade de <procedimento> deste convênio já foi utilizada em <DD/MM/AAAA às HH:MM> por <PACIENTE NOME> com Dr(a). <MEDICO NOME>.
+  > Cobrando <regra do excedente> para este atendimento."
+- O texto de excedente continua derivado do `excedente_modo` (particular / -X% / R$ fixo / bloquear), colado na segunda linha.
+- Para regras **não** gratuitas (ex.: cartão consulta R$9,99), manter o texto atual já implementado.
 
-## Correção
+### 3. Aviso informativo (múltiplos pendentes) também vira modal
+O `avisoLimite` gerado no branch `agsPendentes.length >= 1` (usuário ainda tem cota, mas há outros agendados) também usa `setAvisoConvenio({ tom: "warning", … })`. Mesmo comportamento — atendente fecha para prosseguir.
 
-Em `src/routes/_authenticated/app.agenda.tsx`, no bloco de cálculo de limite (função que gera `beneficioInfo`, linhas ~434-520):
-
-1. Após buscar `agsFiltrados` (agendamentos do dia na cota), consultar `fin_lancamentos`:
-   ```
-   supabase.from("fin_lancamentos")
-     .select("agendamento_id")
-     .eq("clinica_id", clinicaId)
-     .eq("tipo", "receita")
-     .eq("status", "confirmado")
-     .in("agendamento_id", agsFiltrados.map(a=>a.id))
-   ```
-   Montar `Set<string> pagosIds`.
-
-2. Redefinir "pago": `isPago(a) = a.status === 'realizado' || a.status === 'pago' || pagosIds.has(a.id)`. Isso pega tanto atendimentos já concluídos pelo médico quanto agendamentos que apenas foram cobrados no caixa.
-
-3. `agsPagos` e `agsPendentes` usam esse novo critério. `usados = agsPagos.length` e a checagem de excedente / aviso informativo continuam como estão.
-
-4. Para a query do passo 1 funcionar, incluir `id` no `.select()` de `agendamentos` (já vem `id`, mas garantir que `agsFiltrados` carregue `id`) — ajustar tipo local para incluir `id`.
+### 4. Limpeza
+Remove o `duration: 8000` dos toasts substituídos (agora modal). Mantém o `duration: 8000` apenas se restar algum toast de limite não coberto (nenhum caso deve sobrar).
 
 ## Fora do escopo
-- Não alterar o fluxo de pagamento (não vamos passar a gravar `status='realizado'` na agenda — quebraria outros lugares).
-- Não mexer em regras cadastradas nem no aviso informativo/duração do toast (já corretos).
+- Não muda o cálculo de desconto/excedente nem quem "consome" a cota (fin_lancamentos confirmado ou status realizado/pago) — já correto.
+- Não muda outros toasts do sistema.
