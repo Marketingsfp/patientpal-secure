@@ -77,19 +77,6 @@ type Convenio = {
   beneficios: string | null;
 };
 type Faixa = { id: string; convenio_id: string; vidas_de: number; vidas_ate: number | null; valor_mensal: number };
-type Beneficio = {
-  id: string;
-  convenio_id: string;
-  nome: string;
-  descricao: string | null;
-  escopo: string;
-  tipo_desconto: string;
-  valor_desconto: number | null;
-  inicio_a_partir: number;
-  limite_uso: string;
-  periodicidade: string;
-  pessoa: string;
-};
 type Paciente = {
   id: string;
   nome: string;
