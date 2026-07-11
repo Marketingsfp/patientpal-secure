@@ -453,12 +453,23 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     const parcelasFinal = isCredito
       ? (Number(parcelas) || 1)
       : (mistoCredito ? (Number(mistoCredito.parcelas || 1) || 1) : null);
-    const { data: lancInserido, error } = await supabase.from("fin_lancamentos").insert({
+    // -------------------------------------------------------------------
+    // Abordagem B: chama RPC atômica `fn_registrar_lancamento_e_caixa`.
+    // Garante que fin_lancamentos + caixa_movimentos são inseridos na mesma
+    // transação Postgres — se qualquer um falhar, ambos são revertidos pelo
+    // próprio banco (zero janela de inconsistência).
+    // -------------------------------------------------------------------
+    const registraNoCaixa =
+      !!user?.id &&
+      (Number(valor) > 0 || formaFinal === "convenio_gratuidade" || !!agendamentoId);
+
+    const pLancamento = {
       clinica_id: clinicaAtual.clinica_id,
       tipo,
       descricao: descricao.trim(),
       valor: Number(valor),
       data,
+      status: "confirmado",
       categoria_id: categoriaId || null,
       conta_id: contaId || null,
       forma_pagamento: formaFinal,
@@ -466,15 +477,42 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       parcelas: parcelasFinal,
       emitir_nfse: emitirNfse,
       observacoes: obsFinal,
-      status: "confirmado",
       agendamento_id: agendamentoId ?? null,
       medico_id: medicoId,
       paciente_id: pacienteId,
       criado_por: user?.id ?? null,
-    } as never).select("id").single();
-    if (error) { setSaving(false); mostrarErro(error); return; }
-    // NÃO exibir toast.success ainda — só depois do caixa confirmar (correção
-    // do bug crítico: lançamento confirmado sem movimento de caixa).
+    };
+    const pMovimento = registraNoCaixa
+      ? {
+          user_id: user!.id,
+          user_nome:
+            (user!.user_metadata as { nome?: string } | null)?.nome ?? user!.email ?? null,
+          tipo: tipo === "receita" ? "recebimento" : "despesa",
+          valor: Number(valor),
+          descricao: descricao.trim(),
+          forma_pagamento: formaFinal,
+        }
+      : null;
+
+    const { data: rpcData, error } = await (supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: unknown }>)("fn_registrar_lancamento_e_caixa", {
+      p_lancamento: pLancamento,
+      p_movimento: pMovimento,
+    });
+    if (error) {
+      setSaving(false);
+      mostrarErro(error);
+      return;
+    }
+    const rpcResult = (rpcData ?? {}) as { lancamento_id?: string };
+    if (!rpcResult.lancamento_id) {
+      setSaving(false);
+      toast.error("Falha ao registrar: retorno inesperado da função de banco.");
+      return;
+    }
+    const lancInserido: { id: string } = { id: rpcResult.lancamento_id };
     // Sincroniza `tipo_atendimento` do agendamento com o que foi pago,
     // para que o check-in e relatórios reflitam a decisão final.
     if (agendamentoId && tipo === "receita") {
