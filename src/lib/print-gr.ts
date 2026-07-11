@@ -1505,3 +1505,280 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
     } catch (_) { /* falha silenciosa */ }
   }
 }
+
+// ============================================================================
+// GR COMBINADA — mensalidade + taxa de adesão em UM único pop-up
+// ============================================================================
+// Emite uma via de cada GR (mensalidade e taxa) no mesmo documento,
+// separadas por espaço. Se o operador quiser 2 cópias, usa o campo
+// "Cópias" do próprio diálogo de impressão do navegador.
+
+export interface PrintGRMensalidadeComTaxaInput extends PrintGRMensalidadeInput {
+  valorTaxa: number;
+}
+
+export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTaxaInput) {
+  const { mensalidadeId, clinicaId, usuarioNome, usuarioId, valorTaxa, pagamento } = input;
+
+  // -----------------------------------------------------------------
+  // 1) Controle de vias — busca as impressões existentes para os dois tipos.
+  // -----------------------------------------------------------------
+  const { data: visRows } = await supabase
+    .from("gr_impressoes" as never)
+    .select("via_numero, impresso_por_nome, tipo")
+    .eq("mensalidade_id", mensalidadeId)
+    .in("tipo", ["mensalidade", "taxa_adesao"])
+    .order("via_numero", { ascending: false });
+  const visExistentes = (visRows as Array<{ via_numero: number; impresso_por_nome: string | null; tipo: string }> | null) ?? [];
+  const viasMens = visExistentes.filter((r) => r.tipo === "mensalidade");
+  const viasTaxa = visExistentes.filter((r) => r.tipo === "taxa_adesao");
+  const viaNumeroMens = (viasMens[0]?.via_numero ?? 0) + 1;
+  const viaNumeroTaxa = (viasTaxa[0]?.via_numero ?? 0) + 1;
+  const usuarioMensPrimeiro = viasMens.length ? viasMens[viasMens.length - 1].impresso_por_nome : null;
+  const usuarioTaxaPrimeiro = viasTaxa.length ? viasTaxa[viasTaxa.length - 1].impresso_por_nome : null;
+  const usuarioMensNome = usuarioMensPrimeiro ?? usuarioNome;
+  const usuarioTaxaNome = usuarioTaxaPrimeiro ?? usuarioNome;
+
+  // -----------------------------------------------------------------
+  // 2) Busca dados compartilhados (clínica, mensalidade, contrato, paciente, plano).
+  // -----------------------------------------------------------------
+  const [mensRes, cliRes] = await Promise.all([
+    supabase
+      .from("contrato_mensalidades")
+      .select("id, contrato_id, numero_parcela, vencimento, valor, pago_em")
+      .eq("id", mensalidadeId)
+      .maybeSingle(),
+    supabase
+      .from("clinicas")
+      .select("nome, endereco, cidade, estado, telefone, cnpj")
+      .eq("id", clinicaId)
+      .maybeSingle(),
+  ]);
+  if (mensRes.error || !mensRes.data) throw new Error(mensRes.error?.message ?? "Mensalidade não encontrada");
+  const m = mensRes.data as { id: string; contrato_id: string; numero_parcela: number; vencimento: string; valor: number; pago_em: string | null };
+  const c = cliRes.data as { nome: string; endereco: string | null; cidade: string | null; estado: string | null; telefone: string | null; cnpj: string | null } | null;
+
+  const { data: contratoRow, error: errC } = await supabase
+    .from("contratos_assinatura")
+    .select("id, numero, paciente_id, paciente_nome, plano_id, num_parcelas")
+    .eq("id", m.contrato_id)
+    .maybeSingle();
+  if (errC || !contratoRow) throw new Error(errC?.message ?? "Contrato não encontrado");
+  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; plano_id: string | null; num_parcelas: number | null };
+
+  const [planoRes, pacRes] = await Promise.all([
+    contrato.plano_id
+      ? supabase.from("planos_assinatura").select("nome").eq("id", contrato.plano_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    contrato.paciente_id
+      ? supabase.from("pacientes").select("nome, cpf, telefone, data_nascimento").eq("id", contrato.paciente_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const plano = planoRes.data as { nome: string } | null;
+  const paciente = pacRes.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
+
+  // -----------------------------------------------------------------
+  // 3) Formatação comum de pagamento.
+  // -----------------------------------------------------------------
+  const totalParcelas = contrato.num_parcelas ?? m.numero_parcela;
+  const valorMens = Number(pagamento.valor ?? m.valor ?? 0);
+  const valorTax = Number(valorTaxa ?? 0);
+  const formaLbl = pagamento.forma_pagamento ? (FORMA_LABEL[pagamento.forma_pagamento] ?? pagamento.forma_pagamento.toUpperCase()) : "NÃO INFORMADO";
+  const isMisto = pagamento.forma_pagamento === "misto" && (pagamento.detalhe?.length ?? 0) > 0;
+  const bandeiraTxt = pagamento.bandeira_cartao ? pagamento.bandeira_cartao.toUpperCase() : "";
+  const parcelasTxtMens = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
+    ? `${pagamento.parcelas}x DE ${fmtBRL(valorMens / pagamento.parcelas)}`
+    : "À VISTA";
+  const parcelasTxtTaxa = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
+    ? `${pagamento.parcelas}x DE ${fmtBRL(valorTax / pagamento.parcelas)}`
+    : "À VISTA";
+  const detalheRows = isMisto
+    ? pagamento.detalhe!
+        .map((d) => {
+          const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
+          const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
+          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
+        })
+        .join("")
+    : "";
+
+  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
+  const tituloPac = paciente?.nome ?? contrato.paciente_nome;
+
+  // -----------------------------------------------------------------
+  // 4) Ticket 1 — Mensalidade.
+  // -----------------------------------------------------------------
+  const descricaoMens = `MENSALIDADE ${m.numero_parcela}/${totalParcelas} — CONTRATO #${contrato.numero}${plano?.nome ? ` — ${plano.nome.toUpperCase()}` : ""}`;
+  const viaTextoMens = `IMPRESSÃO Nº ${viaNumeroMens}`;
+  const ticketMens = `
+  <div class="ticket">
+    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="center sm">${endereco}</div>
+    ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
+    ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
+
+    <div class="sep"></div>
+    <div class="center lg">GUIA DE RECEBIMENTO</div>
+    <div class="center sm">MENSALIDADE DE CONVÊNIO</div>
+    <div class="sep"></div>
+
+    <div class="center bold">${esc(tituloPac)}</div>
+    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
+    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
+
+    <div class="sep"></div>
+
+    <table>
+      <tr><td class="label">CONTRATO:</td><td class="v right">#${contrato.numero}</td></tr>
+      <tr><td class="label">PARCELA:</td><td class="v right">${m.numero_parcela}/${totalParcelas}</td></tr>
+      <tr><td class="label">VENCIMENTO:</td><td class="v right">${fmtDataSimples(m.vencimento)}</td></tr>
+      ${usuarioMensNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioMensNome)}</span></td></tr>` : ""}
+    </table>
+
+    <div class="sep"></div>
+
+    <table>
+      <tr class="bold">
+        <td style="width:14mm">QTD</td>
+        <td>DESCRIÇÃO</td>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>${esc(descricaoMens)}</td>
+      </tr>
+    </table>
+
+    <div class="row" style="margin-top:8px">
+      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
+      <div class="bold lg">${fmtBRL(valorMens)}</div>
+    </div>
+
+    ${isMisto ? `
+    <table style="margin-top:4px">
+      ${detalheRows}
+    </table>
+    ` : ""}
+
+    ${pagamento.forma_pagamento === "cartao_credito" ? `
+    <table>
+      ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
+      <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxtMens}</td></tr>
+    </table>
+    ` : ""}
+
+    <div class="sep"></div>
+    <div class="row sm">
+      <div>DATA IMPRESSÃO</div>
+      <div>${fmtData(new Date().toISOString())}${viaNumeroMens >= 2 ? ` — ${viaTextoMens}` : ""}</div>
+    </div>
+  </div>`;
+
+  // -----------------------------------------------------------------
+  // 5) Ticket 2 — Taxa de adesão.
+  // -----------------------------------------------------------------
+  const descricaoTaxa = `TAXA DE ADESÃO — CONTRATO #${contrato.numero}${plano?.nome ? ` — ${plano.nome.toUpperCase()}` : ""}`;
+  const viaTextoTaxa = `IMPRESSÃO Nº ${viaNumeroTaxa}`;
+  const ticketTaxa = `
+  <div class="ticket">
+    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="center sm">${endereco}</div>
+    ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
+    ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
+
+    <div class="sep"></div>
+    <div class="center lg">GUIA DE RECEBIMENTO</div>
+    <div class="center sm">TAXA DE ADESÃO — CARTÃO DE BENEFÍCIOS</div>
+    <div class="sep"></div>
+
+    <div class="center bold">${esc(tituloPac)}</div>
+    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
+    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
+
+    <div class="sep"></div>
+
+    <table>
+      <tr><td class="label">CONTRATO:</td><td class="v right">#${contrato.numero}</td></tr>
+      <tr><td class="label">REFERÊNCIA:</td><td class="v right">PARCELA ${m.numero_parcela}</td></tr>
+      ${usuarioTaxaNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioTaxaNome)}</span></td></tr>` : ""}
+    </table>
+
+    <div class="sep"></div>
+
+    <table>
+      <tr class="bold">
+        <td style="width:14mm">QTD</td>
+        <td>DESCRIÇÃO</td>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>${esc(descricaoTaxa)}</td>
+      </tr>
+    </table>
+
+    <div class="row" style="margin-top:8px">
+      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
+      <div class="bold lg">${fmtBRL(valorTax)}</div>
+    </div>
+
+    ${isMisto ? `
+    <table style="margin-top:4px">
+      ${detalheRows}
+    </table>
+    ` : ""}
+
+    ${pagamento.forma_pagamento === "cartao_credito" ? `
+    <table>
+      ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
+      <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxtTaxa}</td></tr>
+    </table>
+    ` : ""}
+
+    <div class="sep"></div>
+    <div class="row sm">
+      <div>DATA IMPRESSÃO</div>
+      <div>${fmtData(new Date().toISOString())}${viaNumeroTaxa >= 2 ? ` — ${viaTextoTaxa}` : ""}</div>
+    </div>
+  </div>`;
+
+  // -----------------------------------------------------------------
+  // 6) Monta um único documento com as duas GRs, separadas por espaço.
+  // -----------------------------------------------------------------
+  const espacador = `<div style="height:10mm"></div>`;
+  const html = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8" />
+<title>GR - ${esc(tituloPac)}</title>
+<style>
+  ${BASE_CSS}
+</style></head>
+<body>
+  ${ticketMens}
+  ${espacador}
+  ${ticketTaxa}
+</body></html>`;
+
+  imprimirViaIframe(html);
+
+  // -----------------------------------------------------------------
+  // 7) Registra auditoria — uma linha por tipo.
+  // -----------------------------------------------------------------
+  try {
+    await supabase.from("gr_impressoes" as never).insert([
+      {
+        clinica_id: clinicaId,
+        mensalidade_id: mensalidadeId,
+        via_numero: viaNumeroMens,
+        impresso_por: usuarioId ?? null,
+        impresso_por_nome: usuarioNome ?? null,
+        tipo: "mensalidade",
+      },
+      {
+        clinica_id: clinicaId,
+        mensalidade_id: mensalidadeId,
+        via_numero: viaNumeroTaxa,
+        impresso_por: usuarioId ?? null,
+        impresso_por_nome: usuarioNome ?? null,
+        tipo: "taxa_adesao",
+      },
+    ] as never);
+  } catch (_) { /* falha silenciosa */ }
+}
