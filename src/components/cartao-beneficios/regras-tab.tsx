@@ -351,6 +351,56 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         </div>
       </div>
 
+      <div className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 p-2">
+        <div className="space-y-1">
+          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Gratuito</Label>
+          <Select value={filtroGratuito} onValueChange={(v) => setFiltroGratuito(v as any)}>
+            <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="sim">Sim</SelectItem>
+              <SelectItem value="nao">Não</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Carência</Label>
+          <Select value={filtroCarencia} onValueChange={setFiltroCarencia}>
+            <SelectTrigger className="h-8 w-52 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas</SelectItem>
+              {CARENCIA_GROUPS.map(g => (
+                <SelectItem key={g.value} value={String(g.value)}>{g.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Limite</Label>
+          <Select value={filtroLimite} onValueChange={(v) => setFiltroLimite(v as any)}>
+            <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="com">Com limite</SelectItem>
+              <SelectItem value="sem">Sem limite</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {(filtroGratuito !== "todos" || filtroCarencia !== "todos" || filtroLimite !== "todos") && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-xs"
+            onClick={() => { setFiltroGratuito("todos"); setFiltroCarencia("todos"); setFiltroLimite("todos"); }}
+          >
+            Limpar filtros
+          </Button>
+        )}
+        <div className="ml-auto text-xs text-muted-foreground self-center">
+          {regrasFiltradas.length} de {regras.length} regra(s)
+        </div>
+      </div>
+
       <div className="border rounded-md overflow-x-auto max-w-full">
         <Table className="min-w-[1400px]">
           <TableHeader className="bg-muted sticky top-0 z-10 [&_tr]:border-b-0">
