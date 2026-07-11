@@ -678,7 +678,7 @@ export function AppShell() {
                 else setClinicaAtual(v);
               }}
             >
-              <SelectTrigger className="w-full min-w-0 max-w-[260px] sm:w-[220px] md:w-[260px] h-8 text-xs shrink">
+              <SelectTrigger className="hidden sm:flex w-full min-w-0 max-w-[260px] sm:w-[180px] md:w-[240px] h-8 text-xs shrink">
                 <SelectValue placeholder="Selecione a clínica" />
               </SelectTrigger>
               <SelectContent>
