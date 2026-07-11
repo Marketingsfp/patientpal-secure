@@ -491,17 +491,17 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     </SelectContent>
                   </Select>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right w-[80px]">
                   <div className="flex justify-end">
                     {r.modo === "valor_fixo" ? (
                       <CurrencyInput
-                        className="w-24 h-8 text-right text-xs"
+                        className="w-20 h-8 text-right text-xs px-1"
                         value={r.valor !== null ? Number(r.valor).toFixed(2) : ""}
                         onChange={(v) => update(idx, { valor: v ? parseFloat(v) : 0 })}
                       />
                     ) : (
                       <Input
-                        className="w-24 h-8 text-right text-xs"
+                        className="w-20 h-8 text-right text-xs px-1"
                         type="number" min="0" max="100" step="0.01"
                         value={r.percentual ?? ""}
                         onChange={(e) => update(idx, { percentual: e.target.value ? parseFloat(e.target.value) : 0 })}
@@ -509,16 +509,16 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     )}
                   </div>
                 </TableCell>
-                <TableCell>
+                <TableCell className="w-[60px] text-center">
                   <Input
-                    className="w-14 h-8 text-xs"
+                    className="w-12 h-8 text-xs text-center px-1 mx-auto"
                     type="number" min="1" max="100"
                     value={r.prioridade}
                     onChange={(e) => update(idx, { prioridade: parseInt(e.target.value) || 1 })}
                   />
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground leading-tight w-[90px] whitespace-nowrap">{sample(r)}</TableCell>
-                <TableCell>
+                <TableCell className="w-[100px]">
                   <Button
                     size="sm"
                     variant={r.limite_qtd ? "secondary" : "ghost"}
@@ -532,12 +532,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                       : "Sem limite"}
                   </Button>
                 </TableCell>
-                <TableCell>
+                <TableCell className="w-[92px]">
                   <Select
                     value={String(r.carencia_mensalidades ?? 0)}
                     onValueChange={(v) => update(idx, { carencia_mensalidades: Number(v) })}
                   >
-                    <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full h-8 text-xs px-2"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="0">Imediato</SelectItem>
                       <SelectItem value="1">Após 1ª</SelectItem>
@@ -548,7 +548,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     </SelectContent>
                   </Select>
                 </TableCell>
-                <TableCell className="text-center w-16 px-1">
+                <TableCell className="text-center w-[52px] !px-1">
                   <div className="flex items-center justify-center" title="Marca como cortesia (valor 0, exibido como Gratuito)">
                     <Checkbox
                       checked={!!r.gratuito}
@@ -561,7 +561,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     />
                   </div>
                 </TableCell>
-                <TableCell className="w-8 px-0">
+                <TableCell className="w-[32px] !px-0">
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => remove(idx)}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
