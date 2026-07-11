@@ -150,12 +150,18 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   // Map criado_por (uuid) → nome do vendedor. Preenchido em load().
   const [vendedores, setVendedores] = useState<Record<string, string>>({});
+  // Agregado de parcelas por contrato (pagas / total / tem atrasada)
+  const [parcAgg, setParcAgg] = useState<Record<string, { pagas: number; total: number; temAtrasada: boolean }>>({});
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [view, setView] = useState<"list" | "new">("list");
   const [detail, setDetail] = useState<Contrato | null>(null);
   const [detailInitialTab, setDetailInitialTab] = useState<"resumo" | "dados" | "contrato">("resumo");
   const [sortPaciente, setSortPaciente] = useState<null | "asc" | "desc">(null);
+  // Filtros
+  const [filtroSituacao, setFiltroSituacao] = useState<"todas" | "em_dia" | "pendente">("todas");
+  const [filtroTermino, setFiltroTermino] = useState<"todos" | "vencidos" | "30d" | "90d" | "sem_data">("todos");
+  const [filtroProgresso, setFiltroProgresso] = useState<"todas" | "sem_pag" | "andamento" | "quitadas">("todas");
 
   // Termo com debounce para acionar busca server-side sem bater a cada tecla.
   const [qDebounced, setQDebounced] = useState("");
@@ -197,6 +203,27 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
     if (cs.error) mostrarErro(cs.error);
     setList((cs.data ?? []) as Contrato[]);
     setConvenios((cv.data ?? []) as Convenio[]);
+    // Agregar parcelas dos contratos carregados
+    const contratoIds = ((cs.data ?? []) as Array<{ id: string }>).map((c) => c.id);
+    if (contratoIds.length > 0) {
+      const { data: mens } = await supabase
+        .from("contrato_mensalidades")
+        .select("contrato_id, status, vencimento")
+        .in("contrato_id", contratoIds);
+      const hojeStr = new Date().toISOString().slice(0, 10);
+      const agg: Record<string, { pagas: number; total: number; temAtrasada: boolean }> = {};
+      for (const id of contratoIds) agg[id] = { pagas: 0, total: 0, temAtrasada: false };
+      for (const m of (mens ?? []) as Array<{ contrato_id: string; status: string; vencimento: string }>) {
+        const a = agg[m.contrato_id];
+        if (!a) continue;
+        a.total += 1;
+        if (m.status === "pago") a.pagas += 1;
+        else if (m.vencimento && m.vencimento < hojeStr) a.temAtrasada = true;
+      }
+      setParcAgg(agg);
+    } else {
+      setParcAgg({});
+    }
     // Buscar nomes dos usuários que criaram os contratos (vendedores).
     const ids = Array.from(
       new Set(
@@ -234,12 +261,40 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     const base = !s ? list : list.filter((c) => `${c.numero} ${c.paciente_nome}`.toLowerCase().includes(s));
-    if (!sortPaciente) return base;
-    const ordered = [...base].sort((a, b) =>
+    const hojeStr = new Date().toISOString().slice(0, 10);
+    const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+    const in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
+    const withFilters = base.filter((c) => {
+      const a = parcAgg[c.id];
+      // Situação
+      if (filtroSituacao !== "todas") {
+        const emDia = !a || !a.temAtrasada;
+        if (filtroSituacao === "em_dia" && !emDia) return false;
+        if (filtroSituacao === "pendente" && emDia) return false;
+      }
+      // Término
+      if (filtroTermino !== "todos") {
+        const fim = c.data_fim?.slice(0, 10) ?? null;
+        if (filtroTermino === "sem_data" && fim) return false;
+        if (filtroTermino === "vencidos" && (!fim || fim >= hojeStr)) return false;
+        if (filtroTermino === "30d" && (!fim || fim < hojeStr || fim > in30)) return false;
+        if (filtroTermino === "90d" && (!fim || fim < hojeStr || fim > in90)) return false;
+      }
+      // Progresso
+      if (filtroProgresso !== "todas") {
+        if (!a) return false;
+        if (filtroProgresso === "sem_pag" && a.pagas !== 0) return false;
+        if (filtroProgresso === "andamento" && (a.pagas === 0 || a.pagas >= a.total)) return false;
+        if (filtroProgresso === "quitadas" && (a.total === 0 || a.pagas < a.total)) return false;
+      }
+      return true;
+    });
+    if (!sortPaciente) return withFilters;
+    const ordered = [...withFilters].sort((a, b) =>
       a.paciente_nome.localeCompare(b.paciente_nome, "pt-BR", { sensitivity: "base" }),
     );
     return sortPaciente === "asc" ? ordered : ordered.reverse();
-  }, [list, q, sortPaciente]);
+  }, [list, q, sortPaciente, parcAgg, filtroSituacao, filtroTermino, filtroProgresso]);
 
   if (view === "new") {
     return (
@@ -296,14 +351,43 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
           Cadastre um convênio antes em <strong>Cartão de Benefícios → Convênios</strong>.
         </div>
       ) : null}
-      <div className="relative max-w-md">
-        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          className="pl-8"
-          placeholder="Buscar por número ou paciente…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full max-w-md">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            className="pl-8"
+            placeholder="Buscar por número ou paciente…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        <Select value={filtroSituacao} onValueChange={(v) => setFiltroSituacao(v as typeof filtroSituacao)}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Situação" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Situação: todas</SelectItem>
+            <SelectItem value="em_dia">Em dia</SelectItem>
+            <SelectItem value="pendente">Pendente</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filtroTermino} onValueChange={(v) => setFiltroTermino(v as typeof filtroTermino)}>
+          <SelectTrigger className="w-[190px]"><SelectValue placeholder="Término" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Término: todos</SelectItem>
+            <SelectItem value="vencidos">Vencidos</SelectItem>
+            <SelectItem value="30d">Vencem em 30 dias</SelectItem>
+            <SelectItem value="90d">Vencem em 90 dias</SelectItem>
+            <SelectItem value="sem_data">Sem data</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filtroProgresso} onValueChange={(v) => setFiltroProgresso(v as typeof filtroProgresso)}>
+          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Progresso" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Parcelas: todas</SelectItem>
+            <SelectItem value="sem_pag">Sem pagamentos</SelectItem>
+            <SelectItem value="andamento">Em andamento</SelectItem>
+            <SelectItem value="quitadas">Quitadas</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="rounded-md border bg-card">
         <Table>
@@ -324,30 +408,34 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                 </button>
               </TableHead>
               <TableHead>Início</TableHead>
+              <TableHead>Término</TableHead>
               <TableHead>Mensal</TableHead>
-              <TableHead>Pagamento</TableHead>
+              <TableHead>Parcelas</TableHead>
+              <TableHead>Situação</TableHead>
               <TableHead>Vendedor</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Assinado</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-6">
                   Carregando…
                 </TableCell>
               </TableRow>
             ) : null}
             {!loading && filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-6">
                   Nenhum contrato.
                 </TableCell>
               </TableRow>
             ) : null}
-            {filtered.map((c) => (
+            {filtered.map((c) => {
+              const agg = parcAgg[c.id];
+              const emDia = !agg || !agg.temAtrasada;
+              return (
               <TableRow key={c.id} className="cursor-pointer" onClick={() => setDetail(c)}>
                 <TableCell className="font-semibold">{c.numero}</TableCell>
                 <TableCell>
@@ -364,8 +452,20 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                   </div>
                 </TableCell>
                 <TableCell>{fmtD(c.data_inicio)}</TableCell>
+                <TableCell>{fmtD(c.data_fim)}</TableCell>
                 <TableCell>{BRL(c.valor_mensal)}</TableCell>
-                <TableCell>{c.forma_pagamento ?? "—"}</TableCell>
+                <TableCell className="tabular-nums">
+                  {agg ? `${agg.pagas} / ${agg.total}` : "—"}
+                </TableCell>
+                <TableCell>
+                  {c.status === "cancelado" ? (
+                    <Badge variant="outline" className="text-muted-foreground">—</Badge>
+                  ) : emDia ? (
+                    <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white">Em dia</Badge>
+                  ) : (
+                    <Badge className="bg-amber-500 hover:bg-amber-500 text-white">Pendente</Badge>
+                  )}
+                </TableCell>
                 <TableCell>
                   {c.criado_por && vendedores[c.criado_por] ? (
                     <span>{vendedores[c.criado_por].trim().split(/\s+/).slice(0, 2).join(" ")}</span>
@@ -384,20 +484,11 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {c.assinado_em ? (
-                    <Badge variant="default">
-                      <Check className="h-3 w-3 mr-1" />
-                      Sim
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline">Pendente</Badge>
-                  )}
-                </TableCell>
-                <TableCell>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>
