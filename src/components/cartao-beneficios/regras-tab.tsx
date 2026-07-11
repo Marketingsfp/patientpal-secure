@@ -353,19 +353,28 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
 
       <div className="border rounded-md overflow-x-auto max-w-full">
         <Table className="min-w-[1400px]">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="min-w-[200px]">Especialidade</TableHead>
-              <TableHead>Categoria</TableHead>
-              <TableHead className="min-w-[220px]">Serviço</TableHead>
-              <TableHead>Modo</TableHead>
-              <TableHead className="text-right">Valor / %</TableHead>
-              <TableHead className="w-20">Prioridade</TableHead>
-              <TableHead>Exemplo</TableHead>
-              <TableHead>Limite</TableHead>
-              <TableHead>Carência</TableHead>
-              <TableHead className="text-center">Gratuito</TableHead>
-              <TableHead className="w-10"></TableHead>
+          <TableHeader className="bg-muted sticky top-0 z-10 [&_tr]:border-b-0">
+            <TableRow className="hover:bg-muted border-b-2 border-border">
+              {[
+                { c: "min-w-[200px]", l: "Especialidade" },
+                { c: "", l: "Categoria" },
+                { c: "min-w-[220px]", l: "Serviço" },
+                { c: "", l: "Modo" },
+                { c: "text-right", l: "Valor / %" },
+                { c: "w-20", l: "Prioridade" },
+                { c: "", l: "Exemplo" },
+                { c: "", l: "Limite" },
+                { c: "", l: "Carência" },
+                { c: "text-center", l: "Gratuito" },
+                { c: "w-10", l: "" },
+              ].map((h, i) => (
+                <TableHead
+                  key={i}
+                  className={`font-semibold text-foreground uppercase text-[11px] tracking-wide ${h.c}`}
+                >
+                  {h.l}
+                </TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -373,36 +382,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
             ) : regras.length === 0 ? (
               <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
-            ) : (() => {
-              // Agrupa regras (mantendo o índice original em `regras`) pela carência.
-              const buckets = new Map<number, Array<{ r: CbRegra; idx: number }>>();
-              regras.forEach((r, idx) => {
-                const key = Number(r.carencia_mensalidades ?? 0) || 0;
-                if (!buckets.has(key)) buckets.set(key, []);
-                buckets.get(key)!.push({ r, idx });
-              });
-              // Ordem: presets primeiro (0,1,2,3,6,12), depois qualquer valor extra.
-              const orderedKeys = [
-                ...CARENCIA_GROUPS.map(g => g.value).filter(k => buckets.has(k)),
-                ...Array.from(buckets.keys())
-                  .filter(k => !CARENCIA_GROUPS.some(g => g.value === k))
-                  .sort((a, b) => a - b),
-              ];
-              return orderedKeys.flatMap((key) => {
-                const items = buckets.get(key)!;
-                return [
-                  <TableRow key={`grp-${key}`} className="bg-muted/60 hover:bg-muted/60">
-                    <TableCell colSpan={11} className="py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      <span className="inline-flex items-center gap-2">
-                        <Timer className="h-3.5 w-3.5" />
-                        {carenciaLabel(key)}
-                        <span className="text-[10px] font-normal normal-case text-muted-foreground/80">
-                          — {items.length} {items.length === 1 ? "regra" : "regras"}
-                        </span>
-                      </span>
-                    </TableCell>
-                  </TableRow>,
-                  ...items.map(({ r, idx }) => (
+            ) : regrasFiltradas.length === 0 ? (
+              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Nenhuma regra corresponde aos filtros.</TableCell></TableRow>
+            ) : (
+              regrasFiltradas.map(({ r, idx }) => (
               <TableRow key={r.id}>
                 <TableCell>
                   <SearchableSelect
@@ -522,10 +505,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   </Button>
                 </TableCell>
               </TableRow>
-                  )),
-                ];
-              });
-            })()}
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
