@@ -747,7 +747,7 @@ function LimiteDialog({
 }
 
 function NovaRegraDialog({
-  open, onClose, convenioId, clinicaId, espOpts, procOpts, onSaved,
+  open, onClose, convenioId, clinicaId, espOpts, procOpts, onSaved, regra,
 }: {
   open: boolean;
   onClose: () => void;
@@ -756,6 +756,7 @@ function NovaRegraDialog({
   espOpts: Array<{ value: string; label: string }>;
   procOpts: Array<{ value: string; label: string }>;
   onSaved: () => void | Promise<void>;
+  regra?: CbRegra | null;
 }) {
   const emptyRegra = (): CbRegra => ({
     id: `new-${crypto.randomUUID()}`,
@@ -780,8 +781,12 @@ function NovaRegraDialog({
   });
   const [r, setR] = useState<CbRegra>(emptyRegra());
   const [saving, setSaving] = useState(false);
+  const isEdit = !!regra && !regra.id.startsWith("new-");
 
-  useEffect(() => { if (open) setR(emptyRegra()); /* eslint-disable-next-line */ }, [open, convenioId]);
+  useEffect(() => {
+    if (open) setR(regra ? { ...regra } : emptyRegra());
+    /* eslint-disable-next-line */
+  }, [open, convenioId, regra]);
 
   const upd = (patch: Partial<CbRegra>) => setR(prev => ({ ...prev, ...patch }));
   const hasLimit = r.limite_qtd != null && Number(r.limite_qtd) > 0;
@@ -806,7 +811,7 @@ function NovaRegraDialog({
       valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
       percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
       prioridade: Number(r.prioridade) || 1,
-      ativo: true,
+      ativo: r.ativo !== false,
       limite_qtd: hasLimit ? Number(r.limite_qtd) : null,
       limite_periodo: hasLimit ? (r.limite_periodo ?? "dia") : null,
       limite_escopo: hasLimit ? (r.limite_escopo ?? "contrato") : null,
@@ -819,10 +824,12 @@ function NovaRegraDialog({
       gratuito: !!r.gratuito,
       grupo_gratuidade: r.grupo_gratuidade?.trim() ? r.grupo_gratuidade.trim() : null,
     };
-    const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
+    const { error } = isEdit
+      ? await (supabase as any).from("cb_convenio_regras").update(payload).eq("id", r.id)
+      : await (supabase as any).from("cb_convenio_regras").insert(payload);
     setSaving(false);
     if (error) { mostrarErro(error); return; }
-    toast.success("Regra adicionada.");
+    toast.success(isEdit ? "Regra atualizada." : "Regra adicionada.");
     await onSaved();
   };
 
@@ -830,7 +837,7 @@ function NovaRegraDialog({
     <Dialog open={open} onOpenChange={(v) => { if (!v && !saving) onClose(); }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nova regra de preço</DialogTitle>
+          <DialogTitle>{isEdit ? "Editar regra de preço" : "Nova regra de preço"}</DialogTitle>
           <DialogDescription>
             Preencha os dados da regra. Regras por serviço específico ignoram especialidade/categoria.
           </DialogDescription>
@@ -1049,7 +1056,7 @@ function NovaRegraDialog({
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button onClick={() => void salvarNovo()} disabled={saving}>
-            {saving ? "Salvando…" : "Salvar regra"}
+            {saving ? "Salvando…" : (isEdit ? "Salvar alterações" : "Salvar regra")}
           </Button>
         </DialogFooter>
       </DialogContent>
