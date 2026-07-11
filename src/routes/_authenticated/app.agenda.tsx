@@ -584,20 +584,41 @@ async function obterInfoConvenioPaciente(params: {
       } else if (agsPendentes.length >= 1) {
         // Cota ainda não consumida, mas existem outros agendamentos pendentes
         // que compartilham a cota — aviso informativo (não altera desconto).
-        const modo = beneficioEscolhido.excedente_modo;
-        let excedenteTxt = "sairão sem o benefício";
-        if (modo === "particular") excedenteTxt = "sairão pelo valor particular cheio";
-        else if (modo === "percentual_particular") {
-          const pct = Number(beneficioEscolhido.excedente_percentual) || 0;
-          excedenteTxt = `sairão com ${pct}% de desconto sobre o particular`;
-        } else if (modo === "valor_fixo") {
-          const v = Number(beneficioEscolhido.excedente_valor) || 0;
-          excedenteTxt = `sairão pelo valor fixo excedente de R$ ${v.toFixed(2)}`;
-        } else if (modo === "bloquear") {
-          excedenteTxt = "serão bloqueados pelo convênio";
+        const norm = (s: string | null | undefined) =>
+          (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+
+        let pendentesRelevantes = agsPendentes;
+        let deveAvisar = false;
+
+        if (beneficioEscolhido.gratuito) {
+          // Gratuidade: só interessa pendente do mesmo serviço
+          const procAtual = norm(procedimentoNome);
+          pendentesRelevantes = agsPendentes.filter(
+            (a) => norm((a as { procedimento?: string | null }).procedimento) === procAtual
+          );
+          deveAvisar = pendentesRelevantes.length >= 1;
+        } else {
+          // Demais benefícios: só avisa se estourar o limite
+          const limite = Number(beneficioEscolhido.limite_qtd) || 0;
+          deveAvisar = limite > 0 && (usados + agsPendentes.length + 1) > limite;
         }
-        const total = agsPendentes.length + 1;
-        avisoLimite = `Existem ${total} agendamentos pendentes com este benefício no período. Apenas ${beneficioEscolhido.limite_qtd} será cobrado com o benefício; os demais ${excedenteTxt} quando pagos.`;
+
+        if (deveAvisar) {
+          const modo = beneficioEscolhido.excedente_modo;
+          let excedenteTxt = "sairão sem o benefício";
+          if (modo === "particular") excedenteTxt = "sairão pelo valor particular cheio";
+          else if (modo === "percentual_particular") {
+            const pct = Number(beneficioEscolhido.excedente_percentual) || 0;
+            excedenteTxt = `sairão com ${pct}% de desconto sobre o particular`;
+          } else if (modo === "valor_fixo") {
+            const v = Number(beneficioEscolhido.excedente_valor) || 0;
+            excedenteTxt = `sairão pelo valor fixo excedente de R$ ${v.toFixed(2)}`;
+          } else if (modo === "bloquear") {
+            excedenteTxt = "serão bloqueados pelo convênio";
+          }
+          const total = pendentesRelevantes.length + 1;
+          avisoLimite = `Existem ${total} agendamentos pendentes com este benefício no período. Apenas ${beneficioEscolhido.limite_qtd} será cobrado com o benefício; os demais ${excedenteTxt} quando pagos.`;
+        }
       }
     }
   }
