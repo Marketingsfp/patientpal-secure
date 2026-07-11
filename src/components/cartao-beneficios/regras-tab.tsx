@@ -62,6 +62,11 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [filtroGratuito, setFiltroGratuito] = useState<"todos" | "sim" | "nao">("todos");
   const [filtroCarencia, setFiltroCarencia] = useState<string>("todos");
   const [filtroLimite, setFiltroLimite] = useState<"todos" | "com" | "sem">("todos");
+  const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
+  const [filtroTipo, setFiltroTipo] = useState<string>("todos");
+  const [filtroProcedimento, setFiltroProcedimento] = useState<string>("todos");
+  const [filtroModo, setFiltroModo] = useState<string>("todos");
+  const [filtroPrioridade, setFiltroPrioridade] = useState<string>("todos");
 
   const load = async () => {
     if (!convenioId) return;
@@ -139,6 +144,20 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         const hasLimit = r.limite_qtd != null && Number(r.limite_qtd) > 0;
         if (filtroLimite === "com" && !hasLimit) return false;
         if (filtroLimite === "sem" && hasLimit) return false;
+        if (filtroEspecialidade !== "todos") {
+          if (filtroEspecialidade === "__any__") { if (r.especialidade_id) return false; }
+          else if (r.especialidade_id !== filtroEspecialidade) return false;
+        }
+        if (filtroTipo !== "todos") {
+          if (filtroTipo === "__any__") { if (r.tipo) return false; }
+          else if ((r.tipo ?? "").toLowerCase() !== filtroTipo) return false;
+        }
+        if (filtroProcedimento !== "todos") {
+          if (filtroProcedimento === "__any__") { if (r.procedimento_id) return false; }
+          else if (r.procedimento_id !== filtroProcedimento) return false;
+        }
+        if (filtroModo !== "todos" && r.modo !== filtroModo) return false;
+        if (filtroPrioridade !== "todos" && Number(r.prioridade) !== Number(filtroPrioridade)) return false;
         return true;
       });
     items.sort((a, b) => {
@@ -154,7 +173,13 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       return 0;
     });
     return items;
-  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, procById, espById]);
+  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, filtroEspecialidade, filtroTipo, filtroProcedimento, filtroModo, filtroPrioridade, procById, espById]);
+
+  const prioridadesUsadas = useMemo(() => {
+    const s = new Set<number>();
+    regras.forEach(r => s.add(Number(r.prioridade) || 0));
+    return Array.from(s).sort((a, b) => b - a);
+  }, [regras]);
 
   const addRegra = () => {
     if (!convenioId) return;
@@ -359,12 +384,89 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         <Table className="w-auto [&_th]:px-2 [&_td]:px-2 [&_th:first-child]:pl-3 [&_td:first-child]:pl-3 [&_th:last-child]:pr-2 [&_td:last-child]:pr-2 [&_th]:border-r-0 [&_td]:border-r-0 [&_.lucide-chevron-down]:hidden [&_.lucide-chevrons-up-down]:hidden">
           <TableHeader className="sticky top-0 z-10">
             <TableRow>
-              <TableHead className="w-[160px]">Especialidade</TableHead>
-              <TableHead className="w-[90px]">Categoria</TableHead>
-              <TableHead className="w-[220px]">Serviço</TableHead>
-              <TableHead className="w-[100px]">Modo</TableHead>
+              <TableHead className="w-[160px]">
+                <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
+                    <span className="inline-flex items-center gap-1">
+                      Especialidade
+                      {filtroEspecialidade !== "todos" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    <SelectItem value="todos">Todas</SelectItem>
+                    <SelectItem value="__any__">Qualquer especialidade</SelectItem>
+                    {especialidades.map(e => (
+                      <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead className="w-[90px]">
+                <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
+                    <span className="inline-flex items-center gap-1">
+                      Categoria
+                      {filtroTipo !== "todos" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todas</SelectItem>
+                    <SelectItem value="__any__">Qualquer</SelectItem>
+                    {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead className="w-[220px]">
+                <Select value={filtroProcedimento} onValueChange={setFiltroProcedimento}>
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
+                    <span className="inline-flex items-center gap-1 truncate">
+                      Serviço
+                      {filtroProcedimento !== "todos" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="__any__">Qualquer serviço</SelectItem>
+                    {procedimentos.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.codigo ? `${p.codigo} — ${p.nome}` : p.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead className="w-[100px]">
+                <Select value={filtroModo} onValueChange={setFiltroModo}>
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
+                    <span className="inline-flex items-center gap-1">
+                      Modo
+                      {filtroModo !== "todos" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="valor_fixo">Valor fixo</SelectItem>
+                    <SelectItem value="percentual_desconto">% desconto</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableHead>
               <TableHead className="text-right w-[70px]">Valor / %</TableHead>
-              <TableHead className="w-[52px] text-center">Prioridade</TableHead>
+              <TableHead className="w-[52px] text-center">
+                <Select value={filtroPrioridade} onValueChange={setFiltroPrioridade}>
+                  <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1 justify-center">
+                    <span className="inline-flex items-center gap-1">
+                      Prio.
+                      {filtroPrioridade !== "todos" && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todas</SelectItem>
+                    {prioridadesUsadas.map(p => (
+                      <SelectItem key={p} value={String(p)}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TableHead>
               <TableHead className="w-[100px]">
                 <Select value={filtroLimite} onValueChange={(v) => setFiltroLimite(v as any)}>
                   <SelectTrigger className="h-6 border-0 bg-transparent px-0 text-[11px] font-semibold uppercase tracking-wide focus:ring-0 focus:ring-offset-0 shadow-none gap-1">
