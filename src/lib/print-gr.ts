@@ -116,6 +116,44 @@ function numViasGR(pag?: {
 
 const VIA_LABELS = ["1ª VIA — MÉDICO", "2ª VIA — FINANCEIRO"];
 
+/**
+ * Resolve o rótulo do campo "CONV." da GR a partir do tipo_atendimento do
+ * agendamento. Para "convenio", busca o nome do convênio do contrato ativo
+ * do paciente (titular ou dependente). Para "particular", retorna "PARTICULAR".
+ * Retorna null quando não deve renderizar a linha.
+ */
+async function resolveConvLabel(
+  tipoAtendimento: string | null | undefined,
+  pacienteId: string | null | undefined,
+  clinicaId: string,
+): Promise<string | null> {
+  if (tipoAtendimento === "particular") return "PARTICULAR";
+  if (tipoAtendimento !== "convenio") return null;
+  if (!pacienteId) return "CONVÊNIO";
+  try {
+    const { data: titular } = await supabase
+      .from("contratos_assinatura")
+      .select("id, cb_convenios(nome)")
+      .eq("clinica_id", clinicaId)
+      .eq("status", "ativo")
+      .eq("paciente_id", pacienteId)
+      .limit(1);
+    const t0 = ((titular ?? []) as any[])[0];
+    if (t0?.cb_convenios?.nome) return String(t0.cb_convenios.nome).toUpperCase();
+    const { data: deps } = await supabase
+      .from("contrato_dependentes")
+      .select("contratos_assinatura!inner(id,clinica_id,status,cb_convenios(nome))")
+      .eq("paciente_id", pacienteId)
+      .eq("ativo", true)
+      .limit(5);
+    const cand = ((deps ?? []) as any[])
+      .map((d) => d.contratos_assinatura)
+      .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
+    if (cand?.cb_convenios?.nome) return String(cand.cb_convenios.nome).toUpperCase();
+  } catch { /* fallback */ }
+  return "CONVÊNIO";
+}
+
 // Duplica o HTML de um ou mais tickets para emitir N vias com quebra de
 // página entre elas e um rótulo identificando a via.
 function multiplicarVias(ticketsHtml: string, nVias: number): string {
