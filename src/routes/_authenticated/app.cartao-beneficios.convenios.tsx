@@ -579,19 +579,6 @@ function ConveniosPage() {
                 </div>
               </div>
               <div>
-                <Label>Benefícios</Label>
-                <Textarea
-                  value={beneficiosTxt}
-                  maxLength={BENEFICIOS_MAX}
-                  onChange={(e) => setBeneficiosTxt(e.target.value)}
-                  rows={4}
-                  placeholder="Liste os benefícios deste convênio"
-                />
-                <p className={`text-xs mt-1 text-right ${beneficiosTxt.trim().length > BENEFICIOS_MAX ? "text-red-600" : "text-muted-foreground"}`}>
-                  {beneficiosTxt.trim().length} / {BENEFICIOS_MAX}
-                </p>
-              </div>
-              <div>
                 <Label>Descrição</Label>
                 <Textarea
                   value={descricao}
