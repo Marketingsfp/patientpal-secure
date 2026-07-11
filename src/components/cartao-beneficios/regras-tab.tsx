@@ -448,6 +448,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     onChange={(v) => update(idx, { especialidade_id: v === "__any__" ? null : v })}
                     placeholder="Qualquer"
                     disabled={!!r.procedimento_id}
+                    className="h-8 text-xs px-2"
                   />
                 </TableCell>
                 <TableCell>
@@ -473,6 +474,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                       ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
                     })}
                     placeholder="Qualquer serviço"
+                    className="h-8 text-xs px-2"
                   />
                 </TableCell>
                 <TableCell>
