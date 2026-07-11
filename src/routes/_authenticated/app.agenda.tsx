@@ -2736,7 +2736,7 @@ function AgendaPage() {
           toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
           descSuffix = ` — ${info.convenioNome} EM ATRASO`;
         } else if (info.bloquear) {
-          toast.error(info.avisoLimite ?? "Limite do convênio atingido — agendamento bloqueado.");
+          toast.error(info.avisoLimite ?? "Limite do convênio atingido — agendamento bloqueado.", { duration: 8000 });
           descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
         } else if (info.desconto) {
           opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
@@ -2749,10 +2749,10 @@ function AgendaPage() {
                   ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
                   : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
           descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
-          if (info.avisoLimite) toast.warning(info.avisoLimite);
+          if (info.avisoLimite) toast.warning(info.avisoLimite, { duration: 8000 });
           else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
         } else if (info.avisoLimite) {
-          toast.warning(info.avisoLimite);
+          toast.warning(info.avisoLimite, { duration: 8000 });
           descSuffix = ` — ${info.convenioNome} (limite atingido)`;
         } else {
           toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
@@ -2989,7 +2989,7 @@ function AgendaPage() {
         toast.error(`Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`);
         descSuffix = ` — ${info.convenioNome} EM ATRASO`;
       } else if (info.bloquear) {
-        toast.error(info.avisoLimite ?? "Limite do convênio atingido — cobrança bloqueada.");
+        toast.error(info.avisoLimite ?? "Limite do convênio atingido — cobrança bloqueada.", { duration: 8000 });
         descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
       } else if (info.desconto) {
         opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
@@ -3002,10 +3002,10 @@ function AgendaPage() {
                 ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
                 : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
         descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
-        if (info.avisoLimite) toast.warning(info.avisoLimite);
+        if (info.avisoLimite) toast.warning(info.avisoLimite, { duration: 8000 });
         else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
       } else if (info.avisoLimite) {
-        toast.warning(info.avisoLimite);
+        toast.warning(info.avisoLimite, { duration: 8000 });
         descSuffix = ` — ${info.convenioNome} (limite atingido)`;
       } else {
         toast.info(`Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`);
