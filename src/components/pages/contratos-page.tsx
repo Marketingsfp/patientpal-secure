@@ -64,6 +64,16 @@ import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog"
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) =>
   s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—";
+// Adiciona 1 ano à data inicial (formato ISO YYYY-MM-DD). Retorna null se inválida.
+const addUmAno = (s?: string | null): string | null => {
+  if (!s) return null;
+  const iso = s.slice(0, 10);
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const dt = new Date(y + 1, m - 1, d);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+};
 const TAXA_BOLETO = 3.5;
 
 // Parcela só é "Atrasado" a partir do dia seguinte ao vencimento (comparação em data local).
@@ -442,6 +452,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                   </span>
                 </button>
               </TableHead>
+              <TableHead>TIPO DE CONVÊNIO</TableHead>
               <TableHead>
                 <Select value={filtroInicio} onValueChange={(v) => setFiltroInicio(v as typeof filtroInicio)}>
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
@@ -563,14 +574,14 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-6">
                   Carregando…
                 </TableCell>
               </TableRow>
             ) : null}
             {!loading && filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-6">
                   Nenhum contrato.
                 </TableCell>
               </TableRow>
@@ -594,8 +605,11 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                     ) : null}
                   </div>
                 </TableCell>
+                <TableCell>
+                  {convenios.find((cv) => cv.id === c.convenio_id)?.nome ?? "—"}
+                </TableCell>
                 <TableCell>{fmtD(c.data_inicio)}</TableCell>
-                <TableCell>{fmtD(c.data_fim)}</TableCell>
+                <TableCell>{fmtD(c.data_fim ?? addUmAno(c.data_inicio))}</TableCell>
                 <TableCell>{BRL(c.valor_mensal)}</TableCell>
                 <TableCell className="tabular-nums">
                   {agg ? `${agg.pagas} / ${agg.total}` : "—"}
@@ -865,6 +879,7 @@ function NovoContratoForm({
         paciente_id: titular.id,
         paciente_nome: titular.nome,
         data_inicio: dataInicio,
+        data_fim: addUmAno(dataInicio),
         dia_vencimento: diaVenc,
         valor_mensal: valor,
         taxa_adesao: taxa,
@@ -989,7 +1004,7 @@ function NovoContratoForm({
       <Card>
         <CardContent className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
+            <div className={faixas.length > 0 ? undefined : "col-span-2"}>
               <Label>Convênio</Label>
               <Select value={convenioId} onValueChange={setConvenioId}>
                 <SelectTrigger>
@@ -1005,7 +1020,7 @@ function NovoContratoForm({
               </Select>
             </div>
             {faixas.length > 0 ? (
-              <div className="col-span-2">
+              <div>
                 <Label>Nº de pessoas no contrato</Label>
                 <Select value={faixaId} onValueChange={setFaixaId}>
                   <SelectTrigger>
@@ -1131,6 +1146,15 @@ function NovoContratoForm({
                   {dataAvisoExtrema}
                 </p>
               ) : null}
+            </div>
+            <div>
+              <Label>Data término</Label>
+              <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">
+                {fmtD(addUmAno(dataInicio))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Calculada automaticamente: 1 ano após a data de início.
+              </p>
             </div>
             <div>
               <Label>Dia de vencimento</Label>
