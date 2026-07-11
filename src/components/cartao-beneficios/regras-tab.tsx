@@ -416,7 +416,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                 { c: "", l: "Modo" },
                 { c: "text-right", l: "Valor / %" },
                 { c: "w-20", l: "Prioridade" },
-                { c: "", l: "Exemplo" },
+                { c: "min-w-[140px]", l: "Exemplo" },
                 { c: "", l: "Limite" },
                 { c: "", l: "Carência" },
                 { c: "text-center", l: "Gratuito" },
@@ -512,7 +512,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     onChange={(e) => update(idx, { prioridade: parseInt(e.target.value) || 1 })}
                   />
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">{sample(r)}</TableCell>
+                <TableCell className="text-xs text-muted-foreground leading-tight min-w-[140px]">{sample(r)}</TableCell>
                 <TableCell>
                   <Button
                     size="sm"
