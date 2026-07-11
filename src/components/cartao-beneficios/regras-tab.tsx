@@ -687,6 +687,7 @@ function LimiteDialog({
                     <SelectItem value="percentual_particular">% do valor particular</SelectItem>
                     <SelectItem value="valor_fixo">Valor fixo (R$)</SelectItem>
                     <SelectItem value="particular">Valor particular cheio (100%)</SelectItem>
+                    <SelectItem value="regra_padrao_convenio">Aplicar regra padrão do convênio</SelectItem>
                     <SelectItem value="bloquear">Bloquear agendamento</SelectItem>
                   </SelectContent>
                 </Select>
@@ -715,6 +716,19 @@ function LimiteDialog({
               )}
             </div>
           )}
+          <div className="border-t pt-3 space-y-1.5">
+            <Label className="text-xs">Grupo de gratuidade (opcional)</Label>
+            <Input
+              value={r.grupo_gratuidade ?? ""}
+              onChange={(e) => onChange({ grupo_gratuidade: e.target.value })}
+              placeholder='Ex.: "mama-preventivo"'
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Regras com o mesmo grupo dividem a mesma cota. Ex.: uma regra grátis
+              para Mamografia e outra para USG Mama, ambas com grupo
+              "mama-preventivo" e limite 1/contrato → usar uma consome a outra.
+            </p>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
