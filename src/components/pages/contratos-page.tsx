@@ -351,43 +351,14 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
           Cadastre um convênio antes em <strong>Cartão de Benefícios → Convênios</strong>.
         </div>
       ) : null}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full max-w-md">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-8"
-            placeholder="Buscar por número ou paciente…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
-        <Select value={filtroSituacao} onValueChange={(v) => setFiltroSituacao(v as typeof filtroSituacao)}>
-          <SelectTrigger className="w-[160px]"><SelectValue placeholder="Situação" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Situação: todas</SelectItem>
-            <SelectItem value="em_dia">Em dia</SelectItem>
-            <SelectItem value="pendente">Pendente</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filtroTermino} onValueChange={(v) => setFiltroTermino(v as typeof filtroTermino)}>
-          <SelectTrigger className="w-[190px]"><SelectValue placeholder="Término" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Término: todos</SelectItem>
-            <SelectItem value="vencidos">Vencidos</SelectItem>
-            <SelectItem value="30d">Vencem em 30 dias</SelectItem>
-            <SelectItem value="90d">Vencem em 90 dias</SelectItem>
-            <SelectItem value="sem_data">Sem data</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filtroProgresso} onValueChange={(v) => setFiltroProgresso(v as typeof filtroProgresso)}>
-          <SelectTrigger className="w-[180px]"><SelectValue placeholder="Progresso" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Parcelas: todas</SelectItem>
-            <SelectItem value="sem_pag">Sem pagamentos</SelectItem>
-            <SelectItem value="andamento">Em andamento</SelectItem>
-            <SelectItem value="quitadas">Quitadas</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="relative max-w-md">
+        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          className="pl-8"
+          placeholder="Buscar por número ou paciente…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
       </div>
       <div className="rounded-md border bg-card">
         <Table>
@@ -408,10 +379,55 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
                 </button>
               </TableHead>
               <TableHead>Início</TableHead>
-              <TableHead>Término</TableHead>
+              <TableHead>
+                <Select value={filtroTermino} onValueChange={(v) => setFiltroTermino(v as typeof filtroTermino)}>
+                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                    <span className="inline-flex items-center gap-1">
+                      TÉRMINO
+                      {filtroTermino !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="vencidos">Vencidos</SelectItem>
+                    <SelectItem value="30d">Vencem em 30 dias</SelectItem>
+                    <SelectItem value="90d">Vencem em 90 dias</SelectItem>
+                    <SelectItem value="sem_data">Sem data</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableHead>
               <TableHead>Mensal</TableHead>
-              <TableHead>Parcelas</TableHead>
-              <TableHead>Situação</TableHead>
+              <TableHead>
+                <Select value={filtroProgresso} onValueChange={(v) => setFiltroProgresso(v as typeof filtroProgresso)}>
+                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                    <span className="inline-flex items-center gap-1">
+                      PARCELAS
+                      {filtroProgresso !== "todas" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas</SelectItem>
+                    <SelectItem value="sem_pag">Sem pagamentos</SelectItem>
+                    <SelectItem value="andamento">Em andamento</SelectItem>
+                    <SelectItem value="quitadas">Quitadas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableHead>
+              <TableHead>
+                <Select value={filtroSituacao} onValueChange={(v) => setFiltroSituacao(v as typeof filtroSituacao)}>
+                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                    <span className="inline-flex items-center gap-1">
+                      SITUAÇÃO
+                      {filtroSituacao !== "todas" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas</SelectItem>
+                    <SelectItem value="em_dia">Em dia</SelectItem>
+                    <SelectItem value="pendente">Pendente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </TableHead>
               <TableHead>Vendedor</TableHead>
               <TableHead>Status</TableHead>
               <TableHead></TableHead>
