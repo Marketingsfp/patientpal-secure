@@ -340,7 +340,7 @@ async function obterInfoConvenioPaciente(params: {
   //    a aba antiga "Benefícios (regras)" (cb_beneficios) foi removida.
   const { data: regrasRaw } = await (supabase as any)
     .from("cb_convenio_regras")
-    .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor")
+    .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,grupo_gratuidade")
     .eq("convenio_id", contrato.convenio_id)
     .eq("ativo", true);
   const regrasCb = ((regrasRaw ?? []) as any[]);
