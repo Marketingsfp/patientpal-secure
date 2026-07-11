@@ -522,18 +522,22 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         regras={regras}
         onClose={() => setLimiteIdx(null)}
         onChange={(patch) => { if (limiteIdx != null) update(limiteIdx, patch); }}
+        onSave={async () => { await salvar(); setLimiteIdx(null); }}
+        saving={loading}
       />
     </div>
   );
 }
 
 function LimiteDialog({
-  idx, regras, onClose, onChange,
+  idx, regras, onClose, onChange, onSave, saving,
 }: {
   idx: number | null;
   regras: CbRegra[];
   onClose: () => void;
   onChange: (patch: Partial<CbRegra>) => void;
+  onSave: () => void | Promise<void>;
+  saving?: boolean;
 }) {
   const open = idx != null;
   const r = idx != null ? regras[idx] : null;
@@ -638,7 +642,10 @@ function LimiteDialog({
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Fechar</Button>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={() => void onSave()} disabled={saving}>
+            {saving ? "Salvando…" : "Salvar"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
