@@ -187,6 +187,9 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
   const [filtroMensal, setFiltroMensal] = useState<"todos" | "zero" | "ate100" | "100a200" | "acima200">("todos");
   const [filtroVendedor, setFiltroVendedor] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [filtroConvenio, setFiltroConvenio] = useState<string>("todos");
+  const [pagina, setPagina] = useState(1);
+  const POR_PAGINA = 50;
 
   // Termo com debounce para acionar busca server-side sem bater a cada tecla.
   const [qDebounced, setQDebounced] = useState("");
@@ -320,6 +323,12 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       }
       // Status
       if (filtroStatus !== "todos" && c.status !== filtroStatus) return false;
+      // Convênio
+      if (filtroConvenio !== "todos") {
+        if (filtroConvenio === "sem") {
+          if (c.convenio_id) return false;
+        } else if (c.convenio_id !== filtroConvenio) return false;
+      }
       // Situação
       if (filtroSituacao !== "todas") {
         const emDia = !a || !a.temAtrasada;
@@ -348,7 +357,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       a.paciente_nome.localeCompare(b.paciente_nome, "pt-BR", { sensitivity: "base" }),
     );
     return sortPaciente === "asc" ? ordered : ordered.reverse();
-  }, [list, q, sortPaciente, parcAgg, vendedores, filtroSituacao, filtroTermino, filtroProgresso, filtroInicio, filtroMensal, filtroVendedor, filtroStatus]);
+  }, [list, q, sortPaciente, parcAgg, vendedores, filtroSituacao, filtroTermino, filtroProgresso, filtroInicio, filtroMensal, filtroVendedor, filtroStatus, filtroConvenio]);
 
   // Opções dinâmicas
   const vendedorOpcoes = useMemo(() => {
@@ -365,6 +374,45 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     for (const c of list) if (c.status) s.add(c.status);
     return Array.from(s).sort();
   }, [list]);
+
+  // Filtros ativos (para contagem/rótulo/limpar)
+  const filtrosAtivos = useMemo(() => {
+    const arr: string[] = [];
+    if (q.trim()) arr.push("Busca");
+    if (filtroConvenio !== "todos") arr.push("Convênio");
+    if (filtroInicio !== "todos") arr.push("Início");
+    if (filtroTermino !== "todos") arr.push("Término");
+    if (filtroMensal !== "todos") arr.push("Mensal");
+    if (filtroProgresso !== "todas") arr.push("Parcelas");
+    if (filtroSituacao !== "todas") arr.push("Situação");
+    if (filtroVendedor !== "todos") arr.push("Vendedor");
+    if (filtroStatus !== "todos") arr.push("Status");
+    return arr;
+  }, [q, filtroConvenio, filtroInicio, filtroTermino, filtroMensal, filtroProgresso, filtroSituacao, filtroVendedor, filtroStatus]);
+  const temFiltroAtivo = filtrosAtivos.length > 0;
+
+  const limparFiltros = () => {
+    setQ("");
+    setFiltroConvenio("todos");
+    setFiltroInicio("todos");
+    setFiltroTermino("todos");
+    setFiltroMensal("todos");
+    setFiltroProgresso("todas");
+    setFiltroSituacao("todas");
+    setFiltroVendedor("todos");
+    setFiltroStatus("todos");
+    setPagina(1);
+  };
+
+  // Paginação
+  const totalPaginas = Math.max(1, Math.ceil(filtered.length / POR_PAGINA));
+  const paginaAtual = Math.min(pagina, totalPaginas);
+  const inicioIdx = (paginaAtual - 1) * POR_PAGINA;
+  const paginados = filtered.slice(inicioIdx, inicioIdx + POR_PAGINA);
+  // Reset página ao mudar filtros/busca/ordem
+  useEffect(() => {
+    setPagina(1);
+  }, [q, sortPaciente, filtroConvenio, filtroInicio, filtroTermino, filtroMensal, filtroProgresso, filtroSituacao, filtroVendedor, filtroStatus]);
 
   if (view === "new") {
     return (
@@ -434,6 +482,30 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           onChange={(e) => setQ(e.target.value)}
         />
       </div>
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div>
+          {filtered.length === 0 ? (
+            <span>Nenhum contrato{temFiltroAtivo ? " com os filtros atuais" : ""}.</span>
+          ) : temFiltroAtivo ? (
+            <span>
+              <strong className="text-foreground">{filtered.length}</strong> resultado{filtered.length === 1 ? "" : "s"}
+              {" — filtros ativos: "}
+              <span className="text-foreground">{filtrosAtivos.join(", ")}</span>
+            </span>
+          ) : (
+            <span>
+              Mostrando{" "}
+              <strong className="text-foreground">
+                {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, filtered.length)}
+              </strong>{" "}
+              de <strong className="text-foreground">{filtered.length}</strong> contratos
+            </span>
+          )}
+        </div>
+        {temFiltroAtivo ? (
+          <Button variant="ghost" size="sm" onClick={limparFiltros}>Limpar filtros</Button>
+        ) : null}
+      </div>
       <div className="rounded-md border bg-card">
         <Table>
           <TableHeader>
@@ -452,7 +524,23 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                   </span>
                 </button>
               </TableHead>
-              <TableHead>TIPO DE CONVÊNIO</TableHead>
+              <TableHead>
+                <Select value={filtroConvenio} onValueChange={setFiltroConvenio}>
+                  <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
+                    <span className="inline-flex items-center gap-1">
+                      TIPO DE CONVÊNIO
+                      {filtroConvenio !== "todos" ? <span className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="sem">Sem convênio</SelectItem>
+                    {convenios.map((cv) => (
+                      <SelectItem key={cv.id} value={cv.id}>{cv.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </TableHead>
               <TableHead>
                 <Select value={filtroInicio} onValueChange={(v) => setFiltroInicio(v as typeof filtroInicio)}>
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
@@ -586,7 +674,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                 </TableCell>
               </TableRow>
             ) : null}
-            {filtered.map((c) => {
+            {paginados.map((c) => {
               const agg = parcAgg[c.id];
               const emDia = !agg || !agg.temAtrasada;
               return (
@@ -648,6 +736,39 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
             })}
           </TableBody>
         </Table>
+        {filtered.length > 0 ? (
+          <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-sm text-muted-foreground">
+            <span>
+              {filtered.length} contrato{filtered.length === 1 ? "" : "s"}
+              {filtered.length > POR_PAGINA ? (
+                <> — exibindo {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, filtered.length)}</>
+              ) : null}
+            </span>
+            {totalPaginas > 1 ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={paginaAtual <= 1}
+                  onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                >
+                  Anterior
+                </Button>
+                <span className="tabular-nums">
+                  Página {paginaAtual} de {totalPaginas}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={paginaAtual >= totalPaginas}
+                  onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                >
+                  Próxima
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
