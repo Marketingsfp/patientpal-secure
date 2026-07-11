@@ -212,6 +212,23 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     setRegras(prev => prev.filter((_, i) => i !== idx));
   };
 
+  const apagarTodas = async () => {
+    if (!convenioId) return;
+    setApagandoTodas(true);
+    try {
+      const { error } = await (supabase as any)
+        .from("cb_convenio_regras")
+        .delete()
+        .eq("convenio_id", convenioId);
+      if (error) { mostrarErro(error); return; }
+      setRegras([]);
+      toast.success("Todas as regras foram apagadas.");
+      setApagarTodasOpen(false);
+    } finally {
+      setApagandoTodas(false);
+    }
+  };
+
   const salvar = async () => {
     if (!convenioId) return;
     setLoading(true);
