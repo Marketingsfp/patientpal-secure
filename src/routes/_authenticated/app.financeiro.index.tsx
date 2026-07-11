@@ -188,13 +188,13 @@ function KpiCard({ icon: Icon, label, value, accent, onClick }: { icon: React.El
   const colorMap = { primary: "text-primary bg-primary/10", success: "text-success bg-success/10", destructive: "text-destructive bg-destructive/10", warning: "text-warning bg-warning/10" };
   return (
     <Card onClick={onClick} className={onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}>
-      <CardContent className="pt-6 flex items-center gap-4">
-        <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${colorMap[accent]}`}>
+      <CardContent className="pt-6 flex items-center gap-3">
+        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${colorMap[accent]}`}>
           <Icon className="h-6 w-6" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-          <p className="text-2xl font-semibold truncate">{value}</p>
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground leading-tight line-clamp-2">{label}</p>
+          <p className="mt-1 text-lg xl:text-xl font-semibold tabular-nums whitespace-nowrap overflow-hidden text-ellipsis leading-tight" title={value}>{value}</p>
         </div>
       </CardContent>
     </Card>
