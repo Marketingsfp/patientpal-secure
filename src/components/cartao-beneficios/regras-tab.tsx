@@ -639,3 +639,302 @@ function LimiteDialog({
     </Dialog>
   );
 }
+
+function NovaRegraDialog({
+  open, onClose, convenioId, clinicaId, espOpts, procOpts, onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  convenioId: string;
+  clinicaId: string;
+  espOpts: Array<{ value: string; label: string }>;
+  procOpts: Array<{ value: string; label: string }>;
+  onSaved: () => void | Promise<void>;
+}) {
+  const emptyRegra = (): CbRegra => ({
+    id: `new-${crypto.randomUUID()}`,
+    convenio_id: convenioId,
+    especialidade_id: null,
+    procedimento_id: null,
+    tipo: null,
+    modo: "valor_fixo",
+    valor: 0,
+    percentual: null,
+    prioridade: 10,
+    ativo: true,
+    limite_qtd: null,
+    limite_periodo: null,
+    limite_escopo: null,
+    excedente_modo: null,
+    excedente_percentual: null,
+    excedente_valor: null,
+    carencia_mensalidades: 0,
+    gratuito: false,
+  });
+  const [r, setR] = useState<CbRegra>(emptyRegra());
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (open) setR(emptyRegra()); /* eslint-disable-next-line */ }, [open, convenioId]);
+
+  const upd = (patch: Partial<CbRegra>) => setR(prev => ({ ...prev, ...patch }));
+  const hasLimit = r.limite_qtd != null && Number(r.limite_qtd) > 0;
+  const excModo = r.excedente_modo ?? "percentual_particular";
+
+  const preview = (() => {
+    const v = computeValor(r, 100, 100);
+    if (!v) return "—";
+    if (r.modo === "valor_fixo") return `R$ ${v.dinheiro.toFixed(2)} (fixo)`;
+    return `de R$100 → R$ ${v.dinheiro.toFixed(2)} (${r.percentual}% off)`;
+  })();
+
+  const salvarNovo = async () => {
+    setSaving(true);
+    const payload: any = {
+      clinica_id: clinicaId,
+      convenio_id: convenioId,
+      procedimento_id: r.procedimento_id ?? null,
+      especialidade_id: r.procedimento_id ? null : r.especialidade_id,
+      tipo: r.procedimento_id ? null : r.tipo,
+      modo: r.modo,
+      valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
+      percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
+      prioridade: Number(r.prioridade) || 1,
+      ativo: true,
+      limite_qtd: hasLimit ? Number(r.limite_qtd) : null,
+      limite_periodo: hasLimit ? (r.limite_periodo ?? "dia") : null,
+      limite_escopo: hasLimit ? (r.limite_escopo ?? "contrato") : null,
+      excedente_modo: hasLimit ? excModo : null,
+      excedente_percentual: hasLimit && excModo === "percentual_particular"
+        ? Number(r.excedente_percentual ?? 50) : null,
+      excedente_valor: hasLimit && excModo === "valor_fixo"
+        ? Number(r.excedente_valor ?? 0) : null,
+      carencia_mensalidades: Number(r.carencia_mensalidades ?? 0) || 0,
+      gratuito: !!r.gratuito,
+    };
+    const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
+    setSaving(false);
+    if (error) { mostrarErro(error); return; }
+    toast.success("Regra adicionada.");
+    await onSaved();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v && !saving) onClose(); }}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Nova regra de preço</DialogTitle>
+          <DialogDescription>
+            Preencha os dados da regra. Regras por serviço específico ignoram especialidade/categoria.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Especialidade</Label>
+              <SearchableSelect
+                options={espOpts}
+                value={r.especialidade_id ?? "__any__"}
+                onChange={(v) => upd({ especialidade_id: v === "__any__" ? null : v })}
+                placeholder="Qualquer"
+                disabled={!!r.procedimento_id}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Categoria</Label>
+              <Select
+                value={r.tipo ?? "__any__"}
+                onValueChange={(v) => upd({ tipo: v === "__any__" ? null : v })}
+                disabled={!!r.procedimento_id}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__any__">Qualquer</SelectItem>
+                  {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Serviço específico (opcional)</Label>
+            <SearchableSelect
+              options={procOpts}
+              value={r.procedimento_id ?? "__any__"}
+              onChange={(v) => upd({
+                procedimento_id: v === "__any__" ? null : v,
+                ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
+              })}
+              placeholder="Qualquer serviço"
+            />
+            <p className="text-[11px] text-muted-foreground">Quando escolhido, esta regra vale apenas para este serviço.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t pt-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Modo</Label>
+              <Select value={r.modo} onValueChange={(v) => upd({ modo: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="valor_fixo">Valor fixo</SelectItem>
+                  <SelectItem value="percentual_desconto">% desconto</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">{r.modo === "valor_fixo" ? "Valor (R$)" : "Percentual (%)"}</Label>
+              {r.modo === "valor_fixo" ? (
+                <CurrencyInput
+                  value={r.valor !== null ? Number(r.valor).toFixed(2) : ""}
+                  onChange={(v) => upd({ valor: v ? parseFloat(v) : 0 })}
+                />
+              ) : (
+                <Input
+                  type="number" min="0" max="100" step="0.01"
+                  value={r.percentual ?? ""}
+                  onChange={(e) => upd({ percentual: e.target.value ? parseFloat(e.target.value) : 0 })}
+                />
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Prioridade</Label>
+              <Input
+                type="number" min="1" max="100"
+                value={r.prioridade}
+                onChange={(e) => upd({ prioridade: parseInt(e.target.value) || 1 })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Carência</Label>
+              <Select
+                value={String(r.carencia_mensalidades ?? 0)}
+                onValueChange={(v) => upd({ carencia_mensalidades: Number(v) })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CARENCIA_GROUPS.map(g => (
+                    <SelectItem key={g.value} value={String(g.value)}>{g.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Cortesia</Label>
+              <div className="flex items-center gap-2 h-9 px-3 rounded-md border">
+                <Checkbox
+                  checked={!!r.gratuito}
+                  onCheckedChange={(v) => {
+                    const on = v === true;
+                    upd(on
+                      ? { gratuito: true, modo: "valor_fixo", valor: 0, percentual: null }
+                      : { gratuito: false });
+                  }}
+                />
+                <span className="text-sm flex items-center gap-1">
+                  {r.gratuito && <Gift className="h-3.5 w-3.5 text-emerald-600" />}
+                  Gratuito (valor 0)
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-3 space-y-3">
+            <div className="text-xs font-semibold text-muted-foreground uppercase">Limite de uso (opcional)</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Quantidade</Label>
+                <Input
+                  type="number" min="1"
+                  value={r.limite_qtd ?? ""}
+                  onChange={(e) => upd({ limite_qtd: e.target.value ? Number(e.target.value) : null })}
+                  placeholder="Sem limite"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Período</Label>
+                <Select
+                  value={r.limite_periodo ?? "dia"}
+                  onValueChange={(v) => upd({ limite_periodo: v })}
+                  disabled={!hasLimit}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dia">Por dia</SelectItem>
+                    <SelectItem value="semana">Por semana</SelectItem>
+                    <SelectItem value="mes">Por mês</SelectItem>
+                    <SelectItem value="contrato">Por contrato</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Escopo</Label>
+                <Select
+                  value={r.limite_escopo ?? "contrato"}
+                  onValueChange={(v) => upd({ limite_escopo: v })}
+                  disabled={!hasLimit}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="contrato">Contrato (titular + deps)</SelectItem>
+                    <SelectItem value="paciente">Por paciente</SelectItem>
+                    <SelectItem value="titular_ou_dependente">Titular ou dependente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {hasLimit && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Quando exceder, cobrar:</Label>
+                  <Select value={excModo} onValueChange={(v) => upd({ excedente_modo: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percentual_particular">% do valor particular</SelectItem>
+                      <SelectItem value="valor_fixo">Valor fixo (R$)</SelectItem>
+                      <SelectItem value="particular">Valor particular cheio</SelectItem>
+                      <SelectItem value="bloquear">Bloquear agendamento</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {excModo === "percentual_particular" && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">% do particular (0-100)</Label>
+                    <Input
+                      type="number" min="0" max="100"
+                      value={r.excedente_percentual ?? 50}
+                      onChange={(e) => upd({ excedente_percentual: e.target.value ? Number(e.target.value) : 0 })}
+                    />
+                  </div>
+                )}
+                {excModo === "valor_fixo" && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Valor fixo (R$)</Label>
+                    <Input
+                      type="number" inputMode="decimal"
+                      value={r.excedente_valor ?? ""}
+                      onChange={(e) => upd({ excedente_valor: e.target.value ? Number(e.target.value) : null })}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="border-t pt-3 text-xs text-muted-foreground">
+            Prévia: <span className="font-medium text-foreground">{preview}</span>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
+          <Button onClick={() => void salvarNovo()} disabled={saving}>
+            {saving ? "Salvando…" : "Salvar regra"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
