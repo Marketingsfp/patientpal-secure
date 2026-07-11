@@ -31,7 +31,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
 
 type EspOpt = { id: string; nome: string };
-type ProcOpt = { id: string; nome: string; codigo: string | null };
+type ProcOpt = { id: string; nome: string; codigo: string | null; tipo: string | null };
 
 interface Props {
   clinicaId: string;
@@ -99,7 +99,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabase
         .from("procedimentos")
-        .select("id,nome,codigo")
+        .select("id,nome,codigo,tipo")
         .eq("clinica_id", clinicaId)
         .eq("ativo", true)
         .order("nome")
@@ -127,8 +127,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
 
   const procOpts = useMemo(
     () => [
-      { value: "__any__", label: "Qualquer serviço" },
-      ...procedimentos.map(p => ({ value: p.id, label: p.codigo ? `${p.codigo} — ${p.nome}` : p.nome })),
+      { value: "__any__", label: "Qualquer serviço", tipo: null as string | null },
+      ...procedimentos.map(p => ({
+        value: p.id,
+        label: p.codigo ? `${p.codigo} — ${p.nome}` : p.nome,
+        tipo: p.tipo,
+      })),
     ],
     [procedimentos],
   );
