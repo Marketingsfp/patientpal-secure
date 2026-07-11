@@ -143,6 +143,7 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
   const [q, setQ] = useState("");
   const [view, setView] = useState<"list" | "new">("list");
   const [detail, setDetail] = useState<Contrato | null>(null);
+  const [detailInitialTab, setDetailInitialTab] = useState<"resumo" | "dados" | "contrato">("resumo");
   const [sortPaciente, setSortPaciente] = useState<null | "asc" | "desc">(null);
 
   // Termo com debounce para acionar busca server-side sem bater a cada tecla.
@@ -236,8 +237,17 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
         convenios={convenios}
         clinicaId={clinicaAtual!.clinica_id}
         userId={user?.id ?? null}
-        onCreated={() => {
+        onCreated={async (contratoId) => {
           setView("list");
+          const { data } = await supabase
+            .from("contratos_assinatura")
+            .select("*")
+            .eq("id", contratoId)
+            .maybeSingle();
+          if (data) {
+            setDetailInitialTab("dados");
+            setDetail(data as Contrato);
+          }
           load();
         }}
       />
@@ -248,8 +258,10 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
     return (
       <DetalheContrato
         contrato={detail}
+        initialTab={detailInitialTab}
         onBack={() => {
           setDetail(null);
+          setDetailInitialTab("resumo");
           load();
         }}
       />
