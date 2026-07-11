@@ -665,6 +665,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       const msg = e instanceof Error ? e.message : String(e);
       try {
         if (lancInserido?.id) {
+          // Remove splits antes do lançamento (FK).
+          await supabase.from("pagamento_splits").delete().eq("pagamento_id", lancInserido.id);
           await supabase.from("fin_lancamentos").delete().eq("id", lancInserido.id);
         }
         toast.error(
