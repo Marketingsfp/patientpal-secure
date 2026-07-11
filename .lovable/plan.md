@@ -1,51 +1,109 @@
-## Objetivo
+# Proteção da arquitetura de permissões
 
-Cadastrar o **Cartão Terapêutico** com dois planos (R$ 290 e R$ 490) como **dois convênios separados**, cada um com seu conjunto de regras. Assim, futuras alterações (valor, limite, %) são feitas na aba do próprio convênio, sem toque em código.
+Nenhuma mudança de funcionamento. Nesta etapa vou apenas **criar `AGENTS.md`** na raiz e **apresentar a proposta de `.github/CODEOWNERS`** para revisão (sem criá-lo).
 
-## Estrutura proposta
+## 1) Arquivo a criar: `AGENTS.md` (raiz)
 
-**Convênio 1 — "Cartão Terapêutico 290"**
-- Mensalidade: R$ 290,00
-- Carência: após 1ª mensalidade paga
-- Regras:
-  1. **Consultas terapêuticas gratuitas** — 4 regras (Psicologia, Fonoaudiologia, T.O., Psicopedagogia), todas `tipo=consulta`, `gratuito=true`, `limite_qtd=2`, `limite_periodo=semana`, `limite_escopo=contrato`, `grupo_gratuidade="terapeutico-290"` (compartilham a mesma cota de 2/semana), `excedente_modo=particular` (excedente = valor particular cheio).
-  2. **40% off em consultas** — 4 regras (Pediatria, Neurologia, Ortopedia, Nutrição), `tipo=consulta`, `modo=percentual_desconto`, `percentual=40`.
-  3. **10% off em todos os exames** — 1 regra genérica, `tipo=exame`, sem especialidade, `modo=percentual_desconto`, `percentual=10`.
+Regra permanente exigindo, antes de qualquer alteração direta ou indireta em autenticação, autorização, cargos, perfis, permissões, guards, rotas protegidas, hooks de acesso, tabelas de usuários ou policies RLS, que o agente:
 
-**Convênio 2 — "Cartão Terapêutico 490"**
-- Mensalidade: R$ 490,00
-- Carência: após 1ª mensalidade paga
-- Regras:
-  1. **Consultas terapêuticas gratuitas** — mesmas 4 especialidades, `limite_qtd=4`, `grupo_gratuidade="terapeutico-490"`, excedente = particular cheio.
-  2. **40% off em consultas** — Pediatria, Neurologia, Ortopedia, Nutrição.
-  3. *(sem desconto de exames)*
+1. Interrompa a implementação.
+2. Liste exatamente os arquivos que seriam alterados.
+3. Explique o possível impacto nas permissões existentes.
+4. Exiba o alerta **"ATENÇÃO: este pedido pode modificar o sistema de permissões de acesso"**.
+5. Solicite confirmação explícita antes de continuar.
+6. **Nunca** desative RLS para resolver problemas.
+7. **Nunca** amplie permissões como solução temporária.
+8. Preserve o princípio do menor privilégio.
+9. Mantenha compatibilidade com a arquitetura atual.
+10. Execute testes de regressão após qualquer alteração autorizada.
 
-## Como serão feitas as alterações futuras
+O arquivo também listará os caminhos sensíveis (mesma lista do CODEOWNERS abaixo) para servir como gatilho automático da regra.
 
-Todas via interface, sem código:
+## 2) Arquitetura atual mapeada (somente leitura)
 
-- **Menu Cartão Benefícios → Convênios → [Cartão Terapêutico 290/490]**
-  - Aba **Dados**: altera valor da mensalidade, taxa de adesão, dependentes, informativo.
-  - Aba **Regras de preço**: adiciona/remove/edita especialidades, % de desconto, limite semanal, carência, excedente. Após alterar, botão **"Reaplicar a todos os serviços"** propaga para os preços já cadastrados.
-- Contratos vigentes continuam com as regras vigentes na data do agendamento — mudanças passam a valer para novos atendimentos.
+**Autenticação / gate de rotas**
+- `src/routes/_authenticated.tsx` — gate `beforeLoad` com `supabase.auth.getSession()` (SSR off).
+- `src/routes/_authenticated/` — toda a árvore de rotas protegidas `/app/*`.
+- `src/routes/login.tsx`, `src/routes/signup.tsx`.
+- `src/hooks/use-auth.tsx`, `src/hooks/use-clinica.tsx`.
 
-## Análise (4 eixos)
+**Autorização / perfis / permissões (client)**
+- `src/hooks/use-permissoes.tsx` — `usePermissoes`, `useAcessoModulo`, `usePodeEscrever`.
+- `src/lib/permissoes-presets.ts` — `PRESETS`, `TODOS_MODULOS`, `presetAllowedSet`.
+- `src/lib/permissoes-rotas.ts` — `ROUTE_TO_MODULE`, `moduloDaRota`, `rotaLivre`.
+- `src/components/app-shell.tsx` — guard de rota + filtro de menu.
+- `src/components/sem-permissao.tsx`.
+- `src/routes/_authenticated/app.perfis.tsx`, `app.cargos.tsx`, `app.equipe.*`, `app.funcionarios.tsx`, `app.funcionario.$userId.tsx`.
 
-- 💰 **Financeiro**: cota semanal compartilhada evita o paciente marcar 5 consultas terapêuticas grátis na mesma semana; excedente cai para particular cheio → protege receita.
-- ⏱️ **Operacional**: recepção seleciona só o convênio; sistema aplica automaticamente 2/4 semanais + descontos, sem cálculo manual.
-- 😊 **Experiência**: benefício e excedente aparecem já no orçamento/agendamento; sem retrabalho na recepção.
-- 🛡️ **Auditoria**: `cb_convenio_regras` já auditada por `updated_at`; carência = 1ª mensalidade paga bloqueia uso antes do pagamento.
-- **Risco**: baixo — usa apenas estrutura existente (`cb_convenios` + `cb_convenio_regras` com `grupo_gratuidade`).
-- **Tempo**: ~10 min (2 seeds SQL).
+**Autorização / server**
+- `src/integrations/supabase/auth-middleware.ts` (`requireSupabaseAuth`).
+- `src/integrations/supabase/auth-attacher.ts`.
+- `src/integrations/supabase/client.ts`, `client.server.ts` (auto-gerados — não editar).
+- `src/start.ts` — registro do `functionMiddleware`.
+- `src/lib/equipe.functions.ts` — `assertManager`, `can_manage_clinica`, criação/edição de membros/senhas.
 
-## Passos de implementação
+**Banco de dados / RLS**
+- Tabelas sensíveis: `user_roles`, `perfis_acesso`, `perfil_permissoes`, `role_permissions`, `permissions`, `clinica_memberships`, `profiles`, `clinicas`, `medicos`, `prestadores`, `cargos`, `setores`, `audit_log`, `integration_secrets`, `lgpd_*`.
+- Funções security-definer: `has_role`, `can_manage_clinica` (e correlatas em `supabase/migrations/`).
+- Diretório: `supabase/migrations/` (toda migração toca RLS/policies/roles).
+- Documentação sensível: `docs/auditoria-permissoes-2026-07-10.md`, `docs/fase-final/frente-3-isolamento-rbac.md`, `.lovable/qa-1-seguranca.md`, `mem/preferences/governanca.md`, `mem/constraints/governanca-dados-imutaveis.md`.
 
-1. Criar migração/insert que popule para a `clinica_id` do usuário:
-   - 2 linhas em `cb_convenios` (Cartão Terapêutico 290, Cartão Terapêutico 490).
-   - 9 regras em `cb_convenio_regras` para o 290 e 5 regras para o 490, conforme mapeamento acima.
-   - Usa `especialidade_id` buscando por nome (Psicologia, Fonoaudiologia, Terapia Ocupacional, Psicopedagogia, Pediatria, Neurologia, Ortopedia, Nutrição). Se alguma não existir na clínica, o script cria antes.
-2. Após aprovar, você abre cada convênio → **Regras de preço** → clica em **"Reaplicar a todos os serviços"** para preencher os valores nos serviços já cadastrados.
+## 3) Proposta de `.github/CODEOWNERS` (para revisão — NÃO será criado agora)
 
-## Pergunta antes de executar
+Substituir `@time-seguranca` pelo handle real antes de aplicar.
 
-Preciso saber **para qual clínica** cadastrar (o sistema é multi-clínica). Se você confirmar "a clínica atual do meu login", eu detecto pelo `clinicaId` da sessão e sigo. Também: os nomes das especialidades no seu cadastro batem exatamente com "Psicologia / Fonoaudiologia / Terapia Ocupacional / Psicopedagogia / Pediatria / Neurologia / Ortopedia / Nutrição"? Se houver variação (ex.: "Nutricionista"), me diga o nome exato para eu casar corretamente.
+```
+# Núcleo de autenticação e gate de rotas
+/src/routes/_authenticated.tsx            @time-seguranca
+/src/routes/_authenticated/**             @time-seguranca
+/src/routes/login.tsx                     @time-seguranca
+/src/routes/signup.tsx                    @time-seguranca
+/src/hooks/use-auth.tsx                   @time-seguranca
+/src/hooks/use-clinica.tsx                @time-seguranca
+
+# Autorização / perfis / permissões (client)
+/src/hooks/use-permissoes.tsx             @time-seguranca
+/src/lib/permissoes-presets.ts            @time-seguranca
+/src/lib/permissoes-rotas.ts              @time-seguranca
+/src/components/app-shell.tsx             @time-seguranca
+/src/components/sem-permissao.tsx         @time-seguranca
+/src/components/supervisor-auth-dialog.tsx @time-seguranca
+
+# Telas de administração de acesso
+/src/routes/_authenticated/app.perfis.tsx        @time-seguranca
+/src/routes/_authenticated/app.cargos.tsx        @time-seguranca
+/src/routes/_authenticated/app.equipe.*          @time-seguranca
+/src/routes/_authenticated/app.funcionarios.tsx  @time-seguranca
+/src/routes/_authenticated/app.funcionario.*     @time-seguranca
+/src/routes/_authenticated/app.clinicas.tsx      @time-seguranca
+/src/routes/_authenticated/app.auditoria.tsx     @time-seguranca
+/src/routes/_authenticated/app.lgpd.tsx          @time-seguranca
+/src/routes/_authenticated/app.integration-secrets.tsx @time-seguranca
+
+# Server / middleware / boot
+/src/integrations/supabase/auth-middleware.ts    @time-seguranca
+/src/integrations/supabase/auth-attacher.ts      @time-seguranca
+/src/integrations/supabase/client.ts             @time-seguranca
+/src/integrations/supabase/client.server.ts      @time-seguranca
+/src/integrations/supabase/types.ts              @time-seguranca
+/src/start.ts                                    @time-seguranca
+/src/lib/equipe.functions.ts                     @time-seguranca
+
+# Banco / RLS / migrações
+/supabase/migrations/**                          @time-seguranca
+/supabase/config.toml                            @time-seguranca
+
+# Governança e documentação de segurança
+/AGENTS.md                                       @time-seguranca
+/.github/CODEOWNERS                              @time-seguranca
+/docs/auditoria-permissoes-2026-07-10.md         @time-seguranca
+/docs/fase-final/frente-3-isolamento-rbac.md     @time-seguranca
+/.lovable/qa-1-seguranca.md                      @time-seguranca
+/mem/preferences/governanca.md                   @time-seguranca
+/mem/constraints/governanca-dados-imutaveis.md   @time-seguranca
+```
+
+## 4) Fora do escopo desta etapa
+
+- Nenhuma edição em arquivos de permissões, hooks, guards, migrations ou RLS.
+- `.github/CODEOWNERS` **não** será criado agora — fica para uma próxima aprovação, junto com o handle correto do time responsável.
