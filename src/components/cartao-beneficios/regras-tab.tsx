@@ -53,6 +53,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [reapplying, setReapplying] = useState(false);
   const [progress, setProgress] = useState<string>("");
   const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
+  const [novoOpen, setNovoOpen] = useState(false);
 
   const load = async () => {
     if (!convenioId) return;
@@ -109,29 +110,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
 
   const addRegra = () => {
     if (!convenioId) return;
-    setRegras(prev => [
-      {
-        id: `new-${crypto.randomUUID()}`,
-        convenio_id: convenioId,
-        especialidade_id: null,
-        procedimento_id: null,
-        tipo: null,
-        modo: "valor_fixo",
-        valor: 0,
-        percentual: null,
-        prioridade: 10,
-        ativo: true,
-        limite_qtd: null,
-        limite_periodo: null,
-        limite_escopo: null,
-        excedente_modo: null,
-        excedente_percentual: null,
-        excedente_valor: null,
-        carencia_mensalidades: 0,
-        gratuito: false,
-      },
-      ...prev,
-    ]);
+    setNovoOpen(true);
   };
 
   const update = (idx: number, patch: Partial<CbRegra>) => {
@@ -524,6 +503,15 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         onChange={(patch) => { if (limiteIdx != null) update(limiteIdx, patch); }}
         onSave={async () => { await salvar(); setLimiteIdx(null); }}
         saving={loading}
+      />
+      <NovaRegraDialog
+        open={novoOpen}
+        onClose={() => setNovoOpen(false)}
+        convenioId={convenioId}
+        clinicaId={clinicaId}
+        espOpts={espOpts}
+        procOpts={procOpts}
+        onSaved={async () => { setNovoOpen(false); await load(); }}
       />
     </div>
   );

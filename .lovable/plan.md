@@ -1,24 +1,30 @@
-## Problema
+## Objetivo
 
-Na aba **Resumo** do contrato, as parcelas estão sendo marcadas como **"Atrasado"** no próprio dia do vencimento (e até um dia antes, dependendo do fuso). Isso ocorre porque:
+Ao clicar em "Adicionar regra" na aba de Regras do convênio, abrir um pop-up (modal) contendo TODOS os campos da regra em uma única tela. Ao salvar, gravar a nova regra no banco e permanecer na tela de regras (com a lista atualizada). Cancelar descarta.
 
-1. `new Date(m.vencimento)` interpreta a string `"2026-07-10"` como **UTC 00:00**, que em horário de Brasília (UTC-3) equivale a `2026-07-09 21:00` local. A comparação com `new Date()` (agora, local) considera a parcela vencida mesmo no dia do vencimento.
-2. A regra do usuário: **só é "Atrasado" a partir do dia seguinte ao vencimento** sem pagamento. No dia do vencimento ainda é "Pendente".
+## Mudanças (apenas `src/components/cartao-beneficios/regras-tab.tsx`)
 
-## Correção
+1. **Novo componente `NovaRegraDialog`** no mesmo arquivo. Estado local com todos os campos de `CbRegra`:
+   - Especialidade (SearchableSelect)
+   - Categoria/Tipo (Select: consulta/exame/procedimento/cirurgia/qualquer)
+   - Serviço específico (SearchableSelect) — desativa Especialidade/Tipo quando escolhido
+   - Modo (valor fixo / % desconto) + campo Valor ou Percentual conforme modo
+   - Prioridade
+   - Carência (Select com CARENCIA_GROUPS)
+   - Gratuito (Checkbox — força valor 0)
+   - Bloco "Limite de uso" (mesmos campos hoje no `LimiteDialog`: quantidade, período, escopo, e excedente)
+   - Prévia do exemplo calculado (usa `computeValor`/`sample`)
 
-Em `src/components/pages/contratos-page.tsx`, criar um helper local `isAtrasado(vencimento)` que:
+2. **Botão "Adicionar regra"** passa a abrir esse dialog (em vez de inserir uma linha vazia na tabela).
 
-- Converte `vencimento` (`YYYY-MM-DD`) em uma data **local** (ano/mês/dia, sem fuso UTC).
-- Compara com o **início do dia de hoje** (também local).
-- Retorna `true` **somente se** `hoje > vencimento` (estritamente maior — dia seguinte em diante).
+3. **Handler de salvar do dialog**: insere direto no `cb_convenio_regras` via supabase (mesmo payload de `salvar()`), com toast de sucesso, fecha o dialog e chama `load()` para atualizar a lista. Usuário permanece na aba de Regras.
 
-Substituir as duas ocorrências atuais que usam `new Date(m.vencimento) < new Date()` (linhas ~2279 e ~2286) pela chamada `isAtrasado(m.vencimento)`, tanto na cor do Badge (`variant`) quanto no texto ("Atrasado" / "Pendente").
+4. **`LimiteDialog` permanece** para editar limite de regras já existentes na tabela. `addRegra` antigo é removido/substituído.
 
-Nada mais é alterado: contagem financeira, valor recebido, botões de pagar e demais status permanecem iguais.
+5. Botão "Salvar regras" da tabela continua existindo para salvar edições feitas inline nas regras existentes.
 
-## Resultado esperado
+## Observações
 
-- Vencimento **hoje** e não pago → **Pendente**.
-- Vencimento **futuro** → **Pendente**.
-- Vencimento **anterior a hoje** e não pago → **Atrasado**.
+- Nenhuma mudança de schema/backend — usa a tabela `cb_convenio_regras` existente.
+- Comportamento das regras inline da tabela permanece igual (edição rápida + botão "Salvar regras").
+- Só o fluxo de criação passa pelo modal.
