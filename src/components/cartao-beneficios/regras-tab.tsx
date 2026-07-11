@@ -914,10 +914,7 @@ function NovaRegraDialog({
                       : { gratuito: false });
                   }}
                 />
-                <span className="text-sm flex items-center gap-1">
-                  {r.gratuito && <Gift className="h-3.5 w-3.5 text-emerald-600" />}
-                  Gratuito (valor 0)
-                </span>
+                <span className="text-sm">Gratuito (valor 0)</span>
               </div>
             </div>
           </div>
