@@ -1,26 +1,32 @@
 ## Problema
 
-Ao gerar o pagamento e imprimir a GR, o navegador abre **dois pop-ups de impressão idênticos** em sequência. O usuário só precisa de um — se quiser 2 vias, tira duas cópias no próprio diálogo do navegador.
+Em `src/routes/_authenticated/app.agenda.tsx` (função que calcula o benefício do convênio, linhas ~388-519), o sistema conta como "usados" **todos os agendamentos não cancelados** da paciente no dia. Isso faz com que, quando existem 2 agendamentos apenas marcados (nenhum pago ainda), o segundo já dispare o excedente ("cobrando 50% do valor particular") na tela de cobrança do primeiro.
 
-## Causa
+A regra correta: o limite só é consumido quando um agendamento é **efetivamente pago/realizado**. Se houver apenas agendamentos pendentes, mostrar aviso informativo.
 
-No utilitário de impressão `src/lib/print-gr.ts` (função `imprimirViaIframe`, linhas ~183–216), a GR é impressa através de um iframe oculto. O disparo do `print()` está registrado em **dois caminhos**:
+## Mudanças
 
-1. `iframe.onload = () => setTimeout(dispararPrint, 80)` — caminho normal.
-2. `setTimeout(() => { if (iframe.isConnected) dispararPrint(); }, 600)` — "fallback" caso o `onload` não dispare.
+### 1. `src/routes/_authenticated/app.agenda.tsx` — contagem só considera pagos
+Na consulta de `agendamentos` para o cálculo do limite (linhas ~435-482):
+- Filtrar `agsFiltrados` para contar apenas os que já foram cobrados/atendidos: `status === "realizado"` (o status "pago" existe em telas legadas mas na tabela `agendamentos` os que já foram pagos ficam como `realizado`).
+- Manter também um segundo array `agsPendentes` (mesmos filtros de especialidade/paciente, mas com `status IN ('agendado','confirmado')`, excluindo o próprio agendamento sendo cobrado agora) para gerar o aviso informativo.
 
-O iframe só é removido do DOM 4 segundos depois (`setTimeout(cleanup, 4000)`). Como o `onload` funciona normalmente, o print é chamado aos ~80 ms; aos 600 ms o iframe ainda está conectado, então o fallback dispara `print()` de novo — abrindo o segundo pop-up idêntico.
+O `esgotadoExclusivo` (titular_ou_dependente) também passa a olhar só para agendamentos realizados.
 
-## Correção
+### 2. Novo aviso informativo (não é excedente)
+Quando:
+- `usados < limite_qtd` (limite ainda não consumido de fato), E
+- `agsPendentes.length >= 1` (há outros agendamentos pendentes no dia que compartilham a cota)
 
-Ajustar `imprimirViaIframe` para garantir que `print()` seja disparado **uma única vez**:
+...adicionar um `avisoLimite` do tipo **informativo** com texto:
+> "Existem X agendamento(s) para hoje com este benefício. Apenas 1 será cobrado como benefício; os demais sairão com 50% de desconto (ou regra do excedente configurado)."
 
-- Adicionar uma flag local `jaImprimiu` dentro da função.
-- `dispararPrint` verifica e seta a flag antes de chamar `cw.print()`; se já impresso, retorna imediatamente.
-- Mantém tanto o `onload` quanto o timeout de 600 ms como fallback, mas só um deles efetivamente aciona a impressão.
+O texto do excedente é derivado do `excedente_modo` da regra (particular, valor_fixo, percentual_particular ou bloquear), sem aplicar o desconto de excedente **neste** agendamento — ele continua como benefício normal. Não altera `desconto` nem `bloquear`.
 
-Nenhuma outra alteração é necessária. Todos os fluxos que imprimem via GR (individual, agrupada, mensalidade, carnê, etc.) passam por essa mesma função e serão corrigidos juntos.
+### 3. Dobrar o tempo do toast
+Sonner default = 4s. Passar `{ duration: 8000 }` nas chamadas de `toast.warning(info.avisoLimite)` e `toast.error(info.avisoLimite ...)` relacionadas a limite de convênio (linhas ~2716, 2729, 2732, 2969, 2982, 2985). Não altera outros toasts do arquivo.
 
-### Arquivo afetado
-
-- `src/lib/print-gr.ts` — função `imprimirViaIframe` (bloco entre linhas ~200 e 216).
+## Fora do escopo
+- Não muda schema nem regras cadastradas.
+- Não altera fluxos de pagamento/GR.
+- Ao pagar o 1º agendamento (vira `realizado`), a próxima cobrança do 2º agendamento continuará disparando o excedente (50%) normalmente — comportamento correto.
