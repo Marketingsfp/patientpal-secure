@@ -401,8 +401,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
 
       <div className="border rounded-md max-w-full">
         <Table className="[&_th]:px-2 [&_td]:px-2 [&_th:first-child]:pl-3 [&_td:first-child]:pl-3 [&_th:last-child]:pr-2 [&_td:last-child]:pr-2">
-          <TableHeader className="bg-muted sticky top-0 z-10 [&_tr]:border-b-0">
-            <TableRow className="hover:bg-muted border-b-2 border-border">
+          <TableHeader className="sticky top-0 z-10">
+            <TableRow>
               {[
                 { c: "", l: "Especialidade" },
                 { c: "", l: "Categoria" },
@@ -410,16 +410,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                 { c: "", l: "Modo" },
                 { c: "text-right w-[80px]", l: "Valor / %" },
                 { c: "w-[60px] text-center", l: "Prioridade" },
-                { c: "w-[90px]", l: "Exemplo" },
                 { c: "w-[100px]", l: "Limite" },
                 { c: "w-[92px]", l: "Carência" },
                 { c: "text-center w-[52px] !px-1", l: "Gratuito" },
                 { c: "w-[64px] !px-0", l: "" },
               ].map((h, i) => (
-                <TableHead
-                  key={i}
-                  className={`font-semibold text-foreground uppercase text-[11px] tracking-wide ${h.c}`}
-                >
+                <TableHead key={i} className={h.c}>
                   {h.l}
                 </TableHead>
               ))}
@@ -427,31 +423,31 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
             ) : regras.length === 0 ? (
-              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">Nenhuma regra. Clique em "Adicionar regra".</TableCell></TableRow>
             ) : regrasFiltradas.length === 0 ? (
-              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-6">Nenhuma regra corresponde aos filtros.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-6">Nenhuma regra corresponde aos filtros.</TableCell></TableRow>
             ) : (
               regrasFiltradas.map(({ r, idx }) => (
-              <TableRow key={r.id} className={editingIdx === idx ? "bg-primary/5" : undefined}>
+              <TableRow key={r.id}>
                 <TableCell>
                   <SearchableSelect
                     options={espOpts}
                     value={r.especialidade_id ?? "__any__"}
                     onChange={(v) => update(idx, { especialidade_id: v === "__any__" ? null : v })}
                     placeholder="Qualquer"
-                    disabled={editingIdx !== idx || !!r.procedimento_id}
-                    className="h-8 text-xs px-2"
+                    disabled
+                    className="h-8 text-xs px-2 border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
                   />
                 </TableCell>
                 <TableCell>
                   <Select
                     value={r.tipo ?? "__any__"}
                     onValueChange={(v) => update(idx, { tipo: v === "__any__" ? null : v })}
-                    disabled={editingIdx !== idx || !!r.procedimento_id}
+                    disabled
                   >
-                    <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-24 h-8 text-xs border-0 rounded-none shadow-none focus:ring-0 bg-transparent disabled:opacity-100"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__any__">Qualquer</SelectItem>
                       {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -468,13 +464,13 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                       ...(v !== "__any__" ? { especialidade_id: null, tipo: null } : {}),
                     })}
                     placeholder="Qualquer serviço"
-                    disabled={editingIdx !== idx}
-                    className="h-8 text-xs px-2"
+                    disabled
+                    className="h-8 text-xs px-2 border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
                   />
                 </TableCell>
                 <TableCell>
-                  <Select value={r.modo} onValueChange={(v) => update(idx, { modo: v })} disabled={editingIdx !== idx}>
-                    <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <Select value={r.modo} onValueChange={(v) => update(idx, { modo: v })} disabled>
+                    <SelectTrigger className="w-28 h-8 text-xs border-0 rounded-none shadow-none focus:ring-0 bg-transparent disabled:opacity-100"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="valor_fixo">Valor fixo</SelectItem>
                       <SelectItem value="percentual_desconto">% desconto</SelectItem>
@@ -485,32 +481,31 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   <div className="flex justify-end">
                     {r.modo === "valor_fixo" ? (
                       <CurrencyInput
-                        className="w-20 h-8 text-right text-xs px-1"
+                        className="w-20 h-8 text-right text-xs px-1 border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
                         value={r.valor !== null ? Number(r.valor).toFixed(2) : ""}
                         onChange={(v) => update(idx, { valor: v ? parseFloat(v) : 0 })}
-                        disabled={editingIdx !== idx}
+                        disabled
                       />
                     ) : (
                       <Input
-                        className="w-20 h-8 text-right text-xs px-1"
+                        className="w-20 h-8 text-right text-xs px-1 border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
                         type="number" min="0" max="100" step="0.01"
                         value={r.percentual ?? ""}
                         onChange={(e) => update(idx, { percentual: e.target.value ? parseFloat(e.target.value) : 0 })}
-                        disabled={editingIdx !== idx}
+                        disabled
                       />
                     )}
                   </div>
                 </TableCell>
                 <TableCell className="w-[60px] text-center">
                   <Input
-                    className="w-12 h-8 text-xs text-center px-1 mx-auto"
+                    className="w-12 h-8 text-xs text-center px-1 mx-auto border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent disabled:opacity-100"
                     type="number" min="1" max="100"
                     value={r.prioridade}
                     onChange={(e) => update(idx, { prioridade: parseInt(e.target.value) || 1 })}
-                    disabled={editingIdx !== idx}
+                    disabled
                   />
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground leading-tight w-[90px] whitespace-nowrap">{sample(r)}</TableCell>
                 <TableCell className="w-[100px]">
                   <Button
                     size="sm"
@@ -518,7 +513,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     className="text-[11px] h-7 px-2"
                     onClick={() => setLimiteIdx(idx)}
                     title="Configurar limite de uso"
-                    disabled={editingIdx !== idx}
+                    disabled
                   >
                     <Timer className="h-3.5 w-3.5 mr-1" />
                     {r.limite_qtd
@@ -530,9 +525,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   <Select
                     value={String(r.carencia_mensalidades ?? 0)}
                     onValueChange={(v) => update(idx, { carencia_mensalidades: Number(v) })}
-                    disabled={editingIdx !== idx}
+                    disabled
                   >
-                    <SelectTrigger className="w-full h-8 text-xs px-2"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-full h-8 text-xs px-2 border-0 rounded-none shadow-none focus:ring-0 bg-transparent disabled:opacity-100"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="0">Imediato</SelectItem>
                       <SelectItem value="1">Após 1ª</SelectItem>
@@ -547,13 +542,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   <div className="flex items-center justify-center" title="Marca como cortesia (valor 0, exibido como Gratuito)">
                     <Checkbox
                       checked={!!r.gratuito}
-                      disabled={editingIdx !== idx}
-                      onCheckedChange={(v) => {
-                        const on = v === true;
-                        update(idx, on
-                          ? { gratuito: true, modo: "valor_fixo", valor: 0, percentual: null }
-                          : { gratuito: false });
-                      }}
+                      disabled
                     />
                   </div>
                 </TableCell>
@@ -563,12 +552,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                       size="icon"
                       variant="ghost"
                       className="h-7 w-7"
-                      onClick={() => setEditingIdx(editingIdx === idx ? null : idx)}
-                      title={editingIdx === idx ? "Concluir edição" : "Editar regra"}
+                      onClick={() => setEditRegra(r)}
+                      title="Editar regra"
                     >
-                      {editingIdx === idx
-                        ? <Check className="h-4 w-4 text-primary" />
-                        : <Pencil className="h-4 w-4 text-muted-foreground" />}
+                      <Pencil className="h-4 w-4 text-muted-foreground" />
                     </Button>
                     <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => remove(idx)} title="Excluir regra">
                       <Trash2 className="h-4 w-4 text-destructive" />
