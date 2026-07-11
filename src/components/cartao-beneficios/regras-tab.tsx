@@ -948,6 +948,12 @@ function NovaRegraDialog({
   }, [open, convenioId, regra]);
 
   const upd = (patch: Partial<CbRegra>) => setR(prev => ({ ...prev, ...patch }));
+
+  const procOptsFiltrados = useMemo(() => {
+    if (!r.tipo) return procOpts;
+    const t = r.tipo.toLowerCase();
+    return procOpts.filter(o => o.value === "__any__" || (o.tipo ?? "").toLowerCase() === t);
+  }, [procOpts, r.tipo]);
   const hasLimit = r.limite_qtd != null && Number(r.limite_qtd) > 0;
   const excModo = r.excedente_modo ?? "percentual_particular";
 
