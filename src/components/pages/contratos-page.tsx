@@ -50,7 +50,7 @@ import { ChevronsUpDown } from "lucide-react";
 import { printContrato } from "@/lib/print-contrato";
 import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
-import { printGuiaMensalidade, printGuiaTaxaAdesao, printGuiaMensalidadeComTaxa } from "@/lib/print-gr";
+import { printGuiaMensalidade, printGuiaMensalidadeComTaxa } from "@/lib/print-gr";
 import { gerarCarnePDF } from "@/lib/print-carne";
 import { gerarBoletosContrato } from "@/lib/boleto.functions";
 import { useServerFn } from "@tanstack/react-start";
