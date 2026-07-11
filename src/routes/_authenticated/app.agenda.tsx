@@ -3058,6 +3058,13 @@ function AgendaPage() {
       { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
     ];
     let descSuffix = "";
+    // Gratuidade: pergunta se quer usar agora ou depois (antes de qualquer
+    // registro). "Depois" → cobra particular sem consumir o benefício.
+    if (info?.desconto?.tipo === "gratuidade" && !opcoesOrc) {
+      const escolha = await perguntarGratuidade(info.convenioNome);
+      if (escolha === "cancel") return;
+      if (escolha === "depois") info = { ...info, desconto: null };
+    }
     if (opcoesOrc) {
       // Valores do orçamento já consideram desconto/convênio definidos na hora
       // de gerar o orçamento — não aplicamos nada por cima.
