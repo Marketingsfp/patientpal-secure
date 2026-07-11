@@ -1642,14 +1642,21 @@ function DetalheContrato({
     if (pacienteId) {
       const { data: avulsos } = await supabase
         .from("fin_lancamentos")
-        .select("valor")
+        .select("valor, descricao")
         .eq("clinica_id", (contrato as any).clinica_id)
         .eq("paciente_id", pacienteId)
         .eq("tipo", "receita")
         .eq("status", "confirmado");
-      const rows = (avulsos ?? []) as Array<{ valor: number | string }>;
+      // A "Taxa de adesão" é cobrada junto com a 1ª mensalidade e vira um
+      // lançamento financeiro próprio — não deve ser contada como parcela
+      // extra (senão o "Pagas x/N" mostra 2/13 em vez de 2/12).
+      // Continua no total Recebido, mas fora da contagem de parcelas.
+      const rows = (avulsos ?? []) as Array<{ valor: number | string; descricao: string | null }>;
       const total = rows.reduce((s, r) => s + Number(r.valor || 0), 0);
-      setExtraRecebido({ total, count: rows.length });
+      const count = rows.filter(
+        (r) => !(r.descricao ?? "").toLowerCase().startsWith("taxa de adesão"),
+      ).length;
+      setExtraRecebido({ total, count });
     } else {
       setExtraRecebido({ total: 0, count: 0 });
     }
