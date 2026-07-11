@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { brl, rangeFromPeriodo, type Periodo } from "@/lib/financeiro/format";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/_authenticated/app/financeiro/")({
 
 function FinDashboard() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("financeiro");
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [stats, setStats] = useState({ receitas: 0, despesas: 0, repasse: 0, cartaoConsulta: 0, consultaPart: 0, exames: 0 });
   const [open, setOpen] = useState<null | "receita" | "despesa">(null);
@@ -70,14 +72,16 @@ function FinDashboard() {
           <h1 className="text-2xl font-semibold">Financeiro — {clinicaAtual?.clinica.nome}</h1>
           <p className="text-sm text-muted-foreground">Visão geral do período</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setOpen("receita")} className="bg-primary text-primary-foreground hover:bg-primary/90">
-            <Plus className="h-4 w-4 mr-1" /> Receita
-          </Button>
-          <Button onClick={() => setOpen("despesa")} variant="destructive">
-            <Minus className="h-4 w-4 mr-1" /> Despesa
-          </Button>
-        </div>
+        {podeEscrever && (
+          <div className="flex gap-2">
+            <Button onClick={() => setOpen("receita")} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              <Plus className="h-4 w-4 mr-1" /> Receita
+            </Button>
+            <Button onClick={() => setOpen("despesa")} variant="destructive">
+              <Minus className="h-4 w-4 mr-1" /> Despesa
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2">

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { logAction } from "@/hooks/use-crud";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { toast } from "sonner";
@@ -305,6 +306,7 @@ const delta = (atual: number, ant: number): number => {
 function PainelExecutivoPage() {
   const { clinicaAtual, loading } = useClinica();
   const podeFin = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
+  const podeEscrever = usePodeEscrever("painel-executivo");
 
   const [periodo, setPeriodo] = useState<Periodo>(presets[2].make()); // 30d
   const [carregando, setCarregando] = useState(false);
@@ -433,7 +435,7 @@ function PainelExecutivoPage() {
                 nome: m.nome,
                 valor: money(m.valor),
                 actionLabel: "Estornar",
-                onAction: () => setEstornoFiltro({ tipo: "medico", medicoId: m.medicoId, label: m.nome }),
+                onAction: podeEscrever ? () => setEstornoFiltro({ tipo: "medico", medicoId: m.medicoId, label: m.nome }) : undefined,
               }))}
             />
             <Card>
@@ -460,14 +462,16 @@ function PainelExecutivoPage() {
                         <TableCell className="text-right tabular-nums text-muted-foreground">{money(pr.custo)}</TableCell>
                         <TableCell className="text-right tabular-nums font-semibold">{money(pr.margem)}</TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
-                            onClick={() => setEstornoFiltro({ tipo: "procedimento", procedimento: pr.nome, label: pr.nome })}
-                          >
-                            <Undo2 className="h-3 w-3 mr-1" /> Estornar
-                          </Button>
+                          {podeEscrever && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+                              onClick={() => setEstornoFiltro({ tipo: "procedimento", procedimento: pr.nome, label: pr.nome })}
+                            >
+                              <Undo2 className="h-3 w-3 mr-1" /> Estornar
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -605,6 +609,7 @@ function EstornoDrawer({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const podeEscrever = usePodeEscrever("painel-executivo");
   const [rows, setRows] = useState<EstornoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [alvo, setAlvo] = useState<EstornoRow | null>(null);
@@ -651,6 +656,7 @@ function EstornoDrawer({
 
   const executar = async () => {
     if (!alvo) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (motivo.trim().length < 5) { toast.error("Descreva o motivo (mínimo 5 caracteres)."); return; }
     setSaving(true);
     try {
@@ -799,15 +805,17 @@ function EstornoDrawer({
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!podeEstornar(r)}
-                      className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
-                      onClick={() => { setAlvo(r); setMotivo(""); }}
-                    >
-                      <Undo2 className="h-3 w-3 mr-1" /> Estornar
-                    </Button>
+                    {podeEscrever && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!podeEstornar(r)}
+                        className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+                        onClick={() => { setAlvo(r); setMotivo(""); }}
+                      >
+                        <Undo2 className="h-3 w-3 mr-1" /> Estornar
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

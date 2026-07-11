@@ -6,6 +6,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/boletos")({
   component: BoletosPage,
@@ -17,6 +18,7 @@ interface Form { valor: string; vencimento: string; nosso_numero: string; linha_
 const STATUS = ["pendente","pago","vencido","cancelado"];
 
 function BoletosPage() {
+  const podeEscrever = usePodeEscrever("boletos");
   return (
     <SimpleCrud<Row, Form>
       table="boletos"
@@ -25,6 +27,7 @@ function BoletosPage() {
       subtitle="Emita e acompanhe boletos integrados."
       icon={<Barcode className="h-6 w-6 text-primary" />}
       orderBy={{ column: "vencimento", ascending: false }}
+      readOnly={!podeEscrever}
       columns={[
         { key: "nn", header: "Nosso número", render: r => r.nosso_numero ?? "—" },
         { key: "venc", header: "Vencimento", className: "w-32", render: r => new Date(r.vencimento).toLocaleDateString("pt-BR") },

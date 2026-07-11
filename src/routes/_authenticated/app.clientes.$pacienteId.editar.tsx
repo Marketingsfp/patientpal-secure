@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { ClienteForm, type Paciente } from "@/components/clientes/cliente-form";
 import { PacienteCartoesBeneficios } from "@/components/clientes/paciente-cartoes-beneficios";
@@ -19,6 +20,7 @@ function EditarClientePage() {
   const { pacienteId } = Route.useParams();
   const navigate = useNavigate();
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("clientes");
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -75,12 +77,20 @@ function EditarClientePage() {
         ) : !clinicaAtual ? (
           <p className="text-sm text-muted-foreground">Selecione uma clínica.</p>
         ) : (
-          <ClienteForm
-            clinicaId={clinicaAtual.clinica_id}
-            paciente={paciente}
-            onCancel={voltar}
-            onSaved={voltar}
-          />
+          <>
+            {!podeEscrever && (
+              <p className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+                Você tem acesso somente leitura neste módulo. Os campos abaixo não podem ser alterados.
+              </p>
+            )}
+            <ClienteForm
+              clinicaId={clinicaAtual.clinica_id}
+              paciente={paciente}
+              onCancel={voltar}
+              onSaved={voltar}
+              readOnly={!podeEscrever}
+            />
+          </>
         )}
       </div>
       {!loading && paciente && clinicaAtual && (

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { FileHeart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,6 +34,7 @@ const EMPTY: Form = {
 
 function ProntuariosPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("prontuarios");
   const [medicos, setMedicos] = useState<{ id: string; nome: string }[]>([]);
   const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
   useEffect(() => { (async () => {
@@ -55,6 +57,7 @@ function ProntuariosPage() {
       subtitle="Histórico clínico dos pacientes."
       icon={<FileHeart className="h-6 w-6 text-primary" />}
       orderBy={{ column: "data", ascending: false }}
+      readOnly={!podeEscrever}
       columns={[
         { key: "data", header: "Data", render: r => new Date(r.data).toLocaleString("pt-BR") },
         { key: "pac", header: "Paciente", render: r => <PacienteNomeCell id={r.paciente_id} /> },

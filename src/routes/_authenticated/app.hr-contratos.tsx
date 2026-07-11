@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useServerFn } from "@tanstack/react-start";
 import { cadastrarUsuario } from "@/lib/equipe.functions";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ const PERFIS = [
 
 function ContratosPage() {
   const { clinicaAtual, memberships } = useClinica();
+  const podeEscrever = usePodeEscrever("hr-contratos");
   const { new: autoNew, edit: autoEdit } = Route.useSearch();
   const navigate = useNavigate();
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
@@ -85,14 +87,14 @@ function ContratosPage() {
 
   useEffect(() => {
     if (autoNew === "1" && clinicaAtual) {
-      openNew();
+      if (podeEscrever) openNew();
       void navigate({ to: "/app/hr-contratos", search: {}, replace: true });
     }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [autoNew, clinicaAtual?.clinica_id]);
 
   useEffect(() => {
-    if (!autoEdit || !clinicaAtual || loading) return;
+    if (!autoEdit || !clinicaAtual || loading || !podeEscrever) return;
     void (async () => {
       const existing = rows.find(r => r.user_id === autoEdit);
       if (existing) {
@@ -146,6 +148,7 @@ function ContratosPage() {
   }
 
   async function salvar() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!form.clinica_id) { toast.error("Selecione a clínica"); return; }
     if (!form.funcionario_nome.trim()) { toast.error("Informe o nome"); return; }
     if (form.criar_login && !editing) {
@@ -370,7 +373,9 @@ function ContratosPage() {
           </Tabs>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button onClick={salvar} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+            {podeEscrever && (
+              <Button onClick={salvar} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

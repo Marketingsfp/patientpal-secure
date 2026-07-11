@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/prontuario-modelos")({
   component: ModelosPage,
@@ -17,6 +18,7 @@ type Form = Omit<Modelo, "id">;
 const EMPTY: Form = { nome: "", prompt_ia: "", ativo: true, secoes: [{ chave: "queixa_principal", titulo: "Queixa principal", placeholder: "" }] };
 
 function ModelosPage() {
+  const podeEscrever = usePodeEscrever("prontuario-modelos");
   return (
     <SimpleCrud<Modelo, Form>
       table="prontuario_modelos"
@@ -25,6 +27,7 @@ function ModelosPage() {
       subtitle="Estrutura SOAP por especialidade, usada no Atendimento com IA."
       icon={<FileHeart className="h-6 w-6 text-primary" />}
       orderBy={{ column: "nome", ascending: true }}
+      readOnly={!podeEscrever}
       columns={[
         { key: "nome", header: "Modelo", render: (r) => <span className="font-medium">{r.nome}</span> },
         { key: "secoes", header: "Seções", render: (r) => <span className="text-sm text-muted-foreground">{r.secoes?.length ?? 0} campos</span> },

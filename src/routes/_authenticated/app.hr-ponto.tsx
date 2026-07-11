@@ -3,6 +3,7 @@ import { SectionTabs, RH_TABS, RH_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,7 @@ function distanciaMetros(la1: number, lo1: number, la2: number, lo2: number) {
 
 function PontoPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("hr-ponto");
   const [pontos, setPontos] = useState<Ponto[]>([]);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +72,7 @@ function PontoPage() {
   useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
 
   async function bater(tipo: string) {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) return;
     setMarcando(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -130,12 +133,14 @@ function PontoPage() {
       <Card className="p-6 text-center">
         <div className="text-5xl font-bold tabular-nums">{formatHora(agora)}</div>
         <div className="text-sm text-muted-foreground mt-1">{formatDateTime(agora).split(" ")[0]}</div>
+        {podeEscrever && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-6">
           <Button onClick={() => bater("entrada")} disabled={marcando}><LogIn className="h-4 w-4 mr-1" /> Entrada</Button>
           <Button variant="outline" onClick={() => bater("intervalo_inicio")} disabled={marcando}><Coffee className="h-4 w-4 mr-1" /> Início intervalo</Button>
           <Button variant="outline" onClick={() => bater("intervalo_fim")} disabled={marcando}><Coffee className="h-4 w-4 mr-1" /> Fim intervalo</Button>
           <Button variant="destructive" onClick={() => bater("saida")} disabled={marcando}><LogOut className="h-4 w-4 mr-1" /> Saída</Button>
         </div>
+        )}
         {unidades.length === 0 && (
           <p className="text-xs text-muted-foreground mt-3">Cadastre unidades com geolocalização para validar a presença.</p>
         )}

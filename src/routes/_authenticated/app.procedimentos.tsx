@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { exportToExcel } from "@/lib/export-csv";
 import { invalidateAgendaRefs } from "@/lib/agenda/refs-cache";
 import { Button } from "@/components/ui/button";
@@ -331,6 +332,7 @@ const PACOTES_EXAMES: PacoteExames[] = [
 
 function ProcedimentosPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("procedimentos");
 
   // ----- Procedimentos -----
   const [items, setItems] = useState<Procedimento[]>([]);
@@ -710,6 +712,7 @@ function ProcedimentosPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!form.nome.trim()) { toast.error("Informe o nome."); return; }
     const isVariavel = !!form.valor_variavel;
     const vDinheiro = isVariavel ? 0 : (Number(form.valor_dinheiro) || 0);
@@ -773,6 +776,7 @@ function ProcedimentosPage() {
 
   const executarSalvar = async (payload: any) => {
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
     let procId = editing?.id;
     if (editing) {
@@ -828,6 +832,7 @@ function ProcedimentosPage() {
   };
 
   const onDelete = async (p: Procedimento) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm(`Excluir ${p.nome}?`)) return;
     const { error } = await supabase.from("procedimentos").delete().eq("id", p.id);
     if (error) { mostrarErro(error); return; }
@@ -838,6 +843,7 @@ function ProcedimentosPage() {
 
   const seedPacote = async (pacote: PacoteExames) => {
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSeeding(true);
     const { data: existentes } = await supabase
       .from("procedimentos")
@@ -929,29 +935,31 @@ function ProcedimentosPage() {
       {/* ============ SERVIÇOS (unificado) ============ */}
       <div className="space-y-4 pt-4 pb-16">
           <div className="flex flex-wrap gap-2 justify-end">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" disabled={seeding}>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  {seeding ? "Cadastrando…" : "Carregar pacote de exames"}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuLabel>Pacotes prontos</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {PACOTES_EXAMES.map(p => (
-                  <DropdownMenuItem key={p.id} onClick={() => seedPacote(p)}>
-                    <span className="font-medium">{p.label}</span>
-                    <span className="ml-auto text-xs text-muted-foreground">{p.itens.length}</span>
+            {podeEscrever && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" disabled={seeding}>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {seeding ? "Cadastrando…" : "Carregar pacote de exames"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuLabel>Pacotes prontos</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {PACOTES_EXAMES.map(p => (
+                    <DropdownMenuItem key={p.id} onClick={() => seedPacote(p)}>
+                      <span className="font-medium">{p.label}</span>
+                      <span className="ml-auto text-xs text-muted-foreground">{p.itens.length}</span>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={seedTodosPacotes}>
+                    <Sparkles className="h-4 w-4 mr-2 text-primary" />
+                    Carregar todos os pacotes
                   </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={seedTodosPacotes}>
-                  <Sparkles className="h-4 w-4 mr-2 text-primary" />
-                  Carregar todos os pacotes
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <Button
               variant="outline"
               onClick={() => {
@@ -985,7 +993,9 @@ function ProcedimentosPage() {
             >
               <Download className="h-4 w-4 mr-2" /> Exportar Excel
             </Button>
-            <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo</Button>
+            {podeEscrever && (
+              <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo</Button>
+            )}
           </div>
 
           <div className="rounded-lg border border-border bg-card p-4 flex flex-wrap gap-3">
@@ -1115,8 +1125,12 @@ function ProcedimentosPage() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(p)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                      {podeEscrever && (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(p)}><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(p)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                        </>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -101,6 +102,7 @@ const formVazio: Form = {
 function TriagemEnfermagemPage() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const podeEscrever = usePodeEscrever("triagem-enfermagem");
   const [loading, setLoading] = useState(false);
   const [ags, setAgs] = useState<Ag[]>([]);
   const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
@@ -172,6 +174,7 @@ function TriagemEnfermagemPage() {
 
   async function chamarPaciente(g: Grupo) {
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!grupoPago(g)) {
       toast.error("Pagamento pendente — envie o paciente ao caixa antes de chamar para a triagem.");
       return;
@@ -197,6 +200,7 @@ function TriagemEnfermagemPage() {
 
   async function salvarEAvancar(avancar: boolean) {
     if (!clinicaAtual || !aberto) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     // Validação de faixas plausíveis (só valida se preenchido)
     const range = (v: string, min: number, max: number, label: string) => {
       if (!v.trim()) return true;

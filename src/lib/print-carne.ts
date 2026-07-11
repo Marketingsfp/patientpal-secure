@@ -111,19 +111,22 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
     throw new Error("Nenhuma mensalidade em aberto para gerar carnê.");
   }
   const fichas = parcelasAbertas.map((p) => {
-    const total = (parcelas ?? []).length;
+    const isAdesao = Number(p.numero_parcela) === 0;
+    const total = (parcelas ?? []).filter((parcela) => Number(parcela.numero_parcela) !== 0).length;
+    const parcelaLabel = isAdesao ? "Adesao" : `${p.numero_parcela}/${total}`;
+    const docLabel = isAdesao ? "TAXA DE ADESAO" : "CARNE DE PAGAMENTO";
     const buildFicha = (viaLabel: string) => `
       <div class="ficha">
         <div class="via-label">${viaLabel}</div>
         <div class="ficha-header">
           <div class="ficha-titulo">
             <div class="ficha-clinica">${esc(clinica?.nome ?? "Clínica")}</div>
-            <div class="ficha-doc">CARNÊ DE PAGAMENTO — Contrato #${esc(contrato.numero)}</div>
+            <div class="ficha-doc">${docLabel} - Contrato #${esc(contrato.numero)}</div>
           </div>
           <div style="display:flex;gap:18px;align-items:flex-start;">
             <div class="ficha-parcela">
               <div class="lab">Parcela</div>
-              <div class="val">${p.numero_parcela}/${total}</div>
+              <div class="val">${parcelaLabel}</div>
             </div>
             <div class="ficha-parcela">
               <div class="lab">Mês Ref.</div>

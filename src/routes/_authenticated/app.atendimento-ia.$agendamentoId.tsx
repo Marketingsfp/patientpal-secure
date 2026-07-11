@@ -4,6 +4,7 @@ import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2,
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -81,6 +82,7 @@ function AtendimentoEditorPage() {
   const backLabel = cameFromAgendaV2 ? "Voltar para Agenda V2" : "Voltar para fila";
   const navigate = useNavigate();
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("atendimento-ia");
   const estruturar = useServerFn(gerarAnamneseEstruturada);
   const sugerir = useServerFn(sugerirCondutaClinica);
   const resumir = useServerFn(resumirHistoricoPaciente);
@@ -282,6 +284,7 @@ function AtendimentoEditorPage() {
   }
 
   async function handleSalvar() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual || !pacienteId) { toast.error("Paciente não identificado"); return; }
     if (pagamento && !pagamento.pago) {
       toast.error("Pagamento pendente — finalize no caixa antes de salvar o prontuário.");
@@ -674,15 +677,17 @@ function AtendimentoEditorPage() {
         <Button variant="outline" size="lg" onClick={() => imprimirDocumento("Prescrição")} disabled={!soap.prescricao.trim()}>
           <Printer className="h-4 w-4" /> Imprimir prescrição
         </Button>
-        <Button
-          size="lg"
-          onClick={handleSalvar}
-          disabled={loading === "salvar" || !pacienteId || (pagamento ? !pagamento.pago : false)}
-          title={pagamento && !pagamento.pago ? "Pagamento pendente" : undefined}
-        >
-          {loading === "salvar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Salvar prontuário
-        </Button>
+        {podeEscrever && (
+          <Button
+            size="lg"
+            onClick={handleSalvar}
+            disabled={loading === "salvar" || !pacienteId || (pagamento ? !pagamento.pago : false)}
+            title={pagamento && !pagamento.pago ? "Pagamento pendente" : undefined}
+          >
+            {loading === "salvar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Salvar prontuário
+          </Button>
+        )}
       </div>
     </div>
   );

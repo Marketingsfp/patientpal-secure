@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +50,7 @@ const STATUS_COR: Record<Row["status"], string> = {
 
 function ExamesResultadosPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("exames-resultados");
   const classificar = useServerFn(classificarResultadoExame);
   const extrair = useServerFn(extrairTextoExameDeArquivo);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -199,6 +201,7 @@ function ExamesResultadosPage() {
   };
 
   const handleSalvar = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaId) return toast.error("Selecione uma clínica");
     if (!pacienteId) return toast.error("Selecione o paciente");
     if (!tipo.trim() || texto.trim().length < 3) return toast.error("Preencha exame e resultado");
@@ -308,10 +311,12 @@ function ExamesResultadosPage() {
             {classificando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             Classificar com IA
           </Button>
-          <Button onClick={handleSalvar} disabled={salvando} variant="secondary">
-            {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Salvar resultado{analise?.precisa_contato ? " + abrir alerta" : ""}
-          </Button>
+          {podeEscrever && (
+            <Button onClick={handleSalvar} disabled={salvando} variant="secondary">
+              {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar resultado{analise?.precisa_contato ? " + abrir alerta" : ""}
+            </Button>
+          )}
         </div>
 
         {analise && (

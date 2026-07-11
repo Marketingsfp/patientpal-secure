@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,7 @@ const EMPTY = { titulo: "", descricao: "", data_lembrete: new Date().toISOString
 
 function Page() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("financeiro");
   const [items, setItems] = useState<Lemb[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -53,6 +55,7 @@ function Page() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
     const payload = { clinica_id: clinicaAtual.clinica_id, titulo: form.titulo.trim(),
       descricao: form.descricao.trim() || null, data_lembrete: form.data_lembrete, prioridade: form.prioridade };
@@ -65,10 +68,12 @@ function Page() {
   };
 
   const toggle = async (l: Lemb) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const { error } = await supabase.from("fin_lembretes").update({ concluido: !l.concluido }).eq("id", l.id);
     if (error) mostrarErro(error); else await load();
   };
   const remove = async (l: Lemb) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm(`Excluir "${l.titulo}"?`)) return;
     const { error } = await supabase.from("fin_lembretes").delete().eq("id", l.id);
     if (error) mostrarErro(error); else { toast.success("Removido"); await load(); }
@@ -82,7 +87,9 @@ function Page() {
         <div><h1 className="text-2xl font-semibold">Lembretes</h1>
           <p className="text-sm text-muted-foreground">Vencimentos e tarefas financeiras</p></div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Novo lembrete</Button></DialogTrigger>
+          {podeEscrever && (
+            <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Novo lembrete</Button></DialogTrigger>
+          )}
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Editar" : "Novo"} lembrete</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-4">
@@ -113,7 +120,7 @@ function Page() {
         : <div className="space-y-2">{items.map((l) => (
           <Card key={l.id} className={l.concluido ? "opacity-60" : ""}>
             <CardContent className="pt-4 pb-4 flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => toggle(l)}>
+              <Button variant="ghost" size="icon" onClick={() => toggle(l)} disabled={!podeEscrever}>
                 <CheckCircle2 className={`h-5 w-5 ${l.concluido ? "text-green-600" : "text-muted-foreground"}`} />
               </Button>
               <Bell className="h-4 w-4 text-muted-foreground" />
@@ -123,8 +130,12 @@ function Page() {
               </div>
               <Badge variant={prioColor(l.prioridade) as "default" | "secondary" | "destructive"}>{l.prioridade}</Badge>
               <span className="text-sm text-muted-foreground">{new Date(l.data_lembrete).toLocaleDateString("pt-BR")}</span>
-              <Button variant="ghost" size="icon" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
-              <Button variant="ghost" size="icon" onClick={() => remove(l)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+              {podeEscrever && (
+                <>
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => remove(l)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                </>
+              )}
             </CardContent>
           </Card>))}
         </div>}

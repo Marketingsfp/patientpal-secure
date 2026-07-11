@@ -19,6 +19,7 @@ import {
   Repeat, AlertTriangle, ShieldCheck, PhoneCall,
 } from "lucide-react";
 import { somenteDigitos, isCPFValido } from "@/lib/cpf";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/agenda/express")({
   component: AgendaExpressPage,
@@ -72,6 +73,7 @@ function groupByDia(slots: Slot[]) {
 function AgendaExpressPage() {
   const { clinicaAtual, modoTodas } = useClinica();
   const navigate = useNavigate();
+  const podeEscrever = usePodeEscrever("agenda");
   const clinicaId = clinicaAtual?.clinica_id ?? null;
 
   const [baseImportada, setBaseImportada] = useState<boolean | null>(null);
@@ -185,6 +187,10 @@ function AgendaExpressPage() {
   }
 
   async function criarPacienteRapido() {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaId) return;
     if (novoNome.trim().length < 3) { toast.error("Informe o nome"); return; }
     if (somenteDigitos(novoTelefone).length < 10) { toast.error("Telefone é obrigatório (DDD + número)"); return; }
@@ -213,6 +219,10 @@ function AgendaExpressPage() {
   }
 
   async function confirmarAgendamento() {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaId || !slotSelecionado || !paciente) return;
     setConfirmando(true);
     try {
@@ -373,11 +383,13 @@ function AgendaExpressPage() {
                     <Input type="date" value={novoNasc} onChange={(e) => setNovoNasc(e.target.value)} />
                   </div>
                 </div>
-                <div className="mt-3">
-                  <Button size="sm" onClick={criarPacienteRapido} disabled={criandoPaciente}>
-                    {criandoPaciente ? "Cadastrando…" : "Cadastrar e continuar"}
-                  </Button>
-                </div>
+                {podeEscrever && (
+                  <div className="mt-3">
+                    <Button size="sm" onClick={criarPacienteRapido} disabled={criandoPaciente}>
+                      {criandoPaciente ? "Cadastrando…" : "Cadastrar e continuar"}
+                    </Button>
+                  </div>
+                )}
               </details>
             )}
 
@@ -544,9 +556,11 @@ function AgendaExpressPage() {
               <Button variant="ghost" onClick={() => setStep(3)}>
                 <ArrowLeft className="mr-1 h-4 w-4" /> Trocar horário
               </Button>
-              <Button onClick={confirmarAgendamento} disabled={confirmando}>
-                {confirmando ? "Confirmando…" : "Finalizar agendamento"}
-              </Button>
+              {podeEscrever && (
+                <Button onClick={confirmarAgendamento} disabled={confirmando}>
+                  {confirmando ? "Confirmando…" : "Finalizar agendamento"}
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

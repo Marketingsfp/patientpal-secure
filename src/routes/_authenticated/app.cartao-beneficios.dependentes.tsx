@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,7 @@ type Filter = "todos" | "sem" | "com";
 
 function DependentesPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("cartao-beneficios");
   const [loading, setLoading] = useState(true);
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [deps, setDeps] = useState<Dep[]>([]);
@@ -123,6 +125,7 @@ function DependentesPage() {
 
   const adicionar = async () => {
     if (!openTitular || !novoDep) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
     const { error } = await supabase.from("contrato_dependentes").insert({
       contrato_id: openTitular.id,
@@ -146,6 +149,7 @@ function DependentesPage() {
   };
 
   const remover = async (depId: string) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm("Excluir este dependente?")) return;
     const { error } = await supabase
       .from("contrato_dependentes")
@@ -240,9 +244,11 @@ function DependentesPage() {
                         </div>
                       )}
                     </div>
-                    <Button size="sm" onClick={() => setOpenTitular(c)}>
-                      <Plus className="h-4 w-4 mr-1" /> Adicionar dependente
-                    </Button>
+                    {podeEscrever && (
+                      <Button size="sm" onClick={() => setOpenTitular(c)}>
+                        <Plus className="h-4 w-4 mr-1" /> Adicionar dependente
+                      </Button>
+                    )}
                   </li>
                 );
               })}

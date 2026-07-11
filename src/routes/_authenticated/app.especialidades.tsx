@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SectionTabs, SERVICOS_TABS, SERVICOS_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +33,7 @@ export const Route = createFileRoute("/_authenticated/app/especialidades")({
 interface Esp { id: string; nome: string; descricao: string | null; ativo: boolean }
 
 function EspecialidadesPage() {
+  const podeEscrever = usePodeEscrever("especialidades");
   const [rows, setRows] = useState<Esp[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -68,6 +70,7 @@ function EspecialidadesPage() {
   }
 
   async function salvar() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!form.nome.trim()) { toast.error("Informe o nome"); return; }
     setSaving(true);
     const toTitle = (s: string) =>
@@ -105,6 +108,7 @@ function EspecialidadesPage() {
   });
 
   async function confirmarExclusao() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!toDelete) return;
     setDeleting(true);
     const { data: vinculos, error: countError } = await supabase
@@ -175,7 +179,9 @@ function EspecialidadesPage() {
           <h1 className="text-xl font-bold">Especialidades</h1>
           <p className="text-sm text-muted-foreground">Cadastro global de especialidades médicas.</p>
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Nova</Button>
+        {podeEscrever && (
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Nova</Button>
+        )}
       </div>
 
       <Card className="p-3">
@@ -220,12 +226,16 @@ function EspecialidadesPage() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(r)} aria-label="Editar">
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setToDelete(r)} aria-label="Excluir">
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    {podeEscrever && (
+                      <>
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(r)} aria-label="Editar">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => setToDelete(r)} aria-label="Excluir">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

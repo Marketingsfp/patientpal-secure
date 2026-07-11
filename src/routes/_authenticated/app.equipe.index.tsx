@@ -3,6 +3,7 @@ import { z } from "zod";
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Users, Stethoscope, HeartPulse } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +54,7 @@ const limparPrefixoMedico = (nome: string) =>
 
 function EquipePage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("equipe");
   const { tab: tabFromUrl } = Route.useSearch();
   const [tab, setTab] = useState<"funcionarios" | "medicos" | "enfermagem">(tabFromUrl ?? "funcionarios");
   useEffect(() => { if (tabFromUrl) setTab(tabFromUrl); }, [tabFromUrl]);
@@ -217,9 +219,11 @@ function EquipePage() {
             Funcionários e médicos de {clinicaAtual.clinica.nome}. Aqui você cadastra a equipe e libera acesso ao sistema.
           </p>
         </div>
-        <Button onClick={() => setOpenChooser(true)}>
-          <Plus className="h-4 w-4 mr-2" /> Novo cadastro
-        </Button>
+        {podeEscrever && (
+          <Button onClick={() => setOpenChooser(true)}>
+            <Plus className="h-4 w-4 mr-2" /> Novo cadastro
+          </Button>
+        )}
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as "funcionarios" | "medicos" | "enfermagem")}>
@@ -271,11 +275,13 @@ function EquipePage() {
                         <Badge variant={f.ativo ? "default" : "outline"}>{f.ativo ? "Ativo" : "Inativo"}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button size="icon" variant="ghost" asChild>
-                          <Link to="/app/equipe/funcionario/$userId/editar" params={{ userId: f.user_id }}>
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                        </Button>
+                        {podeEscrever && (
+                          <Button size="icon" variant="ghost" asChild>
+                            <Link to="/app/equipe/funcionario/$userId/editar" params={{ userId: f.user_id }}>
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -341,25 +347,27 @@ function EquipePage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        {m.pending ? (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            title="Completar cadastro de médico"
-                            onClick={() => {
-                              setMedicoPrefillNome(m.nome);
-                              setMedicoPrefillUserId(m.user_id);
-                              setMedicoDialog({ open: true, id: null });
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        ) : (
-                          <Button size="icon" variant="ghost" asChild>
-                            <Link to="/app/equipe/medico/$medicoId/editar" params={{ medicoId: m.id }}>
+                        {podeEscrever && (
+                          m.pending ? (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Completar cadastro de médico"
+                              onClick={() => {
+                                setMedicoPrefillNome(m.nome);
+                                setMedicoPrefillUserId(m.user_id);
+                                setMedicoDialog({ open: true, id: null });
+                              }}
+                            >
                               <Pencil className="h-4 w-4" />
-                            </Link>
-                          </Button>
+                            </Button>
+                          ) : (
+                            <Button size="icon" variant="ghost" asChild>
+                              <Link to="/app/equipe/medico/$medicoId/editar" params={{ medicoId: m.id }}>
+                                <Pencil className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          )
                         )}
                       </TableCell>
                     </TableRow>
@@ -405,11 +413,13 @@ function EquipePage() {
                         <Badge variant={e.ativo ? "default" : "outline"}>{e.ativo ? "Ativo" : "Inativo"}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button size="icon" variant="ghost" asChild>
-                          <Link to="/app/equipe/enfermeiro/$userId/editar" params={{ userId: e.user_id }}>
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                        </Button>
+                        {podeEscrever && (
+                          <Button size="icon" variant="ghost" asChild>
+                            <Link to="/app/equipe/enfermeiro/$userId/editar" params={{ userId: e.user_id }}>
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

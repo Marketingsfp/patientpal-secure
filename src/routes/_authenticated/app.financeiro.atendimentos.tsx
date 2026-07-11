@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { useServerFn } from "@tanstack/react-start";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
@@ -160,6 +161,7 @@ function Page() {
   const { clinicaAtual } = useClinica();
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
   const podeEstornar = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
+  const podeEscrever = usePodeEscrever("financeiro");
   const [items, setItems] = useState<Atend[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [pacientes, setPacientes] = useState<Pac[]>([]);
@@ -390,6 +392,7 @@ function Page() {
   };
 
   const doEmitNfse = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const a = nfseDialog.atend;
     if (!a || !emitenteId || !a.paciente_id) return;
     setNfseEmitting(true);
@@ -509,6 +512,7 @@ function Page() {
   };
 
   const emitirLaudo = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!laudoTarget) return;
     if (!laudoForm.medico_laudador_id) {
       toast.error("Selecione o médico laudador");
@@ -576,6 +580,7 @@ function Page() {
 
   const vincularLaudoLote = async () => {
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!laudoLoteLaudadorId) {
       toast.error("Selecione o médico laudador");
       return;
@@ -1160,6 +1165,7 @@ function Page() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
@@ -1187,6 +1193,7 @@ function Page() {
   };
 
   const remove = async (a: Atend) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm("Excluir atendimento?")) return;
 
     try {
@@ -1215,6 +1222,7 @@ function Page() {
   };
 
   const darBaixa = async (a: Atend) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (
       !confirm(
         "Confirmar baixa do atendimento?\n\nO médico será marcado como tendo atendido este paciente e o repasse ficará liberado para pagamento.",
@@ -1255,6 +1263,10 @@ function Page() {
   const desfazerBaixa = async (a: Atend) => {
     if (!podeEstornar) {
       toast.error("Sem permissão para desfazer a baixa.");
+      return;
+    }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
     if (a.repasse_pago) {
@@ -1339,6 +1351,7 @@ function Page() {
   };
 
   const darBaixaLote = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const alvos = selectedItems.filter((a) => !a.repasse_pago && !isAtendido(a));
     if (alvos.length === 0) return;
     if (
@@ -1382,6 +1395,10 @@ function Page() {
   const desfazerBaixaLote = async () => {
     if (!podeEstornar) {
       toast.error("Sem permissão para desfazer a baixa.");
+      return;
+    }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
     const alvos = selectedItems.filter((a) => !a.repasse_pago && isAtendido(a));
@@ -1588,6 +1605,7 @@ function Page() {
 
   const confirmarPagamento = async () => {
     if (!clinicaAtual || !selectedItems.length) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setPayingNow(true);
     try {
       // Validação servidor-side: só pode pagar repasse de atendimentos efetivamente
@@ -1794,7 +1812,7 @@ function Page() {
             <Download className="h-4 w-4 mr-2" />
             Exportar Excel
           </Button>
-          {!isMedicoOnly && (
+          {!isMedicoOnly && podeEscrever && (
             <Button
               onClick={openPay}
               disabled={!podePagar}
@@ -1821,7 +1839,7 @@ function Page() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  disabled={selectedNaoBaixados.length === 0}
+                  disabled={selectedNaoBaixados.length === 0 || !podeEscrever}
                   onSelect={(e) => {
                     e.preventDefault();
                     if (selectedNaoBaixados.length > 0) darBaixaLote();
@@ -1832,7 +1850,7 @@ function Page() {
                   {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  disabled={selectedBaixados.length === 0 || !podeEstornar}
+                  disabled={selectedBaixados.length === 0 || !podeEstornar || !podeEscrever}
                   onSelect={(e) => {
                     e.preventDefault();
                     if (selectedBaixados.length > 0) desfazerBaixaLote();
@@ -1855,7 +1873,7 @@ function Page() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  disabled={selectedLaudoElegiveis.length === 0}
+                  disabled={selectedLaudoElegiveis.length === 0 || !podeEscrever}
                   onSelect={(e) => {
                     e.preventDefault();
                     if (selectedLaudoElegiveis.length > 0) abrirLaudoLote();
@@ -1869,7 +1887,7 @@ function Page() {
             </DropdownMenu>
           )}
           <Dialog open={open} onOpenChange={setOpen}>
-            {!isMedicoOnly && (
+            {!isMedicoOnly && podeEscrever && (
               <DialogTrigger asChild>
                 <Button onClick={openNew} disabled={!clinicaAtual}>
                   <Plus className="h-4 w-4 mr-2" />
@@ -2262,7 +2280,7 @@ function Page() {
                               </Badge>
                             );
                           if (!exigeLaudo) return <span className="text-muted-foreground text-[10px]">—</span>;
-                          if (!podeEstornar) return <span className="text-amber-600 text-[10px]">Pendente</span>;
+                          if (!podeEstornar || !podeEscrever) return <span className="text-amber-600 text-[10px]">Pendente</span>;
                           return (
                             <Button
                               variant="outline"
@@ -2287,16 +2305,18 @@ function Page() {
                           {a.origem === "agenda" ? (
                             <div className="flex items-center justify-end gap-0.5">
                               <span className="text-[9px] text-muted-foreground uppercase mr-1">Agenda</span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                title="Emitir NFS-e"
-                                onClick={() => openEmitNfse(a)}
-                                disabled={!a.paciente_id}
-                              >
-                                <Send className="h-3.5 w-3.5" />
-                              </Button>
+                              {podeEscrever && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Emitir NFS-e"
+                                  onClick={() => openEmitNfse(a)}
+                                  disabled={!a.paciente_id}
+                                >
+                                  <Send className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                               {a.repasse_pago && (
                                 <Button
                                   variant="ghost"
@@ -2311,7 +2331,7 @@ function Page() {
                               {a.repasse_pago || a.agendamento_status === "realizado" ? (
                                 <Button
                                   size="sm"
-                                  disabled={!podeEstornar || a.repasse_pago}
+                                  disabled={!podeEstornar || !podeEscrever || a.repasse_pago}
                                   className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
                                   title={
                                     a.repasse_pago
@@ -2325,47 +2345,55 @@ function Page() {
                                   <CheckCircle2 className="h-3 w-3" /> Baixado
                                 </Button>
                               ) : (
-                                <Button
-                                  size="sm"
-                                  className={cn(
-                                    "h-6 px-2 text-[10px] gap-1 border",
-                                    isSelected
-                                      ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
-                                      : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
-                                  )}
-                                  title="Dá baixa (marcar como realizado e liberar repasse)"
-                                  onClick={() => darBaixa(a)}
-                                >
-                                  {isSelected ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                                  Baixar
-                                </Button>
+                                podeEscrever && (
+                                  <Button
+                                    size="sm"
+                                    className={cn(
+                                      "h-6 px-2 text-[10px] gap-1 border",
+                                      isSelected
+                                        ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
+                                        : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
+                                    )}
+                                    title="Dá baixa (marcar como realizado e liberar repasse)"
+                                    onClick={() => darBaixa(a)}
+                                  >
+                                    {isSelected ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                                    Baixar
+                                  </Button>
+                                )
                               )}
                               {/* Botão de excluir para agenda */}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                title="Excluir"
-                                onClick={() => remove(a)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                              </Button>
+                              {podeEscrever && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Excluir"
+                                  onClick={() => remove(a)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              )}
                             </div>
                           ) : (
                             <div className="flex items-center justify-end gap-0.5">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                title="Emitir NFS-e"
-                                onClick={() => openEmitNfse(a)}
-                                disabled={!a.paciente_id}
-                              >
-                                <Send className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(a)}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
+                              {podeEscrever && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Emitir NFS-e"
+                                  onClick={() => openEmitNfse(a)}
+                                  disabled={!a.paciente_id}
+                                >
+                                  <Send className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              {podeEscrever && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(a)}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                               {a.repasse_pago && (
                                 <Button
                                   variant="ghost"
@@ -2380,7 +2408,7 @@ function Page() {
                               {a.repasse_pago || a.status === "realizado" ? (
                                 <Button
                                   size="sm"
-                                  disabled={!podeEstornar || a.repasse_pago}
+                                  disabled={!podeEstornar || !podeEscrever || a.repasse_pago}
                                   className="h-6 px-2 text-[10px] gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-100"
                                   title={
                                     a.repasse_pago
@@ -2394,24 +2422,28 @@ function Page() {
                                   <CheckCircle2 className="h-3 w-3" /> Baixado
                                 </Button>
                               ) : (
-                                <Button
-                                  size="sm"
-                                  className={cn(
-                                    "h-6 px-2 text-[10px] gap-1 border",
-                                    isSelected
-                                      ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
-                                      : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
-                                  )}
-                                  title="Dá baixa (marcar como realizado e liberar repasse)"
-                                  onClick={() => darBaixa(a)}
-                                >
-                                  {isSelected ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                                  Baixar
+                                podeEscrever && (
+                                  <Button
+                                    size="sm"
+                                    className={cn(
+                                      "h-6 px-2 text-[10px] gap-1 border",
+                                      isSelected
+                                        ? "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-600 hover:bg-amber-500"
+                                        : "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200",
+                                    )}
+                                    title="Dá baixa (marcar como realizado e liberar repasse)"
+                                    onClick={() => darBaixa(a)}
+                                  >
+                                    {isSelected ? <CheckCircle2 className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                                    Baixar
+                                  </Button>
+                                )
+                              )}
+                              {podeEscrever && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" onClick={() => remove(a)}>
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
                                 </Button>
                               )}
-                              <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" onClick={() => remove(a)}>
-                                <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                              </Button>
                             </div>
                           )}
                         </TableCell>
@@ -2446,15 +2478,17 @@ function Page() {
             )}
           </div>
           <div className="flex gap-2">
-            <Button
-              size="sm"
-              onClick={openPay}
-              disabled={!podePagar}
-              title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
-            >
-              <Wallet className="h-4 w-4 mr-2" />
-              Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length})` : ""}
-            </Button>
+            {podeEscrever && (
+              <Button
+                size="sm"
+                onClick={openPay}
+                disabled={!podePagar}
+                title={misturado ? "Selecione apenas atendimentos NÃO pagos" : undefined}
+              >
+                <Wallet className="h-4 w-4 mr-2" />
+                Pagar repasse{selectedNaoPagos.length ? ` (${selectedNaoPagos.length})` : ""}
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="outline">
@@ -2464,7 +2498,7 @@ function Page() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuItem
-                  disabled={selectedNaoBaixados.length === 0}
+                  disabled={selectedNaoBaixados.length === 0 || !podeEscrever}
                   onSelect={(e) => {
                     e.preventDefault();
                     if (selectedNaoBaixados.length > 0) darBaixaLote();
@@ -2475,7 +2509,7 @@ function Page() {
                   {selectedNaoBaixados.length ? ` (${selectedNaoBaixados.length})` : ""}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  disabled={selectedBaixados.length === 0 || !podeEstornar}
+                  disabled={selectedBaixados.length === 0 || !podeEstornar || !podeEscrever}
                   onSelect={(e) => {
                     e.preventDefault();
                     if (selectedBaixados.length > 0) desfazerBaixaLote();
@@ -2497,7 +2531,7 @@ function Page() {
                   {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  disabled={selectedLaudoElegiveis.length === 0}
+                  disabled={selectedLaudoElegiveis.length === 0 || !podeEscrever}
                   onSelect={(e) => {
                     e.preventDefault();
                     if (selectedLaudoElegiveis.length > 0) abrirLaudoLote();

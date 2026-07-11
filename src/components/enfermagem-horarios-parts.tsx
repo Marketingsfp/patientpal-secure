@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -52,6 +53,7 @@ export function useEnfermagemHorariosData() {
 }
 
 export function EnfermagemGerarAgendaCard() {
+  const podeEscrever = usePodeEscrever("disponibilidades");
   const { clinicaAtual, recursos, disps } = useEnfermagemHorariosData();
   const hojeIso = new Date().toISOString().slice(0, 10);
   const em30Iso = (() => { const d = new Date(); d.setDate(d.getDate() + 29); return d.toISOString().slice(0,10); })();
@@ -110,7 +112,7 @@ export function EnfermagemGerarAgendaCard() {
   }, [gerar, gerarDias, recursos, disps]);
 
   const gerarAgenda = async () => {
-    if (!clinicaAtual) return;
+    if (!clinicaAtual || !podeEscrever) return;
     if (slotsPreview.length === 0) { toast.error("Sem horários para gerar"); return; }
     if (!confirm(`Confirmar criação de ${slotsPreview.length} horários disponíveis?`)) return;
     setGerando(true);
@@ -187,10 +189,12 @@ export function EnfermagemGerarAgendaCard() {
               value={gerar.intervalo_min}
               onChange={(e) => setGerar({ ...gerar, intervalo_min: e.target.value })} />
           </div>
-          <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
-            <CalendarRange className="h-4 w-4 mr-1" />
-            {gerando ? "Gerando..." : `Gerar ${slotsPreview.length} slots`}
-          </Button>
+          {podeEscrever && (
+            <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
+              <CalendarRange className="h-4 w-4 mr-1" />
+              {gerando ? "Gerando..." : `Gerar ${slotsPreview.length} slots`}
+            </Button>
+          )}
         </div>
         <div>
           <label className="text-xs text-muted-foreground">Dias da semana</label>
@@ -220,6 +224,7 @@ export function EnfermagemGerarAgendaCard() {
 }
 
 export function EnfermagemRecursosHorariosEditor() {
+  const podeEscrever = usePodeEscrever("disponibilidades");
   const { recursos, disps, setDisps, reload } = useEnfermagemHorariosData();
   const [filtro, setFiltro] = useState("");
   const [editandoRecurso, setEditandoRecurso] = useState<string | null>(null);
@@ -236,6 +241,7 @@ export function EnfermagemRecursosHorariosEditor() {
     setNovoNome(nome);
   };
   const salvarNome = async () => {
+    if (!podeEscrever) return;
     const nome = novoNome.trim();
     if (!renomeandoId) return;
     if (!nome) { toast.error("Informe um nome"); return; }
@@ -250,6 +256,7 @@ export function EnfermagemRecursosHorariosEditor() {
   };
 
   const adicionar = async () => {
+    if (!podeEscrever) return;
     if (!novo.recurso_id) { toast.error("Selecione um recurso"); return; }
     const payload = {
       recurso_id: novo.recurso_id,
@@ -280,6 +287,7 @@ export function EnfermagemRecursosHorariosEditor() {
   };
 
   const remover = async (id: string) => {
+    if (!podeEscrever) return;
     const { error } = await supabase.from("enfermagem_recurso_disponibilidades").delete().eq("id", id);
     if (error) { mostrarErro(error); return; }
     setDisps((xs) => xs.filter((x) => x.id !== id));
@@ -390,13 +398,16 @@ export function EnfermagemRecursosHorariosEditor() {
         ) : (
           <>
             <h2 className="text-lg font-semibold">{r.nome}</h2>
-            <Button size="icon" variant="ghost" title="Renomear" onClick={() => iniciarRename(r.id, r.nome)}>
-              <Pencil className="h-4 w-4" />
-            </Button>
+            {podeEscrever && (
+              <Button size="icon" variant="ghost" title="Renomear" onClick={() => iniciarRename(r.id, r.nome)}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
           </>
         )}
         <span className="text-xs text-muted-foreground">· {ds.length} horário(s)</span>
       </div>
+      {podeEscrever && (
       <Card>
         <CardContent className="py-4 flex flex-wrap gap-2 items-end">
           <div>
@@ -433,6 +444,7 @@ export function EnfermagemRecursosHorariosEditor() {
           </Button>
         </CardContent>
       </Card>
+      )}
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -457,22 +469,26 @@ export function EnfermagemRecursosHorariosEditor() {
                   <TableCell>{d.limite_pacientes ?? "—"}</TableCell>
                   <TableCell>{d.intervalo_min ? `${d.intervalo_min} min` : "—"}</TableCell>
                   <TableCell className="text-right space-x-1">
-                    <Button size="icon" variant="ghost" onClick={() => {
-                      setDispEditando(d.id);
-                      setNovo({
-                        recurso_id: r.id,
-                        dia_semana: String(d.dia_semana),
-                        hora_inicio: d.hora_inicio.slice(0,5),
-                        hora_fim: d.hora_fim.slice(0,5),
-                        limite_pacientes: d.limite_pacientes ? String(d.limite_pacientes) : "",
-                        intervalo_min: d.intervalo_min ? String(d.intervalo_min) : "",
-                      });
-                    }}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={() => void remover(d.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {podeEscrever && (
+                      <>
+                        <Button size="icon" variant="ghost" onClick={() => {
+                          setDispEditando(d.id);
+                          setNovo({
+                            recurso_id: r.id,
+                            dia_semana: String(d.dia_semana),
+                            hora_inicio: d.hora_inicio.slice(0,5),
+                            hora_fim: d.hora_fim.slice(0,5),
+                            limite_pacientes: d.limite_pacientes ? String(d.limite_pacientes) : "",
+                            intervalo_min: d.intervalo_min ? String(d.intervalo_min) : "",
+                          });
+                        }}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => void remover(d.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

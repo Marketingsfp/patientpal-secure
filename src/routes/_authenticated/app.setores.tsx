@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Building2, Plus, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/setores")({
   component: SetoresPage,
@@ -23,6 +24,7 @@ interface Setor { id: string; nome: string; descricao: string | null; ativo: boo
 
 function SetoresPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("setores");
   const [rows, setRows] = useState<Setor[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -49,6 +51,7 @@ function SetoresPage() {
   function openEdit(s: Setor) { setEditing(s); setForm({ nome: s.nome, descricao: s.descricao ?? "", ativo: s.ativo }); setOpen(true); }
 
   async function salvar() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) { toast.error("Selecione uma clínica"); return; }
     if (!form.nome.trim()) { toast.error("Informe o nome"); return; }
     setSaving(true);
@@ -78,7 +81,7 @@ function SetoresPage() {
           <h1 className="text-xl font-bold">Setores</h1>
           <p className="text-sm text-muted-foreground">Departamentos da clínica.</p>
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>
+        {podeEscrever && <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>}
       </div>
 
       <Card className="p-3">
@@ -109,7 +112,7 @@ function SetoresPage() {
                 <TableCell className="text-sm text-muted-foreground">{r.descricao ?? "-"}</TableCell>
                 <TableCell><Badge variant={r.ativo ? "default" : "secondary"}>{r.ativo ? "Ativo" : "Inativo"}</Badge></TableCell>
                 <TableCell className="text-right">
-                  <Button size="icon" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
+                  {podeEscrever && <Button size="icon" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>}
                 </TableCell>
               </TableRow>
             ))}

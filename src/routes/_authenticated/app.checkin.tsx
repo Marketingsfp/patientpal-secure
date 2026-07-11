@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import {
   BadgeCheck,
   Search,
@@ -352,11 +353,13 @@ function PatientCard({
   index,
   onConfirm,
   isConfirming,
+  podeEscrever,
 }: {
   item: Item;
   index: number;
   onConfirm: (item: Item) => void;
   isConfirming: boolean;
+  podeEscrever: boolean;
 }) {
   const pendente = estaPendenteCheckin(item.fluxo_etapa);
 
@@ -404,14 +407,16 @@ function PatientCard({
       </div>
 
       {pendente ? (
-        <Button
-          onClick={() => onConfirm(item)}
-          disabled={isConfirming}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[180px] h-9"
-        >
-          {isConfirming ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BadgeCheck className="h-4 w-4 mr-2" />}
-          Confirmar presença
-        </Button>
+        podeEscrever && (
+          <Button
+            onClick={() => onConfirm(item)}
+            disabled={isConfirming}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[180px] h-9"
+          >
+            {isConfirming ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <BadgeCheck className="h-4 w-4 mr-2" />}
+            Confirmar presença
+          </Button>
+        )
       ) : (
         <Button variant="outline" disabled className="h-9">
           {etapaLabel(item.fluxo_etapa)}
@@ -443,6 +448,7 @@ function EmptyState() {
 // 5. CheckinPage - Componente principal
 function CheckinPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("checkin");
 
   const [data, setData] = useState(() => {
     const hoje = new Date();
@@ -606,6 +612,10 @@ function CheckinPage() {
   };
 
   const confirmarCheckin = async (item: Item) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (confirmandoId === item.id) return;
     setConfirmandoId(item.id);
 
@@ -730,6 +740,7 @@ function CheckinPage() {
               index={index}
               onConfirm={confirmarCheckin}
               isConfirming={confirmandoId === item.id}
+              podeEscrever={podeEscrever}
             />
           ))}
         </div>

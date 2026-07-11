@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { EncerrarExpedienteButton } from "@/components/medicos/EncerrarExpedienteButton";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
@@ -620,6 +621,7 @@ const EMPTY = {
 
 function AgendaPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("agenda");
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
   const [usuarioEhMedico, setUsuarioEhMedico] = useState(false);
   const corClinica = (() => {
@@ -775,6 +777,10 @@ function AgendaPage() {
     const sp = new URLSearchParams(window.location.search);
     if (sp.get("novo") !== "1") return;
     novoFromUrlConsumido.current = true;
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const pacIdParam = sp.get("novoPacId") || "";
     const pacNomeParam = sp.get("novoPacNome") || "";
     const telParam = sp.get("novoTelefone") || "";
@@ -820,6 +826,10 @@ function AgendaPage() {
   const [reagLoteIds, setReagLoteIds] = useState<string[] | null>(null);
 
   const iniciarReagendamento = (a: Agendamento) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (a.status === "realizado") {
       toast.error("Atendimento já realizado — peça ao financeiro para estornar antes de reagendar.");
       return;
@@ -830,6 +840,10 @@ function AgendaPage() {
   const cancelarReagendamento = () => setReagendandoAg(null);
 
   const confirmarReagendamentoNoSlot = async (slot: Agendamento) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const origem = reagendandoAg;
     if (!origem || reagSalvando) return;
     if (slot.id === origem.id) { toast.info("Esse já é o horário atual."); return; }
@@ -1043,6 +1057,10 @@ function AgendaPage() {
 
   const cadastrarPacienteRapido = async (e: FormEvent) => {
     e.preventDefault();
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaAtual) return;
     if (!novoPac.nome.trim()) { toast.error("Informe o nome"); return; }
     if (!novoPac.data_nascimento) { toast.error("Informe a data de nascimento"); return; }
@@ -1872,6 +1890,10 @@ function AgendaPage() {
 
   // Atualiza inline o procedimento de um agendamento (do badge na coluna Serviço)
   const atualizarProcedimento = async (ag: Agendamento, novoNome: string) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const nomeFinal = novoNome.trim();
     // Sentinela vazio: limpa o procedimento (volta ao padrão do médico).
     const limpar = nomeFinal === "";
@@ -1979,6 +2001,10 @@ function AgendaPage() {
   };
 
   const cobrarSelecionados = async () => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaAtual) return;
     const ids = Array.from(selecionados);
     const itens = items.filter(a => ids.includes(a.id));
@@ -2067,6 +2093,10 @@ function AgendaPage() {
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
 
   const baixarLoteRealizado = async () => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaAtual) return;
     const roleOk = usuarioEhMedico || ["admin", "gestor", "financeiro", "recepcao"].includes(
       (clinicaAtual?.role ?? "").toLowerCase(),
@@ -2107,6 +2137,10 @@ function AgendaPage() {
   };
 
   const reabrirAtendimento = async (a: Agendamento) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaAtual) return;
     const roleOk = ["admin", "gestor", "financeiro"].includes((clinicaAtual?.role ?? "").toLowerCase());
     if (!roleOk) { toast.error("Apenas admin/gestor/financeiro pode reabrir um atendimento."); return; }
@@ -2155,6 +2189,10 @@ function AgendaPage() {
   };
 
   const excluirSelecionados = async () => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaAtual) return;
     if (!isManager) { toast.error("Você não tem permissão para excluir horários."); return; }
     const ids = Array.from(selecionados);
@@ -2175,6 +2213,10 @@ function AgendaPage() {
 
   // === Reagendamento em lote: move vários agendamentos para outra agenda já aberta ===
   const abrirReagLote = () => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaAtual) return;
     if (!isManager) { toast.error("Apenas gestores podem reagendar em lote."); return; }
     const ids = Array.from(selecionados);
@@ -2205,6 +2247,10 @@ function AgendaPage() {
 
   // Confirma o reagendamento em lote ao clicar num slot DISPONÍVEL (a partir desse slot, ocupa os próximos N livres)
   const confirmarReagLoteNoSlot = async (slot: Agendamento) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaAtual) return;
     const ids = reagLoteIds ?? [];
     if (ids.length === 0 || reagLoteSalvando) return;
@@ -2312,6 +2358,10 @@ function AgendaPage() {
   const [pacienteCopia, setPacienteCopia] = useState<{ id: string; nome: string } | null>(null);
 
   const copiarPacienteSelecionado = () => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (selecionados.size !== 1) {
       toast.error("Selecione apenas 1 agendamento do paciente para copiar.");
       return;
@@ -2328,6 +2378,10 @@ function AgendaPage() {
   };
 
   const openNew = () => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     setEditing(null);
     const base = new Date(`${dataRef}T09:00:00`);
     const end = new Date(base.getTime() + 30 * 60000);
@@ -2534,6 +2588,10 @@ function AgendaPage() {
   //  - URL: /app/agenda?orc=123
   //  - postMessage: { type: 'agendar-orcamento', numero: 123 } (split view)
   const abrirNovoComOrcamento = (numero: number) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaAtual) return;
     const inicio = toLocalInput(new Date(`${dataRef}T09:00:00`).toISOString());
     const fim = toLocalInput(new Date(`${dataRef}T09:30:00`).toISOString());
@@ -2574,6 +2632,10 @@ function AgendaPage() {
   const openSlot = (a: Agendamento) => {
     if (reagendandoAg) { void confirmarReagendamentoNoSlot(a); return; }
     if (reagLoteIds) { void confirmarReagLoteNoSlot(a); return; }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     setEditing(a);
     setForm({
       paciente_nome: pacienteCopia?.nome ?? "",
@@ -2596,6 +2658,10 @@ function AgendaPage() {
   };
 
   const openEdit = async (a: Agendamento) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (reagendandoAg) { toast.error("Esse horário já está ocupado. Escolha um slot disponível."); return; }
     if (reagLoteIds) { toast.error("Esse horário já está ocupado. Escolha um slot DISPONÍVEL."); return; }
     setEditing(a);
@@ -2666,6 +2732,10 @@ function AgendaPage() {
 
   const submit = async (e: FormEvent, irParaPagamento = false) => {
     e.preventDefault();
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaAtual) return;
     if (editing && pagosSet.has(editing.id)) {
       toast.error("Agendamento já pago — somente visualização.");
@@ -2846,6 +2916,10 @@ function AgendaPage() {
   };
 
   const remove = async (a: Agendamento) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     // "Excluir" no menu (...) da linha NÃO apaga a ficha — apenas libera o horário
     // (remove o cliente e volta o slot para DISPONÍVEL). Para excluir o número da ficha,
     // selecione a linha e use "Excluir horários selecionados" no menu de Opções.
@@ -2871,6 +2945,10 @@ function AgendaPage() {
   };
 
   const mudarStatus = async (a: Agendamento, status: Status) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (status === "realizado" && !usuarioEhMedico) {
       // Atendentes do financeiro/recepção também podem baixar como realizado
       // (necessário p/ exames em que a casa executa e o médico apenas lauda,
@@ -2922,6 +3000,10 @@ function AgendaPage() {
   };
 
   const iniciarAtendimentoEnf = async (a: Agendamento) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const uid = (await supabase.auth.getUser()).data.user?.id;
     if (!uid) { toast.error("Sessão expirada"); return; }
     const { error } = await supabase
@@ -2938,6 +3020,10 @@ function AgendaPage() {
   };
 
   const concluirAtendimentoManual = async (a: Agendamento) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (a.status === "realizado") { toast.info("Atendimento já concluído."); return; }
     if (!confirm(`Concluir atendimento de ${a.paciente_nome}?\n\nO médico fará o prontuário em papel. O sistema registra a consulta como realizada e libera o repasse.`)) return;
     const uid = (await supabase.auth.getUser()).data.user?.id;
@@ -2985,6 +3071,10 @@ function AgendaPage() {
   };
 
   const cobrarAgendamento = async (a: Agendamento) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaAtual) return;
     if (pagosSet.has(a.id)) {
       toast.info("Este agendamento já foi pago.");
@@ -3245,6 +3335,10 @@ function AgendaPage() {
   };
 
   const confirmarPresenca = async (a: Agendamento) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     const { error } = await supabase
       .from("agendamentos")
       .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
@@ -3255,6 +3349,10 @@ function AgendaPage() {
   };
 
   const estornarCheckin = async (a: Agendamento) => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!window.confirm("Desfazer check-in deste paciente? Ele voltará para 'aguardando recepção'.")) return;
     const { error } = await supabase
       .from("agendamentos")
@@ -3381,6 +3479,10 @@ function AgendaPage() {
         toast.info(`NFS-e ${ex.numero ?? ""} — status: ${ex.status ?? "—"}. PDF ainda não disponível.`);
         navigate({ to: "/app/nfse" });
       }
+      return;
+    }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
     if (!pagosSet.has(a.id)) {
@@ -3663,6 +3765,7 @@ function AgendaPage() {
               <Clock className="h-3 w-3 mr-1.5" /> Criar/gerar horários
             </Link>
           </Button>
+          {podeEscrever && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" disabled={selecionados.size === 0}>
@@ -3701,6 +3804,7 @@ function AgendaPage() {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -3737,11 +3841,13 @@ function AgendaPage() {
             <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
+          {podeEscrever && (
           <DialogTrigger asChild>
             <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-7 text-[11px] px-2 bg-primary hover:bg-primary/90 text-primary-foreground">
               <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
+          )}
           <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
             <DialogHeader className="space-y-1 px-6 pt-5 pb-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
               <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900">
@@ -3834,11 +3940,13 @@ function AgendaPage() {
                       enableVoice
                     />
                   </div>
+                  {podeEscrever && (
                   <Button type="button" variant="outline" size="icon" title="Cadastrar novo paciente"
                     disabled={editing ? pagosSet.has(editing.id) : false}
                     onClick={() => { setNovoPac(p => ({ ...p, nome: form.paciente_nome })); setNovoPacOpen(true); }}>
                     <UserPlus className="h-4 w-4" />
                   </Button>
+                  )}
                 </div>
                 {editing && pagosSet.has(editing.id) && (
                   <p className="text-xs text-amber-600">
@@ -4940,6 +5048,7 @@ function AgendaPage() {
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Cliente</Label>
             <div className="flex gap-1">
               <Input data-quick-search value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Nome ou CPF…" />
+              {podeEscrever && (
               <Button
                 type="button"
                 variant="outline"
@@ -4953,6 +5062,7 @@ function AgendaPage() {
               >
                 <UserPlus className="h-3.5 w-3.5" />
               </Button>
+              )}
             </div>
           </div>
           <div className="space-y-0.5">
@@ -5249,7 +5359,7 @@ function AgendaPage() {
                       {(() => {
                         const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
                         const pendenteCheckin = ["aguardando_recepcao","recepcao"].includes(etapa);
-                        if (pagosSet.has(a.id) && pendenteCheckin) {
+                        if (pagosSet.has(a.id) && pendenteCheckin && podeEscrever) {
                           return (
                             <Button
                               variant="ghost"
@@ -5344,8 +5454,10 @@ function AgendaPage() {
                         <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        {podeEscrever && (
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
-                        {a.medico_id && recursoIds.has(a.medico_id) && !isSlotLivre(a.paciente_nome) && (
+                        )}
+                        {podeEscrever && a.medico_id && recursoIds.has(a.medico_id) && !isSlotLivre(a.paciente_nome) && (
                           <DropdownMenuItem
                             onClick={() => iniciarAtendimentoEnf(a)}
                             disabled={a.status === "realizado"}
@@ -5353,21 +5465,25 @@ function AgendaPage() {
                             <Play className="h-4 w-4 mr-2" /> Iniciar atendimento
                           </DropdownMenuItem>
                         )}
+                        {podeEscrever && (
                         <DropdownMenuItem
                           onClick={() => iniciarReagendamento(a)}
                           disabled={a.status === "realizado"}
                         >
                           <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
                         </DropdownMenuItem>
+                        )}
+                        {podeEscrever && (
                         <DropdownMenuItem onClick={() => cobrarAgendamento(a)}>
                           <DollarSign className="h-4 w-4 mr-2" /> Pagamento
                         </DropdownMenuItem>
-                        {!isSlotLivre(a.paciente_nome) && a.status !== "realizado" && (
+                        )}
+                        {podeEscrever && !isSlotLivre(a.paciente_nome) && a.status !== "realizado" && (
                           <DropdownMenuItem onClick={() => confirmarPresenca(a)}>
                             <BadgeCheck className="h-4 w-4 mr-2 text-emerald-600" /> Presente na clínica
                           </DropdownMenuItem>
                         )}
-                        {!isSlotLivre(a.paciente_nome) && a.status !== "realizado" && etapaMap.get(a.id) === "triagem" && (
+                        {podeEscrever && !isSlotLivre(a.paciente_nome) && a.status !== "realizado" && etapaMap.get(a.id) === "triagem" && (
                           <DropdownMenuItem onClick={() => estornarCheckin(a)}>
                             <Undo2 className="h-4 w-4 mr-2 text-amber-600" /> Estornar check-in
                           </DropdownMenuItem>
@@ -5384,7 +5500,7 @@ function AgendaPage() {
                         <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
                           <Printer className="h-4 w-4 mr-2" /> Comprovante de agendamento
                         </DropdownMenuItem>
-                        {!isSlotLivre(a.paciente_nome) && a.status !== "realizado" && (
+                        {podeEscrever && !isSlotLivre(a.paciente_nome) && a.status !== "realizado" && (
                           <DropdownMenuItem onClick={() => remove(a)}>
                             <UserMinus className="h-4 w-4 mr-2 text-amber-600" /> Desmarcar paciente
                           </DropdownMenuItem>
@@ -5409,21 +5525,27 @@ function AgendaPage() {
                         <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
                           <ShieldCheck className="h-4 w-4 mr-2" /> Auditoria
                         </DropdownMenuItem>
-                        {a.status === "realizado" && (
+                        {podeEscrever && a.status === "realizado" && (
                           <DropdownMenuItem onClick={() => reabrirAtendimento(a)}>
                             <Flag className="h-4 w-4 mr-2" /> Reabrir atendimento
                           </DropdownMenuItem>
                         )}
+                        {podeEscrever && (
                         <DropdownMenuSeparator />
-                        {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
+                        )}
+                        {podeEscrever && (Object.keys(STATUS_LABEL) as Status[]).map(s => (
                           <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
                             <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}
                           </DropdownMenuItem>
                         ))}
+                        {podeEscrever && (
                         <DropdownMenuSeparator />
+                        )}
+                        {podeEscrever && (
                         <DropdownMenuItem onClick={() => remove(a)} className="text-destructive">
                           <Trash2 className="h-4 w-4 mr-2" /> Excluir
                         </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                     </div>

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -51,6 +52,7 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 
 function Page() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("financeiro");
   const [items, setItems] = useState<Conta[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -78,6 +80,7 @@ function Page() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id, nome: form.nome.trim(), tipo: form.tipo as "banco" | "caixa" | "cartao" | "maquininha" | "outro",
@@ -94,6 +97,7 @@ function Page() {
   };
 
   const remove = async (c: Conta) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm(`Excluir "${c.nome}"?`)) return;
     const { error } = await supabase.from("fin_contas").update({ ativo: false }).eq("id", c.id);
     if (error) mostrarErro(error); else { toast.success("Removida"); await load(); }
@@ -105,7 +109,9 @@ function Page() {
         <div><h1 className="text-2xl font-semibold">Contas</h1>
           <p className="text-sm text-muted-foreground">Contas bancárias, caixa e cartões</p></div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Nova conta</Button></DialogTrigger>
+          {podeEscrever && (
+            <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Nova conta</Button></DialogTrigger>
+          )}
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Editar" : "Nova"} conta</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-4">
@@ -179,10 +185,12 @@ function Page() {
                     )}
                     {c.banco && <p className="text-sm text-muted-foreground mt-2">{c.banco} {c.agencia && `Ag. ${c.agencia}`} {c.conta && `Cc. ${c.conta}`}</p>}
                     <p className="text-sm mt-2">Saldo inicial: <strong>{fmt(Number(c.saldo_inicial))}</strong></p>
-                    <div className="mt-3 flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => remove(c)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                    </div>
+                    {podeEscrever && (
+                      <div className="mt-3 flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => remove(c)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>

@@ -4,6 +4,7 @@ import { ArrowLeft, Pencil, Users } from "lucide-react";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { ClienteForm, type Paciente } from "@/components/clientes/cliente-form";
 import { PacienteCartoesBeneficios } from "@/components/clientes/paciente-cartoes-beneficios";
@@ -18,6 +19,7 @@ function VisualizarClientePage() {
   const { pacienteId } = Route.useParams();
   const navigate = useNavigate();
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("clientes");
   const [paciente, setPaciente] = useState<(Paciente & { codigo_prontuario?: string | null }) | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -66,7 +68,7 @@ function VisualizarClientePage() {
             )}
           </div>
         </div>
-        {paciente && (
+        {paciente && podeEscrever && (
           <Button asChild size="sm">
             <Link to="/app/clientes/$pacienteId/editar" params={{ pacienteId: paciente.id }}>
               <Pencil className="h-4 w-4 mr-2" /> Editar

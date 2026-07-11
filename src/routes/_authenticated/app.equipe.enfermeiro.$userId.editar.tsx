@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { EnfermeiroFormDialog } from "@/components/funcionarios/EnfermeiroFormDialog";
 
 export const Route = createFileRoute("/_authenticated/app/equipe/enfermeiro/$userId/editar")({
@@ -13,11 +14,13 @@ export const Route = createFileRoute("/_authenticated/app/equipe/enfermeiro/$use
 function EditarEnfermeiroPage() {
   const { userId } = Route.useParams();
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("equipe");
   const navigate = useNavigate();
 
   const voltar = () => navigate({ to: "/app/equipe", search: { tab: "enfermagem" } });
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
+  if (!podeEscrever) return <p className="text-muted-foreground">Você não tem permissão de edição neste módulo.</p>;
 
   return (
     <div className="space-y-4">

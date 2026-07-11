@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +34,7 @@ const EMPTY = { nome: "", tipo: "despesa" as "receita" | "despesa", cor: "#13b5a
 
 function Page() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("financeiro");
   const [items, setItems] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -60,6 +62,7 @@ function Page() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
     const payload = { clinica_id: clinicaAtual.clinica_id, nome: form.nome.trim(), tipo: form.tipo, cor: form.cor };
     const { error } = editing
@@ -72,6 +75,7 @@ function Page() {
   };
 
   const remove = async (c: Categoria) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm(`Excluir "${c.nome}"?`)) return;
     const { error } = await supabase.from("fin_categorias").update({ ativo: false }).eq("id", c.id);
     if (error) mostrarErro(error); else { toast.success("Removida"); await load(); }
@@ -85,9 +89,11 @@ function Page() {
           <p className="text-sm text-muted-foreground">Classifique receitas e despesas</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Nova categoria</Button>
-          </DialogTrigger>
+          {podeEscrever && (
+            <DialogTrigger asChild>
+              <Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Nova categoria</Button>
+            </DialogTrigger>
+          )}
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Editar" : "Nova"} categoria</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-4">
@@ -126,8 +132,12 @@ function Page() {
                   <p className="font-medium truncate">{c.nome}</p>
                   <Badge variant={c.tipo === "receita" ? "default" : "secondary"}>{c.tipo}</Badge>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => remove(c)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                {podeEscrever && (
+                  <>
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => remove(c)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </>
+                )}
               </CardContent>
             </Card>
           ))}

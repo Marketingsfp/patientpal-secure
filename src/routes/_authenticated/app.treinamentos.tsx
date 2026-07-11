@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,7 @@ type Modulo = { id: string; curso_id: string; titulo: string; ordem: number };
 function TreinamentosPage() {
   const { user } = useAuth();
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("treinamentos");
   const clinicaId = clinicaAtual?.clinica_id;
 
   const [cursos, setCursos] = useState<Curso[]>([]);
@@ -68,6 +70,7 @@ function TreinamentosPage() {
   const cursoObj = cursos.find((c) => c.id === cursoSel);
 
   async function concluirLicao() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!licao || !user || !cursoSel) return;
     if (concluidas.has(licao.id)) return;
     const { error } = await supabase.from("lms_progresso").insert({
@@ -145,7 +148,7 @@ function TreinamentosPage() {
         <div className="flex items-center gap-3">
           <div className="w-48"><Progress value={progresso} /></div>
           <span className="text-sm text-muted-foreground">{progresso}%</span>
-          {progresso === 100 && (
+          {progresso === 100 && podeEscrever && (
             <Button onClick={emitirCertificado}><Award className="h-4 w-4 mr-1" /> Baixar certificado</Button>
           )}
         </div>
@@ -190,9 +193,11 @@ function TreinamentosPage() {
               {licao.conteudo && (
                 <div className="prose prose-sm max-w-none whitespace-pre-wrap">{licao.conteudo}</div>
               )}
-              <Button onClick={concluirLicao} disabled={concluidas.has(licao.id)}>
-                {concluidas.has(licao.id) ? "Concluída" : "Marcar como concluída"}
-              </Button>
+              {podeEscrever && (
+                <Button onClick={concluirLicao} disabled={concluidas.has(licao.id)}>
+                  {concluidas.has(licao.id) ? "Concluída" : "Marcar como concluída"}
+                </Button>
+              )}
             </div>
           )}
         </Card>

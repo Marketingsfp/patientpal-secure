@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,7 @@ const EMPTY = { nome: "", padrao_descricao: "", categoria_id: "", prioridade: "0
 
 function Page() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("financeiro");
   const [items, setItems] = useState<Regra[]>([]);
   const [cats, setCats] = useState<Cat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +60,7 @@ function Page() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id, nome: form.nome.trim(),
@@ -73,10 +76,12 @@ function Page() {
   };
 
   const toggle = async (r: Regra) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const { error } = await supabase.from("fin_regras_ia").update({ ativo: !r.ativo }).eq("id", r.id);
     if (error) mostrarErro(error); else await load();
   };
   const remove = async (r: Regra) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm(`Excluir "${r.nome}"?`)) return;
     const { error } = await supabase.from("fin_regras_ia").delete().eq("id", r.id);
     if (error) mostrarErro(error); else { toast.success("Removida"); await load(); }
@@ -89,7 +94,9 @@ function Page() {
         <div><h1 className="text-2xl font-semibold flex items-center gap-2"><Sparkles className="h-6 w-6 text-primary" />Regras de IA</h1>
           <p className="text-sm text-muted-foreground">Categorização automática de lançamentos por padrão</p></div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Nova regra</Button></DialogTrigger>
+          {podeEscrever && (
+            <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Nova regra</Button></DialogTrigger>
+          )}
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Editar" : "Nova"} regra</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-4">
@@ -126,9 +133,13 @@ function Page() {
               </div>
               {r.categoria_id && <Badge variant="secondary">{catMap.get(r.categoria_id)}</Badge>}
               <Badge variant="outline">Prio. {r.prioridade}</Badge>
-              <Button variant="ghost" size="sm" onClick={() => toggle(r)}>{r.ativo ? "Ativa" : "Inativa"}</Button>
-              <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="h-3.5 w-3.5" /></Button>
-              <Button variant="ghost" size="icon" onClick={() => remove(r)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+              {podeEscrever && (
+                <>
+                  <Button variant="ghost" size="sm" onClick={() => toggle(r)}>{r.ativo ? "Ativa" : "Inativa"}</Button>
+                  <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => remove(r)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                </>
+              )}
             </CardContent>
           </Card>))}</div>}
     </div>

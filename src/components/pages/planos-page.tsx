@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -34,6 +35,7 @@ type Plano = {
 
 export function PlanosPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("planos");
   const [list, setList] = useState<Plano[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Plano | null>(null);
@@ -54,7 +56,7 @@ export function PlanosPage() {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id]);
 
   const novo = async () => {
-    if (!clinicaAtual) return;
+    if (!clinicaAtual || !podeEscrever) return;
     const { data, error } = await supabase.from("planos_assinatura").insert({
       clinica_id: clinicaAtual.clinica_id,
       nome: "Novo plano",
@@ -70,6 +72,7 @@ export function PlanosPage() {
   };
 
   const salvar = async (p: Plano) => {
+    if (!podeEscrever) return;
     const { id, ...rest } = p;
     const { error } = await supabase.from("planos_assinatura").update(rest).eq("id", id);
     if (error) return mostrarErro(error);
@@ -79,6 +82,7 @@ export function PlanosPage() {
   };
 
   const excluir = async (id: string) => {
+    if (!podeEscrever) return;
     if (!confirm("Excluir este plano?")) return;
     const { error } = await supabase.from("planos_assinatura").delete().eq("id", id);
     if (error) return mostrarErro(error);
@@ -99,7 +103,7 @@ export function PlanosPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold flex items-center gap-2"><CreditCard className="h-6 w-6 text-primary"/>Planos de Assinatura</h1>
-        <Button onClick={novo}><Plus className="h-4 w-4 mr-2"/>Novo plano</Button>
+        {podeEscrever && <Button onClick={novo}><Plus className="h-4 w-4 mr-2"/>Novo plano</Button>}
       </div>
       <Card>
         <CardContent className="p-0">
@@ -129,8 +133,12 @@ export function PlanosPage() {
                   <TableCell>{p.num_parcelas}x</TableCell>
                   <TableCell>{p.vigencia_meses} meses</TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="ghost" onClick={() => setEditing(p)}><Pencil className="h-4 w-4"/></Button>
-                    <Button size="sm" variant="ghost" onClick={() => excluir(p.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                    {podeEscrever && (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => setEditing(p)}><Pencil className="h-4 w-4"/></Button>
+                        <Button size="sm" variant="ghost" onClick={() => excluir(p.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                      </>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -176,7 +184,7 @@ export function PlanosPage() {
           ) : null}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>Cancelar</Button>
-            {editing ? <Button onClick={() => salvar(editing)}><Save className="h-4 w-4 mr-1"/>Salvar</Button> : null}
+            {editing && podeEscrever ? <Button onClick={() => salvar(editing)}><Save className="h-4 w-4 mr-1"/>Salvar</Button> : null}
           </DialogFooter>
         </DialogContent>
       </Dialog>

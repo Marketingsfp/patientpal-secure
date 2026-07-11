@@ -5,6 +5,7 @@ import { FileText, Loader2, ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ interface Emitente {
 
 function TestarNfse() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("nfse");
   const emit = useServerFn(emitirNfse);
   const consulta = useServerFn(consultarNfse);
 
@@ -61,6 +63,7 @@ function TestarNfse() {
   }, [clinicaAtual?.clinica_id]); // eslint-disable-line
 
   const onEmitir = async () => {
+    if (!podeEscrever) return toast.error("Você não tem permissão de edição neste módulo.");
     if (!emitenteId) return toast.error("Selecione um emitente");
     if (!nome.trim()) return toast.error("Informe o nome do tomador");
     const cpfLimpo = (cpf || "").replace(/\D/g, "");
@@ -169,6 +172,7 @@ function TestarNfse() {
               onClick={onEmitir}
               disabled={
                 loading ||
+                !podeEscrever ||
                 !((cpf || "").replace(/\D/g, "").length === 11 || (cpf || "").replace(/\D/g, "").length === 14)
               }
             >

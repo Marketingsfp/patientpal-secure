@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -95,6 +96,7 @@ function anterior(e: Etapa, isExame: boolean): Etapa | null {
 
 function FluxoPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("fluxo");
   const [ags, setAgs] = useState<Ag[]>([]);
   const [loading, setLoading] = useState(false);
   const [dataRef, setDataRef] = useState(() => {
@@ -177,6 +179,7 @@ function FluxoPage() {
   }, [carregar, clinicaAtual]);
 
   async function setEtapa(id: string, etapa: Etapa) {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const { error } = await supabase
       .from("agendamentos")
       .update({ fluxo_etapa: etapa, fluxo_atualizado_em: new Date().toISOString() } as never)
@@ -189,6 +192,7 @@ function FluxoPage() {
   }
 
   async function ciclarPrioridade(a: Ag) {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const atual = a.prioridade ?? "normal";
     const prox = atual === "normal" ? "prioritario" : atual === "prioritario" ? "urgente" : "normal";
     const { error } = await supabase
@@ -204,6 +208,7 @@ function FluxoPage() {
 
   async function chamarPaciente(a: Ag) {
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!consultorio.trim()) {
       toast.error("Defina o consultório (botão de configuração no topo)");
       return;

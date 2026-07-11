@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/mkt-landing")({
   component: LandingPagesAdminWithTabs,
@@ -24,6 +25,7 @@ interface Form {
 }
 
 function LandingPagesAdmin() {
+  const podeEscrever = usePodeEscrever("mkt-landing");
   return (
     <SimpleCrud<Row, Form>
       table="mkt_landing_pages"
@@ -32,6 +34,7 @@ function LandingPagesAdmin() {
       subtitle="Páginas públicas de captura de leads."
       icon={<Sparkles className="h-6 w-6 text-primary" />}
       searchFields={["titulo", "slug"]}
+      readOnly={!podeEscrever}
       columns={[
         { key: "titulo", header: "Título", render: r => <span className="font-medium">{r.titulo}</span> },
         { key: "slug", header: "URL", render: r => (

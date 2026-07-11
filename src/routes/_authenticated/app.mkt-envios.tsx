@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/mkt-envios")({
   component: EnviosPageWithTabs,
@@ -21,6 +22,7 @@ const cor: Record<string, string> = {
 };
 
 function EnviosPage() {
+  const podeEscrever = usePodeEscrever("mkt-envios");
   return (
     <SimpleCrud<Row, Form>
       table="mkt_envios"
@@ -29,6 +31,7 @@ function EnviosPage() {
       subtitle="Histórico de mensagens disparadas."
       icon={<Send className="h-6 w-6 text-primary" />}
       searchFields={["destinatario"]}
+      readOnly={!podeEscrever}
       columns={[
         { key: "dest", header: "Destinatário", render: r => <span className="font-medium">{r.destinatario}</span> },
         { key: "canal", header: "Canal", className: "w-24", render: r => <span className="capitalize text-sm">{r.canal}</span> },

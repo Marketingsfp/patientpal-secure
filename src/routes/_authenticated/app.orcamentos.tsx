@@ -6,6 +6,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -204,6 +205,7 @@ const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", curren
 function OrcamentosPage() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const podeEscrever = usePodeEscrever("orcamentos");
   const navigate = useNavigate();
   const [list, setList] = useState<Orc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -334,6 +336,7 @@ function OrcamentosPage() {
   };
 
   const remover = async (id: string) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm("Excluir este orçamento?")) return;
     const { error } = await supabase.from("orcamentos").delete().eq("id", id);
     if (error) return mostrarErro(error);
@@ -369,7 +372,9 @@ function OrcamentosPage() {
           <Button variant="outline" onClick={exportarCsv} className="gap-2" title="Exportar relatório CSV">
             <Download className="h-4 w-4" /> Exportar
           </Button>
-          <Button onClick={() => setOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Novo orçamento</Button>
+          {podeEscrever && (
+            <Button onClick={() => setOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Novo orçamento</Button>
+          )}
         </div>
       </div>
 
@@ -520,21 +525,25 @@ function OrcamentosPage() {
                     >
                       <Calendar className="h-4 w-4 text-emerald-600" />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setConversaoId(o.id)}
-                      title="Converter itens (vender, agendar, cancelar, NFS-e)"
-                    >
-                      <Workflow className="h-4 w-4 text-primary" />
-                    </Button>
+                    {podeEscrever && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setConversaoId(o.id)}
+                        title="Converter itens (vender, agendar, cancelar, NFS-e)"
+                      >
+                        <Workflow className="h-4 w-4 text-primary" />
+                      </Button>
+                    )}
                     <Button size="sm" variant="ghost" onClick={() => imprimir(o.id)} title="Imprimir"><Printer className="h-4 w-4" /></Button>
                     {podeVerHistorico && (
                       <Button size="sm" variant="ghost" onClick={() => setHistoricoId(o.id)} title="Histórico">
                         <History className="h-4 w-4 text-muted-foreground" />
                       </Button>
                     )}
-                    <Button size="sm" variant="ghost" onClick={() => remover(o.id)} title="Excluir"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    {podeEscrever && (
+                      <Button size="sm" variant="ghost" onClick={() => remover(o.id)} title="Excluir"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    )}
                   </div>
                 </td>
               </tr>

@@ -24,6 +24,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -131,6 +132,11 @@ type Mens = {
   forma_pagamento: string | null;
   taxa_adesao?: number | null;
 };
+
+const isAdesao = (m: Pick<Mens, "numero_parcela">) => Number(m.numero_parcela) === 0;
+
+const cobrancaLabel = (m: Pick<Mens, "numero_parcela">) =>
+  isAdesao(m) ? "Adesão" : `Mensalidade ${m.numero_parcela}`;
 type Dep = {
   id: string;
   paciente_id: string;
@@ -146,6 +152,7 @@ type Dep = {
 export function ContratosPage({ initialContratoId }: { initialContratoId?: string } = {}) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const podeEscrever = usePodeEscrever("contratos");
   const [list, setList] = useState<Contrato[]>([]);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   // Map criado_por (uuid) → nome do vendedor. Preenchido em load().
@@ -286,10 +293,12 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
           <FileSignature className="h-6 w-6 text-primary" />
           Contratos
         </h1>
-        <Button onClick={() => setView("new")} disabled={convenios.length === 0}>
-          <Plus className="h-4 w-4 mr-2" />
-          Vendas
-        </Button>
+        {podeEscrever && (
+          <Button onClick={() => setView("new")} disabled={convenios.length === 0}>
+            <Plus className="h-4 w-4 mr-2" />
+            Vendas
+          </Button>
+        )}
       </div>
       {convenios.length === 0 && !loading ? (
         <div className="rounded-md border bg-muted/40 p-3 text-sm">
@@ -418,6 +427,7 @@ function NovoContratoForm({
   userId: string | null;
   onCreated: (contratoId: string) => void;
 }) {
+  const podeEscrever = usePodeEscrever("contratos");
   const [convenioId, setConvenioId] = useState(convenios[0]?.id ?? "");
   const convenio = convenios.find((c) => c.id === convenioId);
   const [faixas, setFaixas] = useState<Faixa[]>([]);
@@ -586,6 +596,7 @@ function NovoContratoForm({
   };
 
   const salvar = async () => {
+    if (!podeEscrever) return toast.error("Você não tem permissão de edição neste módulo.");
     if (!titular || !convenio) return toast.error("Selecione paciente e convênio");
     if (titularContratoAtivo !== null) {
       return toast.error(
@@ -659,9 +670,11 @@ function NovoContratoForm({
       }
     }
 
-    // Gerar 12 parcelas
+    // Gerar cobrancas: taxa de adesao separada da mensalidade.
     const base = new Date(dataInicio + "T00:00:00");
     const valorParcela = valor + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
+    const primeiraData = new Date(base.getFullYear(), base.getMonth(), diaVenc);
+    const primeiraVencimento = primeiraData.toISOString().slice(0, 10);
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
       const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
       const jaPago = i < mensalidadesJaPagas;
@@ -680,13 +693,28 @@ function NovoContratoForm({
         ...(jaPago ? { pago_em: vencStr, valor_pago: valorParcela } : {}),
       };
     });
-    const { error: mensErr } = await supabase.from("contrato_mensalidades").insert(parcelas);
+    const taxaAdesao = Number(taxa) || 0;
+    const cobrancas = taxaAdesao > 0 && mensalidadesJaPagas === 0
+      ? [
+          {
+            contrato_id: contrato.id,
+            clinica_id: clinicaId,
+            numero_parcela: 0,
+            vencimento: primeiraVencimento,
+            valor: taxaAdesao,
+            status: "pendente",
+            observacoes: "Taxa de adesao cobrada somente na primeira mensalidade.",
+          },
+          ...parcelas,
+        ]
+      : parcelas;
+    const { error: mensErr } = await supabase.from("contrato_mensalidades").insert(cobrancas);
     if (mensErr) {
       toast.error(`Contrato #${contrato.numero} criado, mas as mensalidades não foram geradas: ${mensErr.message}`);
     }
 
     setSaving(false);
-    toast.success(`Contrato #${contrato.numero} criado com ${convenio.num_parcelas} mensalidades`);
+    toast.success(`Contrato #${contrato.numero} criado com ${convenio.num_parcelas} mensalidades${taxaAdesao > 0 && mensalidadesJaPagas === 0 ? " e taxa de adesao separada" : ""}`);
 
     // Pós-criação: gerar carnê ou boletos com timeout de 15s (não trava UI)
     const withTimeout = <T,>(p: Promise<T>, ms: number) =>
@@ -810,19 +838,23 @@ function NovoContratoForm({
                       ) : null}
                     </span>
                     <div className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setEditarPaciente({ alvo: "titular" })}
-                        title="Editar e-mail e telefone"
-                      >
-                        <Pencil className="h-3 w-3 mr-1" />
-                        Editar
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setFaceOpen("titular")}>
-                        <Camera className="h-3 w-3 mr-1" />
-                        {titular.face_descriptor?.length ? "Refazer foto" : "Tirar foto"}
-                      </Button>
+                      {podeEscrever && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditarPaciente({ alvo: "titular" })}
+                          title="Editar e-mail e telefone"
+                        >
+                          <Pencil className="h-3 w-3 mr-1" />
+                          Editar
+                        </Button>
+                      )}
+                      {podeEscrever && (
+                        <Button size="sm" variant="outline" onClick={() => setFaceOpen("titular")}>
+                          <Camera className="h-3 w-3 mr-1" />
+                          {titular.face_descriptor?.length ? "Refazer foto" : "Tirar foto"}
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => setTitular(null)}>
                         Trocar
                       </Button>
@@ -1040,19 +1072,23 @@ function NovoContratoForm({
                         </SelectContent>
                       </Select>
                       <div className="col-span-6 sm:col-span-2 text-xs text-muted-foreground self-center">Dependente</div>
-                      <Button size="sm" variant="outline" className="col-span-6 sm:col-span-2 h-8" onClick={() => setFaceOpen(i)}>
-                        <Camera className="h-3 w-3 mr-1" />
-                        {d.face_descriptor?.length ? "Refazer" : "Foto"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="col-span-3 sm:col-span-1 h-8 px-0"
-                        onClick={() => setEditarPaciente({ alvo: i })}
-                        title="Editar e-mail e telefone"
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
+                      {podeEscrever && (
+                        <Button size="sm" variant="outline" className="col-span-6 sm:col-span-2 h-8" onClick={() => setFaceOpen(i)}>
+                          <Camera className="h-3 w-3 mr-1" />
+                          {d.face_descriptor?.length ? "Refazer" : "Foto"}
+                        </Button>
+                      )}
+                      {podeEscrever && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="col-span-3 sm:col-span-1 h-8 px-0"
+                          onClick={() => setEditarPaciente({ alvo: i })}
+                          title="Editar e-mail e telefone"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -1089,7 +1125,7 @@ function NovoContratoForm({
             </Button>
             <Button
               onClick={salvar}
-              disabled={!podeSalvar}
+              disabled={!podeSalvar || !podeEscrever}
               title={
                 titularContratoAtivo !== null
                   ? `Titular já possui contrato ativo #${titularContratoAtivo}`
@@ -1121,6 +1157,7 @@ function NovoContratoForm({
                   : `Foto — ${deps[faceOpen as number]?.nome ?? "Dependente"}`
               }
               onCaptured={async (descriptor) => {
+                if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
                 const isTitular = faceOpen === "titular";
                 const idx = typeof faceOpen === "number" ? faceOpen : -1;
                 const alvoId = isTitular ? titular!.id : deps[idx].id;
@@ -1209,6 +1246,7 @@ function DetalheContrato({
 }) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const podeEscrever = usePodeEscrever("contratos");
   const DadosField = ({ label, value }: { label: string; value: React.ReactNode }) => (
     <div className="space-y-1">
       <div className="text-sm font-medium">{label}</div>
@@ -1322,6 +1360,7 @@ function DetalheContrato({
   }, [isAdmin, contrato.id]);
 
   const salvarContratoAdmin = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const taxa = Number(String(admTaxaAdesao).replace(",", "."));
     if (!admConvenioId) {
       toast.error("Selecione um convênio");
@@ -1376,7 +1415,7 @@ function DetalheContrato({
       (contrato as any).valor_mensal = novoValorMensal;
       setValorMensalAtual(novoValorMensal);
       // Recalcula parcelas em aberto para o novo valor
-      const abertas = mens.filter((m) => m.status !== "pago");
+      const abertas = mens.filter((m) => !isAdesao(m) && m.status !== "pago");
       if (abertas.length > 0) {
         await Promise.all(
           abertas.map((m) => {
@@ -1405,6 +1444,7 @@ function DetalheContrato({
 
   // Regenera as 12 parcelas a partir da nova data de início; as N primeiras entram como pagas.
   const regerarComPagas = async (n: number) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!retroDialog) return;
     const iniStr = retroDialog.dataInicio;
     if (!iniStr) return;
@@ -1417,7 +1457,8 @@ function DetalheContrato({
       .from("contrato_mensalidades")
       .delete()
       .eq("contrato_id", contrato.id)
-      .eq("status", "pendente");
+      .eq("status", "pendente")
+      .neq("numero_parcela", 0);
     if (delErr) {
       setRegerandoRetro(false);
       return mostrarErro(delErr);
@@ -1427,6 +1468,7 @@ function DetalheContrato({
       .from("contrato_mensalidades")
       .select("numero_parcela")
       .eq("contrato_id", contrato.id)
+      .neq("numero_parcela", 0)
       .order("numero_parcela", { ascending: false })
       .limit(1);
     let prox = ((maxRow?.[0]?.numero_parcela ?? 0) as number) + 1;
@@ -1470,6 +1512,7 @@ function DetalheContrato({
     id: string,
     patch: Partial<{ vencimento: string; valor: number | string }>,
   ) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const payload: any = { ...patch };
     if (payload.valor !== undefined) payload.valor = Number(String(payload.valor).replace(",", "."));
     const { error } = await supabase.from("contrato_mensalidades").update(payload).eq("id", id);
@@ -1481,7 +1524,8 @@ function DetalheContrato({
     );
   };
   const adicionarParcela = async () => {
-    const prox = mens.reduce((mx, m) => Math.max(mx, Number(m.numero_parcela) || 0), 0) + 1;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    const prox = mensalidades.reduce((mx, m) => Math.max(mx, Number(m.numero_parcela) || 0), 0) + 1;
     const hoje = new Date().toISOString().slice(0, 10);
     const { error } = await supabase.from("contrato_mensalidades").insert({
       contrato_id: contrato.id,
@@ -1496,6 +1540,7 @@ function DetalheContrato({
     await load();
   };
   const excluirParcela = async (id: string) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm("Excluir esta parcela? Essa ação não pode ser desfeita.")) return;
     const { error } = await supabase.from("contrato_mensalidades").delete().eq("id", id);
     if (error) return mostrarErro(error);
@@ -1504,6 +1549,7 @@ function DetalheContrato({
   };
 
   const salvarDadosFinanceiros = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const v = Number(String(editValor).replace(",", "."));
     const dia = Math.max(1, Math.min(31, Number(editDia) || 0));
     if (!Number.isFinite(v) || v < 0) {
@@ -1536,12 +1582,14 @@ function DetalheContrato({
         .delete()
         .eq("contrato_id", contrato.id)
         .eq("status", "pendente")
+        .neq("numero_parcela", 0)
         .gt("vencimento", hoje);
       // próximo número
       const { data: maxRow } = await supabase
         .from("contrato_mensalidades")
         .select("numero_parcela")
         .eq("contrato_id", contrato.id)
+        .neq("numero_parcela", 0)
         .order("numero_parcela", { ascending: false })
         .limit(1);
       let prox = ((maxRow?.[0]?.numero_parcela ?? 0) as number) + 1;
@@ -1576,6 +1624,7 @@ function DetalheContrato({
   };
 
   const confirmarCancelamento = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const motivo = cancelMotivo.trim();
     if (!motivo) {
       toast.error("Informe o motivo do cancelamento");
@@ -1721,6 +1770,7 @@ function DetalheContrato({
   // Busca de pacientes agora é feita sob demanda pelo PatientSearchInput.
 
   const marcarPago = async (id: string, paga: boolean, forma?: string | null) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const patch = paga
       ? {
           status: "pago",
@@ -1799,11 +1849,12 @@ function DetalheContrato({
     toast.success("Link de assinatura copiado");
   };
 
-  const pagas = mens.filter((m) => m.status === "pago").length;
+  const mensalidades = mens.filter((m) => !isAdesao(m));
+  const pagas = mensalidades.filter((m) => m.status === "pago").length;
   const totalPagoMens = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
   const totalPago = totalPagoMens + extraRecebido.total;
   const pagasTotal = pagas + extraRecebido.count;
-  const totalParcelas = mens.length + extraRecebido.count;
+  const totalParcelas = mensalidades.length + extraRecebido.count;
   const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
 
   // ---- Dados da venda (aba "Dados") ----
@@ -1927,6 +1978,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
 
   // Recalcula o valor das parcelas em aberto conforme a faixa de vidas do convênio
   const recalcularParcelasAbertas = async (totalVidas: number) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!faixas.length) return;
     const elegiveis = faixas.filter(
       (fx) => totalVidas >= fx.vidas_de && (fx.vidas_ate == null || totalVidas <= fx.vidas_ate),
@@ -1940,7 +1992,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
       // Reflete imediatamente no objeto recebido por prop, para textos derivados
       (contrato as any).valor_mensal = novoValor;
     }
-    const abertas = mens.filter((m) => m.status !== "pago");
+    const abertas = mens.filter((m) => !isAdesao(m) && m.status !== "pago");
     if (abertas.length === 0) return;
     await Promise.all(
       abertas.map((m) => {
@@ -1953,6 +2005,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
   };
 
   const confirmarIncluir = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!incPaciente) {
       toast.error("Selecione um paciente");
       return;
@@ -2015,6 +2068,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
   };
 
   const confirmarExcluir = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!excAlvo) return;
     const hoje = new Date().toISOString().slice(0, 10);
     const { error } = await supabase
@@ -2093,7 +2147,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
           Contrato #{contrato.numero} — {contrato.paciente_nome}
         </h1>
         <div>
-          {!cancelado ? (
+          {!cancelado && podeEscrever ? (
             <Button size="sm" variant="destructive" onClick={() => setCancelOpen(true)}>
               <Ban className="h-4 w-4 mr-1" /> Cancelar contrato
             </Button>
@@ -2221,7 +2275,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="font-semibold text-sm">Mensalidades</h3>
-                  {isAdmin ? (
+                  {isAdmin && podeEscrever ? (
                     <Button size="sm" variant="outline" onClick={adicionarParcela}>
                       <Plus className="h-3 w-3 mr-1" /> Adicionar parcela
                     </Button>
@@ -2231,7 +2285,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>#</TableHead>
+                        <TableHead>Cobrança</TableHead>
                         <TableHead>Vencimento</TableHead>
                         <TableHead>Valor</TableHead>
                         <TableHead>Status</TableHead>
@@ -2249,9 +2303,15 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       ) : null}
                       {mens.map((m) => (
                         <TableRow key={m.id}>
-                          <TableCell>{m.numero_parcela}</TableCell>
                           <TableCell>
-                            {isAdmin ? (
+                            {isAdesao(m) ? (
+                              <Badge variant="secondary">Adesão</Badge>
+                            ) : (
+                              m.numero_parcela
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {isAdmin && podeEscrever ? (
                               <Input
                                 type="date"
                                 className="h-8 w-40"
@@ -2266,7 +2326,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                             )}
                           </TableCell>
                           <TableCell>
-                            {isAdmin ? (
+                            {isAdmin && podeEscrever ? (
                               <Input
                                 type="number"
                                 step="0.01"
@@ -2302,7 +2362,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           <TableCell>{fmtD(m.pago_em)}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1 justify-end">
-                              {m.status === "pago" ? (
+                              {podeEscrever && (m.status === "pago" ? (
                                 <Button size="sm" variant="outline" onClick={() => marcarPago(m.id, false)}>
                                   Reverter
                                 </Button>
@@ -2311,8 +2371,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                   <Check className="h-3 w-3 mr-1" />
                                   Pagar
                                 </Button>
-                              )}
-                              {isAdmin ? (
+                              ))}
+                              {isAdmin && podeEscrever ? (
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -2332,13 +2392,13 @@ h1, h2, h3 { margin: 0 0 6mm; }
               </div>
             </TabsContent>
             <TabsContent value="dados" className="mt-4 space-y-4">
-              {isAdmin ? (
+              {isAdmin && podeEscrever ? (
                 <div className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-primary">
                   Modo administrador — você pode alterar todos os campos deste contrato. Alterações não regeram parcelas
                   automaticamente; use a opção “Regerar 12 parcelas futuras” abaixo quando quiser propagar o novo valor.
                 </div>
               ) : null}
-              {isAdmin ? (
+              {isAdmin && podeEscrever ? (
                 <div className="space-y-1">
                   <Label>Convênio</Label>
                   <Select value={admConvenioId} onValueChange={setAdmConvenioId}>
@@ -2357,7 +2417,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
               ) : (
                 <DadosField label="Convênio" value={convenio?.nome ?? "—"} />
               )}
-              {isAdmin && faixas.length > 0 ? (
+              {isAdmin && podeEscrever && faixas.length > 0 ? (
                 <div className="space-y-1">
                   <Label>Nº de pessoas no contrato</Label>
                   <Select value={admFaixaId} onValueChange={setAdmFaixaId}>
@@ -2387,7 +2447,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
               ) : (
                 <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
               )}
-              {isAdmin ? (
+              {isAdmin && podeEscrever ? (
                 <div className="space-y-1">
                   <Label>Paciente titular</Label>
                   <PatientSearchInput
@@ -2403,7 +2463,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 />
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {isAdmin ? (
+                {isAdmin && podeEscrever ? (
                   <div className="space-y-1">
                     <div className="text-xs text-muted-foreground">Data início</div>
                     <Input
@@ -2423,7 +2483,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     max={31}
                     value={editDia}
                     onChange={(e) => setEditDia(e.target.value)}
-                    disabled={(cancelado && !isAdmin) || savingDados}
+                    disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
                   />
                 </div>
                 <div className="space-y-1">
@@ -2434,10 +2494,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     min={0}
                     value={editValor}
                     onChange={(e) => setEditValor(e.target.value)}
-                    disabled={(cancelado && !isAdmin) || savingDados}
+                    disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
                   />
                 </div>
-                {isAdmin ? (
+                {isAdmin && podeEscrever ? (
                   <div className="space-y-1">
                     <div className="text-xs text-muted-foreground">Taxa de adesão (R$)</div>
                     <Input
@@ -2464,13 +2524,13 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <Button
                   size="sm"
                   onClick={salvarDadosFinanceiros}
-                  disabled={(cancelado && !isAdmin) || savingDados}
+                  disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
                   className="ml-auto"
                 >
                   {savingDados ? "Salvando…" : "Salvar valor e vencimento"}
                 </Button>
               </div>
-              {isAdmin ? (
+              {isAdmin && podeEscrever ? (
                 <div className="space-y-1">
                   <Label>Forma de pagamento</Label>
                   <Select value={admForma || "__none__"} onValueChange={(v) => setAdmForma(v === "__none__" ? "" : v)}>
@@ -2497,26 +2557,30 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     Dependentes ({depsAtivos.length}/{maxDep})
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={async () => {
-                        await recalcularParcelasAbertas(totalVidasAtual);
-                        await load();
-                      }}
-                      disabled={cancelado}
-                      title="Recalcula o valor mensal das parcelas em aberto conforme a quantidade atual de vidas (titular + dependentes ativos)"
-                    >
-                      <RefreshCw className="h-4 w-4 mr-1" /> Atualizar contrato
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setIncOpen(true)}
-                      disabled={cancelado || maxDep === 0 || depsAtivos.length >= maxDep}
-                    >
-                      <Plus className="h-4 w-4 mr-1" /> Incluir dependente
-                    </Button>
+                    {podeEscrever && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={async () => {
+                          await recalcularParcelasAbertas(totalVidasAtual);
+                          await load();
+                        }}
+                        disabled={cancelado}
+                        title="Recalcula o valor mensal das parcelas em aberto conforme a quantidade atual de vidas (titular + dependentes ativos)"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-1" /> Atualizar contrato
+                      </Button>
+                    )}
+                    {podeEscrever && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIncOpen(true)}
+                        disabled={cancelado || maxDep === 0 || depsAtivos.length >= maxDep}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Incluir dependente
+                      </Button>
+                    )}
                   </div>
                 </div>
                 <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
@@ -2540,7 +2604,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                               <span className="text-destructive no-underline"> — Excluído: {fmtD(d.excluido_em)}</span>
                             ) : null}
                           </div>
-                          {d.ativo ? (
+                          {d.ativo && podeEscrever ? (
                             <Button size="sm" variant="ghost" disabled={cancelado} onClick={() => setExcAlvo(d)}>
                               <Trash2 className="h-3 w-3 text-destructive" />
                             </Button>
@@ -2551,7 +2615,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   )}
                 </div>
               </div>
-              {isAdmin ? (
+              {isAdmin && podeEscrever ? (
                 <div className="space-y-1">
                   <Label>Observações</Label>
                   <Textarea
@@ -2564,7 +2628,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
               ) : contrato.observacoes ? (
                 <DadosField label="Observações" value={contrato.observacoes} />
               ) : null}
-              {isAdmin ? (
+              {isAdmin && podeEscrever ? (
                 <div className="flex justify-end pt-2">
                   <Button onClick={salvarContratoAdmin} disabled={savingAdm}>
                     {savingAdm ? (
@@ -2695,7 +2759,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
           </DialogHeader>
           <p className="text-sm text-muted-foreground -mt-2">
             {contrato.paciente_nome} — Contrato #{contrato.numero}
-            {pagMens ? ` · Parcela ${pagMens.numero_parcela}/${mens.length}` : ""}
+            {pagMens ? ` · ${cobrancaLabel(pagMens)}${isAdesao(pagMens) ? "" : `/${mensalidades.length}`}` : ""}
             <span className="block text-xs mt-1 opacity-70">
               Dica: use as teclas 1–{formaOpcoes.length + 1} para escolher rapidamente.
             </span>
@@ -2778,12 +2842,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
         tipo="receita"
         initialDescricao={
           pagMens
-            ? `Mensalidade ${pagMens.numero_parcela}/${mens.length} — Contrato #${contrato.numero} — ${contrato.paciente_nome}`
+            ? `${isAdesao(pagMens) ? "Taxa de adesao" : `Mensalidade ${pagMens.numero_parcela}/${mensalidades.length}`} - Contrato #${contrato.numero} - ${contrato.paciente_nome}`
             : ""
         }
         initialValor={pagMens ? pagValorFinal.toFixed(2) : ""}
         initialFormaPagamento={pagInitialForma}
-        categoriaFixaNome="MENSALIDADE CARTAO CONSULTA"
+        categoriaFixaNome={pagMens && isAdesao(pagMens) ? "ADESAO CARTAO CONSULTA" : "MENSALIDADE CARTAO CONSULTA"}
         onSavedWithData={async (dados) => {
           if (!pagMens || !clinicaAtual) return;
           const mensId = pagMens.id;
@@ -2974,7 +3038,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
             <Button variant="ghost" onClick={() => setIncOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={confirmarIncluir} disabled={incSaving || !incPaciente}>
+            <Button onClick={confirmarIncluir} disabled={incSaving || !incPaciente || !podeEscrever}>
               {incSaving ? "Incluindo…" : "Incluir"}
             </Button>
           </DialogFooter>
@@ -3003,7 +3067,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
             <Button variant="ghost" onClick={() => setExcAlvo(null)}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={confirmarExcluir}>
+            <Button variant="destructive" onClick={confirmarExcluir} disabled={!podeEscrever}>
               Excluir
             </Button>
           </DialogFooter>
@@ -3069,7 +3133,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
             <Button
               variant="destructive"
               onClick={confirmarCancelamento}
-              disabled={cancelSaving || !cancelMotivo.trim()}
+              disabled={cancelSaving || !cancelMotivo.trim() || !podeEscrever}
             >
               {cancelSaving ? "Cancelando…" : "Confirmar cancelamento"}
             </Button>
@@ -3111,7 +3175,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
             </Button>
             <Button
               onClick={() => regerarComPagas(Number(retroDialog?.parcelasPagas ?? 0))}
-              disabled={regerandoRetro}
+              disabled={regerandoRetro || !podeEscrever}
             >
               {regerandoRetro ? "Gerando…" : "Confirmar e regenerar"}
             </Button>

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,7 @@ const SEV_COR: Record<Severidade, string> = {
 
 function AlertasEnfermagemPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("alertas-enfermagem");
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [filtro, setFiltro] = useState<"aberto" | "todos">("aberto");
   const [loading, setLoading] = useState(true);
@@ -67,6 +69,7 @@ function AlertasEnfermagemPage() {
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaId, filtro]);
 
   const updateStatus = async (a: Alerta, novo: Status) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const observacao = obs[a.id] ?? a.observacao_contato ?? null;
     const patch: Partial<Alerta> = { status: novo, observacao_contato: observacao };
     if (novo === "em_contato") patch.contatado_em = new Date().toISOString();
@@ -135,17 +138,19 @@ function AlertasEnfermagemPage() {
                   />
                 </div>
               </div>
-              <div className="flex flex-col gap-2 min-w-[180px]">
-                <Button size="sm" variant="outline" onClick={() => updateStatus(a, "em_contato")}>
-                  <Phone className="h-4 w-4 mr-1" /> Em contato
-                </Button>
-                <Button size="sm" onClick={() => updateStatus(a, "resolvido")}>
-                  <CheckCircle2 className="h-4 w-4 mr-1" /> Resolvido
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => updateStatus(a, "sem_contato")}>
-                  <Clock className="h-4 w-4 mr-1" /> Sem contato
-                </Button>
-              </div>
+              {podeEscrever && (
+                <div className="flex flex-col gap-2 min-w-[180px]">
+                  <Button size="sm" variant="outline" onClick={() => updateStatus(a, "em_contato")}>
+                    <Phone className="h-4 w-4 mr-1" /> Em contato
+                  </Button>
+                  <Button size="sm" onClick={() => updateStatus(a, "resolvido")}>
+                    <CheckCircle2 className="h-4 w-4 mr-1" /> Resolvido
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => updateStatus(a, "sem_contato")}>
+                    <Clock className="h-4 w-4 mr-1" /> Sem contato
+                  </Button>
+                </div>
+              )}
             </div>
           </Card>
         ))}

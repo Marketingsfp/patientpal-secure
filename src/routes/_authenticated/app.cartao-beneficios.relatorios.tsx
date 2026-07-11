@@ -22,7 +22,7 @@ const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "curr
 
 type Contrato = { id: string; numero: number; paciente_id: string; paciente_nome: string; plano_id: string; valor_mensal: number; taxa_adesao: number; status: string; data_inicio: string; assinado_em: string | null };
 type Plano = { id: string; nome: string; tipo: string; valor_mensal: number };
-type Mens = { id: string; contrato_id: string; valor: number; status: string; pago_em: string | null; vencimento: string };
+type Mens = { id: string; contrato_id: string; numero_parcela: number; valor: number; status: string; pago_em: string | null; vencimento: string };
 type Dep = { id: string; contrato_id: string; paciente_id: string; paciente_nome: string; tipo: string; ativo: boolean };
 type Pac = { id: string; data_nascimento: string | null };
 type Atend = { id: string; paciente_id: string | null; data: string };
@@ -98,12 +98,12 @@ function RelatoriosPage() {
       ? await supabase.from("contrato_dependentes").select("id, contrato_id, paciente_id, paciente_nome, tipo, ativo").in("contrato_id", allCIds).limit(20000)
       : { data: [] as Dep[] };
     const allMensRes = allCIds.length
-      ? await supabase.from("contrato_mensalidades").select("id, contrato_id, valor, status, pago_em, vencimento").in("contrato_id", allCIds).eq("status", "pago").limit(50000)
+      ? await supabase.from("contrato_mensalidades").select("id, contrato_id, numero_parcela, valor, status, pago_em, vencimento").in("contrato_id", allCIds).eq("status", "pago").limit(50000)
       : { data: [] as Mens[] };
 
     // Mensalidades para contratos do período
     const mensRes = cIds.length
-      ? await supabase.from("contrato_mensalidades").select("id, contrato_id, valor, status, pago_em, vencimento").in("contrato_id", cIds).limit(20000)
+      ? await supabase.from("contrato_mensalidades").select("id, contrato_id, numero_parcela, valor, status, pago_em, vencimento").in("contrato_id", cIds).limit(20000)
       : { data: [] as Mens[] };
 
     // Coletar todos paciente_ids (titulares + deps)
@@ -153,10 +153,19 @@ function RelatoriosPage() {
     );
     const pagantes = contratos.filter((c) => contratosComPag.has(c.id)).length;
 
-    const receitaMens = mens
-      .filter((m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to)
+    const isAdesao = (m: Mens) => Number(m.numero_parcela) === 0;
+    const pagasPeriodo = mens.filter((m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to);
+    const receitaMens = pagasPeriodo
+      .filter((m) => !isAdesao(m))
       .reduce((s, m) => s + Number(m.valor), 0);
-    const receitaAdesao = contratos.reduce((s, c) => s + Number(c.taxa_adesao || 0), 0);
+    const contratosComAdesaoLancada = new Set(mens.filter(isAdesao).map((m) => m.contrato_id));
+    const receitaAdesaoLancada = pagasPeriodo
+      .filter(isAdesao)
+      .reduce((s, m) => s + Number(m.valor), 0);
+    const receitaAdesaoLegada = contratos
+      .filter((c) => !contratosComAdesaoLancada.has(c.id))
+      .reduce((s, c) => s + Number(c.taxa_adesao || 0), 0);
+    const receitaAdesao = receitaAdesaoLancada + receitaAdesaoLegada;
     const receita = receitaMens + receitaAdesao;
     const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
     const despesa = despesas.reduce((s, l) => s + Number(l.valor), 0);
@@ -255,8 +264,9 @@ function RelatoriosPage() {
     const resultado = receita - despesa;
     const margemPct = receita > 0 ? (resultado / receita) * 100 : 0;
     const ticketMedio = pagantes > 0 ? receita / pagantes : 0;
-    const totalMens = mens.length;
-    const mensPagas = mens.filter((m) => m.status === "pago").length;
+    const mensalidades = mens.filter((m) => !isAdesao(m));
+    const totalMens = mensalidades.length;
+    const mensPagas = mensalidades.filter((m) => m.status === "pago").length;
     const mensAbertas = totalMens - mensPagas;
     const inadimplenciaPct = totalMens > 0 ? (mensAbertas / totalMens) * 100 : 0;
     const utilizacaoPct = (titulares + dependentesCount) > 0
@@ -348,9 +358,10 @@ function RelatoriosPage() {
     } else if (which === "receita") {
       const contratoNome = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
       const pagas = mens.filter((m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to);
+      const contratosComAdesaoLancada = new Set(mens.filter((m) => Number(m.numero_parcela) === 0).map((m) => m.contrato_id));
       const rows = [
-        ...pagas.map((m) => ({ data: fmtDate(m.pago_em ?? ""), descricao: `Mensalidade — ${contratoNome.get(m.contrato_id) ?? "—"}`, valor: BRL(m.valor) })),
-        ...contratos.filter((c) => Number(c.taxa_adesao || 0) > 0).map((c) => ({ data: fmtDate(c.data_inicio), descricao: `Adesão — ${c.paciente_nome}`, valor: BRL(c.taxa_adesao) })),
+        ...pagas.map((m) => ({ data: fmtDate(m.pago_em ?? ""), descricao: `${Number(m.numero_parcela) === 0 ? "Adesao" : "Mensalidade"} - ${contratoNome.get(m.contrato_id) ?? "�"}`, valor: BRL(m.valor) })),
+        ...contratos.filter((c) => Number(c.taxa_adesao || 0) > 0 && !contratosComAdesaoLancada.has(c.id)).map((c) => ({ data: fmtDate(c.data_inicio), descricao: `Ades�o - ${c.paciente_nome}`, valor: BRL(c.taxa_adesao) })),
       ];
       setDrill({
         title: `Receita do período (${rows.length})`,
@@ -380,9 +391,10 @@ function RelatoriosPage() {
     } else if (which === "resultado") {
       const contratoNome = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
       const pagas = mens.filter((m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to);
+      const contratosComAdesaoLancada = new Set(mens.filter((m) => Number(m.numero_parcela) === 0).map((m) => m.contrato_id));
       const rows = [
-        ...pagas.map((m) => ({ data: fmtDate(m.pago_em ?? ""), tipo: "Receita", descricao: `Mensalidade — ${contratoNome.get(m.contrato_id) ?? "—"}`, valor: BRL(m.valor) })),
-        ...contratos.filter((c) => Number(c.taxa_adesao || 0) > 0).map((c) => ({ data: fmtDate(c.data_inicio), tipo: "Receita", descricao: `Adesão — ${c.paciente_nome}`, valor: BRL(c.taxa_adesao) })),
+        ...pagas.map((m) => ({ data: fmtDate(m.pago_em ?? ""), tipo: "Receita", descricao: `${Number(m.numero_parcela) === 0 ? "Adesao" : "Mensalidade"} - ${contratoNome.get(m.contrato_id) ?? "�"}`, valor: BRL(m.valor) })),
+        ...contratos.filter((c) => Number(c.taxa_adesao || 0) > 0 && !contratosComAdesaoLancada.has(c.id)).map((c) => ({ data: fmtDate(c.data_inicio), tipo: "Receita", descricao: `Ades�o - ${c.paciente_nome}`, valor: BRL(c.taxa_adesao) })),
         ...despesas.map((l) => ({ data: fmtDate(l.data), tipo: "Despesa", descricao: l.descricao ?? "—", valor: `- ${BRL(l.valor)}` })),
       ];
       setDrill({

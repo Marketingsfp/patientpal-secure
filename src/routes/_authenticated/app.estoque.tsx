@@ -6,6 +6,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/estoque")({
   component: EstoquePage,
@@ -16,6 +17,7 @@ interface Row { id: string; nome: string; codigo: string | null; unidade: string
 interface Form { nome: string; codigo: string; unidade: string; estoque_atual: string; estoque_minimo: string; custo_unitario: string; observacoes: string; ativo: boolean; }
 
 function EstoquePage() {
+  const podeEscrever = usePodeEscrever("estoque");
   return (
     <SimpleCrud<Row, Form>
       table="estoque_produtos"
@@ -25,6 +27,7 @@ function EstoquePage() {
       icon={<Package className="h-6 w-6 text-primary" />}
       orderBy={{ column: "nome", ascending: true }}
       searchFields={["nome", "codigo"]}
+      readOnly={!podeEscrever}
       columns={[
         { key: "nome", header: "Produto", render: r => <span className="font-medium">{r.nome}</span> },
         { key: "cod", header: "Código", className: "w-28", render: r => r.codigo ?? "—" },

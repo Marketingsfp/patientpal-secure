@@ -53,12 +53,14 @@ export interface SimpleCrudProps<T extends { id: string }, F> {
   /** Optional custom labels for the create/edit dialog title. */
   newLabel?: string;
   editLabel?: string;
+  /** When true, hides create/edit/delete actions (read-only permission level). */
+  readOnly?: boolean;
 }
 
 export function SimpleCrud<T extends { id: string }, F>({
   table, selectColumns, title, subtitle, icon, columns,
   emptyForm, toForm, toPayload, renderForm, validate, searchFields, orderBy, dialogClassName,
-  newLabel, editLabel,
+  newLabel, editLabel, readOnly,
 }: SimpleCrudProps<T, F>) {
   const { clinicaAtual } = useClinica();
   const [items, setItems] = useState<T[]>([]);
@@ -99,6 +101,7 @@ export function SimpleCrud<T extends { id: string }, F>({
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (readOnly) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) return;
     if (validate) {
       const msg = validate(form);
@@ -127,6 +130,7 @@ export function SimpleCrud<T extends { id: string }, F>({
   };
 
   const onDelete = async (r: T) => {
+    if (readOnly) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setDeleting(true);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase.from(table as any) as any).delete().eq("id", r.id);
@@ -144,7 +148,7 @@ export function SimpleCrud<T extends { id: string }, F>({
           <h1 className="text-2xl font-semibold flex items-center gap-2">{icon} {title}</h1>
           {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo</Button>
+        {!readOnly && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Novo</Button>}
       </div>
 
       {searchFields && searchFields.length > 0 && (
@@ -175,8 +179,12 @@ export function SimpleCrud<T extends { id: string }, F>({
               <TableRow key={r.id}>
                 {columns.map(c => <TableCell key={c.key} className={c.className}>{c.render(r)}</TableCell>)}
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => setToDelete(r)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  {!readOnly && (
+                    <>
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => setToDelete(r)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    </>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

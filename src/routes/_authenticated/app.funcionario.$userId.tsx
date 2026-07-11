@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { getFuncionarioLogin } from "@/lib/equipe.functions";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { FuncionarioFormDialog } from "@/components/funcionarios/FuncionarioFormDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ function fmtMoeda(v: number | null | undefined): string {
 function PerfilFuncionarioPage() {
   const { userId } = Route.useParams();
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("equipe");
   const getLoginFn = useServerFn(getFuncionarioLogin);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [email, setEmail] = useState<string | null>(null);
@@ -179,7 +181,7 @@ function PerfilFuncionarioPage() {
                 </div>
               </div>
             </div>
-            {clinicaAtual && (
+            {clinicaAtual && podeEscrever && (
               <div className="pt-2">
                 <Button onClick={() => setEditOpen(true)} variant="outline" size="sm">
                   <Pencil className="h-4 w-4 mr-1" /> Editar cadastro
@@ -256,7 +258,7 @@ function PerfilFuncionarioPage() {
         </TabsContent>
       </Tabs>
 
-      {clinicaAtual && (
+      {clinicaAtual && podeEscrever && (
         <FuncionarioFormDialog
           open={editOpen}
           onOpenChange={setEditOpen}

@@ -1250,6 +1250,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
   const plano = planoRes.data as { nome: string } | null;
   const paciente = pacRes.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
 
+  const isAdesao = Number(m.numero_parcela) === 0;
   const totalParcelas = contrato.num_parcelas ?? m.numero_parcela;
   const valor = Number(pagamento.valor ?? m.valor ?? 0);
 
@@ -1273,7 +1274,9 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
 
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
-  const descricao = `MENSALIDADE ${m.numero_parcela}/${totalParcelas} — CONTRATO #${contrato.numero}${plano?.nome ? ` — ${plano.nome.toUpperCase()}` : ""}`;
+  const descricao = isAdesao
+    ? `TAXA DE ADESAO - CONTRATO #${contrato.numero}${plano?.nome ? ` - ${plano.nome.toUpperCase()}` : ""}`
+    : `MENSALIDADE ${m.numero_parcela}/${totalParcelas} - CONTRATO #${contrato.numero}${plano?.nome ? ` - ${plano.nome.toUpperCase()}` : ""}`;
   const tituloPac = paciente?.nome ?? contrato.paciente_nome;
 
   const ticketHtml = `
@@ -1285,7 +1288,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
 
     <div class="sep"></div>
     <div class="center lg">GUIA DE RECEBIMENTO</div>
-    <div class="center sm">MENSALIDADE DE CONVÊNIO</div>
+    <div class="center sm">${isAdesao ? "TAXA DE ADESAO" : "MENSALIDADE DE CONVÊNIO"}</div>
     <div class="sep"></div>
 
     <div class="center bold">${esc(tituloPac)}</div>
@@ -1296,7 +1299,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
 
     <table>
       <tr><td class="label">CONTRATO:</td><td class="v right">#${contrato.numero}</td></tr>
-      <tr><td class="label">PARCELA:</td><td class="v right">${m.numero_parcela}/${totalParcelas}</td></tr>
+      <tr><td class="label">COBRANCA:</td><td class="v right">${isAdesao ? "ADESAO" : `${m.numero_parcela}/${totalParcelas}`}</td></tr>
       <tr><td class="label">VENCIMENTO:</td><td class="v right">${fmtDataSimples(m.vencimento)}</td></tr>
       ${usuarioFinalNome ? `<tr><td class="label" colspan="2">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
     </table>

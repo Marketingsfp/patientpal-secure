@@ -6,6 +6,7 @@ import { HardDrive, Download, RefreshCw, PlayCircle, ShieldAlert } from "lucide-
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { listarBackups, baixarBackupDoDia, dispararBackupAgora } from "@/lib/backups.functions";
@@ -28,6 +29,7 @@ const fmtBytes = (n: number) => {
 function Page() {
   const { clinicaAtual } = useClinica();
   const isAdmin = clinicaAtual?.role === "admin";
+  const podeEscrever = usePodeEscrever("auditoria");
   const [dias, setDias] = useState<DiaBackup[]>([]);
   const [execs, setExecs] = useState<Execucao[]>([]);
   const [loading, setLoading] = useState(false);
@@ -60,6 +62,7 @@ function Page() {
   useEffect(() => { void carregar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
 
   const rodarAgora = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setRodando(true);
     try {
       const r = await disparar({});
@@ -118,9 +121,11 @@ function Page() {
         <Button variant="outline" size="sm" onClick={carregar} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Recarregar
         </Button>
-        <Button size="sm" onClick={rodarAgora} disabled={rodando}>
-          <PlayCircle className={`h-4 w-4 mr-2 ${rodando ? "animate-pulse" : ""}`} /> Rodar agora
-        </Button>
+        {podeEscrever && (
+          <Button size="sm" onClick={rodarAgora} disabled={rodando}>
+            <PlayCircle className={`h-4 w-4 mr-2 ${rodando ? "animate-pulse" : ""}`} /> Rodar agora
+          </Button>
+        )}
       </header>
 
       <section>

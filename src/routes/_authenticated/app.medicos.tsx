@@ -4,6 +4,7 @@ import { Plus, Stethoscope, Pencil, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ const limparPrefixoMedico = (nome: string) =>
 
 function MedicosPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("medicos");
   const { new: autoNew, edit: autoEdit } = Route.useSearch();
   const navigate = useNavigate();
   const [medicos, setMedicos] = useState<Medico[]>([]);
@@ -70,19 +72,19 @@ function MedicosPage() {
 
   useEffect(() => {
     if (autoNew === "1") {
-      setDialog({ open: true, id: null });
+      if (podeEscrever) setDialog({ open: true, id: null });
       void navigate({ to: "/app/medicos", search: {}, replace: true });
     }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [autoNew]);
+  }, [autoNew, podeEscrever]);
 
   useEffect(() => {
     if (autoEdit) {
-      setDialog({ open: true, id: autoEdit });
+      if (podeEscrever) setDialog({ open: true, id: autoEdit });
       void navigate({ to: "/app/medicos", search: {}, replace: true });
     }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [autoEdit]);
+  }, [autoEdit, podeEscrever]);
 
   const fmtRepasse = (m: Medico) => {
     if (m.tipo_repasse == null) return "—";
@@ -138,9 +140,11 @@ function MedicosPage() {
           <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" /> Exportar Excel
           </Button>
-          <Button onClick={() => setDialog({ open: true, id: null })}>
-            <Plus className="h-4 w-4 mr-2" /> Novo médico
-          </Button>
+          {podeEscrever && (
+            <Button onClick={() => setDialog({ open: true, id: null })}>
+              <Plus className="h-4 w-4 mr-2" /> Novo médico
+            </Button>
+          )}
         </div>
       </div>
 
@@ -177,9 +181,11 @@ function MedicosPage() {
                   <TableCell>{m.medico_especialidades?.map((me) => me.especialidade?.nome).filter(Boolean).join(", ") || "—"}</TableCell>
                   <TableCell className="text-right">{fmtRepasse(m)}</TableCell>
                   <TableCell className="text-right">
-                    <Button size="icon" variant="ghost" onClick={() => setDialog({ open: true, id: m.id })} aria-label="Editar">
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    {podeEscrever && (
+                      <Button size="icon" variant="ghost" onClick={() => setDialog({ open: true, id: m.id })} aria-label="Editar">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -188,13 +194,15 @@ function MedicosPage() {
         </Card>
       )}
 
-      <MedicoFormDialog
-        open={dialog.open}
-        onOpenChange={(o) => setDialog((s) => ({ ...s, open: o }))}
-        clinicaId={clinicaAtual.clinica_id}
-        editingMedicoId={dialog.id}
-        onSaved={() => void load()}
-      />
+      {podeEscrever && (
+        <MedicoFormDialog
+          open={dialog.open}
+          onOpenChange={(o) => setDialog((s) => ({ ...s, open: o }))}
+          clinicaId={clinicaAtual.clinica_id}
+          editingMedicoId={dialog.id}
+          onSaved={() => void load()}
+        />
+      )}
     </div>
   );
 }

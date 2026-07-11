@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -138,6 +139,7 @@ type EspOpt = { id: string; nome: string };
 
 function ConveniosPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("cartao-beneficios");
   const [rows, setRows] = useState<Convenio[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"list" | "form">("list");
@@ -277,6 +279,7 @@ function ConveniosPage() {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id]);
 
   const openNew = () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setEditing(null);
     setEditingBenIdx(null);
     setNome(""); setDescricao(""); setAtivo(true);
@@ -292,6 +295,7 @@ function ConveniosPage() {
   };
 
   const openEdit = async (c: Convenio) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setEditing(c);
     setEditingBenIdx(null);
     setNome(c.nome);
@@ -331,6 +335,7 @@ function ConveniosPage() {
 
   const save = async () => {
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     // 1) Sanitiza campos texto (remove HTML/scripts) antes de validar
     const nomeClean = stripHtml(nome.trim());
     const descClean = stripHtml(descricao.trim());
@@ -458,6 +463,7 @@ function ConveniosPage() {
 
   const confirmDelete = async () => {
     if (!toDelete) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const { error } = await supabase.from("cb_convenios").delete().eq("id", toDelete.id);
     if (error) { mostrarErro(error); return; }
     toast.success("Convênio excluído.");
@@ -476,7 +482,9 @@ function ConveniosPage() {
           <ShieldCheck className="h-4 w-4" />
           Tipos de cartão benefícios oferecidos pela clínica.
         </p>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo convênio</Button>
+        {podeEscrever && (
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo convênio</Button>
+        )}
       </div>
 
       <Card>
@@ -505,8 +513,12 @@ function ConveniosPage() {
                     <Badge variant={c.ativo ? "default" : "outline"}>{c.ativo ? "Ativo" : "Inativo"}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="ghost" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
-                    <Button size="sm" variant="ghost" onClick={() => setToDelete(c)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    {podeEscrever && (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => setToDelete(c)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

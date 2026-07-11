@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Plus, Send, Hash, User as UserIcon, Users, Trash2 } from "lucide-react";
 import { formatDateTime } from "@/lib/date-utils";
 
@@ -38,6 +39,7 @@ type Membro = { user_id: string; nome: string | null };
 function ChatPage() {
   const { user } = useAuth();
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("chat");
   const clinicaId = clinicaAtual?.clinica_id;
 
   const [canais, setCanais] = useState<Canal[]>([]);
@@ -179,6 +181,10 @@ function ChatPage() {
   }
 
   async function enviar() {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!texto.trim() || !canalSel || !user || !clinicaId) return;
     const { error } = await supabase.from("chat_mensagens").insert({
       canal_id: canalSel,
@@ -194,6 +200,10 @@ function ChatPage() {
   }
 
   async function criarCanal() {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaId || !user) return;
     if (selecionados.size === 0) {
       toast.error("Selecione ao menos um participante");
@@ -237,6 +247,10 @@ function ChatPage() {
   }
 
   async function excluirCanal(id: string) {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!confirm("Tem certeza que deseja apagar esta conversa para todos?")) return;
     const { error } = await supabase.from("chat_canais").delete().eq("id", id);
     if (error) {
@@ -263,56 +277,58 @@ function ChatPage() {
       <Card className="w-72 p-3 flex flex-col">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold">Conversas</h2>
-          <Dialog open={openNovo} onOpenChange={setOpenNovo}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Nova conversa</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3">
-                <div>
-                  <Label>Nome (para grupos)</Label>
-                  <Input
-                    value={novoNome}
-                    onChange={(e) => setNovoNome(e.target.value)}
-                    placeholder="Deixe em branco para conversar no privado..."
-                  />
-                </div>
-                <div>
-                  <Label>Participantes</Label>
-                  <div className="max-h-64 overflow-auto border rounded mt-1">
-                    {equipe
-                      .filter((m) => m.user_id !== user?.id)
-                      .map((m) => {
-                        const sel = selecionados.has(m.user_id);
-                        return (
-                          <button
-                            key={m.user_id}
-                            type="button"
-                            onClick={() => {
-                              const s = new Set(selecionados);
-                              if (sel) s.delete(m.user_id);
-                              else s.add(m.user_id);
-                              setSelecionados(s);
-                            }}
-                            className={`w-full text-left px-3 py-2 text-sm border-b last:border-b-0 transition-colors ${sel ? "bg-primary/20 font-medium" : "hover:bg-muted"}`}
-                          >
-                            {m.nome ?? "Usuário"}
-                          </button>
-                        );
-                      })}
+          {podeEscrever && (
+            <Dialog open={openNovo} onOpenChange={setOpenNovo}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Nova conversa</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div>
+                    <Label>Nome (para grupos)</Label>
+                    <Input
+                      value={novoNome}
+                      onChange={(e) => setNovoNome(e.target.value)}
+                      placeholder="Deixe em branco para conversar no privado..."
+                    />
+                  </div>
+                  <div>
+                    <Label>Participantes</Label>
+                    <div className="max-h-64 overflow-auto border rounded mt-1">
+                      {equipe
+                        .filter((m) => m.user_id !== user?.id)
+                        .map((m) => {
+                          const sel = selecionados.has(m.user_id);
+                          return (
+                            <button
+                              key={m.user_id}
+                              type="button"
+                              onClick={() => {
+                                const s = new Set(selecionados);
+                                if (sel) s.delete(m.user_id);
+                                else s.add(m.user_id);
+                                setSelecionados(s);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-sm border-b last:border-b-0 transition-colors ${sel ? "bg-primary/20 font-medium" : "hover:bg-muted"}`}
+                            >
+                              {m.nome ?? "Usuário"}
+                            </button>
+                          );
+                        })}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={criarCanal}>Iniciar Conversa</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                <DialogFooter>
+                  <Button onClick={criarCanal}>Iniciar Conversa</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
         <div className="flex-1 overflow-auto space-y-1 pr-1">
           {canais.length === 0 && <p className="text-xs text-muted-foreground p-2">Sem conversas ainda</p>}
@@ -331,16 +347,18 @@ function ChatPage() {
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="truncate">{nomeDisplay}</span>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void excluirCanal(c.id);
-                  }}
-                  className={`shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive hover:text-destructive-foreground transition-opacity ${ativo ? "text-primary-foreground hover:bg-primary-foreground/20" : "text-muted-foreground"}`}
-                  title="Excluir conversa"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                {podeEscrever && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void excluirCanal(c.id);
+                    }}
+                    className={`shrink-0 opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive hover:text-destructive-foreground transition-opacity ${ativo ? "text-primary-foreground hover:bg-primary-foreground/20" : "text-muted-foreground"}`}
+                    title="Excluir conversa"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
             );
           })}
@@ -366,14 +384,16 @@ function ChatPage() {
                   </Badge>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => void excluirCanal(canalAtual.id)}
-                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="h-4 w-4 mr-1" /> Excluir
-              </Button>
+              {podeEscrever && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void excluirCanal(canalAtual.id)}
+                  className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" /> Excluir
+                </Button>
+              )}
             </div>
             <div ref={listRef} className="flex-1 overflow-auto p-4 space-y-4">
               {mensagens.map((m) => {
@@ -395,23 +415,29 @@ function ChatPage() {
                 );
               })}
             </div>
-            <form
-              className="p-3 border-t bg-muted/20 flex gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void enviar();
-              }}
-            >
-              <Input
-                value={texto}
-                onChange={(e) => setTexto(e.target.value)}
-                placeholder="Escreva sua mensagem…"
-                className="bg-background rounded-full px-4"
-              />
-              <Button type="submit" disabled={!texto.trim()} className="rounded-full h-10 w-10 p-0">
-                <Send className="h-4 w-4" />
-              </Button>
-            </form>
+            {podeEscrever ? (
+              <form
+                className="p-3 border-t bg-muted/20 flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void enviar();
+                }}
+              >
+                <Input
+                  value={texto}
+                  onChange={(e) => setTexto(e.target.value)}
+                  placeholder="Escreva sua mensagem…"
+                  className="bg-background rounded-full px-4"
+                />
+                <Button type="submit" disabled={!texto.trim()} className="rounded-full h-10 w-10 p-0">
+                  <Send className="h-4 w-4" />
+                </Button>
+              </form>
+            ) : (
+              <div className="p-3 border-t bg-muted/20 text-center text-xs text-muted-foreground">
+                Você tem acesso somente leitura a este módulo.
+              </div>
+            )}
           </>
         )}
       </Card>

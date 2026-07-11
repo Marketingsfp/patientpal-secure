@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Briefcase, Plus, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/cargos")({
   component: CargosPage,
@@ -30,6 +31,7 @@ interface Cargo {
 
 function CargosPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("cargos");
   const [rows, setRows] = useState<Cargo[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -70,6 +72,7 @@ function CargosPage() {
   }
 
   async function salvar() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) { toast.error("Selecione uma clínica"); return; }
     if (!form.nome.trim()) { toast.error("Informe o nome"); return; }
     setSaving(true);
@@ -101,7 +104,7 @@ function CargosPage() {
           <h1 className="text-xl font-bold">Cargos</h1>
           <p className="text-sm text-muted-foreground">Cargos e funções da clínica.</p>
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>
+        {podeEscrever && <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>}
       </div>
 
       <Card className="p-3">
@@ -134,7 +137,7 @@ function CargosPage() {
                 <TableCell className="text-right">{r.salario_base ? r.salario_base.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "-"}</TableCell>
                 <TableCell><Badge variant={r.ativo ? "default" : "secondary"}>{r.ativo ? "Ativo" : "Inativo"}</Badge></TableCell>
                 <TableCell className="text-right">
-                  <Button size="icon" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
+                  {podeEscrever && <Button size="icon" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>}
                 </TableCell>
               </TableRow>
             ))}

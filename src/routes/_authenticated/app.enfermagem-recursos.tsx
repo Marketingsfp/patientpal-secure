@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,6 +64,7 @@ async function fetchAllProcedimentos(clinicaId: string): Promise<Procedimento[]>
 
 function EnfermagemRecursosPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("enfermagem-recursos");
   const [recursos, setRecursos] = useState<Recurso[]>([]);
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
   const [busca, setBusca] = useState("");
@@ -116,6 +118,7 @@ function EnfermagemRecursosPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!form.nome.trim()) { toast.error("Informe o nome"); return; }
     const dur = parseInt(form.duracao_padrao_min || "30", 10);
     if (!Number.isFinite(dur) || dur <= 0 || dur > 480) {
@@ -156,6 +159,7 @@ function EnfermagemRecursosPage() {
   };
 
   const remover = async (r: Recurso) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm(`Excluir "${r.nome}"? Agendamentos existentes ficarão sem recurso vinculado.`)) return;
     const { error } = await supabase.from("enfermagem_recursos").delete().eq("id", r.id);
     if (error) { mostrarErro(error); return; }
@@ -185,9 +189,11 @@ function EnfermagemRecursosPage() {
             Salas e exames realizados pela equipe de enfermagem — agendas compartilhadas entre todos os enfermeiros.
           </p>
         </div>
-        <Button onClick={openNovo}>
-          <Plus className="h-4 w-4 mr-2" /> Novo recurso
-        </Button>
+        {podeEscrever && (
+          <Button onClick={openNovo}>
+            <Plus className="h-4 w-4 mr-2" /> Novo recurso
+          </Button>
+        )}
       </div>
 
       {recursos.length === 0 ? (
@@ -216,12 +222,16 @@ function EnfermagemRecursosPage() {
                   <TableCell>{r.duracao_padrao_min} min</TableCell>
                   <TableCell>{r.ativo ? "Sim" : "Não"}</TableCell>
                   <TableCell className="text-right space-x-1">
-                    <Button size="icon" variant="ghost" onClick={() => void openEdit(r)} aria-label="Editar">
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={() => void remover(r)} aria-label="Excluir">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {podeEscrever && (
+                      <>
+                        <Button size="icon" variant="ghost" onClick={() => void openEdit(r)} aria-label="Editar">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => void remover(r)} aria-label="Excluir">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

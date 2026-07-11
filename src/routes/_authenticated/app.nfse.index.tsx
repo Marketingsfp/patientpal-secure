@@ -6,6 +6,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { consultarNfse, reenviarNfse, extrairNfseDeImagem, baixarNfseArquivo } from "@/lib/nfse.functions";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,6 +35,7 @@ interface Row {
 
 function NfsePage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("nfse");
   const consulta = useServerFn(consultarNfse);
   const reenviar = useServerFn(reenviarNfse);
   const extrair = useServerFn(extrairNfseDeImagem);
@@ -104,6 +106,7 @@ function NfsePage() {
   }), [rows, filtroEmitente, filtroStatus]);
 
   const onReenviar = async (id: string) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setReenviando(id);
     try {
       const r = await reenviar({ data: { id } });
@@ -176,7 +179,9 @@ function NfsePage() {
           <Button variant="outline" onClick={() => { setConferirOpen(true); setConferirExtraido(null); setConferirPreview(null); }}>
             <ScanLine className="h-4 w-4 mr-2" /> Conferir por imagem
           </Button>
-          <Button asChild><Link to="/app/nfse/testar"><FilePlus2 className="h-4 w-4 mr-2" /> Emitir NFS-e</Link></Button>
+          {podeEscrever && (
+            <Button asChild><Link to="/app/nfse/testar"><FilePlus2 className="h-4 w-4 mr-2" /> Emitir NFS-e</Link></Button>
+          )}
         </div>
       </div>
 
@@ -286,7 +291,7 @@ function NfsePage() {
                         <AlertCircle className="h-3.5 w-3.5 text-red-600" />
                       </Button>
                     )}
-                    {r.status === "erro" && (
+                    {r.status === "erro" && podeEscrever && (
                       <Button
                         size="sm"
                         variant="outline"

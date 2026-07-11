@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/campanhas")({
   component: CampanhasPageWithTabs,
@@ -16,6 +17,7 @@ interface Row { id: string; nome: string; tipo: string; mensagem: string; segmen
 interface Form { nome: string; tipo: string; mensagem: string; segmento: string; status: string; agendada_para: string; }
 
 function CampanhasPage() {
+  const podeEscrever = usePodeEscrever("campanhas");
   return (
     <SimpleCrud<Row, Form>
       table="campanhas_marketing"
@@ -24,6 +26,7 @@ function CampanhasPage() {
       subtitle="Envios em massa de WhatsApp, e-mail ou SMS."
       icon={<Megaphone className="h-6 w-6 text-primary" />}
       searchFields={["nome"]}
+      readOnly={!podeEscrever}
       columns={[
         { key: "nome", header: "Nome", render: r => <span className="font-medium">{r.nome}</span> },
         { key: "tipo", header: "Canal", className: "w-28", render: r => <span className="capitalize text-sm">{r.tipo}</span> },

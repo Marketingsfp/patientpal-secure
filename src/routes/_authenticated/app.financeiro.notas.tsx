@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useServerFn } from "@tanstack/react-start";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { usePickTomador } from "@/components/nfse/use-pick-tomador";
@@ -44,6 +45,7 @@ const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", curren
 
 function Page() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("financeiro");
   const [items, setItems] = useState<Nota[]>([]);
   const [pacientes, setPacientes] = useState<Pac[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +97,7 @@ function Page() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id, numero: form.numero || null, serie: form.serie || null,
@@ -110,12 +113,14 @@ function Page() {
   };
 
   const remove = async (n: Nota) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm(`Excluir nota ${n.numero ?? ""}?`)) return;
     const { error } = await supabase.from("fin_notas_pacientes").delete().eq("id", n.id);
     if (error) mostrarErro(error); else { toast.success("Removida"); await load(); }
   };
 
   const openEmit = async (n: Nota) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!emitentes.length) { toast.error("Cadastre um emitente em Configurações › NFS-e"); return; }
     setDescricao(n.observacoes || `Serviços médicos prestados${n.paciente_id ? ` ao paciente ${pacMap.get(n.paciente_id) ?? ""}` : ""}`.trim());
     setTomadorCpf("");
@@ -129,6 +134,7 @@ function Page() {
   const [tomadorCpf, setTomadorCpf] = useState("");
 
   const doEmit = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const n = emitDialog.nota;
     if (!n || !emitenteId) return;
     if (!n.paciente_id) { toast.error("Vincule um paciente à nota antes de emitir."); return; }
@@ -197,7 +203,9 @@ function Page() {
         <div><h1 className="text-2xl font-semibold">Notas dos pacientes</h1>
           <p className="text-sm text-muted-foreground">Registro e controle de NFs emitidas</p></div>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Nova nota</Button></DialogTrigger>
+          {podeEscrever && (
+            <DialogTrigger asChild><Button onClick={openNew} disabled={!clinicaAtual}><Plus className="h-4 w-4 mr-2" />Nova nota</Button></DialogTrigger>
+          )}
           <DialogContent>
             <DialogHeader><DialogTitle>{editing ? "Editar" : "Nova"} nota</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-3">
@@ -256,12 +264,18 @@ function Page() {
                 <TableCell><Badge variant={n.status === "emitida" ? "default" : "secondary"}>{n.status}</Badge></TableCell>
                 <TableCell className="text-right font-medium">{fmt(Number(n.valor))}</TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" title="Emitir NFS-e" onClick={() => openEmit(n)} disabled={!n.paciente_id}>
-                    <Send className="h-3.5 w-3.5" />
-                  </Button>
+                  {podeEscrever && (
+                    <Button variant="ghost" size="icon" title="Emitir NFS-e" onClick={() => openEmit(n)} disabled={!n.paciente_id}>
+                      <Send className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                   {n.url_pdf && <a href={n.url_pdf} target="_blank" rel="noopener noreferrer"><Button variant="ghost" size="icon"><ExternalLink className="h-3.5 w-3.5" /></Button></a>}
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(n)}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => remove(n)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                  {podeEscrever && (
+                    <>
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(n)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => remove(n)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                    </>
+                  )}
                 </TableCell>
               </TableRow>))}
             </TableBody>

@@ -10,6 +10,7 @@ import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
 import { ItemServicoPicker } from "@/components/nfse/item-servico-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { mostrarErro } from "@/lib/traduzir-erro";
 
 export const Route = createFileRoute("/_authenticated/app/configuracoes/nfse")({
@@ -88,6 +89,7 @@ const REGIMES = [
 ];
 
 function NfseConfigPage() {
+  const podeEscrever = usePodeEscrever("nfse");
   return (
     <div className="space-y-6">
       <ClinicaNfseModoCard />
@@ -99,6 +101,7 @@ function NfseConfigPage() {
       icon={<Building2 className="h-6 w-6 text-primary" />}
       orderBy={{ column: "created_at", ascending: false }}
       dialogClassName="max-w-5xl w-[95vw]"
+      readOnly={!podeEscrever}
       columns={[
         { key: "nome", header: "Nome", render: (r) => <span className="font-medium">{r.nome}</span> },
         { key: "cnpj", header: "CNPJ", className: "w-44", render: (r) => r.cnpj },
@@ -311,6 +314,7 @@ function NfseConfigPage() {
 
 function ClinicaNfseModoCard() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("nfse");
   const [modo, setModo] = useState<"por_item" | "agrupada">("por_item");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -332,6 +336,7 @@ function ClinicaNfseModoCard() {
   }, [clinicaAtual]);
 
   const salvar = async (novo: "por_item" | "agrupada") => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) return;
     setSaving(true);
     const anterior = modo;
@@ -367,7 +372,7 @@ function ClinicaNfseModoCard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <button
           type="button"
-          disabled={loading || saving}
+          disabled={loading || saving || !podeEscrever}
           onClick={() => salvar("por_item")}
           className={`text-left rounded-md border p-3 transition ${
             modo === "por_item" ? "border-primary bg-primary/5" : "border-border hover:bg-accent"
@@ -380,7 +385,7 @@ function ClinicaNfseModoCard() {
         </button>
         <button
           type="button"
-          disabled={loading || saving}
+          disabled={loading || saving || !podeEscrever}
           onClick={() => salvar("agrupada")}
           className={`text-left rounded-md border p-3 transition ${
             modo === "agrupada" ? "border-primary bg-primary/5" : "border-border hover:bg-accent"

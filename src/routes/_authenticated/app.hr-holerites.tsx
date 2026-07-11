@@ -3,6 +3,7 @@ import { SectionTabs, RH_TABS, RH_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +33,7 @@ interface Holerite {
 
 function HoleritesPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("hr-holerites");
   const [rows, setRows] = useState<Holerite[]>([]);
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +82,7 @@ function HoleritesPage() {
   const liquido = totalProv - totalDesc;
 
   async function salvar() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual || !contratoId) { toast.error("Selecione o funcionário"); return; }
     setSaving(true);
     const { error } = await supabase.from("hr_holerites").insert({
@@ -102,6 +105,7 @@ function HoleritesPage() {
   }
 
   async function marcarPago(id: string) {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const { error } = await supabase.from("hr_holerites").update({
       status: "pago", pago_em: new Date().toISOString().slice(0, 10),
     }).eq("id", id);
@@ -118,7 +122,9 @@ function HoleritesPage() {
           <h1 className="text-xl font-bold">Holerites</h1>
           <p className="text-sm text-muted-foreground">Folha de pagamento mensal.</p>
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>
+        {podeEscrever && (
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>
+        )}
       </div>
 
       <Card>
@@ -148,7 +154,7 @@ function HoleritesPage() {
                 <TableCell className="text-right font-semibold">{Number(r.liquido).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
                 <TableCell><Badge variant={r.status === "pago" ? "default" : "secondary"}>{r.status}</Badge></TableCell>
                 <TableCell className="text-right">
-                  {r.status !== "pago" && <Button size="sm" variant="outline" onClick={() => marcarPago(r.id)}>Pagar</Button>}
+                  {r.status !== "pago" && podeEscrever && <Button size="sm" variant="outline" onClick={() => marcarPago(r.id)}>Pagar</Button>}
                 </TableCell>
               </TableRow>
             ))}

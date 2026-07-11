@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SectionTabs, SERVICOS_TABS, SERVICOS_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/_authenticated/app/tipos-servico")({
 interface Tipo { id: string; nome: string; ativo: boolean }
 
 function TiposServicoPage() {
+  const podeEscrever = usePodeEscrever("tipos-servico");
   const [rows, setRows] = useState<Tipo[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -52,6 +54,7 @@ function TiposServicoPage() {
   }
 
   async function salvar() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const nome = form.nome.trim().toLowerCase();
     if (!nome) { toast.error("Informe o nome"); return; }
     setSaving(true);
@@ -77,7 +80,9 @@ function TiposServicoPage() {
           <h1 className="text-xl font-bold">Categorias de Serviço</h1>
           <p className="text-sm text-muted-foreground">Cadastro das categorias de serviços da clínica (Consulta, Exames / Procedimentos, Cirurgia…).</p>
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>
+        {podeEscrever && (
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo</Button>
+        )}
       </div>
 
       <Card className="p-3">
@@ -110,7 +115,9 @@ function TiposServicoPage() {
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
+                  {podeEscrever && (
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

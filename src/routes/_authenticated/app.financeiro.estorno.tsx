@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { logAction } from "@/hooks/use-crud";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ function StatusBadge({ status }: { status: string }) {
 function Page() {
   const { clinicaAtual } = useClinica();
   const podeEstornar = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
+  const podeEscrever = usePodeEscrever("financeiro");
   const [items, setItems] = useState<Solic[]>([]);
   const [nomesUsuarios, setNomesUsuarios] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -386,6 +388,10 @@ function Page() {
       toast.error("Sem permissão");
       return;
     }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!confirm("Aprovar e estornar esta solicitação?")) return;
     setBusy(s.id);
     try {
@@ -420,6 +426,10 @@ function Page() {
   const recusar = async (s: Solic) => {
     if (!podeEstornar) {
       toast.error("Sem permissão");
+      return;
+    }
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
     const resp = window.prompt("Motivo da recusa (opcional):") ?? "";
@@ -691,7 +701,7 @@ function Page() {
                       <StatusBadge status={s.status} />
                     </TableCell>
                     <TableCell className="text-right">
-                      {s.status === "pendente" ? (
+                      {s.status === "pendente" && podeEscrever ? (
                         <div className="flex gap-1.5 justify-end">
                           <Button
                             size="sm"

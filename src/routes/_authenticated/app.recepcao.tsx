@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -43,6 +44,7 @@ function ordenarPorPrioridade(a: Senha, b: Senha) {
 
 function RecepcaoPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("recepcao");
   const [guiche, setGuiche] = useState<string>("1");
   const [fila, setFila] = useState<Senha[]>([]);
   const [chamadas, setChamadas] = useState<Senha[]>([]);
@@ -123,6 +125,7 @@ function RecepcaoPage() {
 
   async function chamarProxima() {
     if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!guiche.trim()) { toast.error("Informe o guichê"); return; }
     setBusy(true);
     const { data, error } = await supabase.rpc("chamar_proxima_senha", {
@@ -137,6 +140,7 @@ function RecepcaoPage() {
   }
 
   async function setStatus(id: string, status: "atendida" | "cancelada") {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const now = new Date().toISOString();
     const patch = status === "atendida"
       ? { status, atendida_em: now }

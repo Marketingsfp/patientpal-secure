@@ -14,6 +14,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { criarAtendimentoMultiplo } from "@/lib/atendimento-multiplo/criar.functions";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-multiplo")({
   component: AtendimentoMultiploPage,
@@ -101,6 +102,7 @@ function categoriaLabel(t: string | null | undefined): string {
 function AtendimentoMultiploPage() {
   const { clinicaAtual } = useClinica();
   const navigate = useNavigate();
+  const podeEscrever = usePodeEscrever("atendimento-multiplo");
   const criarMultiplo = useServerFn(criarAtendimentoMultiplo);
 
   const dataInicial = useMemo(() => {
@@ -242,6 +244,10 @@ function AtendimentoMultiploPage() {
   }
 
   async function confirmar() {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
     if (!clinicaId || !paciente) {
       toast.error("Escolha um paciente antes de confirmar.");
       return;
@@ -571,10 +577,12 @@ function AtendimentoMultiploPage() {
         </div>
         <div className="flex-1" />
         <Button variant="ghost" onClick={() => navigate({ to: "/app/agenda" })}>Cancelar</Button>
-        <Button onClick={confirmar} disabled={salvando || !paciente}>
-          <Save className="h-4 w-4 mr-1" />
-          {salvando ? "Salvando…" : "Confirmar atendimento"}
-        </Button>
+        {podeEscrever && (
+          <Button onClick={confirmar} disabled={salvando || !paciente}>
+            <Save className="h-4 w-4 mr-1" />
+            {salvando ? "Salvando…" : "Confirmar atendimento"}
+          </Button>
+        )}
       </div>
     </div>
   );

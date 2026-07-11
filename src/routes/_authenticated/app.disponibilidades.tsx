@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,6 +49,7 @@ interface DispRow extends DispExt { agenda_id: string }
 
 function Page() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("disponibilidades");
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [disps, setDisps] = useState<DispRow[]>([]);
   const [agendas, setAgendas] = useState<Agenda[]>([]);
@@ -145,6 +147,7 @@ function Page() {
   }, [clinicaAtual?.clinica_id]);
 
   const adicionar = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual || !novo.medico_id) { toast.error("Selecione um médico"); return; }
     if (!agendaSel) { toast.error("Selecione uma agenda"); return; }
     if (diasSel.length === 0) { toast.error("Selecione ao menos um dia"); return; }
@@ -167,6 +170,7 @@ function Page() {
   };
 
   const salvarEdicao = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!dispEditando || !editRow) return;
     const payload = {
       dia_semana: parseInt(editRow.dia_semana),
@@ -186,6 +190,7 @@ function Page() {
   };
 
   const remover = async (id: string) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const { error } = await supabase.from("medico_disponibilidades").delete().eq("id", id);
     if (error) { mostrarErro(error); return; }
     setDisps((xs) => xs.filter((x) => x.id !== id));
@@ -292,6 +297,7 @@ function Page() {
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
 
   const gerarAgenda = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) return;
     if (slotsPreview.length === 0) { toast.error("Sem horários para gerar"); return; }
     if (!confirm(`Confirmar criação de ${slotsPreview.length} horários disponíveis?`)) return;
@@ -436,10 +442,12 @@ function Page() {
                     value={gerar.intervalo_min}
                     onChange={(e) => setGerar({ ...gerar, intervalo_min: e.target.value })} />
                 </div>
-                <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
-                  <CalendarRange className="h-4 w-4 mr-1" />
-                  {gerando ? "Gerando..." : `Gerar ${slotsPreview.length} slots`}
-                </Button>
+                {podeEscrever && (
+                  <Button onClick={gerarAgenda} disabled={gerando || slotsPreview.length === 0}>
+                    <CalendarRange className="h-4 w-4 mr-1" />
+                    {gerando ? "Gerando..." : `Gerar ${slotsPreview.length} slots`}
+                  </Button>
+                )}
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Dias da semana</label>
@@ -695,12 +703,14 @@ function Page() {
                       <label className="text-xs text-muted-foreground">até</label>
                       <Input type="date" className="w-40" value={novo.vigencia_fim} onChange={(e) => setNovo({ ...novo, vigencia_fim: e.target.value })} />
                     </div>
-                    <Button 
-                      onClick={() => { setNovo({ ...novo, medico_id: m.id }); void adicionar(); }}
-                      disabled={agendasMed.length === 0}
-                    >
-                      <Plus className="h-4 w-4 mr-1" /> Adicionar
-                    </Button>
+                    {podeEscrever && (
+                      <Button
+                        onClick={() => { setNovo({ ...novo, medico_id: m.id }); void adicionar(); }}
+                        disabled={agendasMed.length === 0}
+                      >
+                        <Plus className="h-4 w-4 mr-1" /> Adicionar
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -777,27 +787,31 @@ function Page() {
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex justify-end gap-2">
-                                    <button
-                                      onClick={() => {
-                                        setDispEditando(d.id);
-                                        setEditRow({
-                                          dia_semana: String(d.dia_semana),
-                                          hora_inicio: d.hora_inicio.slice(0, 5),
-                                          hora_fim: d.hora_fim.slice(0, 5),
-                                          limite_pacientes: d.limite_pacientes ? String(d.limite_pacientes) : "",
-                                          intervalo_min: d.intervalo_min ? String(d.intervalo_min) : "",
-                                          vigencia_inicio: d.vigencia_inicio ?? "",
-                                          vigencia_fim: d.vigencia_fim ?? "",
-                                        });
-                                      }}
-                                      className="text-primary hover:opacity-70"
-                                      aria-label="Editar"
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </button>
-                                    <button onClick={() => remover(d.id)} className="text-destructive hover:opacity-70" aria-label="Remover">
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
+                                    {podeEscrever && (
+                                      <>
+                                        <button
+                                          onClick={() => {
+                                            setDispEditando(d.id);
+                                            setEditRow({
+                                              dia_semana: String(d.dia_semana),
+                                              hora_inicio: d.hora_inicio.slice(0, 5),
+                                              hora_fim: d.hora_fim.slice(0, 5),
+                                              limite_pacientes: d.limite_pacientes ? String(d.limite_pacientes) : "",
+                                              intervalo_min: d.intervalo_min ? String(d.intervalo_min) : "",
+                                              vigencia_inicio: d.vigencia_inicio ?? "",
+                                              vigencia_fim: d.vigencia_fim ?? "",
+                                            });
+                                          }}
+                                          className="text-primary hover:opacity-70"
+                                          aria-label="Editar"
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </button>
+                                        <button onClick={() => remover(d.id)} className="text-destructive hover:opacity-70" aria-label="Remover">
+                                          <Trash2 className="h-4 w-4" />
+                                        </button>
+                                      </>
+                                    )}
                                   </div>
                                 </TableCell>
                               </TableRow>

@@ -3,6 +3,7 @@ import { SectionTabs, RH_TABS, RH_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +32,7 @@ interface Ferias {
 
 function FeriasPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("hr-ferias");
   const [rows, setRows] = useState<Ferias[]>([]);
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +70,7 @@ function FeriasPage() {
   }
 
   async function salvar() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) return;
     if (!form.contrato_id) { toast.error("Selecione o funcionário"); return; }
     setSaving(true);
@@ -90,6 +93,7 @@ function FeriasPage() {
   }
 
   async function decidir(id: string, status: "aprovada" | "rejeitada") {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("hr_ferias").update({
       status, aprovado_por: user?.id, aprovado_em: new Date().toISOString(),
@@ -107,7 +111,9 @@ function FeriasPage() {
           <h1 className="text-xl font-bold">Férias</h1>
           <p className="text-sm text-muted-foreground">Solicitações e gestão de períodos de férias.</p>
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Nova solicitação</Button>
+        {podeEscrever && (
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Nova solicitação</Button>
+        )}
       </div>
 
       <Card>
@@ -137,7 +143,7 @@ function FeriasPage() {
                 <TableCell>{r.abono_pecuniario ? "Sim" : "Não"}</TableCell>
                 <TableCell><Badge variant={r.status === "aprovada" ? "default" : r.status === "rejeitada" ? "destructive" : "secondary"}>{r.status}</Badge></TableCell>
                 <TableCell className="text-right space-x-1">
-                  {r.status === "solicitada" && (
+                  {r.status === "solicitada" && podeEscrever && (
                     <>
                       <Button size="icon" variant="ghost" onClick={() => decidir(r.id, "aprovada")}><Check className="h-4 w-4 text-emerald-600" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => decidir(r.id, "rejeitada")}><X className="h-4 w-4 text-destructive" /></Button>

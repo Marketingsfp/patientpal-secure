@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Users } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ interface Row {
 
 function FuncionariosPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("funcionarios");
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [dialog, setDialog] = useState<{ open: boolean; id?: string | null }>({ open: false, id: null });
@@ -80,9 +82,11 @@ function FuncionariosPage() {
             onChange={(e) => setBusca(e.target.value)}
             className="w-full sm:w-72"
           />
-          <Button onClick={() => setDialog({ open: true, id: null })}>
-            <Plus className="h-4 w-4 mr-2" /> Novo funcionário
-          </Button>
+          {podeEscrever && (
+            <Button onClick={() => setDialog({ open: true, id: null })}>
+              <Plus className="h-4 w-4 mr-2" /> Novo funcionário
+            </Button>
+          )}
         </div>
       </div>
 
@@ -116,9 +120,11 @@ function FuncionariosPage() {
                       : <Badge variant="outline">Sem login</Badge>}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button size="icon" variant="ghost" onClick={() => setDialog({ open: true, id: r.id })}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    {podeEscrever && (
+                      <Button size="icon" variant="ghost" onClick={() => setDialog({ open: true, id: r.id })}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

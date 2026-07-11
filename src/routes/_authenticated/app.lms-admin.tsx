@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ type Licao = { id: string; modulo_id: string; curso_id: string; titulo: string; 
 function LMSAdminPage() {
   const { user } = useAuth();
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("lms-admin");
   const clinicaId = clinicaAtual?.clinica_id;
 
   const [cursos, setCursos] = useState<Curso[]>([]);
@@ -62,6 +64,7 @@ function LMSAdminPage() {
   }, [cursoSel]);
 
   async function criarCurso() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaId || !user || !novoCurso.titulo.trim()) return;
     const { error } = await supabase.from("lms_cursos").insert({
       clinica_id: clinicaId, titulo: novoCurso.titulo.trim(),
@@ -74,12 +77,14 @@ function LMSAdminPage() {
   }
 
   async function togglePublicado(c: Curso) {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const { error } = await supabase.from("lms_cursos").update({ publicado: !c.publicado }).eq("id", c.id);
     if (error) { mostrarErro(error); return; }
     await loadCursos();
   }
 
   async function novoModulo() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!cursoSel) return;
     const titulo = prompt("Título do módulo");
     if (!titulo) return;
@@ -92,6 +97,7 @@ function LMSAdminPage() {
   }
 
   async function novaLicao(moduloId: string) {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!cursoSel) return;
     const titulo = prompt("Título da lição");
     if (!titulo) return;
@@ -105,6 +111,7 @@ function LMSAdminPage() {
   }
 
   async function salvarLicao(l: Licao) {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const { error } = await supabase.from("lms_licoes").update({
       titulo: l.titulo, tipo: l.tipo, conteudo: l.conteudo, video_url: l.video_url,
     }).eq("id", l.id);
@@ -113,6 +120,7 @@ function LMSAdminPage() {
   }
 
   async function removerLicao(id: string) {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm("Excluir lição?")) return;
     const { error } = await supabase.from("lms_licoes").delete().eq("id", id);
     if (error) { mostrarErro(error); return; }
@@ -126,6 +134,7 @@ function LMSAdminPage() {
           <h1 className="text-2xl font-bold tracking-tight">Cursos (LMS)</h1>
           <p className="text-sm text-muted-foreground">Crie cursos, módulos e lições para sua equipe</p>
         </div>
+        {podeEscrever && (
         <Dialog open={openCurso} onOpenChange={setOpenCurso}>
           <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-1" /> Novo curso</Button></DialogTrigger>
           <DialogContent>
@@ -138,6 +147,7 @@ function LMSAdminPage() {
             <DialogFooter><Button onClick={criarCurso}>Criar</Button></DialogFooter>
           </DialogContent>
         </Dialog>
+        )}
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-4">
@@ -147,7 +157,7 @@ function LMSAdminPage() {
             <div key={c.id} className={`p-2 rounded border cursor-pointer ${cursoSel === c.id ? "border-primary bg-primary/5" : ""}`} onClick={() => setCursoSel(c.id)}>
               <div className="flex items-center justify-between gap-2">
                 <p className="font-medium text-sm">{c.titulo}</p>
-                <Switch checked={c.publicado} onCheckedChange={() => togglePublicado(c)} onClick={(e) => e.stopPropagation()} />
+                <Switch checked={c.publicado} disabled={!podeEscrever} onCheckedChange={() => togglePublicado(c)} onClick={(e) => e.stopPropagation()} />
               </div>
               <div className="flex gap-1 mt-1">
                 <Badge variant="secondary">{Math.round(c.carga_horaria_min / 60)}h</Badge>
@@ -164,20 +174,24 @@ function LMSAdminPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold">Módulos e lições</h2>
-                <Button size="sm" variant="outline" onClick={novoModulo}><Plus className="h-4 w-4 mr-1" /> Módulo</Button>
+                {podeEscrever && (
+                  <Button size="sm" variant="outline" onClick={novoModulo}><Plus className="h-4 w-4 mr-1" /> Módulo</Button>
+                )}
               </div>
               {modulos.length === 0 && <p className="text-sm text-muted-foreground">Adicione um módulo para começar</p>}
               {modulos.map((m) => (
                 <div key={m.id} className="border rounded p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="font-medium">{m.titulo}</p>
-                    <Button size="sm" variant="ghost" onClick={() => novaLicao(m.id)}><Plus className="h-4 w-4 mr-1" /> Lição</Button>
+                    {podeEscrever && (
+                      <Button size="sm" variant="ghost" onClick={() => novaLicao(m.id)}><Plus className="h-4 w-4 mr-1" /> Lição</Button>
+                    )}
                   </div>
                   {licoes.filter((l) => l.modulo_id === m.id).map((l) => (
                     <div key={l.id} className="bg-muted/40 rounded p-3 space-y-2">
                       <div className="flex items-center gap-2">
-                        <Input value={l.titulo} onChange={(e) => setLicoes((p) => p.map((x) => x.id === l.id ? { ...x, titulo: e.target.value } : x))} className="flex-1" />
-                        <Select value={l.tipo} onValueChange={(v) => setLicoes((p) => p.map((x) => x.id === l.id ? { ...x, tipo: v as Licao["tipo"] } : x))}>
+                        <Input value={l.titulo} disabled={!podeEscrever} onChange={(e) => setLicoes((p) => p.map((x) => x.id === l.id ? { ...x, titulo: e.target.value } : x))} className="flex-1" />
+                        <Select value={l.tipo} disabled={!podeEscrever} onValueChange={(v) => setLicoes((p) => p.map((x) => x.id === l.id ? { ...x, tipo: v as Licao["tipo"] } : x))}>
                           <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="texto">Texto</SelectItem>
@@ -185,13 +199,17 @@ function LMSAdminPage() {
                             <SelectItem value="quiz">Quiz</SelectItem>
                           </SelectContent>
                         </Select>
-                        <Button size="sm" variant="ghost" onClick={() => removerLicao(l.id)}><Trash2 className="h-4 w-4" /></Button>
+                        {podeEscrever && (
+                          <Button size="sm" variant="ghost" onClick={() => removerLicao(l.id)}><Trash2 className="h-4 w-4" /></Button>
+                        )}
                       </div>
                       {l.tipo === "video" && (
-                        <Input placeholder="URL do vídeo (YouTube embed, Vimeo, etc)" value={l.video_url ?? ""} onChange={(e) => setLicoes((p) => p.map((x) => x.id === l.id ? { ...x, video_url: e.target.value } : x))} />
+                        <Input placeholder="URL do vídeo (YouTube embed, Vimeo, etc)" value={l.video_url ?? ""} disabled={!podeEscrever} onChange={(e) => setLicoes((p) => p.map((x) => x.id === l.id ? { ...x, video_url: e.target.value } : x))} />
                       )}
-                      <Textarea placeholder="Conteúdo da lição" value={l.conteudo ?? ""} onChange={(e) => setLicoes((p) => p.map((x) => x.id === l.id ? { ...x, conteudo: e.target.value } : x))} rows={3} />
-                      <Button size="sm" onClick={() => salvarLicao(l)}>Salvar</Button>
+                      <Textarea placeholder="Conteúdo da lição" value={l.conteudo ?? ""} disabled={!podeEscrever} onChange={(e) => setLicoes((p) => p.map((x) => x.id === l.id ? { ...x, conteudo: e.target.value } : x))} rows={3} />
+                      {podeEscrever && (
+                        <Button size="sm" onClick={() => salvarLicao(l)}>Salvar</Button>
+                      )}
                     </div>
                   ))}
                 </div>

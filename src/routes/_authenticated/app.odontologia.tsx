@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { Odontograma } from "@/components/odontograma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +33,7 @@ interface ProntuarioOdonto {
 
 function OdontologiaPage() {
   const { clinicaAtual } = useClinica();
+  const podeEscrever = usePodeEscrever("odontologia");
   const [pacienteId, setPacienteId] = useState<string | null>(null);
   const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
   const [dentes, setDentes] = useState<DenteRow[]>([]);
@@ -65,6 +67,7 @@ function OdontologiaPage() {
   for (const r of [...dentes].reverse()) estados[r.dente] = r.status;
 
   async function salvarDente() {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!selecionado || !pacienteId || !clinicaAtual) return;
     const { error } = await supabase.from("odonto_dentes").insert({
       clinica_id: clinicaAtual.clinica_id,
@@ -83,6 +86,7 @@ function OdontologiaPage() {
 
   type CampoProntuario = "queixa_principal" | "historia_dental" | "plano_tratamento" | "observacoes";
   async function salvarProntuario(campo: CampoProntuario, valor: string) {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!pacienteId || !clinicaAtual) return;
     const patch: Partial<Record<CampoProntuario, string>> = { [campo]: valor };
     if (prontuario) {
@@ -127,7 +131,7 @@ function OdontologiaPage() {
             <CardHeader><CardTitle>Odontograma</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <Odontograma estados={estados} onClickDente={setSelecionado} selecionado={selecionado} />
-              {selecionado && (
+              {selecionado && podeEscrever && (
                 <div className="border rounded-md p-4 space-y-3">
                   <p className="font-medium">Dente {selecionado}</p>
                   <div className="grid md:grid-cols-3 gap-3">
@@ -165,6 +169,7 @@ function OdontologiaPage() {
                   defaultValue={prontuario?.queixa_principal ?? ""}
                   onBlur={(e) => { if (e.target.value !== (prontuario?.queixa_principal ?? "")) void salvarProntuario("queixa_principal", e.target.value); }}
                   rows={3}
+                  disabled={!podeEscrever}
                 />
               </CardContent>
             </Card>
@@ -175,6 +180,7 @@ function OdontologiaPage() {
                   defaultValue={prontuario?.historia_dental ?? ""}
                   onBlur={(e) => { if (e.target.value !== (prontuario?.historia_dental ?? "")) void salvarProntuario("historia_dental", e.target.value); }}
                   rows={3}
+                  disabled={!podeEscrever}
                 />
               </CardContent>
             </Card>
@@ -185,6 +191,7 @@ function OdontologiaPage() {
                   defaultValue={prontuario?.plano_tratamento ?? ""}
                   onBlur={(e) => { if (e.target.value !== (prontuario?.plano_tratamento ?? "")) void salvarProntuario("plano_tratamento", e.target.value); }}
                   rows={4}
+                  disabled={!podeEscrever}
                 />
               </CardContent>
             </Card>
@@ -195,6 +202,7 @@ function OdontologiaPage() {
                   defaultValue={prontuario?.observacoes ?? ""}
                   onBlur={(e) => { if (e.target.value !== (prontuario?.observacoes ?? "")) void salvarProntuario("observacoes", e.target.value); }}
                   rows={4}
+                  disabled={!podeEscrever}
                 />
               </CardContent>
             </Card>
