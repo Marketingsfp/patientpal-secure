@@ -3091,7 +3091,11 @@ function AgendaPage() {
       const desc = isGrat
         ? `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`
         : `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix} — SEM COBRANÇA`;
-      const { error: errSC } = await supabase.from("fin_lancamentos").insert({
+      if (!a.id) {
+        setAvisoConvenio({ tom: "error", mensagem: "Não foi possível registrar: agendamento sem identificador. Recarregue a agenda e tente novamente." });
+        return;
+      }
+      const { data: lancInserido, error: errSC } = await supabase.from("fin_lancamentos").insert({
         clinica_id: clinicaAtual.clinica_id,
         tipo: "receita" as const,
         descricao: desc,
@@ -3103,12 +3107,67 @@ function AgendaPage() {
         observacoes: isGrat
           ? `Gratuidade pelo convênio ${info?.convenioNome ?? ""}.`.trim()
           : "Atendimento sem cobrança (procedimento sem valor).",
-      } as never);
+      } as never).select("id").single();
       if (errSC) {
         mostrarErro(errSC, isGrat ? "falha ao registrar gratuidade" : "falha ao registrar atendimento sem cobrança");
         return;
       }
       setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
+      // Espelha o lançamento em `caixa_movimentos` para que gratuidades e
+      // atendimentos sem cobrança apareçam em "Meu caixa > Movimentos".
+      try {
+        if (user?.id) {
+          let { data: sess } = await supabase
+            .from("caixa_sessoes")
+            .select("id")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .eq("user_id", user.id)
+            .eq("status", "aberto")
+            .order("aberto_em", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (!sess) {
+            const nome = (user.user_metadata as { nome?: string } | null)?.nome ?? user.email ?? null;
+            const { data: novaSess } = await supabase
+              .from("caixa_sessoes")
+              .insert({
+                clinica_id: clinicaAtual.clinica_id,
+                user_id: user.id,
+                user_nome: nome,
+                valor_abertura: 0,
+                status: "aberto",
+                observacoes: "Aberto automaticamente pelo sistema",
+              } as never)
+              .select("id")
+              .single();
+            sess = novaSess;
+            if (sess?.id) {
+              await supabase.from("caixa_movimentos").insert({
+                sessao_id: sess.id,
+                clinica_id: clinicaAtual.clinica_id,
+                user_id: user.id,
+                tipo: "abertura",
+                valor: 0,
+                descricao: "Abertura automática",
+              } as never);
+            }
+          }
+          if (sess?.id) {
+            await supabase.from("caixa_movimentos").insert({
+              sessao_id: sess.id,
+              clinica_id: clinicaAtual.clinica_id,
+              user_id: user.id,
+              tipo: "recebimento",
+              valor: 0,
+              descricao: desc,
+              forma_pagamento: isGrat ? "convenio_gratuidade" : "sem_cobranca",
+              lancamento_id: (lancInserido as { id?: string } | null)?.id ?? null,
+            } as never);
+          }
+        }
+      } catch (e) {
+        console.error("Falha ao registrar gratuidade/sem-cobrança no caixa:", e);
+      }
       // Auto check-in apenas se o atendimento for do mesmo dia.
       try {
         const hoje = new Date().toISOString().slice(0, 10);
