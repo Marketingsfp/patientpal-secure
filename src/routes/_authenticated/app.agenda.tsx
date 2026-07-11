@@ -341,7 +341,7 @@ async function obterInfoConvenioPaciente(params: {
   //    a aba antiga "Benefícios (regras)" (cb_beneficios) foi removida.
   const { data: regrasRaw } = await (supabase as any)
     .from("cb_convenio_regras")
-    .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor")
+    .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,grupo_gratuidade")
     .eq("convenio_id", contrato.convenio_id)
     .eq("ativo", true);
   const regrasCb = ((regrasRaw ?? []) as any[]);
@@ -480,6 +480,30 @@ async function obterInfoConvenioPaciente(params: {
       } else {
         agsFiltrados = (agsDia ?? []) as Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null; inicio?: string | null }>;
       }
+      // Grupo de gratuidade compartilhada: se a regra pertence a um grupo,
+      // a cota é dividida entre todos os procedimentos do grupo. Filtramos os
+      // agendamentos por nome do procedimento (agendamentos.procedimento é
+      // texto) usando os nomes dos procedimentos vinculados ao mesmo grupo.
+      if (beneficioEscolhido.grupo_gratuidade) {
+        const grupoProcIds = Array.from(new Set(
+          (regrasCb as Array<{ grupo_gratuidade: string | null; procedimento_id: string | null }>)
+            .filter((r) => r.grupo_gratuidade === beneficioEscolhido.grupo_gratuidade && r.procedimento_id)
+            .map((r) => r.procedimento_id as string),
+        ));
+        if (grupoProcIds.length) {
+          const { data: procsNomes } = await supabase
+            .from("procedimentos")
+            .select("nome")
+            .in("id", grupoProcIds);
+          const normProc = (s: string | null | undefined) =>
+            (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+          const nomesSet = new Set(
+            ((procsNomes ?? []) as Array<{ nome: string | null }>).map((p) => normProc(p.nome)),
+          );
+          const agsWithProc = agsFiltrados as Array<{ id: string; medico_id: string | null; paciente_id?: string | null; status?: string | null; inicio?: string | null; procedimento?: string | null }>;
+          agsFiltrados = agsWithProc.filter((a) => nomesSet.has(normProc(a.procedimento)));
+        }
+      }
       // Regra: o limite só é consumido quando o agendamento efetivamente foi
       // pago. O status na tabela `agendamentos` nem sempre muda para
       // "realizado" após a cobrança no caixa — o sinal mais confiável é a
@@ -582,6 +606,40 @@ async function obterInfoConvenioPaciente(params: {
           avisoLimite = consumidorTxt
             ? `${consumidorTxt}Cobrando ${100 - pct}% do valor particular neste atendimento.`
             : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — cobrando ${100 - pct}% do valor particular.`;
+        } else if (modo === "regra_padrao_convenio") {
+          // Fallback: procura a próxima regra do mesmo convênio para este
+          // procedimento excluindo regras gratuitas. Aplica o desconto dessa
+          // regra como se o benefício gratuito não existisse.
+          let fallback: any = null;
+          for (const eid of espsTentativa) {
+            const r = findRegra(regrasCb as any, eid, procedimentoTipo, procedimentoId, { excludeGratuito: true });
+            if (r) { fallback = r; break; }
+          }
+          if (fallback) {
+            if (fallback.modo === "valor_fixo") {
+              const v = Number(fallback.valor) || 0;
+              desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };
+              avisoLimite = consumidorTxt
+                ? `${consumidorTxt}Aplicando o desconto padrão do convênio (R$ ${v.toFixed(2)}).`
+                : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — aplicando desconto padrão do convênio (R$ ${v.toFixed(2)}).`;
+            } else if (fallback.modo === "percentual_desconto") {
+              const p = Number(fallback.percentual) || 0;
+              desconto = { tipo: "percentual", valor: p };
+              avisoLimite = consumidorTxt
+                ? `${consumidorTxt}Aplicando o desconto padrão do convênio (${p}% off).`
+                : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — aplicando desconto padrão do convênio (${p}% off).`;
+            } else {
+              desconto = null;
+              avisoLimite = consumidorTxt
+                ? `${consumidorTxt}Sem regra padrão configurada — cobrando particular.`
+                : `Limite atingido e sem regra padrão do convênio — cobrando valor particular.`;
+            }
+          } else {
+            desconto = null;
+            avisoLimite = consumidorTxt
+              ? `${consumidorTxt}Não há regra padrão do convênio para este procedimento — cobrando valor particular.`
+              : `Limite atingido e não há regra padrão do convênio — cobrando valor particular.`;
+          }
         }
       } else if (agsPendentes.length >= 1) {
         // Cota ainda não consumida, mas existem outros agendamentos pendentes
@@ -5152,7 +5210,7 @@ function AgendaPage() {
       </div>
 
       {/* Tabela */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="rounded-lg border border-border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
@@ -5166,12 +5224,12 @@ function AgendaPage() {
                 />
               </TableHead>
               <TableHead className="w-16">Ficha</TableHead>
-              <TableHead className="w-14">Dia</TableHead>
-              <TableHead className="w-24">Data</TableHead>
+              <TableHead className="w-14 hidden md:table-cell">Dia</TableHead>
+              <TableHead className="w-24 hidden md:table-cell">Data</TableHead>
               <TableHead className="w-24">Intervalo</TableHead>
-              <TableHead className="w-[220px] max-w-[220px]">Profissional</TableHead>
+              <TableHead className="w-[220px] max-w-[220px] hidden lg:table-cell">Profissional</TableHead>
               <TableHead className="w-[220px] max-w-[220px]">Cliente</TableHead>
-              <TableHead className="w-40">Serviço</TableHead>
+              <TableHead className="w-40 hidden md:table-cell">Serviço</TableHead>
               <TableHead className="w-28 text-center">Alertas</TableHead>
               <TableHead className="w-32 text-right">Ações</TableHead>
             </TableRow>
@@ -5230,12 +5288,12 @@ function AgendaPage() {
                     <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
                   </TableCell>
                   <TableCell className="font-mono text-sm">{fichaNum}</TableCell>
-                  <TableCell className="text-sm">{fmtDiaSemana(a.inicio)}</TableCell>
-                  <TableCell className="text-sm">{fmtData(a.inicio)}</TableCell>
+                  <TableCell className="text-sm hidden md:table-cell">{fmtDiaSemana(a.inicio)}</TableCell>
+                  <TableCell className="text-sm hidden md:table-cell">{fmtData(a.inicio)}</TableCell>
                   <TableCell>
                      <span className="text-emerald-600 font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
-                  <TableCell className="pr-1 align-middle max-w-[220px]">
+                  <TableCell className="pr-1 align-middle max-w-[220px] hidden lg:table-cell">
                     {(() => {
                       const m = medicos.find((x) => x.id === a.medico_id);
                       const label = medicoNomeAgendamento(a);
@@ -5329,7 +5387,7 @@ function AgendaPage() {
                       </button>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <ProcedimentoCell
                       valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                       opcoes={opcoesProcedimentoMedico(a.medico_id)}

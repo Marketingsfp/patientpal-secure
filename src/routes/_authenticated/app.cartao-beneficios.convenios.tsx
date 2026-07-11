@@ -541,7 +541,7 @@ function ConveniosPage() {
             <TabsList>
               <TabsTrigger value="info">Informações</TabsTrigger>
               <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
-              <TabsTrigger value="regras"><Scale className="h-4 w-4 mr-1" />Regras de Preço</TabsTrigger>
+              <TabsTrigger value="regras"><Gift className="h-4 w-4 mr-1" />Benefícios</TabsTrigger>
               <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
               <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
               <TabsTrigger value="termo"><FileSignature className="h-4 w-4 mr-1" />Termo de Inclusão</TabsTrigger>
@@ -591,19 +591,6 @@ function ConveniosPage() {
                 </div>
               </div>
               <div>
-                <Label>Benefícios</Label>
-                <Textarea
-                  value={beneficiosTxt}
-                  maxLength={BENEFICIOS_MAX}
-                  onChange={(e) => setBeneficiosTxt(e.target.value)}
-                  rows={4}
-                  placeholder="Liste os benefícios deste convênio"
-                />
-                <p className={`text-xs mt-1 text-right ${beneficiosTxt.trim().length > BENEFICIOS_MAX ? "text-red-600" : "text-muted-foreground"}`}>
-                  {beneficiosTxt.trim().length} / {BENEFICIOS_MAX}
-                </p>
-              </div>
-              <div>
                 <Label>Descrição</Label>
                 <Textarea
                   value={descricao}
@@ -642,7 +629,7 @@ function ConveniosPage() {
                     <Plus className="h-4 w-4 mr-1" /> Adicionar Faixa
                   </Button>
                 </div>
-                <div className="border rounded-md overflow-hidden">
+                <div className="border rounded-md overflow-hidden max-w-xl">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -657,6 +644,7 @@ function ConveniosPage() {
                           <TableCell>
                             <Input
                               type="number" min="1"
+                              className="border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent"
                               value={f.vidas_de}
                               onChange={(e) => {
                                 const v = parseInt(e.target.value) || 1;
@@ -666,7 +654,7 @@ function ConveniosPage() {
                           </TableCell>
                           <TableCell>
                             <CurrencyInput
-                              className="text-right"
+                              className="text-right border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent"
                               value={f.valor_mensal ? Number(f.valor_mensal).toFixed(2) : ""}
                               onChange={(v) => {
                                 const num = v ? parseFloat(v) : 0;

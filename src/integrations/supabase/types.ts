@@ -1967,6 +1967,7 @@ export type Database = {
           excedente_percentual: number | null
           excedente_valor: number | null
           gratuito: boolean
+          grupo_gratuidade: string | null
           id: string
           limite_escopo: string | null
           limite_periodo: string | null
@@ -1991,6 +1992,7 @@ export type Database = {
           excedente_percentual?: number | null
           excedente_valor?: number | null
           gratuito?: boolean
+          grupo_gratuidade?: string | null
           id?: string
           limite_escopo?: string | null
           limite_periodo?: string | null
@@ -2015,6 +2017,7 @@ export type Database = {
           excedente_percentual?: number | null
           excedente_valor?: number | null
           gratuito?: boolean
+          grupo_gratuidade?: string | null
           id?: string
           limite_escopo?: string | null
           limite_periodo?: string | null

@@ -54,19 +54,20 @@ export function HhpKpiCard({
         style={{ background: "var(--clinic-accent)" }}
       />
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 leading-tight line-clamp-2 min-w-0">
           {label}
         </span>
-        <span className={cn("inline-flex h-6 w-6 items-center justify-center rounded-lg", HHP_TONE_BG[tone])}>
+        <span className={cn("inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg", HHP_TONE_BG[tone])}>
           <Icon className="h-3 w-3" strokeWidth={2.5} />
         </span>
       </div>
-      <div className="mt-2 flex items-baseline gap-1.5 hhp-kpi-anim">
+      <div className="mt-2 flex items-baseline gap-1.5 hhp-kpi-anim min-w-0">
         <span
           className={cn(
-            "tabular-nums font-bold text-slate-900",
-            compact ? "text-xl" : "text-3xl",
+            "tabular-nums font-bold text-slate-900 truncate max-w-full",
+            compact ? "text-xl" : "text-2xl xl:text-3xl",
           )}
+          title={typeof value === "number" ? value.toLocaleString("pt-BR") : String(value)}
           style={{ fontFamily: "var(--hhp-font-display)", letterSpacing: "-0.02em" }}
         >
           {typeof value === "number" ? value.toLocaleString("pt-BR") : value}
