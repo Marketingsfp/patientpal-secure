@@ -143,6 +143,7 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
   const [q, setQ] = useState("");
   const [view, setView] = useState<"list" | "new">("list");
   const [detail, setDetail] = useState<Contrato | null>(null);
+  const [detailInitialTab, setDetailInitialTab] = useState<"resumo" | "dados" | "contrato">("resumo");
   const [sortPaciente, setSortPaciente] = useState<null | "asc" | "desc">(null);
 
   // Termo com debounce para acionar busca server-side sem bater a cada tecla.
@@ -236,8 +237,17 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
         convenios={convenios}
         clinicaId={clinicaAtual!.clinica_id}
         userId={user?.id ?? null}
-        onCreated={() => {
+        onCreated={async (contratoId) => {
           setView("list");
+          const { data } = await supabase
+            .from("contratos_assinatura")
+            .select("*")
+            .eq("id", contratoId)
+            .maybeSingle();
+          if (data) {
+            setDetailInitialTab("dados");
+            setDetail(data as Contrato);
+          }
           load();
         }}
       />
@@ -248,8 +258,10 @@ export function ContratosPage({ initialContratoId }: { initialContratoId?: strin
     return (
       <DetalheContrato
         contrato={detail}
+        initialTab={detailInitialTab}
         onBack={() => {
           setDetail(null);
+          setDetailInitialTab("resumo");
           load();
         }}
       />
@@ -393,7 +405,7 @@ function NovoContratoForm({
   convenios: Convenio[];
   clinicaId: string;
   userId: string | null;
-  onCreated: () => void;
+  onCreated: (contratoId: string) => void;
 }) {
   const [convenioId, setConvenioId] = useState(convenios[0]?.id ?? "");
   const convenio = convenios.find((c) => c.id === convenioId);
@@ -693,7 +705,7 @@ function NovoContratoForm({
         }
       }
     }
-    onCreated();
+    onCreated(contrato.id);
   };
 
   return (
@@ -1175,7 +1187,15 @@ function NovoContratoForm({
   );
 }
 
-function DetalheContrato({ contrato, onBack }: { contrato: Contrato; onBack: () => void }) {
+function DetalheContrato({
+  contrato,
+  onBack,
+  initialTab = "resumo",
+}: {
+  contrato: Contrato;
+  onBack: () => void;
+  initialTab?: "resumo" | "dados" | "contrato";
+}) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const DadosField = ({ label, value }: { label: string; value: React.ReactNode }) => (
@@ -2066,7 +2086,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
       </div>
       <Card>
         <CardContent className="p-6 space-y-4">
-          <Tabs defaultValue="resumo">
+          <Tabs defaultValue={initialTab}>
             <TabsList>
               <TabsTrigger value="resumo">Resumo</TabsTrigger>
               <TabsTrigger value="dados">Dados</TabsTrigger>
