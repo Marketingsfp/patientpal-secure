@@ -434,7 +434,7 @@ async function obterInfoConvenioPaciente(params: {
     if (pacientesCota.length > 0) {
       let q = supabase
         .from("agendamentos")
-        .select("id,medico_id,procedimento,paciente_id", { count: "exact" })
+        .select("id,medico_id,procedimento,paciente_id,status", { count: "exact" })
         .eq("clinica_id", clinicaId)
         .in("paciente_id", pacientesCota)
         .neq("status", "cancelado");
@@ -446,7 +446,7 @@ async function obterInfoConvenioPaciente(params: {
       // Se o benefício é por especialidade, filtra pelos agendamentos cujo
       // médico tem a mesma especialidade.
       let usados = 0;
-      let agsFiltrados: Array<{ medico_id: string | null; paciente_id?: string | null }> = [];
+      let agsFiltrados: Array<{ medico_id: string | null; paciente_id?: string | null; status?: string | null }> = [];
       if (beneficioEscolhido.escopo === "especialidade" && beneficioEscolhido.especialidade_id) {
         const medicoIds = Array.from(new Set(((agsDia ?? []) as Array<{ medico_id: string | null }>).map((a) => a.medico_id).filter((x): x is string => !!x)));
         if (medicoIds.length) {
@@ -469,23 +469,29 @@ async function obterInfoConvenioPaciente(params: {
             if (m.especialidade_id) s.add(m.especialidade_id);
             espByMed.set(m.medico_id, s);
           });
-          agsFiltrados = ((agsDia ?? []) as Array<{ medico_id: string | null; paciente_id?: string | null }>).filter((a) => {
+          agsFiltrados = ((agsDia ?? []) as Array<{ medico_id: string | null; paciente_id?: string | null; status?: string | null }>).filter((a) => {
             if (!a.medico_id) return false;
             const s = espByMed.get(a.medico_id);
             return s ? s.has(beneficioEscolhido.especialidade_id) : false;
           });
-          usados = agsFiltrados.length;
         }
       } else {
-        agsFiltrados = (agsDia ?? []) as Array<{ medico_id: string | null; paciente_id?: string | null }>;
-        usados = agsFiltrados.length;
+        agsFiltrados = (agsDia ?? []) as Array<{ medico_id: string | null; paciente_id?: string | null; status?: string | null }>;
       }
+      // Regra: o limite só é consumido quando o agendamento efetivamente foi
+      // pago/atendido (status "realizado" ou "pago"). Agendamentos apenas
+      // marcados ("agendado"/"confirmado") não consomem cota — apenas geram
+      // aviso informativo.
+      const isPago = (s: string | null | undefined) => s === "realizado" || s === "pago";
+      const agsPagos = agsFiltrados.filter((a) => isPago(a.status));
+      const agsPendentes = agsFiltrados.filter((a) => !isPago(a.status));
+      usados = agsPagos.length;
 
       // Escopo "titular ou dependente (exclusivo)": se qualquer OUTRO paciente
       // do contrato já consumiu na janela, a cota é considerada esgotada.
       let esgotadoExclusivo = false;
       if (escopoLim === "titular_ou_dependente") {
-        esgotadoExclusivo = agsFiltrados.some((a) => a.paciente_id && a.paciente_id !== pacienteId);
+        esgotadoExclusivo = agsPagos.some((a) => a.paciente_id && a.paciente_id !== pacienteId);
       }
 
       if (usados >= Number(beneficioEscolhido.limite_qtd) || esgotadoExclusivo) {
@@ -515,6 +521,23 @@ async function obterInfoConvenioPaciente(params: {
           desconto = { tipo: "percentual", valor: pct };
           avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — cobrando ${100 - pct}% do valor particular.`;
         }
+      } else if (agsPendentes.length >= 1) {
+        // Cota ainda não consumida, mas existem outros agendamentos pendentes
+        // que compartilham a cota — aviso informativo (não altera desconto).
+        const modo = beneficioEscolhido.excedente_modo;
+        let excedenteTxt = "sairão sem o benefício";
+        if (modo === "particular") excedenteTxt = "sairão pelo valor particular cheio";
+        else if (modo === "percentual_particular") {
+          const pct = Number(beneficioEscolhido.excedente_percentual) || 0;
+          excedenteTxt = `sairão com ${pct}% de desconto sobre o particular`;
+        } else if (modo === "valor_fixo") {
+          const v = Number(beneficioEscolhido.excedente_valor) || 0;
+          excedenteTxt = `sairão pelo valor fixo excedente de R$ ${v.toFixed(2)}`;
+        } else if (modo === "bloquear") {
+          excedenteTxt = "serão bloqueados pelo convênio";
+        }
+        const total = agsPendentes.length + 1;
+        avisoLimite = `Existem ${total} agendamentos pendentes com este benefício no período. Apenas ${beneficioEscolhido.limite_qtd} será cobrado com o benefício; os demais ${excedenteTxt} quando pagos.`;
       }
     }
   }
