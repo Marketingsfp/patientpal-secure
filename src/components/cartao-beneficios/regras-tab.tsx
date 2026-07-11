@@ -410,8 +410,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         </div>
       </div>
 
-      <div className="border rounded-md overflow-x-auto max-w-full">
-        <Table>
+      <div className="border rounded-md max-w-full">
+        <Table className="[&_th]:px-2 [&_td]:px-2 [&_th:first-child]:pl-3 [&_td:first-child]:pl-3 [&_th:last-child]:pr-2 [&_td:last-child]:pr-2">
           <TableHeader className="bg-muted sticky top-0 z-10 [&_tr]:border-b-0">
             <TableRow className="hover:bg-muted border-b-2 border-border">
               {[
@@ -419,13 +419,13 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                 { c: "", l: "Categoria" },
                 { c: "", l: "Serviço" },
                 { c: "", l: "Modo" },
-                { c: "text-right", l: "Valor / %" },
-                { c: "w-20", l: "Prioridade" },
-                { c: "min-w-[110px]", l: "Exemplo" },
-                { c: "", l: "Limite" },
-                { c: "", l: "Carência" },
-                { c: "text-center w-16 px-1", l: "Gratuito" },
-                { c: "w-8 px-0", l: "" },
+                { c: "text-right w-[80px]", l: "Valor / %" },
+                { c: "w-[60px] text-center", l: "Prioridade" },
+                { c: "w-[90px]", l: "Exemplo" },
+                { c: "w-[100px]", l: "Limite" },
+                { c: "w-[92px]", l: "Carência" },
+                { c: "text-center w-[52px] !px-1", l: "Gratuito" },
+                { c: "w-[32px] !px-0", l: "" },
               ].map((h, i) => (
                 <TableHead
                   key={i}
