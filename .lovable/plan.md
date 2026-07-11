@@ -1,25 +1,34 @@
 ## Objetivo
 
-Reformular a tabela de regras do convênio em `src/components/cartao-beneficios/regras-tab.tsx`:
+Compactar a tabela de Regras de Preço em `src/components/cartao-beneficios/regras-tab.tsx` para caber em 100% de zoom, sem alterar comportamento.
 
-1. **Remover o agrupamento por carência** (linhas "Imediato", "Após 2ª mensalidade"…). Tudo volta a ser uma lista única.
-2. **Ordenar alfabeticamente crescente** por: Serviço → Especialidade → Categoria (regras sem serviço/especialidade caem para o fim de cada nível).
-3. **Adicionar filtros** acima da tabela — 3 selects:
-   - Gratuito: Todos / Sim / Não
-   - Carência: Todos / Imediato / Após 1ª / 2ª / 3ª / 6ª / 12ª mensalidade
-   - Limite: Todos / Com limite / Sem limite
-4. **Destacar o cabeçalho da tabela**: fundo mais forte (`bg-muted`), texto `font-semibold` em cor mais escura, `uppercase` com tracking, borda inferior mais marcada e cabeçalho `sticky top-0` para permanecer visível ao rolar.
+## Mudanças
 
-## Mudanças (apenas `regras-tab.tsx`)
+1. **Tabela mais estreita** — remover `min-w-[1400px]` da `<Table>` e o `min-w-[200px]`/`min-w-[220px]` dos cabeçalhos. Deixar a tabela usar 100% da largura disponível.
 
-- Remover a lógica de `buckets` por `carencia_mensalidades` e a `TableRow` de grupo com `<Timer />`.
-- Adicionar `useMemo` com `regrasFiltradas` aplicando os 3 filtros e ordenando por nome de serviço/especialidade/categoria (usa mapas `procedimentos`/`especialidades` já carregados para lookup de nomes).
-- Adicionar estado local: `filtroGratuito`, `filtroCarencia`, `filtroLimite`.
-- Renderizar uma barra de filtros compacta (3 `Select` shadcn) entre o header da aba e a tabela.
-- Ajustar `<TableHeader>` / `<TableHead>` com classes: `bg-muted sticky top-0 z-10`, `<TableHead className="font-semibold text-foreground uppercase text-[11px] tracking-wide border-b-2">`.
-- Manter a coluna "Carência" na tabela (o select por linha continua funcional para edição rápida).
-- Manter comportamento do dialog de nova regra, salvar, reaplicar, limite e exclusão inalterados.
+2. **Especialidade (coluna)** — reduzir o `SearchableSelect` para largura fixa menor (`w-32`) com truncamento; placeholder passa a "Qualquer".
 
-## Observação
+3. **Categoria (Tipo)** — trocar `SelectTrigger` de `w-36` para `w-24 h-8 text-xs`.
 
-- Sem mudanças no banco. Só apresentação/filtros no cliente.
+4. **Modo** — trocar `SelectTrigger` de `w-40` para `w-28 h-8 text-xs`.
+
+5. **Valor / %** — alinhar consistente à direita:
+   - `<TableHead>` já é `text-right`.
+   - Reduzir CurrencyInput/Input para `w-24 h-8 text-right text-xs` e envolver a célula em `flex justify-end` para alinhar todos os campos (fixo e percentual) na mesma borda direita.
+
+6. **Prioridade** — Input `w-14 h-8 text-xs` (era `w-16`).
+
+7. **Carência (coluna e labels)** — abreviar rótulos:
+   - Novo helper `carenciaShort(n)`: `0 → "Imediato"`, `n → "Após ${n}ª"`.
+   - Usar no `SelectItem` da linha (mantém valores 0/1/2/3/6/12).
+   - `SelectTrigger` passa de `w-40` para `w-24 h-8 text-xs`.
+   - Filtro de topo (bar de filtros) também abrevia para "Após 1ª", "Após 2ª"… (mantém `CARENCIA_GROUPS` só para os values; label curto derivado do helper). Trigger do filtro reduz de `w-52` para `w-32`.
+
+8. **Limite** — botão `h-7 text-[11px] px-2` (mais estreito) e texto sem alterações.
+
+9. **Cabeçalhos** — manter estilo destacado atual; apenas remover `min-w-*` para permitir compactação.
+
+## Escopo
+
+- Somente `src/components/cartao-beneficios/regras-tab.tsx`.
+- Sem mudanças em dados, filtros, ordenação, dialogs (Nova regra / Limite) nem no salvar.

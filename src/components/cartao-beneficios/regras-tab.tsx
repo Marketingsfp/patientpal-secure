@@ -44,6 +44,10 @@ const carenciaLabel = (n: number | null | undefined) => {
   const v = Number(n ?? 0);
   return CARENCIA_GROUPS.find(g => g.value === v)?.label ?? `Após ${v}ª mensalidade`;
 };
+const carenciaShort = (n: number | null | undefined) => {
+  const v = Number(n ?? 0);
+  return v === 0 ? "Imediato" : `Após ${v}ª`;
+};
 
 export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props) {
   const [regras, setRegras] = useState<CbRegra[]>([]);
@@ -366,11 +370,11 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         <div className="space-y-1">
           <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Carência</Label>
           <Select value={filtroCarencia} onValueChange={setFiltroCarencia}>
-            <SelectTrigger className="h-8 w-52 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todas</SelectItem>
               {CARENCIA_GROUPS.map(g => (
-                <SelectItem key={g.value} value={String(g.value)}>{g.label}</SelectItem>
+                <SelectItem key={g.value} value={String(g.value)}>{carenciaShort(g.value)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -402,13 +406,13 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       </div>
 
       <div className="border rounded-md overflow-x-auto max-w-full">
-        <Table className="min-w-[1400px]">
+        <Table>
           <TableHeader className="bg-muted sticky top-0 z-10 [&_tr]:border-b-0">
             <TableRow className="hover:bg-muted border-b-2 border-border">
               {[
-                { c: "min-w-[200px]", l: "Especialidade" },
+                { c: "", l: "Especialidade" },
                 { c: "", l: "Categoria" },
-                { c: "min-w-[220px]", l: "Serviço" },
+                { c: "", l: "Serviço" },
                 { c: "", l: "Modo" },
                 { c: "text-right", l: "Valor / %" },
                 { c: "w-20", l: "Prioridade" },
@@ -452,7 +456,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     onValueChange={(v) => update(idx, { tipo: v === "__any__" ? null : v })}
                     disabled={!!r.procedimento_id}
                   >
-                    <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__any__">Qualquer</SelectItem>
                       {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -473,7 +477,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                 </TableCell>
                 <TableCell>
                   <Select value={r.modo} onValueChange={(v) => update(idx, { modo: v })}>
-                    <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="valor_fixo">Valor fixo</SelectItem>
                       <SelectItem value="percentual_desconto">% desconto</SelectItem>
@@ -481,24 +485,26 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   </Select>
                 </TableCell>
                 <TableCell className="text-right">
-                  {r.modo === "valor_fixo" ? (
-                    <CurrencyInput
-                      className="w-28 text-right"
-                      value={r.valor !== null ? Number(r.valor).toFixed(2) : ""}
-                      onChange={(v) => update(idx, { valor: v ? parseFloat(v) : 0 })}
-                    />
-                  ) : (
-                    <Input
-                      className="w-20 text-right"
-                      type="number" min="0" max="100" step="0.01"
-                      value={r.percentual ?? ""}
-                      onChange={(e) => update(idx, { percentual: e.target.value ? parseFloat(e.target.value) : 0 })}
-                    />
-                  )}
+                  <div className="flex justify-end">
+                    {r.modo === "valor_fixo" ? (
+                      <CurrencyInput
+                        className="w-24 h-8 text-right text-xs"
+                        value={r.valor !== null ? Number(r.valor).toFixed(2) : ""}
+                        onChange={(v) => update(idx, { valor: v ? parseFloat(v) : 0 })}
+                      />
+                    ) : (
+                      <Input
+                        className="w-24 h-8 text-right text-xs"
+                        type="number" min="0" max="100" step="0.01"
+                        value={r.percentual ?? ""}
+                        onChange={(e) => update(idx, { percentual: e.target.value ? parseFloat(e.target.value) : 0 })}
+                      />
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <Input
-                    className="w-16"
+                    className="w-14 h-8 text-xs"
                     type="number" min="1" max="100"
                     value={r.prioridade}
                     onChange={(e) => update(idx, { prioridade: parseInt(e.target.value) || 1 })}
@@ -509,7 +515,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                   <Button
                     size="sm"
                     variant={r.limite_qtd ? "secondary" : "ghost"}
-                    className="text-xs h-7"
+                    className="text-[11px] h-7 px-2"
                     onClick={() => setLimiteIdx(idx)}
                     title="Configurar limite de uso"
                   >
@@ -524,14 +530,14 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     value={String(r.carencia_mensalidades ?? 0)}
                     onValueChange={(v) => update(idx, { carencia_mensalidades: Number(v) })}
                   >
-                    <SelectTrigger className="w-40 h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="0">Imediato</SelectItem>
-                      <SelectItem value="2">Após 2ª mensalidade</SelectItem>
-                      <SelectItem value="6">Após 6ª mensalidade</SelectItem>
-                      <SelectItem value="1">Após 1ª mensalidade</SelectItem>
-                      <SelectItem value="3">Após 3ª mensalidade</SelectItem>
-                      <SelectItem value="12">Após 12ª mensalidade</SelectItem>
+                      <SelectItem value="1">Após 1ª</SelectItem>
+                      <SelectItem value="2">Após 2ª</SelectItem>
+                      <SelectItem value="3">Após 3ª</SelectItem>
+                      <SelectItem value="6">Após 6ª</SelectItem>
+                      <SelectItem value="12">Após 12ª</SelectItem>
                     </SelectContent>
                   </Select>
                 </TableCell>
