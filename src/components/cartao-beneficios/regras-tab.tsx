@@ -798,6 +798,7 @@ function NovaRegraDialog({
         ? Number(r.excedente_valor ?? 0) : null,
       carencia_mensalidades: Number(r.carencia_mensalidades ?? 0) || 0,
       gratuito: !!r.gratuito,
+      grupo_gratuidade: r.grupo_gratuidade?.trim() ? r.grupo_gratuidade.trim() : null,
     };
     const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
     setSaving(false);
