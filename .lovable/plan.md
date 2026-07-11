@@ -1,26 +1,32 @@
-Todas as mudanças ficam em `src/components/pages/contratos-page.tsx` (frontend/apresentação). Nenhum arquivo de autenticação, autorização, RLS, presets ou rotas protegidas é tocado. AGENTS.md/seção 1 não se aplica.
+Todas as mudanças ficam em `src/components/pages/contratos-page.tsx` (frontend). Nenhum arquivo de permissões é tocado.
 
-## 1. Formulário de novo contrato (foto 2)
+## 1. Filtro por Tipo de Convênio (cabeçalho da lista)
 
-- Reordenar o campo **"Nº de pessoas no contrato"** para ficar ao lado do campo **"Convênio"**: ambos passam a ocupar 1 coluna cada na primeira linha do grid (em vez de o Convênio ocupar `col-span-2`). Se não houver faixas cadastradas para o convênio, o Convênio volta a ocupar a linha inteira (fallback).
-- Adicionar o campo **"Data Término"** ao lado do campo **"Data início"**, na mesma linha. Substitui a posição atual do "Dia de vencimento", que desce para a linha seguinte junto com "Valor mensal" / "Taxa de adesão".
-- **Data Término** é somente-leitura (mesmo estilo visual dos campos "Valor mensal" e "Taxa de adesão": caixa cinza com valor formatado).
-- Cálculo automático: `data_fim = data_inicio + 1 ano` (mesmo dia/mês do ano seguinte, ex.: 11/07/2026 → 11/07/2027). Se `data_inicio` estiver vazia, exibe "—".
-- No `insert` de `contratos_assinatura` (por volta da linha 862), passar também `data_fim` calculado, para que a coluna Término da listagem seja preenchida corretamente para contratos novos.
+- Trocar o `<TableHead>TIPO DE CONVÊNIO</TableHead>` estático por um `Select` no mesmo padrão visual dos demais (`INÍCIO`, `TÉRMINO`, `MENSAL`, etc.), com a setinha para baixo e o pontinho azul quando ativo.
+- Novo state: `filtroConvenio` (string), default `"todos"`. Opções: `Todos` + um item por convênio ativo carregado em `convenios` (usa `id` como value e `nome` como label). Além disso, uma opção `Sem convênio` para contratos com `convenio_id` nulo.
+- Aplicar o filtro dentro do `filtered = useMemo(...)` existente, antes dos demais.
 
-## 2. Listagem de contratos (foto 1)
+## 2. Paginação — 50 contratos por página
 
-- Adicionar nova coluna **"TIPO DE CONVÊNIO"** entre PACIENTE e INÍCIO. Valor exibido = `convenios.find(x => x.id === c.convenio_id)?.nome ?? "—"` (o array `convenios` já é carregado no `load()`). Coluna sem filtro por enquanto (apenas exibição), para manter o escopo mínimo.
-- Ajustar os `colSpan` dos estados "Carregando…" e "Nenhum contrato" de 10 para 11.
-- Coluna **TÉRMINO**: passa a exibir `fmtD(c.data_fim)` (já é o comportamento atual). Para contratos antigos com `data_fim` nulo no banco, exibir fallback calculado em memória: `data_inicio + 1 ano` — assim registros legados também aparecem preenchidos, sem migração de dados. Contratos novos criados a partir desta mudança já gravam `data_fim` no banco.
+- Novo state: `pagina` (number, default 1). Constante `POR_PAGINA = 50`.
+- Derivar `totalPaginas = Math.max(1, Math.ceil(filtered.length / 50))` e `paginados = filtered.slice((pagina-1)*50, pagina*50)`.
+- Renderizar `paginados` no `filtered.map(...)` (substituir a variável usada no map por `paginados`).
+- Rodapé simples da tabela com: contagem total, controles "Anterior / Próxima" e "Página X de Y". Layout minimalista, consistente com o resto (botões `variant="outline" size="sm"`).
+- Resetar `pagina` para 1 sempre que qualquer filtro, busca ou ordenação mudar (`useEffect` com dependências dos filtros).
 
-## 3. Regra de negócio
+## 3. Contagem de resultados sempre visível
 
-Base de cálculo fixa em **1 ano** conforme o pedido do usuário ("Se um contrato iniciou dia 11/07/2026, ele vence em 11/07/2027"). No último dia da vigência o contrato continua utilizável normalmente (a comparação usa `data_fim` inclusiva — não há mudança em lógica de bloqueio; apenas exibição).
+- Acima da tabela (ou logo abaixo do campo de busca), exibir um resumo: `"Mostrando A–B de N contratos"` quando não há filtro/busca ativo; `"N resultado(s) — filtros ativos: …"` quando houver.
+- `filtrosAtivos` = lista das dimensões alteradas (situação, término, início, mensal, parcelas, vendedor, status, convênio, busca). Se pelo menos uma estiver diferente do default, entra no rótulo em PT-BR curto (ex.: `"Convênio", "Situação"`), separada por vírgula. Objetivo é atender o pedido: "sempre que utilizar um filtro quero que apareça a contagem do resultado".
+- Botão "Limpar filtros" ao lado da contagem, aparece só quando há pelo menos um filtro ativo. Reseta todos os states de filtro para o default e volta para a página 1.
+
+## 4. Ajustes de detalhe
+
+- `colSpan` dos estados vazios permanece 11 (não muda).
+- Contagem também exibida no rodapé junto da paginação, refletindo o total após filtros (`filtered.length`) — evita a impressão de "sumiram registros" quando o usuário está apenas em outra página.
 
 ## Fora de escopo
 
-- Não altera `cb_convenios.vigencia_meses` nem lógica de mensalidades.
-- Não muda a tabela `contratos_assinatura` (o campo `data_fim` já existe).
-- Não adiciona filtro para a nova coluna Tipo de convênio (pode ser pedido depois).
-- Não mexe em edição/administração de contratos existentes (aba admin) — foco apenas em criação + listagem.
+- Não muda nenhum outro filtro existente.
+- Não altera lógica de carregamento server-side (busca por termo continua igual, com o limite atual de 500 mais recentes / 200 quando há termo).
+- Não persiste a página nem os filtros na URL (mantém comportamento atual em memória).
