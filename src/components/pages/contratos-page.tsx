@@ -879,6 +879,7 @@ function NovoContratoForm({
         paciente_id: titular.id,
         paciente_nome: titular.nome,
         data_inicio: dataInicio,
+        data_fim: addUmAno(dataInicio),
         dia_vencimento: diaVenc,
         valor_mensal: valor,
         taxa_adesao: taxa,
