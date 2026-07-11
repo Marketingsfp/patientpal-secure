@@ -323,8 +323,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const sample = (r: CbRegra): string => {
     const v = computeValor(r, 100, 100);
     if (!v) return "—";
-    if (r.modo === "valor_fixo") return `R$ ${v.dinheiro.toFixed(2)} (fixo)`;
-    return `de R$100 → R$ ${v.dinheiro.toFixed(2)} (${r.percentual}% off)`;
+    if (r.modo === "valor_fixo") return `R$ ${v.dinheiro.toFixed(2)}`;
+    return `de R$100 → R$ ${v.dinheiro.toFixed(2)}`;
   };
 
   if (!convenioId) {
@@ -416,7 +416,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                 { c: "", l: "Modo" },
                 { c: "text-right", l: "Valor / %" },
                 { c: "w-20", l: "Prioridade" },
-                { c: "min-w-[140px]", l: "Exemplo" },
+                { c: "min-w-[110px]", l: "Exemplo" },
                 { c: "", l: "Limite" },
                 { c: "", l: "Carência" },
                 { c: "text-center w-16 px-1", l: "Gratuito" },
@@ -512,7 +512,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                     onChange={(e) => update(idx, { prioridade: parseInt(e.target.value) || 1 })}
                   />
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground leading-tight min-w-[140px]">{sample(r)}</TableCell>
+                <TableCell className="text-xs text-muted-foreground leading-tight min-w-[110px] whitespace-nowrap">{sample(r)}</TableCell>
                 <TableCell>
                   <Button
                     size="sm"
