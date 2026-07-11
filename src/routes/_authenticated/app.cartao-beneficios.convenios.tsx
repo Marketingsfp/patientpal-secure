@@ -632,6 +632,7 @@ function ConveniosPage() {
                           <TableCell>
                             <Input
                               type="number" min="1"
+                              className="border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent"
                               value={f.vidas_de}
                               onChange={(e) => {
                                 const v = parseInt(e.target.value) || 1;
@@ -641,7 +642,7 @@ function ConveniosPage() {
                           </TableCell>
                           <TableCell>
                             <CurrencyInput
-                              className="text-right"
+                              className="text-right border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent"
                               value={f.valor_mensal ? Number(f.valor_mensal).toFixed(2) : ""}
                               onChange={(v) => {
                                 const num = v ? parseFloat(v) : 0;
