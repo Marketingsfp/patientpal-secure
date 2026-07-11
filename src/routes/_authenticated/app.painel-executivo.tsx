@@ -665,11 +665,21 @@ function EstornoDrawer({
         .from("fin_atendimentos")
         .select("repasse_pago,lancamento_id")
         .eq("id", alvo.id).maybeSingle();
-      if (atdInfo?.repasse_pago) {
+      const lancId = atdInfo?.lancamento_id ?? alvo.lancamento_id;
+      // Checa também fin_lancamentos.repasse_pago (repasses de agenda são
+      // marcados aqui, não em fin_atendimentos).
+      let lancRepassePago = false;
+      if (lancId) {
+        const { data: lancRep } = await supabase
+          .from("fin_lancamentos")
+          .select("repasse_pago")
+          .eq("id", lancId).maybeSingle();
+        lancRepassePago = !!(lancRep as { repasse_pago?: boolean } | null)?.repasse_pago;
+      }
+      if (atdInfo?.repasse_pago || lancRepassePago) {
         toast.error("Repasse já pago — estorne o pagamento do repasse primeiro.");
         return;
       }
-      const lancId = atdInfo?.lancamento_id ?? alvo.lancamento_id;
 
       // 1) Cancela o lançamento financeiro, se existir
       if (lancId) {
