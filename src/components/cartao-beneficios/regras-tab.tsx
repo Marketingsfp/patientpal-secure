@@ -913,7 +913,7 @@ function NovaRegraDialog({
   convenioId: string;
   clinicaId: string;
   espOpts: Array<{ value: string; label: string }>;
-  procOpts: Array<{ value: string; label: string }>;
+  procOpts: Array<{ value: string; label: string; tipo: string | null }>;
   onSaved: () => void | Promise<void>;
   regra?: CbRegra | null;
 }) {
