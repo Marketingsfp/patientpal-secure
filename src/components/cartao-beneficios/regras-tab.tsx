@@ -757,6 +757,7 @@ function NovaRegraDialog({
     excedente_valor: null,
     carencia_mensalidades: 0,
     gratuito: false,
+    grupo_gratuidade: null,
   });
   const [r, setR] = useState<CbRegra>(emptyRegra());
   const [saving, setSaving] = useState(false);
