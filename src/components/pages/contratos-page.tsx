@@ -323,6 +323,12 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       }
       // Status
       if (filtroStatus !== "todos" && c.status !== filtroStatus) return false;
+      // Convênio
+      if (filtroConvenio !== "todos") {
+        if (filtroConvenio === "sem") {
+          if (c.convenio_id) return false;
+        } else if (c.convenio_id !== filtroConvenio) return false;
+      }
       // Situação
       if (filtroSituacao !== "todas") {
         const emDia = !a || !a.temAtrasada;
@@ -351,7 +357,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       a.paciente_nome.localeCompare(b.paciente_nome, "pt-BR", { sensitivity: "base" }),
     );
     return sortPaciente === "asc" ? ordered : ordered.reverse();
-  }, [list, q, sortPaciente, parcAgg, vendedores, filtroSituacao, filtroTermino, filtroProgresso, filtroInicio, filtroMensal, filtroVendedor, filtroStatus]);
+  }, [list, q, sortPaciente, parcAgg, vendedores, filtroSituacao, filtroTermino, filtroProgresso, filtroInicio, filtroMensal, filtroVendedor, filtroStatus, filtroConvenio]);
 
   // Opções dinâmicas
   const vendedorOpcoes = useMemo(() => {
