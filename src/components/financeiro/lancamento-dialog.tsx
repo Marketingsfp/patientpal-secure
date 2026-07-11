@@ -453,12 +453,23 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     const parcelasFinal = isCredito
       ? (Number(parcelas) || 1)
       : (mistoCredito ? (Number(mistoCredito.parcelas || 1) || 1) : null);
-    const { data: lancInserido, error } = await supabase.from("fin_lancamentos").insert({
+    // -------------------------------------------------------------------
+    // Abordagem B: chama RPC atômica `fn_registrar_lancamento_e_caixa`.
+    // Garante que fin_lancamentos + caixa_movimentos são inseridos na mesma
+    // transação Postgres — se qualquer um falhar, ambos são revertidos pelo
+    // próprio banco (zero janela de inconsistência).
+    // -------------------------------------------------------------------
+    const registraNoCaixa =
+      !!user?.id &&
+      (Number(valor) > 0 || formaFinal === "convenio_gratuidade" || !!agendamentoId);
+
+    const pLancamento = {
       clinica_id: clinicaAtual.clinica_id,
       tipo,
       descricao: descricao.trim(),
       valor: Number(valor),
       data,
+      status: "confirmado",
       categoria_id: categoriaId || null,
       conta_id: contaId || null,
       forma_pagamento: formaFinal,
@@ -466,15 +477,42 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       parcelas: parcelasFinal,
       emitir_nfse: emitirNfse,
       observacoes: obsFinal,
-      status: "confirmado",
       agendamento_id: agendamentoId ?? null,
       medico_id: medicoId,
       paciente_id: pacienteId,
       criado_por: user?.id ?? null,
-    } as never).select("id").single();
-    if (error) { setSaving(false); mostrarErro(error); return; }
-    // NÃO exibir toast.success ainda — só depois do caixa confirmar (correção
-    // do bug crítico: lançamento confirmado sem movimento de caixa).
+    };
+    const pMovimento = registraNoCaixa
+      ? {
+          user_id: user!.id,
+          user_nome:
+            (user!.user_metadata as { nome?: string } | null)?.nome ?? user!.email ?? null,
+          tipo: tipo === "receita" ? "recebimento" : "despesa",
+          valor: Number(valor),
+          descricao: descricao.trim(),
+          forma_pagamento: formaFinal,
+        }
+      : null;
+
+    const { data: rpcData, error } = await (supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: unknown }>)("fn_registrar_lancamento_e_caixa", {
+      p_lancamento: pLancamento,
+      p_movimento: pMovimento,
+    });
+    if (error) {
+      setSaving(false);
+      mostrarErro(error);
+      return;
+    }
+    const rpcResult = (rpcData ?? {}) as { lancamento_id?: string };
+    if (!rpcResult.lancamento_id) {
+      setSaving(false);
+      toast.error("Falha ao registrar: retorno inesperado da função de banco.");
+      return;
+    }
+    const lancInserido: { id: string } = { id: rpcResult.lancamento_id };
     // Sincroniza `tipo_atendimento` do agendamento com o que foi pago,
     // para que o check-in e relatórios reflitam a decisão final.
     if (agendamentoId && tipo === "receita") {
@@ -598,90 +636,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     } catch (e) {
       console.error("Erro no cálculo de splits:", e);
     }
-    // Integração com Caixa: registra movimento na sessão aberta do usuário.
-    // Se não houver sessão aberta, abre uma automaticamente com valor 0.
-    try {
-      // Registra em `caixa_movimentos` sempre que houver usuário (para aparecer
-      // em "Meu caixa > Movimentos"). Antes só entrava quando valor > 0, o que
-      // escondia gratuidades e atendimentos sem cobrança (valor 0) do caixa.
-      const registraNoCaixa =
-        !!user?.id &&
-        (Number(valor) > 0 || formaFinal === "convenio_gratuidade" || !!agendamentoId);
-      if (registraNoCaixa) {
-        // Pode existir mais de uma sessão aberta por histórico — pega a mais recente
-        // em vez de usar maybeSingle() (que retorna erro/null quando há múltiplas)
-        // e acabar abrindo uma nova a cada lançamento.
-        let { data: sess } = await supabase
-          .from("caixa_sessoes")
-          .select("id")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .eq("user_id", user.id)
-          .eq("status", "aberto")
-          .order("aberto_em", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (!sess) {
-          const nome = (user.user_metadata as { nome?: string } | null)?.nome ?? user.email ?? null;
-          const { data: novaSess, error: errSess } = await supabase
-            .from("caixa_sessoes")
-            .insert({
-              clinica_id: clinicaAtual.clinica_id,
-              user_id: user.id,
-              user_nome: nome,
-              valor_abertura: 0,
-              status: "aberto",
-              observacoes: "Aberto automaticamente pelo sistema",
-            } as never)
-            .select("id")
-            .single();
-          if (errSess) throw errSess;
-          sess = novaSess;
-          // movimento de abertura
-          await supabase.from("caixa_movimentos").insert({
-            sessao_id: sess!.id,
-            clinica_id: clinicaAtual.clinica_id,
-            user_id: user.id,
-            tipo: "abertura",
-            valor: 0,
-            descricao: "Abertura automática",
-          } as never);
-        }
-        const { error: errMov } = await supabase.from("caixa_movimentos").insert({
-          sessao_id: sess!.id,
-          clinica_id: clinicaAtual.clinica_id,
-          user_id: user.id,
-          tipo: tipo === "receita" ? "recebimento" : "despesa",
-          valor: Number(valor),
-          descricao: descricao.trim(),
-          forma_pagamento: formaFinal,
-          lancamento_id: lancInserido?.id ?? null,
-        } as never);
-        if (errMov) throw errMov;
-      }
-    } catch (e) {
-      // ROLLBACK: caixa falhou → apaga o lançamento para evitar receita/despesa
-      // confirmada sem contrapartida no caixa (bug crítico corrigido).
-      console.error("Falha ao registrar no caixa — revertendo lançamento:", e);
-      const msg = e instanceof Error ? e.message : String(e);
-      try {
-        if (lancInserido?.id) {
-          // Remove splits antes do lançamento (FK).
-          await supabase.from("pagamento_splits").delete().eq("pagamento_id", lancInserido.id);
-          await supabase.from("fin_lancamentos").delete().eq("id", lancInserido.id);
-        }
-        toast.error(
-          `Não foi possível registrar no caixa. Lançamento revertido. Detalhe: ${msg}`,
-        );
-      } catch (rbErr) {
-        console.error("Falha no rollback do lançamento:", rbErr);
-        toast.error(
-          `ERRO CRÍTICO: caixa falhou e não foi possível reverter o lançamento (id ${lancInserido?.id ?? "?"}). Contate o suporte. Detalhe: ${msg}`,
-        );
-      }
-      setSaving(false);
-      return;
-    }
-    // Ambos confirmaram — agora sim exibe sucesso.
+    // Lançamento + caixa foram gravados atomicamente pela RPC — sucesso.
     setSaving(false);
     toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
     onSavedWithData?.({
