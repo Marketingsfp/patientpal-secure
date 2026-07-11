@@ -738,6 +738,28 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         regra={editRegra}
         onSaved={async () => { setEditRegra(null); await load(); }}
       />
+      <AlertDialog open={apagarTodasOpen} onOpenChange={setApagarTodasOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar todas as regras?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação vai remover permanentemente as <strong>{regras.length}</strong> regra(s) de preço do convênio
+              <strong> "{convenioNome}"</strong>. Os valores já aplicados aos serviços não serão alterados, mas nenhuma nova
+              regra ficará disponível até que você cadastre outras. Esta operação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={apagandoTodas}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); void apagarTodas(); }}
+              disabled={apagandoTodas}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {apagandoTodas ? "Apagando…" : "Sim, apagar tudo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
