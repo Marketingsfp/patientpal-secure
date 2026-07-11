@@ -25,6 +25,13 @@ export interface CbRegra {
   carencia_mensalidades?: number | null;
   /** Regra é cortesia — exibida como "Gratuito" no sistema. */
   gratuito?: boolean | null;
+  /**
+   * Identificador do grupo de gratuidade compartilhada. Regras com o mesmo
+   * `grupo_gratuidade` dentro do mesmo convênio dividem a mesma cota
+   * (limite_qtd) no contrato — ex.: "mama-preventivo" cobre Mamografia OU
+   * USG de Mama. `null` = sem compartilhamento.
+   */
+  grupo_gratuidade?: string | null;
 }
 
 /** Retorna true se o contrato já cumpriu a carência exigida pela regra. */
@@ -45,12 +52,14 @@ export function findRegra(
   especialidadeId: string | null | undefined,
   tipo: string | null | undefined,
   procedimentoId?: string | null,
+  opts?: { excludeGratuito?: boolean },
 ): CbRegra | null {
   const tipoNorm = (tipo ?? "").toLowerCase() || null;
   const espId = especialidadeId || null;
   const procId = procedimentoId || null;
   const candidates = regras.filter((r) => {
     if (r.ativo === false) return false;
+    if (opts?.excludeGratuito && r.gratuito) return false;
     if (r.procedimento_id) {
       // regra específica por serviço só bate se o serviço confere
       if (!procId || r.procedimento_id !== procId) return false;
