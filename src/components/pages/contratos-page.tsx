@@ -1003,7 +1003,7 @@ function NovoContratoForm({
       <Card>
         <CardContent className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
+            <div className={faixas.length > 0 ? undefined : "col-span-2"}>
               <Label>Convênio</Label>
               <Select value={convenioId} onValueChange={setConvenioId}>
                 <SelectTrigger>
@@ -1019,7 +1019,7 @@ function NovoContratoForm({
               </Select>
             </div>
             {faixas.length > 0 ? (
-              <div className="col-span-2">
+              <div>
                 <Label>Nº de pessoas no contrato</Label>
                 <Select value={faixaId} onValueChange={setFaixaId}>
                   <SelectTrigger>
