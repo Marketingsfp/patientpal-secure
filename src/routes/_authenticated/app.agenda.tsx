@@ -4524,6 +4524,63 @@ function AgendaPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Confirmação de gratuidade: usar agora (aplica o benefício) ou depois (cobra particular). */}
+      <Dialog
+        open={gratuidadePrompt !== null}
+        onOpenChange={(o) => {
+          if (!o && gratuidadePrompt) {
+            gratuidadePrompt.resolve("cancel");
+            setGratuidadePrompt(null);
+          }
+        }}
+      >
+        <DialogContent
+          className="max-w-md"
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-emerald-700">Gratuidade disponível</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm leading-relaxed">
+            Este paciente tem direito a <b>GRATUIDADE</b> pelo convênio{" "}
+            <b>{gratuidadePrompt?.convenioNome}</b> para este atendimento.
+            <br />
+            <br />
+            Deseja usar agora ou guardar para uma próxima consulta?
+          </div>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                gratuidadePrompt?.resolve("cancel");
+                setGratuidadePrompt(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                gratuidadePrompt?.resolve("depois");
+                setGratuidadePrompt(null);
+              }}
+            >
+              Cobrar particular (usar depois)
+            </Button>
+            <Button
+              onClick={() => {
+                gratuidadePrompt?.resolve("agora");
+                setGratuidadePrompt(null);
+              }}
+            >
+              Usar agora
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Diálogo de desconto (acionado pelo botão no formulário de agendamento). */}
       <Dialog open={descontoDlgOpen} onOpenChange={setDescontoDlgOpen}>
         <DialogContent className="max-w-sm">
