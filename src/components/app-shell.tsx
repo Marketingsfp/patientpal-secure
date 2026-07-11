@@ -623,6 +623,17 @@ export function AppShell() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-30 h-[50px] bg-card/80 backdrop-blur border-b flex items-center gap-2 px-3 sm:px-5">
+          {!isChooser && (
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              className="md:hidden h-9 w-9 -ml-1 rounded-md flex items-center justify-center hover:bg-muted shrink-0"
+              aria-label="Abrir menu"
+              title="Menu"
+            >
+              <MenuIcon className="h-5 w-5" />
+            </button>
+          )}
           <div className="flex items-center gap-2 min-w-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
