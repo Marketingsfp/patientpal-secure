@@ -5042,7 +5042,7 @@ function AgendaPage() {
       </div>
 
       {/* Tabela */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="rounded-lg border border-border bg-card overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
@@ -5056,12 +5056,12 @@ function AgendaPage() {
                 />
               </TableHead>
               <TableHead className="w-16">Ficha</TableHead>
-              <TableHead className="w-14">Dia</TableHead>
-              <TableHead className="w-24">Data</TableHead>
+              <TableHead className="w-14 hidden md:table-cell">Dia</TableHead>
+              <TableHead className="w-24 hidden md:table-cell">Data</TableHead>
               <TableHead className="w-24">Intervalo</TableHead>
-              <TableHead className="w-[220px] max-w-[220px]">Profissional</TableHead>
+              <TableHead className="w-[220px] max-w-[220px] hidden lg:table-cell">Profissional</TableHead>
               <TableHead className="w-[220px] max-w-[220px]">Cliente</TableHead>
-              <TableHead className="w-40">Serviço</TableHead>
+              <TableHead className="w-40 hidden md:table-cell">Serviço</TableHead>
               <TableHead className="w-28 text-center">Alertas</TableHead>
               <TableHead className="w-32 text-right">Ações</TableHead>
             </TableRow>
@@ -5120,12 +5120,12 @@ function AgendaPage() {
                     <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
                   </TableCell>
                   <TableCell className="font-mono text-sm">{fichaNum}</TableCell>
-                  <TableCell className="text-sm">{fmtDiaSemana(a.inicio)}</TableCell>
-                  <TableCell className="text-sm">{fmtData(a.inicio)}</TableCell>
+                  <TableCell className="text-sm hidden md:table-cell">{fmtDiaSemana(a.inicio)}</TableCell>
+                  <TableCell className="text-sm hidden md:table-cell">{fmtData(a.inicio)}</TableCell>
                   <TableCell>
                      <span className="text-emerald-600 font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
-                  <TableCell className="pr-1 align-middle max-w-[220px]">
+                  <TableCell className="pr-1 align-middle max-w-[220px] hidden lg:table-cell">
                     {(() => {
                       const m = medicos.find((x) => x.id === a.medico_id);
                       const label = medicoNomeAgendamento(a);
@@ -5219,7 +5219,7 @@ function AgendaPage() {
                       </button>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <ProcedimentoCell
                       valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                       opcoes={opcoesProcedimentoMedico(a.medico_id)}
