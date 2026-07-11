@@ -518,24 +518,68 @@ async function obterInfoConvenioPaciente(params: {
             ? "titular-ou-dependente"
             : "contrato";
         const periodoTxt = periodo === "semana" ? "semana" : periodo === "mes" ? "mês" : periodo === "contrato" ? "contrato" : "dia";
+        // Se a regra é gratuita e o limite já foi consumido, monta um texto
+        // detalhado com data/paciente/médico do consumidor (pode ser o
+        // titular ou dependente do mesmo contrato).
+        let consumidorTxt = "";
+        if (beneficioEscolhido.gratuito && agsPagos.length > 0) {
+          const consumidor = agsPagos
+            .slice()
+            .sort((a, b) => {
+              const ta = a.inicio ? new Date(a.inicio).getTime() : 0;
+              const tb = b.inicio ? new Date(b.inicio).getTime() : 0;
+              return tb - ta;
+            })[0];
+          let medicoNome = "";
+          let pacienteNome = "";
+          if (consumidor?.medico_id) {
+            const { data: m } = await supabase
+              .from("medicos")
+              .select("nome")
+              .eq("id", consumidor.medico_id)
+              .maybeSingle();
+            medicoNome = (m as { nome?: string } | null)?.nome ?? "";
+          }
+          if (consumidor?.paciente_id) {
+            const { data: p } = await supabase
+              .from("pacientes")
+              .select("nome")
+              .eq("id", consumidor.paciente_id)
+              .maybeSingle();
+            pacienteNome = (p as { nome?: string } | null)?.nome ?? "";
+          }
+          const dt = consumidor?.inicio ? new Date(consumidor.inicio) : null;
+          const dtTxt = dt
+            ? `${dt.toLocaleDateString("pt-BR")} às ${dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+            : "";
+          consumidorTxt = `Gratuidade de ${procedimentoNome} deste convênio já foi utilizada${dtTxt ? ` em ${dtTxt}` : ""}${pacienteNome ? ` por ${pacienteNome}` : ""}${medicoNome ? ` com Dr(a). ${medicoNome}` : ""}.\n`;
+        }
         if (modo === "bloquear") {
           bloquear = true;
           desconto = null;
-          avisoLimite = esgotadoExclusivo
-            ? `Cota exclusiva já usada por outro membro do contrato — agendamento bloqueado pelo convênio.`
-            : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — agendamento bloqueado pelo convênio.`;
+          avisoLimite = consumidorTxt
+            ? `${consumidorTxt}Este atendimento fica bloqueado pelo convênio.`
+            : (esgotadoExclusivo
+              ? `Cota exclusiva já usada por outro membro do contrato — agendamento bloqueado pelo convênio.`
+              : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — agendamento bloqueado pelo convênio.`);
         } else if (modo === "particular") {
           desconto = null;
-          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — cobrando valor particular cheio.`;
+          avisoLimite = consumidorTxt
+            ? `${consumidorTxt}Cobrando valor particular cheio neste atendimento.`
+            : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — cobrando valor particular cheio.`;
         } else if (modo === "valor_fixo") {
           const v = Number(beneficioEscolhido.excedente_valor) || 0;
           desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };
-          avisoLimite = `Limite atingido — cobrando valor fixo excedente R$ ${v.toFixed(2)}.`;
+          avisoLimite = consumidorTxt
+            ? `${consumidorTxt}Cobrando valor fixo excedente de R$ ${v.toFixed(2)} neste atendimento.`
+            : `Limite atingido — cobrando valor fixo excedente R$ ${v.toFixed(2)}.`;
         } else if (modo === "percentual_particular") {
           const pct = Number(beneficioEscolhido.excedente_percentual) || 0;
           // pct = desconto sobre o particular; ex.: 50 → paga 50% do particular
           desconto = { tipo: "percentual", valor: pct };
-          avisoLimite = `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — cobrando ${100 - pct}% do valor particular.`;
+          avisoLimite = consumidorTxt
+            ? `${consumidorTxt}Cobrando ${100 - pct}% do valor particular neste atendimento.`
+            : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — cobrando ${100 - pct}% do valor particular.`;
         }
       } else if (agsPendentes.length >= 1) {
         // Cota ainda não consumida, mas existem outros agendamentos pendentes
