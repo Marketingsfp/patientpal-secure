@@ -1147,6 +1147,15 @@ function NovoContratoForm({
               ) : null}
             </div>
             <div>
+              <Label>Data término</Label>
+              <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">
+                {fmtD(addUmAno(dataInicio))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Calculada automaticamente: 1 ano após a data de início.
+              </p>
+            </div>
+            <div>
               <Label>Dia de vencimento</Label>
               <Select value={String(diaVenc)} onValueChange={(v) => setDiaVenc(Number(v))}>
                 <SelectTrigger>
