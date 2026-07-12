@@ -11,9 +11,6 @@ import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  validateSearch: (s: Record<string, unknown>) => ({
-    next: typeof s.next === "string" && s.next.startsWith("/") && !s.next.startsWith("//") ? s.next : undefined,
-  }),
   head: () => ({
     meta: [
       { title: "Entrar — ClinicaOS" },
@@ -36,7 +33,15 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { next } = Route.useSearch();
+  // `next` é lido diretamente da URL para preservar a URL de consentimento OAuth
+  // (rota /.lovable/oauth/consent) sem forçar tipagem obrigatória em todos os
+  // links existentes que apontam para /login.
+  const next = (() => {
+    if (typeof window === "undefined") return undefined;
+    const raw = new URLSearchParams(window.location.search).get("next");
+    if (!raw) return undefined;
+    return raw.startsWith("/") && !raw.startsWith("//") ? raw : undefined;
+  })();
   const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
