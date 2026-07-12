@@ -5173,10 +5173,10 @@ function AgendaPage() {
       </div>
 
       {/* Tabela */}
-      <div className="rounded-lg border border-border bg-card overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/40">
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
+          <TableHeader className="sticky top-0 z-20">
+            <TableRow className="bg-muted">
               <TableHead
                 className="w-10"
                 title="Selecione vários atendimentos do mesmo paciente para cobrar em um único pagamento (use o botão Opções acima)"

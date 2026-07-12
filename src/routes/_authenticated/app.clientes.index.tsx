@@ -271,9 +271,9 @@ function ClientesPage() {
       </div>
 
       <div className="rounded-lg border border-border bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/40">
+        <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
+          <TableHeader className="sticky top-0 z-20">
+            <TableRow className="bg-muted">
               <TableHead className="w-28">Prontuário</TableHead>
               <TableHead>Nome</TableHead>
               <TableHead className="w-36">CPF</TableHead>

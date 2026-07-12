@@ -507,10 +507,10 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           <Button variant="ghost" size="sm" onClick={limparFiltros}>Limpar filtros</Button>
         ) : null}
       </div>
-      <div className="rounded-md border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
+      <div className="rounded-md border bg-card overflow-hidden">
+        <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
+          <TableHeader className="sticky top-0 z-20">
+            <TableRow className="bg-muted">
               <TableHead>Nº</TableHead>
               <TableHead>
                 <button

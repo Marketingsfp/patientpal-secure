@@ -2144,9 +2144,9 @@ function Page() {
               Nenhum atendimento no período/filtro selecionado.
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
+            <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
+              <TableHeader className="sticky top-0 z-20">
+                <TableRow className="bg-muted">
                   {!isMedicoOnly && (
                     <TableHead className="w-8 px-2">
                       <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />

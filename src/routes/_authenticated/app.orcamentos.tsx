@@ -352,7 +352,7 @@ function OrcamentosPage() {
   };
 
   return (
-    <div className="p-6 space-y-4 max-w-7xl mx-auto">
+    <div className="space-y-4 flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-md bg-primary/10"><FileText className="h-6 w-6 text-primary" /></div>
@@ -434,9 +434,10 @@ function OrcamentosPage() {
         </div>
       </div>
 
-      <div className="rounded-md border bg-card">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
+      <div className="rounded-md border bg-card overflow-hidden flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0 overflow-auto">
+        <table className="w-full text-sm max-lg:table max-lg:overflow-visible">
+          <thead className="bg-muted sticky top-0 z-20">
             <tr className="text-left">
               <th className="px-3 py-2 w-20">Nº</th>
               <th className="px-3 py-2 w-32">Data</th>
@@ -551,6 +552,7 @@ function OrcamentosPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {open && clinicaAtual && (
