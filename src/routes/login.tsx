@@ -33,15 +33,6 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  // `next` é lido diretamente da URL para preservar a URL de consentimento OAuth
-  // (rota /.lovable/oauth/consent) sem forçar tipagem obrigatória em todos os
-  // links existentes que apontam para /login.
-  const next = (() => {
-    if (typeof window === "undefined") return undefined;
-    const raw = new URLSearchParams(window.location.search).get("next");
-    if (!raw) return undefined;
-    return raw.startsWith("/") && !raw.startsWith("//") ? raw : undefined;
-  })();
   const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,14 +40,8 @@ function LoginPage() {
   const [showPwd, setShowPwd] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && user) {
-      if (next) {
-        window.location.replace(next);
-      } else {
-        navigate({ to: "/app", replace: true });
-      }
-    }
-  }, [authLoading, navigate, user, next]);
+    if (!authLoading && user) navigate({ to: "/app", replace: true });
+  }, [authLoading, navigate, user]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -65,11 +50,7 @@ function LoginPage() {
     setLoading(false);
     if (error) { mostrarErro(error); return; }
     toast.success("Bem-vindo!");
-    if (next) {
-      window.location.replace(next);
-    } else {
-      navigate({ to: "/app", replace: true });
-    }
+    navigate({ to: "/app", replace: true });
   };
 
   return (
