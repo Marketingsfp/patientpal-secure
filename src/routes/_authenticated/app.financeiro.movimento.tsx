@@ -697,7 +697,7 @@ function Page() {
                     </SelectContent>
                   </Select></div>
                 <div className="space-y-2"><Label>Data</Label>
-                  <Input type="date" required value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></div>
+                  <DateInputBR required value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></div>
               </div>
               <div className="space-y-2"><Label>Referente a</Label>
                 <Select
