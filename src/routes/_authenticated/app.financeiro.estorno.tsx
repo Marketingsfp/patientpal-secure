@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/financeiro/estorno")({
   component: Page,
   head: () => ({ meta: [{ title: "Estorno — Financeiro" }] }),
@@ -576,12 +577,11 @@ function Page() {
           </div>
           <div>
             <label className="text-xs text-muted-foreground">De</label>
-            <Input type="date" className="h-9" value={fDe} onChange={(e) => setFDe(e.target.value)} />
+            <DateInputBR className="h-9" value={fDe} onChange={(e) => setFDe(e.target.value)} />
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Até</label>
-            <Input
-              type="date"
+            <DateInputBR
               className="h-9"
               value={fAte}
               onChange={(e) => setFAte(e.target.value)}

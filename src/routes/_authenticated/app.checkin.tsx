@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   BadgeCheck,
   Search,
@@ -249,8 +250,7 @@ function DateSelector({ data, onDataChange }: { data: string; onDataChange: (val
                 </div>
 
                 <div className="border-t pt-2">
-                  <Input
-                    type="date"
+                  <DateInputBR
                     value={data}
                     onChange={(e) => {
                       onDataChange(e.target.value);

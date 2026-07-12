@@ -64,6 +64,7 @@ import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { IdadeIcon } from "@/components/idade-icon";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/agenda")({
   component: AgendaPage,
 });
@@ -4843,7 +4844,7 @@ function AgendaPage() {
               </div>
               <div className="space-y-1">
                 <Label>Nascimento *</Label>
-                <Input type="date" required value={novoPac.data_nascimento} onChange={(e) => setNovoPac(p => ({ ...p, data_nascimento: e.target.value }))} />
+                <DateInputBR required value={novoPac.data_nascimento} onChange={(e) => setNovoPac(p => ({ ...p, data_nascimento: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1">

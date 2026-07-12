@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import type { PatientOption } from "@/components/patient-search-input";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 interface QuickPatientDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -142,7 +143,7 @@ export function QuickPatientDialog({
             </div>
             <div>
               <Label>Data de nascimento</Label>
-              <Input type="date" value={dataNasc} onChange={(e) => setDataNasc(e.target.value)} />
+              <DateInputBR value={dataNasc} onChange={(e) => setDataNasc(e.target.value)} />
             </div>
             <div>
               <Label>Telefone</Label>

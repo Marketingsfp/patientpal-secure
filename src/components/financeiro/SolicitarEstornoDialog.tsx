@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Undo2 } from "lucide-react";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -197,18 +198,16 @@ export function SolicitarEstornoDialog({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label htmlFor="data-pg-orig">Data do pagamento original</Label>
-                  <Input
+                  <DateInputBR
                     id="data-pg-orig"
-                    type="date"
                     value={dataPagamentoOriginal}
                     onChange={(e) => setDataPagamentoOriginal(e.target.value)}
                   />
                 </div>
                 <div>
                   <Label htmlFor="data-est">Data da devolução</Label>
-                  <Input
+                  <DateInputBR
                     id="data-est"
-                    type="date"
                     value={dataEstorno}
                     onChange={(e) => setDataEstorno(e.target.value)}
                   />

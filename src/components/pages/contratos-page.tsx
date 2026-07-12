@@ -61,6 +61,7 @@ import { PatientSearchInput, type PatientOption } from "@/components/patient-sea
 import { EditarPacienteRapidoDialog } from "@/components/contratos/editar-paciente-rapido-dialog";
 import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) =>
   s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—";
@@ -1260,7 +1261,7 @@ function NovoContratoForm({
             </div>
             <div>
               <Label>Data início</Label>
-              <Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+              <DateInputBR value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
               {dataAvisoExtrema ? (
                 <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" />
@@ -2686,8 +2687,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           </TableCell>
                           <TableCell>
                             {isAdmin && podeEscrever ? (
-                              <Input
-                                type="date"
+                              <DateInputBR
                                 className="h-8 w-40"
                                 defaultValue={m.vencimento}
                                 onBlur={(e) => {
@@ -2840,8 +2840,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 {isAdmin && podeEscrever ? (
                   <div className="space-y-1">
                     <div className="text-xs text-muted-foreground">Data início</div>
-                    <Input
-                      type="date"
+                    <DateInputBR
                       value={admDataInicio}
                       onChange={(e) => setAdmDataInicio(e.target.value)}
                     />

@@ -21,6 +21,7 @@ import {
 import { somenteDigitos, isCPFValido } from "@/lib/cpf";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/agenda/express")({
   component: AgendaExpressPage,
 });
@@ -380,7 +381,7 @@ function AgendaExpressPage() {
                   </div>
                   <div>
                     <Label>Nascimento</Label>
-                    <Input type="date" value={novoNasc} onChange={(e) => setNovoNasc(e.target.value)} />
+                    <DateInputBR value={novoNasc} onChange={(e) => setNovoNasc(e.target.value)} />
                   </div>
                 </div>
                 {podeEscrever && (

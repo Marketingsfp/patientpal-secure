@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { exportToExcel } from "@/lib/export-csv";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/auditoria")({
   component: PageWithTabs,
   head: () => ({ meta: [{ title: "Auditoria — ClinicaOS" }] }),
@@ -145,11 +146,11 @@ function Page() {
           </div>
           <div>
             <Label className="text-xs">De</Label>
-            <Input type="date" value={dataIni} onChange={(e) => setDataIni(e.target.value)} />
+            <DateInputBR value={dataIni} onChange={(e) => setDataIni(e.target.value)} />
           </div>
           <div>
             <Label className="text-xs">Até</Label>
-            <Input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+            <DateInputBR value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
           </div>
           <div className="sm:col-span-2 lg:col-span-5 flex justify-end">
             <Button onClick={() => void load()}>Filtrar</Button>

@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { buildCategoriaResolver } from "@/lib/procedimento/categoria";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardPage,
   head: () => ({ meta: [{ title: "Painel — ClinicaOS" }] }),
@@ -402,11 +403,11 @@ function DashboardPage() {
           />
           <div className="space-y-1">
             <Label className="text-xs">Período</Label>
-            <Input type="date" value={periodo.de} onChange={(e) => setPeriodo(p => ({ ...p, de: e.target.value }))} className="w-40" />
+            <DateInputBR value={periodo.de} onChange={(e) => setPeriodo(p => ({ ...p, de: e.target.value }))} className="w-40" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">até</Label>
-            <Input type="date" value={periodo.ate} onChange={(e) => setPeriodo(p => ({ ...p, ate: e.target.value }))} className="w-40" />
+            <DateInputBR value={periodo.ate} onChange={(e) => setPeriodo(p => ({ ...p, ate: e.target.value }))} className="w-40" />
           </div>
           <Button variant="outline" onClick={load}>Atualizar</Button>
         </div>

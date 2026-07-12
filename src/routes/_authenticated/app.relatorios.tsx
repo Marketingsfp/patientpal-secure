@@ -24,6 +24,7 @@ import { CuboBI } from "@/components/relatorios/CuboBI";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/relatorios")({
   component: RelatoriosPage,
 });
@@ -412,11 +413,11 @@ function RelatoriosPage() {
           <div className="flex items-end gap-2">
             <div>
               <Label htmlFor="ini" className="text-xs text-muted-foreground">De</Label>
-              <Input id="ini" type="date" value={ini} onChange={(e) => setIni(e.target.value)} className="h-9 w-36" />
+              <DateInputBR id="ini" value={ini} onChange={(e) => setIni(e.target.value)} className="h-9 w-36" />
             </div>
             <div>
               <Label htmlFor="fim" className="text-xs text-muted-foreground">Até</Label>
-              <Input id="fim" type="date" value={fim} onChange={(e) => setFim(e.target.value)} className="h-9 w-36" />
+              <DateInputBR id="fim" value={fim} onChange={(e) => setFim(e.target.value)} className="h-9 w-36" />
             </div>
           </div>
         </div>

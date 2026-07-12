@@ -25,6 +25,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { laboratorioMedicoIdsFrom, contarAtendimentos } from "@/lib/agenda/contagem";
 import { buildCategoriaResolver } from "@/lib/procedimento/categoria";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/painel-executivo")({
   component: PainelExecutivoPage,
   head: () => ({ meta: [{ title: "Painel Executivo — ClinicaOS" }] }),
@@ -361,11 +362,11 @@ function PainelExecutivoPage() {
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">
             <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">De</Label>
-            <Input type="date" value={periodo.de} onChange={e => setPeriodo(p => ({ ...p, de: e.target.value }))} className="h-9 w-40" />
+            <DateInputBR value={periodo.de} onChange={e => setPeriodo(p => ({ ...p, de: e.target.value }))} className="h-9 w-40" />
           </div>
           <div className="flex flex-col gap-1">
             <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">Até</Label>
-            <Input type="date" value={periodo.ate} onChange={e => setPeriodo(p => ({ ...p, ate: e.target.value }))} className="h-9 w-40" />
+            <DateInputBR value={periodo.ate} onChange={e => setPeriodo(p => ({ ...p, ate: e.target.value }))} className="h-9 w-40" />
           </div>
           <div className="flex gap-1">
             {presets.map(pr => (
