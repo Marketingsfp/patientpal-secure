@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
+import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   listarConversas, listarMensagensConversa, enviarMensagemConversa,
   obterDadosContato, transferirConversa, fecharConversa,
@@ -752,8 +753,8 @@ export function AtendRelatorios() {
         <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
           <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Relatórios de Atendimento</CardTitle>
           <div className="flex items-end gap-2">
-            <div><Label className="text-xs">De</Label><Input type="date" value={de} onChange={(e) => setDe(e.target.value)} className="h-8" /></div>
-            <div><Label className="text-xs">Até</Label><Input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className="h-8" /></div>
+            <div><Label className="text-xs">De</Label><DateInputBR value={de} onChange={(e) => setDe(e.target.value)} className="h-8" /></div>
+            <div><Label className="text-xs">Até</Label><DateInputBR value={ate} onChange={(e) => setAte(e.target.value)} className="h-8" /></div>
             <Button size="sm" onClick={carregar} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
             </Button>

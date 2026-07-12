@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { somenteDigitos, isCPFValido } from "@/lib/cpf";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 interface Props {
   pacienteId: string | null;
   open: boolean;
@@ -168,7 +169,7 @@ export function PatientQuickCompleteSheet({
                 </div>
                 <div>
                   <Label>Data de nascimento {requireNfse && "*"}</Label>
-                  <Input type="date" value={row.data_nascimento ?? ""} onChange={e => set("data_nascimento", e.target.value)} />
+                  <DateInputBR value={row.data_nascimento ?? ""} onChange={e => set("data_nascimento", e.target.value)} />
                 </div>
               </section>
             )}

@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/financeiro/lembretes")({
   component: Page,
   head: () => ({ meta: [{ title: "Lembretes — Financeiro" }] }),
@@ -99,7 +100,7 @@ function Page() {
                 <Textarea rows={3} value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Data</Label>
-                  <Input type="date" required value={form.data_lembrete} onChange={(e) => setForm({ ...form, data_lembrete: e.target.value })} /></div>
+                  <DateInputBR required value={form.data_lembrete} onChange={(e) => setForm({ ...form, data_lembrete: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Prioridade</Label>
                   <Select value={form.prioridade} onValueChange={(v) => setForm({ ...form, prioridade: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>

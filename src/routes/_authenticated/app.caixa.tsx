@@ -40,6 +40,7 @@ import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
 import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
 import { printComprovanteCaixa } from "@/lib/print-caixa-comprovante";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/caixa")({
   component: CaixaRouteDispatcher,
   head: () => ({ meta: [{ title: "Caixa — ClinicaOS" }] }),
@@ -1063,7 +1064,7 @@ function Page() {
   }, [minhasMovs, mistoObs]);
 
   // Helper: converte `created_at` para "YYYY-MM-DD" no fuso local, para casar
-  // com o `<input type="date">` do modal de fechamento.
+  // com o `<DateInputBR>` do modal de fechamento.
   const localYMD = (iso: string) => {
     const d = new Date(iso);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -2201,11 +2202,11 @@ function Page() {
               <CardContent className="pt-4 flex flex-wrap items-end gap-3">
                 <div>
                   <Label className="text-xs">De</Label>
-                  <Input type="date" value={fIni} onChange={(e) => setFIni(e.target.value)} />
+                  <DateInputBR value={fIni} onChange={(e) => setFIni(e.target.value)} />
                 </div>
                 <div>
                   <Label className="text-xs">Até</Label>
-                  <Input type="date" value={fFim} onChange={(e) => setFFim(e.target.value)} />
+                  <DateInputBR value={fFim} onChange={(e) => setFFim(e.target.value)} />
                 </div>
                 <div className="min-w-[200px]">
                   <Label className="text-xs">Operador</Label>
@@ -2552,8 +2553,7 @@ function Page() {
           <form onSubmit={fecharCaixa} className="space-y-3">
             <div>
               <Label>Dia a fechar</Label>
-              <Input
-                type="date"
+              <DateInputBR
                 value={dataFechamento}
                 max={new Date().toISOString().slice(0, 10)}
                 onChange={(e) => {
@@ -2708,8 +2708,7 @@ function Page() {
             })()}
             <div>
               <Label>Data do fechamento</Label>
-              <Input
-                type="date"
+              <DateInputBR
                 value={dataFechamentoTerceiro}
                 max={new Date().toISOString().slice(0, 10)}
                 onChange={(e) => setDataFechamentoTerceiro(e.target.value)}

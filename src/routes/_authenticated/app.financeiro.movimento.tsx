@@ -697,7 +697,7 @@ function Page() {
                     </SelectContent>
                   </Select></div>
                 <div className="space-y-2"><Label>Data</Label>
-                  <Input type="date" required value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></div>
+                  <DateInputBR required value={form.data} onChange={(e) => setForm({ ...form, data: e.target.value })} /></div>
               </div>
               <div className="space-y-2"><Label>Referente a</Label>
                 <Select
@@ -848,9 +848,9 @@ function Page() {
 
       <Card><CardContent className="pt-6 flex flex-wrap items-end gap-3">
         <div className="space-y-1"><Label className="text-xs">De</Label>
-          <DateInputBR value={fromDate} onChange={setFromDate} className="w-40" /></div>
+          <DateInputBR value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="w-40" /></div>
         <div className="space-y-1"><Label className="text-xs">Até</Label>
-          <DateInputBR value={toDate} onChange={setToDate} className="w-40" /></div>
+          <DateInputBR value={toDate} onChange={(e) => setToDate(e.target.value)} className="w-40" /></div>
         <div className="space-y-1"><Label className="text-xs">Tipo</Label>
           <Select value={filterTipo} onValueChange={(v) => setFilterTipo(v as typeof filterTipo)}>
             <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>

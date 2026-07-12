@@ -50,6 +50,7 @@ import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1906,8 +1907,7 @@ function Page() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>Data</Label>
-                    <Input
-                      type="date"
+                    <DateInputBR
                       required
                       value={form.data}
                       onChange={(e) => setForm({ ...form, data: e.target.value })}
@@ -2032,11 +2032,11 @@ function Page() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">De</Label>
-              <Input type="date" className="h-9" value={fIni} onChange={(e) => setFIni(e.target.value)} />
+              <DateInputBR className="h-9" value={fIni} onChange={(e) => setFIni(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Até</Label>
-              <Input type="date" className="h-9" value={fFim} onChange={(e) => setFFim(e.target.value)} />
+              <DateInputBR className="h-9" value={fFim} onChange={(e) => setFFim(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Status repasse</Label>

@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 type Tipo = "receita" | "despesa";
 
 export interface LancamentoSavedData {
@@ -700,7 +701,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
             </div>
             <div className="space-y-1.5">
               <Label>Data</Label>
-              <Input type="date" value={data} onChange={(e) => setData(e.target.value)} />
+              <DateInputBR value={data} onChange={(e) => setData(e.target.value)} />
             </div>
           </div>
           {tipo === "receita" && !!initialValor && (

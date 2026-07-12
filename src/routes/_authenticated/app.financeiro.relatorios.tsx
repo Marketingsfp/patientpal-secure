@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/financeiro/relatorios")({
   component: Page,
   head: () => ({ meta: [{ title: "Relatórios — Financeiro" }] }),
@@ -99,9 +100,9 @@ function Page() {
                 </SelectContent>
               </Select></div>
             <div className="space-y-2"><Label>De</Label>
-              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
+              <DateInputBR value={from} onChange={(e) => setFrom(e.target.value)} /></div>
             <div className="space-y-2"><Label>Até</Label>
-              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+              <DateInputBR value={to} onChange={(e) => setTo(e.target.value)} /></div>
           </div>
           <Button onClick={gerar} disabled={loading || !clinicaAtual}>
             <Download className="h-4 w-4 mr-2" />{loading ? "Gerando..." : "Baixar CSV"}

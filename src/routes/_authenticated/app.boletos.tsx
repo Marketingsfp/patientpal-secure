@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/boletos")({
   component: BoletosPage,
   head: () => ({ meta: [{ title: "Boletos — ClinicaOS" }] }),
@@ -41,7 +42,7 @@ function BoletosPage() {
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1"><Label>Valor *</Label><CurrencyInput value={f.valor} onChange={(v) => set({ ...f, valor: v })} /></div>
-            <div className="space-y-1"><Label>Vencimento *</Label><Input type="date" required value={f.vencimento} onChange={e => set({ ...f, vencimento: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Vencimento *</Label><DateInputBR required value={f.vencimento} onChange={e => set({ ...f, vencimento: e.target.value })} /></div>
             <div className="space-y-1"><Label>Status</Label>
               <Select value={f.status} onValueChange={v => set({ ...f, status: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>

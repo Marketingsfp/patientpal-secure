@@ -12,6 +12,7 @@ import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { cn } from "@/lib/utils";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 // -----------------------------------------------------------------------------
 // Fase F — Wizard V2: agendamento SIMPLES (sem orçamento, sem sessão
 // laboratorial multi-exame, sem encaixe, sem cobrança). Reutiliza 100% das
@@ -435,8 +436,7 @@ export function NovoAgendamentoWizard({
                         <option value="F">Feminino</option>
                         <option value="M">Masculino</option>
                       </select>
-                      <input
-                        type="date"
+                      <DateInputBR
                         value={qcNasc}
                         onChange={(e) => setQcNasc(e.target.value)}
                         className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm"
@@ -591,8 +591,7 @@ export function NovoAgendamentoWizard({
         <div>
           <div className="flex items-center gap-3 mb-4">
             <label className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Data</label>
-            <input
-              type="date"
+            <DateInputBR
               value={dataDia}
               onChange={(e) => { setDataDia(e.target.value); setSlot(null); }}
               className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm"

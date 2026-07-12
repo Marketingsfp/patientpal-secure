@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 interface Props {
   pacienteId: string;
   clinicaId: string;
@@ -160,8 +161,7 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
         </div>
         <div className="col-span-5 sm:col-span-5 flex items-center gap-1 min-w-0">
           <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-          <Input
-            type="date"
+          <DateInputBR
             value={data.data_nascimento ?? ""}
             onChange={(e) => { setData(d => ({ ...d, data_nascimento: e.target.value })); setEdited(true); }}
             className="h-8 w-full min-w-0"

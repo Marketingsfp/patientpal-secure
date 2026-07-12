@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/fluxo")({
   component: FluxoPage,
   head: () => ({ meta: [{ title: "Fluxo do paciente — ClinicaOS" }] }),
@@ -298,8 +299,7 @@ function FluxoPage() {
             
             <div className="flex items-center gap-1 px-1">
               <CalendarDays className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-              <Input 
-                type="date" 
+              <DateInputBR 
                 value={dataRef} 
                 onChange={(e) => { 
                   setFallbackAplicado(true); 

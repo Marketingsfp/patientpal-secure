@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MedicoAgendasTab } from "@/components/medicos/MedicoAgendasTab";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DateInputBR } from "@/components/ui/date-input-br";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -862,7 +863,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-2">
                     <Label>Data de nascimento</Label>
-                    <Input type="date" value={form.data_nascimento} onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })} />
+                    <DateInputBR value={form.data_nascimento} onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })} />
                   </div>
                   <div className="space-y-2">
                     <Label>Nacionalidade</Label>
