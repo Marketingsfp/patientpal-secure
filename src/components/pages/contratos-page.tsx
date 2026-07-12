@@ -3245,68 +3245,37 @@ h1, h2, h3 { margin: 0 0 6mm; }
 
                 // 2) Insere lançamento independente para a taxa de adesão,
                 // com mesma forma de pagamento escolhida pelo operador.
+                // Abordagem B: RPC atômica lançamento + caixa (Postgres cuida do rollback).
                 const hojeStr = new Date().toISOString().slice(0, 10);
-                const { data: lancTaxa, error: errLanc } = await supabase
-                  .from("fin_lancamentos")
-                  .insert({
+                const descricaoTaxa = `Taxa de adesão — Contrato #${contrato.numero} — ${contrato.paciente_nome}`;
+                const { error: rpcErr } = await supabase.rpc("fn_registrar_lancamento_e_caixa", {
+                  p_lancamento: {
                     clinica_id: clinicaAtual.clinica_id,
                     tipo: "receita",
-                    descricao: `Taxa de adesão — Contrato #${contrato.numero} — ${contrato.paciente_nome}`,
+                    descricao: descricaoTaxa,
                     valor: taxaAdesao,
                     data: hojeStr,
+                    status: "confirmado",
                     categoria_id: categoriaTaxaId,
                     forma_pagamento: dados.forma_pagamento,
                     bandeira_cartao: dados.bandeira_cartao,
                     parcelas: dados.parcelas,
-                    status: "confirmado",
                     paciente_id: (contrato as { paciente_id?: string | null }).paciente_id ?? null,
                     criado_por: user?.id ?? null,
-                  } as never)
-                  .select("id")
-                  .single();
-                if (errLanc) throw errLanc;
-
-                // 3) Registra movimento no caixa (sessão aberta do usuário).
-                // Se o caixa falhar, revertemos o lançamento da taxa (bug
-                // crítico: taxa "confirmado" sem movimento de caixa).
-                let caixaTaxaOk = true;
-                let caixaTaxaErr = "";
-                if (user?.id) {
-                  const { data: sess } = await supabase
-                    .from("caixa_sessoes")
-                    .select("id")
-                    .eq("clinica_id", clinicaAtual.clinica_id)
-                    .eq("user_id", user.id)
-                    .eq("status", "aberto")
-                    .order("aberto_em", { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-                  if (sess?.id) {
-                    const { error: errMovTaxa } = await supabase.from("caixa_movimentos").insert({
-                      sessao_id: sess.id,
-                      clinica_id: clinicaAtual.clinica_id,
-                      user_id: user.id,
-                      tipo: "recebimento",
-                      valor: taxaAdesao,
-                      descricao: `Taxa de adesão — Contrato #${contrato.numero} — ${contrato.paciente_nome}`,
-                      forma_pagamento: dados.forma_pagamento,
-                      lancamento_id: (lancTaxa as { id: string } | null)?.id ?? null,
-                    } as never);
-                    if (errMovTaxa) {
-                      caixaTaxaOk = false;
-                      caixaTaxaErr = errMovTaxa.message ?? String(errMovTaxa);
-                    }
-                  }
-                }
-                if (!caixaTaxaOk) {
-                  const lancId = (lancTaxa as { id?: string } | null)?.id;
-                  try {
-                    if (lancId) await supabase.from("fin_lancamentos").delete().eq("id", lancId);
-                    toast.error(`Taxa de adesão: caixa falhou. Lançamento revertido. Detalhe: ${caixaTaxaErr}`);
-                  } catch (rbErr) {
-                    console.error("Falha no rollback da taxa de adesão:", rbErr);
-                    toast.error(`ERRO CRÍTICO: taxa de adesão (lançamento ${lancId ?? "?"}) sem caixa e sem rollback. Contate o suporte.`);
-                  }
+                  },
+                  p_movimento: user?.id
+                    ? {
+                        user_id: user.id,
+                        user_nome: user?.user_metadata?.nome ?? user?.email ?? null,
+                        tipo: "recebimento",
+                        valor: taxaAdesao,
+                        descricao: descricaoTaxa,
+                        forma_pagamento: dados.forma_pagamento,
+                      }
+                    : null,
+                } as never);
+                if (rpcErr) {
+                  toast.error(`Taxa de adesão: falha atômica (nada foi gravado). Detalhe: ${rpcErr.message ?? String(rpcErr)}`);
                   return;
                 }
 
