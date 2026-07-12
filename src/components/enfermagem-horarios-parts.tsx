@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 const DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const FERIADOS_FIXOS = new Set<string>([
   "01-01","04-21","05-01","09-07","10-12","11-02","11-15","11-20","12-25",
@@ -159,12 +160,12 @@ export function EnfermagemGerarAgendaCard() {
           </div>
           <div>
             <label className="text-xs text-muted-foreground">De</label>
-            <Input type="date" className="w-40" value={gerar.data_inicio}
+            <DateInputBR className="w-40" value={gerar.data_inicio}
               onChange={(e) => setGerar({ ...gerar, data_inicio: e.target.value })} />
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Até</label>
-            <Input type="date" className="w-40" value={gerar.data_fim}
+            <DateInputBR className="w-40" value={gerar.data_fim}
               onChange={(e) => setGerar({ ...gerar, data_fim: e.target.value })} />
           </div>
           <div>

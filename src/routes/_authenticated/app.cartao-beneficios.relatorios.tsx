@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { exportToExcel } from "@/lib/export-csv";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/relatorios")({
   component: RelatoriosPage,
   head: () => ({ meta: [{ title: "Relatórios — Cartão Benefícios" }] }),
@@ -492,8 +493,8 @@ function RelatoriosPage() {
           </div>
           {showCustom && (
             <>
-              <div><Label>De</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)}/></div>
-              <div><Label>Até</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)}/></div>
+              <div><Label>De</Label><DateInputBR value={from} onChange={(e) => setFrom(e.target.value)}/></div>
+              <div><Label>Até</Label><DateInputBR value={to} onChange={(e) => setTo(e.target.value)}/></div>
             </>
           )}
           <Button variant="outline" onClick={exportarPlanos}><Download className="h-4 w-4 mr-2"/>Exportar planos (CSV)</Button>

@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/financeiro/notas")({
   component: Page,
   head: () => ({ meta: [{ title: "Notas Pacientes — Financeiro" }] }),
@@ -215,7 +216,7 @@ function Page() {
                 <div className="space-y-2"><Label>Série</Label>
                   <Input value={form.serie} onChange={(e) => setForm({ ...form, serie: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Data</Label>
-                  <Input type="date" required value={form.data_emissao} onChange={(e) => setForm({ ...form, data_emissao: e.target.value })} /></div>
+                  <DateInputBR required value={form.data_emissao} onChange={(e) => setForm({ ...form, data_emissao: e.target.value })} /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2"><Label>Valor *</Label>

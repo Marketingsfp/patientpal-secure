@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { formatDatePura } from "@/lib/date-utils";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/hr-contratos")({
   component: ContratosPage,
   head: () => ({ meta: [{ title: "Funcionários — ClinicaOS" }] }),
@@ -310,8 +311,8 @@ function ContratosPage() {
               </div>
               <div><Label>Carga semanal (h)</Label><Input type="number" step="0.5" value={form.carga_horaria_semanal} onChange={e => setForm({ ...form, carga_horaria_semanal: e.target.value })} /></div>
               <div><Label>Salário (R$)</Label><Input type="number" step="0.01" value={form.salario} onChange={e => setForm({ ...form, salario: e.target.value })} /></div>
-              <div><Label>Admissão</Label><Input type="date" value={form.data_admissao} onChange={e => setForm({ ...form, data_admissao: e.target.value })} /></div>
-              <div><Label>Demissão</Label><Input type="date" value={form.data_demissao} onChange={e => setForm({ ...form, data_demissao: e.target.value })} /></div>
+              <div><Label>Admissão</Label><DateInputBR value={form.data_admissao} onChange={e => setForm({ ...form, data_admissao: e.target.value })} /></div>
+              <div><Label>Demissão</Label><DateInputBR value={form.data_demissao} onChange={e => setForm({ ...form, data_demissao: e.target.value })} /></div>
               <div>
                 <Label>Status</Label>
                 <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>

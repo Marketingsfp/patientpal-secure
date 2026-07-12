@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { formatDatePura } from "@/lib/date-utils";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/hr-ferias")({
   component: FeriasPageWithTabs,
   head: () => ({ meta: [{ title: "Férias — ClinicaOS" }] }),
@@ -168,10 +169,10 @@ function FeriasPage() {
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Aquisitivo início</Label><Input type="date" value={form.periodo_aquisitivo_inicio} onChange={e => setForm({ ...form, periodo_aquisitivo_inicio: e.target.value })} /></div>
-              <div><Label>Aquisitivo fim</Label><Input type="date" value={form.periodo_aquisitivo_fim} onChange={e => setForm({ ...form, periodo_aquisitivo_fim: e.target.value })} /></div>
-              <div><Label>Início gozo</Label><Input type="date" value={form.inicio} onChange={e => setForm({ ...form, inicio: e.target.value })} /></div>
-              <div><Label>Fim gozo</Label><Input type="date" value={form.fim} onChange={e => setForm({ ...form, fim: e.target.value })} /></div>
+              <div><Label>Aquisitivo início</Label><DateInputBR value={form.periodo_aquisitivo_inicio} onChange={e => setForm({ ...form, periodo_aquisitivo_inicio: e.target.value })} /></div>
+              <div><Label>Aquisitivo fim</Label><DateInputBR value={form.periodo_aquisitivo_fim} onChange={e => setForm({ ...form, periodo_aquisitivo_fim: e.target.value })} /></div>
+              <div><Label>Início gozo</Label><DateInputBR value={form.inicio} onChange={e => setForm({ ...form, inicio: e.target.value })} /></div>
+              <div><Label>Fim gozo</Label><DateInputBR value={form.fim} onChange={e => setForm({ ...form, fim: e.target.value })} /></div>
               <div><Label>Dias</Label><Input type="number" value={form.dias} onChange={e => setForm({ ...form, dias: e.target.value })} /></div>
               <div className="flex items-end">
                 <label className="flex items-center gap-2 text-sm">

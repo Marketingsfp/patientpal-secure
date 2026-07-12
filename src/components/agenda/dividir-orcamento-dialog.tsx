@@ -14,6 +14,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { AlertTriangle, Package, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export type DividirItem = {
   id: string;
   descricao: string;
@@ -554,8 +555,7 @@ export function DividirOrcamentoDialog({
                 </div>
                 <div>
                   <Label className="text-xs">Data</Label>
-                  <Input
-                    type="date"
+                  <DateInputBR
                     value={g.data}
                     onChange={(e) => updateGrupo(idx, { data: e.target.value, hora: "" })}
                   />

@@ -15,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EnfermagemGerarAgendaCard, EnfermagemRecursosHorariosEditor } from "@/components/enfermagem-horarios-parts";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/disponibilidades")({
   component: Page,
   head: () => ({ meta: [{ title: "Horários médicos — ClinicaOS" }] }),
@@ -409,11 +410,11 @@ function Page() {
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">De</label>
-                  <Input type="date" className="w-40" value={gerar.data_inicio} onChange={(e) => setGerar({ ...gerar, data_inicio: e.target.value })} />
+                  <DateInputBR className="w-40" value={gerar.data_inicio} onChange={(e) => setGerar({ ...gerar, data_inicio: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Até</label>
-                  <Input type="date" className="w-40" value={gerar.data_fim} onChange={(e) => setGerar({ ...gerar, data_fim: e.target.value })} />
+                  <DateInputBR className="w-40" value={gerar.data_fim} onChange={(e) => setGerar({ ...gerar, data_fim: e.target.value })} />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Nº de fichas</label>
@@ -697,11 +698,11 @@ function Page() {
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Vigência de</label>
-                      <Input type="date" className="w-40" value={novo.vigencia_inicio} onChange={(e) => setNovo({ ...novo, vigencia_inicio: e.target.value })} />
+                      <DateInputBR className="w-40" value={novo.vigencia_inicio} onChange={(e) => setNovo({ ...novo, vigencia_inicio: e.target.value })} />
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">até</label>
-                      <Input type="date" className="w-40" value={novo.vigencia_fim} onChange={(e) => setNovo({ ...novo, vigencia_fim: e.target.value })} />
+                      <DateInputBR className="w-40" value={novo.vigencia_fim} onChange={(e) => setNovo({ ...novo, vigencia_fim: e.target.value })} />
                     </div>
                     {podeEscrever && (
                       <Button
@@ -759,8 +760,8 @@ function Page() {
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex gap-1">
-                                    <Input type="date" className="w-36" value={editRow.vigencia_inicio} onChange={(e) => setEditRow({ ...editRow, vigencia_inicio: e.target.value })} />
-                                    <Input type="date" className="w-36" value={editRow.vigencia_fim} onChange={(e) => setEditRow({ ...editRow, vigencia_fim: e.target.value })} />
+                                    <DateInputBR className="w-36" value={editRow.vigencia_inicio} onChange={(e) => setEditRow({ ...editRow, vigencia_inicio: e.target.value })} />
+                                    <DateInputBR className="w-36" value={editRow.vigencia_fim} onChange={(e) => setEditRow({ ...editRow, vigencia_fim: e.target.value })} />
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right">

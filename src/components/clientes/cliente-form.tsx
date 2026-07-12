@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 export interface Paciente {
   id: string;
   nome: string;
@@ -872,7 +873,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
             <div className="grid grid-cols-2 gap-3 items-end">
               <div className="space-y-1">
                 <Label>Data de nascimento *</Label>
-                <Input type="date" required value={form.data_nascimento}
+                <DateInputBR required value={form.data_nascimento}
                   min="1900-01-01"
                   max={new Date().toISOString().slice(0, 10)}
                   onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })} />
@@ -1007,11 +1008,11 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                 <div className="border rounded-lg p-3 bg-muted/30 grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto] items-end">
                   <div className="space-y-1">
                     <Label className="text-xs">Data de</Label>
-                    <Input type="date" value={filtroDataDe} onChange={(e) => setFiltroDataDe(e.target.value)} />
+                    <DateInputBR value={filtroDataDe} onChange={(e) => setFiltroDataDe(e.target.value)} />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Data até</Label>
-                    <Input type="date" value={filtroDataAte} onChange={(e) => setFiltroDataAte(e.target.value)} />
+                    <DateInputBR value={filtroDataAte} onChange={(e) => setFiltroDataAte(e.target.value)} />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Médico</Label>
@@ -1143,11 +1144,11 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                 <div className="border rounded-lg p-3 bg-muted/30 grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto] items-end">
                   <div className="space-y-1">
                     <Label className="text-xs">Data de</Label>
-                    <Input type="date" value={histFiltroDataDe} onChange={(e) => setHistFiltroDataDe(e.target.value)} />
+                    <DateInputBR value={histFiltroDataDe} onChange={(e) => setHistFiltroDataDe(e.target.value)} />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Data até</Label>
-                    <Input type="date" value={histFiltroDataAte} onChange={(e) => setHistFiltroDataAte(e.target.value)} />
+                    <DateInputBR value={histFiltroDataAte} onChange={(e) => setHistFiltroDataAte(e.target.value)} />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Médico</Label>

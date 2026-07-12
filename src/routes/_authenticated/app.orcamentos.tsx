@@ -21,6 +21,7 @@ import { ConversaoOrcamentoDialog } from "@/components/orcamentos/conversao-orca
 import { useOrcamentosV2Flag } from "@/hooks/use-orcamentos-v2-flag";
 import { OrcamentosV2Mount } from "@/components/orcamentos-v2/orcamentos-v2-mount";
 
+import { DateInputBR } from "@/components/ui/date-input-br";
 type AuditRow = {
   id: string;
   user_email: string | null;
@@ -404,9 +405,9 @@ function OrcamentosPage() {
         </div>
         {periodo === "personalizado" && (
           <div className="flex items-center gap-1">
-            <Input type="date" value={dataIni} onChange={(e) => setDataIni(e.target.value)} className="h-8 w-[150px] text-xs" />
+            <DateInputBR value={dataIni} onChange={(e) => setDataIni(e.target.value)} className="h-8 w-[150px] text-xs" />
             <span className="text-xs text-muted-foreground">até</span>
-            <Input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="h-8 w-[150px] text-xs" />
+            <DateInputBR value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="h-8 w-[150px] text-xs" />
           </div>
         )}
         <div className="flex items-center gap-1 rounded-md border bg-card p-0.5 text-xs">
