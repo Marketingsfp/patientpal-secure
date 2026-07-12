@@ -10,6 +10,7 @@ import { logAction } from "@/hooks/use-crud";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInputBR } from "@/components/ui/date-input-br";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -847,9 +848,9 @@ function Page() {
 
       <Card><CardContent className="pt-6 flex flex-wrap items-end gap-3">
         <div className="space-y-1"><Label className="text-xs">De</Label>
-          <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="w-40" /></div>
+          <DateInputBR value={fromDate} onChange={setFromDate} className="w-40" /></div>
         <div className="space-y-1"><Label className="text-xs">Até</Label>
-          <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="w-40" /></div>
+          <DateInputBR value={toDate} onChange={setToDate} className="w-40" /></div>
         <div className="space-y-1"><Label className="text-xs">Tipo</Label>
           <Select value={filterTipo} onValueChange={(v) => setFilterTipo(v as typeof filterTipo)}>
             <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
