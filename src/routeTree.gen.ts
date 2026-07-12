@@ -100,6 +100,7 @@ import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/
 import { Route as AuthenticatedAppAgendaV2RouteImport } from './routes/_authenticated/app.agenda-v2'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as AuthenticatedAppNfseIndexRouteImport } from './routes/_authenticated/app.nfse.index'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
 import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authenticated/app.equipe.index'
@@ -645,6 +646,11 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAppNfseIndexRoute =
   AuthenticatedAppNfseIndexRouteImport.update({
     id: '/nfse/',
@@ -914,6 +920,7 @@ export interface FileRoutesByFullPath {
   '/paciente/perfil': typeof PacientePerfilRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
   '/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
@@ -1046,6 +1053,7 @@ export interface FileRoutesByTo {
   '/paciente/perfil': typeof PacientePerfilRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente': typeof PacienteIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
   '/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
@@ -1178,6 +1186,7 @@ export interface FileRoutesById {
   '/paciente/perfil': typeof PacientePerfilRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
   '/_authenticated/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
@@ -1313,6 +1322,7 @@ export interface FileRouteTypes {
     | '/paciente/perfil'
     | '/verificar/$codigo'
     | '/paciente/'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/app/agenda'
     | '/app/agenda-v2'
@@ -1445,6 +1455,7 @@ export interface FileRouteTypes {
     | '/paciente/perfil'
     | '/verificar/$codigo'
     | '/paciente'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/app/agenda'
     | '/app/agenda-v2'
@@ -1576,6 +1587,7 @@ export interface FileRouteTypes {
     | '/paciente/perfil'
     | '/verificar/$codigo'
     | '/paciente/'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/app/agenda'
     | '/_authenticated/app/agenda-v2'
@@ -1710,6 +1722,7 @@ export interface RootRouteChildren {
   PacientePerfilRoute: typeof PacientePerfilRoute
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
   ApiPublicFocusnfeWebhookRoute: typeof ApiPublicFocusnfeWebhookRoute
@@ -2356,6 +2369,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/app/nfse/': {
       id: '/_authenticated/app/nfse/'
       path: '/nfse'
@@ -2999,6 +3019,7 @@ const rootRouteChildren: RootRouteChildren = {
   PacientePerfilRoute: PacientePerfilRoute,
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   PContratoTokenRoute: PContratoTokenRoute,
   ApiPublicFocusnfeWebhookRoute: ApiPublicFocusnfeWebhookRoute,
