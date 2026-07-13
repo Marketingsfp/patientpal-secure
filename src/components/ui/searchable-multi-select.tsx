@@ -18,6 +18,7 @@ interface Props {
   emptyText?: string;
   className?: string;
   disabled?: boolean;
+  side?: "top" | "right" | "bottom" | "left";
 }
 
 const cleanLabel = (label: string) => label.replace(/^\d+\.\s*/, "");
@@ -37,6 +38,7 @@ export function SearchableMultiSelect({
   emptyText = "Nenhum resultado.",
   className,
   disabled = false,
+  side = "bottom",
 }: Props) {
   const [open, setOpen] = useState(false);
   const selectedSet = useMemo(() => new Set(value), [value]);
@@ -80,6 +82,7 @@ export function SearchableMultiSelect({
       <PopoverContent
         className="p-0 w-[min(var(--radix-popover-trigger-width),32rem)] max-w-[94vw]"
         align="start"
+        side={side}
         sideOffset={4}
         collisionPadding={12}
         onWheel={(e) => e.stopPropagation()}

@@ -4144,6 +4144,7 @@ function AgendaPage() {
                         placeholder="Selecione um ou mais serviços"
                         searchPlaceholder="Buscar serviço..."
                         options={opts.filter((o) => o.value !== "none")}
+                        side="top"
                       />
                       {form.procedimentos.length > 1 && (
                         <p className="text-[11px] text-emerald-700">
