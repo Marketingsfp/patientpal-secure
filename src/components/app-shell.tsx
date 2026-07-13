@@ -139,10 +139,10 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     label: "Cadastros",
     items: [
     { to: "/app/equipe", label: "Equipe", icon: Users },
+    { to: "/app/perfis", label: "Perfis", icon: KeyRound },
     { to: "/app/especialidades", label: "Serviços", icon: Stethoscope, aliases: ["/app/tipos-servico", "/app/procedimentos", "/app/enfermagem-recursos"] },
     { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
     { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
-    { to: "/app/perfis", label: "Perfis", icon: KeyRound },
     { to: "/app/unidades", label: "Unidades", icon: MapPin },
     { to: "/app/planos", label: "Planos / Convênios", icon: Gift },
     { to: "/app/modelos-documentos", label: "Modelos de Documentos", icon: FileText },
