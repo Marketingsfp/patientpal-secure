@@ -22,7 +22,12 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/chat": "chat",
   "/app/clientes": "clientes",
   "/app/clientes/duplicados": "clientes",
-  "/app/painel": "painel",
+  // O sidebar rotula esta rota "Dashboard" (LayoutDashboard) e ela é a
+  // página de indicadores — nada a ver com o módulo "painel" (Painel de
+  // Senhas, painel público de chamadas em src/routes/painel.tsx, fora da
+  // árvore autenticada). Usa a chave "dashboard" da tela de Perfis de
+  // Acesso, que antes não estava amarrada a rota nenhuma.
+  "/app/painel": "dashboard",
   "/app/painel-executivo": "painel-executivo",
   "/app/fluxo": "fluxo",
   "/app/orcamentos": "orcamentos",

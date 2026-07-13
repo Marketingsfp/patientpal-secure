@@ -1,10 +1,13 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
+import { usePermissoes } from "@/hooks/use-permissoes";
 
 export interface SectionTab {
   to: string;
   label: string;
   icon: LucideIcon;
+  /** Chave de módulo (tela Perfis de Acesso) que governa esta aba. */
+  modulo: string;
 }
 
 interface SectionTabsProps {
@@ -15,6 +18,13 @@ interface SectionTabsProps {
 
 export function SectionTabs({ title, icon: TitleIcon, tabs }: SectionTabsProps) {
   const loc = useLocation();
+  // Antes as abas apareciam todas, sempre — mesmo quando o módulo de uma
+  // aba específica estava com acesso "Sem" no perfil do usuário (clicar
+  // nela ainda era bloqueado pela guarda de rota do AppShell, mas a aba
+  // "não sumia" como o esperado). Filtra aqui do mesmo jeito que o menu
+  // lateral já faz.
+  const { allowed } = usePermissoes();
+  const visiveis = allowed === null ? tabs : tabs.filter((t) => allowed.has(t.modulo));
   return (
     <div className="space-y-3 mb-4">
       <div className="flex items-center gap-2">
@@ -22,7 +32,7 @@ export function SectionTabs({ title, icon: TitleIcon, tabs }: SectionTabsProps) 
         <h1 className="text-2xl font-bold">{title}</h1>
       </div>
       <nav className="flex flex-wrap gap-1 border-b">
-        {tabs.map((t) => {
+        {visiveis.map((t) => {
           const active = loc.pathname === t.to || loc.pathname.startsWith(t.to + "/");
           return (
             <Link
@@ -44,35 +54,36 @@ export function SectionTabs({ title, icon: TitleIcon, tabs }: SectionTabsProps) 
   );
 }
 
-import { Megaphone, Send, Sparkles, Users, Filter, Clock, Palmtree, FileText, GraduationCap, BookOpen, HeartPulse, LayoutGrid, ClipboardList, ShieldCheck, KeyRound, Stethoscope } from "lucide-react";
+import { Megaphone, Send, Sparkles, Users, Filter, Clock, Palmtree, FileText, FileSignature, GraduationCap, BookOpen, HeartPulse, LayoutGrid, ClipboardList, ShieldCheck, KeyRound, Stethoscope } from "lucide-react";
 
 export const MARKETING_TABS: ReadonlyArray<SectionTab> = [
-  { to: "/app/mkt-leads", label: "Leads", icon: Users },
-  { to: "/app/campanhas", label: "Campanhas", icon: Megaphone },
-  { to: "/app/mkt-envios", label: "Envios", icon: Send },
-  { to: "/app/mkt-segmentos", label: "Segmentos", icon: Filter },
-  { to: "/app/mkt-landing", label: "Landing Pages", icon: Sparkles },
+  { to: "/app/mkt-leads", label: "Leads", icon: Users, modulo: "mkt-leads" },
+  { to: "/app/campanhas", label: "Campanhas", icon: Megaphone, modulo: "campanhas" },
+  { to: "/app/mkt-envios", label: "Envios", icon: Send, modulo: "mkt-envios" },
+  { to: "/app/mkt-segmentos", label: "Segmentos", icon: Filter, modulo: "mkt-segmentos" },
+  { to: "/app/mkt-landing", label: "Landing Pages", icon: Sparkles, modulo: "mkt-landing" },
 ];
 
 export const RH_TABS: ReadonlyArray<SectionTab> = [
-  { to: "/app/hr-ponto", label: "Ponto", icon: Clock },
-  { to: "/app/hr-ferias", label: "Férias", icon: Palmtree },
-  { to: "/app/hr-holerites", label: "Holerites", icon: FileText },
-  { to: "/app/treinamentos", label: "Treinamentos", icon: GraduationCap },
-  { to: "/app/lms-admin", label: "Cursos (admin)", icon: BookOpen },
+  { to: "/app/hr-ponto", label: "Ponto", icon: Clock, modulo: "hr-ponto" },
+  { to: "/app/hr-contratos", label: "Contratos", icon: FileSignature, modulo: "hr-contratos" },
+  { to: "/app/hr-ferias", label: "Férias", icon: Palmtree, modulo: "hr-ferias" },
+  { to: "/app/hr-holerites", label: "Holerites", icon: FileText, modulo: "hr-holerites" },
+  { to: "/app/treinamentos", label: "Treinamentos", icon: GraduationCap, modulo: "treinamentos" },
+  { to: "/app/lms-admin", label: "Cursos (admin)", icon: BookOpen, modulo: "lms-admin" },
 ];
 
 export const SERVICOS_TABS: ReadonlyArray<SectionTab> = [
-  { to: "/app/especialidades", label: "Especialidades", icon: HeartPulse },
-  { to: "/app/tipos-servico", label: "Categorias", icon: LayoutGrid },
-  { to: "/app/procedimentos", label: "Serviços", icon: ClipboardList },
-  { to: "/app/enfermagem-recursos", label: "Enfermagem", icon: HeartPulse },
+  { to: "/app/especialidades", label: "Especialidades", icon: HeartPulse, modulo: "especialidades" },
+  { to: "/app/tipos-servico", label: "Categorias", icon: LayoutGrid, modulo: "tipos-servico" },
+  { to: "/app/procedimentos", label: "Serviços", icon: ClipboardList, modulo: "procedimentos" },
+  { to: "/app/enfermagem-recursos", label: "Enfermagem", icon: HeartPulse, modulo: "enfermagem-recursos" },
 ];
 
 export const SEGURANCA_TABS: ReadonlyArray<SectionTab> = [
-  { to: "/app/auditoria", label: "Auditoria", icon: ShieldCheck },
-  { to: "/app/lgpd", label: "LGPD", icon: ShieldCheck },
-  { to: "/app/integration-secrets", label: "Integrações", icon: KeyRound },
+  { to: "/app/auditoria", label: "Auditoria", icon: ShieldCheck, modulo: "auditoria" },
+  { to: "/app/lgpd", label: "LGPD", icon: ShieldCheck, modulo: "lgpd" },
+  { to: "/app/integration-secrets", label: "Integrações", icon: KeyRound, modulo: "integration-secrets" },
 ];
 
 export const MARKETING_META = { title: "Marketing", icon: Megaphone };

@@ -14,7 +14,10 @@ export const Route = createFileRoute("/_authenticated/app/equipe/medico/$medicoI
 function EditarMedicoPage() {
   const { medicoId } = Route.useParams();
   const { clinicaAtual } = useClinica();
-  const podeEscrever = usePodeEscrever("medicos");
+  // A rota vive sob /app/equipe/... e é alcançada a partir da aba "Médicos"
+  // da tela Equipe — a permissão que abre a página (módulo "equipe", via
+  // permissoes-rotas.ts) precisa ser a mesma que libera salvar aqui.
+  const podeEscrever = usePodeEscrever("equipe");
   const navigate = useNavigate();
 
   const voltar = () => navigate({ to: "/app/equipe", search: { tab: "medicos" } });

@@ -167,12 +167,6 @@ const GRUPOS: Grupo[] = [
       { key: "painel-executivo", nome: "Painel Executivo", descricao: "Indicadores executivos da clínica" },
     ],
   },
-  {
-    label: "Sistema",
-    modulos: [
-      { key: "perfil-proprio", nome: "Perfil próprio", descricao: "Dados do próprio usuário" },
-    ],
-  },
 ];
 
 const TODOS_MODULOS = GRUPOS.flatMap((g) => g.modulos.map((m) => m.key));
@@ -191,6 +185,12 @@ function buildInitialState(): Record<PerfilKey, Record<string, Acesso>> {
 function PerfisPage() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
+  // Deliberadamente hardcoded para role === "admin", e NÃO
+  // usePodeEscrever("perfis") — quem gerencia permissões precisa ser um
+  // admin de verdade, mesmo que a matriz configure "perfis: Edição" para
+  // outro perfil. Sem essa trava, um perfil não-admin com edição em
+  // "Perfis de acesso" poderia se auto-promover a qualquer nível de
+  // acesso no sistema.
   const podeAdministrar = clinicaAtual?.role === "admin";
   const [tab, setTab] = useState<"perfis" | "permissoes">("perfis");
   const [perfilSel, setPerfilSel] = useState<PerfilKey>("admin");
