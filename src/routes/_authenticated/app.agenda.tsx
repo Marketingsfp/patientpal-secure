@@ -3911,7 +3911,7 @@ function AgendaPage() {
               )}
               <fieldset
                 disabled={editing ? pagosSet.has(editing.id) : false}
-                className="space-y-4 contents disabled:opacity-90"
+                className="space-y-2 contents disabled:opacity-90"
               >
               <div className="space-y-1.5 rounded-xl border border-primary/25 bg-primary/[0.04] p-3 text-xs">
                 <div className="flex items-center gap-2 flex-wrap">
