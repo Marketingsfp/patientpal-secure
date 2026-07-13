@@ -252,7 +252,7 @@ function TotemPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/40 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/40 flex flex-col cursor-none [&_*]:cursor-none">
       {/* Header */}
       <header className="px-8 py-6 flex items-center justify-between">
         <div>
