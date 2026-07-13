@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { useNavigate } from "@tanstack/react-router";
 import { cadastrarUsuario, getFuncionarioLogin, definirSenhaFuncionario } from "@/lib/equipe.functions";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -149,11 +148,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [savingSenha, setSavingSenha] = useState(false);
-  // Troca de perfil de acesso (mover médico → funcionário)
-  const [novoPerfilAcesso, setNovoPerfilAcesso] = useState<string>("medico");
-  const [confirmTrocaPerfil, setConfirmTrocaPerfil] = useState(false);
-  const [trocandoPerfil, setTrocandoPerfil] = useState(false);
-  const navigateEquipe = useNavigate();
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [bulkQuery, setBulkQuery] = useState("");
@@ -584,46 +578,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       toast.error((e as Error)?.message ?? "Erro ao atualizar senha");
     } finally {
       setSavingSenha(false);
-    }
-  }
-
-  // Troca o perfil de acesso deste usuário na clínica ativa e desativa o
-  // cadastro em `public.medicos` (o histórico é preservado). RLS de
-  // `clinica_memberships` já restringe a admin/gestor via
-  // `can_manage_clinica`; a UI só oferece o botão para essa mesma faixa.
-  async function trocarPerfilAcesso() {
-    if (!medicoUserId || !activeClinicaId) return;
-    if (novoPerfilAcesso === "medico") {
-      toast.info("Selecione um perfil diferente de Médico.");
-      return;
-    }
-    setTrocandoPerfil(true);
-    try {
-      const { data: memUpd, error: e1 } = await supabase
-        .from("clinica_memberships")
-        .update({ role: novoPerfilAcesso as "recepcao" })
-        .eq("user_id", medicoUserId)
-        .eq("clinica_id", activeClinicaId)
-        .select("id");
-      if (e1) { mostrarErro(e1); return; }
-      if (!memUpd || memUpd.length === 0) {
-        toast.error("Sem permissão para trocar o perfil deste usuário.");
-        return;
-      }
-      if (editId) {
-        const { error: e2 } = await supabase
-          .from("medicos")
-          .update({ ativo: false })
-          .eq("id", editId);
-        if (e2) { mostrarErro(e2, "erro ao desativar cadastro do médico"); return; }
-      }
-      toast.success("Perfil de acesso alterado. O usuário agora aparece em Funcionários.");
-      setConfirmTrocaPerfil(false);
-      navigateEquipe({ to: "/app/equipe", search: { tab: "funcionarios" } });
-    } catch (err) {
-      toast.error((err as Error)?.message ?? "Erro ao trocar perfil");
-    } finally {
-      setTrocandoPerfil(false);
     }
   }
 
@@ -1705,42 +1659,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         </div>
                       )}
                     </div>
-                  {podeGerenciarEquipe && (
-                    <div className="border-t pt-4 space-y-3">
-                      <div>
-                        <Label>Trocar perfil de acesso</Label>
-                        <p className="text-xs text-muted-foreground">
-                          Move este usuário de <b>Médico</b> para outro perfil (Recepção, Caixa, etc.).
-                          O cadastro em <b>Médicos</b> é desativado (o histórico é preservado) e o usuário
-                          passa a aparecer na aba <b>Funcionários</b>.
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2 items-end">
-                        <div className="w-full sm:w-64">
-                          <Select value={novoPerfilAcesso} onValueChange={setNovoPerfilAcesso}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="medico">Médico (sem alteração)</SelectItem>
-                              <SelectItem value="enfermeiro">Enfermeiro</SelectItem>
-                              <SelectItem value="recepcao">Recepção</SelectItem>
-                              <SelectItem value="caixa">Caixa</SelectItem>
-                              <SelectItem value="financeiro">Financeiro</SelectItem>
-                              <SelectItem value="gestor">Gestor</SelectItem>
-                              <SelectItem value="admin">Administrador</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={novoPerfilAcesso === "medico" || trocandoPerfil}
-                          onClick={() => setConfirmTrocaPerfil(true)}
-                        >
-                          Aplicar troca de perfil
-                        </Button>
-                      </div>
-                    </div>
-                  )}
                   </div>
                 ) : (
                   <>
@@ -1821,31 +1739,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
               </DialogFooter>
             )}
-            <Dialog open={confirmTrocaPerfil} onOpenChange={setConfirmTrocaPerfil}>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Confirmar troca de perfil</DialogTitle>
-                </DialogHeader>
-                <div className="text-sm space-y-2">
-                  <p>
-                    Isso removerá o acesso de <b>Médico</b> e definirá o novo perfil como{" "}
-                    <b>{novoPerfilAcesso}</b>.
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    O cadastro em <b>Médicos</b> será desativado; o histórico (agendamentos,
-                    prontuários, repasses) permanece preservado.
-                  </p>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setConfirmTrocaPerfil(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="button" onClick={trocarPerfilAcesso} disabled={trocandoPerfil}>
-                    {trocandoPerfil ? "Aplicando..." : "Confirmar troca"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
             <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
               <DialogContent className="sm:max-w-2xl w-[calc(100vw-2rem)] max-h-[85vh] overflow-hidden flex flex-col">
                 <DialogHeader>
