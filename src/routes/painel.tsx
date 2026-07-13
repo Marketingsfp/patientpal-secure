@@ -41,6 +41,8 @@ function PainelPage() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const jaFaladoRef = useRef<Set<string>>(new Set());
   const chamadaPendenteRef = useRef<{ key: string; senha: Senha } | null>(null);
+  const filaFalaRef = useRef<Array<{ key: string; senha: Senha }>>([]);
+  const falandoRef = useRef<boolean>(false);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window === "undefined") return "dark";
     return (localStorage.getItem("painel-theme") as "dark" | "light") ?? "dark";
