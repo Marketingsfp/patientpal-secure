@@ -3887,7 +3887,7 @@ function AgendaPage() {
           </DialogTrigger>
           )}
           <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
-            <DialogHeader className="space-y-1 px-6 pt-5 pb-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
+            <DialogHeader className="space-y-0.5 px-6 pt-3 pb-2 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
               <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900">
                 {editing
                   ? (pagosSet.has(editing.id) ? "Visualizar agendamento" : "Editar agendamento")
@@ -3899,7 +3899,7 @@ function AgendaPage() {
                   : "Preencha os dados abaixo. Campos com * são obrigatórios."}
               </p>
             </DialogHeader>
-            <form onSubmit={submit} className="space-y-4 px-6 py-5">
+            <form onSubmit={submit} className="space-y-2.5 px-6 py-3">
               {editing && open && (
                 <FichaEmUsoAlert agendamentoId={editing.id} />
               )}
