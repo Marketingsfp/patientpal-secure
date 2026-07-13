@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ClinicaProvider, useClinica } from "@/hooks/use-clinica";
-import { Loader2, Sun, Moon, Volume2, VolumeX } from "lucide-react";
+import { Loader2, Sun, Moon } from "lucide-react";
 
 export const Route = createFileRoute("/painel")({
   component: PainelRoute,
@@ -38,7 +38,6 @@ function PainelPage() {
   const { clinicaAtual, loading } = useClinica();
   const [atual, setAtual] = useState<Senha | null>(null);
   const [historico, setHistorico] = useState<Senha[]>([]);
-  const [audioOn, setAudioOn] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const jaFaladoRef = useRef<Set<string>>(new Set());
   const [theme, setTheme] = useState<"dark" | "light">(() => {
@@ -49,6 +48,36 @@ function PainelPage() {
   useEffect(() => {
     if (typeof window !== "undefined") localStorage.setItem("painel-theme", theme);
   }, [theme]);
+
+  // Destrava o áudio automaticamente no primeiro gesto do usuário em
+  // QUALQUER lugar da página (política de autoplay dos navegadores).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const unlock = () => {
+      try {
+        if ("speechSynthesis" in window) {
+          const u = new SpeechSynthesisUtterance(" ");
+          u.volume = 0;
+          window.speechSynthesis.speak(u);
+        }
+        const AC = (window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext
+          ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (AC && !audioCtxRef.current) audioCtxRef.current = new AC();
+        void audioCtxRef.current?.resume();
+      } catch { /* ignore */ }
+    };
+    // Tenta imediatamente (funciona se a aba já teve interação)
+    unlock();
+    const opts = { once: true, capture: true } as const;
+    window.addEventListener("pointerdown", unlock, opts);
+    window.addEventListener("keydown", unlock, opts);
+    window.addEventListener("touchstart", unlock, opts);
+    return () => {
+      window.removeEventListener("pointerdown", unlock, opts);
+      window.removeEventListener("keydown", unlock, opts);
+      window.removeEventListener("touchstart", unlock, opts);
+    };
+  }, []);
 
   const t = isLight ? {
     root: "bg-[#f6f7fb] text-slate-900",
@@ -192,23 +221,6 @@ function PainelPage() {
     };
     dizer(700);
     dizer(4500);
-  }
-
-  function ativarAudio() {
-    try {
-      if ("speechSynthesis" in window) {
-        const u = new SpeechSynthesisUtterance(" ");
-        u.volume = 0;
-        window.speechSynthesis.speak(u);
-      }
-      const AC = (window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext
-        ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (AC && !audioCtxRef.current) audioCtxRef.current = new AC();
-      void audioCtxRef.current?.resume();
-    } catch {
-      // ignore
-    }
-    setAudioOn(true);
   }
 
   function tocarDing() {
