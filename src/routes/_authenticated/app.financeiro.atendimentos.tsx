@@ -3245,7 +3245,7 @@ function Page() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setEditRepasse({ open: false, atend: null, valor: 0 })}
+              onClick={() => setEditRepasse({ open: false, atend: null, valor: "" })}
               disabled={savingRepasse}
             >
               Cancelar
