@@ -142,6 +142,12 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       }
     }
 
+    // Snapshot do próprio slot (paciente_nome) no momento da validação — usado
+    // logo abaixo como trava otimista no UPDATE, para fechar a janela entre
+    // "validei que está livre" e "gravei o agendamento" onde dois operadores
+    // simultâneos poderiam consumir o mesmo horário (um sobrescreveria o
+    // outro silenciosamente, sem erro).
+    let slotPacienteNomeNaValidacao: string | null = null;
     // ---------- 2/3/4. Agenda aberta + slot livre cobrindo o intervalo (2440-2478) ----------
     if (checagens.validar_agenda_aberta && payload.medico_id) {
       const di = new Date(payload.inicio);
@@ -157,6 +163,9 @@ export const criarAgendamento = createServerFn({ method: "POST" })
         .lte("inicio", fimDia)
         .limit(500);
       const lista = (slotsDia ?? []) as { id: string; paciente_nome: string; inicio: string; fim: string }[];
+      if (editing_id) {
+        slotPacienteNomeNaValidacao = lista.find((x) => x.id === editing_id)?.paciente_nome ?? null;
+      }
       const excluindoEditing = editing_id ? lista.filter((x) => x.id !== editing_id) : lista;
       if (excluindoEditing.length === 0) {
         return {
@@ -208,14 +217,25 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     // ---------- 6. INSERT ou UPDATE do agendamento (2519-2527) ----------
     let novoId: string | null = editing_id;
     let siblingIds: string[] = [];
+    // Erro de conflito compartilhado pelos dois ramos de UPDATE abaixo: a
+    // condição extra .eq("paciente_nome", snapshot) faz o UPDATE não casar
+    // nenhuma linha se outro operador já ocupou este exato horário entre a
+    // validação (passo 2/3/4) e este ponto — sem isso, o segundo UPDATE
+    // simplesmente sobrescrevia o primeiro paciente em silêncio.
+    const conflitoDeSlot: CriarAgendamentoResult = {
+      ok: false,
+      validation_error: {
+        message: "Este horário acabou de ser ocupado por outro atendimento. Atualize a agenda e escolha outro horário.",
+      },
+    };
     if (editing_id) {
       if (multiModo === "imagem") {
         const [primeiro, ...restantes] = procedimentos;
-        const { error } = await supabase
-          .from("agendamentos")
-          .update({ ...payload, procedimento: primeiro })
-          .eq("id", editing_id);
+        let q1 = supabase.from("agendamentos").update({ ...payload, procedimento: primeiro }).eq("id", editing_id);
+        if (slotPacienteNomeNaValidacao !== null) q1 = q1.eq("paciente_nome", slotPacienteNomeNaValidacao);
+        const { data: upd1, error } = await q1.select("id");
         if (error) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
+        if (slotPacienteNomeNaValidacao !== null && (!upd1 || upd1.length === 0)) return conflitoDeSlot;
         if (restantes.length > 0) {
           const rows = restantes.map((procedimento) => ({ ...payload, procedimento }));
           const { data: novosIrmaos, error: insertError } = await supabase
@@ -229,8 +249,11 @@ export const criarAgendamento = createServerFn({ method: "POST" })
         const payloadEdicao = multiModo === "laboratorio"
         ? { ...payload, procedimento: procedimentos.join(" + ") }
         : payload;
-        const { error } = await supabase.from("agendamentos").update(payloadEdicao).eq("id", editing_id);
+        let q2 = supabase.from("agendamentos").update(payloadEdicao).eq("id", editing_id);
+        if (slotPacienteNomeNaValidacao !== null) q2 = q2.eq("paciente_nome", slotPacienteNomeNaValidacao);
+        const { data: upd2, error } = await q2.select("id");
         if (error) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
+        if (slotPacienteNomeNaValidacao !== null && (!upd2 || upd2.length === 0)) return conflitoDeSlot;
       }
     } else if (multiModo === "imagem") {
       const rows = procedimentos.map((procedimento) => ({ ...payload, procedimento }));
