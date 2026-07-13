@@ -255,112 +255,104 @@ function PainelPage() {
   if (!clinicaAtual) return <div className="min-h-screen flex items-center justify-center bg-background">Nenhuma clínica selecionada.</div>;
 
   return (
-    <div className={`min-h-screen w-full ${t.root} p-8 lg:p-12 flex flex-col transition-colors`}>
-      <header className={`flex justify-between items-end mb-8 lg:mb-12 border-b ${t.headerBorder} pb-6 lg:pb-8`}>
-        <div>
-          <p className={`${t.accent} font-bold tracking-widest text-sm uppercase mb-1`}>Painel de Chamada</p>
-          <h1 className={`text-3xl lg:text-4xl font-black uppercase tracking-tight ${t.heading}`}>{clinicaAtual.clinica.nome}</h1>
+    <div className={`min-h-screen w-full ${t.root} p-[clamp(1rem,3vw,3rem)] flex flex-col transition-colors`}>
+      <header className={`grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 mb-[clamp(1rem,3vh,3rem)] border-b ${t.headerBorder} pb-[clamp(0.75rem,2vh,2rem)]`}>
+        <div className="min-w-0">
+          <p className={`${t.accent} font-bold tracking-widest text-[clamp(0.7rem,1.2vw,0.95rem)] uppercase mb-1`}>Painel de Chamada</p>
+          <h1 className={`truncate font-black uppercase tracking-tight ${t.heading} text-[clamp(1.25rem,3vw,2.5rem)]`}>{clinicaAtual.clinica.nome}</h1>
         </div>
-        <div className="flex items-center gap-4 lg:gap-6">
-          <button
-            type="button"
-            onClick={ativarAudio}
-            aria-label={audioOn ? "Áudio ativado" : "Ativar áudio"}
-            title={audioOn ? "Áudio ativado" : "Clique para ativar a chamada por voz"}
-            className={`h-11 lg:h-12 px-4 rounded-full flex items-center gap-2 transition ${t.toggle} ${!audioOn ? "ring-2 ring-blue-500 animate-pulse" : ""}`}
-          >
-            {audioOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-            <span className="text-sm font-semibold hidden lg:inline">
-              {audioOn ? "Som ativo" : "Ativar som"}
-            </span>
-          </button>
+        <div className="flex items-center gap-[clamp(0.75rem,1.5vw,1.5rem)] shrink-0">
           <button
             type="button"
             onClick={() => setTheme(isLight ? "dark" : "light")}
             aria-label={isLight ? "Mudar para modo escuro" : "Mudar para modo claro"}
-            className={`h-11 w-11 lg:h-12 lg:w-12 rounded-full flex items-center justify-center transition ${t.toggle}`}
+            className={`h-10 w-10 sm:h-11 sm:w-11 lg:h-12 lg:w-12 rounded-full flex items-center justify-center transition ${t.toggle}`}
           >
             {isLight ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
           </button>
-          <div className={`text-3xl lg:text-4xl font-medium tabular-nums ${t.clock}`}><PainelClock /></div>
+          <div className={`font-medium tabular-nums ${t.clock} text-[clamp(1.25rem,2.5vw,2.5rem)]`}><PainelClock /></div>
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col lg:flex-row gap-6 lg:gap-10">
-        <div className={`flex-[2] relative overflow-hidden ${t.heroCard} rounded-[40px] flex flex-col items-center justify-center p-10 lg:p-16`}>
+      <main className="flex flex-1 flex-col lg:flex-row gap-[clamp(1rem,2vw,2.5rem)] min-h-0">
+        <div className={`flex-[2] min-h-0 relative overflow-hidden ${t.heroCard} rounded-[clamp(1.5rem,3vw,2.5rem)] flex flex-col items-center justify-center p-[clamp(1.25rem,3vw,4rem)]`}>
           <div className={`absolute -top-24 -left-24 w-96 h-96 ${t.heroGlow} blur-[120px] rounded-full pointer-events-none`} />
           <div className="relative z-10 text-center w-full">
             {atual ? (() => {
               const ehNome = /[a-zA-Z]{3,}/.test(atual.codigo) && /\s/.test(atual.codigo.trim());
               const fonte = ehNome
-                ? (atual.codigo.length > 16 ? "text-6xl lg:text-7xl" : atual.codigo.length > 10 ? "text-7xl lg:text-8xl" : "text-8xl lg:text-9xl")
-                : "text-[10rem] lg:text-[18rem] tabular-nums";
+                ? (atual.codigo.length > 16
+                    ? "text-[clamp(2.5rem,7vw,5rem)]"
+                    : atual.codigo.length > 10
+                      ? "text-[clamp(3rem,8vw,6rem)]"
+                      : "text-[clamp(3.5rem,10vw,8rem)]")
+                : "text-[clamp(5rem,18vw,18rem)] tabular-nums";
               return (
                 <>
-                  <span className={`inline-block px-6 py-2 rounded-full ${t.badgeActive} font-bold text-lg lg:text-xl uppercase tracking-[0.2em] mb-8 lg:mb-12`}>
+                  <span className={`inline-block px-[clamp(1rem,1.5vw,1.5rem)] py-[clamp(0.35rem,0.6vw,0.6rem)] rounded-full ${t.badgeActive} font-bold uppercase tracking-[0.2em] mb-[clamp(1rem,2.5vw,3rem)] text-[clamp(0.75rem,1.2vw,1.25rem)]`}>
                     Chamando Agora
                   </span>
-                  <div className={`${fonte} font-black leading-none ${t.ticket} tracking-tighter break-words max-w-full mb-6`}>
+                  <div className={`${fonte} font-black leading-none ${t.ticket} tracking-tighter break-words max-w-full mb-[clamp(0.75rem,1.5vw,1.5rem)]`}>
                     {atual.codigo}
                   </div>
                   {!ehNome && atual.paciente_nome && (
-                    <h3 className={`text-4xl lg:text-6xl font-bold ${t.patient} tracking-tight uppercase break-words max-w-full`}>
+                    <h3 className={`font-bold ${t.patient} tracking-tight uppercase break-words max-w-full text-[clamp(1.5rem,4vw,3.75rem)]`}>
                       {atual.paciente_nome}
                     </h3>
                   )}
-                  <div className="flex items-center justify-center gap-4 lg:gap-6 mt-8 lg:mt-12">
+                  <div className="flex items-center justify-center gap-[clamp(0.75rem,1.5vw,1.5rem)] mt-[clamp(1rem,2.5vw,3rem)]">
                     {!ehNome && (
-                      <span className={`text-2xl lg:text-4xl ${t.guicheLabel} font-medium uppercase tracking-widest`}>Guichê</span>
+                      <span className={`${t.guicheLabel} font-medium uppercase tracking-widest text-[clamp(1rem,2.5vw,2.25rem)]`}>Guichê</span>
                     )}
-                    <span className={`text-6xl lg:text-8xl font-black ${t.guicheValue}`}>{atual.guiche ?? "—"}</span>
+                    <span className={`font-black ${t.guicheValue} text-[clamp(2.5rem,7vw,6rem)]`}>{atual.guiche ?? "—"}</span>
                   </div>
                 </>
               );
             })() : (
               <>
-                <span className={`inline-block px-6 py-2 rounded-full ${t.badgeIdle} font-bold text-lg lg:text-xl uppercase tracking-[0.2em] mb-8`}>
+                <span className={`inline-block px-[clamp(1rem,1.5vw,1.5rem)] py-[clamp(0.35rem,0.6vw,0.6rem)] rounded-full ${t.badgeIdle} font-bold uppercase tracking-[0.2em] mb-[clamp(1rem,2vw,2rem)] text-[clamp(0.75rem,1.2vw,1.25rem)]`}>
                   Chamando Agora
                 </span>
-                <div className={`text-4xl lg:text-5xl ${t.idleText} font-light`}>Aguardando chamada…</div>
+                <div className={`${t.idleText} font-light text-[clamp(1.5rem,4vw,3rem)]`}>Aguardando chamada…</div>
               </>
             )}
           </div>
         </div>
 
-        <aside className={`flex-1 ${t.aside} rounded-[40px] p-6 lg:p-10 flex flex-col`}>
-          <h3 className={`text-xl lg:text-2xl font-bold uppercase tracking-widest ${t.asideTitle} mb-6 lg:mb-10 pl-2 lg:pl-4`}>
+        <aside className={`flex-1 min-h-0 ${t.aside} rounded-[clamp(1.5rem,3vw,2.5rem)] p-[clamp(1rem,2vw,2.5rem)] flex flex-col`}>
+          <h3 className={`font-bold uppercase tracking-widest ${t.asideTitle} mb-[clamp(0.75rem,2vw,2.5rem)] pl-2 lg:pl-4 text-[clamp(0.9rem,1.5vw,1.5rem)]`}>
             Anteriores
           </h3>
-          <div className="space-y-3 lg:space-y-4 flex-1">
+          <div className="space-y-[clamp(0.5rem,1vw,1rem)] flex-1 overflow-y-auto min-h-0">
             {historico.length === 0 && (
-              <div className={`${t.asideEmpty} text-lg pl-2 lg:pl-4`}>Sem chamadas anteriores</div>
+              <div className={`${t.asideEmpty} pl-2 lg:pl-4 text-[clamp(0.9rem,1.4vw,1.125rem)]`}>Sem chamadas anteriores</div>
             )}
             {historico.map((s, i) => (
               <div
                 key={s.id}
-                className={`flex items-center justify-between p-5 lg:p-8 rounded-3xl ${i === 0 ? t.itemFirst : t.itemRest}`}
+                className={`flex items-center justify-between p-[clamp(0.75rem,1.5vw,2rem)] rounded-[clamp(1rem,1.5vw,1.5rem)] ${i === 0 ? t.itemFirst : t.itemRest}`}
               >
                 <div className="min-w-0">
-                  <p className={`text-3xl lg:text-4xl font-black tabular-nums mb-1 truncate ${i === 0 ? t.itemCodeFirst : t.itemCodeRest}`}>
+                  <p className={`font-black tabular-nums mb-1 truncate ${i === 0 ? t.itemCodeFirst : t.itemCodeRest} text-[clamp(1.25rem,2.5vw,2.25rem)]`}>
                     {s.codigo}
                   </p>
                   {s.paciente_nome && (
-                    <p className={`text-base lg:text-xl font-bold uppercase truncate ${i === 0 ? t.itemNameFirst : t.itemNameRest}`}>
+                    <p className={`font-bold uppercase truncate ${i === 0 ? t.itemNameFirst : t.itemNameRest} text-[clamp(0.8rem,1.3vw,1.25rem)]`}>
                       {s.paciente_nome}
                     </p>
                   )}
                 </div>
-                <div className="text-right shrink-0 pl-4">
-                  <p className={`text-[10px] lg:text-xs ${t.itemLabel} uppercase font-bold tracking-widest mb-1`}>Guichê</p>
-                  <p className={`text-3xl lg:text-4xl font-black ${i === 0 ? t.itemGuicheFirst : t.itemGuicheRest}`}>
+                <div className="text-right shrink-0 pl-3">
+                  <p className={`${t.itemLabel} uppercase font-bold tracking-widest mb-1 text-[clamp(0.55rem,0.8vw,0.75rem)]`}>Guichê</p>
+                  <p className={`font-black ${i === 0 ? t.itemGuicheFirst : t.itemGuicheRest} text-[clamp(1.5rem,2.8vw,2.25rem)]`}>
                     {s.guiche ?? "—"}
                   </p>
                 </div>
               </div>
             ))}
           </div>
-          <div className={`mt-auto pt-6 lg:pt-8 border-t ${t.footerBorder} text-center`}>
-            <p className={`${t.footerText} font-medium text-sm lg:text-base`}>Por favor, dirija-se ao guichê indicado.</p>
+          <div className={`mt-auto pt-[clamp(0.75rem,1.5vw,2rem)] border-t ${t.footerBorder} text-center`}>
+            <p className={`${t.footerText} font-medium text-[clamp(0.75rem,1.1vw,1rem)]`}>Por favor, dirija-se ao guichê indicado.</p>
           </div>
         </aside>
       </main>
