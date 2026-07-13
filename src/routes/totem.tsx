@@ -93,7 +93,7 @@ function TotemPage() {
     imprimirSenhaTotem({
       codigo: row.codigo,
       tipo: _tipo,
-      clinicaNome: clinicaAtual.nome ?? null,
+      clinicaNome: clinicaAtual.clinica?.nome ?? null,
     });
   }
 
