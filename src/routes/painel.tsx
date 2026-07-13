@@ -26,7 +26,7 @@ function PainelRoute() {
 type Senha = {
   id: string;
   codigo: string;
-  tipo: "N" | "P" | "E" | "R";
+  tipo: "N" | "P" | "C" | "R";
   status: string;
   guiche: string | null;
   chamada_em: string | null;
@@ -237,7 +237,7 @@ function PainelPage() {
     if (ehNome) {
       texto = `${s.codigo}${s.guiche ? `, ${s.guiche}` : ""}`;
     } else {
-      const tipoNome = { N: "Comum", P: "Preferencial", E: "Prioridade", R: "Retorno" }[s.tipo];
+      const tipoNome = { N: "Comum", P: "Preferencial", C: "Cartão consulta", R: "Retorno" }[s.tipo];
       const nomePart = s.paciente_nome ? `, ${s.paciente_nome}` : "";
       texto = `Senha ${tipoNome} ${s.codigo.replace("-", " ")}${nomePart}${s.guiche ? `, guichê ${s.guiche}` : ""}`;
     }
