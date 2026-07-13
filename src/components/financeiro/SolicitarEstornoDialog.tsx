@@ -137,7 +137,20 @@ export function SolicitarEstornoDialog({
       solicitado_por: user.id,
     });
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (error) {
+      // Índice único parcial (uq_estorno_solicitacoes_lancamento_pendente) é a
+      // trava real contra duplicidade — a checagem acima é só uma prévia para
+      // UX; ela pode perder uma corrida (duplo clique, duas abas) e o banco
+      // barra do mesmo jeito. Mostra a mesma mensagem amigável nesse caso raro.
+      if ((error as { code?: string }).code === "23505") {
+        toast.error("Já existe uma solicitação de estorno pendente para este item.");
+        onOpenChange(false);
+        onCreated?.();
+        return;
+      }
+      mostrarErro(error);
+      return;
+    }
     toast.success("Solicitação enviada ao financeiro");
     setMotivo("");
     setTipo("erro_caixa");
