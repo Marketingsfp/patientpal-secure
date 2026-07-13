@@ -328,7 +328,13 @@ export function NovoAgendamentoWizard({
       const result = await criarAgendamentoFn({
         data: {
           clinica_id: clinicaId,
-          editing_id: null,
+          // O wizard V2 só oferece slots DISPONÍVEL já existentes (nunca cria
+          // horário do zero) — editing_id precisa apontar para esse slot para
+          // que criarAgendamento faça UPDATE nele (consumindo o horário).
+          // Com editing_id: null aqui, o slot original ficava intocado
+          // (ainda "disponível") e um agendamento novo era inserido por cima,
+          // deixando duas linhas no mesmo horário.
+          editing_id: slot.id,
           payload: {
             clinica_id: clinicaId,
             paciente_nome: paciente.nome.trim(),
