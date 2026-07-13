@@ -1705,7 +1705,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                         </div>
                       )}
                     </div>
-                  </div>
                   {podeGerenciarEquipe && (
                     <div className="border-t pt-4 space-y-3">
                       <div>
@@ -1742,6 +1741,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       </div>
                     </div>
                   )}
+                  </div>
                 ) : (
                   <>
                     <div className="rounded-md border p-3 space-y-3">
