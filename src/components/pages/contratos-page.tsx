@@ -981,61 +981,6 @@ function NovoContratoForm({
       return toast.error(`Observações: máximo ${OBS_MAX} caracteres.`);
     }
     setSaving(true);
-    // Rede de segurança: revalida duplicidade no submit (o estado já bloqueia o botão)
-    const { data: jaAtivo } = await supabase
-      .from("contratos_assinatura")
-      .select("id, numero")
-      .eq("clinica_id", clinicaId)
-      .eq("paciente_id", titular.id)
-      .eq("status", "ativo")
-      .limit(1)
-      .maybeSingle();
-    if (jaAtivo) {
-      setSaving(false);
-      return toast.error(
-        `Este titular já possui um contrato ativo (#${(jaAtivo as { numero: number }).numero}). Cancele o contrato anterior antes de criar um novo.`,
-      );
-    }
-    const { data: contrato, error } = await supabase
-      .from("contratos_assinatura")
-      .insert({
-        clinica_id: clinicaId,
-        convenio_id: convenio.id,
-        paciente_id: titular.id,
-        paciente_nome: titular.nome,
-        data_inicio: dataInicio,
-        data_fim: addUmAno(dataInicio),
-        dia_vencimento: diaVenc,
-        valor_mensal: valor,
-        taxa_adesao: taxa,
-        num_parcelas: convenio.num_parcelas,
-        forma_pagamento: tipoCobranca ?? null,
-        observacoes: obsClean,
-        criado_por: userId,
-      })
-      .select("*")
-      .single();
-    if (error || !contrato) {
-      setSaving(false);
-      return mostrarErro(error);
-    }
-
-    if (deps.length > 0) {
-      const { error: depErr } = await supabase.from("contrato_dependentes").insert(
-        deps.map((d) => ({
-          contrato_id: contrato.id,
-          paciente_id: d.id,
-          paciente_nome: d.nome,
-          parentesco: d.parentesco || null,
-          tipo: d.tipo,
-        })),
-      );
-      if (depErr) {
-        toast.error(
-          `Contrato #${contrato.numero} criado, mas ${deps.length} dependente(s) não foram salvos. Reabra o contrato e adicione manualmente.`,
-        );
-      }
-    }
 
     // Gerar cobrancas: taxa de adesao separada da mensalidade.
     const base = new Date(dataInicio + "T00:00:00");
@@ -1050,8 +995,6 @@ function NovoContratoForm({
       // "já pagas" (contrato retroativo), a taxa também já foi paga e vai zero.
       const taxaParcela = i === 0 && !jaPago ? Number(taxa || 0) : 0;
       return {
-        contrato_id: contrato.id,
-        clinica_id: clinicaId,
         numero_parcela: i + 1,
         vencimento: vencStr,
         valor: valorParcela,
@@ -1064,8 +1007,6 @@ function NovoContratoForm({
     const cobrancas = taxaAdesao > 0 && mensalidadesJaPagas === 0
       ? [
           {
-            contrato_id: contrato.id,
-            clinica_id: clinicaId,
             numero_parcela: 0,
             vencimento: primeiraVencimento,
             valor: taxaAdesao,
@@ -1075,9 +1016,44 @@ function NovoContratoForm({
           ...parcelas,
         ]
       : parcelas;
-    const { error: mensErr } = await supabase.from("contrato_mensalidades").insert(cobrancas);
-    if (mensErr) {
-      toast.error(`Contrato #${contrato.numero} criado, mas as mensalidades não foram geradas: ${mensErr.message}`);
+
+    // Contrato + dependentes + mensalidades numa única transação (RPC):
+    // se qualquer etapa falhar, o Postgres desfaz tudo — antes eram 3
+    // inserts separados e uma falha no meio podia deixar contrato sem
+    // parcelas ou sem dependentes.
+    const { data: rpcData, error } = await (supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: unknown }>)("criar_contrato_assinatura", {
+      _clinica_id: clinicaId,
+      _convenio_id: convenio.id,
+      _paciente_id: titular.id,
+      _paciente_nome: titular.nome,
+      _data_inicio: dataInicio,
+      _data_fim: addUmAno(dataInicio),
+      _dia_vencimento: diaVenc,
+      _valor_mensal: valor,
+      _taxa_adesao: taxa,
+      _num_parcelas: convenio.num_parcelas,
+      _forma_pagamento: tipoCobranca ?? null,
+      _observacoes: obsClean,
+      _criado_por: userId,
+      _dependentes: deps.map((d) => ({
+        paciente_id: d.id,
+        paciente_nome: d.nome,
+        parentesco: d.parentesco || null,
+        tipo: d.tipo,
+      })),
+      _mensalidades: cobrancas,
+    });
+    if (error) {
+      setSaving(false);
+      return mostrarErro(error);
+    }
+    const contrato = rpcData as { id: string; numero: number } | null;
+    if (!contrato?.id) {
+      setSaving(false);
+      return toast.error("Falha ao criar contrato: retorno inesperado da função de banco.");
     }
 
     setSaving(false);
