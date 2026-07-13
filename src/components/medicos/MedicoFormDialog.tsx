@@ -587,6 +587,46 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
     }
   }
 
+  // Troca o perfil de acesso deste usuário na clínica ativa e desativa o
+  // cadastro em `public.medicos` (o histórico é preservado). RLS de
+  // `clinica_memberships` já restringe a admin/gestor via
+  // `can_manage_clinica`; a UI só oferece o botão para essa mesma faixa.
+  async function trocarPerfilAcesso() {
+    if (!medicoUserId || !activeClinicaId) return;
+    if (novoPerfilAcesso === "medico") {
+      toast.info("Selecione um perfil diferente de Médico.");
+      return;
+    }
+    setTrocandoPerfil(true);
+    try {
+      const { data: memUpd, error: e1 } = await supabase
+        .from("clinica_memberships")
+        .update({ role: novoPerfilAcesso as "recepcao" })
+        .eq("user_id", medicoUserId)
+        .eq("clinica_id", activeClinicaId)
+        .select("id");
+      if (e1) { mostrarErro(e1); return; }
+      if (!memUpd || memUpd.length === 0) {
+        toast.error("Sem permissão para trocar o perfil deste usuário.");
+        return;
+      }
+      if (editId) {
+        const { error: e2 } = await supabase
+          .from("medicos")
+          .update({ ativo: false })
+          .eq("id", editId);
+        if (e2) { mostrarErro(e2, "erro ao desativar cadastro do médico"); return; }
+      }
+      toast.success("Perfil de acesso alterado. O usuário agora aparece em Funcionários.");
+      setConfirmTrocaPerfil(false);
+      navigateEquipe({ to: "/app/equipe", search: { tab: "funcionarios" } });
+    } catch (err) {
+      toast.error((err as Error)?.message ?? "Erro ao trocar perfil");
+    } finally {
+      setTrocandoPerfil(false);
+    }
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     for (const er of form.especialidades) {
