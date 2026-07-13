@@ -6,7 +6,7 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { Bell, Check, X, ExternalLink } from "lucide-react";
+import { Bell, Check, X, ExternalLink, Volume2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/recepcao")({
   component: RecepcaoPage,
@@ -46,6 +46,7 @@ function RecepcaoPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("recepcao");
   const [guiche, setGuiche] = useState<string>("1");
+  const [tipoFiltro, setTipoFiltro] = useState<"AUTO" | "N" | "P" | "E" | "R">("AUTO");
   const [fila, setFila] = useState<Senha[]>([]);
   const [chamadas, setChamadas] = useState<Senha[]>([]);
   const [busy, setBusy] = useState(false);
@@ -128,15 +129,27 @@ function RecepcaoPage() {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!guiche.trim()) { toast.error("Informe o guichê"); return; }
     setBusy(true);
-    const { data, error } = await supabase.rpc("chamar_proxima_senha", {
+    const { data, error } = await supabase.rpc("chamar_proxima_senha_tipo", {
       _clinica_id: clinicaAtual.clinica_id,
       _guiche: guiche.trim(),
-    });
+      _tipo: tipoFiltro === "AUTO" ? null : tipoFiltro,
+    } as never);
     setBusy(false);
     if (error) { mostrarErro(error); return; }
-    if (!data) { toast.info("Não há senhas na fila"); return; }
+    if (!data) {
+      toast.info(tipoFiltro === "AUTO" ? "Não há senhas na fila" : `Não há senhas do tipo ${tipoFiltro}`);
+      return;
+    }
     const row = Array.isArray(data) ? data[0] : data;
     toast.success(`Chamada ${row.codigo} no guichê ${guiche}`);
+  }
+
+  async function rechamar(id: string) {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    const { data, error } = await supabase.rpc("rechamar_senha", { _id: id } as never);
+    if (error) { mostrarErro(error); return; }
+    const row = Array.isArray(data) ? data[0] : data;
+    toast.success(`Rechamada ${row?.codigo ?? ""}`);
   }
 
   async function setStatus(id: string, status: "atendida" | "cancelada") {
@@ -167,6 +180,21 @@ function RecepcaoPage() {
               onChange={(e) => setGuiche(e.target.value.slice(0, 10))}
               className="h-10 w-24 px-3 rounded-md border bg-background text-lg font-semibold"
             />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor="tipo-select" className="text-xs text-muted-foreground">Tipo</label>
+            <select
+              id="tipo-select"
+              value={tipoFiltro}
+              onChange={(e) => setTipoFiltro(e.target.value as typeof tipoFiltro)}
+              className="h-10 px-2 rounded-md border bg-background text-sm font-medium"
+            >
+              <option value="AUTO">Automático (E · P · R · N)</option>
+              <option value="E">E · Prioridade médica</option>
+              <option value="P">P · Preferencial</option>
+              <option value="R">R · Retorno</option>
+              <option value="N">N · Comum</option>
+            </select>
           </div>
           <Button size="lg" onClick={chamarProxima} disabled={busy} data-primary>
             <Bell className="h-4 w-4 mr-2" /> Chamar próxima
@@ -217,9 +245,14 @@ function RecepcaoPage() {
                   <span className="font-bold tabular-nums">{s.codigo}</span>
                   <span className="text-sm text-muted-foreground">Guichê {s.guiche ?? "—"}</span>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => setStatus(s.id, "atendida")}>
-                  <Check className="h-4 w-4 mr-1" /> Concluir
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => rechamar(s.id)} title="Rechamar (o painel toca e fala novamente)">
+                    <Volume2 className="h-4 w-4 mr-1" /> Rechamar
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setStatus(s.id, "atendida")}>
+                    <Check className="h-4 w-4 mr-1" /> Concluir
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

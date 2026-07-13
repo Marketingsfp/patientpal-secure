@@ -8041,6 +8041,36 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      chamar_proxima_senha_tipo: {
+        Args: {
+          _clinica_id: string
+          _guiche: string
+          _tipo?: Database["public"]["Enums"]["tipo_senha"]
+        }
+        Returns: {
+          atendida_em: string | null
+          cancelada_em: string | null
+          chamada_em: string | null
+          chamada_por: string | null
+          clinica_id: string
+          codigo: string
+          data_dia: string
+          emitida_em: string
+          guiche: string | null
+          id: string
+          identificado_por_facial: boolean
+          numero: number
+          paciente_id: string | null
+          status: Database["public"]["Enums"]["status_senha"]
+          tipo: Database["public"]["Enums"]["tipo_senha"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "senhas"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       checkin_agendamento: { Args: { _token: string }; Returns: Json }
       consulta_publica: { Args: { _token: string }; Returns: Json }
       contrato_publico: { Args: { _token: string }; Returns: Json }
@@ -8474,6 +8504,32 @@ export type Database = {
       reagendar_atendimento: {
         Args: { _destino_id: string; _origem_id: string; _trilha_msg: string }
         Returns: Json
+      }
+      rechamar_senha: {
+        Args: { _id: string }
+        Returns: {
+          atendida_em: string | null
+          cancelada_em: string | null
+          chamada_em: string | null
+          chamada_por: string | null
+          clinica_id: string
+          codigo: string
+          data_dia: string
+          emitida_em: string
+          guiche: string | null
+          id: string
+          identificado_por_facial: boolean
+          numero: number
+          paciente_id: string | null
+          status: Database["public"]["Enums"]["status_senha"]
+          tipo: Database["public"]["Enums"]["tipo_senha"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "senhas"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       salvar_agendamento_multi_imagem: {
         Args: {
