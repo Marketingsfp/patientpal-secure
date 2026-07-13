@@ -8461,6 +8461,10 @@ export type Database = {
           total: number
         }[]
       }
+      reagendar_atendimento: {
+        Args: { _destino_id: string; _origem_id: string; _trilha_msg: string }
+        Returns: Json
+      }
       salvar_anamnese_publica: {
         Args: { _modelo_id: string; _respostas: Json; _token: string }
         Returns: string
