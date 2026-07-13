@@ -8465,6 +8465,29 @@ export type Database = {
         Args: { _destino_id: string; _origem_id: string; _trilha_msg: string }
         Returns: Json
       }
+      salvar_agendamento_multi_imagem: {
+        Args: {
+          _clinica_id: string
+          _data_pagamento: string
+          _editing_id: string
+          _enfermagem_recurso_id: string
+          _especialidade_id: string
+          _fim: string
+          _forma_pagamento_prevista: string
+          _grupo_id: string
+          _inicio: string
+          _medico_id: string
+          _observacoes: string
+          _orcamento_id: string
+          _paciente_id: string
+          _paciente_nome: string
+          _paciente_nome_esperado_no_slot: string
+          _procedimentos: string[]
+          _status: string
+          _tipo_atendimento: string
+        }
+        Returns: Json
+      }
       salvar_anamnese_publica: {
         Args: { _modelo_id: string; _respostas: Json; _token: string }
         Returns: string
