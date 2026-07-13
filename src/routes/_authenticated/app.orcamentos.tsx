@@ -18,6 +18,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { printOrcamento } from "@/lib/print-orcamento";
 import { ConversaoOrcamentoDialog } from "@/components/orcamentos/conversao-orcamento-dialog";
+import { pickTop60 } from "@/lib/procedimento/laboratorio-top60";
 import { useOrcamentosV2Flag } from "@/hooks/use-orcamentos-v2-flag";
 import { OrcamentosV2Mount } from "@/components/orcamentos-v2/orcamentos-v2-mount";
 
