@@ -41,6 +41,8 @@ function PainelPage() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const jaFaladoRef = useRef<Set<string>>(new Set());
   const chamadaPendenteRef = useRef<{ key: string; senha: Senha } | null>(null);
+  const filaFalaRef = useRef<Array<{ key: string; senha: Senha }>>([]);
+  const falandoRef = useRef<boolean>(false);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window === "undefined") return "dark";
     return (localStorage.getItem("painel-theme") as "dark" | "light") ?? "dark";
@@ -70,7 +72,14 @@ function PainelPage() {
         // Se o navegador bloqueou a voz antes de qualquer interação, qualquer
         // toque/clique na tela repete a última chamada pendente sem botão visível.
         const pendente = chamadaPendenteRef.current;
-        if (pendente) falar(pendente.senha, pendente.key);
+        if (pendente) {
+          // Reenfileira o anúncio pendente para tocar assim que o áudio
+          // for destravado por qualquer gesto do usuário.
+          if (!filaFalaRef.current.some((f) => f.key === pendente.key)) {
+            filaFalaRef.current.push(pendente);
+          }
+          processarFilaFala();
+        }
       } catch { /* ignore */ }
     };
     // Tenta imediatamente (funciona se a aba já teve interação)
@@ -217,7 +226,8 @@ function PainelPage() {
     if (jaFaladoRef.current.has(key)) return;
     jaFaladoRef.current.add(key);
     chamadaPendenteRef.current = { key, senha: s };
-    falar(s, key);
+    filaFalaRef.current.push({ key, senha: s });
+    processarFilaFala();
   }
 
   function criarFala(texto: string, key: string) {
@@ -230,24 +240,39 @@ function PainelPage() {
     return utter;
   }
 
-  function falar(s: Senha, key = chaveSenha(s)) {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  function textoDaSenha(s: Senha) {
     const ehNome = /[a-zA-Z]{3,}/.test(s.codigo) && /\s/.test(s.codigo.trim());
-    let texto: string;
-    if (ehNome) {
-      texto = `${s.codigo}${s.guiche ? `, ${s.guiche}` : ""}`;
-    } else {
-      const tipoNome = { N: "Comum", P: "Preferencial", C: "Cartão consulta", R: "Retorno" }[s.tipo];
-      const nomePart = s.paciente_nome ? `, ${s.paciente_nome}` : "";
-      texto = `Senha ${tipoNome} ${s.codigo.replace("-", " ")}${nomePart}${s.guiche ? `, guichê ${s.guiche}` : ""}`;
-    }
-    window.speechSynthesis.cancel();
+    if (ehNome) return `${s.codigo}${s.guiche ? `, ${s.guiche}` : ""}`;
+    const tipoNome = { N: "Comum", P: "Preferencial", C: "Cartão consulta", R: "Retorno" }[s.tipo];
+    const nomePart = s.paciente_nome ? `, ${s.paciente_nome}` : "";
+    return `Senha ${tipoNome} ${s.codigo.replace("-", " ")}${nomePart}${s.guiche ? `, guichê ${s.guiche}` : ""}`;
+  }
+
+  // Processa a fila de anúncios: só chama a próxima senha depois que a
+  // atual terminar de falar por completo (ding + fala + repetição).
+  function processarFilaFala() {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (falandoRef.current) return;
+    const prox = filaFalaRef.current.shift();
+    if (!prox) return;
+    falandoRef.current = true;
+    const texto = textoDaSenha(prox.senha);
+    try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
     window.speechSynthesis.resume();
     tocarDing();
-    window.speechSynthesis.speak(criarFala(texto, key));
+    const primeira = criarFala(texto, prox.key);
+    const segunda = criarFala(texto, prox.key);
+    // Fim da repetição = fim do anúncio; libera a próxima senha da fila.
+    segunda.onend = () => {
+      falandoRef.current = false;
+      processarFilaFala();
+    };
+    segunda.onerror = segunda.onend;
+    // Se a primeira falhar, ainda tocamos a segunda depois do intervalo.
+    window.speechSynthesis.speak(primeira);
     window.setTimeout(() => {
       window.speechSynthesis.resume();
-      window.speechSynthesis.speak(criarFala(texto, key));
+      window.speechSynthesis.speak(segunda);
     }, 3800);
   }
 
