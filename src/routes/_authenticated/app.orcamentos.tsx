@@ -711,6 +711,24 @@ function NovoOrcamentoDialog({
     return () => { cancel = true; clearTimeout(t); };
   }, [procQuery, clinicaId, categoria]);
 
+  // Pré-carrega os procedimentos laboratoriais quando o orçamento é do
+  // tipo Laboratório, para montar o bloco Top 60 sem depender da busca.
+  useEffect(() => {
+    if (categoria !== "laboratorio" || !clinicaId) { setLabProcs([]); return; }
+    let cancel = false;
+    (async () => {
+      const { data } = await supabase
+        .from("procedimentos")
+        .select("id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo, valor_variavel")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%")
+        .limit(2000);
+      if (!cancel) setLabProcs((data ?? []) as Procedimento[]);
+    })();
+    return () => { cancel = true; };
+  }, [categoria, clinicaId]);
+
   const valorPorForma = (p: Procedimento, f: string) => {
     if (f === "Dinheiro") return Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
     if (f === "PIX") return Number(p.valor_pix ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
