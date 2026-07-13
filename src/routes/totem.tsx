@@ -230,7 +230,7 @@ function TotemPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-8">
+      <div className="min-h-screen flex items-center justify-center bg-background p-8 cursor-none [&_*]:cursor-none">
         <div className="text-center space-y-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
           <p className="text-muted-foreground">Carregando totem…</p>
@@ -241,7 +241,7 @@ function TotemPage() {
 
   if (!clinicaAtual) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-8">
+      <div className="min-h-screen flex items-center justify-center bg-background p-8 cursor-none [&_*]:cursor-none">
         <div className="text-center space-y-4 max-w-md">
           <h1 className="text-2xl font-semibold">Nenhuma clínica selecionada</h1>
           <p className="text-muted-foreground">Faça login no painel administrativo e selecione a clínica antes de abrir o totem.</p>
@@ -252,7 +252,7 @@ function TotemPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/40 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/40 flex flex-col cursor-none [&_*]:cursor-none">
       {/* Header */}
       <header className="px-8 py-6 flex items-center justify-between">
         <div>
