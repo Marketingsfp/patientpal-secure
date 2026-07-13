@@ -112,7 +112,7 @@ const STATUS_COR: Record<Status, string> = {
   faltou: "bg-[#f7b6c0] text-slate-800 border border-[#e88594]",
 };
 const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 const normalizar = (s: string) =>
   (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
