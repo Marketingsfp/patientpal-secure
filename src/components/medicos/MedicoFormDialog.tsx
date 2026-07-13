@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
+import { useNavigate } from "@tanstack/react-router";
 import { cadastrarUsuario, getFuncionarioLogin, definirSenhaFuncionario } from "@/lib/equipe.functions";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -148,6 +149,11 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
   const [savingSenha, setSavingSenha] = useState(false);
+  // Troca de perfil de acesso (mover médico → funcionário)
+  const [novoPerfilAcesso, setNovoPerfilAcesso] = useState<string>("medico");
+  const [confirmTrocaPerfil, setConfirmTrocaPerfil] = useState(false);
+  const [trocandoPerfil, setTrocandoPerfil] = useState(false);
+  const navigateEquipe = useNavigate();
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
   const [bulkQuery, setBulkQuery] = useState("");
