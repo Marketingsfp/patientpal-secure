@@ -2459,12 +2459,19 @@ function Page() {
                                 )
                               )}
                               {/* Botão de excluir para agenda */}
-                              {podeEscrever && !a.repasse_pago && (
+                              {podeEscrever && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7"
-                                  title="Editar repasse médico deste atendimento"
+                                  className={cn(
+                                    "h-7 w-7",
+                                    a.repasse_pago && "text-amber-600 hover:text-amber-700",
+                                  )}
+                                  title={
+                                    a.repasse_pago
+                                      ? "Editar repasse (já pago — ajusta a despesa vinculada)"
+                                      : "Editar repasse médico deste atendimento"
+                                  }
                                   onClick={() => abrirEditRepasse(a)}
                                 >
                                   <Wallet className="h-3.5 w-3.5" />
