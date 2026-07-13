@@ -72,7 +72,14 @@ function PainelPage() {
         // Se o navegador bloqueou a voz antes de qualquer interação, qualquer
         // toque/clique na tela repete a última chamada pendente sem botão visível.
         const pendente = chamadaPendenteRef.current;
-        if (pendente) falar(pendente.senha, pendente.key);
+        if (pendente) {
+          // Reenfileira o anúncio pendente para tocar assim que o áudio
+          // for destravado por qualquer gesto do usuário.
+          if (!filaFalaRef.current.some((f) => f.key === pendente.key)) {
+            filaFalaRef.current.push(pendente);
+          }
+          processarFilaFala();
+        }
       } catch { /* ignore */ }
     };
     // Tenta imediatamente (funciona se a aba já teve interação)
