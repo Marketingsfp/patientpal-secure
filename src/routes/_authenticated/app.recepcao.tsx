@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_authenticated/app/recepcao")({
 type Senha = {
   id: string;
   codigo: string;
-  tipo: "N" | "P" | "E" | "R";
+  tipo: "N" | "P" | "C" | "R";
   status: string;
   guiche: string | null;
   emitida_em: string;
@@ -28,12 +28,12 @@ type Senha = {
 const TIPO_COR: Record<string, string> = {
   N: "bg-primary/10 text-primary",
   P: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-  E: "bg-rose-500/15 text-rose-700 dark:text-rose-400",
+  C: "bg-rose-500/15 text-rose-700 dark:text-rose-400",
   R: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
 };
 
 // Prioridade de atendimento: Emergência > Prioritário > Retorno > Normal
-const TIPO_PRIORIDADE: Record<string, number> = { E: 0, P: 1, R: 2, N: 3 };
+const TIPO_PRIORIDADE: Record<string, number> = { C: 0, P: 1, R: 2, N: 3 };
 
 function ordenarPorPrioridade(a: Senha, b: Senha) {
   const pa = TIPO_PRIORIDADE[a.tipo] ?? 99;
@@ -46,7 +46,7 @@ function RecepcaoPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("recepcao");
   const [guiche, setGuiche] = useState<string>("1");
-  const [tipoFiltro, setTipoFiltro] = useState<"AUTO" | "N" | "P" | "E" | "R">("AUTO");
+  const [tipoFiltro, setTipoFiltro] = useState<"AUTO" | "N" | "P" | "C" | "R">("AUTO");
   const [fila, setFila] = useState<Senha[]>([]);
   const [chamadas, setChamadas] = useState<Senha[]>([]);
   const [busy, setBusy] = useState(false);
@@ -189,8 +189,8 @@ function RecepcaoPage() {
               onChange={(e) => setTipoFiltro(e.target.value as typeof tipoFiltro)}
               className="h-10 px-2 rounded-md border bg-background text-sm font-medium"
             >
-              <option value="AUTO">Automático (E · P · R · N)</option>
-              <option value="E">E · Cartão consulta</option>
+              <option value="AUTO">Automático (C · P · R · N)</option>
+              <option value="C">C · Cartão consulta</option>
               <option value="P">P · Preferencial</option>
               <option value="R">R · Retorno</option>
               <option value="N">N · Comum</option>
@@ -213,7 +213,7 @@ function RecepcaoPage() {
         <section className="bg-card border rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold">Fila ({fila.length})</h2>
-            <span className="text-xs text-muted-foreground">Ordem: E · P · R · N</span>
+            <span className="text-xs text-muted-foreground">Ordem: C · P · R · N</span>
           </div>
           <div className="space-y-2 max-h-[60vh] overflow-auto">
             {fila.length === 0 && <div className="text-sm text-muted-foreground py-6 text-center">Fila vazia</div>}
