@@ -18,9 +18,16 @@ interface Props {
   emptyText?: string;
   className?: string;
   disabled?: boolean;
+  side?: "top" | "right" | "bottom" | "left";
 }
 
 const cleanLabel = (label: string) => label.replace(/^\d+\.\s*/, "");
+const normalizeSearch = (text: string) =>
+  cleanLabel(text)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 
 export function SearchableMultiSelect({
   options,
@@ -31,6 +38,7 @@ export function SearchableMultiSelect({
   emptyText = "Nenhum resultado.",
   className,
   disabled = false,
+  side = "bottom",
 }: Props) {
   const [open, setOpen] = useState(false);
   const selectedSet = useMemo(() => new Set(value), [value]);
@@ -74,6 +82,7 @@ export function SearchableMultiSelect({
       <PopoverContent
         className="p-0 w-[min(var(--radix-popover-trigger-width),32rem)] max-w-[94vw]"
         align="start"
+        side={side}
         sideOffset={4}
         collisionPadding={12}
         onWheel={(e) => e.stopPropagation()}
@@ -83,7 +92,11 @@ export function SearchableMultiSelect({
           filter={(val, search) => {
             const opt = options.find((o) => o.value === val);
             if (!opt) return 0;
-            return opt.label.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
+            const query = normalizeSearch(search);
+            if (!query) return 1;
+            const label = normalizeSearch(opt.label);
+            const value = normalizeSearch(opt.value);
+            return label.includes(query) || value.includes(query) ? 1 : 0;
           }}
         >
           <div className="flex items-center gap-2 border-b px-2">
