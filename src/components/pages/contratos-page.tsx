@@ -3244,7 +3244,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 // Abordagem B: RPC atômica lançamento + caixa (Postgres cuida do rollback).
                 const hojeStr = new Date().toISOString().slice(0, 10);
                 const descricaoTaxa = `Taxa de adesão — Contrato #${contrato.numero} — ${contrato.paciente_nome}`;
-                const { error: rpcErr } = await supabase.rpc("fn_registrar_lancamento_e_caixa", {
+                const { data: rpcData, error: rpcErr } = await supabase.rpc("fn_registrar_lancamento_e_caixa", {
                   p_lancamento: {
                     clinica_id: clinicaAtual.clinica_id,
                     tipo: "receita",
@@ -3273,6 +3273,24 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 if (rpcErr) {
                   toast.error(`Taxa de adesão: falha atômica (nada foi gravado). Detalhe: ${rpcErr.message ?? String(rpcErr)}`);
                   return;
+                }
+
+                // 3.5) A taxa de adesão tinha lançamento + caixa próprios (RPC
+                // acima), mas a linha correspondente em contrato_mensalidades
+                // (numero_parcela=0) nunca era marcada como paga — ficava
+                // "pendente" para sempre, ao contrário da mensalidade normal
+                // (que já grava status/lancamento_id/valor_pago). Padroniza o
+                // mesmo nível de vínculo financeiro para as duas.
+                const taxaRpcResult = (rpcData ?? {}) as { lancamento_id?: string };
+                const taxaMensRow = mens.find((m) => isAdesao(m));
+                if (taxaMensRow) {
+                  await marcarPago(
+                    taxaMensRow.id,
+                    true,
+                    dados.forma_pagamento ?? "misto",
+                    taxaRpcResult.lancamento_id ?? null,
+                    taxaAdesao,
+                  );
                 }
 
                 // 4) Imprime UMA GR única com mensalidade + taxa de adesão.
