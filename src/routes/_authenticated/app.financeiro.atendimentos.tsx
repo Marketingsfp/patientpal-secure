@@ -1674,6 +1674,89 @@ function Page() {
         const medNome = medId !== "sem" ? (medMap.get(medId) ?? "") : "—";
         const { data: userData } = await supabase.auth.getUser();
         const currentUserId = userData?.user?.id ?? null;
+        // Idempotência: primeiro reservamos os atendimentos com um lockId
+        // usando UPDATE ... WHERE repasse_pago = false. Se algum já estava
+        // pago (corrida com outra aba, retry após falha parcial etc.), o
+        // filtro devolve menos linhas do que pedimos e abortamos ANTES de
+        // criar a despesa duplicada.
+        const lockId =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const lockUpd = {
+          repasse_pago: true,
+          repasse_pago_em: payForm.data,
+          repasse_pago_at: nowIso,
+          repasse_forma_pagamento: payForm.forma_pagamento || null,
+          repasse_conta_id: payForm.conta_id || null,
+          repasse_lock_id: lockId,
+        };
+        const manualIds = list.filter((x) => x.origem === "manual").map((x) => x.id);
+        const agendaIds = list.filter((x) => x.origem === "agenda").map((x) => x.id);
+        let lockedManual: Array<{ id: string }> = [];
+        let lockedAgenda: Array<{ id: string }> = [];
+        if (manualIds.length) {
+          const { data, error } = await supabase
+            .from("fin_atendimentos")
+            .update(lockUpd)
+            .in("id", manualIds)
+            .eq("repasse_pago", false)
+            .select("id");
+          if (error) throw error;
+          lockedManual = data ?? [];
+        }
+        if (agendaIds.length) {
+          const { data, error } = await supabase
+            .from("fin_lancamentos")
+            .update(lockUpd)
+            .in("id", agendaIds)
+            .eq("repasse_pago", false)
+            .select("id");
+          if (error) throw error;
+          lockedAgenda = data ?? [];
+        }
+        const esperado = manualIds.length + agendaIds.length;
+        const travados = lockedManual.length + lockedAgenda.length;
+        if (travados === 0) {
+          toast.error(
+            `Repasse de ${medNome} já havia sido pago por outra tentativa. Recarregando…`,
+          );
+          continue;
+        }
+        if (travados < esperado) {
+          // Rollback do que travamos e aborta este médico.
+          if (lockedManual.length) {
+            await supabase
+              .from("fin_atendimentos")
+              .update({
+                repasse_pago: false,
+                repasse_pago_em: null,
+                repasse_pago_at: null,
+                repasse_forma_pagamento: null,
+                repasse_conta_id: null,
+                repasse_lock_id: null,
+              })
+              .eq("repasse_lock_id", lockId);
+          }
+          if (lockedAgenda.length) {
+            await supabase
+              .from("fin_lancamentos")
+              .update({
+                repasse_pago: false,
+                repasse_pago_em: null,
+                repasse_pago_at: null,
+                repasse_forma_pagamento: null,
+                repasse_conta_id: null,
+                repasse_lock_id: null,
+              })
+              .eq("repasse_lock_id", lockId);
+          }
+          toast.error(
+            `Alguns atendimentos de ${medNome} já haviam sido pagos. Nenhum novo pagamento foi gerado — recarregando.`,
+          );
+          continue;
+        }
+        // Só agora criamos a despesa; se falhar, desfazemos o lock.
         const { data: lanc, error: eLanc } = await supabase
           .from("fin_lancamentos")
           .insert({
@@ -1691,24 +1774,49 @@ function Page() {
           })
           .select("id")
           .single();
-        if (eLanc) throw eLanc;
-        const lancId = lanc?.id ?? null;
-        const upd = {
-          repasse_pago: true,
-          repasse_pago_em: payForm.data,
-          repasse_pago_at: nowIso,
-          repasse_forma_pagamento: payForm.forma_pagamento || null,
-          repasse_conta_id: payForm.conta_id || null,
-          repasse_lancamento_id: lancId,
-        };
-        const manualIds = list.filter((x) => x.origem === "manual").map((x) => x.id);
-        const agendaIds = list.filter((x) => x.origem === "agenda").map((x) => x.id);
-        if (manualIds.length) {
-          const { error } = await supabase.from("fin_atendimentos").update(upd).in("id", manualIds);
+        if (eLanc || !lanc?.id) {
+          if (lockedManual.length) {
+            await supabase
+              .from("fin_atendimentos")
+              .update({
+                repasse_pago: false,
+                repasse_pago_em: null,
+                repasse_pago_at: null,
+                repasse_forma_pagamento: null,
+                repasse_conta_id: null,
+                repasse_lock_id: null,
+              })
+              .eq("repasse_lock_id", lockId);
+          }
+          if (lockedAgenda.length) {
+            await supabase
+              .from("fin_lancamentos")
+              .update({
+                repasse_pago: false,
+                repasse_pago_em: null,
+                repasse_pago_at: null,
+                repasse_forma_pagamento: null,
+                repasse_conta_id: null,
+                repasse_lock_id: null,
+              })
+              .eq("repasse_lock_id", lockId);
+          }
+          throw eLanc ?? new Error("Falha ao criar despesa de repasse");
+        }
+        const lancId = lanc.id;
+        // Vincula a despesa aos atendimentos travados.
+        if (lockedManual.length) {
+          const { error } = await supabase
+            .from("fin_atendimentos")
+            .update({ repasse_lancamento_id: lancId })
+            .eq("repasse_lock_id", lockId);
           if (error) throw error;
         }
-        if (agendaIds.length) {
-          const { error } = await supabase.from("fin_lancamentos").update(upd).in("id", agendaIds);
+        if (lockedAgenda.length) {
+          const { error } = await supabase
+            .from("fin_lancamentos")
+            .update({ repasse_lancamento_id: lancId })
+            .eq("repasse_lock_id", lockId);
           if (error) throw error;
         }
         // Se usamos valor manual, ajusta o valor_medico de cada atendimento
@@ -1754,6 +1862,10 @@ function Page() {
     } catch (e) {
       const err = e as { message?: string };
       mostrarErro(err);
+      // Sincroniza o estado local com o banco após falha para evitar que
+      // o usuário tente pagar de novo achando que nada foi feito quando na
+      // verdade um médico do lote já foi processado com sucesso.
+      try { await load(); } catch { /* noop */ }
     } finally {
       setPayingNow(false);
     }
