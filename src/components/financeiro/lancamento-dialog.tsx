@@ -18,6 +18,25 @@ import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import { DateInputBR } from "@/components/ui/date-input-br";
 type Tipo = "receita" | "despesa";
 
+// A receita já foi gravada (RPC atômica) quando o split é calculado — não dá
+// para desfazer retroativamente. Se o split falhar, deixamos uma pendência
+// visível e persistente no próprio lançamento (em vez de só console.error),
+// para o financeiro encontrar e recalcular depois.
+async function marcarSplitPendente(lancamentoId: string, motivo: string) {
+  const { data: atual } = await supabase
+    .from("fin_lancamentos")
+    .select("observacoes")
+    .eq("id", lancamentoId)
+    .maybeSingle();
+  const obsAtual = (atual as { observacoes: string | null } | null)?.observacoes ?? "";
+  const marcador = `[SPLIT PENDENTE — recalcular divisão de repasse] ${motivo}`.trim();
+  const novaObs = [obsAtual, marcador].filter(Boolean).join(" | ");
+  await supabase
+    .from("fin_lancamentos")
+    .update({ observacoes: novaObs } as never)
+    .eq("id", lancamentoId);
+}
+
 export interface LancamentoSavedData {
   valor: number;
   forma_pagamento: string | null;
@@ -539,6 +558,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // Antes esse cálculo só era feito em memória (na hora de imprimir a GR
     // ou nos relatórios). Agora persistimos em `pagamento_splits` para que o
     // histórico de repasses fique rastreável e somável por consulta direta.
+    let splitFalhou = false;
     try {
       if (tipo === "receita" && lancInserido?.id && Number(valor) > 0) {
         const splits: Array<{
@@ -631,15 +651,30 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         }
         if (splits.length > 0) {
           const { error: errSplit } = await supabase.from("pagamento_splits").insert(splits as never);
-          if (errSplit) console.error("Falha ao gravar splits:", errSplit);
+          if (errSplit) {
+            console.error("Falha ao gravar splits:", errSplit);
+            splitFalhou = true;
+            await marcarSplitPendente(lancInserido.id, errSplit.message);
+          }
         }
       }
     } catch (e) {
       console.error("Erro no cálculo de splits:", e);
+      if (tipo === "receita" && lancInserido?.id) {
+        splitFalhou = true;
+        await marcarSplitPendente(lancInserido.id, e instanceof Error ? e.message : String(e));
+      }
     }
     // Lançamento + caixa foram gravados atomicamente pela RPC — sucesso.
     setSaving(false);
-    toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
+    if (splitFalhou) {
+      toast.warning(
+        `${tipo === "receita" ? "Receita" : "Despesa"} registrada, mas houve falha ao calcular a divisão de repasse (médico/clínica). Pendência marcada no lançamento — avise o financeiro para recalcular.`,
+        { duration: 10000 },
+      );
+    } else {
+      toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
+    }
     onSavedWithData?.({
       valor: Number(valor),
       forma_pagamento: formaFinal,
