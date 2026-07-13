@@ -8689,7 +8689,7 @@ export type Database = {
         | "declaracao"
         | "contrato"
         | "outro"
-      tipo_senha: "N" | "P" | "E" | "R"
+      tipo_senha: "N" | "P" | "C" | "R"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -8930,7 +8930,7 @@ export const Constants = {
         "contrato",
         "outro",
       ],
-      tipo_senha: ["N", "P", "E", "R"],
+      tipo_senha: ["N", "P", "C", "R"],
     },
   },
 } as const
