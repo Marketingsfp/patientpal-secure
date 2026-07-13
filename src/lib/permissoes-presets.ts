@@ -58,7 +58,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     "consulta-rapida": "read", "prontuario-modelos": "read",
     odontologia: "write", prontuarios: "write", anamneses: "write",
     documentos: "write", clientes: "read", chat: "write",
-    "atendimento-multiplo": "write",
+    "atendimento-multiplo": "write", caixa: "read",
   },
   recepcao: {
     agenda: "write", recepcao: "write", clientes: "write", fluxo: "write",
@@ -91,6 +91,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     anamneses: "write", prontuarios: "read", estoque: "read",
     documentos: "read", chat: "write", orcamentos: "write",
     "atendimento-multiplo": "write", "enfermagem-recursos": "write",
+    caixa: "read",
   },
 };
 
