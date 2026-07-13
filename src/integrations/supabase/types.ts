@@ -6705,7 +6705,6 @@ export type Database = {
           convenio_id: string
           created_at: string
           id: string
-          origem: string
           procedimento_id: string
           updated_at: string
           valor_dinheiro: number
@@ -6716,7 +6715,6 @@ export type Database = {
           convenio_id: string
           created_at?: string
           id?: string
-          origem?: string
           procedimento_id: string
           updated_at?: string
           valor_dinheiro?: number
@@ -6727,7 +6725,6 @@ export type Database = {
           convenio_id?: string
           created_at?: string
           id?: string
-          origem?: string
           procedimento_id?: string
           updated_at?: string
           valor_dinheiro?: number
