@@ -2144,15 +2144,26 @@ function DetalheContrato({
 
   // Busca de pacientes agora é feita sob demanda pelo PatientSearchInput.
 
-  const marcarPago = async (id: string, paga: boolean, forma?: string | null) => {
+  const marcarPago = async (
+    id: string,
+    paga: boolean,
+    forma?: string | null,
+    lancamentoId?: string | null,
+    valorPago?: number | null,
+  ) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    // Grava lancamento_id + valor_pago junto com o status: sem isso a
+    // mensalidade fica marcada como paga sem ponte confiável para o
+    // lançamento financeiro (auditoria/estorno não conseguem localizá-lo).
     const patch = paga
       ? {
           status: "pago",
           pago_em: new Date().toISOString().slice(0, 10),
           ...(forma !== undefined ? { forma_pagamento: forma } : {}),
+          ...(lancamentoId ? { lancamento_id: lancamentoId } : {}),
+          ...(valorPago != null ? { valor_pago: valorPago } : {}),
         }
-      : { status: "pendente", pago_em: null, forma_pagamento: null };
+      : { status: "pendente", pago_em: null, forma_pagamento: null, lancamento_id: null, valor_pago: null };
     const { error } = await supabase.from("contrato_mensalidades").update(patch).eq("id", id);
     if (error) return mostrarErro(error);
     load();
@@ -3225,7 +3236,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
           if (!pagMens || !clinicaAtual) return;
           const mensId = pagMens.id;
           const taxaAdesao = Number(pagMens.taxa_adesao ?? 0) || 0;
-          await marcarPago(mensId, true, dados.forma_pagamento ?? "misto");
+          await marcarPago(mensId, true, dados.forma_pagamento ?? "misto", dados.lancamento_id, dados.valor);
           try {
             // Se a parcela carrega a taxa de adesão (apenas a 1ª parcela),
             // gera um lançamento financeiro separado e imprime UMA GR única

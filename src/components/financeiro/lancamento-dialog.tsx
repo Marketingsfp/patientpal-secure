@@ -38,6 +38,7 @@ async function marcarSplitPendente(lancamentoId: string, motivo: string) {
 }
 
 export interface LancamentoSavedData {
+  lancamento_id: string;
   valor: number;
   forma_pagamento: string | null;
   parcelas: number | null;
@@ -676,6 +677,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       toast.success(`${tipo === "receita" ? "Receita" : "Despesa"} registrada`);
     }
     onSavedWithData?.({
+      lancamento_id: lancInserido.id,
       valor: Number(valor),
       forma_pagamento: formaFinal,
       parcelas: parcelasFinal,
