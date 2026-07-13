@@ -623,6 +623,10 @@ function NovoOrcamentoDialog({
   const [procQuery, setProcQuery] = useState("");
   const [procResults, setProcResults] = useState<Procedimento[]>([]);
   const [searchingProc, setSearchingProc] = useState(false);
+  // Bloco "Laboratório — Top 60": lista curta de acesso rápido para exames
+  // laboratoriais. Não substitui a busca — apenas destaca os mais comuns.
+  const [labProcs, setLabProcs] = useState<Procedimento[]>([]);
+  const [mostrarTop60, setMostrarTop60] = useState(true);
   // Categoria Laboratório é identificada diretamente em `procedimentos`
   // (tipo_procedimento/grupo) — mesma fonte usada pelo cadastro de Serviços.
   // Nada de prefetch de IDs: a lista completa (~4.4k) estouraria a URL do
