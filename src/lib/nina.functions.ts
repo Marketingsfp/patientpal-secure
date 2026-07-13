@@ -45,7 +45,26 @@ export const getContextoClinica = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await assertMembership(supabase, userId, data.clinicaId);
-    const [medR, dispR, procR, meR, espAllR] = await Promise.all([
+
+    const carregarProcedimentos = async () => {
+      const pageSize = 1000;
+      const rows: any[] = [];
+      for (let from = 0; ; from += pageSize) {
+        const { data: page, error } = await supabase
+          .from("procedimentos")
+          .select("id, nome, tipo, grupo, valor_padrao, valor_dinheiro, valor_dinheiro_pix, valor_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, duracao_minutos, preparo")
+          .eq("clinica_id", data.clinicaId)
+          .eq("ativo", true)
+          .order("nome")
+          .range(from, from + pageSize - 1);
+        if (error) throw new Error(error.message);
+        rows.push(...(page ?? []));
+        if (!page || page.length < pageSize) break;
+      }
+      return rows;
+    };
+
+    const [medR, dispR, procedimentosRows, meR, espAllR] = await Promise.all([
       supabase
         .from("medicos")
         .select("id, nome, crm, crm_uf, telefone, email")
@@ -59,13 +78,7 @@ export const getContextoClinica = createServerFn({ method: "POST" })
         .eq("ativo", true)
         .order("dia_semana")
         .order("hora_inicio"),
-      supabase
-        .from("procedimentos")
-        .select("id, nome, tipo, grupo, valor_padrao, valor_dinheiro, valor_dinheiro_pix, valor_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, duracao_minutos, preparo")
-        .eq("clinica_id", data.clinicaId)
-        .eq("ativo", true)
-        .order("nome")
-        .limit(10000),
+      carregarProcedimentos(),
       supabase
         .from("medico_especialidades")
         .select("medico_id, especialidade_id"),
@@ -97,7 +110,7 @@ export const getContextoClinica = createServerFn({ method: "POST" })
         })),
     }));
 
-    const procedimentos = (procR.data ?? []).map((p: any) => {
+    const procedimentos = procedimentosRows.map((p: any) => {
       const dinheiro =
         Number(p.valor_dinheiro_pix) ||
         Number(p.valor_dinheiro) ||
@@ -190,7 +203,26 @@ export const chatNina = createServerFn({ method: "POST" })
     await assertMembership(supabase, userId, data.clinicaId);
     const inicioDia = new Date(); inicioDia.setHours(0, 0, 0, 0);
     const fimDia = new Date(); fimDia.setHours(23, 59, 59, 999);
-    const [medR, dispR, procR, espR, planR, cliR, agR, meR] = await Promise.all([
+
+    const carregarProcedimentos = async () => {
+      const pageSize = 1000;
+      const rows: any[] = [];
+      for (let from = 0; ; from += pageSize) {
+        const { data: page, error } = await supabase
+          .from("procedimentos")
+          .select("nome, grupo, valor_dinheiro_pix, valor_cartao, preparo")
+          .eq("clinica_id", data.clinicaId)
+          .eq("ativo", true)
+          .order("nome")
+          .range(from, from + pageSize - 1);
+        if (error) throw new Error(error.message);
+        rows.push(...(page ?? []));
+        if (!page || page.length < pageSize) break;
+      }
+      return rows;
+    };
+
+    const [medR, dispR, procedimentosRows, espR, planR, cliR, agR, meR] = await Promise.all([
       supabase
         .from("medicos")
         .select("id, nome, crm, crm_uf")
@@ -201,12 +233,7 @@ export const chatNina = createServerFn({ method: "POST" })
         .select("medico_id, dia_semana, hora_inicio, hora_fim, observacoes")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true),
-      supabase
-        .from("procedimentos")
-        .select("nome, grupo, valor_dinheiro_pix, valor_cartao, preparo")
-        .eq("clinica_id", data.clinicaId)
-        .eq("ativo", true)
-        .limit(10000),
+      carregarProcedimentos(),
       supabase
         .from("especialidades")
         .select("id, nome")
@@ -274,7 +301,7 @@ export const chatNina = createServerFn({ method: "POST" })
 
     const contextoTexto = montarContextoTexto({
       medicos,
-      procedimentos: (procR.data ?? []) as Array<{
+      procedimentos: procedimentosRows as Array<{
         nome: string;
         valor_dinheiro_pix: number;
         valor_cartao: number;
