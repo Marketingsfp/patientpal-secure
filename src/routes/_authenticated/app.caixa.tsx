@@ -1328,7 +1328,7 @@ function Page() {
       : "";
     const sufixoCartao = ehPagto ? montarSufixoCartao(movForma, movBandeira, movParcelas) : "";
     setSaving(true);
-    const { error } = await supabase.from("caixa_movimentos").insert({
+    const { data: movRow, error } = await supabase.from("caixa_movimentos").insert({
       sessao_id: minhaSessao.id,
       clinica_id: clinicaAtual.clinica_id,
       user_id: user.id,
@@ -1338,9 +1338,29 @@ function Page() {
       forma_pagamento: ehPagto ? movForma : null,
       destino_user_id: ehTransfer ? movDestinoUserId : null,
       destino_nome: ehTransfer ? destinoNome : null,
-    });
+    }).select("id").single();
+    if (error || !movRow) { setSaving(false); mostrarErro(error); return; }
+    // Recebimento/despesa manuais são receita/despesa real (diferente de
+    // sangria/suprimento, que só transferem dinheiro dentro do caixa) — sem um
+    // fin_lancamentos vinculado, o valor nunca aparecia em Financeiro >
+    // Movimento (que só importa sangria/suprimento de caixa_movimentos).
+    if (openMov.tipo === "recebimento" || openMov.tipo === "despesa") {
+      const { data: lanc, error: eLanc } = await supabase.from("fin_lancamentos").insert({
+        clinica_id: clinicaAtual.clinica_id,
+        tipo: openMov.tipo === "recebimento" ? "receita" : "despesa",
+        valor: v,
+        descricao: `[Caixa] ${(movDesc || TIPO_LABEL[openMov.tipo]) + sufixoCartao}`,
+        forma_pagamento: movForma,
+        status: "confirmado",
+        criado_por: user.id,
+      }).select("id").single();
+      if (eLanc) {
+        toast.warning("Movimento de caixa registrado, mas falhou ao vincular ao financeiro — registre manualmente em Financeiro > Movimento.");
+      } else if (lanc) {
+        await supabase.from("caixa_movimentos").update({ lancamento_id: lanc.id }).eq("id", movRow.id);
+      }
+    }
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
     setOpenMov(null);
     const tipoLancado = openMov.tipo;
     const descLancada = (movDesc || "") + sufixoCartao + sufixoDestino;
