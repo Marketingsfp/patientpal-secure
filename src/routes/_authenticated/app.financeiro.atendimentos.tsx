@@ -196,6 +196,48 @@ function Page() {
   const [optsReady, setOptsReady] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "", valor_manual: "" });
+  // Edição pontual do repasse médico de um atendimento (linha da tabela)
+  const [editRepasse, setEditRepasse] = useState<{ open: boolean; atend: Atend | null; valor: number }>({
+    open: false,
+    atend: null,
+    valor: 0,
+  });
+  const [savingRepasse, setSavingRepasse] = useState(false);
+  const abrirEditRepasse = (a: Atend) => {
+    if (a.repasse_pago) {
+      toast.error("Repasse já pago — estorne antes de editar.");
+      return;
+    }
+    setEditRepasse({ open: true, atend: a, valor: Number(a.valor_medico) || 0 });
+  };
+  const salvarEditRepasse = async () => {
+    const a = editRepasse.atend;
+    if (!a) return;
+    if (a.repasse_pago) {
+      toast.error("Repasse já pago — estorne antes de editar.");
+      return;
+    }
+    if (editRepasse.valor < 0) {
+      toast.error("Valor inválido");
+      return;
+    }
+    setSavingRepasse(true);
+    try {
+      const { error } = await supabase
+        .from("fin_atendimentos")
+        .update({ valor_medico: editRepasse.valor })
+        .eq("id", a.id);
+      if (error) {
+        mostrarErro(error);
+        return;
+      }
+      toast.success("Repasse atualizado");
+      setEditRepasse({ open: false, atend: null, valor: 0 });
+      await load();
+    } finally {
+      setSavingRepasse(false);
+    }
+  };
   // Comprovante de pagamento de repasse (para impressão)
   type CompItem = { data: string; medico: string; paciente: string; servico: string; valorMedico: number; pagoEm: string | null; pagoHora: string | null };
   type Comprovante = {
