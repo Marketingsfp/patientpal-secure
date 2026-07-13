@@ -190,7 +190,7 @@ function RecepcaoPage() {
               className="h-10 px-2 rounded-md border bg-background text-sm font-medium"
             >
               <option value="AUTO">Automático (E · P · R · N)</option>
-              <option value="E">E · Prioridade médica</option>
+              <option value="E">E · Cartão consulta</option>
               <option value="P">P · Preferencial</option>
               <option value="R">R · Retorno</option>
               <option value="N">N · Comum</option>
