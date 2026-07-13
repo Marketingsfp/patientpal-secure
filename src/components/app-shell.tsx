@@ -91,6 +91,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/recepcao", label: "Recepção / Filas", icon: ConciergeBell },
     { to: "/app/triagem-enfermagem", label: "Triagem - Enfermagem", icon: HeartPulse },
     { to: "/app/cartao-beneficios/contratos", label: "Cartão Benefícios", icon: CreditCard },
+    { to: "/app/documentos", label: "Documentos do paciente", icon: FileText },
     ],
   },
   {
@@ -128,6 +129,10 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     label: "Marketing",
     items: [
     { to: "/app/mkt-leads", label: "Marketing", icon: Megaphone },
+    { to: "/app/campanhas", label: "Campanhas", icon: Send },
+    { to: "/app/mkt-envios", label: "Envios", icon: Send },
+    { to: "/app/mkt-landing", label: "Landing Pages", icon: Sparkles },
+    { to: "/app/mkt-segmentos", label: "Segmentos", icon: Filter },
     ],
   },
   {
@@ -139,12 +144,22 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
     { to: "/app/perfis", label: "Perfis", icon: KeyRound },
     { to: "/app/unidades", label: "Unidades", icon: MapPin },
+    { to: "/app/planos", label: "Planos / Convênios", icon: Gift },
+    { to: "/app/modelos-documentos", label: "Modelos de Documentos", icon: FileText },
+    { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
+    { to: "/app/medicos", label: "Médicos", icon: Stethoscope },
+    { to: "/app/estoque", label: "Estoque", icon: LayoutGrid },
     ],
   },
   {
     label: "RH",
     items: [
     { to: "/app/hr-ponto", label: "RH", icon: GraduationCap },
+    { to: "/app/hr-contratos", label: "RH · Contratos", icon: FileText },
+    { to: "/app/hr-ferias", label: "RH · Férias", icon: Palmtree },
+    { to: "/app/hr-holerites", label: "RH · Holerites", icon: FileText },
+    { to: "/app/treinamentos", label: "Treinamentos", icon: GraduationCap },
+    { to: "/app/lms-admin", label: "Cursos (admin)", icon: BookOpen },
     ],
   },
   {
@@ -157,6 +172,11 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
     { to: "/app/auditoria", label: "Segurança & Compliance", icon: ShieldCheck },
     { to: "/app/setores", label: "Setores", icon: Building2 },
+    { to: "/app/boletos", label: "Boletos", icon: FileText },
+    { to: "/app/contratos", label: "Contratos de assinatura", icon: FileText },
+    { to: "/app/nfse", label: "NFS-e", icon: FileText },
+    { to: "/app/integration-secrets", label: "Integrações", icon: KeyRound },
+    { to: "/app/lgpd", label: "LGPD", icon: ShieldCheck },
     ],
   },
 ];
