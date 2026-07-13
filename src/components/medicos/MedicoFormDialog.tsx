@@ -1706,6 +1706,42 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                       )}
                     </div>
                   </div>
+                  {podeGerenciarEquipe && (
+                    <div className="border-t pt-4 space-y-3">
+                      <div>
+                        <Label>Trocar perfil de acesso</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Move este usuário de <b>Médico</b> para outro perfil (Recepção, Caixa, etc.).
+                          O cadastro em <b>Médicos</b> é desativado (o histórico é preservado) e o usuário
+                          passa a aparecer na aba <b>Funcionários</b>.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 items-end">
+                        <div className="w-full sm:w-64">
+                          <Select value={novoPerfilAcesso} onValueChange={setNovoPerfilAcesso}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="medico">Médico (sem alteração)</SelectItem>
+                              <SelectItem value="enfermeiro">Enfermeiro</SelectItem>
+                              <SelectItem value="recepcao">Recepção</SelectItem>
+                              <SelectItem value="caixa">Caixa</SelectItem>
+                              <SelectItem value="financeiro">Financeiro</SelectItem>
+                              <SelectItem value="gestor">Gestor</SelectItem>
+                              <SelectItem value="admin">Administrador</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={novoPerfilAcesso === "medico" || trocandoPerfil}
+                          onClick={() => setConfirmTrocaPerfil(true)}
+                        >
+                          Aplicar troca de perfil
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 ) : (
                   <>
                     <div className="rounded-md border p-3 space-y-3">
