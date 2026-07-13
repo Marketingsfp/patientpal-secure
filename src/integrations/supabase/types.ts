@@ -3528,6 +3528,7 @@ export type Database = {
           updated_at: string
           valor: number
           valor_laudo: number
+          valor_medico_override: number | null
         }
         Insert: {
           agendamento_id?: string | null
@@ -3567,6 +3568,7 @@ export type Database = {
           updated_at?: string
           valor: number
           valor_laudo?: number
+          valor_medico_override?: number | null
         }
         Update: {
           agendamento_id?: string | null
@@ -3606,6 +3608,7 @@ export type Database = {
           updated_at?: string
           valor?: number
           valor_laudo?: number
+          valor_medico_override?: number | null
         }
         Relationships: [
           {
