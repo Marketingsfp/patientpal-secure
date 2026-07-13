@@ -1,63 +1,81 @@
-## Antes vs. depois
+# Trocar perfil de acesso do médico
 
-**Antes (bug atual):**
-- `confirmarPagamento` faz `INSERT` na `fin_lancamentos` (despesa do repasse) e **depois** `UPDATE` marcando `repasse_pago = true` nos atendimentos.
-- Se o `UPDATE` falha ou a página recarrega no meio, a despesa já ficou gravada mas os atendimentos continuam como "não pagos".
-- O `catch` não desfaz nada e não recarrega a lista — o usuário clica "Pagar repasse" de novo e uma nova despesa é criada. Sem trava no banco, dá para pagar N vezes.
+## Contexto
 
-**Depois:**
-- Um atendimento com `repasse_pago = true` fica bloqueado no banco (não permite ser referenciado por outra despesa de repasse).
-- O fluxo passa a: **marcar os atendimentos primeiro** (com uma coluna nova `repasse_lock_id`) → só depois inserir a despesa → gravar `repasse_lancamento_id`. Se qualquer passo falhar, desfazemos os locks.
-- Botão continua com `disabled={payingNow}`, mas mesmo com duplo submit por rede/refresh o banco recusa o segundo pagamento.
+Hoje, quando um funcionário é promovido para **Médico** (`clinica_memberships.role = 'medico'`), ele some da aba "Funcionários" (a listagem filtra `role !== 'medico'`) e passa a aparecer só na aba "Médicos". A edição do médico usa `MedicoFormDialog`, que **não tem** o seletor de perfil de acesso — por isso não dá para voltar o usuário para "Funcionário" (recepção, caixa, etc.) pela interface.
 
-## Escopo (o que muda)
+## ATENÇÃO — impacto em permissões
 
-### 1. Banco — migração isolada de segurança/consistência
-Aciono a Regra 1 do AGENTS.md antes: essa migração toca tabelas financeiras sensíveis (`fin_lancamentos`, `fin_atendimentos`). Impacto: nenhum usuário perde acesso; apenas impede pagamento duplicado. Sem mudança em RLS/GRANT existentes.
+Esta mudança altera diretamente o **perfil de acesso** (`clinica_memberships.role`) do usuário. Consequências práticas ao trocar de "medico" para outro perfil:
 
-- Adicionar coluna `repasse_lock_id uuid` em `fin_atendimentos` e `fin_lancamentos` (nullable).
-- Índice **único parcial**: `UNIQUE (id) WHERE repasse_pago = true` já é dado pela PK — a trava real é uma constraint em nível de linha:
-  - Trigger `BEFORE UPDATE` em ambas as tabelas: se `OLD.repasse_pago = true` e o `NEW` tenta setar `repasse_pago = true` de novo com `repasse_lancamento_id` diferente, `RAISE EXCEPTION 'Repasse já foi pago para este atendimento'`.
-  - Isso garante que, mesmo com corrida de dois cliques concorrentes, apenas o primeiro `UPDATE ... SET repasse_pago = true WHERE repasse_pago = false` pega as linhas — o segundo pega 0 linhas e é abortado.
-- Sem `DISABLE RLS`, sem `TO anon`, sem policy nova permissiva.
+- Perde acesso automático à agenda médica, prontuário, atendimento e módulos vinculados ao preset "medico"
+- Ganha acesso aos módulos do novo perfil (recepção/caixa/financeiro/etc.)
+- `has_role(uid,'medico')` passa a retornar falso — RLS de agendas/prontuário passa a filtrar
+- O registro em `public.medicos` continua existindo (para preservar histórico de agendamentos, prontuários, repasses passados) — só é **desativado** (`ativo=false`) por padrão
 
-### 2. Código — `src/routes/_authenticated/app.financeiro.atendimentos.tsx`
-Reescrever `confirmarPagamento` (linhas 1610–1760) para o padrão idempotente:
+Apenas **admin/gestor da clínica** pode executar a troca (mesma regra que `can_manage_clinica` já usada em toda essa área). Nada de anon, nada de RLS afrouxada.
+
+## Escopo
+
+**Dentro:**
+- Adicionar no `MedicoFormDialog` (na aba "Login e Perfil", junto do campo "Perfil de acesso" que já existe para outros formulários) um seletor de **Perfil de acesso**, pré-preenchido com "Médico".
+- Se o usuário mudar o perfil e salvar:
+  1. Atualiza `clinica_memberships.role` do `user_id` do médico para o novo perfil
+  2. Desativa o cadastro em `public.medicos` (`ativo=false`) — o registro permanece para histórico
+  3. Mostra confirmação em modal antes de aplicar ("Isso removerá o acesso de médico. Continuar?")
+- Botão só aparece se `can_manage_clinica` (admin/gestor). Demais perfis veem apenas leitura.
+
+**Fora:**
+- Não mexer em RLS, funções `security definer`, GRANTs, `has_role`, `can_manage_clinica`, `can_manage_medicos`
+- Não deletar o registro do médico (histórico preservado)
+- Não mexer em `FuncionarioFormDialog` (o caminho inverso já funciona: promover funcionário → médico)
+- Não criar tabela nova
+
+## Arquivos que serão alterados
+
+1. `src/components/medicos/MedicoFormDialog.tsx`
+   - Novo seletor "Perfil de acesso" com as mesmas opções de `PERFIS` do FuncionarioFormDialog
+   - Nova ação `handleTrocarPerfil` que faz `UPDATE clinica_memberships` + `UPDATE medicos SET ativo=false`
+   - Confirmação via modal antes de aplicar
+   - Só habilita se `podeGerenciarEquipe` (já existe no componente)
+
+Nenhum outro arquivo será tocado. Não há mudança em: `_authenticated/route.tsx`, `auth-middleware.ts`, presets, mapa rota→módulo, RLS ou funções `security definer`.
+
+## Fluxo em texto
 
 ```text
-para cada médico do agrupamento:
-  1. gerar lockId = crypto.randomUUID()
-  2. UPDATE fin_atendimentos / fin_lancamentos
-       SET repasse_pago = true, repasse_pago_em, repasse_pago_at,
-           repasse_forma_pagamento, repasse_conta_id,
-           repasse_lock_id = lockId
-       WHERE id IN (...) AND repasse_pago = false
-       RETURNING id
-     → se a contagem retornada < ids enviados: algum já estava pago;
-       aborta o médico, mostra "Alguns atendimentos já haviam sido pagos" e recarrega.
-  3. INSERT fin_lancamentos (despesa) — se falhar,
-       UPDATE ... SET repasse_pago = false, repasse_lock_id = null
-       WHERE repasse_lock_id = lockId  (rollback aplicativo)
-  4. UPDATE ... SET repasse_lancamento_id = lancId WHERE repasse_lock_id = lockId
+Editar médico  →  aba "Login e Perfil"
+                 ├─ Perfil de acesso: [Médico ▼]  ← já é "medico"
+                 │                    ├─ Recepção
+                 │                    ├─ Caixa
+                 │                    ├─ Financeiro
+                 │                    ├─ Enfermeiro
+                 │                    ├─ Gestor
+                 │                    └─ Administrador
+                 │
+                 └─ Salvar
+                    ├─ Se perfil mudou → modal de confirmação
+                    │  "Isso removerá o acesso de médico. O cadastro será
+                    │   desativado mas o histórico permanece. Continuar?"
+                    ├─ Confirma → UPDATE clinica_memberships.role
+                    │              UPDATE medicos SET ativo=false
+                    │              redireciona para /app/equipe?tab=funcionarios
+                    └─ Cancela → nada muda
 ```
 
-Também:
-- No `catch`, chamar `load()` sempre (mesmo em erro) para sincronizar o estado local com o banco antes que o usuário tente de novo.
-- Manter `disabled={payingNow}` no botão.
+## Validação após a mudança
 
-### 3. O que NÃO muda
-- Regras de repasse, cálculo, comprovante, laudo.
-- Permissões, presets, `permissoes-rotas.ts`, `_authenticated`.
-- `client.ts`, `client.server.ts`, `types.ts` (auto-gerados).
-- Nenhuma outra tela.
+1. Login como admin da clínica → editar um médico → trocar perfil para "recepção" → salvar → confirmar que:
+   - o usuário aparece na aba "Funcionários"
+   - some da aba "Médicos"
+   - ao logar como esse usuário, não vê mais menu médico
+   - agendas/prontuários antigos dele continuam existindo (não foram deletados)
+2. Login como recepcionista → editar médico → o seletor de perfil aparece somente leitura (ou não aparece)
+3. `bun run build` limpo
 
-## Validação
-- Build + typecheck.
-- Simulação manual em produção (com aviso — regra 2.6): selecionar 1 atendimento, pagar, tentar clicar de novo → botão desabilita; forçar segunda tentativa via refresh → banco recusa. Sem resíduo se falhar (rollback).
-- Verificar que atendimentos legítimos que ainda não foram pagos continuam pagáveis.
+## Riscos / pendências
 
-## Pontos de atenção
-- Migrações que criam trigger em tabela sensível: aplicar em janela sem operação de caixa e revisar o `linter` do Supabase depois.
-- Se já existirem duplicatas históricas de repasse pago, elas ficam intactas — a migração não faz limpeza retroativa (posso listar depois para você decidir).
+- O usuário virou "recepção" mas ainda tem `medicos.user_id` ligado. Se você quiser que ele volte a ser médico depois, hoje já dá para reativar o registro (`ativo=true`) e devolver o perfil — mas isso ficará como próxima iteração, não faz parte deste escopo.
+- Perfis com `role` fora do enum previsto por `has_role` seguem funcionando normalmente (o enum já cobre admin/gestor/medico/enfermeiro/recepcao/caixa/financeiro).
 
-Confirma que sigo com **(1) migração de trigger + coluna** e **(2) reescrita do `confirmarPagamento`**?
+**Preciso da sua confirmação explícita para prosseguir**, conforme regra 1 do AGENTS.md.
