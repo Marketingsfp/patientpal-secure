@@ -197,9 +197,22 @@ function PainelPage() {
           }
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        // eslint-disable-next-line no-console
+        console.info("[painel] realtime status:", status);
+      });
 
-    return () => { void supabase.removeChannel(ch); };
+    // Fallback de polling: garante atualização mesmo se o canal de realtime
+    // cair silenciosamente (proxy, sleep de aba, RLS bloqueando o socket).
+    const poll = window.setInterval(() => { void carregar(); }, 3000);
+    const onVis = () => { if (document.visibilityState === "visible") void carregar(); };
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      window.clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVis);
+      void supabase.removeChannel(ch);
+    };
   }, [clinicaAtual?.clinica_id]);
 
   function falar(s: Senha) {
