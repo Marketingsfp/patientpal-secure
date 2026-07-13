@@ -228,44 +228,55 @@ export const criarAgendamento = createServerFn({ method: "POST" })
         message: "Este horário acabou de ser ocupado por outro atendimento. Atualize a agenda e escolha outro horário.",
       },
     };
-    if (editing_id) {
-      if (multiModo === "imagem") {
-        const [primeiro, ...restantes] = procedimentos;
-        let q1 = supabase.from("agendamentos").update({ ...payload, procedimento: primeiro }).eq("id", editing_id);
-        if (slotPacienteNomeNaValidacao !== null) q1 = q1.eq("paciente_nome", slotPacienteNomeNaValidacao);
-        const { data: upd1, error } = await q1.select("id");
-        if (error) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
-        if (slotPacienteNomeNaValidacao !== null && (!upd1 || upd1.length === 0)) return conflitoDeSlot;
-        if (restantes.length > 0) {
-          const rows = restantes.map((procedimento) => ({ ...payload, procedimento }));
-          const { data: novosIrmaos, error: insertError } = await supabase
-            .from("agendamentos")
-            .insert(rows)
-            .select("id");
-          if (insertError) return { ok: false, pg_error: toPgErrorLikeLocal(insertError) };
-          siblingIds = ((novosIrmaos ?? []) as Array<{ id: string }>).map((r) => r.id);
-        }
-      } else {
-        const payloadEdicao = multiModo === "laboratorio"
-        ? { ...payload, procedimento: procedimentos.join(" + ") }
-        : payload;
-        let q2 = supabase.from("agendamentos").update(payloadEdicao).eq("id", editing_id);
-        if (slotPacienteNomeNaValidacao !== null) q2 = q2.eq("paciente_nome", slotPacienteNomeNaValidacao);
-        const { data: upd2, error } = await q2.select("id");
-        if (error) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
-        if (slotPacienteNomeNaValidacao !== null && (!upd2 || upd2.length === 0)) return conflitoDeSlot;
+    if (multiModo === "imagem") {
+      // Principal (UPDATE ou INSERT) + irmãos (INSERT) numa única transação
+      // (RPC) — antes eram passos separados: se a inserção dos irmãos
+      // falhasse depois do UPDATE do principal já commitado, o agendamento
+      // principal ficava alterado sozinho, sem os irmãos. A RPC também
+      // grava atendimento_grupo_id em todas as linhas, vinculando o
+      // multi-exame como um grupo (antes não havia vínculo nenhum entre
+      // as linhas irmãs).
+      const grupoId = (globalThis.crypto as { randomUUID?: () => string } | undefined)?.randomUUID?.()
+        ?? Array.from({ length: 4 }, () => Math.random().toString(16).slice(2, 10)).join("-");
+      const { data: rpcData, error } = await supabase.rpc("salvar_agendamento_multi_imagem", {
+        _editing_id: editing_id,
+        _clinica_id: clinica_id,
+        _paciente_id: payload.paciente_id,
+        _paciente_nome: payload.paciente_nome,
+        _medico_id: payload.medico_id,
+        _enfermagem_recurso_id: payload.enfermagem_recurso_id,
+        _inicio: payload.inicio,
+        _fim: payload.fim,
+        _procedimentos: procedimentos,
+        _status: payload.status,
+        _observacoes: payload.observacoes,
+        _data_pagamento: payload.data_pagamento,
+        _orcamento_id: payload.orcamento_id,
+        _tipo_atendimento: payload.tipo_atendimento,
+        _forma_pagamento_prevista: payload.forma_pagamento_prevista,
+        _especialidade_id: payload.especialidade_id ?? null,
+        _grupo_id: grupoId,
+        _paciente_nome_esperado_no_slot: editing_id ? slotPacienteNomeNaValidacao : null,
+      } as never);
+      if (error) {
+        if ((error as { code?: string }).code === "23505") return conflitoDeSlot;
+        return { ok: false, pg_error: toPgErrorLikeLocal(error) };
       }
-    } else if (multiModo === "imagem") {
-      const rows = procedimentos.map((procedimento) => ({ ...payload, procedimento }));
-      const { data: novos, error } = await supabase
-        .from("agendamentos")
-        .insert(rows)
-        .select("id")
-        .limit(procedimentos.length);
-      if (error || !novos || novos.length === 0) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
-      const ids = (novos as Array<{ id: string }>).map((r) => r.id);
-      novoId = ids[0];
-      siblingIds = ids.slice(1);
+      const resultado = (rpcData ?? {}) as { principal_id?: string; sibling_ids?: string[] };
+      if (!resultado.principal_id) {
+        return { ok: false, pg_error: toPgErrorLikeLocal(new Error("Retorno inesperado ao salvar multi-exame.")) };
+      }
+      novoId = resultado.principal_id;
+      siblingIds = resultado.sibling_ids ?? [];
+    } else if (editing_id) {
+      const payloadEdicao = multiModo === "laboratorio"
+      ? { ...payload, procedimento: procedimentos.join(" + ") }
+      : payload;
+      let q2 = supabase.from("agendamentos").update(payloadEdicao).eq("id", editing_id);
+      if (slotPacienteNomeNaValidacao !== null) q2 = q2.eq("paciente_nome", slotPacienteNomeNaValidacao);
+      const { data: upd2, error } = await q2.select("id");
+      if (error) return { ok: false, pg_error: toPgErrorLikeLocal(error) };
+      if (slotPacienteNomeNaValidacao !== null && (!upd2 || upd2.length === 0)) return conflitoDeSlot;
     } else {
       const payloadNovo = multiModo === "laboratorio"
         ? { ...payload, procedimento: procedimentos.join(" + ") }
