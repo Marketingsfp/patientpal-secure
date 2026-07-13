@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ClinicaProvider, useClinica } from "@/hooks/use-clinica";
-import { Loader2, Sun, Moon } from "lucide-react";
+import { Loader2, Sun, Moon, Volume2, VolumeX } from "lucide-react";
 
 export const Route = createFileRoute("/painel")({
   component: PainelRoute,
@@ -38,6 +38,9 @@ function PainelPage() {
   const { clinicaAtual, loading } = useClinica();
   const [atual, setAtual] = useState<Senha | null>(null);
   const [historico, setHistorico] = useState<Senha[]>([]);
+  const [audioOn, setAudioOn] = useState(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const jaFaladoRef = useRef<Set<string>>(new Set());
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window === "undefined") return "dark";
     return (localStorage.getItem("painel-theme") as "dark" | "light") ?? "dark";
@@ -145,6 +148,9 @@ function PainelPage() {
             (payload.eventType === "UPDATE" || payload.eventType === "INSERT") &&
             novo?.status === "chamada"
           ) {
+            const key = `${novo.id}:${novo.chamada_em ?? ""}`;
+            if (jaFaladoRef.current.has(key)) return;
+            jaFaladoRef.current.add(key);
             let nome: string | null = null;
             if (novo.paciente_id) {
               const { data: p } = await supabase
@@ -175,10 +181,52 @@ function PainelPage() {
       texto = `Senha ${tipoNome} ${s.codigo.replace("-", " ")}${nomePart}${s.guiche ? `, guichê ${s.guiche}` : ""}`;
     }
     window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(texto);
-    utter.lang = "pt-BR";
-    utter.rate = 0.9;
-    window.speechSynthesis.speak(utter);
+    tocarDing();
+    const dizer = (delayMs: number) => {
+      window.setTimeout(() => {
+        const utter = new SpeechSynthesisUtterance(texto);
+        utter.lang = "pt-BR";
+        utter.rate = 0.9;
+        window.speechSynthesis.speak(utter);
+      }, delayMs);
+    };
+    dizer(700);
+    dizer(4500);
+  }
+
+  function ativarAudio() {
+    try {
+      if ("speechSynthesis" in window) {
+        const u = new SpeechSynthesisUtterance(" ");
+        u.volume = 0;
+        window.speechSynthesis.speak(u);
+      }
+      const AC = (window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext
+        ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AC && !audioCtxRef.current) audioCtxRef.current = new AC();
+      void audioCtxRef.current?.resume();
+    } catch {
+      // ignore
+    }
+    setAudioOn(true);
+  }
+
+  function tocarDing() {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    [880, 1320].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const start = ctx.currentTime + i * 0.18;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.25, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.4);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.45);
+    });
   }
 
   if (loading) {
@@ -202,6 +250,18 @@ function PainelPage() {
           <h1 className={`text-3xl lg:text-4xl font-black uppercase tracking-tight ${t.heading}`}>{clinicaAtual.clinica.nome}</h1>
         </div>
         <div className="flex items-center gap-4 lg:gap-6">
+          <button
+            type="button"
+            onClick={ativarAudio}
+            aria-label={audioOn ? "Áudio ativado" : "Ativar áudio"}
+            title={audioOn ? "Áudio ativado" : "Clique para ativar a chamada por voz"}
+            className={`h-11 lg:h-12 px-4 rounded-full flex items-center gap-2 transition ${t.toggle} ${!audioOn ? "ring-2 ring-blue-500 animate-pulse" : ""}`}
+          >
+            {audioOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+            <span className="text-sm font-semibold hidden lg:inline">
+              {audioOn ? "Som ativo" : "Ativar som"}
+            </span>
+          </button>
           <button
             type="button"
             onClick={() => setTheme(isLight ? "dark" : "light")}
