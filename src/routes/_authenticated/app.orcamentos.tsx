@@ -18,6 +18,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { printOrcamento } from "@/lib/print-orcamento";
 import { ConversaoOrcamentoDialog } from "@/components/orcamentos/conversao-orcamento-dialog";
+import { pickTop60 } from "@/lib/procedimento/laboratorio-top60";
 import { useOrcamentosV2Flag } from "@/hooks/use-orcamentos-v2-flag";
 import { OrcamentosV2Mount } from "@/components/orcamentos-v2/orcamentos-v2-mount";
 
@@ -623,6 +624,10 @@ function NovoOrcamentoDialog({
   const [procQuery, setProcQuery] = useState("");
   const [procResults, setProcResults] = useState<Procedimento[]>([]);
   const [searchingProc, setSearchingProc] = useState(false);
+  // Bloco "Laboratório — Top 60": lista curta de acesso rápido para exames
+  // laboratoriais. Não substitui a busca — apenas destaca os mais comuns.
+  const [labProcs, setLabProcs] = useState<Procedimento[]>([]);
+  const [mostrarTop60, setMostrarTop60] = useState(true);
   // Categoria Laboratório é identificada diretamente em `procedimentos`
   // (tipo_procedimento/grupo) — mesma fonte usada pelo cadastro de Serviços.
   // Nada de prefetch de IDs: a lista completa (~4.4k) estouraria a URL do
@@ -706,6 +711,24 @@ function NovoOrcamentoDialog({
     }, 250);
     return () => { cancel = true; clearTimeout(t); };
   }, [procQuery, clinicaId, categoria]);
+
+  // Pré-carrega os procedimentos laboratoriais quando o orçamento é do
+  // tipo Laboratório, para montar o bloco Top 60 sem depender da busca.
+  useEffect(() => {
+    if (categoria !== "laboratorio" || !clinicaId) { setLabProcs([]); return; }
+    let cancel = false;
+    (async () => {
+      const { data } = await supabase
+        .from("procedimentos")
+        .select("id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo, valor_variavel")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%")
+        .limit(2000);
+      if (!cancel) setLabProcs((data ?? []) as Procedimento[]);
+    })();
+    return () => { cancel = true; };
+  }, [categoria, clinicaId]);
 
   const valorPorForma = (p: Procedimento, f: string) => {
     if (f === "Dinheiro") return Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0);
@@ -1058,6 +1081,51 @@ function NovoOrcamentoDialog({
 
           <div className="space-y-2 border-t pt-3">
             <Label>Adicionar serviço</Label>
+            {categoria === "laboratorio" && (() => {
+              const top60 = pickTop60(labProcs);
+              if (top60.length === 0) return null;
+              return (
+                <div className="rounded-md border p-2 bg-muted/40">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-[11px] font-semibold uppercase text-muted-foreground">
+                      🧪 Laboratório — Top 60
+                      <span className="ml-2 text-[10px] font-normal normal-case text-muted-foreground/80">
+                        ({top60.length} disponíveis no seu cadastro)
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-[11px]"
+                      onClick={() => setMostrarTop60((v) => !v)}
+                    >
+                      {mostrarTop60 ? "ocultar" : "mostrar"}
+                    </Button>
+                  </div>
+                  {mostrarTop60 && (
+                    <div className="flex flex-wrap gap-1 max-h-40 overflow-auto">
+                      {top60.map(({ item, proc }) => (
+                        <Button
+                          key={proc.id}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          title={proc.nome}
+                          onClick={() => adicionarProc(proc)}
+                        >
+                          {item.label}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Os demais exames continuam disponíveis pela busca abaixo.
+                  </p>
+                </div>
+              );
+            })()}
             <div className="relative">
               <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input className="pl-9" placeholder="Buscar serviço da tabela…" value={procQuery} onChange={(e) => setProcQuery(e.target.value)} />
