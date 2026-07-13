@@ -1081,6 +1081,51 @@ function NovoOrcamentoDialog({
 
           <div className="space-y-2 border-t pt-3">
             <Label>Adicionar serviço</Label>
+            {categoria === "laboratorio" && (() => {
+              const top60 = pickTop60(labProcs);
+              if (top60.length === 0) return null;
+              return (
+                <div className="rounded-md border p-2 bg-muted/40">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-[11px] font-semibold uppercase text-muted-foreground">
+                      🧪 Laboratório — Top 60
+                      <span className="ml-2 text-[10px] font-normal normal-case text-muted-foreground/80">
+                        ({top60.length} disponíveis no seu cadastro)
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-[11px]"
+                      onClick={() => setMostrarTop60((v) => !v)}
+                    >
+                      {mostrarTop60 ? "ocultar" : "mostrar"}
+                    </Button>
+                  </div>
+                  {mostrarTop60 && (
+                    <div className="flex flex-wrap gap-1 max-h-40 overflow-auto">
+                      {top60.map(({ item, proc }) => (
+                        <Button
+                          key={proc.id}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          title={proc.nome}
+                          onClick={() => adicionarProc(proc)}
+                        >
+                          {item.label}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Os demais exames continuam disponíveis pela busca abaixo.
+                  </p>
+                </div>
+              );
+            })()}
             <div className="relative">
               <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input className="pl-9" placeholder="Buscar serviço da tabela…" value={procQuery} onChange={(e) => setProcQuery(e.target.value)} />
