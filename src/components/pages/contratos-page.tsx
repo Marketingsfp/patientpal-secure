@@ -2686,7 +2686,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                             {isAdmin && podeEscrever ? (
                               <DateInputBR
                                 className="h-8 w-40"
-                                defaultValue={m.vencimento}
+                                value={m.vencimento}
                                 onBlur={(e) => {
                                   const v = e.target.value;
                                   if (v && v !== m.vencimento) atualizarParcela(m.id, { vencimento: v });

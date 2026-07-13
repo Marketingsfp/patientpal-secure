@@ -42,7 +42,7 @@ type NativeInputProps = React.ComponentProps<typeof Input>;
 type Props = Omit<NativeInputProps, "type">;
 
 export const DateInputBR = forwardRef<HTMLInputElement, Props>(function DateInputBR(
-  { value, onChange, placeholder = "dd/mm/aaaa", inputMode = "numeric", maxLength = 10, ...rest },
+  { value, onChange, onBlur, placeholder = "dd/mm/aaaa", inputMode = "numeric", maxLength = 10, ...rest },
   ref,
 ) {
   const external = typeof value === "string" ? value : "";
@@ -81,6 +81,22 @@ export const DateInputBR = forwardRef<HTMLInputElement, Props>(function DateInpu
             currentTarget: { ...e.currentTarget, value: iso },
           } as unknown as React.ChangeEvent<HTMLInputElement>;
           onChange(synthetic);
+        }
+      }}
+      onBlur={(e) => {
+        if (onBlur) {
+          // Mesma conversão do onChange: quem consome este evento espera
+          // target.value em ISO (yyyy-mm-dd), não o texto mascarado
+          // dd/mm/aaaa exibido no input — sem isso, um onBlur que salva
+          // direto no banco (coluna date) recebia "13/07/2026" e o Postgres
+          // rejeitava como formato de data inválido.
+          const iso = brToIso(text);
+          const synthetic = {
+            ...e,
+            target: { ...e.target, value: iso },
+            currentTarget: { ...e.currentTarget, value: iso },
+          } as unknown as React.FocusEvent<HTMLInputElement>;
+          onBlur(synthetic);
         }
       }}
       {...rest}
