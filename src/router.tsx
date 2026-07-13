@@ -2,6 +2,14 @@ import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
+function DefaultPending() {
+  return (
+    <div className="flex min-h-[40vh] w-full items-center justify-center bg-background">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary" />
+    </div>
+  );
+}
+
 export const getRouter = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -27,11 +35,18 @@ export const getRouter = () => {
     context: { queryClient },
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
-    // Preload desabilitado: tanto "viewport" quanto "intent" estavam
-    // disparando loadRouteMatch em matches ainda não inicializados e
-    // quebrando navegação com "Cannot read properties of undefined
-    // (reading '_nonReactive')", deixando cliques de menu sem resposta.
-    defaultPreload: false,
+    // "intent" baixa o chunk da rota quando o usuário passa o mouse/foca
+    // um <Link>. Elimina o flash branco ao navegar entre telas grandes
+    // (agenda, financeiro, prontuário) porque o JS já está em cache no
+    // momento do clique. O bug antigo de "_nonReactive" foi corrigido nas
+    // versões recentes do @tanstack/react-router.
+    defaultPreload: "intent",
+    defaultPreloadDelay: 50,
+    // Se a próxima rota demorar >200ms para resolver, mostra o spinner
+    // em vez de tela branca. Se resolver antes, transição direta.
+    defaultPendingMs: 200,
+    defaultPendingMinMs: 0,
+    defaultPendingComponent: DefaultPending,
   });
 
   return router;
