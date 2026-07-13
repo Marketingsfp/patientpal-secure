@@ -3235,6 +3235,7 @@ export type Database = {
           repasse_conta_id: string | null
           repasse_forma_pagamento: string | null
           repasse_lancamento_id: string | null
+          repasse_lock_id: string | null
           repasse_pago: boolean
           repasse_pago_at: string | null
           repasse_pago_em: string | null
@@ -3267,6 +3268,7 @@ export type Database = {
           repasse_conta_id?: string | null
           repasse_forma_pagamento?: string | null
           repasse_lancamento_id?: string | null
+          repasse_lock_id?: string | null
           repasse_pago?: boolean
           repasse_pago_at?: string | null
           repasse_pago_em?: string | null
@@ -3299,6 +3301,7 @@ export type Database = {
           repasse_conta_id?: string | null
           repasse_forma_pagamento?: string | null
           repasse_lancamento_id?: string | null
+          repasse_lock_id?: string | null
           repasse_pago?: boolean
           repasse_pago_at?: string | null
           repasse_pago_em?: string | null
@@ -3515,6 +3518,7 @@ export type Database = {
           repasse_conta_id: string | null
           repasse_forma_pagamento: string | null
           repasse_lancamento_id: string | null
+          repasse_lock_id: string | null
           repasse_pago: boolean
           repasse_pago_at: string | null
           repasse_pago_em: string | null
@@ -3553,6 +3557,7 @@ export type Database = {
           repasse_conta_id?: string | null
           repasse_forma_pagamento?: string | null
           repasse_lancamento_id?: string | null
+          repasse_lock_id?: string | null
           repasse_pago?: boolean
           repasse_pago_at?: string | null
           repasse_pago_em?: string | null
@@ -3591,6 +3596,7 @@ export type Database = {
           repasse_conta_id?: string | null
           repasse_forma_pagamento?: string | null
           repasse_lancamento_id?: string | null
+          repasse_lock_id?: string | null
           repasse_pago?: boolean
           repasse_pago_at?: string | null
           repasse_pago_em?: string | null
