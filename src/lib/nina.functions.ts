@@ -205,7 +205,8 @@ export const chatNina = createServerFn({ method: "POST" })
         .from("procedimentos")
         .select("nome, grupo, valor_dinheiro_pix, valor_cartao, preparo")
         .eq("clinica_id", data.clinicaId)
-        .eq("ativo", true),
+        .eq("ativo", true)
+        .limit(10000),
       supabase
         .from("especialidades")
         .select("id, nome")
