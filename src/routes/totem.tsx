@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Accessibility, Stethoscope, Hash, RotateCcw, Camera, ShieldCheck, X, ArrowLeft, Loader2 } from "lucide-react";
 import { detectDescriptor, ensureFaceModels, euclidean, FACE_MATCH_THRESHOLD } from "@/lib/face-recognition";
+import { imprimirSenhaTotem } from "@/lib/print-senha";
 
 export const Route = createFileRoute("/totem")({
   component: TotemRoute,
@@ -88,6 +89,12 @@ function TotemPage() {
     setTicket({ codigo: row.codigo, tipo: _tipo, identificado });
     setStep("ticket");
     stopCamera();
+    // Impressão automática da senha na impressora térmica configurada no totem.
+    imprimirSenhaTotem({
+      codigo: row.codigo,
+      tipo: _tipo,
+      clinicaNome: clinicaAtual.nome ?? null,
+    });
   }
 
   function escolherTipo(t: TipoSenha) {
