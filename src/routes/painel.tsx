@@ -57,6 +57,12 @@ function PainelPage() {
   // QUALQUER lugar da página (política de autoplay dos navegadores).
   useEffect(() => {
     if (typeof window === "undefined") return;
+    // Carrega a voz feminina assim que a lista estiver disponível.
+    escolherVozFeminina();
+    const onVoicesChanged = () => { escolherVozFeminina(); };
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.addEventListener?.("voiceschanged", onVoicesChanged);
+    }
     const unlock = () => {
       try {
         if ("speechSynthesis" in window) {
@@ -97,6 +103,9 @@ function PainelPage() {
       window.removeEventListener("keydown", unlock, opts);
       window.removeEventListener("touchstart", unlock, opts);
       document.removeEventListener("visibilitychange", unlock);
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.removeEventListener?.("voiceschanged", onVoicesChanged);
+      }
     };
   }, []);
 
