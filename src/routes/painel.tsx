@@ -40,6 +40,7 @@ function PainelPage() {
   const [historico, setHistorico] = useState<Senha[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const jaFaladoRef = useRef<Set<string>>(new Set());
+  const chamadaPendenteRef = useRef<{ key: string; senha: Senha } | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window === "undefined") return "dark";
     return (localStorage.getItem("painel-theme") as "dark" | "light") ?? "dark";
@@ -64,6 +65,12 @@ function PainelPage() {
           ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
         if (AC && !audioCtxRef.current) audioCtxRef.current = new AC();
         void audioCtxRef.current?.resume();
+        if ("speechSynthesis" in window) window.speechSynthesis.resume();
+
+        // Se o navegador bloqueou a voz antes de qualquer interação, qualquer
+        // toque/clique na tela repete a última chamada pendente sem botão visível.
+        const pendente = chamadaPendenteRef.current;
+        if (pendente) falar(pendente.senha, pendente.key);
       } catch { /* ignore */ }
     };
     // Tenta imediatamente (funciona se a aba já teve interação)
@@ -165,6 +172,11 @@ function PainelPage() {
       })) as Senha[];
       setAtual(lista[0] ?? null);
       setHistorico(lista.slice(1));
+
+      const chamadaMaisRecente = lista[0];
+      if (chamadaMaisRecente?.status === "chamada") {
+        anunciarSenha(chamadaMaisRecente);
+      }
     };
 
     void carregar();
@@ -174,27 +186,8 @@ function PainelPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "senhas", filter: `clinica_id=eq.${clinicaId}` },
-        async (payload) => {
+        () => {
           void carregar();
-          const novo = payload.new as Senha | undefined;
-          if (
-            (payload.eventType === "UPDATE" || payload.eventType === "INSERT") &&
-            novo?.status === "chamada"
-          ) {
-            const key = `${novo.id}:${novo.chamada_em ?? ""}`;
-            if (jaFaladoRef.current.has(key)) return;
-            jaFaladoRef.current.add(key);
-            let nome: string | null = null;
-            if (novo.paciente_id) {
-              const { data: p } = await supabase
-                .from("pacientes")
-                .select("nome")
-                .eq("id", novo.paciente_id)
-                .maybeSingle();
-              nome = p?.nome ?? null;
-            }
-            falar({ ...novo, paciente_nome: nome });
-          }
         },
       )
       .subscribe((status) => {
@@ -215,7 +208,29 @@ function PainelPage() {
     };
   }, [clinicaAtual?.clinica_id]);
 
-  function falar(s: Senha) {
+  function chaveSenha(s: Senha) {
+    return `${s.id}:${s.chamada_em ?? ""}`;
+  }
+
+  function anunciarSenha(s: Senha) {
+    const key = chaveSenha(s);
+    if (jaFaladoRef.current.has(key)) return;
+    jaFaladoRef.current.add(key);
+    chamadaPendenteRef.current = { key, senha: s };
+    falar(s, key);
+  }
+
+  function criarFala(texto: string, key: string) {
+    const utter = new SpeechSynthesisUtterance(texto);
+    utter.lang = "pt-BR";
+    utter.rate = 0.9;
+    utter.onstart = () => {
+      if (chamadaPendenteRef.current?.key === key) chamadaPendenteRef.current = null;
+    };
+    return utter;
+  }
+
+  function falar(s: Senha, key = chaveSenha(s)) {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     const ehNome = /[a-zA-Z]{3,}/.test(s.codigo) && /\s/.test(s.codigo.trim());
     let texto: string;
@@ -227,17 +242,13 @@ function PainelPage() {
       texto = `Senha ${tipoNome} ${s.codigo.replace("-", " ")}${nomePart}${s.guiche ? `, guichê ${s.guiche}` : ""}`;
     }
     window.speechSynthesis.cancel();
+    window.speechSynthesis.resume();
     tocarDing();
-    const dizer = (delayMs: number) => {
-      window.setTimeout(() => {
-        const utter = new SpeechSynthesisUtterance(texto);
-        utter.lang = "pt-BR";
-        utter.rate = 0.9;
-        window.speechSynthesis.speak(utter);
-      }, delayMs);
-    };
-    dizer(700);
-    dizer(4500);
+    window.speechSynthesis.speak(criarFala(texto, key));
+    window.setTimeout(() => {
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(criarFala(texto, key));
+    }, 3800);
   }
 
   function tocarDing() {
