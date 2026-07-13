@@ -46,6 +46,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
+import { estornarLancamentoReceita } from "@/lib/estornar-lancamento";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
 import { printContrato } from "@/lib/print-contrato";
@@ -142,6 +143,8 @@ type Mens = {
   pago_em: string | null;
   forma_pagamento: string | null;
   taxa_adesao?: number | null;
+  lancamento_id?: string | null;
+  valor_pago?: number | null;
 };
 
 const isAdesao = (m: Pick<Mens, "numero_parcela">) => Number(m.numero_parcela) === 0;
@@ -2169,6 +2172,32 @@ function DetalheContrato({
     load();
   };
 
+  // Botão "Reverter": antes só zerava os campos da mensalidade, sem tocar no
+  // lançamento nem no caixa — podia sobrar mensalidade pendente com dinheiro
+  // confirmado no caixa. Agora usa a mesma rotina de estorno do módulo
+  // Financeiro > Estorno (cancela o lançamento, reverte o caixa e reabre a
+  // mensalidade), centralizando os dois pontos de entrada num único fluxo.
+  const reverterMensalidade = async (m: Mens) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!m.lancamento_id) {
+      // Mensalidade paga antes desta correção, sem lançamento vinculado —
+      // não há o que estornar no financeiro/caixa, só reabre a parcela.
+      await marcarPago(m.id, false);
+      return;
+    }
+    const resultado = await estornarLancamentoReceita(m.lancamento_id, clinicaAtual?.clinica_id);
+    if (!resultado.ok) {
+      if (resultado.motivo === "repasse_pago") {
+        toast.error(resultado.mensagem);
+      } else {
+        mostrarErro(resultado.error, resultado.mensagem);
+      }
+      return;
+    }
+    toast.success("Pagamento estornado: lançamento cancelado, caixa revertido e mensalidade reaberta.");
+    load();
+  };
+
   const abrirFormaPag = (m: Mens) => {
     setPagMens(m);
     setFormaPagOpen(true);
@@ -2748,7 +2777,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           <TableCell>
                             <div className="flex items-center gap-1 justify-end">
                               {podeEscrever && (m.status === "pago" ? (
-                                <Button size="sm" variant="outline" onClick={() => marcarPago(m.id, false)}>
+                                <Button size="sm" variant="outline" onClick={() => reverterMensalidade(m)}>
                                   Reverter
                                 </Button>
                               ) : (

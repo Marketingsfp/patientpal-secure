@@ -6,7 +6,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { logAction } from "@/hooks/use-crud";
+import { estornarLancamentoReceita } from "@/lib/estornar-lancamento";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -205,186 +205,14 @@ function Page() {
     if (!s.lancamento_id) {
       return { executado: false, resposta: "Aprovado manualmente (sem lançamento vinculado)" };
     }
-    // Busca lançamento
-    const { data: lanc, error: eLanc } = await supabase
-      .from("fin_lancamentos")
-      .select("id, agendamento_id, valor, descricao, repasse_pago")
-      .eq("id", s.lancamento_id)
-      .maybeSingle();
-    if (eLanc) {
-      mostrarErro(eLanc);
+    const resultado = await estornarLancamentoReceita(s.lancamento_id, clinicaAtual?.clinica_id);
+    if (!resultado.ok) {
+      if (resultado.motivo === "repasse_pago") {
+        toast.error(resultado.mensagem);
+      } else {
+        mostrarErro(resultado.error, resultado.mensagem);
+      }
       return null;
-    }
-    if (!lanc) {
-      return { executado: false, resposta: "Aprovado manualmente (lançamento não encontrado)" };
-    }
-    // Pré-checagem: repasse já pago bloqueia o estorno.
-    // Bug histórico: só olhávamos fin_atendimentos, mas repasses de agenda
-    // são gravados em fin_lancamentos.repasse_pago (298 registros em prod
-    // eram falso-negativo). Checamos as DUAS tabelas.
-    const { data: atd } = await supabase
-      .from("fin_atendimentos")
-      .select("id, repasse_pago")
-      .eq("lancamento_id", s.lancamento_id)
-      .maybeSingle();
-    if (atd?.repasse_pago || (lanc as { repasse_pago?: boolean }).repasse_pago) {
-      toast.error("Repasse já pago — estorne o pagamento do repasse primeiro.");
-      return null;
-    }
-    // Marca o lançamento como CANCELADO (estornado). Vale tanto para
-    // atendimentos da agenda quanto para receitas avulsas (ex.: mensalidade de
-    // contrato) que não têm agendamento vinculado. Não usamos DELETE porque a
-    // policy `fin_lanc_delete` só permite admin/gestor — para usuários
-    // financeiro o DELETE não retorna erro, mas afeta 0 linhas, deixando o
-    // pagamento "vivo". Como o restante do sistema já filtra apenas
-    // status='confirmado', mudar para 'cancelado' efetiva o estorno.
-    const { error: eUpdLanc } = await supabase
-      .from("fin_lancamentos")
-      .update({ status: "cancelado" })
-      .eq("id", lanc.id);
-    if (eUpdLanc) {
-      mostrarErro(eUpdLanc, "falha ao estornar lançamento");
-      return null;
-    }
-    // Reverte o(s) recebimento(s) de caixa vinculados a este lançamento,
-    // inserindo uma sangria na MESMA sessão do recebimento original. Sem
-    // isso o saldo do caixa continuaria refletindo dinheiro que não existe
-    // mais (ver bug: estornos aprovados sem reversão no caixa).
-    try {
-      const { data: recebs } = await supabase
-        .from("caixa_movimentos")
-        .select("id, sessao_id, clinica_id, user_id, valor, descricao, forma_pagamento, lancamento_id")
-        .eq("lancamento_id", lanc.id)
-        .eq("tipo", "recebimento");
-      const recebRows =
-        (recebs ?? []) as Array<{
-          id: string;
-          sessao_id: string;
-          clinica_id: string;
-          user_id: string;
-          valor: number;
-          descricao: string | null;
-          forma_pagamento: string | null;
-          lancamento_id: string | null;
-        }>;
-      if (recebRows.length > 0) {
-        // Ignora recebimentos que já tenham uma sangria de estorno anterior
-        const { data: jaEstornados } = await supabase
-          .from("caixa_movimentos")
-          .select("sessao_id, lancamento_id, descricao, tipo")
-          .eq("lancamento_id", lanc.id)
-          .eq("tipo", "sangria");
-        const chaveJa = new Set(
-          ((jaEstornados ?? []) as Array<{ sessao_id: string; descricao: string | null }>)
-            .filter((r) => (r.descricao ?? "").toLowerCase().startsWith("estorno"))
-            .map((r) => r.sessao_id),
-        );
-        const paraInserir = recebRows
-          .filter((r) => !chaveJa.has(r.sessao_id))
-          .map((r) => ({
-            sessao_id: r.sessao_id,
-            clinica_id: r.clinica_id,
-            user_id: r.user_id,
-            tipo: "sangria" as const,
-            valor: Number(r.valor || 0),
-            descricao: `Estorno — ${r.descricao ?? ""}`.trim(),
-            forma_pagamento: r.forma_pagamento,
-            lancamento_id: r.lancamento_id,
-          }));
-        if (paraInserir.length > 0) {
-          const { error: eRev } = await supabase
-            .from("caixa_movimentos")
-            .insert(paraInserir);
-          if (eRev) {
-            // Não bloqueia o estorno — apenas avisa. O saldo do caixa
-            // será corrigido pela blindagem do front (que ignora
-            // recebimentos com lançamento cancelado).
-            console.warn("Falha ao lançar sangria de estorno no caixa:", eRev);
-          }
-        }
-      }
-    } catch (err) {
-      console.warn("Reversão de caixa não pôde ser aplicada:", err);
-    }
-    const agId = lanc.agendamento_id;
-    if (agId) {
-      // Atendimento vindo da agenda: reabre a ficha (libera o horário).
-      const { data: agAntes } = await supabase
-        .from("agendamentos")
-        .select("id, status, fluxo_etapa")
-        .eq("id", agId)
-        .maybeSingle();
-      const { error: eUpd } = await supabase
-        .from("agendamentos")
-        .update({
-          status: "agendado",
-          fluxo_etapa: "aguardando_recepcao",
-          fluxo_atualizado_em: new Date().toISOString(),
-        })
-        .eq("id", agId);
-      if (eUpd) {
-        mostrarErro(eUpd);
-        return null;
-      }
-      try {
-        await logAction({
-          table_name: "agendamentos",
-          record_id: agId,
-          action: "ESTORNO",
-          clinica_id: clinicaAtual?.clinica_id,
-          dados_antes: agAntes ?? { id: agId },
-          dados_depois: {
-            id: agId,
-            status: "agendado",
-            fin_lancamentos_id_removido: lanc.id,
-            valor_estornado: lanc.valor ?? null,
-          },
-        });
-      } catch {
-        /* auditoria best-effort */
-      }
-    } else {
-      // Receita avulsa (ex.: mensalidade de contrato): não há agendamento para
-      // reabrir. Se houver uma parcela de mensalidade vinculada a este
-      // lançamento, reverte para "pendente" para que possa ser cobrada de novo.
-      const { data: mens } = await supabase
-        .from("contrato_mensalidades")
-        .select("id")
-        .eq("lancamento_id", lanc.id)
-        .maybeSingle();
-      if (mens) {
-        const { error: eMens } = await supabase
-          .from("contrato_mensalidades")
-          .update({
-            status: "pendente",
-            pago_em: null,
-            forma_pagamento: null,
-            valor_pago: null,
-            lancamento_id: null,
-          })
-          .eq("id", (mens as { id: string }).id);
-        if (eMens) {
-          mostrarErro(eMens, "lançamento estornado, mas falha ao reabrir a parcela da mensalidade");
-          return null;
-        }
-      }
-      try {
-        await logAction({
-          table_name: "fin_lancamentos",
-          record_id: lanc.id,
-          action: "ESTORNO",
-          clinica_id: clinicaAtual?.clinica_id,
-          dados_antes: { id: lanc.id, status: "confirmado" },
-          dados_depois: {
-            id: lanc.id,
-            status: "cancelado",
-            valor_estornado: lanc.valor ?? null,
-            mensalidade_revertida: (mens as { id: string } | null)?.id ?? null,
-          },
-        });
-      } catch {
-        /* auditoria best-effort */
-      }
     }
     return { executado: true, resposta: "Estorno executado" };
   };
