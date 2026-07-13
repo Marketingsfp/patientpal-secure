@@ -815,6 +815,10 @@ function ProcedimentosPage() {
             convenio_id: c.id,
             valor_dinheiro: Number(v.dinheiro) || 0,
             valor_outros: Number(v.outros) || 0,
+            // Digitado à mão no cadastro do serviço — "Reaplicar regras" (cartão
+            // benefícios) preserva linhas origem='manual' e só limpa/recalcula
+            // as origem='regra'.
+            origem: "manual",
           };
         });
       const { error: errConv } = await (supabase as any)
