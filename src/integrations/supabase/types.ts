@@ -6402,7 +6402,7 @@ export type Database = {
             foreignKeyName: "pagamento_splits_pagamento_id_fkey"
             columns: ["pagamento_id"]
             isOneToOne: false
-            referencedRelation: "pagamentos"
+            referencedRelation: "fin_lancamentos"
             referencedColumns: ["id"]
           },
         ]
@@ -8460,6 +8460,10 @@ export type Database = {
           procedimento: string
           total: number
         }[]
+      }
+      reagendar_atendimento: {
+        Args: { _destino_id: string; _origem_id: string; _trilha_msg: string }
+        Returns: Json
       }
       salvar_anamnese_publica: {
         Args: { _modelo_id: string; _respostas: Json; _token: string }
