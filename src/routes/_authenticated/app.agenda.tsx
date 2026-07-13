@@ -2220,8 +2220,15 @@ function AgendaPage() {
       if (temRepassePago) {
         const desp = (lanc as any).repasse_lancamento_id as string | null;
         if (desp) {
-          const { error: eDel } = await supabase.from("fin_lancamentos").delete().eq("id", desp);
-          if (eDel) throw eDel;
+          // Cancela em vez de apagar: mantém o histórico contábil da despesa
+          // de repasse (auditoria, relatórios) — o restante do sistema já
+          // trata status='cancelado' como estornado/inativo (mesma convenção
+          // usada em Financeiro > Estorno e Financeiro > Movimento).
+          const { error: eCancel } = await supabase
+            .from("fin_lancamentos")
+            .update({ status: "cancelado" } as never)
+            .eq("id", desp);
+          if (eCancel) throw eCancel;
         }
         const { error: eUpd } = await supabase
           .from("fin_lancamentos")
