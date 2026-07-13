@@ -3215,6 +3215,53 @@ function Page() {
         </DialogContent>
       </Dialog>
       {tomadorNfseDialog}
+
+      {/* Edição pontual do repasse médico de um atendimento */}
+      <Dialog
+        open={editRepasse.open}
+        onOpenChange={(o) => setEditRepasse((s) => ({ ...s, open: o }))}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Editar repasse médico</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-xs text-muted-foreground">
+              {editRepasse.atend?.procedimento || "Atendimento"} — Total{" "}
+              {fmt(Number(editRepasse.atend?.valor_total) || 0)}
+            </div>
+            <div className="space-y-1">
+              <Label>Valor do repasse (R$)</Label>
+              <CurrencyInput
+                value={editRepasse.valor}
+                onChange={(v) => setEditRepasse((s) => ({ ...s, valor: v }))}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Só ajusta este atendimento. Não altera a regra padrão do médico.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditRepasse({ open: false, atend: null, valor: 0 })}
+              disabled={savingRepasse}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={() => void salvarEditRepasse()} disabled={savingRepasse}>
+              {savingRepasse ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                "Salvar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
