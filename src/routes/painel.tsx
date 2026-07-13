@@ -43,6 +43,7 @@ function PainelPage() {
   const chamadaPendenteRef = useRef<{ key: string; senha: Senha } | null>(null);
   const filaFalaRef = useRef<Array<{ key: string; senha: Senha }>>([]);
   const falandoRef = useRef<boolean>(false);
+  const vozFemininaRef = useRef<SpeechSynthesisVoice | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window === "undefined") return "dark";
     return (localStorage.getItem("painel-theme") as "dark" | "light") ?? "dark";
@@ -234,10 +235,29 @@ function PainelPage() {
     const utter = new SpeechSynthesisUtterance(texto);
     utter.lang = "pt-BR";
     utter.rate = 0.9;
+    const voz = vozFemininaRef.current ?? escolherVozFeminina();
+    if (voz) utter.voice = voz;
     utter.onstart = () => {
       if (chamadaPendenteRef.current?.key === key) chamadaPendenteRef.current = null;
     };
     return utter;
+  }
+
+  // Escolhe uma voz pt-BR feminina disponível no navegador do painel.
+  // A lista de vozes carrega de forma assíncrona; por isso reavaliamos
+  // sempre que necessário e escutamos "voiceschanged" no efeito abaixo.
+  function escolherVozFeminina(): SpeechSynthesisVoice | null {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
+    const vozes = window.speechSynthesis.getVoices();
+    if (!vozes.length) return null;
+    const ptBR = vozes.filter((v) => /pt(-|_)?BR/i.test(v.lang) || /portuguese.*brazil/i.test(v.name));
+    const candidatas = ptBR.length ? ptBR : vozes.filter((v) => /^pt/i.test(v.lang));
+    // Nomes conhecidos de vozes femininas em pt-BR nos principais SOs/browsers
+    const nomesFemininos = /(luciana|maria|francisca|camila|helena|joana|vitoria|vitória|fernanda|paulina|google.*português|microsoft.*(maria|francisca|heloisa|helo[íi]sa)|female|feminina|mulher)/i;
+    const feminina = candidatas.find((v) => nomesFemininos.test(v.name));
+    const escolhida = feminina ?? candidatas[0] ?? null;
+    vozFemininaRef.current = escolhida;
+    return escolhida;
   }
 
   function textoDaSenha(s: Senha) {
