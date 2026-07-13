@@ -911,37 +911,21 @@ function AgendaPage() {
       return;
     }
     setReagSalvando(true);
-    const obsAnt = origem.observacoes ?? "";
     const trilha = `[Reagendado em ${new Date().toLocaleString("pt-BR")}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(slot.inicio).toLocaleString("pt-BR")}`;
-    const novasObs = obsAnt ? `${obsAnt}\n${trilha}` : trilha;
-    // 1) Libera a ficha de origem (vira DISPONÍVEL no horário atual)
-    const { error: e1 } = await supabase.from("agendamentos").update({
-      paciente_id: null,
-      paciente_nome: "DISPONÍVEL",
-      status: "agendado",
-      procedimento: null,
-      observacoes: null,
-      data_pagamento: null,
-    } as never).eq("id", origem.id);
-    if (e1) { setReagSalvando(false); mostrarErro(e1); return; }
-    // 2) Coloca a paciente na ficha de destino (slot escolhido), preservando o horário do slot.
-    //    Importante: se a origem NÃO tinha procedimento (ex.: slot sem serviço), mantemos o
-    //    procedimento que já estava no slot de destino, para não esvaziar essa informação —
-    //    isso evita que a cobrança caia depois no fallback genérico "CONSULTA".
-    const { error: e2 } = await supabase.from("agendamentos").update({
-      paciente_id: origem.paciente_id ?? null,
-      paciente_nome: origem.paciente_nome,
-      procedimento: origem.procedimento ?? slot.procedimento ?? null,
-      status: "agendado",
-      observacoes: novasObs,
-      data_pagamento: origem.data_pagamento ?? null,
-    } as never).eq("id", slot.id);
-    if (e2) { setReagSalvando(false); mostrarErro(e2); return; }
-    // 3) Transfere lançamentos financeiros (pagamento) da ficha de origem para a de destino,
-    //    para que o ícone de "pago" continue aparecendo na nova ficha.
-    await supabase.from("fin_lancamentos")
-      .update({ agendamento_id: slot.id } as never)
-      .eq("agendamento_id", origem.id);
+    // Libera origem + ocupa destino + transfere lançamentos financeiros numa
+    // única transação (RPC) — se qualquer etapa falhar, o Postgres desfaz
+    // tudo. Antes eram 3 updates client-side separados: se o 2º falhasse, a
+    // origem já tinha sido liberada e o paciente "sumia" do horário original.
+    const { error } = await supabase.rpc("reagendar_atendimento", {
+      _origem_id: origem.id,
+      _destino_id: slot.id,
+      _trilha_msg: trilha,
+    } as never);
+    if (error) {
+      setReagSalvando(false);
+      mostrarErro(error);
+      return;
+    }
     setReagSalvando(false);
     setReagendandoAg(null);
     toast.success(`Reagendado para ${new Date(slot.inicio).toLocaleString("pt-BR")}.`);
@@ -2386,39 +2370,20 @@ function AgendaPage() {
 
     setReagLoteSalvando(true);
     const agora = new Date().toLocaleString("pt-BR");
-    // H3 — Processa todos os pares (origem → alvo) em paralelo (cada par é
-    // independente). Reduz N×3 chamadas seriais a 3 ondas paralelas.
+    // Cada par (origem → alvo) é independente, então continuam em paralelo —
+    // mas agora cada par roda como uma única transação (RPC), não mais como
+    // dois updates paralelos separados. Antes, se o update do destino
+    // falhasse, o da origem (rodando ao mesmo tempo) já tinha sido aplicado
+    // mesmo assim, liberando o paciente sem realocar corretamente.
     const resultados = await Promise.all(fontes.map(async (origem, i) => {
       const alvo = alvos[i];
       const trilha = `[Reagendado em lote em ${agora}] de ${new Date(origem.inicio).toLocaleString("pt-BR")} para ${new Date(alvo.inicio).toLocaleString("pt-BR")}`;
-      const novasObs = origem.observacoes ? `${origem.observacoes}\n${trilha}` : trilha;
-      // 1+2) Libera origem e ocupa destino em paralelo
-      const [{ error: e1 }, { error: e2 }] = await Promise.all([
-        supabase.from("agendamentos").update({
-          paciente_id: null,
-          paciente_nome: "DISPONÍVEL",
-          status: "agendado",
-          procedimento: null,
-          observacoes: null,
-          data_pagamento: null,
-        } as never).eq("id", origem.id),
-        supabase.from("agendamentos").update({
-          paciente_id: origem.paciente_id ?? null,
-          paciente_nome: origem.paciente_nome,
-          // Preserva o procedimento do slot de destino quando a origem não tinha
-          // um definido, para não deixar a cobrança cair no fallback "CONSULTA".
-          procedimento: origem.procedimento ?? alvo.procedimento ?? null,
-          status: "agendado",
-          observacoes: novasObs,
-          data_pagamento: origem.data_pagamento ?? null,
-        } as never).eq("id", alvo.id),
-      ]);
-      if (e1) { mostrarErro(e1, `mover ${origem.paciente_nome}`); return false; }
-      if (e2) { mostrarErro(e2, "falha ao mover para destino"); return false; }
-      // 3) Transfere lançamentos financeiros
-      await supabase.from("fin_lancamentos")
-        .update({ agendamento_id: alvo.id } as never)
-        .eq("agendamento_id", origem.id);
+      const { error } = await supabase.rpc("reagendar_atendimento", {
+        _origem_id: origem.id,
+        _destino_id: alvo.id,
+        _trilha_msg: trilha,
+      } as never);
+      if (error) { mostrarErro(error, `mover ${origem.paciente_nome}`); return false; }
       return true;
     }));
     const okCount = resultados.filter(Boolean).length;
