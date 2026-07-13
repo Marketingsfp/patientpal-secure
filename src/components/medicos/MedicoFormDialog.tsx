@@ -1822,6 +1822,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
               </DialogFooter>
             )}
             <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+              {/* Modal placeholder for bulk services below */}
               <DialogContent className="sm:max-w-2xl w-[calc(100vw-2rem)] max-h-[85vh] overflow-hidden flex flex-col">
                 <DialogHeader>
                   <DialogTitle>Adicionar vários serviços</DialogTitle>
