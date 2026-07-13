@@ -2520,6 +2520,17 @@ function Page() {
                                 )
                               )}
                               {/* Botão de excluir para agenda */}
+                              {podeEscrever && !a.repasse_pago && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Editar repasse médico deste atendimento"
+                                  onClick={() => abrirEditRepasse(a)}
+                                >
+                                  <Wallet className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                               {podeEscrever && (
                                 <Button
                                   variant="ghost"
