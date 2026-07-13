@@ -3183,6 +3183,13 @@ function Page() {
               {editRepasse.atend?.procedimento || "Atendimento"} — Total{" "}
               {fmt(Number(editRepasse.atend?.valor_total) || 0)}
             </div>
+            {editRepasse.atend?.repasse_pago && (
+              <div className="rounded border border-amber-300 bg-amber-50 text-amber-900 text-[11px] p-2 leading-snug">
+                Este repasse já foi pago. Ao salvar, a despesa vinculada
+                (fin_lancamentos) será ajustada pela diferença para o caixa
+                continuar batendo. Confirme com o médico antes de gravar.
+              </div>
+            )}
             <div className="space-y-1">
               <Label>Valor do repasse (R$)</Label>
               <CurrencyInput
