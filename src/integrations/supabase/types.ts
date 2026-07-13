@@ -8408,6 +8408,21 @@ export type Database = {
           nome: string
         }[]
       }
+      pagar_repasse_medico: {
+        Args: {
+          _agenda_ids: string[]
+          _clinica_id: string
+          _conta_id: string
+          _criado_por: string
+          _data: string
+          _forma_pagamento: string
+          _manual_ids: string[]
+          _medico_id: string
+          _medico_nome: string
+          _total: number
+        }
+        Returns: string
+      }
       pendencias_paciente: { Args: { _paciente_id: string }; Returns: Json }
       procedimentos_popularidade: {
         Args: { p_clinica_id: string }

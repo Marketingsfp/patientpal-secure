@@ -196,6 +196,49 @@ function Page() {
   const [optsReady, setOptsReady] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "", valor_manual: "" });
+  // Edição pontual do repasse médico de um atendimento (linha da tabela)
+  const [editRepasse, setEditRepasse] = useState<{ open: boolean; atend: Atend | null; valor: string }>({
+    open: false,
+    atend: null,
+    valor: "",
+  });
+  const [savingRepasse, setSavingRepasse] = useState(false);
+  const abrirEditRepasse = (a: Atend) => {
+    if (a.repasse_pago) {
+      toast.error("Repasse já pago — estorne antes de editar.");
+      return;
+    }
+    setEditRepasse({ open: true, atend: a, valor: (Number(a.valor_medico) || 0).toFixed(2) });
+  };
+  const salvarEditRepasse = async () => {
+    const a = editRepasse.atend;
+    if (!a) return;
+    if (a.repasse_pago) {
+      toast.error("Repasse já pago — estorne antes de editar.");
+      return;
+    }
+    const valorNum = Number(editRepasse.valor);
+    if (!Number.isFinite(valorNum) || valorNum < 0) {
+      toast.error("Valor inválido");
+      return;
+    }
+    setSavingRepasse(true);
+    try {
+      const { error } = await supabase
+        .from("fin_atendimentos")
+        .update({ valor_medico: valorNum })
+        .eq("id", a.id);
+      if (error) {
+        mostrarErro(error);
+        return;
+      }
+      toast.success("Repasse atualizado");
+      setEditRepasse({ open: false, atend: null, valor: "" });
+      await load();
+    } finally {
+      setSavingRepasse(false);
+    }
+  };
   // Comprovante de pagamento de repasse (para impressão)
   type CompItem = { data: string; medico: string; paciente: string; servico: string; valorMedico: number; pagoEm: string | null; pagoHora: string | null };
   type Comprovante = {
@@ -2361,6 +2404,17 @@ function Page() {
                                 )
                               )}
                               {/* Botão de excluir para agenda */}
+                              {podeEscrever && !a.repasse_pago && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Editar repasse médico deste atendimento"
+                                  onClick={() => abrirEditRepasse(a)}
+                                >
+                                  <Wallet className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                               {podeEscrever && (
                                 <Button
                                   variant="ghost"
@@ -2436,6 +2490,17 @@ function Page() {
                                     Baixar
                                   </Button>
                                 )
+                              )}
+                              {podeEscrever && !a.repasse_pago && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Editar repasse médico deste atendimento"
+                                  onClick={() => abrirEditRepasse(a)}
+                                >
+                                  <Wallet className="h-3.5 w-3.5" />
+                                </Button>
                               )}
                               {podeEscrever && (
                                 <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" onClick={() => remove(a)}>
@@ -3034,6 +3099,53 @@ function Page() {
         </DialogContent>
       </Dialog>
       {tomadorNfseDialog}
+
+      {/* Edição pontual do repasse médico de um atendimento */}
+      <Dialog
+        open={editRepasse.open}
+        onOpenChange={(o) => setEditRepasse((s) => ({ ...s, open: o }))}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Editar repasse médico</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-xs text-muted-foreground">
+              {editRepasse.atend?.procedimento || "Atendimento"} — Total{" "}
+              {fmt(Number(editRepasse.atend?.valor_total) || 0)}
+            </div>
+            <div className="space-y-1">
+              <Label>Valor do repasse (R$)</Label>
+              <CurrencyInput
+                value={editRepasse.valor}
+                onChange={(v) => setEditRepasse((s) => ({ ...s, valor: v }))}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Só ajusta este atendimento. Não altera a regra padrão do médico.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditRepasse({ open: false, atend: null, valor: "" })}
+              disabled={savingRepasse}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={() => void salvarEditRepasse()} disabled={savingRepasse}>
+              {savingRepasse ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                "Salvar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
