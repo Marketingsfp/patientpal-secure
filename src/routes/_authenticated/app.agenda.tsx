@@ -1744,34 +1744,44 @@ function AgendaPage() {
   const opcoesProcedimentoMedico = (medicoId: string | null, agendaId?: string | null) => {
     if (!medicoId) return [] as { id: string; nome: string }[];
     const opcoesCadastradas = procOpcoesPorMedico.get(medicoId);
-    const filtrarPorAgenda = (lista: { id: string; nome: string }[]) => {
+    // União com os serviços vinculados diretamente à agenda selecionada
+    // (via `medico_agenda_procedimentos`). Isso garante que serviços
+    // configurados na agenda apareçam mesmo se ainda não estiverem no
+    // cadastro do médico (a intersecção antes escondia essas linhas e
+    // fazia o seletor mostrar só 1 exame).
+    const complementoAgenda = (lista: { id: string; nome: string }[]) => {
       if (!agendaId) return lista;
-      // Só aplica o filtro de agenda quando a agenda pertence ao médico selecionado.
       const agendasDoMedico = agendasPorMedico.get(medicoId) ?? [];
       if (!agendasDoMedico.some((a) => a.id === agendaId)) return lista;
       const idsAgenda = procIdsPorAgenda.get(agendaId);
       if (!idsAgenda || idsAgenda.size === 0) return lista;
-      const nomesAgenda = new Set<string>();
+      const jaTem = new Set(lista.map((p) => p.id));
+      const nomesJaTem = new Set(lista.map((p) => normalizar(p.nome)));
+      const extras: { id: string; nome: string }[] = [];
       for (const p of procedimentosList) {
-        if (idsAgenda.has(p.id)) nomesAgenda.add(normalizar(p.nome));
+        if (!idsAgenda.has(p.id)) continue;
+        if (jaTem.has(p.id) || nomesJaTem.has(normalizar(p.nome))) continue;
+        extras.push({ id: p.id, nome: p.nome });
       }
-      const filtrada = lista.filter((p) => idsAgenda.has(p.id) || nomesAgenda.has(normalizar(p.nome)));
-      // Fallback: se o filtro zerar a lista mas o médico tem serviços
-      // cadastrados, mostra todos eles para não bloquear o agendamento.
-      return filtrada.length > 0 ? filtrada : lista;
+      if (extras.length === 0) return lista;
+      return [...lista, ...extras];
     };
     if (opcoesCadastradas && opcoesCadastradas.length > 0) {
       // Preserva a ordem do cadastro (created_at asc) — Top 10 aparecem primeiro.
-      return filtrarPorAgenda([...opcoesCadastradas]);
+      return complementoAgenda([...opcoesCadastradas]);
     }
     const ids = procPorMedico.get(medicoId);
     const nomes = procNomesPorMedico.get(medicoId);
     const temConfig = (ids && ids.size > 0) || (nomes && nomes.size > 0);
-    if (!temConfig) return [];
+    if (!temConfig) {
+      // Sem cadastro no médico, mas com vínculos na agenda: usa a agenda
+      // como fonte de verdade.
+      return complementoAgenda([]);
+    }
     const lista = procedimentosList.filter(
       (p) => (ids?.has(p.id) ?? false) || (nomes?.has(normalizar(p.nome)) ?? false),
     );
-    return filtrarPorAgenda(lista);
+    return complementoAgenda(lista);
   };
 
   const procedimentoPadraoDoMedico = (medicoId: string | null | undefined) => {
