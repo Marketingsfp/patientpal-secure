@@ -8060,6 +8060,26 @@ export type Database = {
         }
         Returns: string
       }
+      criar_contrato_assinatura: {
+        Args: {
+          _clinica_id: string
+          _convenio_id: string
+          _criado_por: string
+          _data_fim: string
+          _data_inicio: string
+          _dependentes: Json
+          _dia_vencimento: number
+          _forma_pagamento: string
+          _mensalidades: Json
+          _num_parcelas: number
+          _observacoes: string
+          _paciente_id: string
+          _paciente_nome: string
+          _taxa_adesao: number
+          _valor_mensal: number
+        }
+        Returns: Json
+      }
       cubo_bi_financeiro_agregado: {
         Args: {
           _clinica_id: string
