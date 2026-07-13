@@ -3887,19 +3887,19 @@ function AgendaPage() {
           </DialogTrigger>
           )}
           <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
-            <DialogHeader className="space-y-0 px-6 pt-2 pb-1.5 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
-              <DialogTitle className="text-base font-semibold tracking-tight text-slate-900">
+            <DialogHeader className="space-y-0 px-6 pt-1.5 pb-1 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
+              <DialogTitle className="text-sm font-semibold tracking-tight text-slate-900">
                 {editing
                   ? (pagosSet.has(editing.id) ? "Visualizar agendamento" : "Editar agendamento")
                   : "Novo agendamento"}
               </DialogTitle>
-              <p className="text-xs text-slate-500">
+              <p className="text-[11px] text-slate-500 leading-tight">
                 {editing && pagosSet.has(editing.id)
                   ? "Este agendamento já foi pago. Alterações exigem estorno."
                   : "Preencha os dados abaixo. Campos com * são obrigatórios."}
               </p>
             </DialogHeader>
-            <form onSubmit={submit} className="space-y-2 px-6 py-2.5">
+            <form onSubmit={submit} className="space-y-1.5 px-6 py-2">
               {editing && open && (
                 <FichaEmUsoAlert agendamentoId={editing.id} />
               )}
@@ -3913,7 +3913,7 @@ function AgendaPage() {
                 disabled={editing ? pagosSet.has(editing.id) : false}
                 className="space-y-2 contents disabled:opacity-90"
               >
-              <div className="space-y-1.5 rounded-xl border border-primary/25 bg-primary/[0.04] p-3 text-xs">
+              <div className="space-y-1 rounded-xl border border-primary/25 bg-primary/[0.04] p-2 text-xs">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Label className="text-[10px] font-semibold uppercase tracking-widest text-primary whitespace-nowrap">Nº do orçamento</Label>
                   <Input
