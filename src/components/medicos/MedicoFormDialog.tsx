@@ -5,6 +5,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { cadastrarUsuario, getFuncionarioLogin, definirSenhaFuncionario } from "@/lib/equipe.functions";
+import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -124,6 +125,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
   const getLoginFn = useServerFn(getFuncionarioLogin);
   const definirSenhaFn = useServerFn(definirSenhaFuncionario);
+  const { clinicaAtual } = useClinica();
+  const podeGerenciarEquipe = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
 
   const [esps, setEsps] = useState<Especialidade[]>([]);
   const [procs, setProcs] = useState<Procedimento[]>([]);
@@ -542,10 +545,14 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         ativo: (med as { ativo?: boolean }).ativo !== false,
       });
       if (med.user_id) {
-        try {
-          const res = await getLoginFn({ data: { clinicaId: med.clinica_id ?? clinicaId, userId: med.user_id } });
-          setExistingEmail((res as { email?: string | null })?.email ?? null);
-        } catch { setExistingEmail(null); }
+        if (podeGerenciarEquipe) {
+          try {
+            const res = await getLoginFn({ data: { clinicaId: med.clinica_id ?? clinicaId, userId: med.user_id } });
+            setExistingEmail((res as { email?: string | null })?.email ?? null);
+          } catch { setExistingEmail(null); }
+        } else {
+          setExistingEmail(null);
+        }
       } else {
         setExistingEmail(null);
       }
