@@ -4360,7 +4360,9 @@ function AgendaPage() {
             const currentUserId = (await supabase.auth.getUser()).data.user?.id ?? null;
 
             // 1) Localiza o lançamento principal recém-criado pelo LancamentoDialog
-            //    (agendamento_id = principal, tipo = receita, status = confirmado, mais recente).
+            //    (agendamento_id = principal, tipo = receita, status = confirmado, mais recente)
+            //    — só para ler as observações e preservar o trecho "Pagamento misto: ...".
+            //    A gravação em si (passo 2 em diante) acontece toda dentro da RPC abaixo.
             const { data: principalRow, error: errPrincipal } = await supabase
               .from("fin_lancamentos")
               .select("id, observacoes, criado_por")
@@ -4383,99 +4385,32 @@ function AgendaPage() {
             const trechoMisto = idxMisto >= 0
               ? obsOriginal.slice(idxMisto).split(" | ")[0]
               : "";
-
-            // 2) Atualiza o principal com valor rateado + grupo_pagamento_id + descrição individual.
             const rotuloPrincipal = pagamentoRotulos[agId] ?? "CONSULTA";
-            if (principalRow?.id) {
-              const { error: errUpdPrinc } = await supabase
-                .from("fin_lancamentos")
-                .update({
-                  valor: valoresRat[0],
-                  grupo_pagamento_id: grupoId,
-                  descricao: `${pagamentoPacienteNome} — ${rotuloPrincipal} (1/${N} do grupo)`,
-                  criado_por: (principalRow as { criado_por?: string | null }).criado_por ?? currentUserId,
-                  observacoes: [
-                    `Pagamento agrupado (grupo ${grupoId}) — 1/${N} atendimentos`,
-                    trechoMisto,
-                  ].filter(Boolean).join(" | "),
-                } as never)
-                .eq("id", principalRow.id);
-              if (errUpdPrinc) {
-                mostrarErro(errUpdPrinc, "pagamento salvo, mas falhou ao ajustar o principal");
-              }
-            }
 
-            // 3) Insere N-1 lançamentos individuais (um por extra).
-            const extrasRows = pagamentoExtraIds.map((extraId, i) => ({
-              clinica_id: clinicaAtual.clinica_id,
-              tipo: "receita" as const,
-              descricao: `${pagamentoPacienteNome} — ${pagamentoRotulos[extraId] ?? "CONSULTA"} (${i + 2}/${N} do grupo)`,
-              valor: valoresRat[i + 1],
-              data: new Date().toISOString().slice(0, 10),
-              forma_pagamento: dados.forma_pagamento,
-              status: "confirmado" as const,
-              agendamento_id: extraId,
-              grupo_pagamento_id: grupoId,
-              criado_por: (principalRow as { criado_por?: string | null } | null)?.criado_por ?? currentUserId,
+            // 2) Atualiza o principal + insere os N-1 extras (fin_lancamentos e
+            //    caixa_movimentos) numa única transação (RPC) — antes eram ~6
+            //    chamadas separadas; se alguma falhasse no meio, parte dos
+            //    atendimentos ficava paga e parte sem lançamento/caixa correto.
+            const itensRateio = todosIds.map((id, i) => ({
+              agendamento_id: id,
+              valor: valoresRat[i],
+              descricao: i === 0
+                ? `${pagamentoPacienteNome} — ${rotuloPrincipal} (1/${N} do grupo)`
+                : `${pagamentoPacienteNome} — ${pagamentoRotulos[id] ?? "CONSULTA"} (${i + 1}/${N} do grupo)`,
               observacoes: [
-                `Pagamento agrupado (grupo ${grupoId}) — ${i + 2}/${N} atendimentos`,
+                `Pagamento agrupado (grupo ${grupoId}) — ${i + 1}/${N} atendimentos`,
                 trechoMisto,
               ].filter(Boolean).join(" | "),
             }));
-            const { data: extrasInseridos, error: errExtras } = await supabase
-              .from("fin_lancamentos")
-              .insert(extrasRows as never)
-              .select("id, agendamento_id");
-            if (errExtras) {
-              mostrarErro(errExtras, "pagamento salvo, mas falhou ao vincular itens extras");
-            }
-
-            // 4) Espelha a divisão no Caixa: o LancamentoDialog criou 1 movimento
-            //    com o valor total. Ajustamos esse movimento para o principal
-            //    rateado e criamos N-1 movimentos individuais (um por extra).
-            try {
-              if (principalRow?.id) {
-                const { data: movPrinc } = await supabase
-                  .from("caixa_movimentos")
-                  .select("id, sessao_id, clinica_id, user_id, forma_pagamento")
-                  .eq("lancamento_id", principalRow.id)
-                  .order("created_at", { ascending: false })
-                  .limit(1)
-                  .maybeSingle();
-                if (movPrinc) {
-                  await supabase
-                    .from("caixa_movimentos")
-                    .update({
-                      valor: valoresRat[0],
-                      descricao: `${pagamentoPacienteNome} — ${rotuloPrincipal} (1/${N} do grupo)`,
-                    } as never)
-                    .eq("id", movPrinc.id);
-                  const extrasList = (extrasInseridos ?? []) as Array<{ id: string; agendamento_id: string | null }>;
-                  const movsExtras = pagamentoExtraIds.map((extraId, i) => {
-                    const lanc = extrasList.find((r) => r.agendamento_id === extraId);
-                    return {
-                      sessao_id: movPrinc.sessao_id,
-                      clinica_id: movPrinc.clinica_id,
-                      user_id: movPrinc.user_id,
-                      tipo: "recebimento" as const,
-                      valor: valoresRat[i + 1],
-                      descricao: `${pagamentoPacienteNome} — ${pagamentoRotulos[extraId] ?? "CONSULTA"} (${i + 2}/${N} do grupo)`,
-                      forma_pagamento: movPrinc.forma_pagamento,
-                      lancamento_id: lanc?.id ?? null,
-                    };
-                  });
-                  if (movsExtras.length > 0) {
-                    const { error: errMovExtras } = await supabase
-                      .from("caixa_movimentos")
-                      .insert(movsExtras as never);
-                    if (errMovExtras) {
-                      console.error("Falha ao criar movimentos de caixa dos extras:", errMovExtras);
-                    }
-                  }
-                }
-              }
-            } catch (e) {
-              console.error("Falha ao espelhar divisão no caixa:", e);
+            const { error: errRateio } = await supabase.rpc("finalizar_pagamento_agrupado", {
+              _clinica_id: clinicaAtual.clinica_id,
+              _grupo_id: grupoId,
+              _forma_pagamento: dados.forma_pagamento,
+              _criado_por: (principalRow as { criado_por?: string | null } | null)?.criado_por ?? currentUserId,
+              _itens: itensRateio,
+            } as never);
+            if (errRateio) {
+              mostrarErro(errRateio, "pagamento salvo, mas falhou ao ratear entre os atendimentos do grupo");
             }
           }
           setPagosSet((prev) => {
