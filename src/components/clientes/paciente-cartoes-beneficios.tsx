@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { CreditCard, Plus, AlertTriangle, ExternalLink, Trash2 } from "lucide-react";
+import { CreditCard, Plus, AlertTriangle, ExternalLink, Trash2, ChevronDown, ChevronRight, History } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,6 +53,7 @@ export function PacienteCartoesBeneficios({
   const [novoDep, setNovoDep] = useState<PatientOption | null>(null);
   const [parentesco, setParentesco] = useState("");
   const [saving, setSaving] = useState(false);
+  const [histOpen, setHistOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -160,6 +161,15 @@ export function PacienteCartoesBeneficios({
   };
 
   const totalContratos = titulares.length + dependeDe.length;
+  // Contrato cancelado/inativo não é utilizável para o atendimento — misturado
+  // com os ativos, dava a impressão de que o paciente tinha cobertura vigente
+  // quando não tinha. Separa o que é "contrato ativo utilizável" do que é só
+  // histórico.
+  const titularesAtivos = useMemo(() => titulares.filter((c) => c.status === "ativo"), [titulares]);
+  const titularesHistorico = useMemo(() => titulares.filter((c) => c.status !== "ativo"), [titulares]);
+  const dependeDeAtivos = useMemo(() => dependeDe.filter((c) => c.status === "ativo"), [dependeDe]);
+  const dependeDeHistorico = useMemo(() => dependeDe.filter((c) => c.status !== "ativo"), [dependeDe]);
+  const totalHistorico = titularesHistorico.length + dependeDeHistorico.length;
 
   return (
     <div className="rounded-lg border border-border bg-card">
@@ -167,7 +177,9 @@ export function PacienteCartoesBeneficios({
         <div className="flex items-center gap-2 font-semibold">
           <CreditCard className="h-5 w-5 text-primary" />
           Cartão Benefícios
-          {totalContratos > 0 && <Badge variant="outline">{totalContratos} contrato(s)</Badge>}
+          {(titularesAtivos.length + dependeDeAtivos.length) > 0 && (
+            <Badge variant="outline">{titularesAtivos.length + dependeDeAtivos.length} contrato(s) ativo(s)</Badge>
+          )}
         </div>
       </div>
       <div className="p-4 space-y-4">
@@ -181,7 +193,12 @@ export function PacienteCartoesBeneficios({
           </p>
         ) : (
           <>
-            {titulares.map((c) => (
+            {titularesAtivos.length === 0 && dependeDeAtivos.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Nenhum contrato ativo no momento — veja o histórico abaixo.
+              </p>
+            )}
+            {titularesAtivos.map((c) => (
               <div key={c.id} className="rounded-md border p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
@@ -233,7 +250,7 @@ export function PacienteCartoesBeneficios({
                 </div>
               </div>
             ))}
-            {dependeDe.map((c) => (
+            {dependeDeAtivos.map((c) => (
               <div key={`dep-${c.id}`} className="rounded-md border p-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
@@ -249,6 +266,55 @@ export function PacienteCartoesBeneficios({
                 </div>
               </div>
             ))}
+            {totalHistorico > 0 && (
+              <div className="pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setHistOpen((v) => !v)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  {histOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                  <History className="h-3.5 w-3.5" />
+                  Histórico de contratos ({totalHistorico})
+                </button>
+                {histOpen && (
+                  <div className="mt-2 space-y-2 opacity-70">
+                    {titularesHistorico.map((c) => (
+                      <div key={`tit-hist-${c.id}`} className="rounded-md border border-dashed p-3 space-y-1">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">TITULAR</Badge>
+                            <Badge variant="outline" className="text-muted-foreground">
+                              {c.status === "cancelado" ? "CANCELADO" : c.status.toUpperCase()}
+                            </Badge>
+                            <span className="font-medium">{c.convenio_nome}</span>
+                            <span className="text-xs text-muted-foreground">#{c.numero}</span>
+                          </div>
+                          <Link to="/app/cartao-beneficios/contratos" search={{ contratoId: c.id }} className="text-xs text-primary underline flex items-center gap-1">
+                            <ExternalLink className="h-3 w-3" /> Abrir
+                          </Link>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          R$ {c.valor_mensal.toFixed(2)}/mês · início {c.data_inicio.split("-").reverse().join("/")}
+                        </div>
+                      </div>
+                    ))}
+                    {dependeDeHistorico.map((c) => (
+                      <div key={`dep-hist-${c.id}`} className="rounded-md border border-dashed p-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="secondary">DEPENDENTE{c.parentesco ? ` (${c.parentesco})` : ""}</Badge>
+                          <Badge variant="outline" className="text-muted-foreground">
+                            {c.status === "cancelado" ? "CANCELADO" : c.status.toUpperCase()}
+                          </Badge>
+                          <span className="font-medium">{c.convenio_nome}</span>
+                          <span className="text-xs text-muted-foreground">#{c.numero}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
