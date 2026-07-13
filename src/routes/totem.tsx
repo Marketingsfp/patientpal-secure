@@ -26,7 +26,7 @@ type TipoSenha = "N" | "P" | "E" | "R";
 const TIPOS: { tipo: TipoSenha; titulo: string; sub: string; Icon: typeof Hash; classe: string }[] = [
   { tipo: "N", titulo: "Comum", sub: "Atendimento padrão", Icon: Hash, classe: "from-primary/90 to-primary" },
   { tipo: "P", titulo: "Preferencial", sub: "Idoso · Gestante · PCD · Crianças de colo", Icon: Accessibility, classe: "from-amber-500 to-amber-600" },
-  { tipo: "E", titulo: "Prioridade médica", sub: "Urgência / encaixe", Icon: Stethoscope, classe: "from-rose-600 to-rose-700" },
+  { tipo: "E", titulo: "Cartão consulta", sub: "Urgência / encaixe", Icon: Stethoscope, classe: "from-rose-600 to-rose-700" },
   { tipo: "R", titulo: "Retorno", sub: "Pacientes em retorno", Icon: RotateCcw, classe: "from-emerald-600 to-emerald-700" },
 ];
 
