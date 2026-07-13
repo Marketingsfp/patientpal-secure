@@ -197,10 +197,10 @@ function Page() {
   const [payOpen, setPayOpen] = useState(false);
   const [payForm, setPayForm] = useState({ data: hoje, conta_id: "", forma_pagamento: "", valor_manual: "" });
   // Edição pontual do repasse médico de um atendimento (linha da tabela)
-  const [editRepasse, setEditRepasse] = useState<{ open: boolean; atend: Atend | null; valor: number }>({
+  const [editRepasse, setEditRepasse] = useState<{ open: boolean; atend: Atend | null; valor: string }>({
     open: false,
     atend: null,
-    valor: 0,
+    valor: "",
   });
   const [savingRepasse, setSavingRepasse] = useState(false);
   const abrirEditRepasse = (a: Atend) => {
@@ -208,7 +208,7 @@ function Page() {
       toast.error("Repasse já pago — estorne antes de editar.");
       return;
     }
-    setEditRepasse({ open: true, atend: a, valor: Number(a.valor_medico) || 0 });
+    setEditRepasse({ open: true, atend: a, valor: (Number(a.valor_medico) || 0).toFixed(2) });
   };
   const salvarEditRepasse = async () => {
     const a = editRepasse.atend;
@@ -217,7 +217,8 @@ function Page() {
       toast.error("Repasse já pago — estorne antes de editar.");
       return;
     }
-    if (editRepasse.valor < 0) {
+    const valorNum = Number(editRepasse.valor);
+    if (!Number.isFinite(valorNum) || valorNum < 0) {
       toast.error("Valor inválido");
       return;
     }
@@ -225,14 +226,14 @@ function Page() {
     try {
       const { error } = await supabase
         .from("fin_atendimentos")
-        .update({ valor_medico: editRepasse.valor })
+        .update({ valor_medico: valorNum })
         .eq("id", a.id);
       if (error) {
         mostrarErro(error);
         return;
       }
       toast.success("Repasse atualizado");
-      setEditRepasse({ open: false, atend: null, valor: 0 });
+      setEditRepasse({ open: false, atend: null, valor: "" });
       await load();
     } finally {
       setSavingRepasse(false);
