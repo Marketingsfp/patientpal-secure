@@ -68,14 +68,18 @@ function PainelPage() {
     };
     // Tenta imediatamente (funciona se a aba já teve interação)
     unlock();
-    const opts = { once: true, capture: true } as const;
+    // Mantém sempre ativo: reexecuta o unlock a cada gesto e quando a aba
+    // volta a ficar visível (kiosque que fica horas aberto sem foco).
+    const opts = { capture: true } as const;
     window.addEventListener("pointerdown", unlock, opts);
     window.addEventListener("keydown", unlock, opts);
     window.addEventListener("touchstart", unlock, opts);
+    document.addEventListener("visibilitychange", unlock);
     return () => {
       window.removeEventListener("pointerdown", unlock, opts);
       window.removeEventListener("keydown", unlock, opts);
       window.removeEventListener("touchstart", unlock, opts);
+      document.removeEventListener("visibilitychange", unlock);
     };
   }, []);
 
