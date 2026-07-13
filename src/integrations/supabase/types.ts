@@ -6402,7 +6402,7 @@ export type Database = {
             foreignKeyName: "pagamento_splits_pagamento_id_fkey"
             columns: ["pagamento_id"]
             isOneToOne: false
-            referencedRelation: "pagamentos"
+            referencedRelation: "fin_lancamentos"
             referencedColumns: ["id"]
           },
         ]
