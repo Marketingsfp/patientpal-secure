@@ -983,14 +983,23 @@ function Page() {
       const medIdEff = r.medico_id ?? ag?.medico_id ?? null;
       const pago = Number(r.valor);
       const { total, repasse } = calcRepasseFull(medIdEff, pago, proc, r.descricao ?? null);
+      // Override manual do repasse (editado na tela). Quando presente,
+      // sobrescreve o cálculo por regra.
+      const overrideRaw = (r as { valor_medico_override?: number | string | null }).valor_medico_override;
+      const override =
+        overrideRaw !== null && overrideRaw !== undefined && overrideRaw !== ""
+          ? Number(overrideRaw)
+          : null;
+      const valorMedicoFinal = override !== null && Number.isFinite(override) ? override : repasse;
+      const valorClinicaFinal = +(total - valorMedicoFinal).toFixed(2);
       return {
         id: r.id,
         data: r.data,
         procedimento: proc,
         agendamento_id: r.agendamento_id ?? null,
         valor_total: total,
-        valor_medico: repasse,
-        valor_clinica: +(total - repasse).toFixed(2),
+        valor_medico: valorMedicoFinal,
+        valor_clinica: valorClinicaFinal,
         status: "realizado",
         forma_pagamento: r.forma_pagamento,
         medico_id: medIdEff,
