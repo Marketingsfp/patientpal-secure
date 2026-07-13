@@ -1821,8 +1821,6 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
               </DialogFooter>
             )}
-            <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
-            </Dialog>
             <Dialog open={confirmTrocaPerfil} onOpenChange={setConfirmTrocaPerfil}>
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
