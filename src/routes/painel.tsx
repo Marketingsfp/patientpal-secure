@@ -259,8 +259,8 @@ function PainelPage() {
   if (!clinicaAtual) return <div className="min-h-screen flex items-center justify-center bg-background">Nenhuma clínica selecionada.</div>;
 
   return (
-    <div className={`min-h-screen w-full ${t.root} p-[clamp(1rem,3vw,3rem)] flex flex-col transition-colors`}>
-      <header className={`grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 mb-[clamp(1rem,3vh,3rem)] border-b ${t.headerBorder} pb-[clamp(0.75rem,2vh,2rem)]`}>
+    <div className={`h-screen w-full overflow-hidden ${t.root} p-[clamp(0.75rem,2vw,2rem)] flex flex-col transition-colors`}>
+      <header className={`grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 mb-[clamp(0.5rem,1.5vh,1.5rem)] border-b ${t.headerBorder} pb-[clamp(0.5rem,1.2vh,1.25rem)]`}>
         <div className="min-w-0">
           <p className={`${t.accent} font-bold tracking-widest text-[clamp(0.7rem,1.2vw,0.95rem)] uppercase mb-1`}>Painel de Chamada</p>
           <h1 className={`truncate font-black uppercase tracking-tight ${t.heading} text-[clamp(1.25rem,3vw,2.5rem)]`}>{clinicaAtual.clinica.nome}</h1>
@@ -278,85 +278,85 @@ function PainelPage() {
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col lg:flex-row gap-[clamp(1rem,2vw,2.5rem)] min-h-0">
-        <div className={`flex-[2] min-h-0 relative overflow-hidden ${t.heroCard} rounded-[clamp(1.5rem,3vw,2.5rem)] flex flex-col items-center justify-center p-[clamp(1.25rem,3vw,4rem)]`}>
+      <main className="flex flex-1 flex-col lg:flex-row gap-[clamp(0.75rem,1.5vw,2rem)] min-h-0">
+        <div className={`flex-[2] min-h-0 min-w-0 relative overflow-hidden ${t.heroCard} rounded-[clamp(1rem,2vw,2rem)] flex flex-col items-center justify-center p-[clamp(0.75rem,2vw,2.5rem)]`}>
           <div className={`absolute -top-24 -left-24 w-96 h-96 ${t.heroGlow} blur-[120px] rounded-full pointer-events-none`} />
           <div className="relative z-10 text-center w-full">
             {atual ? (() => {
               const ehNome = /[a-zA-Z]{3,}/.test(atual.codigo) && /\s/.test(atual.codigo.trim());
               const fonte = ehNome
                 ? (atual.codigo.length > 16
-                    ? "text-[clamp(2.5rem,7vw,5rem)]"
+                    ? "text-[clamp(2rem,min(6vw,9vh),4.5rem)]"
                     : atual.codigo.length > 10
-                      ? "text-[clamp(3rem,8vw,6rem)]"
-                      : "text-[clamp(3.5rem,10vw,8rem)]")
-                : "text-[clamp(5rem,18vw,18rem)] tabular-nums";
+                      ? "text-[clamp(2.5rem,min(7vw,11vh),5.5rem)]"
+                      : "text-[clamp(3rem,min(9vw,14vh),7rem)]")
+                : "text-[clamp(4rem,min(16vw,26vh),14rem)] tabular-nums";
               return (
                 <>
-                  <span className={`inline-block px-[clamp(1rem,1.5vw,1.5rem)] py-[clamp(0.35rem,0.6vw,0.6rem)] rounded-full ${t.badgeActive} font-bold uppercase tracking-[0.2em] mb-[clamp(1rem,2.5vw,3rem)] text-[clamp(0.75rem,1.2vw,1.25rem)]`}>
+                  <span className={`inline-block px-[clamp(0.75rem,1.2vw,1.25rem)] py-[clamp(0.25rem,0.5vw,0.5rem)] rounded-full ${t.badgeActive} font-bold uppercase tracking-[0.2em] mb-[clamp(0.5rem,min(2vw,2vh),1.5rem)] text-[clamp(0.7rem,1vw,1.1rem)]`}>
                     Chamando Agora
                   </span>
-                  <div className={`${fonte} font-black leading-none ${t.ticket} tracking-tighter break-words max-w-full mb-[clamp(0.75rem,1.5vw,1.5rem)]`}>
+                  <div className={`${fonte} font-black leading-none ${t.ticket} tracking-tighter break-words max-w-full mb-[clamp(0.5rem,min(1.5vw,1.5vh),1rem)]`}>
                     {atual.codigo}
                   </div>
                   {!ehNome && atual.paciente_nome && (
-                    <h3 className={`font-bold ${t.patient} tracking-tight uppercase break-words max-w-full text-[clamp(1.5rem,4vw,3.75rem)]`}>
+                    <h3 className={`font-bold ${t.patient} tracking-tight uppercase break-words max-w-full text-[clamp(1rem,min(3.5vw,5vh),3rem)]`}>
                       {atual.paciente_nome}
                     </h3>
                   )}
-                  <div className="flex items-center justify-center gap-[clamp(0.75rem,1.5vw,1.5rem)] mt-[clamp(1rem,2.5vw,3rem)]">
+                  <div className="flex items-center justify-center gap-[clamp(0.5rem,1.2vw,1.25rem)] mt-[clamp(0.5rem,min(2vw,2.5vh),1.5rem)]">
                     {!ehNome && (
-                      <span className={`${t.guicheLabel} font-medium uppercase tracking-widest text-[clamp(1rem,2.5vw,2.25rem)]`}>Guichê</span>
+                      <span className={`${t.guicheLabel} font-medium uppercase tracking-widest text-[clamp(0.85rem,min(2vw,3vh),1.75rem)]`}>Guichê</span>
                     )}
-                    <span className={`font-black ${t.guicheValue} text-[clamp(2.5rem,7vw,6rem)]`}>{atual.guiche ?? "—"}</span>
+                    <span className={`font-black ${t.guicheValue} text-[clamp(2rem,min(6vw,9vh),5rem)]`}>{atual.guiche ?? "—"}</span>
                   </div>
                 </>
               );
             })() : (
               <>
-                <span className={`inline-block px-[clamp(1rem,1.5vw,1.5rem)] py-[clamp(0.35rem,0.6vw,0.6rem)] rounded-full ${t.badgeIdle} font-bold uppercase tracking-[0.2em] mb-[clamp(1rem,2vw,2rem)] text-[clamp(0.75rem,1.2vw,1.25rem)]`}>
+                <span className={`inline-block px-[clamp(0.75rem,1.2vw,1.25rem)] py-[clamp(0.25rem,0.5vw,0.5rem)] rounded-full ${t.badgeIdle} font-bold uppercase tracking-[0.2em] mb-[clamp(0.5rem,2vh,1.5rem)] text-[clamp(0.7rem,1vw,1.1rem)]`}>
                   Chamando Agora
                 </span>
-                <div className={`${t.idleText} font-light text-[clamp(1.5rem,4vw,3rem)]`}>Aguardando chamada…</div>
+                <div className={`${t.idleText} font-light text-[clamp(1.25rem,min(3.5vw,5vh),2.5rem)]`}>Aguardando chamada…</div>
               </>
             )}
           </div>
         </div>
 
-        <aside className={`flex-1 min-h-0 ${t.aside} rounded-[clamp(1.5rem,3vw,2.5rem)] p-[clamp(1rem,2vw,2.5rem)] flex flex-col`}>
-          <h3 className={`font-bold uppercase tracking-widest ${t.asideTitle} mb-[clamp(0.75rem,2vw,2.5rem)] pl-2 lg:pl-4 text-[clamp(0.9rem,1.5vw,1.5rem)]`}>
+        <aside className={`flex-1 min-h-0 min-w-0 ${t.aside} rounded-[clamp(1rem,2vw,2rem)] p-[clamp(0.75rem,1.5vw,1.75rem)] flex flex-col`}>
+          <h3 className={`font-bold uppercase tracking-widest ${t.asideTitle} mb-[clamp(0.5rem,1.5vh,1.5rem)] pl-2 lg:pl-4 text-[clamp(0.8rem,1.2vw,1.25rem)]`}>
             Anteriores
           </h3>
-          <div className="space-y-[clamp(0.5rem,1vw,1rem)] flex-1 overflow-y-auto min-h-0">
+          <div className="space-y-[clamp(0.4rem,0.8vh,0.85rem)] flex-1 overflow-y-auto min-h-0">
             {historico.length === 0 && (
               <div className={`${t.asideEmpty} pl-2 lg:pl-4 text-[clamp(0.9rem,1.4vw,1.125rem)]`}>Sem chamadas anteriores</div>
             )}
             {historico.map((s, i) => (
               <div
                 key={s.id}
-                className={`flex items-center justify-between p-[clamp(0.75rem,1.5vw,2rem)] rounded-[clamp(1rem,1.5vw,1.5rem)] ${i === 0 ? t.itemFirst : t.itemRest}`}
+                className={`flex items-center justify-between p-[clamp(0.6rem,min(1.2vw,1.6vh),1.25rem)] rounded-[clamp(0.75rem,1.2vw,1.25rem)] ${i === 0 ? t.itemFirst : t.itemRest}`}
               >
                 <div className="min-w-0">
-                  <p className={`font-black tabular-nums mb-1 truncate ${i === 0 ? t.itemCodeFirst : t.itemCodeRest} text-[clamp(1.25rem,2.5vw,2.25rem)]`}>
+                  <p className={`font-black tabular-nums mb-1 truncate ${i === 0 ? t.itemCodeFirst : t.itemCodeRest} text-[clamp(1rem,min(2vw,3vh),1.85rem)]`}>
                     {s.codigo}
                   </p>
                   {s.paciente_nome && (
-                    <p className={`font-bold uppercase truncate ${i === 0 ? t.itemNameFirst : t.itemNameRest} text-[clamp(0.8rem,1.3vw,1.25rem)]`}>
+                    <p className={`font-bold uppercase truncate ${i === 0 ? t.itemNameFirst : t.itemNameRest} text-[clamp(0.7rem,1.1vw,1.1rem)]`}>
                       {s.paciente_nome}
                     </p>
                   )}
                 </div>
                 <div className="text-right shrink-0 pl-3">
-                  <p className={`${t.itemLabel} uppercase font-bold tracking-widest mb-1 text-[clamp(0.55rem,0.8vw,0.75rem)]`}>Guichê</p>
-                  <p className={`font-black ${i === 0 ? t.itemGuicheFirst : t.itemGuicheRest} text-[clamp(1.5rem,2.8vw,2.25rem)]`}>
+                  <p className={`${t.itemLabel} uppercase font-bold tracking-widest mb-1 text-[clamp(0.5rem,0.75vw,0.7rem)]`}>Guichê</p>
+                  <p className={`font-black ${i === 0 ? t.itemGuicheFirst : t.itemGuicheRest} text-[clamp(1.25rem,min(2.2vw,3vh),1.85rem)]`}>
                     {s.guiche ?? "—"}
                   </p>
                 </div>
               </div>
             ))}
           </div>
-          <div className={`mt-auto pt-[clamp(0.75rem,1.5vw,2rem)] border-t ${t.footerBorder} text-center`}>
-            <p className={`${t.footerText} font-medium text-[clamp(0.75rem,1.1vw,1rem)]`}>Por favor, dirija-se ao guichê indicado.</p>
+          <div className={`mt-auto pt-[clamp(0.5rem,1vh,1.25rem)] border-t ${t.footerBorder} text-center`}>
+            <p className={`${t.footerText} font-medium text-[clamp(0.7rem,1vw,0.95rem)]`}>Por favor, dirija-se ao guichê indicado.</p>
           </div>
         </aside>
       </main>
