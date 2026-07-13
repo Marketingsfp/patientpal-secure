@@ -1822,6 +1822,33 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
               </DialogFooter>
             )}
             <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+            </Dialog>
+            <Dialog open={confirmTrocaPerfil} onOpenChange={setConfirmTrocaPerfil}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Confirmar troca de perfil</DialogTitle>
+                </DialogHeader>
+                <div className="text-sm space-y-2">
+                  <p>
+                    Isso removerá o acesso de <b>Médico</b> e definirá o novo perfil como{" "}
+                    <b>{novoPerfilAcesso}</b>.
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    O cadastro em <b>Médicos</b> será desativado; o histórico (agendamentos,
+                    prontuários, repasses) permanece preservado.
+                  </p>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setConfirmTrocaPerfil(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="button" onClick={trocarPerfilAcesso} disabled={trocandoPerfil}>
+                    {trocandoPerfil ? "Aplicando..." : "Confirmar troca"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
               <DialogContent className="sm:max-w-2xl w-[calc(100vw-2rem)] max-h-[85vh] overflow-hidden flex flex-col">
                 <DialogHeader>
                   <DialogTitle>Adicionar vários serviços</DialogTitle>
