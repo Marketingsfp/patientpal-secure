@@ -8200,6 +8200,16 @@ export type Database = {
           total: number
         }[]
       }
+      finalizar_pagamento_agrupado: {
+        Args: {
+          _clinica_id: string
+          _criado_por: string
+          _forma_pagamento: string
+          _grupo_id: string
+          _itens: Json
+        }
+        Returns: Json
+      }
       fn_registrar_lancamento_e_caixa: {
         Args: { p_lancamento: Json; p_movimento?: Json }
         Returns: Json
