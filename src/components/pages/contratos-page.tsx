@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/dialog";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { estornarLancamentoReceita } from "@/lib/estornar-lancamento";
+import { incluirDependenteContrato } from "@/lib/contrato-dependentes";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
 import { printContrato } from "@/lib/print-contrato";
@@ -2401,52 +2402,32 @@ h1, h2, h3 { margin: 0 0 6mm; }
       toast.error("Selecione um paciente");
       return;
     }
-    if (depsAtivos.length >= maxDep) {
-      toast.error(
-        maxDep === 0 ? "Este convênio não permite dependentes." : `Limite de ${maxDep} dependentes atingido.`,
-      );
-      return;
-    }
-    if (depsAtivos.find((d) => d.paciente_id === incPaciente.id)) {
-      toast.error("Esse paciente já é dependente ativo deste contrato");
-      return;
-    }
-    if (incPaciente.id === (contrato as any).paciente_id) {
-      toast.error("O titular não pode ser dependente");
-      return;
-    }
     setIncSaving(true);
-    const hoje = new Date().toISOString().slice(0, 10);
-    const { data, error } = await supabase
-      .from("contrato_dependentes")
-      .insert({
-        contrato_id: contrato.id,
-        paciente_id: incPaciente.id,
-        paciente_nome: incPaciente.nome,
-        parentesco: incParentesco || null,
-        tipo: incTipo,
-        incluido_em: hoje,
-        ativo: true,
-      })
-      .select("id, paciente_id, paciente_nome, parentesco, tipo, incluido_em, excluido_em, ativo")
-      .maybeSingle();
+    const resultado = await incluirDependenteContrato({
+      contratoId: contrato.id,
+      pacienteId: incPaciente.id,
+      pacienteNome: incPaciente.nome,
+      parentesco: incParentesco || null,
+      tipo: incTipo,
+    });
     setIncSaving(false);
-    if (error) {
-      mostrarErro(error);
+    if (!resultado.ok) {
+      toast.error(resultado.mensagem);
       return;
     }
+    const data = resultado.dependente;
     toast.success("Dependente incluído");
     setIncOpen(false);
     const novoDep: Dep = {
-      id: data!.id,
-      paciente_id: data!.paciente_id,
-      paciente_nome: data!.paciente_nome,
-      parentesco: data!.parentesco,
-      tipo: data!.tipo,
+      id: data.id,
+      paciente_id: data.paciente_id,
+      paciente_nome: data.paciente_nome,
+      parentesco: data.parentesco,
+      tipo: data.tipo,
       cpf: incPaciente.cpf,
-      incluido_em: data!.incluido_em,
-      excluido_em: data!.excluido_em,
-      ativo: !!data!.ativo,
+      incluido_em: data.incluido_em,
+      excluido_em: data.excluido_em,
+      ativo: !!data.ativo,
     };
     setIncPaciente(null);
     setIncParentesco("");

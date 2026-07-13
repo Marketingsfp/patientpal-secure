@@ -4,6 +4,7 @@ import { Users, Search, Plus, Trash2, AlertCircle, CheckCircle2, X } from "lucid
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
+import { incluirDependenteContrato } from "@/lib/contrato-dependentes";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -127,15 +128,14 @@ function DependentesPage() {
     if (!openTitular || !novoDep) return;
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
-    const { error } = await supabase.from("contrato_dependentes").insert({
-      contrato_id: openTitular.id,
-      paciente_id: novoDep.id,
-      paciente_nome: novoDep.nome,
+    const resultado = await incluirDependenteContrato({
+      contratoId: openTitular.id,
+      pacienteId: novoDep.id,
+      pacienteNome: novoDep.nome,
       parentesco: parentesco.trim() || null,
-      ativo: true,
     });
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (!resultado.ok) { toast.error(resultado.mensagem); return; }
     toast.success("Dependente adicionado.");
     setNovoDep(null);
     setParentesco("");

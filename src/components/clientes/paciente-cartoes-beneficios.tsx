@@ -4,6 +4,7 @@ import { CreditCard, Plus, AlertTriangle, ExternalLink, Trash2 } from "lucide-re
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
+import { incluirDependenteContrato } from "@/lib/contrato-dependentes";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -134,15 +135,14 @@ export function PacienteCartoesBeneficios({
   const adicionar = async () => {
     if (!openAdd || !novoDep) return;
     setSaving(true);
-    const { error } = await supabase.from("contrato_dependentes").insert({
-      contrato_id: openAdd,
-      paciente_id: novoDep.id,
-      paciente_nome: novoDep.nome,
+    const resultado = await incluirDependenteContrato({
+      contratoId: openAdd,
+      pacienteId: novoDep.id,
+      pacienteNome: novoDep.nome,
       parentesco: parentesco.trim() || null,
-      ativo: true,
     });
     setSaving(false);
-    if (error) { mostrarErro(error); return; }
+    if (!resultado.ok) { toast.error(resultado.mensagem); return; }
     toast.success("Dependente adicionado.");
     setOpenAdd(null); setNovoDep(null); setParentesco("");
     await load();
