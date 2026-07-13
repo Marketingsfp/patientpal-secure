@@ -283,7 +283,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
    */
   const reaplicar = async () => {
     if (!convenioId) return;
-    if (!confirm(`Reaplicar as regras de "${convenioNome}" a todos os serviços? Valores manuais serão sobrescritos onde houver regra correspondente, e valores calculados por regras antigas (removidas ou alteradas) serão limpos.`)) return;
+    if (!confirm(`Reaplicar as regras de "${convenioNome}" a todos os serviços? Valores manuais serão sobrescritos onde houver regra correspondente.`)) return;
     setReapplying(true);
     setProgress("Carregando serviços…");
     try {
@@ -356,23 +356,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
             convenio_id: convenioId,
             valor_dinheiro: best.dinheiro,
             valor_outros: best.outros,
-            origem: "regra",
           });
         }
       }
-
-      // 4.5) Limpa valores calculados por regra na rodada anterior — sem
-      // isso, um procedimento que deixou de casar com qualquer regra (regra
-      // removida ou alterada) ficava com o preço antigo indefinidamente.
-      // Valores digitados manualmente (origem='manual') não são tocados.
-      setProgress("Limpando valores calculados anteriores…");
-      const { error: errClear } = await (supabase as any)
-        .from("procedimento_cb_convenio_valores")
-        .delete()
-        .eq("clinica_id", clinicaId)
-        .eq("convenio_id", convenioId)
-        .eq("origem", "regra");
-      if (errClear) throw errClear;
 
       // 5) upsert em lotes
       const BATCH = 500;
