@@ -204,19 +204,11 @@ function Page() {
   });
   const [savingRepasse, setSavingRepasse] = useState(false);
   const abrirEditRepasse = (a: Atend) => {
-    if (a.repasse_pago) {
-      toast.error("Repasse já pago — estorne antes de editar.");
-      return;
-    }
     setEditRepasse({ open: true, atend: a, valor: (Number(a.valor_medico) || 0).toFixed(2) });
   };
   const salvarEditRepasse = async () => {
     const a = editRepasse.atend;
     if (!a) return;
-    if (a.repasse_pago) {
-      toast.error("Repasse já pago — estorne antes de editar.");
-      return;
-    }
     const valorNum = Number(editRepasse.valor);
     if (!Number.isFinite(valorNum) || valorNum < 0) {
       toast.error("Valor inválido");
@@ -224,15 +216,69 @@ function Page() {
     }
     setSavingRepasse(true);
     try {
-      const { error } = await supabase
-        .from("fin_atendimentos")
-        .update({ valor_medico: valorNum })
-        .eq("id", a.id);
-      if (error) {
-        mostrarErro(error);
-        return;
+      const oldValor = Number(a.valor_medico) || 0;
+      const delta = +(valorNum - oldValor).toFixed(2);
+      // 1) Grava o valor no local certo conforme a origem do atendimento.
+      if (a.origem === "agenda") {
+        // Agenda: fin_lancamentos não tem valor_medico; usamos o override.
+        const { error } = await supabase
+          .from("fin_lancamentos")
+          .update({ valor_medico_override: valorNum })
+          .eq("id", a.id);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+      } else {
+        const { error } = await supabase
+          .from("fin_atendimentos")
+          .update({ valor_medico: valorNum })
+          .eq("id", a.id);
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
       }
-      toast.success("Repasse atualizado");
+      // 2) Se o repasse já foi pago, ajusta a despesa vinculada pelo delta
+      //    para o total do lançamento continuar batendo com o pago.
+      let msgExtra = "";
+      if (a.repasse_pago && Math.abs(delta) >= 0.005) {
+        const srcTable = a.origem === "agenda" ? "fin_lancamentos" : "fin_atendimentos";
+        const { data: src } = await supabase
+          .from(srcTable)
+          .select("repasse_lancamento_id")
+          .eq("id", a.id)
+          .maybeSingle();
+        const lancId =
+          (src as { repasse_lancamento_id?: string | null } | null)?.repasse_lancamento_id ?? null;
+        if (lancId) {
+          const { data: desp } = await supabase
+            .from("fin_lancamentos")
+            .select("valor")
+            .eq("id", lancId)
+            .maybeSingle();
+          const valorAtual = Number((desp as { valor?: number | string | null } | null)?.valor) || 0;
+          const novoValor = +(valorAtual + delta).toFixed(2);
+          if (novoValor < 0) {
+            toast.error(
+              `Ajuste inválido: a despesa vinculada ficaria negativa (R$ ${novoValor.toFixed(2)}). Estorne o pagamento antes.`,
+            );
+            return;
+          }
+          const { error: eUp } = await supabase
+            .from("fin_lancamentos")
+            .update({ valor: novoValor })
+            .eq("id", lancId);
+          if (eUp) {
+            mostrarErro(eUp);
+            return;
+          }
+          msgExtra = ` Despesa vinculada ajustada em ${delta >= 0 ? "+" : ""}${delta.toFixed(2)}.`;
+        } else {
+          msgExtra = " (Sem despesa vinculada — nada a ajustar no caixa.)";
+        }
+      }
+      toast.success("Repasse atualizado." + msgExtra);
       setEditRepasse({ open: false, atend: null, valor: "" });
       await load();
     } finally {
@@ -880,7 +926,7 @@ function Page() {
     let qAgenda = supabase
       .from("fin_lancamentos")
       .select(
-        "id, data, descricao, valor, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+        "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
@@ -983,14 +1029,23 @@ function Page() {
       const medIdEff = r.medico_id ?? ag?.medico_id ?? null;
       const pago = Number(r.valor);
       const { total, repasse } = calcRepasseFull(medIdEff, pago, proc, r.descricao ?? null);
+      // Override manual do repasse (editado na tela). Quando presente,
+      // sobrescreve o cálculo por regra.
+      const overrideRaw = (r as { valor_medico_override?: number | string | null }).valor_medico_override;
+      const override =
+        overrideRaw !== null && overrideRaw !== undefined && overrideRaw !== ""
+          ? Number(overrideRaw)
+          : null;
+      const valorMedicoFinal = override !== null && Number.isFinite(override) ? override : repasse;
+      const valorClinicaFinal = +(total - valorMedicoFinal).toFixed(2);
       return {
         id: r.id,
         data: r.data,
         procedimento: proc,
         agendamento_id: r.agendamento_id ?? null,
         valor_total: total,
-        valor_medico: repasse,
-        valor_clinica: +(total - repasse).toFixed(2),
+        valor_medico: valorMedicoFinal,
+        valor_clinica: valorClinicaFinal,
         status: "realizado",
         forma_pagamento: r.forma_pagamento,
         medico_id: medIdEff,
@@ -2404,12 +2459,19 @@ function Page() {
                                 )
                               )}
                               {/* Botão de excluir para agenda */}
-                              {podeEscrever && !a.repasse_pago && (
+                              {podeEscrever && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7"
-                                  title="Editar repasse médico deste atendimento"
+                                  className={cn(
+                                    "h-7 w-7",
+                                    a.repasse_pago && "text-amber-600 hover:text-amber-700",
+                                  )}
+                                  title={
+                                    a.repasse_pago
+                                      ? "Editar repasse (já pago — ajusta a despesa vinculada)"
+                                      : "Editar repasse médico deste atendimento"
+                                  }
                                   onClick={() => abrirEditRepasse(a)}
                                 >
                                   <Wallet className="h-3.5 w-3.5" />
@@ -2491,12 +2553,19 @@ function Page() {
                                   </Button>
                                 )
                               )}
-                              {podeEscrever && !a.repasse_pago && (
+                              {podeEscrever && (
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7"
-                                  title="Editar repasse médico deste atendimento"
+                                  className={cn(
+                                    "h-7 w-7",
+                                    a.repasse_pago && "text-amber-600 hover:text-amber-700",
+                                  )}
+                                  title={
+                                    a.repasse_pago
+                                      ? "Editar repasse (já pago — ajusta a despesa vinculada)"
+                                      : "Editar repasse médico deste atendimento"
+                                  }
                                   onClick={() => abrirEditRepasse(a)}
                                 >
                                   <Wallet className="h-3.5 w-3.5" />
@@ -3114,6 +3183,13 @@ function Page() {
               {editRepasse.atend?.procedimento || "Atendimento"} — Total{" "}
               {fmt(Number(editRepasse.atend?.valor_total) || 0)}
             </div>
+            {editRepasse.atend?.repasse_pago && (
+              <div className="rounded border border-amber-300 bg-amber-50 text-amber-900 text-[11px] p-2 leading-snug">
+                Este repasse já foi pago. Ao salvar, a despesa vinculada
+                (fin_lancamentos) será ajustada pela diferença para o caixa
+                continuar batendo. Confirme com o médico antes de gravar.
+              </div>
+            )}
             <div className="space-y-1">
               <Label>Valor do repasse (R$)</Label>
               <CurrencyInput

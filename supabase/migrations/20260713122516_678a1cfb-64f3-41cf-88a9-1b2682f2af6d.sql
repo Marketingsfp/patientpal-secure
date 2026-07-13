@@ -1,0 +1,2 @@
+ALTER TABLE public.fin_lancamentos ADD COLUMN IF NOT EXISTS valor_medico_override numeric NULL;
+COMMENT ON COLUMN public.fin_lancamentos.valor_medico_override IS 'Ajuste manual pontual do repasse médico deste atendimento (sobrescreve o cálculo por regra). Editado em Financeiro → Atendimentos.';
