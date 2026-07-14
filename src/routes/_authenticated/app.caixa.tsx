@@ -332,7 +332,7 @@ function Page() {
   // "Solicitar estorno" por "Aguardando aprovação" (pendente) ou
   // "Estornado" (aprovado) conforme a decisão do financeiro.
   const [estornosPorLanc, setEstornosPorLanc] = useState<Map<string, "pendente" | "aprovado">>(new Map());
-  const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, { servico: string | null; medico: string | null }>>(new Map());
+  const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null }>>(new Map());
   // Conjunto de lancamento_ids cujo fin_lancamentos.status = 'cancelado'
   // (i.e., estornados). Esses recebimentos não devem entrar no saldo do
   // caixa mesmo que o movimento reverso ainda não tenha sido gravado.
