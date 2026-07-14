@@ -976,6 +976,23 @@ export function AtendimentosPage() {
       return;
     }
     const agendaRows = [...(ar.data ?? []), ...(sr.data ?? [])];
+    const manualLancamentoIds = (mr.data ?? [])
+      .map((r: { lancamento_id?: string | null }) => r.lancamento_id ?? null)
+      .filter((x): x is string => !!x);
+    const lancamentosEspelhoAgenda = new Set<string>();
+    if (manualLancamentoIds.length) {
+      const { data: espelhos, error: espelhoErr } = await supabase
+        .from("fin_lancamentos")
+        .select("id, agendamento_id")
+        .in("id", manualLancamentoIds)
+        .not("agendamento_id", "is", null);
+      if (espelhoErr) {
+        mostrarErro(espelhoErr);
+        setLoading(false);
+        return;
+      }
+      for (const e of espelhos ?? []) lancamentosEspelhoAgenda.add(e.id);
+    }
     // IDs de fin_lancamentos já carregados — usado para descartar linhas de
     // fin_atendimentos que espelham o mesmo pagamento (duplicidade legada
     // criada pelo fluxo de atendimento IA antes da correção).
@@ -991,6 +1008,7 @@ export function AtendimentosPage() {
     const manuaisRaw = (mr.data ?? []).filter(
       (r: { lancamento_id?: string | null }) => {
         if (r.lancamento_id && lancIds.has(r.lancamento_id)) return false;
+        if (r.lancamento_id && lancamentosEspelhoAgenda.has(r.lancamento_id)) return false;
         // Sem lancamento_id: descarta se algum lançamento carregado apontar
         // para um agendamento que também aparece no lote manual (mesma data,
         // procedimento e paciente). O DB já tem trigger que impede este caso
