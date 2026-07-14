@@ -1082,6 +1082,8 @@ function AgendaPage() {
     setAuditAg(a);
     setAuditLoading(true);
     setAuditRows([]);
+    setNotasHist([]);
+    setNotaTexto("");
     void carregarEquipe();
     // 1) histórico do próprio agendamento
     const { data: agAudit, error } = await supabase
@@ -1112,6 +1114,13 @@ function AgendaPage() {
       .sort((x, y) => (x.created_at < y.created_at ? 1 : -1));
     setAuditLoading(false);
     setAuditRows(todos);
+    const { data: nts } = await supabase
+      .from("agendamento_historico_notas" as never)
+      .select("id, user_email, user_nome, texto, created_at")
+      .eq("agendamento_id", a.id)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    setNotasHist(((nts as unknown as NotaHist[]) ?? []));
   };
 
   const cadastrarPacienteRapido = async (e: FormEvent) => {
