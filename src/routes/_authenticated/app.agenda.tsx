@@ -1138,7 +1138,7 @@ function AgendaPage() {
         user_email: user?.email ?? null,
         user_nome: nome,
         texto: txt,
-      })
+      } as never)
       .select("id, user_email, user_nome, texto, created_at")
       .single();
     setSavingNota(false);
