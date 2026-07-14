@@ -4938,7 +4938,7 @@ function AgendaPage() {
 
       {/* Filtros */}
       <div
-        className="rounded-lg border bg-card p-2 space-y-1.5 text-xs [&_input]:h-7 [&_input]:text-xs [&_button[role=combobox]]:h-7 [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
+        className="rounded-2xl border bg-card p-4 space-y-2 text-xs shadow-sm [&_input]:h-9 [&_input]:text-xs [&_button[role=combobox]]:h-9 [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
         style={{ ["--clinic" as never]: corClinica }}
       >
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
