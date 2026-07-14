@@ -137,8 +137,16 @@ async function buscarProcedimentoPorNome(
   nome: string,
   lista: any[] | null | undefined,
 ): Promise<any | null> {
-  // Remove sufixo de disambiguação " (ESPECIALIDADE)" antes de pesquisar.
-  const nomeBase = (nome ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim();
+  // Tenta primeiro o nome COMPLETO (ex.: "ECOCARDIOGRAMA (ADULTO)"). Só se
+  // não houver match exato caímos para uma versão sem sufixo entre parênteses
+  // — que é uma heurística para disambiguação de especialidade
+  // (ex.: "CONSULTA (CARDIOLOGIA)"). Sem isso, procedimentos cujo NOME REAL
+  // termina em "(ADULTO)"/"(INFANTIL)"/etc. eram truncados e o fallback ilike
+  // podia casar com outro procedimento parecido (ex.: "USG ECOCARDIOGRAMA
+  // FETAL"), aplicando o valor errado no modal de cobrança.
+  const nomeCompleto = (nome ?? "").trim();
+  const nomeSemSufixo = nomeCompleto.replace(/\s*\([^()]*\)\s*$/, "").trim();
+  const nomeBase = nomeCompleto || nomeSemSufixo;
   const alvo = nomeBase.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const norm = (s: string) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   // 1) Sempre tentar primeiro uma busca FRESCA no banco pelo nome exato
@@ -147,18 +155,22 @@ async function buscarProcedimentoPorNome(
   const temValor = (p: any) =>
     p && [p.valor_dinheiro, p.valor_pix, p.valor_padrao, p.valor_cartao, p.valor_cartao_credito, p.valor_cartao_debito, p.valor_dinheiro_pix]
       .some((v) => Number(v) > 0);
-  try {
-    const { data: exatoDb } = await supabase
-      .from("procedimentos")
-      .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
-      .eq("clinica_id", clinicaId)
-      .eq("ativo", true)
-      .ilike("nome", nomeBase)
-      .limit(5);
-    const exatoComValor = (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvo && temValor(p))
-      ?? (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvo);
-    if (exatoComValor) return exatoComValor;
-  } catch { /* segue para fallback */ }
+  // Tenta match exato no banco: 1) nome completo, 2) sem sufixo (parênteses).
+  for (const tentativa of [nomeCompleto, nomeSemSufixo].filter((s, i, a) => s && a.indexOf(s) === i)) {
+    try {
+      const alvoT = norm(tentativa);
+      const { data: exatoDb } = await supabase
+        .from("procedimentos")
+        .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .ilike("nome", tentativa)
+        .limit(5);
+      const exatoComValor = (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvoT && temValor(p))
+        ?? (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvoT);
+      if (exatoComValor) return exatoComValor;
+    } catch { /* segue para próxima tentativa */ }
+  }
   const arr = lista ?? [];
   // Prioriza matches que TÊM valores cadastrados, para evitar pegar linhas
   // placeholder (ex.: "CONSULTA 110 E 130" com tudo zerado) na frente da
