@@ -1053,13 +1053,25 @@ function AgendaPage() {
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [savingPac, setSavingPac] = useState(false);
-  const [equipeList, setEquipeList] = useState<Array<{ nome: string | null; email: string | null }>>([]);
+  const [equipeList, setEquipeList] = useState<Array<{ nome: string | null; email: string | null; user_id: string | null; role: string | null }>>([]);
   type AuditRow = { id: string; action: string; table_name: string; user_email: string | null; created_at: string; dados_antes: Record<string, unknown> | null; dados_depois: Record<string, unknown> | null };
   const [auditAg, setAuditAg] = useState<Agendamento | null>(null);
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   type NotaHist = { id: string; user_email: string | null; user_nome: string | null; texto: string; created_at: string };
   const [notasHist, setNotasHist] = useState<NotaHist[]>([]);
+  type EstornoHist = {
+    id: string;
+    status: string;
+    motivo: string | null;
+    resposta: string | null;
+    solicitado_por: string | null;
+    solicitado_em: string;
+    resolvido_por: string | null;
+    resolvido_em: string | null;
+  };
+  const [estornosHist, setEstornosHist] = useState<EstornoHist[]>([]);
+  const [nomePorUidExtra, setNomePorUidExtra] = useState<Map<string, string>>(new Map());
   const [notaTexto, setNotaTexto] = useState("");
   const [savingNota, setSavingNota] = useState(false);
 
@@ -1074,7 +1086,7 @@ function AgendaPage() {
     if (!clinicaAtual || equipeList.length > 0) return;
     try {
       const data = await fnListarEquipe({ data: { clinicaId: clinicaAtual.clinica_id } });
-      setEquipeList((data as any[]).map((m) => ({ nome: m.nome, email: m.email })));
+      setEquipeList((data as any[]).map((m) => ({ nome: m.nome, email: m.email, user_id: m.user_id ?? null, role: m.role ?? null })));
     } catch (_) { /* silencioso */ }
   };
 
