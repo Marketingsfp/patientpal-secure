@@ -915,6 +915,10 @@ export function AtendimentosPage() {
     }
     setLoading(true);
     // Une atendimentos manuais (fin_atendimentos) com pagamentos da agenda (fin_lancamentos receita).
+    // Regra de repasse da agenda: a competência é a data marcada no agendamento,
+    // não a data em que o paciente pagou no caixa. Assim pagamento antecipado não
+    // libera repasse antes do dia do atendimento/reagendamento.
+    const agendaFimDia = `${fFim}T23:59:59.999`;
     let qManual = supabase
       .from("fin_atendimentos")
       .select(
@@ -926,11 +930,23 @@ export function AtendimentosPage() {
     let qAgenda = supabase
       .from("fin_lancamentos")
       .select(
+        "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos!inner(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+      )
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("tipo", "receita")
+      .eq("status", "confirmado")
+      .not("agendamento_id", "is", null)
+      .gte("agendamento.inicio", `${fIni}T00:00:00`)
+      .lte("agendamento.inicio", agendaFimDia);
+    const qReceitasSemAgenda = supabase
+      .from("fin_lancamentos")
+      .select(
         "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
       .eq("status", "confirmado")
+      .is("agendamento_id", null)
       .gte("data", fIni)
       .lte("data", fFim);
     if (fMedico !== "todos") {
@@ -939,9 +955,10 @@ export function AtendimentosPage() {
       // com medico_id nulo (médico vem do agendamento). Filtramos client-side
       // logo após o mapeamento abaixo.
     }
-    const [mr, ar] = await Promise.all([
+    const [mr, ar, sr] = await Promise.all([
       qManual.order("data", { ascending: false }),
       qAgenda.order("data", { ascending: false }),
+      qReceitasSemAgenda.order("data", { ascending: false }),
     ]);
     if (mr.error) {
       mostrarErro(mr.error);
@@ -953,15 +970,21 @@ export function AtendimentosPage() {
       setLoading(false);
       return;
     }
+    if (sr.error) {
+      mostrarErro(sr.error);
+      setLoading(false);
+      return;
+    }
+    const agendaRows = [...(ar.data ?? []), ...(sr.data ?? [])];
     // IDs de fin_lancamentos já carregados — usado para descartar linhas de
     // fin_atendimentos que espelham o mesmo pagamento (duplicidade legada
     // criada pelo fluxo de atendimento IA antes da correção).
-    const lancIds = new Set((ar.data ?? []).map((r: { id: string }) => r.id));
+    const lancIds = new Set(agendaRows.map((r: { id: string }) => r.id));
     // Também colecionamos o agendamento_id dos lançamentos para descartar
     // manuais que espelhem o mesmo agendamento (caso o lancamento_id não
     // tenha sido preenchido no fin_atendimentos, por qualquer motivo).
     const lancAgendIds = new Set(
-      (ar.data ?? [])
+      agendaRows
         .map((r: { agendamento_id?: string | null }) => r.agendamento_id ?? null)
         .filter((x): x is string => !!x),
     );
@@ -973,7 +996,7 @@ export function AtendimentosPage() {
         // procedimento e paciente). O DB já tem trigger que impede este caso
         // em novos inserts; aqui blindamos registros históricos.
         if (r.lancamento_id && lancAgendIds.size > 0) {
-          const lanc = (ar.data ?? []).find((l: { id: string }) => l.id === r.lancamento_id) as
+          const lanc = agendaRows.find((l: { id: string }) => l.id === r.lancamento_id) as
             | { agendamento_id?: string | null }
             | undefined;
           if (lanc?.agendamento_id && lancAgendIds.has(lanc.agendamento_id)) return false;
@@ -1011,7 +1034,7 @@ export function AtendimentosPage() {
         valor_laudo: Number((r as any).valor_laudo ?? 0),
       };
     });
-    const agend: Atend[] = (ar.data ?? []).map((r): Atend => {
+    const agend: Atend[] = agendaRows.map((r): Atend => {
       const ag = (r as any).agendamento as {
         procedimento: string | null;
         paciente_nome: string | null;
@@ -1027,6 +1050,7 @@ export function AtendimentosPage() {
       const pacNomeExtra = ag?.paciente_nome ?? ((r.descricao ?? "").split("—")[0]?.trim() || null);
       const pacIdEff = r.paciente_id ?? ag?.paciente_id ?? null;
       const medIdEff = r.medico_id ?? ag?.medico_id ?? null;
+      const dataRepasse = ag?.inicio ? ag.inicio.slice(0, 10) : r.data;
       const pago = Number(r.valor);
       const { total, repasse } = calcRepasseFull(medIdEff, pago, proc, r.descricao ?? null);
       // Override manual do repasse (editado na tela). Quando presente,
@@ -1040,7 +1064,7 @@ export function AtendimentosPage() {
       const valorClinicaFinal = +(total - valorMedicoFinal).toFixed(2);
       return {
         id: r.id,
-        data: r.data,
+        data: dataRepasse,
         procedimento: proc,
         agendamento_id: r.agendamento_id ?? null,
         valor_total: total,
