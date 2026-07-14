@@ -1,63 +1,94 @@
 ## Objetivo
 
-Fazer com que cada profissional/agenda tenha sua **própria sequência de fichas** (001, 002, 003…) por dia, **independente** de qual filtro está ativo, de qual query o `load()` executou por último, ou de quantas linhas o servidor devolveu. O laboratório deve ver 001–023 sempre — nunca 024, 039, 058…
+Deixar o **Histórico do agendamento** (modal aberto pelo ícone de escudo na agenda) claro sobre **quem fez o quê**, em vez de mostrar "Alterou / Registro criado" com nomes de coluna crus. Todas as ações da linha do tempo devem descrever a operação em linguagem de recepção.
 
-## Diagnóstico (o que está errado hoje)
+## Escopo (o que muda)
 
-Arquivo: `src/routes/_authenticated/app.agenda.tsx`, bloco `fichaPorId` (linhas 2017-2040).
+Um único arquivo: `src/routes/_authenticated/app.agenda.tsx`, dentro do modal `Histórico` (linhas 4895-5010) e da função `abrirAuditoria` (linhas 1081-1124). Não mexo em banco, RLS, triggers nem em outros modais nesta rodada.
 
-1. A ficha exibida **não vem do banco** — é recalculada posicionalmente no cliente com base em `items`.
-2. `items` depende do `load()`, que **empurra o filtro de médico para o servidor** (linha 1204-1206). Isso muda o conjunto de agendamentos usado como base da contagem entre um reload e outro.
-3. O comentário atual diz "fila única global por dia da clínica", mas a implementação real produz "fila local do médico" quando o filtro está ativo — daí as duas fotos incompatíveis.
+## 1. Ações compostas legíveis a partir do `audit_log`
 
-## Regra correta (confirmada pelo usuário)
+Hoje: UPDATE de agendamento imprime `observacoes: SLOT GERADO... → SLOT GERADO...`, `paciente_id: — → uuid`, `paciente_nome: DISPONÍVEL → NOME`. O usuário vê "Alterou" sem entender o que aconteceu.
 
-**Foto 1 é o comportamento esperado.** Cada profissional (ou recurso de enfermagem) tem sua própria sequência começando em 001 dentro do dia. O filtro visual do usuário **não deve alterar** os números — mudar o filtro só esconde/mostra linhas.
+Passa a **classificar** cada linha do audit em uma dessas ações, com rótulo e descrição amigáveis:
 
-## O que vou alterar
+| Diferença detectada em `dados_antes` → `dados_depois` | Rótulo exibido |
+| --- | --- |
+| `paciente_nome`: DISPONÍVEL → nome (e `paciente_id`: null → uuid) | **Agendou o paciente** — mostra nome |
+| `paciente_nome`: nome → DISPONÍVEL (e `paciente_id`: uuid → null) | **Liberou o horário** — mostra paciente removido |
+| `inicio`/`fim` mudou com paciente alocado | **Reagendou** — mostra "de X para Y" |
+| `fluxo_etapa` → `aguardando_atendimento` (ou nome usado no banco) | **Fez check-in** |
+| `fluxo_etapa` → `em_atendimento` | **Iniciou o atendimento** |
+| `status` → `confirmado` | **Confirmou o agendamento** |
+| `status` → `realizado` | **Marcou como realizado** |
+| `status` → `cancelado` | **Cancelou o agendamento** |
+| `data_pagamento`: null → data | **Registrou o pagamento** |
+| `observacoes` (mudança pura de texto, sem outros campos relevantes) | **Alterou observação** — antes/depois |
+| Qualquer outro UPDATE residual | Cai no formato genérico atual, mas com **rótulos amigáveis** por coluna (Paciente, Profissional, Horário, Status, Observações, Etapa do fluxo). Nunca mais mostra `paciente_id` (redundante com `paciente_nome`), `agenda_id`, `token_publico`, `atendimento_grupo_id`, `fluxo_atualizado_em`. |
 
-Um único bloco em `src/routes/_authenticated/app.agenda.tsx`:
+Para o **INSERT do agendamento**:
+- Se `paciente_nome` inicial é "DISPONÍVEL" (ou null) → **"Gerou o slot da agenda"**. Isso resolve o caso do Luan.
+- Se já vem com paciente → **"Agendou o paciente"** direto.
 
-**Substituir a lógica de `fichaPorId` (linhas 2017-2040)** para numerar por chave composta `(dia, medico_id)`:
+Para o **INSERT de `fin_lancamentos`** (já implementado): mantém "Pagamento registrado — repasse pendente/pago".
 
-```text
-- ordenar TODOS os items por (inicio, paciente_nome)
-- para cada linha:
-    chave = dia (YYYY-MM-DD) + medico_id
-    contador[chave] += 1
-    fichaPorId[a.id] = padStart(contador[chave], 3, "0")
+Valores de status/etapa também são traduzidos em português quando aparecem crus (`aguardando_recepcao` → "Aguardando recepção" etc.).
+
+## 2. Estorno entra no histórico
+
+Hoje: se Amanda solicitou e Jean aprovou o estorno, isso não aparece no histórico do agendamento — só o `UPDATE` no lançamento. Precisamos mostrar duas linhas específicas.
+
+Em `abrirAuditoria` acrescento uma terceira consulta:
+
+```
+supabase.from("estorno_solicitacoes")
+  .select("id, status, motivo, resposta, solicitado_por, solicitado_em, resolvido_por, resolvido_em")
+  .or(`agendamento_id.eq.${a.id},lancamento_id.in.(${lancIds.join(",")})`)
 ```
 
-Assim:
-- LABORATORIO no dia 14/07 sempre vai de 001 a 023, independente de qual filtro esteja aplicado.
-- Cada médico tem sua própria sequência 001, 002, 003… no mesmo dia.
-- Recursos de enfermagem (que já são mapeados como "médicos virtuais" na linha 1268) participam da mesma regra automaticamente.
-- Slots sem médico atribuído (raros) ficam agrupados numa sequência à parte por dia, o que preserva o comportamento antigo desses casos-limite.
+Cada solicitação vira **até duas entradas** na timeline:
 
-Também atualizo o **comentário** do bloco para refletir a regra correta ("sequência por profissional dentro do dia"), removendo o texto atual que diz o oposto.
+- `Solicitou estorno` — em `solicitado_em`, autor = nome de `solicitado_por`, corpo mostra o motivo digitado.
+- `Aprovou estorno` / `Rejeitou estorno` / `Cancelou estorno` — em `resolvido_em`, autor = nome de `resolvido_por`, corpo mostra a resposta (quando houver).
 
-## O que **não** vou mexer
+Assim o caso do print fica: linha "Amanda — Solicitou estorno" seguida de "Jean — Aprovou estorno".
 
-- Não vou tocar em `load()`, nem retirar o filtro do servidor. Ele continua útil para performance.
-- Não vou usar a coluna `ficha_numero` do banco nesta rodada — ela está sendo carregada mas nunca foi usada como fonte de verdade, e não sei se ela é preenchida de forma consistente em todos os pontos de criação (múltiplo, orçamento, reagendamento). Auditar isso é outro trabalho.
-- Não vou mudar impressão de comprovante, senha, chamada, prontuário nem lançamentos financeiros — tudo isso já usa `id` do agendamento, não o número exibido.
-- Não vou alterar permissões, RLS, nem regras de repasse/estorno.
+## 3. Resolver nomes por uuid, não só por email
 
-## Impacto e riscos
+Hoje só resolve email → nome via `equipeList` (funcionários + médicos). O estorno guarda `uuid`, não email. Amplio o mapa:
 
-- **Impacto positivo:** número da ficha estável entre reloads, filtros e usuários.
-- **Risco baixo:** a mudança é isolada a um `useMemo` de UI. Cai fora de qualquer fluxo transacional.
-- **Ponto de atenção:** quem já estava acostumado com o comportamento "salpicado" da foto 2 vai ver os números baixarem. Nada quebra — só fica mais previsível.
+- Além do `nomePorEmail` atual, monto `nomePorUserId` a partir de `equipeList` (já traz `id`/`user_id` de médicos e funcionários) e, se faltar, faço uma consulta única em `profiles` pelos uuids que aparecerem em estornos.
+- Fallback: quando não achar, exibe "Usuário (…últimos 6 chars do uuid)" em vez do uuid inteiro.
+
+Também aproveito para exibir na coluna "Quem" o **cargo** entre parênteses quando conhecido (médico / funcionário), como o modal `historico-atendimento-dialog.tsx` já faz — assim fica óbvio se foi médico ou recepção que deu baixa.
+
+## 4. Coluna "Alterou / Criou" vira ação semântica
+
+Hoje o badge diz apenas "Alterou" (amarelo) ou "Criou" (verde). Passo a exibir o rótulo da ação detectada acima (ex.: **Check-in**, **Pagamento**, **Reagendou**, **Estorno solicitado**, **Estorno aprovado**), mantendo cores:
+
+- verde: criações, pagamento, check-in, atendimento realizado, estorno aprovado
+- âmbar: alterações neutras, reagendou, alterou observação
+- rosa: cancelamento, liberação, estorno rejeitado
+- azul: notas manuais (já existente)
+- roxo: estorno solicitado, para diferenciar do aprovado
+
+## Fora de escopo
+
+- Não crio nova coluna no banco nem novos triggers de audit.
+- Não altero o modal `historico-atendimento-dialog.tsx` (aba Financeiro > Atendimentos) — se você quiser esse mesmo nível de detalhe lá, é próxima rodada.
+- Não altero permissões/RLS.
+
+## Riscos e mitigação
+
+- **Risco:** algum UPDATE do agendamento pode conter combinação inesperada de campos e cair na regra genérica. **Mitigação:** o fallback continua funcionando (mostra colunas com rótulos amigáveis), então nunca fica pior do que hoje.
+- **Risco:** nomes de valores do `fluxo_etapa`/`status` no banco não baterem com o que assumi. **Mitigação:** vou olhar em runtime via `psql` antes de codificar o mapa para não inventar rótulo errado.
 
 ## Validação
 
 1. Typecheck do arquivo alterado.
-2. Abrir `/app/agenda`, aplicar filtro LABORATORIO no dia 14/07/26 e conferir que aparece 001–023 sequencial.
-3. Trocar o filtro para outro médico e voltar — os números devem permanecer os mesmos por profissional.
-4. Recarregar a página várias vezes — números não podem mudar.
-5. Tirar o filtro (TODOS) — cada linha continua com o número do seu próprio profissional (várias linhas com 001 é esperado, uma por médico).
-
-## Fora de escopo (para outra rodada, se quiser)
-
-- Auditar se a coluna `ficha_numero` no banco reflete a mesma regra em todos os pontos de criação e, se sim, passar a exibir dela direto. Isso elimina qualquer chance de dois usuários verem números diferentes.
-- Revisar impressão de comprovante/senha para incluir o nome do profissional junto do número, já que 001 passa a existir uma vez por médico.
+2. Abrir o mesmo agendamento do print (SIMONE SUELY, 14/07 13:50) e conferir:
+   - Linha do Luan aparece como "Gerou o slot da agenda", não "Registro criado".
+   - Linhas de Amanda/Jean sobre o estorno aparecem como "Solicitou estorno" / "Aprovou estorno" com os nomes certos.
+   - As duas linhas "Alterou" com `paciente_id`/`paciente_nome`/`observacoes` colapsam em uma única "Agendou o paciente SIMONE SUELY" (ou "Reagendou de … para …") — sem coluna `paciente_id` crua na tela.
+3. Abrir um agendamento com pagamento realizado e conferir que aparece "Registrou o pagamento" com o nome de quem deu baixa.
+4. Abrir um agendamento com check-in e conferir "Fez check-in" com o nome da recepção.
