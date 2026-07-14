@@ -1986,7 +1986,13 @@ function AgendaPage() {
     // isso fazia a numeração "reiniciar" por profissional e repetir 001 várias
     // vezes na lista geral (uma vez por profissional).
     const contadores = new Map<string, number>();
-    const ordenados = [...items].sort((a, b) => a.inicio.localeCompare(b.inicio));
+    const ordenados = [...items].sort((a, b) => {
+      const t = a.inicio.localeCompare(b.inicio);
+      if (t !== 0) return t;
+      // Mesmo horário: desempata em ordem alfabética do paciente (pt-BR,
+      // acento-insensível) para a numeração da fila ficar crescente e estável.
+      return (a.paciente_nome ?? "").localeCompare(b.paciente_nome ?? "", "pt-BR", { sensitivity: "base" });
+    });
     ordenados.forEach((a) => {
       const dia = a.inicio.slice(0, 10);
       const n = (contadores.get(dia) ?? 0) + 1;
@@ -2045,7 +2051,11 @@ function AgendaPage() {
 
   const totalPages = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE));
   const filtradosOrdenados = useMemo(
-    () => [...filtrados].sort((a, b) => a.inicio.localeCompare(b.inicio)),
+    () => [...filtrados].sort((a, b) => {
+      const t = a.inicio.localeCompare(b.inicio);
+      if (t !== 0) return t;
+      return (a.paciente_nome ?? "").localeCompare(b.paciente_nome ?? "", "pt-BR", { sensitivity: "base" });
+    }),
     [filtrados]
   );
   const paginados = filtradosOrdenados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
