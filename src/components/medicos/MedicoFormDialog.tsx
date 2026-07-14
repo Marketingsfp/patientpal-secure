@@ -606,6 +606,18 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         return;
       }
     }
+    // Salvaguarda: se o médico já tinha procedimentos cadastrados no banco
+    // e o formulário está prestes a salvar com a lista vazia, pede
+    // confirmação explícita antes de apagar todos os vínculos. Evita perda
+    // acidental por bug de exibição na aba Procedimentos.
+    const procedimentosPreenchidos = form.procedimentos.filter((x) => !!x).length;
+    const totalAnterior = initialProcedimentosCountRef.current;
+    if (editId && totalAnterior > 0 && procedimentosPreenchidos === 0) {
+      const ok = window.confirm(
+        `Este médico tem ${totalAnterior} procedimento(s) cadastrado(s), mas a lista está vazia neste formulário.\n\nSe você salvar agora, TODOS os procedimentos vinculados serão apagados.\n\nDeseja continuar mesmo assim?`,
+      );
+      if (!ok) return;
+    }
     setSaving(true);
     const nomeLimpo = limparPrefixoMedico(form.nome);
     const payload = {
