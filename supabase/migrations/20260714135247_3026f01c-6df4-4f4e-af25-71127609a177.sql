@@ -52,7 +52,7 @@ begin
       inicio = _inicio,
       fim = _fim,
       procedimento = _procedimento,
-      status = _status,
+      status = _status::agendamento_status,
       observacoes = _observacoes,
       data_pagamento = _data_pagamento,
       orcamento_id = _orcamento_id,
@@ -75,7 +75,7 @@ begin
       orcamento_id, tipo_atendimento, forma_pagamento_prevista, especialidade_id
     ) values (
       _clinica_id, _paciente_id, _paciente_nome, _medico_id, _enfermagem_recurso_id,
-      _inicio, _fim, _procedimento, _status, _observacoes, _data_pagamento,
+      _inicio, _fim, _procedimento, _status::agendamento_status, _observacoes, _data_pagamento,
       _orcamento_id, _tipo_atendimento, _forma_pagamento_prevista, _especialidade_id
     ) returning id into v_id;
   end if;
@@ -148,7 +148,7 @@ begin
       inicio = _inicio,
       fim = _fim,
       procedimento = _procedimentos[1],
-      status = _status,
+      status = _status::agendamento_status,
       observacoes = _observacoes,
       data_pagamento = _data_pagamento,
       orcamento_id = _orcamento_id,
@@ -173,7 +173,7 @@ begin
       atendimento_grupo_id
     ) values (
       _clinica_id, _paciente_id, _paciente_nome, _medico_id, _enfermagem_recurso_id,
-      _inicio, _fim, _procedimentos[1], _status, _observacoes, _data_pagamento,
+      _inicio, _fim, _procedimentos[1], _status::agendamento_status, _observacoes, _data_pagamento,
       _orcamento_id, _tipo_atendimento, _forma_pagamento_prevista, _especialidade_id,
       _grupo_id
     ) returning id into v_principal_id;
@@ -188,7 +188,7 @@ begin
         atendimento_grupo_id
       ) values (
         _clinica_id, _paciente_id, _paciente_nome, _medico_id, _enfermagem_recurso_id,
-        _inicio, _fim, _procedimentos[i], _status, _observacoes, _data_pagamento,
+        _inicio, _fim, _procedimentos[i], _status::agendamento_status, _observacoes, _data_pagamento,
         _orcamento_id, _tipo_atendimento, _forma_pagamento_prevista, _especialidade_id,
         _grupo_id
       ) returning id into v_new_id;
