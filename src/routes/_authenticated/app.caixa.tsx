@@ -536,6 +536,106 @@ function Page() {
     const aberta = abertaRes.data;
     setMinhaSessao((aberta ?? null) as Sessao | null);
 
+    // Enriquecimento compartilhado entre os dois ramos (com/sem sessão
+    // aberta). Puxa serviço, médico E paciente a partir de
+    // fin_lancamentos, para que a lista de Movimentos exiba o paciente
+    // vinculado mesmo quando a descrição do movimento não trouxer o nome.
+    const enrichMovsList = async (
+      movsList: Mov[],
+    ): Promise<{
+      enrich: Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null }>;
+      cancelados: Set<string>;
+    }> => {
+      const enrich = new Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null }>();
+      const cancelados = new Set<string>();
+      const lancIds = Array.from(new Set(movsList.map((m) => m.lancamento_id).filter((x): x is string => !!x)));
+      if (lancIds.length === 0) return { enrich, cancelados };
+      const { data: lancs } = await supabase
+        .from("fin_lancamentos")
+        .select("id, medico_id, agendamento_id, paciente_id, descricao, status")
+        .in("id", lancIds);
+      const lancRows = (lancs ?? []) as Array<{ id: string; medico_id: string | null; agendamento_id: string | null; paciente_id: string | null; descricao: string | null; status: string | null }>;
+      for (const l of lancRows) {
+        if (l.status === "cancelado") cancelados.add(l.id);
+      }
+      const medIds = Array.from(new Set(lancRows.map((l) => l.medico_id).filter((x): x is string => !!x)));
+      const agIds = Array.from(new Set(lancRows.map((l) => l.agendamento_id).filter((x): x is string => !!x)));
+      const pacIds = Array.from(new Set(lancRows.map((l) => l.paciente_id).filter((x): x is string => !!x)));
+      const [medRes, agRes, pacRes] = await Promise.all([
+        medIds.length > 0
+          ? supabase.from("medicos").select("id, nome").in("id", medIds)
+          : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
+        agIds.length > 0
+          ? supabase.from("agendamentos").select("id, procedimento_id, paciente_id").in("id", agIds)
+          : Promise.resolve({ data: [] as Array<{ id: string; procedimento_id: string | null; paciente_id: string | null }> }),
+        pacIds.length > 0
+          ? supabase.from("pacientes").select("id, nome").in("id", pacIds)
+          : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
+      ]);
+      const medMap = new Map<string, string>();
+      for (const m of (medRes.data ?? []) as Array<{ id: string; nome: string | null }>) {
+        if (m.nome) medMap.set(m.id, m.nome);
+      }
+      const agMap = new Map<string, { procedimento_id: string | null; paciente_id: string | null }>();
+      const procIds = new Set<string>();
+      const pacIdsExtra = new Set<string>();
+      for (const a of (agRes.data ?? []) as Array<{ id: string; procedimento_id: string | null; paciente_id: string | null }>) {
+        agMap.set(a.id, { procedimento_id: a.procedimento_id, paciente_id: a.paciente_id });
+        if (a.procedimento_id) procIds.add(a.procedimento_id);
+        // Paciente pelo agendamento cobre casos em que fin_lancamentos
+        // não tem paciente_id (ex.: mensalidades ou lançamentos gerados
+        // por caminhos antigos).
+        if (a.paciente_id && !pacIds.includes(a.paciente_id)) pacIdsExtra.add(a.paciente_id);
+      }
+      const pacMap = new Map<string, string>();
+      for (const p of (pacRes.data ?? []) as Array<{ id: string; nome: string | null }>) {
+        if (p.nome) pacMap.set(p.id, p.nome);
+      }
+      if (pacIdsExtra.size > 0) {
+        const { data: pacsExtra } = await supabase
+          .from("pacientes")
+          .select("id, nome")
+          .in("id", Array.from(pacIdsExtra));
+        for (const p of (pacsExtra ?? []) as Array<{ id: string; nome: string | null }>) {
+          if (p.nome) pacMap.set(p.id, p.nome);
+        }
+      }
+      const procMap = new Map<string, string>();
+      if (procIds.size > 0) {
+        const { data: procs } = await supabase
+          .from("procedimentos")
+          .select("id, nome")
+          .in("id", Array.from(procIds));
+        for (const p of (procs ?? []) as Array<{ id: string; nome: string | null }>) {
+          if (p.nome) procMap.set(p.id, p.nome);
+        }
+      }
+      for (const l of lancRows) {
+        const agInfo = l.agendamento_id ? agMap.get(l.agendamento_id) : undefined;
+        const procId = agInfo?.procedimento_id ?? null;
+        const servicoFromProc = procId ? procMap.get(procId) ?? null : null;
+        // fallback: extrai serviço da descrição do lançamento
+        let servico = servicoFromProc;
+        if (!servico && l.descricao) {
+          const desc = l.descricao;
+          const idx = Math.max(desc.lastIndexOf(" — "), desc.lastIndexOf(" · "));
+          if (idx > 0) servico = desc.slice(idx + 3).replace(/\s*\(.*\)\s*$/, "").trim() || null;
+        }
+        // Paciente: prioriza fin_lancamentos.paciente_id; fallback via
+        // agendamento.paciente_id; se nada disso existir, fica null e a
+        // linha usará pacienteFromDescricao() no render.
+        const pacIdEfetivo = l.paciente_id ?? agInfo?.paciente_id ?? null;
+        const pacienteNome = pacIdEfetivo ? pacMap.get(pacIdEfetivo) ?? null : null;
+        enrich.set(l.id, {
+          servico,
+          medico: l.medico_id ? medMap.get(l.medico_id) ?? null : null,
+          paciente: pacienteNome,
+          paciente_id: pacIdEfetivo,
+        });
+      }
+      return { enrich, cancelados };
+    };
+
     if (aberta) {
       const { data: movs } = await supabase
         .from("caixa_movimentos")
@@ -544,86 +644,29 @@ function Page() {
         .order("created_at", { ascending: true });
       const movsList = (movs ?? []) as Mov[];
       setMinhasMovs(movsList);
-      // Enriquecer com nome do serviço e médico
-      const lancIds = Array.from(new Set(movsList.map((m) => m.lancamento_id).filter((x): x is string => !!x)));
-      const enrich = new Map<string, { servico: string | null; medico: string | null }>();
-      const cancelados = new Set<string>();
-      if (lancIds.length > 0) {
-        const { data: lancs } = await supabase
-          .from("fin_lancamentos")
-          .select("id, medico_id, agendamento_id, descricao, status")
-          .in("id", lancIds);
-        const lancRows = (lancs ?? []) as Array<{ id: string; medico_id: string | null; agendamento_id: string | null; descricao: string | null; status: string | null }>;
-        for (const l of lancRows) {
-          if (l.status === "cancelado") cancelados.add(l.id);
-        }
-        const medIds = Array.from(new Set(lancRows.map((l) => l.medico_id).filter((x): x is string => !!x)));
-        const agIds = Array.from(new Set(lancRows.map((l) => l.agendamento_id).filter((x): x is string => !!x)));
-        const [medRes, agRes] = await Promise.all([
-          medIds.length > 0
-            ? supabase.from("medicos").select("id, nome").in("id", medIds)
-            : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
-          agIds.length > 0
-            ? supabase.from("agendamentos").select("id, procedimento_id").in("id", agIds)
-            : Promise.resolve({ data: [] as Array<{ id: string; procedimento_id: string | null }> }),
-        ]);
-        const medMap = new Map<string, string>();
-        for (const m of (medRes.data ?? []) as Array<{ id: string; nome: string | null }>) {
-          if (m.nome) medMap.set(m.id, m.nome);
-        }
-        const agMap = new Map<string, string | null>();
-        const procIds = new Set<string>();
-        for (const a of (agRes.data ?? []) as Array<{ id: string; procedimento_id: string | null }>) {
-          agMap.set(a.id, a.procedimento_id);
-          if (a.procedimento_id) procIds.add(a.procedimento_id);
-        }
-        const procMap = new Map<string, string>();
-        if (procIds.size > 0) {
-          const { data: procs } = await supabase
-            .from("procedimentos")
-            .select("id, nome")
-            .in("id", Array.from(procIds));
-          for (const p of (procs ?? []) as Array<{ id: string; nome: string | null }>) {
-            if (p.nome) procMap.set(p.id, p.nome);
-          }
-        }
-        for (const l of lancRows) {
-          const procId = l.agendamento_id ? agMap.get(l.agendamento_id) ?? null : null;
-          const servicoFromProc = procId ? procMap.get(procId) ?? null : null;
-          // fallback: extrai serviço da descrição do lançamento após " — " ou " · "
-          let servico = servicoFromProc;
-          if (!servico && l.descricao) {
-            const desc = l.descricao;
-            const idx = Math.max(desc.lastIndexOf(" — "), desc.lastIndexOf(" · "));
-            if (idx > 0) servico = desc.slice(idx + 3).replace(/\s*\(.*\)\s*$/, "").trim() || null;
-          }
-          enrich.set(l.id, {
-            servico,
-            medico: l.medico_id ? medMap.get(l.medico_id) ?? null : null,
-          });
-        }
-      }
+      const { enrich, cancelados } = await enrichMovsList(movsList);
       setEnrichPorLanc(enrich);
       setLancsCancelados(cancelados);
     } else {
-      // Sem sessão aberta: mostrar movimentos das sessões recentes do próprio usuário
-      // (assim mensalidades pagas numa sessão já encerrada continuam visíveis
-      // em "Meu caixa"). O filtro por período/paciente/médico continua sendo
-      // aplicado no useMemo abaixo.
+      // Sem sessão aberta: mostra movimentos das sessões recentes do
+      // próprio usuário e AINDA ASSIM roda o enriquecimento — sem isso,
+      // as colunas Paciente/Serviço/Médico ficavam vazias e o filtro
+      // por médico não listava opções, mesmo com movimentos visíveis.
       const histSessoes = (histRes.data ?? []) as Sessao[];
       const histIds = histSessoes.map((s) => s.id);
+      let movsList: Mov[] = [];
       if (histIds.length > 0) {
         const { data: movs } = await supabase
           .from("caixa_movimentos")
           .select(MOV_FIELDS)
           .in("sessao_id", histIds)
           .order("created_at", { ascending: false });
-        setMinhasMovs((movs ?? []) as Mov[]);
-      } else {
-        setMinhasMovs([]);
+        movsList = (movs ?? []) as Mov[];
       }
-      setEnrichPorLanc(new Map());
-      setLancsCancelados(new Set());
+      setMinhasMovs(movsList);
+      const { enrich, cancelados } = await enrichMovsList(movsList);
+      setEnrichPorLanc(enrich);
+      setLancsCancelados(cancelados);
     }
 
     setMinhasSessoes((histRes.data ?? []) as Sessao[]);
