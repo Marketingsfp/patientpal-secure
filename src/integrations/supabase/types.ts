@@ -260,6 +260,36 @@ export type Database = {
         }
         Relationships: []
       }
+      agendamento_historico_notas: {
+        Row: {
+          agendamento_id: string
+          clinica_id: string
+          created_at: string
+          id: string
+          texto: string
+          user_email: string | null
+          user_nome: string | null
+        }
+        Insert: {
+          agendamento_id: string
+          clinica_id: string
+          created_at?: string
+          id?: string
+          texto: string
+          user_email?: string | null
+          user_nome?: string | null
+        }
+        Update: {
+          agendamento_id?: string
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          texto?: string
+          user_email?: string | null
+          user_nome?: string | null
+        }
+        Relationships: []
+      }
       agendamento_orcamento_itens: {
         Row: {
           agendamento_id: string

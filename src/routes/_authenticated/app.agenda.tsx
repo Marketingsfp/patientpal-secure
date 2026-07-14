@@ -1058,6 +1058,10 @@ function AgendaPage() {
   const [auditAg, setAuditAg] = useState<Agendamento | null>(null);
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
+  type NotaHist = { id: string; user_email: string | null; user_nome: string | null; texto: string; created_at: string };
+  const [notasHist, setNotasHist] = useState<NotaHist[]>([]);
+  const [notaTexto, setNotaTexto] = useState("");
+  const [savingNota, setSavingNota] = useState(false);
 
   // Visão "Por médico — vários dias" (estilo planilha)
   const [viewMode, setViewMode] = useState<"dia" | "medico">("dia");
@@ -1078,6 +1082,8 @@ function AgendaPage() {
     setAuditAg(a);
     setAuditLoading(true);
     setAuditRows([]);
+    setNotasHist([]);
+    setNotaTexto("");
     void carregarEquipe();
     // 1) histórico do próprio agendamento
     const { data: agAudit, error } = await supabase
@@ -1108,6 +1114,37 @@ function AgendaPage() {
       .sort((x, y) => (x.created_at < y.created_at ? 1 : -1));
     setAuditLoading(false);
     setAuditRows(todos);
+    const { data: nts } = await supabase
+      .from("agendamento_historico_notas" as never)
+      .select("id, user_email, user_nome, texto, created_at")
+      .eq("agendamento_id", a.id)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    setNotasHist(((nts as unknown as NotaHist[]) ?? []));
+  };
+
+  const adicionarNotaHist = async () => {
+    if (!auditAg || !clinicaAtual) return;
+    const txt = notaTexto.trim();
+    if (!txt) return;
+    if (txt.length > 1000) { toast.error("Máximo 1000 caracteres"); return; }
+    setSavingNota(true);
+    const nome = (user?.user_metadata as { nome?: string } | null)?.nome ?? null;
+    const { data, error } = await supabase
+      .from("agendamento_historico_notas" as never)
+      .insert({
+        clinica_id: clinicaAtual.clinica_id,
+        agendamento_id: auditAg.id,
+        user_email: user?.email ?? null,
+        user_nome: nome,
+        texto: txt,
+      } as never)
+      .select("id, user_email, user_nome, texto, created_at")
+      .single();
+    setSavingNota(false);
+    if (error) { mostrarErro(error); return; }
+    setNotasHist((prev) => [data as unknown as NotaHist, ...prev]);
+    setNotaTexto("");
   };
 
   const cadastrarPacienteRapido = async (e: FormEvent) => {
@@ -4843,12 +4880,12 @@ function AgendaPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!auditAg} onOpenChange={(o) => { if (!o) { setAuditAg(null); setAuditRows([]); } }}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+      <Dialog open={!!auditAg} onOpenChange={(o) => { if (!o) { setAuditAg(null); setAuditRows([]); setNotasHist([]); setNotaTexto(""); } }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-primary" />
-              Histórico de alterações
+              Histórico
             </DialogTitle>
             {auditAg && (
               <p className="text-sm text-muted-foreground">
@@ -4856,98 +4893,143 @@ function AgendaPage() {
               </p>
             )}
           </DialogHeader>
+          <div className="space-y-2 border-b pb-3">
+            <Textarea
+              value={notaTexto}
+              onChange={(e) => setNotaTexto(e.target.value.slice(0, 1000))}
+              placeholder="Adicionar uma observação ao histórico deste agendamento…"
+              rows={3}
+              className="resize-none"
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-muted-foreground">{notaTexto.length}/1000</span>
+              <Button
+                size="sm"
+                onClick={adicionarNotaHist}
+                disabled={savingNota || !notaTexto.trim()}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <Plus className="h-4 w-4 mr-1" /> Adicionar
+              </Button>
+            </div>
+          </div>
           <div className="overflow-auto flex-1 -mx-6 px-6">
             {auditLoading ? (
               <p className="text-sm text-muted-foreground py-8 text-center">Carregando...</p>
-            ) : auditRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">
-                Nenhuma alteração registrada para este agendamento.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {(() => {
-                  const nomePorEmail = new Map<string, string>(
-                    equipeList
-                      .filter((m) => m.email && m.nome)
-                      .map((m) => [m.email as string, m.nome as string]),
-                  );
-                  return auditRows.map((r) => {
-                  const acaoLabel: Record<string, string> = { INSERT: "Criou", UPDATE: "Alterou", DELETE: "Excluiu" };
-                  const acaoCor: Record<string, string> = {
-                    INSERT: "bg-emerald-100 text-emerald-700",
-                    UPDATE: "bg-amber-100 text-amber-700",
-                    DELETE: "bg-rose-100 text-rose-700",
-                  };
-                  const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
-                  const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
-                  const isLanc = r.table_name === "fin_lancamentos";
-                  const repasseLabel: Record<string, string> = {
-                    repasse_pago: "Repasse ao médico",
-                    repasse_pago_em: "Data do repasse",
-                    repasse_forma_pagamento: "Forma do repasse",
-                  };
-                  const allowedLanc = new Set(Object.keys(repasseLabel));
-                  const fmtVal = (k: string, v: unknown) => {
-                    if (k === "repasse_pago") return v ? "Pago" : "Pendente";
-                    if (k === "repasse_pago_em" && typeof v === "string" && v) {
-                      return new Date(v + "T00:00:00").toLocaleDateString("pt-BR");
-                    }
-                    return v == null || v === "" ? "—" : String(v);
-                  };
-                  const chaves = Array.from(new Set([...Object.keys(antes), ...Object.keys(depois)]))
-                    .filter((k) => !["updated_at", "created_at", "fluxo_atualizado_em"].includes(k))
-                    .filter((k) => (isLanc ? allowedLanc.has(k) : true))
-                    .filter((k) => JSON.stringify(antes[k]) !== JSON.stringify(depois[k]));
-                  const quem = (r.user_email && nomePorEmail.get(r.user_email)) || r.user_email || "—";
-                  // Para lançamentos: ignorar entradas que não envolvem campos de repasse
-                  if (isLanc && r.action === "UPDATE" && chaves.length === 0) return null;
-                  return (
-                    <div key={r.id} className="rounded-md border p-3 bg-card">
-                      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                        <div className="flex items-center gap-2">
-                          <Badge className={acaoCor[r.action] ?? ""}>{acaoLabel[r.action] ?? r.action}</Badge>
-                          <span className="text-xs font-mono text-muted-foreground">
-                            {isLanc ? "pagamento" : r.table_name}
-                          </span>
+            ) : (() => {
+              const nomePorEmail = new Map<string, string>(
+                equipeList.filter((m) => m.email && m.nome).map((m) => [m.email as string, m.nome as string]),
+              );
+              const acaoLabel: Record<string, string> = { INSERT: "Criou", UPDATE: "Alterou", DELETE: "Excluiu" };
+              const acaoCor: Record<string, string> = {
+                INSERT: "bg-emerald-100 text-emerald-700 border-emerald-200",
+                UPDATE: "bg-amber-100 text-amber-700 border-amber-200",
+                DELETE: "bg-rose-100 text-rose-700 border-rose-200",
+                NOTA: "bg-sky-100 text-sky-700 border-sky-200",
+              };
+              const repasseLabel: Record<string, string> = {
+                repasse_pago: "Repasse ao médico",
+                repasse_pago_em: "Data do repasse",
+                repasse_forma_pagamento: "Forma do repasse",
+              };
+              const allowedLanc = new Set(Object.keys(repasseLabel));
+              const fmtVal = (k: string, v: unknown) => {
+                if (k === "repasse_pago") return v ? "Pago" : "Pendente";
+                if (k === "repasse_pago_em" && typeof v === "string" && v) {
+                  return new Date(v + "T00:00:00").toLocaleDateString("pt-BR");
+                }
+                return v == null || v === "" ? "—" : String(v);
+              };
+              type Item = { id: string; when: string; quem: string; kind: "INSERT" | "UPDATE" | "DELETE" | "NOTA"; label: string; body: React.ReactNode };
+              const items: Item[] = [];
+              for (const r of auditRows) {
+                const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
+                const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
+                const isLanc = r.table_name === "fin_lancamentos";
+                const chaves = Array.from(new Set([...Object.keys(antes), ...Object.keys(depois)]))
+                  .filter((k) => !["updated_at", "created_at", "fluxo_atualizado_em"].includes(k))
+                  .filter((k) => (isLanc ? allowedLanc.has(k) : true))
+                  .filter((k) => JSON.stringify(antes[k]) !== JSON.stringify(depois[k]));
+                if (isLanc && r.action === "UPDATE" && chaves.length === 0) continue;
+                const quem = (r.user_email && nomePorEmail.get(r.user_email)) || r.user_email || "—";
+                const kind = (r.action as "INSERT" | "UPDATE" | "DELETE");
+                let body: React.ReactNode = null;
+                if (r.action === "UPDATE" && chaves.length > 0) {
+                  body = (
+                    <div className="space-y-0.5">
+                      {chaves.map((k) => (
+                        <div key={k}>
+                          <span className="font-medium">{isLanc ? (repasseLabel[k] ?? k) : k}:</span>{" "}
+                          <span className="line-through text-rose-600">{fmtVal(k, antes[k])}</span>
+                          {" → "}
+                          <span className="text-emerald-700">{fmtVal(k, depois[k])}</span>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(r.created_at).toLocaleString("pt-BR")} · {quem}
-                        </div>
-                      </div>
-                      {r.action === "UPDATE" && chaves.length > 0 && (
-                        <div className="text-xs space-y-1">
-                          {chaves.map((k) => (
-                            <div key={k} className="grid grid-cols-[120px_1fr] gap-2">
-                              <span className="font-medium text-muted-foreground">
-                                {isLanc ? (repasseLabel[k] ?? k) : k}:
-                              </span>
-                              <span>
-                                <span className="line-through text-rose-600">{fmtVal(k, antes[k])}</span>
-                                {" → "}
-                                <span className="text-emerald-700">{fmtVal(k, depois[k])}</span>
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {r.action === "INSERT" && (
-                        <p className="text-xs text-muted-foreground">
-                          {isLanc
-                            ? `Pagamento da consulta registrado${depois.repasse_pago ? " — repasse já pago" : " — repasse pendente"}.`
-                            : "Registro criado."}
-                        </p>
-                      )}
-                      {r.action === "DELETE" && (
-                        <p className="text-xs text-muted-foreground">
-                          {isLanc ? "Pagamento removido." : "Registro excluído."}
-                        </p>
-                      )}
+                      ))}
                     </div>
                   );
-                  });
-                })()}
-              </div>
-            )}
+                } else if (r.action === "INSERT") {
+                  body = isLanc
+                    ? `Pagamento da consulta registrado${depois.repasse_pago ? " — repasse já pago" : " — repasse pendente"}.`
+                    : "Registro criado.";
+                } else if (r.action === "DELETE") {
+                  body = isLanc ? "Pagamento removido." : "Registro excluído.";
+                }
+                items.push({
+                  id: r.id,
+                  when: r.created_at,
+                  quem,
+                  kind,
+                  label: acaoLabel[r.action] ?? r.action,
+                  body,
+                });
+              }
+              for (const n of notasHist) {
+                const quem = n.user_nome || (n.user_email && nomePorEmail.get(n.user_email)) || n.user_email || "—";
+                items.push({
+                  id: `nota-${n.id}`,
+                  when: n.created_at,
+                  quem,
+                  kind: "NOTA",
+                  label: "Nota",
+                  body: <span className="whitespace-pre-wrap">{n.texto}</span>,
+                });
+              }
+              items.sort((x, y) => (x.when < y.when ? 1 : -1));
+              if (items.length === 0) {
+                return (
+                  <p className="text-sm text-muted-foreground py-8 text-center">
+                    Nenhum registro para este agendamento.
+                  </p>
+                );
+              }
+              return (
+                <Table>
+                  <TableHeader className="sticky top-0 bg-muted/60 backdrop-blur">
+                    <TableRow>
+                      <TableHead className="w-[140px]">Data</TableHead>
+                      <TableHead className="w-[180px]">Usuário</TableHead>
+                      <TableHead>Histórico</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((it) => (
+                      <TableRow key={it.id} className="align-top">
+                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground align-top">
+                          {new Date(it.when).toLocaleString("pt-BR")}
+                        </TableCell>
+                        <TableCell className="text-xs align-top">{it.quem}</TableCell>
+                        <TableCell className="text-xs align-top">
+                          <div className="flex items-start gap-2">
+                            <Badge variant="outline" className={`${acaoCor[it.kind]} shrink-0`}>{it.label}</Badge>
+                            <div className="flex-1">{it.body}</div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              );
+            })()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setAuditAg(null); setAuditRows([]); }}>Fechar</Button>
