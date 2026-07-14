@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   Plus,
   Pencil,
@@ -304,6 +304,137 @@ export function AtendimentosPage() {
   const [comprovante, setComprovante] = useState<Comprovante>(null);
   const [comprovantes, setComprovantes] = useState<NonNullable<Comprovante>[]>([]);
   const [comprovanteOpen, setComprovanteOpen] = useState(false);
+  const printAreaRef = useRef<HTMLDivElement | null>(null);
+  const imprimirComprovante = (somenteResumo = false) => {
+    const source = printAreaRef.current;
+    if (!source) {
+      toast.error("Comprovante não encontrado para impressão.");
+      return;
+    }
+
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    Object.assign(iframe.style, {
+      position: "fixed",
+      right: "0",
+      bottom: "0",
+      width: "0",
+      height: "0",
+      border: "0",
+      visibility: "hidden",
+    });
+
+    document.body.appendChild(iframe);
+    const printWindow = iframe.contentWindow;
+    const printDocument = printWindow?.document;
+    if (!printWindow || !printDocument) {
+      iframe.remove();
+      toast.error("Não foi possível preparar a impressão.");
+      return;
+    }
+
+    const cleanup = () => {
+      setTimeout(() => iframe.remove(), 500);
+      printWindow.removeEventListener("afterprint", cleanup);
+    };
+
+    printDocument.open();
+    printDocument.write(`<!doctype html>
+      <html lang="pt-BR">
+        <head>
+          <meta charset="utf-8" />
+          <title>Comprovante de repasse médico</title>
+          <style>
+            @page { size: A4 portrait; margin: 9mm; }
+            html, body { margin: 0; padding: 0; background: #fff; color: #111; }
+            body { font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt; line-height: 1.28; }
+            * { box-sizing: border-box; }
+            .print-shell { width: 100%; max-width: 192mm; margin: 0 auto; }
+            .print-area { width: 100%; max-width: 100%; overflow: visible; background: #fff; color: #111; }
+            .comprovante-bloco { width: 100%; break-after: page; page-break-after: always; }
+            .comprovante-bloco:last-child { break-after: auto; page-break-after: auto; }
+            .flex { display: flex; }
+            .grid { display: grid; }
+            .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .items-start { align-items: flex-start; }
+            .justify-between { justify-content: space-between; }
+            .gap-8 { gap: 12mm; }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .uppercase { text-transform: uppercase; }
+            .font-semibold { font-weight: 600; }
+            .font-extrabold { font-weight: 800; }
+            .text-xs { font-size: 8pt; }
+            .text-sm { font-size: 9.5pt; }
+            .text-base { font-size: 10pt; }
+            .text-lg { font-size: 12pt; }
+            .text-xl { font-size: 13pt; }
+            .tracking-wide { letter-spacing: 0; }
+            .opacity-80 { opacity: .8; }
+            .border, .border-b, .border-t, .border-2, .border-t-4 { border-color: #d4d4d4; }
+            .border { border: 1px solid #d4d4d4; }
+            .border-b { border-bottom: 1px solid #d4d4d4; }
+            .border-t { border-top: 1px solid #d4d4d4; }
+            .border-2 { border: 2px solid #be123c; }
+            .border-t-4 { border-top: 2px dashed #94a3b8; }
+            .rounded-md { border-radius: 4px; }
+            .p-2 { padding: 1.6mm; }
+            .p-3 { padding: 2.4mm; }
+            .pt-1 { padding-top: 1mm; }
+            .pt-4 { padding-top: 3mm; }
+            .pt-8 { padding-top: 4mm; }
+            .pb-3 { padding-bottom: 2.4mm; }
+            .mb-3 { margin-bottom: 2.4mm; }
+            .mt-0\.5 { margin-top: .5mm; }
+            .mt-1 { margin-top: 1mm; }
+            .mt-8 { margin-top: 4mm; }
+            .mt-10 { margin-top: 10mm; }
+            .ml-1 { margin-left: 1mm; }
+            .bg-rose-100 { background: #ffe4e6; }
+            .text-rose-900 { color: #881337; }
+            .text-muted-foreground { color: #555; }
+            .text-primary { color: #111; }
+            .comprovante-resumo {
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              column-gap: 8mm;
+              row-gap: 1.4mm;
+              border: 1px solid #d4d4d4;
+              border-radius: 4px;
+              padding: 2.4mm;
+              margin-bottom: 2.5mm;
+            }
+            table { width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8.2pt; }
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+            tr { break-inside: avoid; page-break-inside: avoid; }
+            th, td { padding: 1.4mm 1.2mm; border-bottom: 1px solid #d7d7d7; vertical-align: top; overflow-wrap: anywhere; word-break: normal; }
+            th { text-align: left; font-weight: 700; background: #f4f4f5; }
+            th:nth-child(1), td:nth-child(1) { width: 18mm; white-space: nowrap; }
+            th:nth-child(2), td:nth-child(2) { width: 31mm; white-space: nowrap; }
+            th:nth-child(3), td:nth-child(3) { width: 32mm; }
+            th:nth-child(4), td:nth-child(4) { width: 38mm; }
+            th:nth-child(5), td:nth-child(5) { width: auto; }
+            th:nth-child(6), td:nth-child(6) { width: 24mm; text-align: right; white-space: nowrap; }
+            body.print-resumo-only .print-area .comprovante-bloco > *:not(.comprovante-resumo) { display: none !important; }
+            body.print-resumo-only .print-area .comprovante-resumo { margin-top: 0 !important; }
+          </style>
+        </head>
+        <body class="${somenteResumo ? "print-resumo-only" : ""}">
+          <main class="print-shell">
+            <div class="print-area">${source.innerHTML}</div>
+          </main>
+        </body>
+      </html>`);
+    printDocument.close();
+
+    printWindow.addEventListener("afterprint", cleanup);
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+      setTimeout(cleanup, 60000);
+    }, 100);
+  };
   const buildComprovante = (
     itens: Atend[],
     meta: { data: string; forma_pagamento: string; conta_id: string; pago_at?: string | null; reimpressao?: boolean },
@@ -2839,7 +2970,7 @@ export function AtendimentosPage() {
             </DialogTitle>
           </DialogHeader>
           {comprovantes.length > 0 && (
-            <div className="print-area bg-white text-black text-sm max-h-[70vh] overflow-y-auto print:max-h-none print:overflow-visible">
+            <div ref={printAreaRef} className="print-area bg-white text-black text-sm max-h-[70vh] overflow-y-auto print:max-h-none print:overflow-visible">
               {comprovantes.map((comprovante, blocoIdx) => (
                 <div
                   key={blocoIdx}
@@ -2972,78 +3103,16 @@ export function AtendimentosPage() {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => {
-                document.body.classList.add("print-resumo-only");
-                const cleanup = () => {
-                  document.body.classList.remove("print-resumo-only");
-                  window.removeEventListener("afterprint", cleanup);
-                };
-                window.addEventListener("afterprint", cleanup);
-                window.print();
-                setTimeout(cleanup, 60000);
-              }}
+              onClick={() => imprimirComprovante(true)}
             >
               <Printer className="h-4 w-4 mr-2" />
               Imprimir resumo (médico)
             </Button>
-            <Button onClick={() => window.print()}>
+            <Button onClick={() => imprimirComprovante()}>
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
             </Button>
           </DialogFooter>
-          <style>{`
-            @media print {
-              @page { size: A4 portrait; margin: 12mm; }
-              html, body { height: auto !important; overflow: visible !important; background: white !important; margin: 0 !important; padding: 0 !important; }
-              /* Esconde de verdade tudo que não contém o comprovante (sidebar,
-                 listas, overlays do Radix que não são do dialog aberto).
-                 display:none tira do fluxo — a página 1 não fica em branco. */
-              body > *:not(:has(.print-area)) { display: none !important; }
-              /* Achata TODOS os wrappers do Radix Portal / Dialog para que
-                 nenhum ancestral com position:fixed ou transform vire o
-                 "containing block" e desloque o comprovante lateralmente. */
-              body > *:has(.print-area),
-              body > *:has(.print-area) *:not(.print-area):not(.print-area *) {
-                position: static !important;
-                transform: none !important;
-                inset: auto !important;
-                top: auto !important; left: auto !important; right: auto !important; bottom: auto !important;
-                max-height: none !important; height: auto !important;
-                max-width: none !important; width: auto !important;
-                overflow: visible !important;
-                box-shadow: none !important;
-                border: none !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                background: transparent !important;
-                filter: none !important;
-              }
-              /* O comprovante flui normalmente na página, ocupando a largura
-                 útil do @page A4 (as margens já são aplicadas pelo @page). */
-              .print-area { position: static !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; background: white !important; color: black !important; overflow: visible !important; font-size: 10pt; line-height: 1.35; }
-              .no-print { display: none !important; }
-              .comprovante-bloco { break-after: page; page-break-after: always; }
-              .comprovante-bloco:last-child { break-after: auto; page-break-after: auto; }
-              .comprovante-bloco table, .comprovante-bloco thead, .comprovante-bloco tbody, .comprovante-bloco tr, .comprovante-bloco td, .comprovante-bloco th { page-break-inside: auto; break-inside: auto; }
-              .comprovante-bloco tr { page-break-inside: avoid; break-inside: avoid; }
-              .print-area table { font-size: 9.5pt; }
-              .print-area th, .print-area td { padding: 3px 6px !important; }
-              .print-area .comprovante-resumo { padding: 6px 10px !important; margin-bottom: 8px !important; gap: 2px 12px !important; }
-              .print-area .mt-10 { margin-top: 18px !important; }
-              .print-area .mt-8 { margin-top: 10px !important; }
-              .print-area .pt-8 { padding-top: 10px !important; }
-              .print-area .mb-3 { margin-bottom: 6px !important; }
-              .print-area .pb-3 { padding-bottom: 6px !important; }
-            }
-            @media print {
-              body.print-resumo-only .print-area .comprovante-bloco > *:not(.comprovante-resumo) {
-                display: none !important;
-              }
-              body.print-resumo-only .print-area .comprovante-resumo {
-                margin-top: 0 !important;
-              }
-            }
-          `}</style>
         </DialogContent>
       </Dialog>
 
