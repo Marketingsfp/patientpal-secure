@@ -2142,17 +2142,6 @@ export function AtendimentosPage() {
                   Desfazer baixa
                   {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!podeReimprimir}
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    if (podeReimprimir) reimprimirSelecionados();
-                  }}
-                >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Imprimir 2ª via
-                  {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
-                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   disabled={selectedLaudoElegiveis.length === 0 || !podeEscrever}
@@ -2835,17 +2824,6 @@ export function AtendimentosPage() {
                   <Undo2 className="h-4 w-4 mr-2 text-amber-600" />
                   Desfazer baixa
                   {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!podeReimprimir}
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    if (podeReimprimir) reimprimirSelecionados();
-                  }}
-                >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Imprimir 2ª via
-                  {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={selectedLaudoElegiveis.length === 0 || !podeEscrever}
