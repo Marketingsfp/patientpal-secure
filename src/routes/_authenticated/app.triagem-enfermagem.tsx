@@ -184,6 +184,7 @@ function TriagemEnfermagemPage() {
     const { data: ult } = await supabase
       .from("senhas").select("numero")
       .eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("tipo", "N")
+      .ilike("guiche", "Triagem%")
       .order("numero", { ascending: false }).limit(1).maybeSingle();
     const proximoNum = Math.min(9999, (ult?.numero ?? 0) + 1);
     const nomeCurto = g.paciente_nome.split(/\s+/).slice(0, 2).join(" ").toUpperCase().slice(0, 24);
