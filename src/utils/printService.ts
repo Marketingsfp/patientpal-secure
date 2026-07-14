@@ -30,9 +30,6 @@ export async function imprimirDocumentoSilencioso(pdfBase64: string): Promise<vo
   const base64Limpo = pdfBase64.replace(/^data:application\/pdf;base64,/, "").trim();
 
   try {
-    // 0) Configura assinatura/certificado antes de qualquer conexão.
-    configurarSeguranca();
-
     // 1) Garante o websocket ativo antes de qualquer chamada.
     if (!qz.websocket.isActive()) {
       await qz.websocket.connect();
