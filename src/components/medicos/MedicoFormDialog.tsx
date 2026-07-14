@@ -524,6 +524,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         .select("procedimento_id, especialidade_id")
         .eq("medico_id", med.id);
       if (cancelled) return;
+      initialProcedimentosCountRef.current = (mprocs ?? []).length;
       setForm({
         nome: limparPrefixoMedico(med.nome ?? ""),
         crm: med.crm,
