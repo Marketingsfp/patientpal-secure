@@ -4861,7 +4861,7 @@ function AgendaPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!auditAg} onOpenChange={(o) => { if (!o) { setAuditAg(null); setAuditRows([]); } }}>
+      <Dialog open={!!auditAg} onOpenChange={(o) => { if (!o) { setAuditAg(null); setAuditRows([]); setNotasHist([]); setNotaTexto(""); } }}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
