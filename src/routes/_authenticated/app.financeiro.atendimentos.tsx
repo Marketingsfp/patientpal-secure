@@ -59,6 +59,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ComprovantesTab } from "@/components/financeiro/comprovantes-tab";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
   component: AtendimentosPage,
@@ -2031,6 +2033,12 @@ export function AtendimentosPage() {
 
   return (
     <div className="space-y-3">
+      <Tabs defaultValue="atendimentos" className="space-y-3">
+        <TabsList>
+          <TabsTrigger value="atendimentos">Atendimentos</TabsTrigger>
+          <TabsTrigger value="comprovantes">Comprovantes</TabsTrigger>
+        </TabsList>
+        <TabsContent value="atendimentos" className="space-y-3 mt-0">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
