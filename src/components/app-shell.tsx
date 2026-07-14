@@ -81,7 +81,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/atendimento-multiplo", label: "Atendimento Múltiplo", icon: ClipboardList },
     { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
     { to: "/app/caixa", label: "Caixa", icon: Wallet },
-    { to: "/app/financeiro/atendimentos", label: "Repasse médico", icon: HandCoins },
+    { to: "/app/atendimentos", label: "Atendimentos", icon: HandCoins },
     { to: "/app/chat", label: "Chat interno", icon: MessageCircle },
     { to: "/app/clientes", label: "Clientes", icon: Contact },
     { to: "/app/painel", label: "Dashboard", icon: LayoutDashboard },
