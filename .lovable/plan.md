@@ -1,46 +1,41 @@
-## Problema
+Tipo de pedido: erro visual/experiência do usuário no comprovante de repasse médico. Não é regra de negócio nem alteração de dados financeiros.
 
-No comprovante de repasse (impressão e reimpressão), o print sai cortado à esquerda e "empurra" o comprovante para a página 2 com uma folha em branco antes (a foto do preview mostra "2 folhas de papel", conteúdo deslocado e recortado).
+Plano de correção:
 
-## Causa
+1. Trocar a estratégia de impressão atual
+   - Hoje o sistema tenta imprimir o comprovante de dentro do modal usando CSS `@media print`.
+   - Isso é frágil porque o modal usa camadas centralizadas, posição fixa e transformações; no print preview do navegador, isso pode deslocar o conteúdo e cortar a lateral.
+   - Vou parar de depender do layout da tela/modal para imprimir.
 
-Bloco `@media print` atual em `src/routes/_authenticated/app.financeiro.atendimentos.tsx` (linhas ~2994–3035) usa uma estratégia frágil:
+2. Criar impressão isolada do comprovante
+   - Ao clicar em “Imprimir” ou “Imprimir resumo (médico)”, o sistema vai copiar somente o conteúdo do comprovante para uma área/documento de impressão isolado.
+   - Essa impressão terá CSS próprio de A4, sem sidebar, sem fundo da tela, sem modal, sem transformações e sem dependência do restante do aplicativo.
+   - Resultado esperado: todos os dados devem aparecer alinhados dentro da folha, sem corte lateral.
 
-1. Esconde o resto da página com `visibility: hidden`, o que **preserva o layout** — todos os elementos (sidebar, cabeçalho, listas de atendimento) continuam ocupando espaço e empurram o comprovante para baixo, gerando a página 1 em branco.
-2. Neutraliza `position/transform` só no `[role="dialog"]`, mas o Radix envolve o dialog em um Portal com wrappers próprios (`data-radix-*`) que continuam com `position: fixed` / transformações. Como `.print-area` é `position: absolute` com `left: 0`, ela se ancora a um desses ancestrais transformados → deslocamento horizontal → corte à esquerda.
+3. Manter exatamente os mesmos dados
+   - Não vou alterar cálculo de repasse, baixa de pagamento, reimpressão, dados do médico, paciente, serviço, conta ou total.
+   - A mudança será apenas na forma de preparar o conteúdo para impressão.
 
-## Correção proposta (mudança localizada só no CSS de impressão)
+4. Ajustar o layout impresso para caber melhor
+   - Definir largura segura para A4.
+   - Reduzir espaçamentos da tabela na impressão.
+   - Permitir quebra de texto em nomes longos de pacientes, médicos e serviços.
+   - Manter valores e datas sem quebra indevida.
+   - Garantir que múltiplos médicos/comprovantes quebrem em páginas separadas corretamente.
 
-Substituir o bloco `@media print` do diálogo do comprovante por uma abordagem mais robusta, sem tocar em nada da lógica de dados / botões / geração do comprovante:
+5. Remover/neutralizar o CSS de impressão anterior desse modal
+   - O bloco atual de `@media print` será substituído ou reduzido para não interferir.
+   - Isso evita que regras antigas continuem causando deslocamento ou corte.
 
-1. **Esconder de verdade** o restante da página com `display: none` no `body > *` que **não** contém o `.print-area` (usando seletor `:has(.print-area)` — suportado em todos os browsers modernos que os usuários da clínica utilizam para imprimir). Assim, sidebar, listas e demais elementos não ocupam mais espaço e a página 1 deixa de ficar vazia.
-2. **Achatar todos os wrappers** do Radix Portal / Dialog (`[data-radix-portal]`, `[data-radix-dialog-overlay]`, `[role="dialog"]` e seus containers): forçar `position: static`, `transform: none`, `inset: auto`, `max-width: none`, `overflow: visible`. Isso remove o "containing block" transformado que estava deslocando o `.print-area`.
-3. **Colocar o `.print-area` em fluxo estático** (não mais `position: absolute`), ocupando `width: 100%` da área imprimível do `@page A4 portrait; margin: 12mm`. Sem ancoragem absoluta, não há como o conteúdo vazar para a esquerda da folha.
-4. Manter (sem alteração) os ajustes tipográficos existentes: `font-size: 10pt`, paddings da tabela, `break-inside: avoid` nas linhas, quebra de página entre múltiplos médicos, e o modo "Imprimir resumo (médico)".
+6. Validação
+   - Abrir o comprovante de repasse e acionar a impressão.
+   - Verificar que o conteúdo começa dentro da margem esquerda da folha e que a tabela não fica cortada.
+   - Verificar também o botão “Imprimir resumo (médico)”.
 
-## Escopo
+Arquivos afetados:
+- `src/routes/_authenticated/app.financeiro.atendimentos.tsx`
 
-**Dentro do escopo (só o bloco `<style>` do diálogo do comprovante):**
-- Reescrita do `@media print` nas linhas ~2994–3035 de `src/routes/_authenticated/app.financeiro.atendimentos.tsx`.
-
-**Fora do escopo (não será tocado):**
-- Estrutura JSX do comprovante, cálculo de valores, ordem dos itens, layout na tela (fora de impressão).
-- Lógica de reimpressão / 2ª via (o rótulo vermelho continua igual).
-- Outros comprovantes/relatórios do sistema.
-- Regras de negócio, banco, RLS.
-
-## Validação
-
-- Build/typecheck automáticos.
-- Instruções para o usuário testar: abrir um comprovante existente (repasse já pago), clicar "Imprimir" → verificar que o preview do navegador mostra **1 folha A4** com todos os dados (cabeçalho da clínica, resumo médico/data/forma/conta/atendimentos/total, tabela e linhas de assinatura) sem corte lateral.
-- Testar também a 2ª via (reimpressão) a partir do mesmo item.
-- Se o comprovante tiver muitos itens e ocupar >1 página, verificar que as linhas da tabela não são cortadas no meio.
-
-## Riscos
-
-- Baixo. A mudança é puramente CSS `@media print`, escopada ao diálogo do comprovante de repasse. Nenhum dado é alterado.
-- Único ponto de atenção: o seletor `:has()` — suportado em Chrome/Edge/Safari/Firefox atuais (versões usadas em produção clínica). Se algum totem/estação usar browser muito antigo, um fallback pode ser adicionado; me avise se for o caso.
-
-## Confirmação
-
-Posso implementar dessa forma? Ou você prefere que eu também revise os outros comprovantes/relatórios impressos (não faz parte deste pedido, mas se quiser, listo primeiro os que existem)?
+Fora do escopo:
+- Não mexer em banco de dados.
+- Não mexer em regras de pagamento/repasse.
+- Não alterar outros relatórios ou comprovantes fora desta tela.
