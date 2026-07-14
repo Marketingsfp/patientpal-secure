@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Trash2, Plus, CalendarRange, Pencil, ArrowLeft } from "lucide-react";
+import { Trash2, Plus, CalendarRange, Pencil, ArrowLeft, Ban, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,11 +8,14 @@ import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { EnfermagemGerarAgendaCard, EnfermagemRecursosHorariosEditor } from "@/components/enfermagem-horarios-parts";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -67,6 +70,19 @@ function Page() {
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
   const [dispEditando, setDispEditando] = useState<string | null>(null);
   const [editRow, setEditRow] = useState<{ dia_semana: string; hora_inicio: string; hora_fim: string; limite_pacientes: string; intervalo_min: string; vigencia_inicio: string; vigencia_fim: string } | null>(null);
+
+  // MED-07: bloqueio pontual — antes a única forma de tirar um médico de
+  // parte da agenda (ex.: reunião, imprevisto num dia específico) era
+  // editar a disponibilidade RECORRENTE (afeta a semana inteira) ou apagar
+  // os horários já gerados na mão, direto no calendário, sem nenhum
+  // registro de "isso foi bloqueado de propósito" — fácil esquecer de
+  // desfazer depois.
+  const [bloqueioMedico, setBloqueioMedico] = useState<Medico | null>(null);
+  const [bloqueioForm, setBloqueioForm] = useState({ data_inicio: hojeIso, data_fim: hojeIso, hora_inicio: "", hora_fim: "", motivo: "" });
+  const [bloqueando, setBloqueando] = useState(false);
+  const [bloqueiosAtivos, setBloqueiosAtivos] = useState<Array<{ id: string; inicio: string; fim: string; observacoes: string | null }>>([]);
+  const [carregandoBloqueios, setCarregandoBloqueios] = useState(false);
+  const [desfazendoId, setDesfazendoId] = useState<string | null>(null);
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -147,11 +163,58 @@ function Page() {
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [clinicaAtual?.clinica_id]);
 
+  // MED-08: nada impedia cadastrar regras de horário semanal que se
+  // contradizem (ex.: Seg 08:00–12:00 e Seg 10:00–14:00 pro mesmo médico,
+  // ou hora fim antes da hora início) — a agenda gerada a partir daí saía
+  // com horários duplicados/sobrepostos, sem nenhum aviso na hora do
+  // cadastro.
+  const vigenciasSeSobrepoem = (aIni: string | null, aFim: string | null, bIni: string | null, bFim: string | null) => {
+    const aI = aIni ?? "0000-01-01", aF = aFim ?? "9999-12-31";
+    const bI = bIni ?? "0000-01-01", bF = bFim ?? "9999-12-31";
+    return aI <= bF && bI <= aF;
+  };
+  const horariosSeSobrepoem = (aIni: string, aFim: string, bIni: string, bFim: string) => aIni < bFim && bIni < aFim;
+  const encontrarConflito = (
+    candidato: { medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; vigencia_inicio: string | null; vigencia_fim: string | null },
+    ignorarId?: string,
+  ): DispRow | null =>
+    disps.find((d) =>
+      d.id !== ignorarId
+      && d.medico_id === candidato.medico_id
+      && d.dia_semana === candidato.dia_semana
+      && horariosSeSobrepoem(d.hora_inicio, d.hora_fim, candidato.hora_inicio, candidato.hora_fim)
+      && vigenciasSeSobrepoem(d.vigencia_inicio, d.vigencia_fim, candidato.vigencia_inicio, candidato.vigencia_fim),
+    ) ?? null;
+
   const adicionar = async () => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual || !novo.medico_id) { toast.error("Selecione um médico"); return; }
     if (!agendaSel) { toast.error("Selecione uma agenda"); return; }
     if (diasSel.length === 0) { toast.error("Selecione ao menos um dia"); return; }
+    if (novo.hora_fim <= novo.hora_inicio) {
+      toast.error("A hora de término precisa ser depois da hora de início.");
+      return;
+    }
+    if (novo.vigencia_inicio && novo.vigencia_fim && novo.vigencia_fim < novo.vigencia_inicio) {
+      toast.error("A vigência final não pode ser antes da vigência inicial.");
+      return;
+    }
+    for (const dia of diasSel) {
+      const conflito = encontrarConflito({
+        medico_id: novo.medico_id,
+        dia_semana: dia,
+        hora_inicio: novo.hora_inicio,
+        hora_fim: novo.hora_fim,
+        vigencia_inicio: novo.vigencia_inicio || null,
+        vigencia_fim: novo.vigencia_fim || null,
+      });
+      if (conflito) {
+        toast.error(
+          `Já existe uma regra para ${DIAS[dia]} (${conflito.hora_inicio}–${conflito.hora_fim}) que se sobrepõe a esse horário. Ajuste o horário ou remova a regra antiga primeiro.`,
+        );
+        return;
+      }
+    }
     const payload = diasSel.map((dia) => ({
       clinica_id: clinicaAtual.clinica_id,
       medico_id: novo.medico_id,
@@ -173,8 +236,34 @@ function Page() {
   const salvarEdicao = async () => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!dispEditando || !editRow) return;
+    if (editRow.hora_fim <= editRow.hora_inicio) {
+      toast.error("A hora de término precisa ser depois da hora de início.");
+      return;
+    }
+    if (editRow.vigencia_inicio && editRow.vigencia_fim && editRow.vigencia_fim < editRow.vigencia_inicio) {
+      toast.error("A vigência final não pode ser antes da vigência inicial.");
+      return;
+    }
+    const diaNum = parseInt(editRow.dia_semana);
+    const atual = disps.find((d) => d.id === dispEditando);
+    if (atual) {
+      const conflito = encontrarConflito({
+        medico_id: atual.medico_id,
+        dia_semana: diaNum,
+        hora_inicio: editRow.hora_inicio,
+        hora_fim: editRow.hora_fim,
+        vigencia_inicio: editRow.vigencia_inicio || null,
+        vigencia_fim: editRow.vigencia_fim || null,
+      }, dispEditando);
+      if (conflito) {
+        toast.error(
+          `Já existe uma regra para ${DIAS[diaNum]} (${conflito.hora_inicio}–${conflito.hora_fim}) que se sobrepõe a esse horário.`,
+        );
+        return;
+      }
+    }
     const payload = {
-      dia_semana: parseInt(editRow.dia_semana),
+      dia_semana: diaNum,
       hora_inicio: editRow.hora_inicio,
       hora_fim: editRow.hora_fim,
       limite_pacientes: editRow.limite_pacientes ? parseInt(editRow.limite_pacientes) : null,
@@ -362,6 +451,123 @@ function Page() {
       mostrarErro(e);
     } finally {
       setGerando(false);
+    }
+  };
+
+  const isSlotLivreLocal = (nome: string | null | undefined) => {
+    const n = (nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    return n === "disponivel";
+  };
+  const isBloqueioLocal = (nome: string | null | undefined) => {
+    const n = (nome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    return n === "bloqueio";
+  };
+
+  const carregarBloqueios = async (medicoId: string) => {
+    if (!clinicaAtual) return;
+    setCarregandoBloqueios(true);
+    try {
+      const agora = new Date().toISOString();
+      const { data, error } = await supabase
+        .from("agendamentos")
+        .select("id, paciente_nome, inicio, fim, observacoes")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("medico_id", medicoId)
+        .is("paciente_id", null)
+        .eq("status", "agendado")
+        .gte("inicio", agora)
+        .order("inicio")
+        .limit(1000);
+      if (error) throw error;
+      const bloqueios = ((data ?? []) as Array<{ id: string; paciente_nome: string; inicio: string; fim: string; observacoes: string | null }>)
+        .filter((s) => isBloqueioLocal(s.paciente_nome));
+      setBloqueiosAtivos(bloqueios);
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setCarregandoBloqueios(false);
+    }
+  };
+
+  const abrirBloqueio = (m: Medico) => {
+    setBloqueioMedico(m);
+    setBloqueioForm({ data_inicio: hojeIso, data_fim: hojeIso, hora_inicio: "", hora_fim: "", motivo: "" });
+    void carregarBloqueios(m.id);
+  };
+
+  const aplicarBloqueio = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!clinicaAtual || !bloqueioMedico) return;
+    if (!bloqueioForm.data_inicio || !bloqueioForm.data_fim) {
+      toast.error("Informe o período a bloquear.");
+      return;
+    }
+    if (bloqueioForm.data_fim < bloqueioForm.data_inicio) {
+      toast.error("Data final não pode ser antes da data inicial.");
+      return;
+    }
+    setBloqueando(true);
+    try {
+      const horaIni = bloqueioForm.hora_inicio || "00:00";
+      const horaFim = bloqueioForm.hora_fim || "23:59";
+      const iniIso = new Date(`${bloqueioForm.data_inicio}T${horaIni}:00`).toISOString();
+      const fimIso = new Date(`${bloqueioForm.data_fim}T${horaFim}:59`).toISOString();
+      const { data: slots, error: eSel } = await supabase
+        .from("agendamentos")
+        .select("id, paciente_nome")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("medico_id", bloqueioMedico.id)
+        .is("paciente_id", null)
+        .eq("status", "agendado")
+        .gte("inicio", iniIso)
+        .lte("inicio", fimIso);
+      if (eSel) throw eSel;
+      const candidatos = (slots ?? []) as Array<{ id: string; paciente_nome: string }>;
+      // Só bloqueia o que está livre — nunca sobrescreve um horário que já
+      // tenha algum outro rótulo (ex.: já bloqueado antes).
+      const livres = candidatos.filter((s) => isSlotLivreLocal(s.paciente_nome));
+      if (livres.length === 0) {
+        toast.info("Nenhum horário livre encontrado nesse período para bloquear. Gere a agenda desse período antes, se ainda não existir.");
+        return;
+      }
+      const motivo = bloqueioForm.motivo.trim();
+      const { error: eUpd } = await supabase
+        .from("agendamentos")
+        .update({
+          paciente_nome: "BLOQUEIO",
+          observacoes: motivo ? `Bloqueado: ${motivo}` : "Bloqueado pela recepção",
+        } as never)
+        .in("id", livres.map((s) => s.id));
+      if (eUpd) throw eUpd;
+      const jaOcupados = candidatos.length - livres.length;
+      toast.success(
+        `${livres.length} horário(s) bloqueado(s).`
+        + (jaOcupados > 0 ? ` ${jaOcupados} já tinham paciente e não foram tocados.` : ""),
+      );
+      setBloqueioForm((f) => ({ ...f, motivo: "" }));
+      await carregarBloqueios(bloqueioMedico.id);
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setBloqueando(false);
+    }
+  };
+
+  const desfazerBloqueio = async (id: string) => {
+    if (!podeEscrever || !bloqueioMedico) return;
+    setDesfazendoId(id);
+    try {
+      const { error } = await supabase
+        .from("agendamentos")
+        .update({ paciente_nome: "DISPONÍVEL", observacoes: null } as never)
+        .eq("id", id);
+      if (error) throw error;
+      toast.success("Bloqueio desfeito — horário voltou a ficar disponível.");
+      await carregarBloqueios(bloqueioMedico.id);
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setDesfazendoId(null);
     }
   };
 
@@ -571,23 +777,36 @@ function Page() {
                               {ds.length}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                variant={!temAgenda ? "default" : "ghost"}
-                                onClick={() => {
-                                  setMedicoEditando(m.id);
-                                  setNovo({ ...novo, medico_id: m.id });
-                                  const primeira = agendas.find((a) => a.medico_id === m.id && a.ativo) ?? agendas.find((a) => a.medico_id === m.id);
-                                  setAgendaSel(primeira?.id ?? "");
-                                  if (!primeira) {
-                                    toast.warning("Este médico não possui agenda ativa. Crie uma agenda primeiro.");
-                                  }
-                                }}
-                                aria-label="Editar horários"
-                              >
-                                <Pencil className="h-4 w-4" />
-                                {!temAgenda && <span className="ml-1 text-xs">Criar</span>}
-                              </Button>
+                              <div className="flex items-center justify-end gap-1">
+                                {temAgenda && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => abrirBloqueio(m)}
+                                    aria-label="Bloquear período"
+                                    title="Bloquear um período pontual sem mexer na semana inteira"
+                                  >
+                                    <Ban className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant={!temAgenda ? "default" : "ghost"}
+                                  onClick={() => {
+                                    setMedicoEditando(m.id);
+                                    setNovo({ ...novo, medico_id: m.id });
+                                    const primeira = agendas.find((a) => a.medico_id === m.id && a.ativo) ?? agendas.find((a) => a.medico_id === m.id);
+                                    setAgendaSel(primeira?.id ?? "");
+                                    if (!primeira) {
+                                      toast.warning("Este médico não possui agenda ativa. Crie uma agenda primeiro.");
+                                    }
+                                  }}
+                                  aria-label="Editar horários"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                  {!temAgenda && <span className="ml-1 text-xs">Criar</span>}
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -832,6 +1051,100 @@ function Page() {
           <EnfermagemRecursosHorariosEditor />
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!bloqueioMedico} onOpenChange={(v) => { if (!v) setBloqueioMedico(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Ban className="h-4 w-4" /> Bloquear período — {bloqueioMedico?.nome}
+            </DialogTitle>
+            <DialogDescription>
+              Bloqueia horários já livres nesse período sem mexer na disponibilidade recorrente da semana.
+              Horários que já têm paciente marcado não são alterados.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="bloq-data-ini">Data início</Label>
+                <DateInputBR
+                  id="bloq-data-ini"
+                  value={bloqueioForm.data_inicio}
+                  onChange={(e) => setBloqueioForm((f) => ({ ...f, data_inicio: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="bloq-data-fim">Data fim</Label>
+                <DateInputBR
+                  id="bloq-data-fim"
+                  value={bloqueioForm.data_fim}
+                  onChange={(e) => setBloqueioForm((f) => ({ ...f, data_fim: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="bloq-hora-ini">Hora início (opcional)</Label>
+                <Input
+                  id="bloq-hora-ini" type="time"
+                  value={bloqueioForm.hora_inicio}
+                  onChange={(e) => setBloqueioForm((f) => ({ ...f, hora_inicio: e.target.value }))}
+                  placeholder="Dia inteiro"
+                />
+              </div>
+              <div>
+                <Label htmlFor="bloq-hora-fim">Hora fim (opcional)</Label>
+                <Input
+                  id="bloq-hora-fim" type="time"
+                  value={bloqueioForm.hora_fim}
+                  onChange={(e) => setBloqueioForm((f) => ({ ...f, hora_fim: e.target.value }))}
+                  placeholder="Dia inteiro"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="bloq-motivo">Motivo (opcional)</Label>
+              <Textarea
+                id="bloq-motivo" rows={2}
+                value={bloqueioForm.motivo}
+                onChange={(e) => setBloqueioForm((f) => ({ ...f, motivo: e.target.value }))}
+                placeholder="Ex.: reunião, imprevisto, licença..."
+              />
+            </div>
+            <Button onClick={aplicarBloqueio} disabled={bloqueando} className="w-full">
+              <Ban className="h-4 w-4 mr-1" /> {bloqueando ? "Bloqueando..." : "Bloquear período"}
+            </Button>
+
+            <div className="pt-2 border-t">
+              <div className="text-sm font-medium mb-2">Bloqueios ativos (futuros)</div>
+              {carregandoBloqueios ? (
+                <p className="text-xs text-muted-foreground">Carregando...</p>
+              ) : bloqueiosAtivos.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhum bloqueio ativo para este médico.</p>
+              ) : (
+                <ul className="space-y-1 max-h-48 overflow-y-auto">
+                  {bloqueiosAtivos.map((b) => (
+                    <li key={b.id} className="flex items-center justify-between text-xs bg-muted/40 rounded px-2 py-1.5 gap-2">
+                      <span>
+                        {new Date(b.inicio).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                        {b.observacoes ? ` — ${b.observacoes}` : ""}
+                      </span>
+                      <Button
+                        size="sm" variant="ghost" className="h-6 px-2 shrink-0"
+                        disabled={desfazendoId === b.id}
+                        onClick={() => desfazerBloqueio(b.id)}
+                      >
+                        <Undo2 className="h-3 w-3 mr-1" /> Desfazer
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBloqueioMedico(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

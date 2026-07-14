@@ -21,10 +21,15 @@ export async function agendamentosStatusPagamento(
   ids.forEach((id) => out.set(id, { pago: false, motivo: null }));
 
   // 1) lançamentos de receita
+  // ALTA-10: sem o filtro de status, um lançamento estornado
+  // (status='cancelado', nunca apagado — ver estornar-lancamento.ts) ainda
+  // contava como "pago", travando o atendimento em "pago" para sempre
+  // mesmo depois de um estorno legítimo.
   const { data: lancs } = await supabase
     .from("fin_lancamentos")
     .select("agendamento_id")
     .eq("tipo", "receita")
+    .eq("status", "confirmado")
     .in("agendamento_id", ids);
   ((lancs ?? []) as Array<{ agendamento_id: string | null }>).forEach((r) => {
     if (r.agendamento_id) out.set(r.agendamento_id, { pago: true, motivo: "caixa" });

@@ -69,6 +69,47 @@ export const criarAtendimentoMultiplo = createServerFn({ method: "POST" })
       };
     }
 
+    // MED-03: este fluxo cria agendamentos por um caminho separado (não
+    // passa por criarAgendamento), então tinha as mesmas duas lacunas —
+    // nada checava se o paciente já tinha outro agendamento no mesmo
+    // horário, nem bloqueava data já passada.
+    const hojeInicio = new Date();
+    hojeInicio.setHours(0, 0, 0, 0);
+    const passado = itens.find((it) => new Date(it.inicio).getTime() < hojeInicio.getTime());
+    if (passado) {
+      return { ok: false, message: "Não é possível criar um agendamento para uma data que já passou." };
+    }
+    const overlap = (aIni: string, aFim: string, bIni: string, bFim: string) =>
+      new Date(aIni).getTime() < new Date(bFim).getTime() && new Date(aFim).getTime() > new Date(bIni).getTime();
+    for (let i = 0; i < itens.length; i++) {
+      for (let j = i + 1; j < itens.length; j++) {
+        if (overlap(itens[i].inicio, itens[i].fim, itens[j].inicio, itens[j].fim)) {
+          return {
+            ok: false,
+            message: `Dois serviços deste atendimento têm horários conflitantes entre si (item ${i + 1} e ${j + 1}).`,
+          };
+        }
+      }
+    }
+    const minIni = itens.reduce((min, it) => (it.inicio < min ? it.inicio : min), itens[0].inicio);
+    const maxFim = itens.reduce((max, it) => (it.fim > max ? it.fim : max), itens[0].fim);
+    const { data: existentes } = await supabase
+      .from("agendamentos")
+      .select("id, inicio, fim")
+      .eq("clinica_id", clinica_id)
+      .eq("paciente_id", paciente_id)
+      .neq("status", "cancelado")
+      .lt("inicio", maxFim)
+      .gt("fim", minIni);
+    const conflitoExistente = ((existentes ?? []) as Array<{ id: string; inicio: string; fim: string }>)
+      .find((ex) => itens.some((it) => overlap(it.inicio, it.fim, ex.inicio, ex.fim)));
+    if (conflitoExistente) {
+      return {
+        ok: false,
+        message: `Este paciente já tem outro agendamento nesse horário (${new Date(conflitoExistente.inicio).toLocaleString("pt-BR")}). Escolha outro horário ou cancele o conflito primeiro.`,
+      };
+    }
+
     // Um único grupo id para todos os agendamentos deste atendimento.
     const grupoId =
       (globalThis as { crypto?: { randomUUID?: () => string } }).crypto?.randomUUID?.() ??

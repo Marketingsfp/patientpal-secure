@@ -4334,6 +4334,14 @@ function AgendaPage() {
           // divide o valor total proporcionalmente entre os N atendimentos e cria
           // 1 lançamento por atendimento — permitindo estorno individual sem
           // afetar os demais do grupo.
+          // ALTA-01: se o rateio (RPC) falhar, os atendimentos extras do
+          // grupo NÃO têm lançamento/caixa registrado — só o principal (que
+          // manteve seu lançamento original, de valor cheio). Antes o código
+          // seguia em frente mesmo assim: marcava TODOS como pagos e
+          // imprimia a guia do grupo inteiro, escondendo que o repasse dos
+          // extras nunca teria lançamento por trás. `idsConfirmados` abaixo
+          // restringe pago/fluxo/impressão só ao que realmente foi gravado.
+          let rateioFalhou = false;
           if (pagamentoExtraIds.length > 0) {
             const todosIds = [agId, ...pagamentoExtraIds];
             const N = todosIds.length;
@@ -4410,18 +4418,25 @@ function AgendaPage() {
               _itens: itensRateio,
             } as never);
             if (errRateio) {
-              mostrarErro(errRateio, "pagamento salvo, mas falhou ao ratear entre os atendimentos do grupo");
+              rateioFalhou = true;
+              mostrarErro(errRateio, "Pagamento do atendimento principal foi registrado, mas o rateio com os demais do grupo falhou");
+              toast.error(
+                `${pagamentoExtraIds.length} atendimento(s) do grupo continuam SEM pagamento registrado — repita a cobrança para eles (não foram marcados como pagos).`,
+                { duration: 12000 },
+              );
             }
           }
+          // Com rateio falho, só o principal foi realmente gravado — os
+          // extras ficam de fora de pagosSet/fluxo/impressão.
+          const idsConfirmados = rateioFalhou ? [agId] : [agId, ...pagamentoExtraIds];
           setPagosSet((prev) => {
             const next = new Set(prev);
-            next.add(agId);
-            for (const id of pagamentoExtraIds) next.add(id);
+            for (const id of idsConfirmados) next.add(id);
             return next;
           });
           // Avança o fluxo do paciente: após o pagamento no caixa, segue para triagem.
           try {
-            const todos = [agId, ...pagamentoExtraIds];
+            const todos = idsConfirmados;
             // Auto check-in: apenas para atendimentos do MESMO DIA do pagamento.
             // Se o pagamento é antecipado (consulta em outro dia), o paciente
             // ainda não chegou — o check-in será feito manualmente na recepção.
@@ -4454,8 +4469,10 @@ function AgendaPage() {
             setSelecionados(new Set());
           }
           try {
+            // Imprime a guia só do que foi de fato confirmado — se o rateio
+            // falhou, isso é [agId] (só o principal), não o grupo inteiro.
             await printGuiaAtendimentoAgrupada({
-              agendamentoIds: [pagamentoAgId, ...pagamentoExtraIds],
+              agendamentoIds: idsConfirmados,
               clinicaId: clinicaAtual.clinica_id,
               usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
               usuarioId: user?.id ?? null,
@@ -4467,7 +4484,9 @@ function AgendaPage() {
                 detalhe: dados.pagamentos_detalhe,
               },
             });
-            toast.success("Pagamento registrado e GR enviado para impressão.");
+            if (!rateioFalhou) {
+              toast.success("Pagamento registrado e GR enviado para impressão.");
+            }
           } catch (err) {
             mostrarErro(err);
           }

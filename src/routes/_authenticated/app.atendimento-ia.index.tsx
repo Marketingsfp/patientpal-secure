@@ -95,6 +95,9 @@ function AtendimentoIaPage() {
         .select("medico_id, paciente_id, paciente_nome, fluxo_etapa")
         .eq("clinica_id", cid)
         .in("fluxo_etapa", ["aguardando_recepcao", "recepcao", "caixa", "triagem", "atendimento", "finalizado"])
+        // Cancelar não reseta fluxo_etapa — sem este filtro um agendamento
+        // cancelado contava como "fila pendente" (CRIT-09).
+        .neq("status", "cancelado")
         .gte("inicio", `${hoje}T00:00:00`)
         .lte("inicio", `${hoje}T23:59:59`);
       const idsAtivos = new Set(ativos.map((m) => m.id));
@@ -155,6 +158,9 @@ function AtendimentoIaPage() {
       .gte("inicio", `${hoje}T00:00:00`)
       .lte("inicio", `${hoje}T23:59:59`)
       .in("fluxo_etapa", ["aguardando_recepcao", "recepcao", "caixa", "triagem", "atendimento", "finalizado"])
+      // Cancelar não reseta fluxo_etapa — sem este filtro um agendamento
+      // cancelado continuava aparecendo na fila do médico (CRIT-09).
+      .neq("status", "cancelado")
       .order("inicio");
     setFila(((data ?? []) as unknown as FilaItem[]).filter((item) => item.paciente_id && item.paciente_nome !== "DISPONÍVEL"));
   };

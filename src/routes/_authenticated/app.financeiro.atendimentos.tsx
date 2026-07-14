@@ -2949,13 +2949,21 @@ function Page() {
           <style>{`
             @media print {
               @page { size: A4 portrait; margin: 12mm; }
+              html, body { height: auto !important; overflow: visible !important; background: white !important; margin: 0 !important; padding: 0 !important; }
               body * { visibility: hidden !important; }
               .print-area, .print-area * { visibility: visible !important; }
-              html, body { height: auto !important; overflow: visible !important; background: white !important; }
-              .print-area { position: absolute; left: 0; top: 0; right: 0; margin: 0; padding: 0; width: 186mm; background: white !important; color: black !important; max-height: none !important; height: auto !important; overflow: visible !important; z-index: 9999; font-size: 11pt; }
-              [role="dialog"], [role="dialog"] > * { position: static !important; transform: none !important; max-height: none !important; height: auto !important; overflow: visible !important; }
+              /* O dialog é centralizado com translate-x/-y (transform). Um
+                 transform em qualquer ancestral vira o "containing block" do
+                 .print-area absoluto e o desloca — daí o corte à esquerda.
+                 Neutraliza posição/transform/recorte do dialog SEM incluir os
+                 filhos (senão o !important do static abaixo clobbava o
+                 position:absolute do próprio .print-area). */
+              [role="dialog"] { position: static !important; transform: none !important; max-height: none !important; height: auto !important; overflow: visible !important; box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: auto !important; max-width: none !important; }
+              /* Ancora o comprovante no canto da página (independe do layout
+                 do app / sidebar). width:100% = largura útil da página (@page
+                 já subtrai as margens de 12mm). */
+              .print-area { position: absolute !important; left: 0 !important; top: 0 !important; right: auto !important; bottom: auto !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; color: black !important; max-height: none !important; height: auto !important; overflow: visible !important; z-index: 2147483647; font-size: 11pt; }
               .no-print { display: none !important; }
-              [role="dialog"] { box-shadow: none !important; border: none !important; }
               .comprovante-bloco { break-after: page; page-break-after: always; }
               .comprovante-bloco:last-child { break-after: auto; page-break-after: auto; }
               .comprovante-bloco table, .comprovante-bloco thead, .comprovante-bloco tbody, .comprovante-bloco tr, .comprovante-bloco td, .comprovante-bloco th { page-break-inside: auto; break-inside: auto; }

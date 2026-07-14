@@ -769,12 +769,16 @@ function Page() {
     const movimentosInseridos: string[] = [];
     const lancamentosInseridos: string[] = [];
     try {
-      // Re-checa server-side se já foi pago (anti dupla cobrança / race)
+      // Re-checa server-side se já foi pago (anti dupla cobrança / race).
+      // ALTA-10: sem o filtro de status, uma cobrança já estornada
+      // (status='cancelado') ainda contava como "já paga" e bloqueava
+      // cobrar de novo — mesmo depois de um estorno legítimo.
       const { data: jaPago } = await supabase
         .from("fin_lancamentos")
         .select("id")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("tipo", "receita")
+        .eq("status", "confirmado")
         .eq("agendamento_id", openCobranca.id)
         .limit(1)
         .maybeSingle();

@@ -87,7 +87,7 @@ function AtendimentoEditorPage() {
   const sugerir = useServerFn(sugerirCondutaClinica);
   const resumir = useServerFn(resumirHistoricoPaciente);
 
-  const [agendamento, setAgendamento] = useState<{ id: string; paciente_id: string | null; paciente_nome: string; medico_id: string | null; procedimento: string | null; fluxo_etapa: string } | null>(null);
+  const [agendamento, setAgendamento] = useState<{ id: string; paciente_id: string | null; paciente_nome: string; medico_id: string | null; procedimento: string | null; fluxo_etapa: string; status: string } | null>(null);
   const [medico, setMedico] = useState<Medico | null>(null);
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [triagem, setTriagem] = useState<Triagem | null>(null);
@@ -106,10 +106,22 @@ function AtendimentoEditorPage() {
     if (!clinicaAtual || !agendamentoId) return;
     const { data: ag, error } = await supabase
         .from("agendamentos")
-        .select("id, paciente_id, paciente_nome, medico_id, procedimento, fluxo_etapa")
+        .select("id, paciente_id, paciente_nome, medico_id, procedimento, fluxo_etapa, status")
         .eq("id", agendamentoId)
         .maybeSingle();
       if (error || !ag) { toast.error("Agendamento não encontrado"); navigate({ to: "/app/atendimento-ia" }); return; }
+      // CRIT-09: consulta cancelada não pode ser "atendida" — sem esta
+      // checagem, o médico conseguia abrir a tela e criar prontuário para um
+      // agendamento cancelado, e a promoção automática de etapa abaixo
+      // (quando já pago) ignorava o cancelamento e empurrava para
+      // "atendimento" mesmo assim. Roda de novo a cada refresh via realtime,
+      // então também tira o médico da tela se o agendamento for cancelado
+      // no meio do atendimento.
+      if (ag.status === "cancelado") {
+        toast.error("Este atendimento foi cancelado.");
+        navigate({ to: "/app/atendimento-ia" });
+        return;
+      }
       setAgendamento(ag as never);
 
       // Pagamento ANTES da consulta — bloqueia avanço enquanto pendente.
@@ -297,6 +309,10 @@ function AtendimentoEditorPage() {
         clinica_id: cid,
         paciente_id: pacienteId,
         medico_id: medico?.id ?? null,
+        // ALTA-04: sem isso, duas consultas do mesmo paciente no mesmo dia
+        // não tinham como ser distinguidas — nenhum campo ligava o
+        // prontuário de volta ao agendamento que o originou.
+        agendamento_id: agendamentoId,
         data: new Date().toISOString(),
         queixa_principal: soap.queixa_principal || null,
         historia_doenca: soap.historia_doenca || null,
@@ -305,7 +321,7 @@ function AtendimentoEditorPage() {
         conduta: soap.conduta || null,
         prescricao: soap.prescricao || null,
         observacoes: transcricao ? `Transcrição:\n${transcricao}` : null,
-      });
+      } as never);
       if (error) throw error;
 
       const procNome = agendamento?.procedimento ?? "";
@@ -343,6 +359,10 @@ function AtendimentoEditorPage() {
           clinica_id: cid,
           paciente_id: pacienteId,
           medico_id: medico?.id ?? null,
+          // ALTA-04: mesma lacuna do prontuário — sem agendamento_id não dá
+          // pra provar qual cobrança é de qual consulta quando há mais de
+          // uma no mesmo dia.
+          agendamento_id: agendamentoId,
           procedimento: procNome || null,
           data: new Date().toISOString().slice(0, 10),
           valor_total: valorTotal,
