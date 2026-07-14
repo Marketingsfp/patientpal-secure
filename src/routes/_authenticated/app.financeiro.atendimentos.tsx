@@ -179,6 +179,7 @@ function AtendimentosPage() {
   const [procTipos, setProcTipos] = useState<Map<string, string>>(new Map());
   const [procLaudo, setProcLaudo] = useState<Map<string, boolean>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [historicoAtend, setHistoricoAtend] = useState<Atend | null>(null);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Atend | null>(null);
