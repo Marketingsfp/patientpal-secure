@@ -4972,15 +4972,110 @@ function AgendaPage() {
             {auditLoading ? (
               <p className="text-sm text-muted-foreground py-8 text-center">Carregando...</p>
             ) : (() => {
-              const nomePorEmail = new Map<string, string>(
-                equipeList.filter((m) => m.email && m.nome).map((m) => [m.email as string, m.nome as string]),
-              );
-              const acaoLabel: Record<string, string> = { INSERT: "Criou", UPDATE: "Alterou", DELETE: "Excluiu" };
-              const acaoCor: Record<string, string> = {
-                INSERT: "bg-emerald-100 text-emerald-700 border-emerald-200",
-                UPDATE: "bg-amber-100 text-amber-700 border-amber-200",
-                DELETE: "bg-rose-100 text-rose-700 border-rose-200",
-                NOTA: "bg-sky-100 text-sky-700 border-sky-200",
+              // Mapas de nome/cargo (por email e por user_id).
+              const nomePorEmail = new Map<string, string>();
+              const cargoPorEmail = new Map<string, string>();
+              const nomePorUid = new Map<string, string>();
+              const cargoPorUid = new Map<string, string>();
+              equipeList.forEach((m) => {
+                if (m.email && m.nome) nomePorEmail.set(m.email, m.nome);
+                if (m.email && m.role) cargoPorEmail.set(m.email, m.role);
+                if (m.user_id && m.nome) nomePorUid.set(m.user_id, m.nome);
+                if (m.user_id && m.role) cargoPorUid.set(m.user_id, m.role);
+              });
+              nomePorUidExtra.forEach((v, k) => { if (!nomePorUid.has(k)) nomePorUid.set(k, v); });
+              const cargoBonito = (r: string | undefined) => {
+                if (!r) return "";
+                const map: Record<string, string> = {
+                  admin: "administrador", gestor: "gestor", financeiro: "financeiro",
+                  caixa: "caixa", recepcao: "recepção", medico: "médico",
+                  enfermeiro: "enfermeiro", enfermagem: "enfermagem", laboratorio: "laboratório",
+                };
+                return map[r] ?? r;
+              };
+              const quemPorEmail = (email: string | null | undefined) => {
+                if (!email) return "—";
+                const nome = nomePorEmail.get(email) ?? email;
+                const cargo = cargoBonito(cargoPorEmail.get(email));
+                return cargo ? `${nome} (${cargo})` : nome;
+              };
+              const quemPorUid = (uid: string | null | undefined) => {
+                if (!uid) return "—";
+                const nome = nomePorUid.get(uid) ?? `Usuário …${uid.slice(-6)}`;
+                const cargo = cargoBonito(cargoPorUid.get(uid));
+                return cargo ? `${nome} (${cargo})` : nome;
+              };
+
+              // Rótulos e cores por tipo de ação da timeline.
+              type Kind =
+                | "criou_slot" | "agendou" | "reagendou" | "liberou"
+                | "checkin" | "iniciou" | "confirmou" | "realizou" | "cancelou"
+                | "pagamento" | "pagamento_removido" | "observacao"
+                | "estorno_solicitado" | "estorno_aprovado" | "estorno_rejeitado" | "estorno_cancelado"
+                | "alterou" | "criou" | "excluiu" | "nota";
+              const kindLabel: Record<Kind, string> = {
+                criou_slot: "Slot gerado", agendou: "Agendou", reagendou: "Reagendou",
+                liberou: "Liberou horário", checkin: "Check-in", iniciou: "Iniciou atendimento",
+                confirmou: "Confirmou", realizou: "Realizado", cancelou: "Cancelou",
+                pagamento: "Pagamento", pagamento_removido: "Pagamento removido",
+                observacao: "Observação alterada",
+                estorno_solicitado: "Estorno solicitado", estorno_aprovado: "Estorno aprovado",
+                estorno_rejeitado: "Estorno rejeitado", estorno_cancelado: "Estorno cancelado",
+                alterou: "Alterou", criou: "Criou", excluiu: "Excluiu", nota: "Nota",
+              };
+              const green = "bg-emerald-100 text-emerald-700 border-emerald-200";
+              const amber = "bg-amber-100 text-amber-700 border-amber-200";
+              const rose = "bg-rose-100 text-rose-700 border-rose-200";
+              const sky = "bg-sky-100 text-sky-700 border-sky-200";
+              const violet = "bg-violet-100 text-violet-700 border-violet-200";
+              const kindCor: Record<Kind, string> = {
+                criou_slot: green, agendou: green, reagendou: amber, liberou: rose,
+                checkin: green, iniciou: green, confirmou: green, realizou: green, cancelou: rose,
+                pagamento: green, pagamento_removido: rose, observacao: amber,
+                estorno_solicitado: violet, estorno_aprovado: green,
+                estorno_rejeitado: rose, estorno_cancelado: rose,
+                alterou: amber, criou: green, excluiu: rose, nota: sky,
+              };
+
+              // Rótulos amigáveis para colunas do agendamento e do lançamento.
+              const colLabelAg: Record<string, string> = {
+                paciente_nome: "Paciente",
+                paciente_id: "Paciente (id)",
+                medico_id: "Profissional",
+                enfermagem_recurso_id: "Recurso de enfermagem",
+                inicio: "Início",
+                fim: "Fim",
+                status: "Status",
+                fluxo_etapa: "Etapa do fluxo",
+                observacoes: "Observações",
+                procedimento: "Procedimento",
+                data_pagamento: "Pagamento",
+                forma_pagamento_prevista: "Forma de pagamento",
+                orcamento_id: "Orçamento",
+              };
+              const hideAg = new Set([
+                "id", "clinica_id", "created_at", "updated_at", "fluxo_atualizado_em",
+                "token_publico", "agenda_id", "atendimento_grupo_id", "pacote_id",
+                "tipo_atendimento", "ficha_numero", "paciente_id",
+              ]);
+              const statusPt: Record<string, string> = {
+                agendado: "Agendado", confirmado: "Confirmado",
+                realizado: "Realizado", cancelado: "Cancelado",
+              };
+              const etapaPt: Record<string, string> = {
+                aguardando_recepcao: "Aguardando recepção",
+                triagem: "Triagem",
+                atendimento: "Em atendimento",
+                exame: "Em exame",
+                finalizado: "Finalizado",
+              };
+              const isSlot = (nome: unknown) => {
+                if (!nome || typeof nome !== "string") return true;
+                return /disponível|disponivel|slot/i.test(nome);
+              };
+              const fmtDateTime = (v: unknown) => {
+                if (typeof v !== "string" || !v) return "—";
+                try { return new Date(v).toLocaleString("pt-BR"); } catch { return v; }
               };
               const repasseLabel: Record<string, string> = {
                 repasse_pago: "Repasse ao médico",
@@ -4988,64 +5083,231 @@ function AgendaPage() {
                 repasse_forma_pagamento: "Forma do repasse",
               };
               const allowedLanc = new Set(Object.keys(repasseLabel));
-              const fmtVal = (k: string, v: unknown) => {
+              const fmtValAg = (k: string, v: unknown): string => {
+                if (v == null || v === "") return "—";
+                if (k === "status") return statusPt[String(v)] ?? String(v);
+                if (k === "fluxo_etapa") return etapaPt[String(v)] ?? String(v);
+                if (k === "inicio" || k === "fim") return fmtDateTime(v);
+                if (k === "data_pagamento" && typeof v === "string") {
+                  try { return new Date(v).toLocaleString("pt-BR"); } catch { return String(v); }
+                }
+                return String(v);
+              };
+              const fmtValLanc = (k: string, v: unknown) => {
                 if (k === "repasse_pago") return v ? "Pago" : "Pendente";
                 if (k === "repasse_pago_em" && typeof v === "string" && v) {
                   return new Date(v + "T00:00:00").toLocaleDateString("pt-BR");
                 }
                 return v == null || v === "" ? "—" : String(v);
               };
-              type Item = { id: string; when: string; quem: string; kind: "INSERT" | "UPDATE" | "DELETE" | "NOTA"; label: string; body: React.ReactNode };
+
+              type Item = { id: string; when: string; quem: string; kind: Kind; body: React.ReactNode };
               const items: Item[] = [];
+
               for (const r of auditRows) {
                 const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
                 const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
                 const isLanc = r.table_name === "fin_lancamentos";
+                const quem = quemPorEmail(r.user_email);
+
+                if (isLanc) {
+                  const chaves = Array.from(new Set([...Object.keys(antes), ...Object.keys(depois)]))
+                    .filter((k) => allowedLanc.has(k))
+                    .filter((k) => JSON.stringify(antes[k]) !== JSON.stringify(depois[k]));
+                  if (r.action === "UPDATE" && chaves.length === 0) continue;
+                  let kind: Kind = "alterou";
+                  let body: React.ReactNode = null;
+                  if (r.action === "INSERT") {
+                    kind = "pagamento";
+                    body = `Pagamento da consulta registrado${depois.repasse_pago ? " — repasse já pago" : " — repasse pendente"}.`;
+                  } else if (r.action === "DELETE") {
+                    kind = "pagamento_removido";
+                    body = "Pagamento removido.";
+                  } else if (r.action === "UPDATE") {
+                    body = (
+                      <div className="space-y-0.5">
+                        {chaves.map((k) => (
+                          <div key={k}>
+                            <span className="font-medium">{repasseLabel[k] ?? k}:</span>{" "}
+                            <span className="line-through text-rose-600">{fmtValLanc(k, antes[k])}</span>
+                            {" → "}
+                            <span className="text-emerald-700">{fmtValLanc(k, depois[k])}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+                  items.push({ id: r.id, when: r.created_at, quem, kind, body });
+                  continue;
+                }
+
+                // Tabela agendamentos
+                if (r.action === "INSERT") {
+                  const nome = depois.paciente_nome;
+                  const kind: Kind = isSlot(nome) ? "criou_slot" : "agendou";
+                  const body = kind === "criou_slot"
+                    ? "Slot da agenda gerado (horário disponibilizado)."
+                    : <>Agendou o paciente <b>{String(nome ?? "—")}</b>.</>;
+                  items.push({ id: r.id, when: r.created_at, quem, kind, body });
+                  continue;
+                }
+                if (r.action === "DELETE") {
+                  items.push({ id: r.id, when: r.created_at, quem, kind: "excluiu", body: "Registro do agendamento excluído." });
+                  continue;
+                }
+                // UPDATE — detecta ações compostas
                 const chaves = Array.from(new Set([...Object.keys(antes), ...Object.keys(depois)]))
-                  .filter((k) => !["updated_at", "created_at", "fluxo_atualizado_em"].includes(k))
-                  .filter((k) => (isLanc ? allowedLanc.has(k) : true))
+                  .filter((k) => !hideAg.has(k))
                   .filter((k) => JSON.stringify(antes[k]) !== JSON.stringify(depois[k]));
-                if (isLanc && r.action === "UPDATE" && chaves.length === 0) continue;
-                const quem = (r.user_email && nomePorEmail.get(r.user_email)) || r.user_email || "—";
-                const kind = (r.action as "INSERT" | "UPDATE" | "DELETE");
-                let body: React.ReactNode = null;
-                if (r.action === "UPDATE" && chaves.length > 0) {
-                  body = (
+                if (chaves.length === 0) continue;
+                const set = new Set(chaves);
+                const pacienteMudou = set.has("paciente_nome");
+                const antesLivre = isSlot(antes.paciente_nome);
+                const depoisLivre = isSlot(depois.paciente_nome);
+
+                // Agendou paciente (slot → alocado)
+                if (pacienteMudou && antesLivre && !depoisLivre) {
+                  items.push({
+                    id: r.id, when: r.created_at, quem, kind: "agendou",
+                    body: <>Agendou o paciente <b>{String(depois.paciente_nome ?? "—")}</b>.</>,
+                  });
+                  continue;
+                }
+                // Liberou horário (alocado → slot)
+                if (pacienteMudou && !antesLivre && depoisLivre) {
+                  items.push({
+                    id: r.id, when: r.created_at, quem, kind: "liberou",
+                    body: <>Liberou o horário (paciente removido: <b>{String(antes.paciente_nome ?? "—")}</b>).</>,
+                  });
+                  continue;
+                }
+                // Reagendou (mudou início/fim, sem trocar paciente)
+                if ((set.has("inicio") || set.has("fim")) && !pacienteMudou && !depoisLivre) {
+                  items.push({
+                    id: r.id, when: r.created_at, quem, kind: "reagendou",
+                    body: (
+                      <>
+                        Reagendou de <b>{fmtDateTime(antes.inicio)}</b> para <b>{fmtDateTime(depois.inicio)}</b>.
+                      </>
+                    ),
+                  });
+                  continue;
+                }
+                // Status
+                if (set.has("status") && !pacienteMudou) {
+                  const novo = String(depois.status ?? "");
+                  if (novo === "confirmado") {
+                    items.push({ id: r.id, when: r.created_at, quem, kind: "confirmou", body: "Confirmou o agendamento." });
+                    continue;
+                  }
+                  if (novo === "realizado") {
+                    items.push({ id: r.id, when: r.created_at, quem, kind: "realizou", body: "Marcou o atendimento como realizado." });
+                    continue;
+                  }
+                  if (novo === "cancelado") {
+                    items.push({ id: r.id, when: r.created_at, quem, kind: "cancelou", body: "Cancelou o agendamento." });
+                    continue;
+                  }
+                }
+                // Check-in / atendimento pelo fluxo_etapa
+                if (set.has("fluxo_etapa") && !pacienteMudou) {
+                  const novo = String(depois.fluxo_etapa ?? "");
+                  if (novo === "aguardando_recepcao" || novo === "triagem") {
+                    items.push({ id: r.id, when: r.created_at, quem, kind: "checkin", body: "Registrou o check-in do paciente." });
+                    continue;
+                  }
+                  if (novo === "atendimento" || novo === "exame") {
+                    items.push({ id: r.id, when: r.created_at, quem, kind: "iniciou", body: "Iniciou o atendimento." });
+                    continue;
+                  }
+                  if (novo === "finalizado") {
+                    items.push({ id: r.id, when: r.created_at, quem, kind: "realizou", body: "Finalizou o atendimento." });
+                    continue;
+                  }
+                }
+                // Pagamento (data_pagamento null → data)
+                if (set.has("data_pagamento") && !antes.data_pagamento && depois.data_pagamento) {
+                  items.push({
+                    id: r.id, when: r.created_at, quem, kind: "pagamento",
+                    body: "Deu baixa no pagamento do atendimento.",
+                  });
+                  continue;
+                }
+                // Observação isolada
+                if (chaves.length === 1 && set.has("observacoes")) {
+                  items.push({
+                    id: r.id, when: r.created_at, quem, kind: "observacao",
+                    body: (
+                      <div>
+                        <span className="line-through text-rose-600 whitespace-pre-wrap">{String(antes.observacoes ?? "—")}</span>
+                        {" → "}
+                        <span className="text-emerald-700 whitespace-pre-wrap">{String(depois.observacoes ?? "—")}</span>
+                      </div>
+                    ),
+                  });
+                  continue;
+                }
+                // Fallback: mostra colunas com rótulos amigáveis
+                items.push({
+                  id: r.id, when: r.created_at, quem, kind: "alterou",
+                  body: (
                     <div className="space-y-0.5">
                       {chaves.map((k) => (
                         <div key={k}>
-                          <span className="font-medium">{isLanc ? (repasseLabel[k] ?? k) : k}:</span>{" "}
-                          <span className="line-through text-rose-600">{fmtVal(k, antes[k])}</span>
+                          <span className="font-medium">{colLabelAg[k] ?? k}:</span>{" "}
+                          <span className="line-through text-rose-600">{fmtValAg(k, antes[k])}</span>
                           {" → "}
-                          <span className="text-emerald-700">{fmtVal(k, depois[k])}</span>
+                          <span className="text-emerald-700">{fmtValAg(k, depois[k])}</span>
                         </div>
                       ))}
                     </div>
-                  );
-                } else if (r.action === "INSERT") {
-                  body = isLanc
-                    ? `Pagamento da consulta registrado${depois.repasse_pago ? " — repasse já pago" : " — repasse pendente"}.`
-                    : "Registro criado.";
-                } else if (r.action === "DELETE") {
-                  body = isLanc ? "Pagamento removido." : "Registro excluído.";
-                }
-                items.push({
-                  id: r.id,
-                  when: r.created_at,
-                  quem,
-                  kind,
-                  label: acaoLabel[r.action] ?? r.action,
-                  body,
+                  ),
                 });
               }
+
+              // Estornos
+              for (const e of estornosHist) {
+                items.push({
+                  id: `est-req-${e.id}`,
+                  when: e.solicitado_em,
+                  quem: quemPorUid(e.solicitado_por),
+                  kind: "estorno_solicitado",
+                  body: (
+                    <div>
+                      Solicitou estorno.
+                      {e.motivo ? <div className="text-muted-foreground whitespace-pre-wrap">Motivo: {e.motivo}</div> : null}
+                    </div>
+                  ),
+                });
+                if (e.resolvido_em && e.status !== "pendente") {
+                  const k: Kind =
+                    e.status === "aprovado" ? "estorno_aprovado" :
+                    e.status === "rejeitado" ? "estorno_rejeitado" : "estorno_cancelado";
+                  items.push({
+                    id: `est-res-${e.id}`,
+                    when: e.resolvido_em,
+                    quem: quemPorUid(e.resolvido_por),
+                    kind: k,
+                    body: (
+                      <div>
+                        {k === "estorno_aprovado" ? "Aprovou o estorno." :
+                         k === "estorno_rejeitado" ? "Rejeitou o estorno." :
+                         "Cancelou a solicitação de estorno."}
+                        {e.resposta ? <div className="text-muted-foreground whitespace-pre-wrap">Resposta: {e.resposta}</div> : null}
+                      </div>
+                    ),
+                  });
+                }
+              }
+
+              // Notas manuais
               for (const n of notasHist) {
-                const quem = n.user_nome || (n.user_email && nomePorEmail.get(n.user_email)) || n.user_email || "—";
+                const quem = n.user_nome || quemPorEmail(n.user_email);
                 items.push({
                   id: `nota-${n.id}`,
                   when: n.created_at,
                   quem,
-                  kind: "NOTA",
-                  label: "Nota",
+                  kind: "nota",
                   body: <span className="whitespace-pre-wrap">{n.texto}</span>,
                 });
               }
@@ -5075,7 +5337,7 @@ function AgendaPage() {
                         <TableCell className="text-xs align-top">{it.quem}</TableCell>
                         <TableCell className="text-xs align-top">
                           <div className="flex items-start gap-2">
-                            <Badge variant="outline" className={`${acaoCor[it.kind]} shrink-0`}>{it.label}</Badge>
+                            <Badge variant="outline" className={`${kindCor[it.kind]} shrink-0`}>{kindLabel[it.kind]}</Badge>
                             <div className="flex-1">{it.body}</div>
                           </div>
                         </TableCell>
