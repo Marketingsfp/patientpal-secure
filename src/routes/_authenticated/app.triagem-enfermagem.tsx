@@ -183,14 +183,13 @@ function TriagemEnfermagemPage() {
     const hoje = new Date().toISOString().slice(0, 10);
     const { data: ult } = await supabase
       .from("senhas").select("numero")
-      .eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("tipo", "N")
-      .ilike("guiche", "Triagem%")
+      .eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("tipo", "T")
       .order("numero", { ascending: false }).limit(1).maybeSingle();
     const proximoNum = Math.min(9999, (ult?.numero ?? 0) + 1);
     const nomeCurto = g.paciente_nome.split(/\s+/).slice(0, 2).join(" ").toUpperCase().slice(0, 24);
     const guicheStr = `Triagem · Sala ${consultorio.trim()}`;
     const { error } = await supabase.from("senhas").insert({
-      clinica_id: clinicaAtual.clinica_id, tipo: "N", numero: proximoNum,
+      clinica_id: clinicaAtual.clinica_id, tipo: "T", numero: proximoNum,
       codigo: nomeCurto, status: "chamada", paciente_id: g.paciente_id,
       guiche: guicheStr, chamada_em: new Date().toISOString(),
     } as never);
