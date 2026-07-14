@@ -61,7 +61,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
-  component: Page,
+  component: AtendimentosPage,
   head: () => ({ meta: [{ title: "Atendimentos — Financeiro" }] }),
 });
 
@@ -158,7 +158,7 @@ function FormaPagamentoIcon({ forma }: { forma: string | null | undefined }) {
   return <HelpCircle className="h-4 w-4 text-muted-foreground" aria-label={forma ?? ""} />;
 }
 
-function Page() {
+export function AtendimentosPage() {
   const { clinicaAtual } = useClinica();
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
   const podeEscrever = usePodeEscrever("financeiro");
