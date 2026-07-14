@@ -5104,14 +5104,42 @@ function AgendaPage() {
           </div>
         </div>
       )}
-      {/* Totais + paginação topo */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-        <div className="flex gap-4">
-          <span>Total: <b className="text-foreground">{totais.total}</b></span>
-          <span>Confirmados: <b className="text-foreground">{totais.confirmados}</b></span>
-          <span>Realizados: <b className="text-foreground">{totais.realizados}</b></span>
+      {/* Totais em cartões de KPI + paginação topo */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <KpiRow>
+              <KpiCard
+                label="Total"
+                value={totais.total}
+                icon={ListChecks}
+                tone="info"
+              />
+              <KpiCard
+                label="Confirmados"
+                value={totais.confirmados}
+                icon={CheckCircle2}
+                tone="success"
+              />
+              <KpiCard
+                label="Realizados"
+                value={totais.realizados}
+                icon={Activity}
+                tone="success"
+              />
+              <KpiCard
+                label="Pendentes"
+                value={Math.max(0, totais.total - totais.confirmados - totais.realizados)}
+                icon={Clock}
+                tone="warn"
+                hint="Total − Confirmados − Realizados"
+              />
+            </KpiRow>
+          </div>
+          <div className="w-full lg:w-auto flex justify-end">
+            <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
+          </div>
         </div>
-        <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
       </div>
 
       {/* Tabela */}
