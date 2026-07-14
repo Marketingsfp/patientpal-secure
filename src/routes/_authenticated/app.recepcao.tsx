@@ -90,8 +90,12 @@ function RecepcaoPage() {
     const hoje = new Date().toISOString().slice(0, 10);
     const sel = "id, codigo, tipo, status, guiche, emitida_em, chamada_em, identificado_por_facial, paciente_id, pacientes(nome)";
     const [{ data: emit, error: errEmit }, { data: cham, error: errCham }] = await Promise.all([
+      // Fila da recepção: apenas senhas emitidas pelo totem/recepção
+      // (exclui as senhas geradas pela Triagem, que já nascem com status="chamada").
       supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "emitida").order("emitida_em"),
-      supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "chamada").order("chamada_em", { ascending: false }).limit(10),
+      // Chamadas recentes: só as chamadas feitas pela Recepção — filtra fora
+      // qualquer senha cujo guichê comece com "Triagem" (fila separada).
+      supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "chamada").not("guiche", "ilike", "Triagem%").order("chamada_em", { ascending: false }).limit(10),
     ]);
 
     if (errEmit || errCham) {
