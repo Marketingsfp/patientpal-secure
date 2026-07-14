@@ -35,7 +35,7 @@ Frases padrão obrigatórias:
 - Para comportamento funcional ambíguo: "Possível regra de negócio — validar
   com a equipe da clínica".
 
-### 2.2 Explicação antes de qualquer alteração
+### 1.2 Explicação antes de qualquer alteração
 
 Antes de alterar arquivos, o agente deve explicar em linguagem simples:
 
@@ -49,7 +49,7 @@ Para mudanças pequenas e localizadas, essa explicação pode ser curta. Para
 mudanças amplas, sensíveis ou com risco de impacto em produção, o agente deve
 apresentar um plano antes da edição.
 
-### 2.3 Resumo de antes e depois
+### 1.3 Resumo de antes e depois
 
 Depois de qualquer alteração, o agente deve apresentar um resumo objetivo:
 
@@ -62,7 +62,7 @@ O agente não deve dizer que algo foi corrigido se apenas aplicou uma tentativa
 sem validação mínima. Quando a validação não for possível, deve dizer isso de
 forma direta.
 
-### 2.4 Controle de contexto e qualidade do prompt
+### 1.4 Controle de contexto e qualidade do prompt
 
 Se o prompt for muito longo, misturar muitos problemas diferentes ou incluir
 muitas imagens/evidências de uma só vez, o agente deve avisar que isso pode
@@ -72,7 +72,7 @@ Nesses casos, o agente deve recomendar dividir o trabalho em partes menores e
 sugerir uma ordem de execução. O agente não deve fingir alta confiança quando
 o volume de contexto puder comprometer a precisão.
 
-### 2.5 Classificação do tipo de pedido
+### 1.5 Classificação do tipo de pedido
 
 Sempre que responder sobre uma correção ou alteração, o agente deve indicar,
 em linguagem simples, se o pedido parece envolver:
@@ -90,7 +90,7 @@ Quando houver mistura de categorias, o agente deve separar o que é fato
 observado no código, o que é interpretação e o que precisa de validação do
 time.
 
-### 2.6 Testes de fluxo em produção
+### 1.6 Testes de fluxo em produção
 
 Este projeto pode ser testado em ambiente de produção. Por isso, qualquer teste
 de fluxo real exige cautela extra.
@@ -114,7 +114,7 @@ O agente nunca deve usar teste em produção como desculpa para criar dados sem
 rastreabilidade, acionar integrações reais desnecessárias ou deixar resíduos
 operacionais sem avisar.
 
-### 2.7 Linguagem simples para o time
+### 1.7 Linguagem simples para o time
 
 O agente deve explicar mudanças, riscos e resultados em linguagem simples do
 dia a dia. Linguagem técnica deve ser usada apenas quando:
@@ -128,7 +128,7 @@ Clareza tem prioridade sobre formalismo. A resposta deve ajudar o colaborador a
 entender o impacto prático da mudança, não apenas os detalhes internos do
 código.
 
-### 2.8 Escopo, suposições e trabalho em equipe
+### 1.8 Escopo, suposições e trabalho em equipe
 
 Antes de mudanças relevantes, o agente deve deixar claro:
 
@@ -145,7 +145,7 @@ Se perceber alterações de outros colaboradores, o agente deve trabalhar ao
 redor delas. Não deve sobrescrever, apagar, reverter ou "limpar" trabalho alheio
 sem pedido explícito.
 
-### 2.9 Impacto em áreas críticas
+### 1.9 Impacto em áreas críticas
 
 Qualquer alteração que possa afetar agenda, financeiro, permissões, dados
 clínicos, faturamento, prontuário, LGPD, auditoria, integrações ou produção
@@ -157,7 +157,7 @@ ampliar o escopo.
 
 ---
 
-## 3. Outras regras herdadas
+## 2. Outras regras herdadas
 
 As regras contidas em `mem/preferences/governanca.md`,
 `mem/constraints/governanca-dados-imutaveis.md` e nos documentos de
