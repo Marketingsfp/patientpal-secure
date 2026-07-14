@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Eye, Printer, Loader2, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
@@ -11,11 +10,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DateInputBR } from "@/components/ui/date-input-br";
-
-export const Route = createFileRoute("/_authenticated/app/financeiro/comprovantes")({
-  component: ComprovantesPage,
-  head: () => ({ meta: [{ title: "Comprovantes de repasse — Financeiro" }] }),
-});
 
 type Row = {
   id: string;
@@ -78,7 +72,7 @@ const labelForma = (v: string | null | undefined) => {
   return FORMA_LABEL[k] ?? v.toUpperCase();
 };
 
-function ComprovantesPage() {
+export function ComprovantesTab() {
   const { clinicaAtual } = useClinica();
   const clinicaNome = clinicaAtual?.clinica?.nome ?? "—";
   const clinicaId = clinicaAtual?.clinica_id ?? null;
