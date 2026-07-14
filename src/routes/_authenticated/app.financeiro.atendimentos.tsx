@@ -2996,15 +2996,22 @@ export function AtendimentosPage() {
               @page { size: A4 portrait; margin: 12mm; }
               body * { visibility: hidden !important; }
               .print-area, .print-area * { visibility: visible !important; }
-              html, body { height: auto !important; overflow: visible !important; background: white !important; }
-              .print-area { position: absolute; left: 0; top: 0; right: 0; margin: 0; padding: 0; width: 186mm; background: white !important; color: black !important; max-height: none !important; height: auto !important; overflow: visible !important; z-index: 9999; font-size: 11pt; }
-              [role="dialog"], [role="dialog"] > * { position: static !important; transform: none !important; max-height: none !important; height: auto !important; overflow: visible !important; }
+              html, body { height: auto !important; overflow: visible !important; background: white !important; margin: 0 !important; padding: 0 !important; }
+              .print-area { position: fixed !important; left: 0 !important; top: 0 !important; right: 0 !important; bottom: auto !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; color: black !important; max-height: none !important; height: auto !important; overflow: visible !important; z-index: 9999; font-size: 10pt; line-height: 1.35; }
+              [role="dialog"], [role="dialog"] > * { position: static !important; transform: none !important; max-height: none !important; height: auto !important; overflow: visible !important; box-shadow: none !important; border: none !important; background: transparent !important; }
               .no-print { display: none !important; }
-              [role="dialog"] { box-shadow: none !important; border: none !important; }
               .comprovante-bloco { break-after: page; page-break-after: always; }
               .comprovante-bloco:last-child { break-after: auto; page-break-after: auto; }
               .comprovante-bloco table, .comprovante-bloco thead, .comprovante-bloco tbody, .comprovante-bloco tr, .comprovante-bloco td, .comprovante-bloco th { page-break-inside: auto; break-inside: auto; }
               .comprovante-bloco tr { page-break-inside: avoid; break-inside: avoid; }
+              .print-area table { font-size: 9.5pt; }
+              .print-area th, .print-area td { padding: 3px 6px !important; }
+              .print-area .comprovante-resumo { padding: 6px 10px !important; margin-bottom: 8px !important; gap: 2px 12px !important; }
+              .print-area .mt-10 { margin-top: 18px !important; }
+              .print-area .mt-8 { margin-top: 10px !important; }
+              .print-area .pt-8 { padding-top: 10px !important; }
+              .print-area .mb-3 { margin-bottom: 6px !important; }
+              .print-area .pb-3 { padding-bottom: 6px !important; }
             }
             @media print {
               body.print-resumo-only .print-area .comprovante-bloco > *:not(.comprovante-resumo) {
