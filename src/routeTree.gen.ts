@@ -118,6 +118,7 @@ import { Route as AuthenticatedAppFinanceiroEstornoRouteImport } from './routes/
 import { Route as AuthenticatedAppFinanceiroEstatisticasRouteImport } from './routes/_authenticated/app.financeiro.estatisticas'
 import { Route as AuthenticatedAppFinanceiroEmpresasRouteImport } from './routes/_authenticated/app.financeiro.empresas'
 import { Route as AuthenticatedAppFinanceiroContasRouteImport } from './routes/_authenticated/app.financeiro.contas'
+import { Route as AuthenticatedAppFinanceiroComprovantesRouteImport } from './routes/_authenticated/app.financeiro.comprovantes'
 import { Route as AuthenticatedAppFinanceiroCategoriasRouteImport } from './routes/_authenticated/app.financeiro.categorias'
 import { Route as AuthenticatedAppFinanceiroBiRouteImport } from './routes/_authenticated/app.financeiro.bi'
 import { Route as AuthenticatedAppFinanceiroAtendimentosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos'
@@ -751,6 +752,12 @@ const AuthenticatedAppFinanceiroContasRoute =
     path: '/contas',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
+const AuthenticatedAppFinanceiroComprovantesRoute =
+  AuthenticatedAppFinanceiroComprovantesRouteImport.update({
+    id: '/comprovantes',
+    path: '/comprovantes',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
 const AuthenticatedAppFinanceiroCategoriasRoute =
   AuthenticatedAppFinanceiroCategoriasRouteImport.update({
     id: '/categorias',
@@ -975,6 +982,7 @@ export interface FileRoutesByFullPath {
   '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
   '/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
+  '/app/financeiro/comprovantes': typeof AuthenticatedAppFinanceiroComprovantesRoute
   '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
   '/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
   '/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
@@ -1101,6 +1109,7 @@ export interface FileRoutesByTo {
   '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
   '/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
+  '/app/financeiro/comprovantes': typeof AuthenticatedAppFinanceiroComprovantesRoute
   '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
   '/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
   '/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
@@ -1233,6 +1242,7 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
   '/_authenticated/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/_authenticated/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
+  '/_authenticated/app/financeiro/comprovantes': typeof AuthenticatedAppFinanceiroComprovantesRoute
   '/_authenticated/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
   '/_authenticated/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
   '/_authenticated/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
@@ -1365,6 +1375,7 @@ export interface FileRouteTypes {
     | '/app/financeiro/atendimentos'
     | '/app/financeiro/bi'
     | '/app/financeiro/categorias'
+    | '/app/financeiro/comprovantes'
     | '/app/financeiro/contas'
     | '/app/financeiro/empresas'
     | '/app/financeiro/estatisticas'
@@ -1491,6 +1502,7 @@ export interface FileRouteTypes {
     | '/app/financeiro/atendimentos'
     | '/app/financeiro/bi'
     | '/app/financeiro/categorias'
+    | '/app/financeiro/comprovantes'
     | '/app/financeiro/contas'
     | '/app/financeiro/empresas'
     | '/app/financeiro/estatisticas'
@@ -1622,6 +1634,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/financeiro/atendimentos'
     | '/_authenticated/app/financeiro/bi'
     | '/_authenticated/app/financeiro/categorias'
+    | '/_authenticated/app/financeiro/comprovantes'
     | '/_authenticated/app/financeiro/contas'
     | '/_authenticated/app/financeiro/empresas'
     | '/_authenticated/app/financeiro/estatisticas'
@@ -2440,6 +2453,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroContasRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
+    '/_authenticated/app/financeiro/comprovantes': {
+      id: '/_authenticated/app/financeiro/comprovantes'
+      path: '/comprovantes'
+      fullPath: '/app/financeiro/comprovantes'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroComprovantesRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
     '/_authenticated/app/financeiro/categorias': {
       id: '/_authenticated/app/financeiro/categorias'
       path: '/categorias'
@@ -2674,6 +2694,7 @@ interface AuthenticatedAppFinanceiroRouteChildren {
   AuthenticatedAppFinanceiroAtendimentosRoute: typeof AuthenticatedAppFinanceiroAtendimentosRoute
   AuthenticatedAppFinanceiroBiRoute: typeof AuthenticatedAppFinanceiroBiRoute
   AuthenticatedAppFinanceiroCategoriasRoute: typeof AuthenticatedAppFinanceiroCategoriasRoute
+  AuthenticatedAppFinanceiroComprovantesRoute: typeof AuthenticatedAppFinanceiroComprovantesRoute
   AuthenticatedAppFinanceiroContasRoute: typeof AuthenticatedAppFinanceiroContasRoute
   AuthenticatedAppFinanceiroEmpresasRoute: typeof AuthenticatedAppFinanceiroEmpresasRoute
   AuthenticatedAppFinanceiroEstatisticasRoute: typeof AuthenticatedAppFinanceiroEstatisticasRoute
@@ -2697,6 +2718,8 @@ const AuthenticatedAppFinanceiroRouteChildren: AuthenticatedAppFinanceiroRouteCh
     AuthenticatedAppFinanceiroBiRoute: AuthenticatedAppFinanceiroBiRoute,
     AuthenticatedAppFinanceiroCategoriasRoute:
       AuthenticatedAppFinanceiroCategoriasRoute,
+    AuthenticatedAppFinanceiroComprovantesRoute:
+      AuthenticatedAppFinanceiroComprovantesRoute,
     AuthenticatedAppFinanceiroContasRoute:
       AuthenticatedAppFinanceiroContasRoute,
     AuthenticatedAppFinanceiroEmpresasRoute:
