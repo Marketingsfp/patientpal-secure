@@ -2665,6 +2665,15 @@ function AtendimentosPage() {
                                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
                                 </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                title="Ver histórico"
+                                onClick={() => setHistoricoAtend(a)}
+                              >
+                                <History className="h-3.5 w-3.5" />
+                              </Button>
                             </div>
                           ) : (
                             <div className="flex items-center justify-end gap-0.5">
