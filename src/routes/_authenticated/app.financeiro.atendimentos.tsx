@@ -316,12 +316,13 @@ export function AtendimentosPage() {
     iframe.setAttribute("aria-hidden", "true");
     Object.assign(iframe.style, {
       position: "fixed",
-      right: "0",
-      bottom: "0",
-      width: "0",
-      height: "0",
+      left: "-10000px",
+      top: "0",
+      width: "210mm",
+      height: "297mm",
       border: "0",
-      visibility: "hidden",
+      opacity: "0",
+      pointerEvents: "none",
     });
 
     document.body.appendChild(iframe);
