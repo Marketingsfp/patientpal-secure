@@ -89,7 +89,11 @@ export async function getMedicoProcedimentosAgenda(
 ): Promise<MedicoProcedimentoRef[]> {
   const cached = fresh(cMedicoProcs.get(clinicaId), TTL_REFS_MS);
   if (cached) return cached;
-  const pageSize = 5000;
+  // PostgREST cap the response at 1000 rows per request by default. Using a
+  // pageSize acima disso faz o loop de paginação parar cedo (o servidor
+  // devolve 1000, o código compara com 5000, pensa que terminou e nunca lê
+  // as próximas páginas — causando vínculos de médico "sumirem" na agenda).
+  const pageSize = 1000;
   const rows: MedicoProcedimentoRef[] = [];
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
@@ -113,13 +117,20 @@ export async function getMedicoConveniosAgenda(
 ): Promise<MedicoConvenioRef[]> {
   const cached = fresh(cMedicoConvenios.get(clinicaId), TTL_REFS_MS);
   if (cached) return cached;
-  const { data, error } = await supabase
-    .from("medico_convenios")
-    .select("medico_id,nome,ativo,medicos!inner(clinica_id)")
-    .eq("ativo", true)
-    .eq("medicos.clinica_id", clinicaId);
-  if (error) throw error;
-  const rows = (data ?? []) as unknown as MedicoConvenioRef[];
+  const pageSize = 1000;
+  const rows: MedicoConvenioRef[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("medico_convenios")
+      .select("medico_id,nome,ativo,medicos!inner(clinica_id)")
+      .eq("ativo", true)
+      .eq("medicos.clinica_id", clinicaId)
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = (data ?? []) as unknown as MedicoConvenioRef[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
   cMedicoConvenios.set(clinicaId, { ts: Date.now(), data: rows });
   return rows;
 }
@@ -129,15 +140,22 @@ export async function getProcedimentosComValor(
 ): Promise<ProcComValor[]> {
   const cached = fresh(cProcedimentosComValor.get(clinicaId), TTL_VALORES_MS);
   if (cached) return cached;
-  const { data } = await supabase
-    .from("procedimentos")
-    .select(
-      "nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix",
-    )
-    .eq("clinica_id", clinicaId)
-    .eq("ativo", true)
-    .limit(5000);
-  const rows = (data ?? []) as ProcComValor[];
+  const pageSize = 1000;
+  const rows: ProcComValor[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("procedimentos")
+      .select(
+        "nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix",
+      )
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true)
+      .range(from, from + pageSize - 1);
+    if (error) break;
+    const page = (data ?? []) as ProcComValor[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
   cProcedimentosComValor.set(clinicaId, { ts: Date.now(), data: rows });
   return rows;
 }
