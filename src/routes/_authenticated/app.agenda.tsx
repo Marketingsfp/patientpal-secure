@@ -2016,12 +2016,11 @@ function AgendaPage() {
 
   const fichaPorId = useMemo(() => {
     const m = new Map<string, string>();
-    // Numeração POSICIONAL única por dia (fila geral da clínica, como senha de
-    // padaria): TODOS os profissionais dividem a mesma sequência 001, 002, 003…
-    // na ordem do horário, cada linha (inclusive slots livres) recebendo o
-    // número da sua posição no dia. Não particiona por médico nem por agenda —
-    // isso fazia a numeração "reiniciar" por profissional e repetir 001 várias
-    // vezes na lista geral (uma vez por profissional).
+    // Numeração POSICIONAL por (dia, profissional): cada médico ou recurso de
+    // enfermagem tem a própria sequência 001, 002, 003… dentro do dia, na
+    // ordem do horário. O filtro visual (médico, status, cliente…) NÃO afeta
+    // esses números — sempre calculamos sobre TODOS os items carregados, para
+    // que a ficha exibida seja estável entre reloads e entre filtros.
     const contadores = new Map<string, number>();
     const ordenados = [...items].sort((a, b) => {
       const t = a.inicio.localeCompare(b.inicio);
@@ -2032,8 +2031,13 @@ function AgendaPage() {
     });
     ordenados.forEach((a) => {
       const dia = a.inicio.slice(0, 10);
-      const n = (contadores.get(dia) ?? 0) + 1;
-      contadores.set(dia, n);
+      // Chave por profissional: usa medico_id (que já engloba recursos de
+      // enfermagem, mapeados como "médicos virtuais" no load()). Slots sem
+      // profissional atribuído são numerados em um bucket próprio por dia.
+      const prof = a.medico_id ?? "__sem_profissional__";
+      const chave = `${dia}::${prof}`;
+      const n = (contadores.get(chave) ?? 0) + 1;
+      contadores.set(chave, n);
       m.set(a.id, String(n).padStart(3, "0"));
     });
     return m;
