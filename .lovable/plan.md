@@ -1,37 +1,71 @@
-**Tipo do pedido:** regra de negócio + inconsistência de dados no Financeiro/Agenda.
+## Objetivo
 
-**Diagnóstico confirmado**
-- A paciente Raquel está com agendamento em **21/07/2026**.
-- O lançamento financeiro vinculado está com `data = 13/07/2026`.
-- A tela de **Financeiro > Atendimentos** hoje filtra atendimentos da agenda por `fin_lancamentos.data`, ou seja, pela data do pagamento/lançamento, não pela data marcada na agenda.
-- Por isso ela aparece no repasse de 13/07 mesmo estando agendada para 21/07.
+Validar em produção, **usando apenas dados fictícios prefixados `SIM_`**, que a correção da aba **Caixa > Movimentos** faz o paciente aparecer corretamente na lista para a atendente em todos os caminhos possíveis, e que ele deixa de aparecer nos casos em que antes sumia.
 
-**Regra correta a aplicar**
-- Atendimento vindo da agenda deve liberar repasse pela **data do agendamento** (`agendamentos.inicio`).
-- Se houver reagendamento, o repasse acompanha a **nova data do agendamento**, porque o lançamento continua vinculado ao agendamento novo.
-- O fato de estar pago antecipadamente não deve antecipar o repasse médico.
+Não vou tocar em nenhum registro real. Não vou usar UI. Tudo será feito por `INSERT` direto no banco e `DELETE` no final do próprio teste.
 
-**Plano de correção**
-1. **Ajustar a listagem de repasse** em `src/routes/_authenticated/app.financeiro.atendimentos.tsx`:
-   - Para registros de origem `agenda`, carregar os lançamentos com vínculo de agenda e usar `agendamentos.inicio::date` como `data` exibida/filtrada.
-   - O filtro “De/Até” deve considerar a data marcada da agenda, não a data do lançamento financeiro.
-   - Manter atendimentos manuais usando `fin_atendimentos.data`, pois eles não têm agenda vinculada.
+## Escopo — 3 cenários
 
-2. **Blindar o pagamento do repasse** na função do banco `pagar_repasse_medico`:
-   - Antes de marcar o repasse como pago, validar que todos os lançamentos de agenda selecionados pertencem a agendamentos já realizados.
-   - Validar também que a data do agendamento não é futura em relação ao dia do repasse informado.
-   - Assim, mesmo se alguma tela antiga/cache tentar pagar antes da data correta, o banco bloqueia.
+Cada cenário reproduz um caminho diferente de como o paciente chega até a linha de Movimentos. Antes da correção, o cenário 2 e o cenário 3 falhavam.
 
-3. **Corrigir o caso já existente da Raquel**:
-   - Após a correção, ela deve deixar de aparecer no período 13/07/2026 e aparecer no período 21/07/2026.
-   - Não vou apagar pagamento nem agendamento; a correção é de regra de elegibilidade/exibição do repasse.
+### Cenário 1 — Cobrança padrão (paciente pelo `fin_lancamentos.paciente_id`)
+- Insere `pacientes` fictício `SIM_TESTE1 CAIXA MOVIMENTOS`.
+- Insere `fin_lancamentos` com `paciente_id` preenchido, `tipo='receita'`, `descricao='SIM_TESTE1 CAIXA MOVIMENTOS · CONSULTA'`.
+- Insere `caixa_movimentos` (tipo `recebimento`) apontando para esse lançamento, em uma sessão fictícia `SIM_SESSAO_TESTE`.
+- **Esperado:** coluna Paciente exibe `SIM_TESTE1 CAIXA MOVIMENTOS` via enrich; filtro por nome encontra a linha; tooltip mostra descrição completa.
 
-4. **Validação após implementação**
-   - Consultar a mesma paciente no banco para confirmar: lançamento em 13/07, agendamento em 21/07.
-   - Conferir que o período 13/07 não lista esse repasse e o período 21/07 lista.
-   - Confirmar que o botão de pagamento não consegue pagar repasse de agenda futura/não realizada.
+### Cenário 2 — Descrição sem o nome (paciente só via `fin_lancamentos.paciente_id`)
+- Reusa paciente fictício `SIM_TESTE2`.
+- Insere `fin_lancamentos` com `paciente_id` preenchido, mas com `descricao='[Caixa] recebimento avulso'` (sem nome no texto).
+- Insere `caixa_movimentos` com descrição também sem o nome: `'consulta particular sem identificação'`.
+- **Esperado (era o bug):** coluna Paciente ainda exibe `SIM_TESTE2` porque o enrich puxa o nome via `paciente_id`. Filtro por `SIM_TESTE2` acha a linha mesmo sem o nome estar na descrição.
 
-**Impacto esperado**
-- Financeiro continua registrando pagamento no dia em que o paciente pagou.
-- Repasse médico passa a ser controlado pelo dia do atendimento marcado/realizado.
-- Reagendamentos passam a mover automaticamente a competência do repasse para a nova data.
+### Cenário 3 — Mensalidade (paciente via `agendamento.paciente_id` fallback)
+- Insere paciente fictício `SIM_TESTE3`.
+- Insere `agendamentos` fictício com `paciente_id` preenchido.
+- Insere `fin_lancamentos` com **`paciente_id = NULL`**, `agendamento_id` apontando para o agendamento acima, `descricao='MENSALIDADE 99/99 - CONTRATO #SIM999 - SIM_TESTE3'`.
+- Insere `caixa_movimentos` referenciando esse lançamento.
+- **Esperado:** paciente resolvido pelo fallback `agendamento.paciente_id`; nome aparece na coluna Paciente; filtro encontra.
+
+## Validação
+
+Para cada cenário, executo **duas checagens SQL** que replicam a lógica do frontend:
+
+1. **Enrich SQL** — mesmo SELECT que o `enrichMovsList` faz, confirma que o backend está devolvendo o `paciente_nome` correto para o `lancamento_id` do movimento fictício.
+2. **Filtro SQL** — confirma que buscar por parte do nome (`SIM_TESTE1`, `SIM_TESTE2`, `SIM_TESTE3`) retornaria a linha através do novo caminho (enrich OU descrição), e não apenas por `descricao ILIKE`.
+
+Não vou renderizar a UI — a lógica testada é a mesma que o React executa (mesmo SELECT em `fin_lancamentos`, `agendamentos`, `pacientes`), então validar SQL é equivalente e não deixa resíduo na sessão de nenhuma atendente real.
+
+## Limpeza (obrigatória e no mesmo teste)
+
+Ao final, na ordem inversa das dependências:
+
+```
+DELETE FROM caixa_movimentos WHERE descricao ILIKE 'SIM\_%' OR descricao ILIKE '%SIM_TESTE%' OR sessao_id = <sessao_sim>;
+DELETE FROM fin_lancamentos  WHERE descricao ILIKE 'SIM\_%' OR descricao ILIKE '%SIM_TESTE%' OR descricao ILIKE 'MENSALIDADE 99/99%';
+DELETE FROM agendamentos     WHERE observacoes ILIKE 'SIM_%';
+DELETE FROM caixa_sessoes    WHERE observacoes = 'SIM_SESSAO_TESTE';
+DELETE FROM pacientes        WHERE nome LIKE 'SIM\_TESTE%';
+```
+
+Depois, uma checagem final:
+
+```
+SELECT COUNT(*) FROM pacientes         WHERE nome LIKE 'SIM\_%';
+SELECT COUNT(*) FROM caixa_movimentos  WHERE descricao ILIKE '%SIM_TESTE%';
+SELECT COUNT(*) FROM fin_lancamentos   WHERE descricao ILIKE '%SIM_TESTE%';
+SELECT COUNT(*) FROM agendamentos      WHERE observacoes ILIKE 'SIM_%';
+```
+
+Todos devem retornar `0`. Se sobrar qualquer resíduo, aviso antes de encerrar.
+
+## Restrições respeitadas
+
+- Todo registro criado tem prefixo `SIM_` e é apagado no mesmo teste.
+- Nenhuma sessão real de atendente é usada; a `caixa_sessoes` é criada fictícia e apagada.
+- Zero interação com registros reais de pacientes, agenda, contratos, mensalidades ou outros caixas.
+- Sem UI, sem chamadas a RPCs de pagamento real, sem NFS-e, sem impressão.
+
+## Entregável
+
+Ao final, mando um relatório curto por cenário: **antes / depois / status (passou ou falhou)**, e a confirmação do `COUNT(*) = 0` da limpeza.
