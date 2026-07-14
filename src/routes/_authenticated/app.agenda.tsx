@@ -1095,6 +1095,8 @@ function AgendaPage() {
     setAuditLoading(true);
     setAuditRows([]);
     setNotasHist([]);
+    setEstornosHist([]);
+    setNomePorUidExtra(new Map());
     setNotaTexto("");
     void carregarEquipe();
     // 1) histórico do próprio agendamento
@@ -1133,6 +1135,35 @@ function AgendaPage() {
       .order("created_at", { ascending: false })
       .limit(500);
     setNotasHist(((nts as unknown as NotaHist[]) ?? []));
+
+    // 3) Solicitações de estorno vinculadas a este agendamento (direta ou via lançamentos)
+    const filtros: string[] = [`agendamento_id.eq.${a.id}`];
+    if (lancIds.length > 0) filtros.push(`lancamento_id.in.(${lancIds.join(",")})`);
+    const { data: ests } = await supabase
+      .from("estorno_solicitacoes")
+      .select("id, status, motivo, resposta, solicitado_por, solicitado_em, resolvido_por, resolvido_em")
+      .or(filtros.join(","))
+      .limit(100);
+    const estornos = ((ests ?? []) as unknown as EstornoHist[]);
+    setEstornosHist(estornos);
+
+    // Resolve nomes de uuids que aparecem em estornos e não estão em equipeList.
+    const uids = new Set<string>();
+    estornos.forEach((e) => {
+      if (e.solicitado_por) uids.add(e.solicitado_por);
+      if (e.resolvido_por) uids.add(e.resolvido_por);
+    });
+    if (uids.size > 0) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, nome")
+        .in("id", Array.from(uids));
+      const m = new Map<string, string>();
+      ((profs ?? []) as Array<{ id: string; nome: string | null }>).forEach((p) => {
+        if (p.nome) m.set(p.id, p.nome);
+      });
+      setNomePorUidExtra(m);
+    }
   };
 
   const adicionarNotaHist = async () => {
