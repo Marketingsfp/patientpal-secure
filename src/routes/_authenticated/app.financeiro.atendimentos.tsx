@@ -2995,21 +2995,32 @@ export function AtendimentosPage() {
             @media print {
               @page { size: A4 portrait; margin: 12mm; }
               html, body { height: auto !important; overflow: visible !important; background: white !important; margin: 0 !important; padding: 0 !important; }
-              body * { visibility: hidden !important; }
-              .print-area, .print-area * { visibility: visible !important; }
-              /* O dialog é centralizado com translate-x/-y (transform). Um
-                 transform em qualquer ancestral vira o "containing block" do
-                 .print-area absoluto e o desloca — daí o corte à esquerda.
-                 Neutraliza posição/transform/recorte do dialog SEM incluir os
-                 filhos: incluir "> *" (com !important static) clobbaria o
-                 position:absolute do próprio .print-area e reintroduziria o
-                 corte. */
-              [role="dialog"] { position: static !important; transform: none !important; max-height: none !important; height: auto !important; overflow: visible !important; box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: auto !important; max-width: none !important; background: transparent !important; }
-              /* Ancora o comprovante no canto da página (independe do layout
-                 do app / sidebar). width:100% = largura útil da página (@page
-                 já subtrai as margens de 12mm). Tipografia alinhada aos
-                 refinamentos de tabela/resumo logo abaixo (base 10pt). */
-              .print-area { position: absolute !important; left: 0 !important; top: 0 !important; right: auto !important; bottom: auto !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; color: black !important; max-height: none !important; height: auto !important; overflow: visible !important; z-index: 2147483647; font-size: 10pt; line-height: 1.35; }
+              /* Esconde de verdade tudo que não contém o comprovante (sidebar,
+                 listas, overlays do Radix que não são do dialog aberto).
+                 display:none tira do fluxo — a página 1 não fica em branco. */
+              body > *:not(:has(.print-area)) { display: none !important; }
+              /* Achata TODOS os wrappers do Radix Portal / Dialog para que
+                 nenhum ancestral com position:fixed ou transform vire o
+                 "containing block" e desloque o comprovante lateralmente. */
+              body > *:has(.print-area),
+              body > *:has(.print-area) *:not(.print-area):not(.print-area *) {
+                position: static !important;
+                transform: none !important;
+                inset: auto !important;
+                top: auto !important; left: auto !important; right: auto !important; bottom: auto !important;
+                max-height: none !important; height: auto !important;
+                max-width: none !important; width: auto !important;
+                overflow: visible !important;
+                box-shadow: none !important;
+                border: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: transparent !important;
+                filter: none !important;
+              }
+              /* O comprovante flui normalmente na página, ocupando a largura
+                 útil do @page A4 (as margens já são aplicadas pelo @page). */
+              .print-area { position: static !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; background: white !important; color: black !important; overflow: visible !important; font-size: 10pt; line-height: 1.35; }
               .no-print { display: none !important; }
               .comprovante-bloco { break-after: page; page-break-after: always; }
               .comprovante-bloco:last-child { break-after: auto; page-break-after: auto; }
