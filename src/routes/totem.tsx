@@ -99,7 +99,7 @@ function TotemPage() {
 
   function escolherTipo(t: TipoSenha) {
     setTipo(t);
-    setStep("consent");
+    void emitir(t);
   }
 
   async function iniciarCamera() {
