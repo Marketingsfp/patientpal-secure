@@ -47,38 +47,29 @@ function configurarSeguranca() {
   if (qzSecurityConfigured) return;
   qzSecurityConfigured = true;
 
-  // Algoritmo casando com a Edge Function (SHA-512).
-  qz.security.setSignatureAlgorithm?.("SHA512");
-
-  // 1) Certificado público — enviado ao QZ Tray para identificar o site.
-  qz.security.setCertificatePromise((arg) => {
-    arg.resolve(QZ_PUBLIC_CERT);
-  });
-
-  // 2) Assinatura — o QZ chama este callback com a string a ser assinada.
-  //    Encaminhamos para a Edge Function `sign-qz` via cliente Supabase,
-  //    que assina em SHA-512 com a chave privada (QZ_PRIVATE_KEY) mantida
-  //    apenas no servidor, e devolve a assinatura em base64.
-  qz.security.setSignaturePromise((toSign: string) => (resolve, reject) => {
-    supabase.functions
-      .invoke("sign-qz", { body: { toSign } })
-      .then(({ data, error }) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        const signature =
-          typeof data === "string"
-            ? data
-            : (data as { signature?: string } | null)?.signature;
-        if (!signature) {
-          reject(new Error("Assinatura ausente na resposta do sign-qz."));
-          return;
-        }
-        resolve(signature);
-      })
-      .catch(reject);
-  });
+  // TEMPORÁRIO: as chamadas setCertificatePromise/setSignaturePromise foram
+  // desativadas porque o QZ Tray recusa o certificado com "Invalid
+  // Certificate" e desabilita o botão Allow no diálogo. Sem esses callbacks,
+  // a requisição volta a ser anônima — o operador do totem consegue clicar
+  // manualmente em "Allow" e a impressão prossegue. Reativar quando o par
+  // certificado/chave for regerado e validado pelo QZ Tray.
+  //
+  // qz.security.setSignatureAlgorithm?.("SHA512");
+  // qz.security.setCertificatePromise((arg) => { arg.resolve(QZ_PUBLIC_CERT); });
+  // qz.security.setSignaturePromise((toSign: string) => (resolve, reject) => {
+  //   supabase.functions.invoke("sign-qz", { body: { toSign } })
+  //     .then(({ data, error }) => {
+  //       if (error) { reject(error); return; }
+  //       const signature = typeof data === "string"
+  //         ? data
+  //         : (data as { signature?: string } | null)?.signature;
+  //       if (!signature) { reject(new Error("Assinatura ausente na resposta do sign-qz.")); return; }
+  //       resolve(signature);
+  //     })
+  //     .catch(reject);
+  // });
+  void QZ_PUBLIC_CERT;
+  void supabase;
 }
 
 export async function imprimirDocumentoSilencioso(pdfBase64: string): Promise<void> {
