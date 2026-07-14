@@ -4225,6 +4225,7 @@ function AgendaPage() {
                   const opts = opcoesServicoFormulario();
                   const permiteMulti = !!form.medico_id
                     && (medicoEhLaboratorioFormulario(form.medico_id) || opts.some((o) => procedimentoEhImagem(o.label)));
+                  const optsMulti = opts.filter((o) => o.value !== "none");
                   return permiteMulti ? (
                     <>
                       <SearchableMultiSelect
@@ -4236,14 +4237,14 @@ function AgendaPage() {
                         }))}
                         placeholder="Selecione um ou mais serviços"
                         searchPlaceholder="Buscar serviço..."
-                        options={opts.filter((o) => o.value !== "none")}
-                        side="top"
+                        options={optsMulti}
                       />
-                      {form.procedimentos.length > 1 && (
-                        <p className="text-[11px] text-emerald-700">
-                          {form.procedimentos.length} exames selecionados.
-                        </p>
-                      )}
+                      <p className="text-[11px] text-slate-500">
+                        {optsMulti.length} serviço{optsMulti.length === 1 ? "" : "s"} disponíve{optsMulti.length === 1 ? "l" : "is"} — role para ver todos.
+                        {form.procedimentos.length > 1 && (
+                          <span className="text-emerald-700"> {form.procedimentos.length} selecionados.</span>
+                        )}
+                      </p>
                     </>
                   ) : (
                     <SearchableSelect
