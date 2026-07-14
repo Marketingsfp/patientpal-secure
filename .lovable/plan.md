@@ -1,41 +1,78 @@
-Tipo de pedido: erro visual/experiência do usuário no comprovante de repasse médico. Não é regra de negócio nem alteração de dados financeiros.
+## Objetivo
 
-Plano de correção:
+Criar uma nova aba **Comprovantes** ao lado da aba **Atendimentos** dentro do submenu Financeiro, listando apenas os **pagamentos de repasse já realizados** (agrupados por médico + data de pagamento), sem misturar com a listagem de atendimentos. Cada linha permite visualizar o comprovante completo (com detalhes dos pacientes) e imprimir a segunda via.
 
-1. Trocar a estratégia de impressão atual
-   - Hoje o sistema tenta imprimir o comprovante de dentro do modal usando CSS `@media print`.
-   - Isso é frágil porque o modal usa camadas centralizadas, posição fixa e transformações; no print preview do navegador, isso pode deslocar o conteúdo e cortar a lateral.
-   - Vou parar de depender do layout da tela/modal para imprimir.
+## Escopo
 
-2. Criar impressão isolada do comprovante
-   - Ao clicar em “Imprimir” ou “Imprimir resumo (médico)”, o sistema vai copiar somente o conteúdo do comprovante para uma área/documento de impressão isolado.
-   - Essa impressão terá CSS próprio de A4, sem sidebar, sem fundo da tela, sem modal, sem transformações e sem dependência do restante do aplicativo.
-   - Resultado esperado: todos os dados devem aparecer alinhados dentro da folha, sem corte lateral.
+Dentro do escopo:
+- Nova rota `/app/financeiro/comprovantes` com item no submenu "Financeiro" chamado **Comprovantes** (ao lado de Atendimentos).
+- Listagem agrupada de repasses pagos.
+- Modal de visualização com o comprovante detalhado (mesmo layout já existente na aba Atendimentos) e botão de imprimir/reimprimir.
 
-3. Manter exatamente os mesmos dados
-   - Não vou alterar cálculo de repasse, baixa de pagamento, reimpressão, dados do médico, paciente, serviço, conta ou total.
-   - A mudança será apenas na forma de preparar o conteúdo para impressão.
+Fora do escopo (não será alterado):
+- Regras de cálculo de repasse, forma de pagamento, laudo, splits, permissões, RLS.
+- Layout/dados do comprovante em si — será reutilizado o mesmo componente/função já usado hoje.
+- A aba Atendimentos continua igual.
 
-4. Ajustar o layout impresso para caber melhor
-   - Definir largura segura para A4.
-   - Reduzir espaçamentos da tabela na impressão.
-   - Permitir quebra de texto em nomes longos de pacientes, médicos e serviços.
-   - Manter valores e datas sem quebra indevida.
-   - Garantir que múltiplos médicos/comprovantes quebrem em páginas separadas corretamente.
+## Fonte de dados
 
-5. Remover/neutralizar o CSS de impressão anterior desse modal
-   - O bloco atual de `@media print` será substituído ou reduzido para não interferir.
-   - Isso evita que regras antigas continuem causando deslocamento ou corte.
+Comprovantes serão derivados de `fin_atendimentos` onde `repasse_pago = true`. Um "comprovante" = um grupo de linhas com a mesma combinação de:
+- `clinica_id`
+- `medico_id`
+- `repasse_pago_em` (data do pagamento)
+- `repasse_lancamento_id` (quando existir, identifica exatamente o evento de baixa; garante que dois repasses no mesmo dia para o mesmo médico apareçam como comprovantes separados)
 
-6. Validação
-   - Abrir o comprovante de repasse e acionar a impressão.
-   - Verificar que o conteúdo começa dentro da margem esquerda da folha e que a tabela não fica cortada.
-   - Verificar também o botão “Imprimir resumo (médico)”.
+Nenhuma tabela nova é necessária — o histórico já está preservado nesses campos.
 
-Arquivos afetados:
-- `src/routes/_authenticated/app.financeiro.atendimentos.tsx`
+## Tela: /app/financeiro/comprovantes
 
-Fora do escopo:
-- Não mexer em banco de dados.
-- Não mexer em regras de pagamento/repasse.
-- Não alterar outros relatórios ou comprovantes fora desta tela.
+Filtros no topo (padrão do módulo):
+- Médico (dropdown, igual ao usado em Atendimentos)
+- Período De / Até (default: últimos 30 dias)
+- Busca por nome do médico
+
+Tabela (uma linha por comprovante):
+- Data do pagamento (`repasse_pago_em`)
+- Médico
+- Qtd. de pacientes (contagem do grupo)
+- Valor total do repasse (soma de `valor_medico` + `valor_laudo` do grupo)
+- Forma de pagamento (`repasse_forma_pagamento`)
+- Ações: **Visualizar** (olho) e **Imprimir** (impressora)
+
+Exemplo de linha: `10/07/26 — Dr. Alex Louzada — 12 pacientes — R$ 660,00 — DINHEIRO — [Visualizar] [Imprimir]`.
+
+Ao clicar em **Visualizar**: abre o mesmo modal de comprovante já existente (função `buildComprovante` + Dialog em `app.financeiro.atendimentos.tsx`), populando com os atendimentos daquele grupo. O modal já tem botões "Imprimir resumo" e "Imprimir" que serão reutilizados.
+
+Ao clicar em **Imprimir** direto na linha: dispara `imprimirComprovante()` (mesma função já usada hoje, com iframe A4 isolado).
+
+## Menu
+
+Em `src/routes/_authenticated/app.financeiro.tsx`, adicionar item entre "Atendimentos" e "Estorno":
+
+```
+{ to: "/app/financeiro/comprovantes", label: "Comprovantes", icon: ReceiptText }
+```
+
+## Arquivos
+
+Novos:
+- `src/routes/_authenticated/app.financeiro.comprovantes.tsx` — nova rota e componente da lista.
+
+Alterados:
+- `src/routes/_authenticated/app.financeiro.tsx` — inclui o novo item no submenu.
+- `src/routes/_authenticated/app.financeiro.atendimentos.tsx` — extrair `buildComprovante`, o Dialog do comprovante e `imprimirComprovante` para um módulo compartilhado (ex.: `src/components/financeiro/comprovante-repasse-dialog.tsx`) para que a nova aba use exatamente o mesmo layout/impressão. A aba Atendimentos passa a importar do módulo compartilhado, mantendo o comportamento atual.
+
+Nada muda em banco, RLS, regras de negócio, permissões ou dados existentes.
+
+## Validação
+
+- Abrir /app/financeiro/comprovantes e conferir que só aparecem repasses **pagos**.
+- Confirmar agrupamento por médico + data.
+- Clicar em Visualizar → conferir que os pacientes do dia aparecem exatamente iguais ao comprovante original gerado no momento do pagamento.
+- Clicar em Imprimir → conferir que a impressão sai completa (não cortada), reaproveitando a correção recente.
+- Aba Atendimentos continua funcionando normalmente.
+
+## Pendências / suposições
+
+- Suposição: dois repasses distintos para o mesmo médico no mesmo dia terão `repasse_lancamento_id` diferentes; caso não tenham, aparecerão como um único comprovante consolidado do dia. Se a clínica quiser tratar de outra forma, ajusto depois.
+- Não haverá exclusão de comprovantes por esta aba — apenas visualização e impressão.
