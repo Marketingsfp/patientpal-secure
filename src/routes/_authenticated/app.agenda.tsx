@@ -3755,14 +3755,17 @@ function AgendaPage() {
           </div>
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <CalendarDays className="h-6 w-6" /> Agendas
-          </h1>
-          <p className="text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm">
+            <CalendarDays className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-foreground">Agendas</h1>
+            <p className="text-xs text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
+          </div>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <TurboModeToggle />
           <div className="inline-flex rounded-full border bg-card p-0.5">
             <button
