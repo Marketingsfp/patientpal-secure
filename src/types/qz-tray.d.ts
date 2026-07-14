@@ -12,7 +12,10 @@ declare module "qz-tray" {
     create(printer: string, options?: unknown): unknown;
   }
   interface QzSecurity {
-    setCertificatePromise(cb: (arg: { resolve: (v: string) => void; reject: (e: unknown) => void }) => void): void;
+    setCertificatePromise(
+      cb: (resolve: (v: string) => void, reject: (e: unknown) => void) => void,
+      options?: { rejectOnFailure?: boolean }
+    ): void;
     setSignaturePromise(cb: (toSign: string) => (resolve: (v: string) => void, reject: (e: unknown) => void) => void): void;
     setSignatureAlgorithm?(alg: string): void;
   }
