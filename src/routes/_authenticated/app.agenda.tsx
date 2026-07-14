@@ -1058,6 +1058,10 @@ function AgendaPage() {
   const [auditAg, setAuditAg] = useState<Agendamento | null>(null);
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
+  type NotaHist = { id: string; user_email: string | null; user_nome: string | null; texto: string; created_at: string };
+  const [notasHist, setNotasHist] = useState<NotaHist[]>([]);
+  const [notaTexto, setNotaTexto] = useState("");
+  const [savingNota, setSavingNota] = useState(false);
 
   // Visão "Por médico — vários dias" (estilo planilha)
   const [viewMode, setViewMode] = useState<"dia" | "medico">("dia");
