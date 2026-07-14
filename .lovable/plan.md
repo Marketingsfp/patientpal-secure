@@ -1,102 +1,46 @@
-## Objetivo
+## Problema
 
-Redesenhar o diálogo "Histórico de alterações" do slot de agendamento (foto 2) para o formato tabela da foto 1 (Data · Usuário · Histórico), mantendo as cores/estilo do nosso sistema, e adicionar um campo para inclusão de **histórico avulso** (texto livre digitado por um usuário da clínica).
+No comprovante de repasse (impressão e reimpressão), o print sai cortado à esquerda e "empurra" o comprovante para a página 2 com uma folha em branco antes (a foto do preview mostra "2 folhas de papel", conteúdo deslocado e recortado).
+
+## Causa
+
+Bloco `@media print` atual em `src/routes/_authenticated/app.financeiro.atendimentos.tsx` (linhas ~2994–3035) usa uma estratégia frágil:
+
+1. Esconde o resto da página com `visibility: hidden`, o que **preserva o layout** — todos os elementos (sidebar, cabeçalho, listas de atendimento) continuam ocupando espaço e empurram o comprovante para baixo, gerando a página 1 em branco.
+2. Neutraliza `position/transform` só no `[role="dialog"]`, mas o Radix envolve o dialog em um Portal com wrappers próprios (`data-radix-*`) que continuam com `position: fixed` / transformações. Como `.print-area` é `position: absolute` com `left: 0`, ela se ancora a um desses ancestrais transformados → deslocamento horizontal → corte à esquerda.
+
+## Correção proposta (mudança localizada só no CSS de impressão)
+
+Substituir o bloco `@media print` do diálogo do comprovante por uma abordagem mais robusta, sem tocar em nada da lógica de dados / botões / geração do comprovante:
+
+1. **Esconder de verdade** o restante da página com `display: none` no `body > *` que **não** contém o `.print-area` (usando seletor `:has(.print-area)` — suportado em todos os browsers modernos que os usuários da clínica utilizam para imprimir). Assim, sidebar, listas e demais elementos não ocupam mais espaço e a página 1 deixa de ficar vazia.
+2. **Achatar todos os wrappers** do Radix Portal / Dialog (`[data-radix-portal]`, `[data-radix-dialog-overlay]`, `[role="dialog"]` e seus containers): forçar `position: static`, `transform: none`, `inset: auto`, `max-width: none`, `overflow: visible`. Isso remove o "containing block" transformado que estava deslocando o `.print-area`.
+3. **Colocar o `.print-area` em fluxo estático** (não mais `position: absolute`), ocupando `width: 100%` da área imprimível do `@page A4 portrait; margin: 12mm`. Sem ancoragem absoluta, não há como o conteúdo vazar para a esquerda da folha.
+4. Manter (sem alteração) os ajustes tipográficos existentes: `font-size: 10pt`, paddings da tabela, `break-inside: avoid` nas linhas, quebra de página entre múltiplos médicos, e o modo "Imprimir resumo (médico)".
 
 ## Escopo
 
-- **Somente** o diálogo aberto pelo ícone de escudo no slot de agendamento (arquivo `src/routes/_authenticated/app.agenda.tsx`, linhas ~4827–4937).
-- Não altera o histórico de orçamentos (`historico-orcamento-dialog.tsx`) nem a página de Auditoria.
-- Sem mudanças em regras de negócio de agendamento, financeiro ou repasse.
+**Dentro do escopo (só o bloco `<style>` do diálogo do comprovante):**
+- Reescrita do `@media print` nas linhas ~2994–3035 de `src/routes/_authenticated/app.financeiro.atendimentos.tsx`.
 
-## Como vai ficar
-
-### Layout (parecido com foto 1, cores HHP)
-
-```
-┌─────────────────────────────────────────────────────────┐
-│ 🛡  Histórico                                        ✕  │
-│    ALINE TAVARES... — 14/07/2026, 07:00                 │
-├─────────────────────────────────────────────────────────┤
-│  ┌───────────────────────────────────────────────────┐  │
-│  │ [textarea: digite uma observação de histórico...] │  │
-│  └───────────────────────────────────────────────────┘  │
-│                                    [ + Adicionar ]      │
-├─────────────────────────────────────────────────────────┤
-│  Data              Usuário              Histórico       │
-│  14/07/26 10:28    ELISABETE M.         Alterou status: │
-│                                         agendado →      │
-│                                         realizado       │
-│  14/07/26 07:07    EDNALDA P.           Alterou etapa:  │
-│                                         recepção →      │
-│                                         triagem         │
-│  10/07/26 09:49    KELLY B.             (avulso) Não    │
-│                                         compareceu…     │
-│  17/06/26 09:21    PATRICIA M.          Criou           │
-│                                         agendamento     │
-└─────────────────────────────────────────────────────────┘
-                                              [ Fechar ]
-```
-
-- Tabela com cabeçalho fixo, linhas com hover suave (padrão shadcn `Table`).
-- Coluna **Data**: `dd/MM/yy HH:mm`.
-- Coluna **Usuário**: nome do funcionário (via `equipeList`, fallback e‑mail).
-- Coluna **Histórico**: descrição legível em texto corrido. Sem cards, sem badges grandes; usa apenas um pequeno rótulo colorido (verde=Criou, âmbar=Alterou, rosa=Excluiu, azul=Nota) antes do texto — nossas cores atuais.
-- Ordenação: mais recentes no topo (igual hoje).
-- Empty state: linha única "Nenhum registro."
-
-### Campo de "histórico avulso"
-
-- Textarea + botão **Adicionar** logo abaixo do cabeçalho do diálogo.
-- Ao clicar, grava uma nota livre com autor, data/hora e agendamento_id, e a linha aparece imediatamente na tabela junto com as alterações auditadas.
-- Notas avulsas **não podem ser editadas nem excluídas** depois de gravadas (regra de imutabilidade de dados do projeto — `mem/constraints/governanca-dados-imutaveis.md`).
-- Nota vazia é ignorada; texto é limitado a 1000 caracteres.
-
-## Detalhes técnicos
-
-### Persistência das notas avulsas
-
-Nova tabela `agendamento_historico_notas` no schema `public`:
-
-```
-id uuid pk default gen_random_uuid()
-clinica_id uuid not null
-agendamento_id uuid not null
-user_email text
-user_nome text
-texto text not null check (length(texto) between 1 and 1000)
-created_at timestamptz not null default now()
-```
-
-- Índice em `(agendamento_id, created_at desc)`.
-- `GRANT SELECT, INSERT ON public.agendamento_historico_notas TO authenticated;` (sem UPDATE/DELETE — imutável).
-- `GRANT ALL ON ... TO service_role;`
-- RLS habilitado; políticas: `SELECT` e `INSERT` só quando o usuário pertence à `clinica_id` (mesmo padrão das outras tabelas de agendamento).
-- Sem `anon`.
-
-### Frontend
-
-No `app.agenda.tsx`:
-
-- Substituir o conteúdo do `Dialog` (linhas 4827–4937) pela tabela shadcn (`Table/TableHeader/TableRow/TableCell`) + textarea + botão.
-- Novo estado: `notaTexto`, `notasAvulsas`, `savingNota`.
-- Carregar notas avulsas em paralelo com `auditRows` quando `auditAg` mudar.
-- Fundir `auditRows` (INSERT/UPDATE/DELETE) e `notasAvulsas` em uma única lista ordenada por `created_at desc` para renderizar.
-- Função helper para transformar cada `auditRow` em uma string de "Histórico" legível (ex.: `Alterou status: agendado → realizado`), reaproveitando a lógica atual de diff + `repasseLabel`.
-
-### Não muda
-
-- Não muda `audit_log`, triggers, nem o dialog de histórico de orçamentos.
-- Não altera nenhum outro fluxo da agenda.
+**Fora do escopo (não será tocado):**
+- Estrutura JSX do comprovante, cálculo de valores, ordem dos itens, layout na tela (fora de impressão).
+- Lógica de reimpressão / 2ª via (o rótulo vermelho continua igual).
+- Outros comprovantes/relatórios do sistema.
+- Regras de negócio, banco, RLS.
 
 ## Validação
 
-- Abrir o histórico de um agendamento existente e conferir que todas as linhas hoje exibidas em cards continuam aparecendo, agora em formato tabela.
-- Inserir uma nota avulsa curta e conferir que aparece imediatamente no topo, com o nome do usuário logado.
-- Tentar inserir nota vazia → botão desabilitado.
-- Recarregar o dialog → nota persiste.
-- Conferir em outra clínica que a nota não vaza (RLS).
+- Build/typecheck automáticos.
+- Instruções para o usuário testar: abrir um comprovante existente (repasse já pago), clicar "Imprimir" → verificar que o preview do navegador mostra **1 folha A4** com todos os dados (cabeçalho da clínica, resumo médico/data/forma/conta/atendimentos/total, tabela e linhas de assinatura) sem corte lateral.
+- Testar também a 2ª via (reimpressão) a partir do mesmo item.
+- Se o comprovante tiver muitos itens e ocupar >1 página, verificar que as linhas da tabela não são cortadas no meio.
 
-## Pendências que dependem de você
+## Riscos
 
-1. Confirma o **nome do rótulo** para notas manuais? Sugestão: mostrar um chip azul `Nota` na coluna Histórico. Alternativas: `Anotação`, `Observação`.
-2. Alguma nota avulsa deve poder ser **oculta/marcada como corrigida** por gestor, ou realmente segue 100% imutável (recomendado, alinhado com a governança do projeto)?
+- Baixo. A mudança é puramente CSS `@media print`, escopada ao diálogo do comprovante de repasse. Nenhum dado é alterado.
+- Único ponto de atenção: o seletor `:has()` — suportado em Chrome/Edge/Safari/Firefox atuais (versões usadas em produção clínica). Se algum totem/estação usar browser muito antigo, um fallback pode ser adicionado; me avise se for o caso.
+
+## Confirmação
+
+Posso implementar dessa forma? Ou você prefere que eu também revise os outros comprovantes/relatórios impressos (não faz parte deste pedido, mas se quiser, listo primeiro os que existem)?
