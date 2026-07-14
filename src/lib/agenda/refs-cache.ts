@@ -89,7 +89,11 @@ export async function getMedicoProcedimentosAgenda(
 ): Promise<MedicoProcedimentoRef[]> {
   const cached = fresh(cMedicoProcs.get(clinicaId), TTL_REFS_MS);
   if (cached) return cached;
-  const pageSize = 5000;
+  // PostgREST cap the response at 1000 rows per request by default. Using a
+  // pageSize acima disso faz o loop de paginação parar cedo (o servidor
+  // devolve 1000, o código compara com 5000, pensa que terminou e nunca lê
+  // as próximas páginas — causando vínculos de médico "sumirem" na agenda).
+  const pageSize = 1000;
   const rows: MedicoProcedimentoRef[] = [];
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabase
