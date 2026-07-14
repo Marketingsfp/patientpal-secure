@@ -7,7 +7,7 @@
 -- também guarda paciente_id, então a resposta continua rastreável ao
 -- paciente mesmo sem o vínculo à consulta específica.
 alter table public.anamnese_respostas
-  drop constraint anamnese_respostas_agendamento_id_fkey;
+  drop constraint if exists anamnese_respostas_agendamento_id_fkey;
 
 alter table public.anamnese_respostas
   add constraint anamnese_respostas_agendamento_id_fkey
