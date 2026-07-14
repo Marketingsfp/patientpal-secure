@@ -1,71 +1,102 @@
 ## Objetivo
 
-Validar em produção, **usando apenas dados fictícios prefixados `SIM_`**, que a correção da aba **Caixa > Movimentos** faz o paciente aparecer corretamente na lista para a atendente em todos os caminhos possíveis, e que ele deixa de aparecer nos casos em que antes sumia.
+Redesenhar o diálogo "Histórico de alterações" do slot de agendamento (foto 2) para o formato tabela da foto 1 (Data · Usuário · Histórico), mantendo as cores/estilo do nosso sistema, e adicionar um campo para inclusão de **histórico avulso** (texto livre digitado por um usuário da clínica).
 
-Não vou tocar em nenhum registro real. Não vou usar UI. Tudo será feito por `INSERT` direto no banco e `DELETE` no final do próprio teste.
+## Escopo
 
-## Escopo — 3 cenários
+- **Somente** o diálogo aberto pelo ícone de escudo no slot de agendamento (arquivo `src/routes/_authenticated/app.agenda.tsx`, linhas ~4827–4937).
+- Não altera o histórico de orçamentos (`historico-orcamento-dialog.tsx`) nem a página de Auditoria.
+- Sem mudanças em regras de negócio de agendamento, financeiro ou repasse.
 
-Cada cenário reproduz um caminho diferente de como o paciente chega até a linha de Movimentos. Antes da correção, o cenário 2 e o cenário 3 falhavam.
+## Como vai ficar
 
-### Cenário 1 — Cobrança padrão (paciente pelo `fin_lancamentos.paciente_id`)
-- Insere `pacientes` fictício `SIM_TESTE1 CAIXA MOVIMENTOS`.
-- Insere `fin_lancamentos` com `paciente_id` preenchido, `tipo='receita'`, `descricao='SIM_TESTE1 CAIXA MOVIMENTOS · CONSULTA'`.
-- Insere `caixa_movimentos` (tipo `recebimento`) apontando para esse lançamento, em uma sessão fictícia `SIM_SESSAO_TESTE`.
-- **Esperado:** coluna Paciente exibe `SIM_TESTE1 CAIXA MOVIMENTOS` via enrich; filtro por nome encontra a linha; tooltip mostra descrição completa.
+### Layout (parecido com foto 1, cores HHP)
 
-### Cenário 2 — Descrição sem o nome (paciente só via `fin_lancamentos.paciente_id`)
-- Reusa paciente fictício `SIM_TESTE2`.
-- Insere `fin_lancamentos` com `paciente_id` preenchido, mas com `descricao='[Caixa] recebimento avulso'` (sem nome no texto).
-- Insere `caixa_movimentos` com descrição também sem o nome: `'consulta particular sem identificação'`.
-- **Esperado (era o bug):** coluna Paciente ainda exibe `SIM_TESTE2` porque o enrich puxa o nome via `paciente_id`. Filtro por `SIM_TESTE2` acha a linha mesmo sem o nome estar na descrição.
+```
+┌─────────────────────────────────────────────────────────┐
+│ 🛡  Histórico                                        ✕  │
+│    ALINE TAVARES... — 14/07/2026, 07:00                 │
+├─────────────────────────────────────────────────────────┤
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ [textarea: digite uma observação de histórico...] │  │
+│  └───────────────────────────────────────────────────┘  │
+│                                    [ + Adicionar ]      │
+├─────────────────────────────────────────────────────────┤
+│  Data              Usuário              Histórico       │
+│  14/07/26 10:28    ELISABETE M.         Alterou status: │
+│                                         agendado →      │
+│                                         realizado       │
+│  14/07/26 07:07    EDNALDA P.           Alterou etapa:  │
+│                                         recepção →      │
+│                                         triagem         │
+│  10/07/26 09:49    KELLY B.             (avulso) Não    │
+│                                         compareceu…     │
+│  17/06/26 09:21    PATRICIA M.          Criou           │
+│                                         agendamento     │
+└─────────────────────────────────────────────────────────┘
+                                              [ Fechar ]
+```
 
-### Cenário 3 — Mensalidade (paciente via `agendamento.paciente_id` fallback)
-- Insere paciente fictício `SIM_TESTE3`.
-- Insere `agendamentos` fictício com `paciente_id` preenchido.
-- Insere `fin_lancamentos` com **`paciente_id = NULL`**, `agendamento_id` apontando para o agendamento acima, `descricao='MENSALIDADE 99/99 - CONTRATO #SIM999 - SIM_TESTE3'`.
-- Insere `caixa_movimentos` referenciando esse lançamento.
-- **Esperado:** paciente resolvido pelo fallback `agendamento.paciente_id`; nome aparece na coluna Paciente; filtro encontra.
+- Tabela com cabeçalho fixo, linhas com hover suave (padrão shadcn `Table`).
+- Coluna **Data**: `dd/MM/yy HH:mm`.
+- Coluna **Usuário**: nome do funcionário (via `equipeList`, fallback e‑mail).
+- Coluna **Histórico**: descrição legível em texto corrido. Sem cards, sem badges grandes; usa apenas um pequeno rótulo colorido (verde=Criou, âmbar=Alterou, rosa=Excluiu, azul=Nota) antes do texto — nossas cores atuais.
+- Ordenação: mais recentes no topo (igual hoje).
+- Empty state: linha única "Nenhum registro."
+
+### Campo de "histórico avulso"
+
+- Textarea + botão **Adicionar** logo abaixo do cabeçalho do diálogo.
+- Ao clicar, grava uma nota livre com autor, data/hora e agendamento_id, e a linha aparece imediatamente na tabela junto com as alterações auditadas.
+- Notas avulsas **não podem ser editadas nem excluídas** depois de gravadas (regra de imutabilidade de dados do projeto — `mem/constraints/governanca-dados-imutaveis.md`).
+- Nota vazia é ignorada; texto é limitado a 1000 caracteres.
+
+## Detalhes técnicos
+
+### Persistência das notas avulsas
+
+Nova tabela `agendamento_historico_notas` no schema `public`:
+
+```
+id uuid pk default gen_random_uuid()
+clinica_id uuid not null
+agendamento_id uuid not null
+user_email text
+user_nome text
+texto text not null check (length(texto) between 1 and 1000)
+created_at timestamptz not null default now()
+```
+
+- Índice em `(agendamento_id, created_at desc)`.
+- `GRANT SELECT, INSERT ON public.agendamento_historico_notas TO authenticated;` (sem UPDATE/DELETE — imutável).
+- `GRANT ALL ON ... TO service_role;`
+- RLS habilitado; políticas: `SELECT` e `INSERT` só quando o usuário pertence à `clinica_id` (mesmo padrão das outras tabelas de agendamento).
+- Sem `anon`.
+
+### Frontend
+
+No `app.agenda.tsx`:
+
+- Substituir o conteúdo do `Dialog` (linhas 4827–4937) pela tabela shadcn (`Table/TableHeader/TableRow/TableCell`) + textarea + botão.
+- Novo estado: `notaTexto`, `notasAvulsas`, `savingNota`.
+- Carregar notas avulsas em paralelo com `auditRows` quando `auditAg` mudar.
+- Fundir `auditRows` (INSERT/UPDATE/DELETE) e `notasAvulsas` em uma única lista ordenada por `created_at desc` para renderizar.
+- Função helper para transformar cada `auditRow` em uma string de "Histórico" legível (ex.: `Alterou status: agendado → realizado`), reaproveitando a lógica atual de diff + `repasseLabel`.
+
+### Não muda
+
+- Não muda `audit_log`, triggers, nem o dialog de histórico de orçamentos.
+- Não altera nenhum outro fluxo da agenda.
 
 ## Validação
 
-Para cada cenário, executo **duas checagens SQL** que replicam a lógica do frontend:
+- Abrir o histórico de um agendamento existente e conferir que todas as linhas hoje exibidas em cards continuam aparecendo, agora em formato tabela.
+- Inserir uma nota avulsa curta e conferir que aparece imediatamente no topo, com o nome do usuário logado.
+- Tentar inserir nota vazia → botão desabilitado.
+- Recarregar o dialog → nota persiste.
+- Conferir em outra clínica que a nota não vaza (RLS).
 
-1. **Enrich SQL** — mesmo SELECT que o `enrichMovsList` faz, confirma que o backend está devolvendo o `paciente_nome` correto para o `lancamento_id` do movimento fictício.
-2. **Filtro SQL** — confirma que buscar por parte do nome (`SIM_TESTE1`, `SIM_TESTE2`, `SIM_TESTE3`) retornaria a linha através do novo caminho (enrich OU descrição), e não apenas por `descricao ILIKE`.
+## Pendências que dependem de você
 
-Não vou renderizar a UI — a lógica testada é a mesma que o React executa (mesmo SELECT em `fin_lancamentos`, `agendamentos`, `pacientes`), então validar SQL é equivalente e não deixa resíduo na sessão de nenhuma atendente real.
-
-## Limpeza (obrigatória e no mesmo teste)
-
-Ao final, na ordem inversa das dependências:
-
-```
-DELETE FROM caixa_movimentos WHERE descricao ILIKE 'SIM\_%' OR descricao ILIKE '%SIM_TESTE%' OR sessao_id = <sessao_sim>;
-DELETE FROM fin_lancamentos  WHERE descricao ILIKE 'SIM\_%' OR descricao ILIKE '%SIM_TESTE%' OR descricao ILIKE 'MENSALIDADE 99/99%';
-DELETE FROM agendamentos     WHERE observacoes ILIKE 'SIM_%';
-DELETE FROM caixa_sessoes    WHERE observacoes = 'SIM_SESSAO_TESTE';
-DELETE FROM pacientes        WHERE nome LIKE 'SIM\_TESTE%';
-```
-
-Depois, uma checagem final:
-
-```
-SELECT COUNT(*) FROM pacientes         WHERE nome LIKE 'SIM\_%';
-SELECT COUNT(*) FROM caixa_movimentos  WHERE descricao ILIKE '%SIM_TESTE%';
-SELECT COUNT(*) FROM fin_lancamentos   WHERE descricao ILIKE '%SIM_TESTE%';
-SELECT COUNT(*) FROM agendamentos      WHERE observacoes ILIKE 'SIM_%';
-```
-
-Todos devem retornar `0`. Se sobrar qualquer resíduo, aviso antes de encerrar.
-
-## Restrições respeitadas
-
-- Todo registro criado tem prefixo `SIM_` e é apagado no mesmo teste.
-- Nenhuma sessão real de atendente é usada; a `caixa_sessoes` é criada fictícia e apagada.
-- Zero interação com registros reais de pacientes, agenda, contratos, mensalidades ou outros caixas.
-- Sem UI, sem chamadas a RPCs de pagamento real, sem NFS-e, sem impressão.
-
-## Entregável
-
-Ao final, mando um relatório curto por cenário: **antes / depois / status (passou ou falhou)**, e a confirmação do `COUNT(*) = 0` da limpeza.
+1. Confirma o **nome do rótulo** para notas manuais? Sugestão: mostrar um chip azul `Nota` na coluna Histórico. Alternativas: `Anotação`, `Observação`.
+2. Alguma nota avulsa deve poder ser **oculta/marcada como corrigida** por gestor, ou realmente segue 100% imutável (recomendado, alinhado com a governança do projeto)?
