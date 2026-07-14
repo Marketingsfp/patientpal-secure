@@ -18,28 +18,28 @@ import { supabase } from "@/integrations/supabase/client";
 // mantida em segredo no servidor). O QZ Tray envia este certificado ao
 // aplicativo local para validar que o site é autorizado a imprimir.
 const QZ_PUBLIC_CERT = `-----BEGIN CERTIFICATE-----
-MIIECzCCAvOgAwIBAgIGAZ9hK3mnMA0GCSqGSIb3DQEBCwUAMIGiMQswCQYDVQQG
+MIID+zCCAuOgAwIBAgIGAZ9hDLaEMA0GCSqGSIb3DQEBCwUAMIGaMQswCQYDVQQG
 EwJVUzELMAkGA1UECAwCTlkxEjAQBgNVBAcMCUNhbmFzdG90YTEbMBkGA1UECgwS
 UVogSW5kdXN0cmllcywgTExDMRswGQYDVQQLDBJRWiBJbmR1c3RyaWVzLCBMTEMx
-HDAaBgkqhkiG9w0BCQEWDXN1cHBvcnRAcXouaW8xGjAYBgNVBAMMEVFaIFRyYXkg
-RGVtbyBDZXJ0MB4XDTI2MDcxMzE1MDc0NloXDTQ2MDcxMzE1MDc0NlowgaIxCzAJ
-BgNVBAYTAlVTMQswCQYDVQQIDAJOWTESMBAGA1UEBwwJQ2FuYXN0b3RhMRswGQYD
-VQQKDBJRWiBJbmR1c3RyaWVzLCBMTEMxGzAZBgNVBAsMElFaIEluZHVzdHJpZXMs
-IExMQzEcMBoGCSqGSIb3DQEJARYNc3VwcG9ydEBxei5pbzEaMBgGA1UEAwwRUVog
-VHJheSBEZW1vIENlcnQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCa
-r74A9U3lWNRczws871Fiwe9yNdXVIpVWVxBin294Kw0iu/4/bcarUo30Ez49tiQ+
-gPBMWwdGH90m0qJ/mKPagqdUgnqJdaSJA8rHBXBQ2oPCirR6CAvEmsUuHEdai0YW
-BNiXD9J4RevykVviLxt2YXtG4qk4oeJeoFe8Fo2bh7FaiIV6LbVDwY9HmAsis5tn
-Ihcw8SYH9fb91D03Jdk2qbByLDflHmHN4cZEQlJLFhz/JQBQHnyaRqznlNO8wCcf
-XlUHSu3u6Y/gpd1O6c9tB1g6Fw1swir4EDNCVcneZN+T/fdGdNbRuGnUmkd2tzpW
-TB1LQpm3e+PpZ1KCPX7rAgMBAAGjRTBDMBIGA1UdEwEB/wQIMAYBAf8CAQEwDgYD
-VR0PAQH/BAQDAgEGMB0GA1UdDgQWBBQ329DVjOCCrUrb371w6SlwMGYP6jANBgkq
-hkiG9w0BAQsFAAOCAQEAi9OjVPobFMgVfdXDHX8uEwAZ636b7nHL7j4CtVstJtbP
-/bb8FgY3JMT+LI8A/4bO+fib7Iwp2DBpSlH+0/cEDIBIMK6EXsJp+/RYzohVeun2
-jPsc8vByD+OjKvhhYB0NskKLFSV0qllYBCSYBpXa1lhazwOKZywVZMmGRO6IAds7
-8de/NAAtmaKiS24RQXTIBdhYXqrXLOGNlNYq+ZXrCWjZv043BqmvhToNOhl1+u9o
-P8+R1/Yd17Edza1AlIIl82j4SUbm9xvrODi6M311ugnJgDFGDPvl4mJb3/ADjXKt
-clGgs+KzMvapNrPUElCRB209qqZuQmRbWR0MUPEvtw==
+HDAaBgkqhkiG9w0BCQEWDXN1cHBvcnRAcXouaW8xEjAQBgNVBAMMCWxvY2FsaG9z
+dDAeFw0yNjA3MTMxNDM0MTBaFw00NjA3MTMxNDM0MTBaMIGaMQswCQYDVQQGEwJV
+UzELMAkGA1UECAwCTlkxEjAQBgNVBAcMCUNhbmFzdG90YTEbMBkGA1UECgwSUVog
+SW5kdXN0cmllcywgTExDMRswGQYDVQQLDBJRWiBJbmR1c3RyaWVzLCBMTEMxHDAa
+BgkqhkiG9w0BCQEWDXN1cHBvcnRAcXouaW8xEjAQBgNVBAMMCWxvY2FsaG9zdDCC
+ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAORj8Gr/sqp5yn8TtkgSOL+r
+gmvhcXdJT1rBwiyhFBCPw0nbk+YOMUS2KrX2beG0tcet5Hdrrys7rtah6VDhWup1
+LIwBGUW+1Fz0VRE8NLK70SqRA/MhcAZsmd1by8ZjLjcOXPX/9qERs1QuBBVICGrt
+73fUH3Reo3zIf6Wm4yrvXeW8be43StZfteNkV3DUbzayGdV3bVFb9IKUI2AYv2dP
+C1pkG6IQaM5rAm9x1GkrpUyIAAVo6tQ5npcrKmQ4fU5RSr4jII+tteFANKCiEGKr
+XlNiLuuYC9UzCiGy7Y3tmmLsOSE7UZ7l1beF0tDSf1iC83GKC2arz/wdUARRGZcC
+AwEAAaNFMEMwEgYDVR0TAQH/BAgwBgEB/wIBATAOBgNVHQ8BAf8EBAMCAQYwHQYD
+VR0OBBYEFMJgR4alU4UOQaJCubmrzVSB9EDaMA0GCSqGSIb3DQEBCwUAA4IBAQBj
+ce1BsveCiDnMruQQr2eXI9VxiB0a/ebpMN21POFNtcRicMpY8d6UAgVruY+c6ejS
+XURiuwHb9eFwTdsL2IcjQ79Kd4nfXDMPN1RyWTm9abFMTE1lJdZo/4I0MFmBubaw
+D/HYnuEn3mwj5SO8XCKUWjpmIzvY3PgsaeCme2GmggIsr8WwHIaSeyF7203hiHmj
+BTUydw4HRUv87rBQQjmQVGXRGhY90VTqfTGpZ8KQg6e+eTeNXXq1oFOY6prlWbZF
+qGvwDNM0U4JGgbyEbDFWSZp0qEcM1MWSxXGcTpdwnLPpYkDElJEIv4r2aH0d63if
+J7naCuQg1YqLIUUXzeCR
 -----END CERTIFICATE-----`;
 
 let qzSecurityConfigured = false;
@@ -47,28 +47,16 @@ function configurarSeguranca() {
   if (qzSecurityConfigured) return;
   qzSecurityConfigured = true;
 
-  // TEMPORÁRIO: as chamadas setCertificatePromise/setSignaturePromise foram
-  // desativadas porque o QZ Tray recusa o certificado com "Invalid
-  // Certificate" e desabilita o botão Allow no diálogo. Sem esses callbacks,
-  // a requisição volta a ser anônima — o operador do totem consegue clicar
-  // manualmente em "Allow" e a impressão prossegue. Reativar quando o par
-  // certificado/chave for regerado e validado pelo QZ Tray.
-  //
-  // qz.security.setSignatureAlgorithm?.("SHA512");
-  // qz.security.setCertificatePromise((arg) => { arg.resolve(QZ_PUBLIC_CERT); });
-  // qz.security.setSignaturePromise((toSign: string) => (resolve, reject) => {
-  //   supabase.functions.invoke("sign-qz", { body: { toSign } })
-  //     .then(({ data, error }) => {
-  //       if (error) { reject(error); return; }
-  //       const signature = typeof data === "string"
-  //         ? data
-  //         : (data as { signature?: string } | null)?.signature;
-  //       if (!signature) { reject(new Error("Assinatura ausente na resposta do sign-qz.")); return; }
-  //       resolve(signature);
-  //     })
-  //     .catch(reject);
-  // });
-  void QZ_PUBLIC_CERT;
+  // Usa o certificado root-ca local do QZ Tray desta máquina do totem.
+  // Sem chave privada correspondente, a assinatura é vazia — o QZ Tray
+  // reconhece o certificado e libera o botão Allow no diálogo, e o operador
+  // confirma manualmente.
+  qz.security.setCertificatePromise((arg) => {
+    arg.resolve(QZ_PUBLIC_CERT);
+  });
+  qz.security.setSignaturePromise(() => (resolve) => {
+    resolve("");
+  });
   void supabase;
 }
 
