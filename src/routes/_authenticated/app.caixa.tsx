@@ -362,10 +362,21 @@ function Page() {
       } else if (meuPeriodo === "mes") {
         ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0);
       } else {
-        const [yi, mi, di] = meuDataIni.split("-").map(Number);
-        const [yf, mf, df] = meuDataFim.split("-").map(Number);
-        ini = new Date(yi, (mi || 1) - 1, di || 1, 0, 0, 0, 0);
-        fimP = new Date(yf, (mf || 1) - 1, df || 1, 23, 59, 59, 999);
+        // Validação defensiva: se o intervalo estiver em branco/mal
+        // formatado, cai para o dia de hoje em vez de gerar Date(NaN)
+        // e sumir com todas as linhas silenciosamente.
+        const parseIso = (s: string): [number, number, number] | null => {
+          const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || "");
+          if (!m) return null;
+          const y = Number(m[1]); const mo = Number(m[2]); const d = Number(m[3]);
+          if (!y || !mo || !d) return null;
+          return [y, mo, d];
+        };
+        const pi = parseIso(meuDataIni);
+        const pf = parseIso(meuDataFim);
+        if (pi) ini = new Date(pi[0], pi[1] - 1, pi[2], 0, 0, 0, 0);
+        else ini = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        if (pf) fimP = new Date(pf[0], pf[1] - 1, pf[2], 23, 59, 59, 999);
       }
       base = base.filter((m) => {
         const d = new Date(m.created_at);
@@ -379,10 +390,16 @@ function Page() {
         return (enr?.medico ?? "").trim() === meuMedico;
       });
     }
-    // 3) filtro por paciente (nome antes do " — " na descrição)
+    // 3) filtro por paciente — usa o nome enriquecido de fin_lancamentos
+    // (fonte de verdade) com fallback para a descrição do próprio
+    // movimento. Assim, mensalidades e recebimentos manuais sem o nome
+    // no texto continuam encontráveis quando existe vínculo real.
     const termo = meuPaciente.trim().toLocaleLowerCase("pt-BR");
     if (termo) {
       base = base.filter((m) => {
+        const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
+        const nomeEnr = (enr?.paciente ?? "").toLocaleLowerCase("pt-BR");
+        if (nomeEnr && nomeEnr.includes(termo)) return true;
         const desc = (m.descricao ?? "").toLocaleLowerCase("pt-BR");
         return desc.includes(termo);
       });
@@ -403,6 +420,8 @@ function Page() {
 
   const filtrosAtivos =
     meuPeriodo !== "hoje" || meuMedico !== "__all__" || meuPaciente.trim() !== "";
+  // Nota: o rótulo "(X de N)" e o botão "Limpar" continuam válidos
+  // porque `meuPeriodo === "intervalo"` também difere de "hoje".
   const limparFiltros = () => {
     setMeuPeriodo("hoje");
     setMeuMedico("__all__");
