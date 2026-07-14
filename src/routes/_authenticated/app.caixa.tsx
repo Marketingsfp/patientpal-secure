@@ -214,6 +214,37 @@ function servicoFromDescricao(desc: string | null): string | null {
   return null;
 }
 
+/** Extrai o nome do paciente da descrição de um movimento como fallback,
+ *  quando não há enriquecimento via fin_lancamentos.paciente_id. Aceita
+ *  os formatos usados nos diversos caminhos de escrita: cobrança
+ *  (`NOME — SERVIÇO (ESPECIALIDADE)` / `NOME · SERVIÇO`), mensalidade
+ *  (`MENSALIDADE X/Y - CONTRATO #Z - NOME`) e recebimento genérico
+ *  (`Recebimento — NOME (SERVIÇO)`). Retorna null quando o texto não
+ *  contém um nome identificável (sangrias, aberturas, [Caixa] livres). */
+function pacienteFromDescricao(desc: string | null): string | null {
+  if (!desc) return null;
+  // Mensalidade de contrato: nome fica no fim, depois do último " - "
+  const mens = desc.match(/CONTRATO\s+#\S+\s+-\s+(.+?)\s*$/i);
+  if (mens) return mens[1].trim() || null;
+  // Descarta descrições sem paciente (sangria/suprimento/fechamento/etc.)
+  if (/^\s*(abertura|fechamento|sangria|suprimento)\b/i.test(desc)) return null;
+  if (/^\s*\[caixa\]/i.test(desc)) return null;
+  const clean = desc.replace(/^Recebimento\s+—\s+/i, "");
+  // Nome vem antes do PRIMEIRO separador " — " ou " · "
+  const seps = [" — ", " · "];
+  let idx = -1;
+  for (const s of seps) {
+    const i = clean.indexOf(s);
+    if (i > 0 && (idx === -1 || i < idx)) idx = i;
+  }
+  if (idx > 0) {
+    const nome = clean.slice(0, idx).trim();
+    if (!nome || /^mensalidade/i.test(nome)) return null;
+    return nome;
+  }
+  return null;
+}
+
 const BANDEIRAS_CARTAO = [
   "Visa", "Mastercard", "Elo", "Hipercard", "American Express", "Diners", "Outra",
 ];
