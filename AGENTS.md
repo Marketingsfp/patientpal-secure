@@ -160,6 +160,6 @@ ampliar o escopo.
 ## 2. Outras regras herdadas
 
 As regras contidas em `mem/preferences/governanca.md`,
-`mem/constraints/governanca-dados-imutaveis.md` e nos documentos de
-auditoria referenciados em 1.1 continuam válidas e complementam este
-arquivo. Em caso de conflito, prevalece a interpretação **mais restritiva**.
+`mem/constraints/governanca-dados-imutaveis.md` continuam válidas e
+complementam este arquivo. Em caso de conflito, prevalece a interpretação
+**mais restritiva**.
