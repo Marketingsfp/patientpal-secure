@@ -11,8 +11,25 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CENTROS, PERFIL_DEFAULTS, findItem, type Centro, type MenuItem, type PerfilKey } from "./menu-catalog";
 import { useMenuPrefs } from "@/hooks/use-menu-prefs";
+import { usePermissoes } from "@/hooks/use-permissoes";
+import { moduloDaRota } from "@/lib/permissoes-rotas";
 
 const MAX_INLINE = 6;
+
+/**
+ * Um path do menu é permitido quando:
+ * - o usuário é admin (allowed === null); ou
+ * - a rota é livre/sistema (moduloDaRota === null); ou
+ * - o módulo mapeado está no Set de permitidos.
+ * Módulos não mapeados (undefined) são bloqueados (fail-closed).
+ */
+function pathAllowed(path: string, allowed: Set<string> | null): boolean {
+  if (allowed === null) return true;
+  const mod = moduloDaRota(path);
+  if (mod === null) return true;
+  if (mod === undefined) return false;
+  return allowed.has(mod);
+}
 
 function IconBtn({
   active, onClick, title, children, pressed,
@@ -167,9 +184,18 @@ function CentroGroup({
 
 export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey; clinicColor?: string }) {
   const { prefs, loading, togglePin, toggleFavorite, toggleGroup, pushRecent } = useMenuPrefs();
+  const { allowed: allowedModules, loading: permsLoading } = usePermissoes();
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const defaults = PERFIL_DEFAULTS[perfil];
-  const centrosVisiveis = CENTROS.filter((c) => defaults.centros.includes(c.key));
+  const centrosBase = CENTROS.filter((c) => defaults.centros.includes(c.key));
+  // Filtra itens de cada centro pelas permissões do perfil. Enquanto
+  // permissões carregam, escondemos tudo (fail-closed) para não vazar
+  // links de módulos negados.
+  const centrosVisiveis = useMemo(() => {
+    return centrosBase
+      .map((c) => ({ ...c, items: c.items.filter((it) => pathAllowed(it.path, allowedModules)) }))
+      .filter((c) => c.items.length > 0);
+  }, [centrosBase, allowedModules]);
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -191,20 +217,23 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
 
   const pinnedItems = effectivePinned
     .map((p) => findItem(p))
-    .filter((x): x is MenuItem => Boolean(x));
+    .filter((x): x is MenuItem => Boolean(x))
+    .filter((it) => pathAllowed(it.path, allowedModules));
 
   const recentesFiltrados = prefs.recent
     .filter((r) => !effectivePinned.includes(r.path) && r.path !== currentPath)
     // remove itens que já aparecem em algum centro visível — evita mostrar a
     // mesma coisa em "Recentes" e no grupo do centro logo acima.
     .filter((r) => !centrosVisiveis.some((c) => c.items.some((i) => i.path === r.path)))
+    .filter((r) => pathAllowed(r.path, allowedModules))
     .slice(0, 5);
 
   const favoritos = prefs.favorites
     .map((p) => findItem(p))
-    .filter((x): x is MenuItem => Boolean(x));
+    .filter((x): x is MenuItem => Boolean(x))
+    .filter((it) => pathAllowed(it.path, allowedModules));
 
-  if (loading) {
+  if (loading || permsLoading) {
     return <div className="p-4 text-sm text-muted-foreground">Carregando menu…</div>;
   }
 
