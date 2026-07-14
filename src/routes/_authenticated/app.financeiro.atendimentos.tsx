@@ -61,7 +61,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
-  component: Page,
+  component: AtendimentosPage,
   head: () => ({ meta: [{ title: "Atendimentos — Financeiro" }] }),
 });
 
@@ -158,7 +158,7 @@ function FormaPagamentoIcon({ forma }: { forma: string | null | undefined }) {
   return <HelpCircle className="h-4 w-4 text-muted-foreground" aria-label={forma ?? ""} />;
 }
 
-function Page() {
+export function AtendimentosPage() {
   const { clinicaAtual } = useClinica();
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
   const podeEscrever = usePodeEscrever("financeiro");
@@ -915,6 +915,10 @@ function Page() {
     }
     setLoading(true);
     // Une atendimentos manuais (fin_atendimentos) com pagamentos da agenda (fin_lancamentos receita).
+    // Regra de repasse da agenda: a competência é a data marcada no agendamento,
+    // não a data em que o paciente pagou no caixa. Assim pagamento antecipado não
+    // libera repasse antes do dia do atendimento/reagendamento.
+    const agendaFimDia = `${fFim}T23:59:59.999`;
     let qManual = supabase
       .from("fin_atendimentos")
       .select(
@@ -926,11 +930,23 @@ function Page() {
     let qAgenda = supabase
       .from("fin_lancamentos")
       .select(
+        "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos!inner(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+      )
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("tipo", "receita")
+      .eq("status", "confirmado")
+      .not("agendamento_id", "is", null)
+      .gte("agendamento.inicio", `${fIni}T00:00:00`)
+      .lte("agendamento.inicio", agendaFimDia);
+    const qReceitasSemAgenda = supabase
+      .from("fin_lancamentos")
+      .select(
         "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("tipo", "receita")
       .eq("status", "confirmado")
+      .is("agendamento_id", null)
       .gte("data", fIni)
       .lte("data", fFim);
     if (fMedico !== "todos") {
@@ -939,9 +955,10 @@ function Page() {
       // com medico_id nulo (médico vem do agendamento). Filtramos client-side
       // logo após o mapeamento abaixo.
     }
-    const [mr, ar] = await Promise.all([
+    const [mr, ar, sr] = await Promise.all([
       qManual.order("data", { ascending: false }),
       qAgenda.order("data", { ascending: false }),
+      qReceitasSemAgenda.order("data", { ascending: false }),
     ]);
     if (mr.error) {
       mostrarErro(mr.error);
@@ -953,27 +970,51 @@ function Page() {
       setLoading(false);
       return;
     }
+    if (sr.error) {
+      mostrarErro(sr.error);
+      setLoading(false);
+      return;
+    }
+    const agendaRows = [...(ar.data ?? []), ...(sr.data ?? [])];
+    const manualLancamentoIds = (mr.data ?? [])
+      .map((r: { lancamento_id?: string | null }) => r.lancamento_id ?? null)
+      .filter((x): x is string => !!x);
+    const lancamentosEspelhoAgenda = new Set<string>();
+    if (manualLancamentoIds.length) {
+      const { data: espelhos, error: espelhoErr } = await supabase
+        .from("fin_lancamentos")
+        .select("id, agendamento_id")
+        .in("id", manualLancamentoIds)
+        .not("agendamento_id", "is", null);
+      if (espelhoErr) {
+        mostrarErro(espelhoErr);
+        setLoading(false);
+        return;
+      }
+      for (const e of espelhos ?? []) lancamentosEspelhoAgenda.add(e.id);
+    }
     // IDs de fin_lancamentos já carregados — usado para descartar linhas de
     // fin_atendimentos que espelham o mesmo pagamento (duplicidade legada
     // criada pelo fluxo de atendimento IA antes da correção).
-    const lancIds = new Set((ar.data ?? []).map((r: { id: string }) => r.id));
+    const lancIds = new Set(agendaRows.map((r: { id: string }) => r.id));
     // Também colecionamos o agendamento_id dos lançamentos para descartar
     // manuais que espelhem o mesmo agendamento (caso o lancamento_id não
     // tenha sido preenchido no fin_atendimentos, por qualquer motivo).
     const lancAgendIds = new Set(
-      (ar.data ?? [])
+      agendaRows
         .map((r: { agendamento_id?: string | null }) => r.agendamento_id ?? null)
         .filter((x): x is string => !!x),
     );
     const manuaisRaw = (mr.data ?? []).filter(
       (r: { lancamento_id?: string | null }) => {
         if (r.lancamento_id && lancIds.has(r.lancamento_id)) return false;
+        if (r.lancamento_id && lancamentosEspelhoAgenda.has(r.lancamento_id)) return false;
         // Sem lancamento_id: descarta se algum lançamento carregado apontar
         // para um agendamento que também aparece no lote manual (mesma data,
         // procedimento e paciente). O DB já tem trigger que impede este caso
         // em novos inserts; aqui blindamos registros históricos.
         if (r.lancamento_id && lancAgendIds.size > 0) {
-          const lanc = (ar.data ?? []).find((l: { id: string }) => l.id === r.lancamento_id) as
+          const lanc = agendaRows.find((l: { id: string }) => l.id === r.lancamento_id) as
             | { agendamento_id?: string | null }
             | undefined;
           if (lanc?.agendamento_id && lancAgendIds.has(lanc.agendamento_id)) return false;
@@ -1011,7 +1052,7 @@ function Page() {
         valor_laudo: Number((r as any).valor_laudo ?? 0),
       };
     });
-    const agend: Atend[] = (ar.data ?? []).map((r): Atend => {
+    const agend: Atend[] = agendaRows.map((r): Atend => {
       const ag = (r as any).agendamento as {
         procedimento: string | null;
         paciente_nome: string | null;
@@ -1027,6 +1068,7 @@ function Page() {
       const pacNomeExtra = ag?.paciente_nome ?? ((r.descricao ?? "").split("—")[0]?.trim() || null);
       const pacIdEff = r.paciente_id ?? ag?.paciente_id ?? null;
       const medIdEff = r.medico_id ?? ag?.medico_id ?? null;
+      const dataRepasse = ag?.inicio ? ag.inicio.slice(0, 10) : r.data;
       const pago = Number(r.valor);
       const { total, repasse } = calcRepasseFull(medIdEff, pago, proc, r.descricao ?? null);
       // Override manual do repasse (editado na tela). Quando presente,
@@ -1040,7 +1082,7 @@ function Page() {
       const valorClinicaFinal = +(total - valorMedicoFinal).toFixed(2);
       return {
         id: r.id,
-        data: r.data,
+        data: dataRepasse,
         procedimento: proc,
         agendamento_id: r.agendamento_id ?? null,
         valor_total: total,
@@ -1710,31 +1752,34 @@ function Page() {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setPayingNow(true);
     try {
-      // Validação servidor-side: só pode pagar repasse de atendimentos efetivamente
-      // realizados (lançamento confirmado + agendamento com status 'realizado').
-      // Bloqueia o bug de repassar antes do paciente ter sido atendido.
+      // Pré-validação no cliente: só pode pagar repasse de atendimentos efetivamente
+      // realizados e cuja data marcada na agenda já chegou. A mesma regra também
+      // é reforçada no banco pela RPC pagar_repasse_medico.
       const agendaIdsCheck = selectedItems.filter((x) => x.origem === "agenda").map((x) => x.id);
       if (agendaIdsCheck.length) {
         const { data: lancs, error: eChk } = await supabase
           .from("fin_lancamentos")
-          .select("id, status, agendamento_id, agendamento:agendamentos(status)")
+          .select("id, status, agendamento_id, agendamento:agendamentos(status, inicio)")
           .in("id", agendaIdsCheck);
         if (eChk) throw eChk;
+        const hojeIso = new Date().toISOString().slice(0, 10);
         const bloq: string[] = [];
         for (const l of (lancs ?? []) as Array<{
           id: string;
           status: string | null;
           agendamento_id: string | null;
-          agendamento: { status: string | null } | null;
+          agendamento: { status: string | null; inicio: string | null } | null;
         }>) {
           const lancOk = l.status === "confirmado";
           const agStatus = l.agendamento?.status ?? null;
+          const dataAgenda = l.agendamento?.inicio?.slice(0, 10) ?? null;
           const agOk = agStatus === "realizado";
-          if (!lancOk || !agOk) bloq.push(l.id);
+          const dataOk = !!dataAgenda && dataAgenda <= hojeIso && dataAgenda <= payForm.data;
+          if (!lancOk || !agOk || !dataOk) bloq.push(l.id);
         }
         if (bloq.length) {
           toast.error(
-            `Não é possível pagar o repasse: ${bloq.length} atendimento(s) ainda não foram baixados/realizados. Confirme o pagamento no Caixa e marque o atendimento como realizado antes de gerar o repasse.`,
+            `Não é possível pagar o repasse: ${bloq.length} atendimento(s) ainda não estão liberados. O repasse só pode ser pago no dia marcado do atendimento ou depois, com o atendimento realizado.`,
           );
           setPayingNow(false);
           return;
@@ -2956,18 +3001,28 @@ function Page() {
                  transform em qualquer ancestral vira o "containing block" do
                  .print-area absoluto e o desloca — daí o corte à esquerda.
                  Neutraliza posição/transform/recorte do dialog SEM incluir os
-                 filhos (senão o !important do static abaixo clobbava o
-                 position:absolute do próprio .print-area). */
-              [role="dialog"] { position: static !important; transform: none !important; max-height: none !important; height: auto !important; overflow: visible !important; box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: auto !important; max-width: none !important; }
+                 filhos: incluir "> *" (com !important static) clobbaria o
+                 position:absolute do próprio .print-area e reintroduziria o
+                 corte. */
+              [role="dialog"] { position: static !important; transform: none !important; max-height: none !important; height: auto !important; overflow: visible !important; box-shadow: none !important; border: none !important; margin: 0 !important; padding: 0 !important; width: auto !important; max-width: none !important; background: transparent !important; }
               /* Ancora o comprovante no canto da página (independe do layout
                  do app / sidebar). width:100% = largura útil da página (@page
-                 já subtrai as margens de 12mm). */
-              .print-area { position: absolute !important; left: 0 !important; top: 0 !important; right: auto !important; bottom: auto !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; color: black !important; max-height: none !important; height: auto !important; overflow: visible !important; z-index: 2147483647; font-size: 11pt; }
+                 já subtrai as margens de 12mm). Tipografia alinhada aos
+                 refinamentos de tabela/resumo logo abaixo (base 10pt). */
+              .print-area { position: absolute !important; left: 0 !important; top: 0 !important; right: auto !important; bottom: auto !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: 100% !important; background: white !important; color: black !important; max-height: none !important; height: auto !important; overflow: visible !important; z-index: 2147483647; font-size: 10pt; line-height: 1.35; }
               .no-print { display: none !important; }
               .comprovante-bloco { break-after: page; page-break-after: always; }
               .comprovante-bloco:last-child { break-after: auto; page-break-after: auto; }
               .comprovante-bloco table, .comprovante-bloco thead, .comprovante-bloco tbody, .comprovante-bloco tr, .comprovante-bloco td, .comprovante-bloco th { page-break-inside: auto; break-inside: auto; }
               .comprovante-bloco tr { page-break-inside: avoid; break-inside: avoid; }
+              .print-area table { font-size: 9.5pt; }
+              .print-area th, .print-area td { padding: 3px 6px !important; }
+              .print-area .comprovante-resumo { padding: 6px 10px !important; margin-bottom: 8px !important; gap: 2px 12px !important; }
+              .print-area .mt-10 { margin-top: 18px !important; }
+              .print-area .mt-8 { margin-top: 10px !important; }
+              .print-area .pt-8 { padding-top: 10px !important; }
+              .print-area .mb-3 { margin-bottom: 6px !important; }
+              .print-area .pb-3 { padding-bottom: 6px !important; }
             }
             @media print {
               body.print-resumo-only .print-area .comprovante-bloco > *:not(.comprovante-resumo) {

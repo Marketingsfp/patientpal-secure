@@ -43,7 +43,7 @@ import { calcularAvisoLimitePendentes } from "@/lib/agenda/aviso-limite-pendente
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, UserMinus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText, Undo2,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, UserMinus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText, Undo2, CheckCircle2, User,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
@@ -137,8 +137,16 @@ async function buscarProcedimentoPorNome(
   nome: string,
   lista: any[] | null | undefined,
 ): Promise<any | null> {
-  // Remove sufixo de disambiguação " (ESPECIALIDADE)" antes de pesquisar.
-  const nomeBase = (nome ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim();
+  // Tenta primeiro o nome COMPLETO (ex.: "ECOCARDIOGRAMA (ADULTO)"). Só se
+  // não houver match exato caímos para uma versão sem sufixo entre parênteses
+  // — que é uma heurística para disambiguação de especialidade
+  // (ex.: "CONSULTA (CARDIOLOGIA)"). Sem isso, procedimentos cujo NOME REAL
+  // termina em "(ADULTO)"/"(INFANTIL)"/etc. eram truncados e o fallback ilike
+  // podia casar com outro procedimento parecido (ex.: "USG ECOCARDIOGRAMA
+  // FETAL"), aplicando o valor errado no modal de cobrança.
+  const nomeCompleto = (nome ?? "").trim();
+  const nomeSemSufixo = nomeCompleto.replace(/\s*\([^()]*\)\s*$/, "").trim();
+  const nomeBase = nomeCompleto || nomeSemSufixo;
   const alvo = nomeBase.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const norm = (s: string) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   // 1) Sempre tentar primeiro uma busca FRESCA no banco pelo nome exato
@@ -147,18 +155,22 @@ async function buscarProcedimentoPorNome(
   const temValor = (p: any) =>
     p && [p.valor_dinheiro, p.valor_pix, p.valor_padrao, p.valor_cartao, p.valor_cartao_credito, p.valor_cartao_debito, p.valor_dinheiro_pix]
       .some((v) => Number(v) > 0);
-  try {
-    const { data: exatoDb } = await supabase
-      .from("procedimentos")
-      .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
-      .eq("clinica_id", clinicaId)
-      .eq("ativo", true)
-      .ilike("nome", nomeBase)
-      .limit(5);
-    const exatoComValor = (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvo && temValor(p))
-      ?? (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvo);
-    if (exatoComValor) return exatoComValor;
-  } catch { /* segue para fallback */ }
+  // Tenta match exato no banco: 1) nome completo, 2) sem sufixo (parênteses).
+  for (const tentativa of [nomeCompleto, nomeSemSufixo].filter((s, i, a) => s && a.indexOf(s) === i)) {
+    try {
+      const alvoT = norm(tentativa);
+      const { data: exatoDb } = await supabase
+        .from("procedimentos")
+        .select("nome,valor_dinheiro,valor_pix,valor_padrao,valor_cartao,valor_cartao_credito,valor_cartao_debito,valor_dinheiro_pix")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .ilike("nome", tentativa)
+        .limit(5);
+      const exatoComValor = (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvoT && temValor(p))
+        ?? (exatoDb ?? []).find((p: any) => norm(p.nome ?? "") === alvoT);
+      if (exatoComValor) return exatoComValor;
+    } catch { /* segue para próxima tentativa */ }
+  }
   const arr = lista ?? [];
   // Prioriza matches que TÊM valores cadastrados, para evitar pegar linhas
   // placeholder (ex.: "CONSULTA 110 E 130" com tudo zerado) na frente da
@@ -1974,7 +1986,13 @@ function AgendaPage() {
     // isso fazia a numeração "reiniciar" por profissional e repetir 001 várias
     // vezes na lista geral (uma vez por profissional).
     const contadores = new Map<string, number>();
-    const ordenados = [...items].sort((a, b) => a.inicio.localeCompare(b.inicio));
+    const ordenados = [...items].sort((a, b) => {
+      const t = a.inicio.localeCompare(b.inicio);
+      if (t !== 0) return t;
+      // Mesmo horário: desempata em ordem alfabética do paciente (pt-BR,
+      // acento-insensível) para a numeração da fila ficar crescente e estável.
+      return (a.paciente_nome ?? "").localeCompare(b.paciente_nome ?? "", "pt-BR", { sensitivity: "base" });
+    });
     ordenados.forEach((a) => {
       const dia = a.inicio.slice(0, 10);
       const n = (contadores.get(dia) ?? 0) + 1;
@@ -2029,11 +2047,16 @@ function AgendaPage() {
     total: filtrados.length,
     confirmados: filtrados.filter(i => i.status === "confirmado").length,
     realizados: filtrados.filter(i => i.status === "realizado").length,
+    pendentes: filtrados.filter(i => i.status === "agendado").length,
   }), [filtrados]);
 
   const totalPages = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE));
   const filtradosOrdenados = useMemo(
-    () => [...filtrados].sort((a, b) => a.inicio.localeCompare(b.inicio)),
+    () => [...filtrados].sort((a, b) => {
+      const t = a.inicio.localeCompare(b.inicio);
+      if (t !== 0) return t;
+      return (a.paciente_nome ?? "").localeCompare(b.paciente_nome ?? "", "pt-BR", { sensitivity: "base" });
+    }),
     [filtrados]
   );
   const paginados = filtradosOrdenados.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -3732,14 +3755,17 @@ function AgendaPage() {
           </div>
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <CalendarDays className="h-6 w-6" /> Agendas
-          </h1>
-          <p className="text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm">
+            <CalendarDays className="h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-foreground">Agendas</h1>
+            <p className="text-xs text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
+          </div>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <TurboModeToggle />
           <div className="inline-flex rounded-full border bg-card p-0.5">
             <button
@@ -4931,7 +4957,7 @@ function AgendaPage() {
 
       {/* Filtros */}
       <div
-        className="rounded-lg border bg-card p-2 space-y-1.5 text-xs [&_input]:h-7 [&_input]:text-xs [&_button[role=combobox]]:h-7 [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
+        className="rounded-2xl border bg-card p-4 space-y-2 text-xs shadow-sm [&_input]:h-9 [&_input]:text-xs [&_button[role=combobox]]:h-9 [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
         style={{ ["--clinic" as never]: corClinica }}
       >
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
@@ -5099,12 +5125,45 @@ function AgendaPage() {
           </div>
         </div>
       )}
-      {/* Totais + paginação topo */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-        <div className="flex gap-4">
-          <span>Total: <b className="text-foreground">{totais.total}</b></span>
-          <span>Confirmados: <b className="text-foreground">{totais.confirmados}</b></span>
-          <span>Realizados: <b className="text-foreground">{totais.realizados}</b></span>
+      {/* KPIs + paginação topo */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1 min-w-[280px]">
+          <div className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <CalendarDays className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Total</div>
+              <div className="text-xl font-bold tabular-nums leading-tight">{totais.total}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Confirmados</div>
+              <div className="text-xl font-bold tabular-nums leading-tight">{totais.confirmados}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
+              <User className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Realizados</div>
+              <div className="text-xl font-bold tabular-nums leading-tight">{totais.realizados}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+              <Clock className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Pendentes</div>
+              <div className="text-xl font-bold tabular-nums leading-tight">{totais.pendentes}</div>
+            </div>
+          </div>
         </div>
         <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
       </div>

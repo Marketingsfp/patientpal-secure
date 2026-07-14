@@ -11,6 +11,68 @@ const TIPO_LABEL: Record<string, string> = {
   R: "RETORNO",
 };
 
+/**
+ * Gera um PDF 80mm da senha (base64, sem o prefixo data:) para envio
+ * ao QZ Tray via `imprimirDocumentoSilencioso`. Mantém o mesmo layout
+ * do fallback HTML.
+ */
+export async function gerarSenhaPdfBase64(params: {
+  codigo: string;
+  tipo: string;
+  clinicaNome?: string | null;
+}): Promise<string> {
+  const { codigo, tipo, clinicaNome } = params;
+  const label = TIPO_LABEL[tipo] ?? "SENHA";
+  const agora = new Date().toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  // jsPDF é dinâmico para não carregar no bundle inicial do totem.
+  const { jsPDF } = await import("jspdf");
+  // 80mm de largura; altura suficiente para o cupom.
+  const doc = new jsPDF({ unit: "mm", format: [80, 120] });
+  const w = 80;
+  const center = w / 2;
+
+  let y = 10;
+  doc.setFont("courier", "bold");
+  if (clinicaNome) {
+    doc.setFontSize(12);
+    doc.text(clinicaNome, center, y, { align: "center" });
+    y += 6;
+  }
+  doc.setFont("courier", "normal");
+  doc.setFontSize(10);
+  doc.text("SUA SENHA", center, y, { align: "center" });
+  y += 5;
+  doc.setFont("courier", "bold");
+  doc.setFontSize(12);
+  doc.text(label, center, y, { align: "center" });
+  y += 10;
+  doc.setFontSize(48);
+  doc.text(codigo, center, y + 15, { align: "center" });
+  y += 28;
+  doc.setLineDashPattern([1, 1], 0);
+  doc.line(6, y, w - 6, y);
+  y += 6;
+  doc.setFont("courier", "normal");
+  doc.setFontSize(10);
+  doc.text(agora, center, y, { align: "center" });
+  y += 6;
+  doc.setFontSize(9);
+  doc.text("Aguarde ser chamado(a)", center, y, { align: "center" });
+  y += 4;
+  doc.text("no painel da recepcao.", center, y, { align: "center" });
+
+  // dataurlstring => "data:application/pdf;base64,XXXX"
+  const dataUrl = doc.output("datauristring");
+  return dataUrl.replace(/^data:application\/pdf(?:;filename=.*?)?;base64,/, "");
+}
+
 export function imprimirSenhaTotem(params: {
   codigo: string;
   tipo: string;
