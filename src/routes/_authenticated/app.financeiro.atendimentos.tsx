@@ -183,6 +183,7 @@ export function AtendimentosPage() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Atend | null>(null);
   const [form, setForm] = useState(EMPTY);
+  const [historicoAtend, setHistoricoAtend] = useState<Atend | null>(null);
   // Filtros do relatório
   const hoje = new Date().toISOString().slice(0, 10);
   const primeiroDia = new Date();
