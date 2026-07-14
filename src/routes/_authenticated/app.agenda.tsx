@@ -43,7 +43,7 @@ import { calcularAvisoLimitePendentes } from "@/lib/agenda/aviso-limite-pendente
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
-  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, UserMinus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText, Undo2,
+  MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, UserMinus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText, Undo2, CheckCircle2, User,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
