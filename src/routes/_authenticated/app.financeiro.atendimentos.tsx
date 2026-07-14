@@ -23,6 +23,7 @@ import {
   Undo2,
   CalendarIcon,
 } from "lucide-react";
+import { History } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,6 +62,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ComprovantesTab } from "@/components/financeiro/comprovantes-tab";
+import { HistoricoAtendimentoDialog } from "@/components/financeiro/historico-atendimento-dialog";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
   component: AtendimentosPage,
