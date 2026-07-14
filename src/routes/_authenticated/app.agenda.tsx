@@ -50,7 +50,7 @@ import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
-import { KpiCard, KpiRow, FilterCard, FilterField } from "@/components/agenda-v2/ui";
+import { KpiCard, KpiRow } from "@/components/agenda-v2/ui";
 import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
 import { usePickTomador } from "@/components/nfse/use-pick-tomador";
 import { useAuth } from "@/hooks/use-auth";
