@@ -5106,12 +5106,45 @@ function AgendaPage() {
           </div>
         </div>
       )}
-      {/* Totais + paginação topo */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-        <div className="flex gap-4">
-          <span>Total: <b className="text-foreground">{totais.total}</b></span>
-          <span>Confirmados: <b className="text-foreground">{totais.confirmados}</b></span>
-          <span>Realizados: <b className="text-foreground">{totais.realizados}</b></span>
+      {/* KPIs + paginação topo */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1 min-w-[280px]">
+          <div className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <CalendarDays className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Total</div>
+              <div className="text-xl font-bold tabular-nums leading-tight">{totais.total}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Confirmados</div>
+              <div className="text-xl font-bold tabular-nums leading-tight">{totais.confirmados}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
+              <User className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Realizados</div>
+              <div className="text-xl font-bold tabular-nums leading-tight">{totais.realizados}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+              <Clock className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Pendentes</div>
+              <div className="text-xl font-bold tabular-nums leading-tight">{totais.pendentes}</div>
+            </div>
+          </div>
         </div>
         <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
       </div>
