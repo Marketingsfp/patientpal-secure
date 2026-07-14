@@ -49,6 +49,7 @@ export function usePermissoes(): {
     if (role === "admin") {
       setAllowed(null);
       setNivel(null);
+      setLoading(false);
       return;
     }
 
