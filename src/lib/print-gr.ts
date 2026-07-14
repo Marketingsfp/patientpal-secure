@@ -84,6 +84,7 @@ const esc = (s: string | null | undefined) =>
 
 const FORMA_LABEL: Record<string, string> = {
   dinheiro: "DINHEIRO",
+  manual: "DINHEIRO",
   pix: "PIX",
   cartao_credito: "CARTÃO CRÉDITO",
   cartao_debito: "CARTÃO DÉBITO",
