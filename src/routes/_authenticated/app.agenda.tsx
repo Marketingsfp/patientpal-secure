@@ -2047,6 +2047,7 @@ function AgendaPage() {
     total: filtrados.length,
     confirmados: filtrados.filter(i => i.status === "confirmado").length,
     realizados: filtrados.filter(i => i.status === "realizado").length,
+    pendentes: filtrados.filter(i => i.status === "agendado").length,
   }), [filtrados]);
 
   const totalPages = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE));
