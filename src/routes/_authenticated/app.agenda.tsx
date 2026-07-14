@@ -44,11 +44,13 @@ import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
   MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, UserMinus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText, Undo2,
+  ListChecks, CheckCircle2, Activity, SlidersHorizontal,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
+import { KpiCard, KpiRow, FilterCard, FilterField } from "@/components/agenda-v2/ui";
 import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
 import { usePickTomador } from "@/components/nfse/use-pick-tomador";
 import { useAuth } from "@/hooks/use-auth";
