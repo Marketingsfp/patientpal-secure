@@ -2931,14 +2931,18 @@ function AgendaPage() {
     if (irParaPagamento && novoId) {
       let [lista, info] = await Promise.all([
         getProcedimentosComValor(clinicaAtual.clinica_id),
-        obterInfoConvenioPaciente({
-          clinicaId: clinicaAtual.clinica_id,
-          pacienteId: payload.paciente_id,
-          medicoId: payload.medico_id,
-          procedimentoNome: payload.procedimento ?? "",
-          agendamentoId: novoId,
-          dataRef: payload.inicio ?? null,
-        }),
+        // Atendimento marcado como "Particular" ignora o convênio do paciente
+        // de propósito — cobra valor cheio, sem desconto/bloqueio/gratuidade.
+        payload.tipo_atendimento === "particular"
+          ? Promise.resolve(null)
+          : obterInfoConvenioPaciente({
+              clinicaId: clinicaAtual.clinica_id,
+              pacienteId: payload.paciente_id,
+              medicoId: payload.medico_id,
+              procedimentoNome: payload.procedimento ?? "",
+              agendamentoId: novoId,
+              dataRef: payload.inicio ?? null,
+            }),
       ]);
       // Multi-exame: quando há mais de um procedimento (imagem ou laboratório),
       // o payload.procedimento vem concatenado ("A + B + C") e não encontra match
@@ -3202,14 +3206,18 @@ function AgendaPage() {
         .eq("agendamento_id", a.id)
         .limit(1),
       getProcedimentosComValor(clinicaAtual.clinica_id),
-      obterInfoConvenioPaciente({
-        clinicaId: clinicaAtual.clinica_id,
-        pacienteId: a.paciente_id,
-        medicoId: a.medico_id,
-        procedimentoNome: a.procedimento ?? "",
-        agendamentoId: a.id,
-        dataRef: a.inicio ?? null,
-      }),
+      // Atendimento marcado como "Particular" ignora o convênio do paciente
+      // de propósito — cobra valor cheio, sem desconto/bloqueio/gratuidade.
+      a.tipo_atendimento === "particular"
+        ? Promise.resolve(null)
+        : obterInfoConvenioPaciente({
+            clinicaId: clinicaAtual.clinica_id,
+            pacienteId: a.paciente_id,
+            medicoId: a.medico_id,
+            procedimentoNome: a.procedimento ?? "",
+            agendamentoId: a.id,
+            dataRef: a.inicio ?? null,
+          }),
     ]);
     if ((jaPagos ?? []).length > 0) {
       toast.info("Este agendamento já foi pago.");
