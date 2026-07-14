@@ -12,6 +12,7 @@
 // (sem o prefixo "data:application/pdf;base64,").
 
 import qz from "qz-tray";
+import { supabase } from "@/integrations/supabase/client";
 
 // Certificado público gerado para este projeto (pareado com QZ_PRIVATE_KEY
 // mantida em segredo no servidor). O QZ Tray envia este certificado ao
@@ -41,10 +42,6 @@ P8+R1/Yd17Edza1AlIIl82j4SUbm9xvrODi6M311ugnJgDFGDPvl4mJb3/ADjXKt
 clGgs+KzMvapNrPUElCRB209qqZuQmRbWR0MUPEvtw==
 -----END CERTIFICATE-----`;
 
-// URL da Edge Function que assina o payload usando a chave privada
-// (mantida apenas no servidor, jamais no bundle do navegador).
-const SIGN_QZ_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sign-qz`;
-
 let qzSecurityConfigured = false;
 function configurarSeguranca() {
   if (qzSecurityConfigured) return;
@@ -59,21 +56,28 @@ function configurarSeguranca() {
   });
 
   // 2) Assinatura — o QZ chama este callback com a string a ser assinada.
-  //    Encaminhamos para a Edge Function `sign-qz`, que assina em SHA-512
-  //    com a chave privada (QZ_PRIVATE_KEY) e devolve a assinatura em base64.
-  qz.security.setSignaturePromise((toSign: string) => (arg) => {
-    fetch(SIGN_QZ_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ toSign }),
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`sign-qz respondeu ${res.status}`);
-        const json = (await res.json()) as { signature?: string };
-        if (!json.signature) throw new Error("Assinatura ausente na resposta do sign-qz.");
-        arg.resolve(json.signature);
+  //    Encaminhamos para a Edge Function `sign-qz` via cliente Supabase,
+  //    que assina em SHA-512 com a chave privada (QZ_PRIVATE_KEY) mantida
+  //    apenas no servidor, e devolve a assinatura em base64.
+  qz.security.setSignaturePromise((toSign: string) => (resolve, reject) => {
+    supabase.functions
+      .invoke("sign-qz", { body: { toSign } })
+      .then(({ data, error }) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        const signature =
+          typeof data === "string"
+            ? data
+            : (data as { signature?: string } | null)?.signature;
+        if (!signature) {
+          reject(new Error("Assinatura ausente na resposta do sign-qz."));
+          return;
+        }
+        resolve(signature);
       })
-      .catch((err) => arg.reject(err));
+      .catch(reject);
   });
 }
 
