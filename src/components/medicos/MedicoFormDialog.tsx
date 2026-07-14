@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Plus, Trash2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -143,6 +143,11 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [laudadores, setLaudadores] = useState<LaudadorRow[]>([]);
   // Map procedimento_id -> Map(normalizedSpecialtyKey -> originalSpecialtyName)
   const [procEspMap, setProcEspMap] = useState<Map<string, Map<string, string>>>(new Map());
+  // Contagem de procedimentos que o médico já tinha no banco no momento da
+  // carga inicial. Serve para detectar (no save) se o formulário está sendo
+  // salvo com a lista vazia por engano — ex.: por bug de exibição — evitando
+  // apagar os vínculos existentes sem confirmação explícita.
+  const initialProcedimentosCountRef = useRef<number>(0);
 
   const [showSenha, setShowSenha] = useState(false);
   const [novaSenha, setNovaSenha] = useState("");
@@ -234,9 +239,19 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   // e `procEspMap` estão carregados para não apagar tudo no primeiro render.
   useEffect(() => {
     if (!procs.length) return;
+    // Guarda contra condição de corrida: se as especialidades ainda não
+    // carregaram, ou se o formulário ainda tem procedimentos mas nenhuma
+    // especialidade selecionada (form ainda não populado), não filtre — do
+    // contrário todos os itens seriam removidos por falta de referência.
+    if (!esps.length) return;
+    if (form.procedimentos.length > 0 && form.especialidades.length === 0) return;
     const idsValidos = new Set(procsFiltradosPorEspecialidade.map((p) => p.id));
     setForm((f) => {
       if (!f.procedimentos.length) return f;
+      // Segunda proteção dentro do setForm: se por alguma razão o filtro
+      // resultaria em remover TODOS os itens e o form ainda tem
+      // especialidades para casar, é mais seguro não mexer.
+      if (idsValidos.size === 0 && f.especialidades.length > 0) return f;
       const filtrados = f.procedimentos.filter((item) => {
         if (!item) return true; // preserva linhas em branco (novo serviço manual)
         const { pid } = splitItem(item);
@@ -247,7 +262,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       return { ...f, procedimentos: filtrados };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [procs, procEspMap, especialidadesSelecionadasNomes, procsFiltradosPorEspecialidade]);
+  }, [procs, esps, procEspMap, especialidadesSelecionadasNomes, procsFiltradosPorEspecialidade]);
 
   // Sincroniza a aba "Repasse" com os serviços selecionados em Especialidades:
   //  • Cada categoria distinta (Consulta / Exame / Procedimento) dos serviços
@@ -429,6 +444,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
       setLaudadores([]);
       setLaudadoresCatalog([]);
+      initialProcedimentosCountRef.current = 0;
       setForm({ ...emptyForm(), nome: prefillNome ?? "" });
       return;
     }
@@ -509,6 +525,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         .select("procedimento_id, especialidade_id")
         .eq("medico_id", med.id);
       if (cancelled) return;
+      initialProcedimentosCountRef.current = (mprocs ?? []).length;
       setForm({
         nome: limparPrefixoMedico(med.nome ?? ""),
         crm: med.crm,
@@ -588,6 +605,18 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         toast.error("Informe o número do RQE da especialidade marcada");
         return;
       }
+    }
+    // Salvaguarda: se o médico já tinha procedimentos cadastrados no banco
+    // e o formulário está prestes a salvar com a lista vazia, pede
+    // confirmação explícita antes de apagar todos os vínculos. Evita perda
+    // acidental por bug de exibição na aba Procedimentos.
+    const procedimentosPreenchidos = form.procedimentos.filter((x) => !!x).length;
+    const totalAnterior = initialProcedimentosCountRef.current;
+    if (editId && totalAnterior > 0 && procedimentosPreenchidos === 0) {
+      const ok = window.confirm(
+        `Este médico tem ${totalAnterior} procedimento(s) cadastrado(s), mas a lista está vazia neste formulário.\n\nSe você salvar agora, TODOS os procedimentos vinculados serão apagados.\n\nDeseja continuar mesmo assim?`,
+      );
+      if (!ok) return;
     }
     setSaving(true);
     const nomeLimpo = limparPrefixoMedico(form.nome);
