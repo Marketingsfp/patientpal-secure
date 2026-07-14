@@ -444,6 +444,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
       setLaudadores([]);
       setLaudadoresCatalog([]);
+      initialProcedimentosCountRef.current = 0;
       setForm({ ...emptyForm(), nome: prefillNome ?? "" });
       return;
     }
