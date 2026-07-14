@@ -70,6 +70,7 @@
     "dompurify": "^3.4.5",
     "embla-carousel-react": "^8.6.0",
     "face-api.js": "^0.22.2",
+    "framer-motion": "^12.42.2",
     "input-otp": "^1.4.2",
     "isomorphic-dompurify": "^3.14.0",
     "jspdf": "^4.2.1",
