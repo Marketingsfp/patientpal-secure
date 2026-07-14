@@ -1,246 +1,149 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { mostrarErro } from "@/lib/traduzir-erro";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Loader2 } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
-type AuditRow = {
-  id: string;
-  user_email: string | null;
-  user_id: string | null;
-  table_name: string;
-  record_id: string | null;
-  action: string;
-  dados_antes: Record<string, unknown> | null;
-  dados_depois: Record<string, unknown> | null;
-  ip_address: string | null;
-  created_at: string;
-};
-
-interface Props {
+type Props = {
   open: boolean;
   onClose: () => void;
-  lancamentoId: string;
+  lancamentoId?: string | null;
   agendamentoId?: string | null;
-  clinicaId: string;
-}
-
-// Campos irrelevantes/ruído no diff — omitidos.
-const IGNORAR = new Set([
-  "updated_at",
-  "atualizado_por",
-  "created_at",
-  "criado_por",
-]);
-
-// Rótulos amigáveis para os campos alterados.
-const LABEL_CAMPO: Record<string, string> = {
-  valor: "Valor",
-  valor_medico_override: "Valor do médico",
-  forma_pagamento: "Forma de pagamento",
-  descricao: "Descrição",
-  status: "Status",
-  data: "Data",
-  repasse_pago: "Repasse pago",
-  repasse_pago_em: "Data da baixa",
-  repasse_pago_por: "Responsável pela baixa",
-  repasse_forma_pagamento: "Forma do repasse",
-  observacoes: "Observações",
-  paciente_nome: "Paciente",
-  procedimento: "Procedimento",
-  inicio: "Início",
+  clinicaId?: string | null;
 };
 
-const fmtVal = (v: unknown): string => {
-  if (v === null || v === undefined || v === "") return "—";
-  if (typeof v === "boolean") return v ? "sim" : "não";
-  return String(v);
+type Row = {
+  id: string;
+  action: string;
+  table_name: string;
+  user_id: string | null;
+  user_email: string | null;
+  created_at: string;
+  dados_antes: unknown;
+  dados_depois: unknown;
 };
 
-export function HistoricoAtendimentoDialog({
-  open,
-  onClose,
-  lancamentoId,
-  agendamentoId,
-  clinicaId,
-}: Props) {
-  const [rows, setRows] = useState<AuditRow[]>([]);
-  const [autores, setAutores] = useState<Map<string, { nome: string; papel: "medico" | "funcionario" }>>(new Map());
+const ACTION_LABEL: Record<string, string> = {
+  INSERT: "Criação",
+  UPDATE: "Alteração",
+  DELETE: "Exclusão",
+};
+
+export function HistoricoAtendimentoDialog({ open, onClose, lancamentoId, agendamentoId, clinicaId }: Props) {
   const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState<Row[]>([]);
+  const [autores, setAutores] = useState<Record<string, { nome: string; papel: "medico" | "funcionario" | "desconhecido" }>>({});
 
   useEffect(() => {
     if (!open) return;
-    let cancel = false;
+    const ids = [lancamentoId, agendamentoId].filter((x): x is string => !!x);
+    if (!ids.length || !clinicaId) {
+      setRows([]);
+      return;
+    }
     setLoading(true);
-    void (async () => {
-      const ids = [lancamentoId, agendamentoId].filter(Boolean) as string[];
+    (async () => {
       const { data, error } = await supabase
-        .from("audit_log" as never)
-        .select("*")
+        .from("audit_log")
+        .select("id, action, table_name, user_id, user_email, created_at, dados_antes, dados_depois")
         .eq("clinica_id", clinicaId)
         .in("record_id", ids)
         .order("created_at", { ascending: false })
         .limit(300);
-      if (cancel) return;
       if (error) {
+        setRows([]);
         setLoading(false);
-        mostrarErro(error);
         return;
       }
-      const list = (data as unknown as AuditRow[]) ?? [];
+      const list = (data ?? []) as Row[];
       setRows(list);
-
-      // Resolve autores → nome + papel (médico/funcionário)
-      const userIds = Array.from(new Set(list.map((r) => r.user_id).filter(Boolean))) as string[];
-      const map = new Map<string, { nome: string; papel: "medico" | "funcionario" }>();
+      // Resolve autores
+      const userIds = Array.from(new Set(list.map((r) => r.user_id).filter((x): x is string => !!x)));
       if (userIds.length) {
         const [{ data: profs }, { data: meds }] = await Promise.all([
-          supabase.from("profiles").select("id, nome").in("id", userIds),
+          supabase.from("profiles").select("id, nome, email").in("id", userIds),
           supabase.from("medicos").select("user_id, nome").in("user_id", userIds),
         ]);
-        const medUsers = new Set(((meds ?? []) as Array<{ user_id: string | null }>).map((m) => m.user_id).filter(Boolean) as string[]);
-        ((profs ?? []) as Array<{ id: string; nome: string | null }>).forEach((p) => {
-          map.set(p.id, {
-            nome: p.nome ?? "—",
-            papel: medUsers.has(p.id) ? "medico" : "funcionario",
-          });
-        });
-        // médicos sem profile (raro): usa nome do cadastro
-        ((meds ?? []) as Array<{ user_id: string | null; nome: string }>).forEach((m) => {
-          if (m.user_id && !map.has(m.user_id)) {
-            map.set(m.user_id, { nome: m.nome, papel: "medico" });
-          }
-        });
-      }
-      if (!cancel) {
+        const map: Record<string, { nome: string; papel: "medico" | "funcionario" | "desconhecido" }> = {};
+        const medUserIds = new Set((meds ?? []).map((m: any) => m.user_id));
+        for (const p of profs ?? []) {
+          const nome = (p as any).nome || (p as any).email || "Usuário";
+          map[(p as any).id] = {
+            nome,
+            papel: medUserIds.has((p as any).id) ? "medico" : "funcionario",
+          };
+        }
+        for (const m of meds ?? []) {
+          const uid = (m as any).user_id as string;
+          if (!map[uid]) map[uid] = { nome: (m as any).nome, papel: "medico" };
+        }
         setAutores(map);
-        setLoading(false);
+      } else {
+        setAutores({});
       }
+      setLoading(false);
     })();
-    return () => {
-      cancel = true;
-    };
   }, [open, lancamentoId, agendamentoId, clinicaId]);
 
-  const rotulo = (r: AuditRow): string => {
-    const isLanc = r.table_name === "fin_lancamentos";
-    const isAgend = r.table_name === "agendamentos";
-    if (isLanc && r.action === "INSERT") return "Pagamento registrado";
-    if (isLanc && r.action === "UPDATE") {
-      const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
-      const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
+  function autorDe(r: Row) {
+    if (r.user_id && autores[r.user_id]) return autores[r.user_id];
+    return { nome: r.user_email || "Sistema", papel: "desconhecido" as const };
+  }
+
+  function descricaoAcao(r: Row): string {
+    const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
+    const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
+    if (r.action === "INSERT") {
+      if (r.table_name === "fin_lancamentos" || r.table_name === "fin_atendimentos") return "Pagamento registrado";
+      return ACTION_LABEL[r.action] ?? r.action;
+    }
+    if (r.action === "DELETE") return "Registro excluído / estornado";
+    // UPDATE
+    if (antes && depois) {
       if (antes.repasse_pago === false && depois.repasse_pago === true) return "Baixa do repasse realizada";
       if (antes.repasse_pago === true && depois.repasse_pago === false) return "Baixa do repasse desfeita";
-      if (antes.status !== depois.status && depois.status === "cancelado") return "Lançamento estornado";
-      return "Lançamento editado";
+      if (antes.status !== depois.status) return `Status: ${String(antes.status ?? "-")} → ${String(depois.status ?? "-")}`;
     }
-    if (isLanc && r.action === "DELETE") return "Lançamento excluído";
-    if (isAgend && r.action === "UPDATE") {
-      const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
-      const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
-      if (!antes.executado_por && depois.executado_por) return "Baixa realizada (agenda)";
-      if (antes.executado_por && !depois.executado_por) return "Baixa desfeita (agenda)";
-      return "Agendamento alterado";
-    }
-    if (isAgend && r.action === "INSERT") return "Agendamento criado";
-    if (r.action.startsWith("blocked_")) return `Tentativa bloqueada (${r.action.replace("blocked_", "")})`;
-    return `${r.table_name} · ${r.action}`;
-  };
-
-  const diff = (r: AuditRow): Array<{ campo: string; antes: string; depois: string }> => {
-    if (!r.dados_antes || !r.dados_depois) return [];
-    const antes = r.dados_antes as Record<string, unknown>;
-    const depois = r.dados_depois as Record<string, unknown>;
-    const out: Array<{ campo: string; antes: string; depois: string }> = [];
-    for (const k of Object.keys(depois)) {
-      if (IGNORAR.has(k)) continue;
-      const a = JSON.stringify(antes[k] ?? null);
-      const b = JSON.stringify(depois[k] ?? null);
-      if (a !== b) {
-        out.push({
-          campo: LABEL_CAMPO[k] ?? k,
-          antes: fmtVal(antes[k]),
-          depois: fmtVal(depois[k]),
-        });
-      }
-    }
-    return out;
-  };
-
-  const autorInfo = (r: AuditRow) => {
-    const a = r.user_id ? autores.get(r.user_id) : undefined;
-    return {
-      nome: a?.nome ?? r.user_email ?? "Sistema",
-      papel: a?.papel,
-      email: r.user_email,
-    };
-  };
-
-  // ordena cronologicamente (mais antigo → mais recente) para leitura em linha do tempo
-  const ordenadas = [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at));
+    return "Alteração";
+  }
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto" data-testid="historico-atendimento-dialog">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Histórico do atendimento</DialogTitle>
         </DialogHeader>
         {loading ? (
-          <p className="py-8 text-center text-muted-foreground">Carregando…</p>
-        ) : ordenadas.length === 0 ? (
-          <p className="py-8 text-center text-muted-foreground">
-            Nenhum evento registrado para este atendimento.
-          </p>
+          <div className="flex items-center justify-center py-8 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin mr-2" /> Carregando...
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="py-6 text-center text-sm text-muted-foreground">Nenhum registro de histórico encontrado.</div>
         ) : (
-          <div className="space-y-3">
-            {ordenadas.map((r) => {
-              const info = autorInfo(r);
-              const isBlocked = r.action.startsWith("blocked_");
-              const changes = diff(r);
+          <div className="max-h-[60vh] overflow-y-auto divide-y">
+            {rows.map((r) => {
+              const a = autorDe(r);
               return (
-                <div
-                  key={r.id}
-                  className={`border rounded p-3 text-sm ${isBlocked ? "border-rose-300 bg-rose-50" : ""}`}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="font-medium flex items-center gap-2 flex-wrap">
-                        {rotulo(r)}
-                        {info.papel === "medico" && (
-                          <Badge variant="secondary" className="text-[10px]">Médico</Badge>
-                        )}
-                        {info.papel === "funcionario" && (
-                          <Badge variant="outline" className="text-[10px]">Funcionário</Badge>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        Por <strong>{info.nome}</strong>
-                        {info.email && info.nome !== info.email ? ` (${info.email})` : ""} ·{" "}
-                        {new Date(r.created_at).toLocaleString("pt-BR")}
-                        {r.ip_address ? ` · IP ${r.ip_address}` : ""}
-                      </div>
+                <div key={r.id} className="py-3 space-y-1">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="font-medium text-sm">{descricaoAcao(r)}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {format(new Date(r.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                     </div>
                   </div>
-                  {changes.length > 0 && (
-                    <ul className="mt-2 text-xs space-y-0.5">
-                      {changes.map((c, i) => (
-                        <li key={i}>
-                          <span className="text-muted-foreground">{c.campo}:</span>{" "}
-                          <span className="line-through text-muted-foreground">{c.antes}</span>{" "}
-                          <span aria-hidden>→</span>{" "}
-                          <span className="font-medium">{c.depois}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>Por: <span className="text-foreground">{a.nome}</span></span>
+                    {a.papel === "medico" && <Badge variant="secondary" className="text-[10px]">Médico</Badge>}
+                    {a.papel === "funcionario" && <Badge variant="outline" className="text-[10px]">Funcionário</Badge>}
+                    <span className="ml-auto text-[10px] opacity-60">{r.table_name}</span>
+                  </div>
                 </div>
               );
             })}
           </div>
         )}
-        <p className="text-[11px] text-muted-foreground pt-2 border-t">
-          Registros podem estar ausentes para eventos anteriores à ativação da auditoria.
-        </p>
       </DialogContent>
     </Dialog>
   );

@@ -179,11 +179,11 @@ function AtendimentosPage() {
   const [procTipos, setProcTipos] = useState<Map<string, string>>(new Map());
   const [procLaudo, setProcLaudo] = useState<Map<string, boolean>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [historicoAtend, setHistoricoAtend] = useState<Atend | null>(null);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Atend | null>(null);
   const [form, setForm] = useState(EMPTY);
-  const [historicoAtend, setHistoricoAtend] = useState<Atend | null>(null);
   // Filtros do relatório
   const hoje = new Date().toISOString().slice(0, 10);
   const primeiroDia = new Date();
@@ -2654,15 +2654,6 @@ function AtendimentosPage() {
                                   <Wallet className="h-3.5 w-3.5" />
                                 </Button>
                               )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                title="Ver histórico"
-                                onClick={() => setHistoricoAtend(a)}
-                              >
-                                <History className="h-3.5 w-3.5" />
-                              </Button>
                               {podeEscrever && (
                                 <Button
                                   variant="ghost"
@@ -2674,6 +2665,15 @@ function AtendimentosPage() {
                                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
                                 </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                title="Ver histórico"
+                                onClick={() => setHistoricoAtend(a)}
+                              >
+                                <History className="h-3.5 w-3.5" />
+                              </Button>
                             </div>
                           ) : (
                             <div className="flex items-center justify-end gap-0.5">
@@ -2757,6 +2757,11 @@ function AtendimentosPage() {
                                   <Wallet className="h-3.5 w-3.5" />
                                 </Button>
                               )}
+                              {podeEscrever && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" onClick={() => remove(a)}>
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -2766,11 +2771,6 @@ function AtendimentosPage() {
                               >
                                 <History className="h-3.5 w-3.5" />
                               </Button>
-                              {podeEscrever && (
-                                <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" onClick={() => remove(a)}>
-                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                </Button>
-                              )}
                             </div>
                           )}
                         </TableCell>
@@ -3378,15 +3378,13 @@ function AtendimentosPage() {
           <ComprovantesTab />
         </TabsContent>
       </Tabs>
-      {historicoAtend && clinicaAtual?.clinica_id && (
-        <HistoricoAtendimentoDialog
-          open={!!historicoAtend}
-          onClose={() => setHistoricoAtend(null)}
-          lancamentoId={historicoAtend.id}
-          agendamentoId={historicoAtend.agendamento_id ?? null}
-          clinicaId={clinicaAtual.clinica_id}
-        />
-      )}
+      <HistoricoAtendimentoDialog
+        open={!!historicoAtend}
+        onClose={() => setHistoricoAtend(null)}
+        lancamentoId={historicoAtend?.id ?? null}
+        agendamentoId={historicoAtend?.agendamento_id ?? null}
+        clinicaId={clinicaAtual?.clinica_id ?? null}
+      />
     </div>
   );
 }
