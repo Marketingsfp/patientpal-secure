@@ -3374,6 +3374,11 @@ export function AtendimentosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+        <TabsContent value="comprovantes" className="mt-0">
+          <ComprovantesTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
