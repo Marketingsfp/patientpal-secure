@@ -46,9 +46,9 @@ function configurarQzUmaVez() {
   if (qzConfigurado) return;
   qzConfigurado = true;
 
-  qz.security.setCertificatePromise((cb) => {
-    cb.resolve(QZ_PUBLIC_CERT);
-  });
+  qz.security.setCertificatePromise((resolve) => {
+    resolve(QZ_PUBLIC_CERT);
+  }, { rejectOnFailure: true });
 
   if (qz.security.setSignatureAlgorithm) {
     qz.security.setSignatureAlgorithm("SHA512");
