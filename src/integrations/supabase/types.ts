@@ -3215,6 +3215,7 @@ export type Database = {
       }
       fin_atendimentos: {
         Row: {
+          agendamento_id: string | null
           clinica_id: string
           created_at: string
           data: string
@@ -3248,6 +3249,7 @@ export type Database = {
           valor_total: number
         }
         Insert: {
+          agendamento_id?: string | null
           clinica_id: string
           created_at?: string
           data?: string
@@ -3281,6 +3283,7 @@ export type Database = {
           valor_total?: number
         }
         Update: {
+          agendamento_id?: string | null
           clinica_id?: string
           created_at?: string
           data?: string
@@ -3314,6 +3317,13 @@ export type Database = {
           valor_total?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "fin_atendimentos_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fin_atendimentos_lancamento_id_fkey"
             columns: ["lancamento_id"]
@@ -7148,6 +7158,7 @@ export type Database = {
       }
       prontuarios: {
         Row: {
+          agendamento_id: string | null
           clinica_id: string
           conduta: string | null
           created_at: string
@@ -7164,6 +7175,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agendamento_id?: string | null
           clinica_id: string
           conduta?: string | null
           created_at?: string
@@ -7180,6 +7192,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agendamento_id?: string | null
           clinica_id?: string
           conduta?: string | null
           created_at?: string
@@ -7195,7 +7208,15 @@ export type Database = {
           queixa_principal?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "prontuarios_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       regras_rateio: {
         Row: {
@@ -8170,6 +8191,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      estornar_lancamento_receita: {
+        Args: { _clinica_id: string; _lancamento_id: string }
+        Returns: Json
+      }
       fila_caixa_hoje: {
         Args: { _clinica_id: string; _data?: string }
         Returns: {
@@ -8531,6 +8556,29 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      salvar_agendamento_e_vincular_orcamento: {
+        Args: {
+          _clinica_id: string
+          _data_pagamento: string
+          _editing_id: string
+          _enfermagem_recurso_id: string
+          _especialidade_id: string
+          _fim: string
+          _forma_pagamento_prevista: string
+          _inicio: string
+          _medico_id: string
+          _observacoes: string
+          _orcamento_id: string
+          _orcamento_item_ids: string[]
+          _paciente_id: string
+          _paciente_nome: string
+          _paciente_nome_esperado_no_slot: string
+          _procedimento: string
+          _status: string
+          _tipo_atendimento: string
+        }
+        Returns: Json
+      }
       salvar_agendamento_multi_imagem: {
         Args: {
           _clinica_id: string
@@ -8545,6 +8593,7 @@ export type Database = {
           _medico_id: string
           _observacoes: string
           _orcamento_id: string
+          _orcamento_item_ids?: string[]
           _paciente_id: string
           _paciente_nome: string
           _paciente_nome_esperado_no_slot: string
