@@ -1,79 +1,71 @@
+## Objetivo
 
-# Redesign da Tela de Agendas — Plano Faseado
+Validar em produção, **usando apenas dados fictícios prefixados `SIM_`**, que a correção da aba **Caixa > Movimentos** faz o paciente aparecer corretamente na lista para a atendente em todos os caminhos possíveis, e que ele deixa de aparecer nos casos em que antes sumia.
 
-## Contexto e riscos (leitura obrigatória)
+Não vou tocar em nenhum registro real. Não vou usar UI. Tudo será feito por `INSERT` direto no banco e `DELETE` no final do próprio teste.
 
-A tela atual `src/routes/_authenticated/app.agenda.tsx` tem **6.068 linhas** e concentra: filtros, KPIs, tabela, ações em massa, encaixe, Agenda Express, criar horários, encerrar expediente, exportar, opções, modais, atalhos de teclado, contadores, realtime, integração com WhatsApp/Financeiro/Prontuário, permissões e regras de negócio sensíveis (agenda, financeiro, clínico).
+## Escopo — 3 cenários
 
-Um "redesign completo em um único passo" nesse arquivo tem alto risco de:
-- Quebrar filtros, contadores, paginação server-side e realtime.
-- Quebrar permissões / RLS por reordenar condicionais de render.
-- Perder atalhos de teclado e comportamentos sutis.
-- Deixar regressões em modais e ações que hoje funcionam.
+Cada cenário reproduz um caminho diferente de como o paciente chega até a linha de Movimentos. Antes da correção, o cenário 2 e o cenário 3 falhavam.
 
-Por isso, **este é um trabalho puramente de apresentação (frontend/UI)**. Nenhuma regra de negócio, query, mutation, permissão, contagem, filtro server-side ou fluxo será alterada. O escopo é: estilos, layout, hierarquia visual, componentização visual, microinterações.
+### Cenário 1 — Cobrança padrão (paciente pelo `fin_lancamentos.paciente_id`)
+- Insere `pacientes` fictício `SIM_TESTE1 CAIXA MOVIMENTOS`.
+- Insere `fin_lancamentos` com `paciente_id` preenchido, `tipo='receita'`, `descricao='SIM_TESTE1 CAIXA MOVIMENTOS · CONSULTA'`.
+- Insere `caixa_movimentos` (tipo `recebimento`) apontando para esse lançamento, em uma sessão fictícia `SIM_SESSAO_TESTE`.
+- **Esperado:** coluna Paciente exibe `SIM_TESTE1 CAIXA MOVIMENTOS` via enrich; filtro por nome encontra a linha; tooltip mostra descrição completa.
 
-Sidebar, header global, busca universal, notificações, seletor de clínica e avatar do usuário **já existem** em `src/components/app-shell.tsx` / `menu-v2` — não vou recriá-los aqui; se houver ajuste visual, vira uma fase separada para não misturar com a Agenda.
+### Cenário 2 — Descrição sem o nome (paciente só via `fin_lancamentos.paciente_id`)
+- Reusa paciente fictício `SIM_TESTE2`.
+- Insere `fin_lancamentos` com `paciente_id` preenchido, mas com `descricao='[Caixa] recebimento avulso'` (sem nome no texto).
+- Insere `caixa_movimentos` com descrição também sem o nome: `'consulta particular sem identificação'`.
+- **Esperado (era o bug):** coluna Paciente ainda exibe `SIM_TESTE2` porque o enrich puxa o nome via `paciente_id`. Filtro por `SIM_TESTE2` acha a linha mesmo sem o nome estar na descrição.
 
----
+### Cenário 3 — Mensalidade (paciente via `agendamento.paciente_id` fallback)
+- Insere paciente fictício `SIM_TESTE3`.
+- Insere `agendamentos` fictício com `paciente_id` preenchido.
+- Insere `fin_lancamentos` com **`paciente_id = NULL`**, `agendamento_id` apontando para o agendamento acima, `descricao='MENSALIDADE 99/99 - CONTRATO #SIM999 - SIM_TESTE3'`.
+- Insere `caixa_movimentos` referenciando esse lançamento.
+- **Esperado:** paciente resolvido pelo fallback `agendamento.paciente_id`; nome aparece na coluna Paciente; filtro encontra.
 
-## Fases
+## Validação
 
-### Fase 1 — Design System local da Agenda (baixo risco)
-Criar componentes visuais reutilizáveis **sem tocar em `app.agenda.tsx` ainda**, em `src/components/agenda-v2/ui/`:
+Para cada cenário, executo **duas checagens SQL** que replicam a lógica do frontend:
 
-- `PageHeader` — título "Agendas" + subtítulo, slot de ações à direita.
-- `ActionToolbar` — agrupa ações primárias (Adicionar Encaixe, Agenda Express) e secundárias (Criar Horários, Encerrar Expediente, Exportar Excel, Opções) com hierarquia visual (primário sólido azul, secundário ghost).
-- `FilterCard` — card único "Filtros" com grid responsivo (4 / 3 / 2 colunas conforme linha) + botões Exibir/Limpar ancorados à direita.
-- `KpiCard` — ícone, número grande tabular, label, hover sutil, estado ativo.
-- `StatusBadge` — Confirmado (azul), Realizado (verde), Livre (cinza), Cancelado (vermelho), Pendente (âmbar), etc. Mapeia os status já usados.
-- `ServiceBadge` — cores por categoria (Consulta, Retorno, Enfermagem, Exames, Odonto, Laboratório).
-- `ClienteCell` — nome em destaque + CPF/telefone em muted.
-- `ProfissionalCell` — avatar + nome + especialidade abaixo.
-- `RowActions` — atalhos WhatsApp/Financeiro/Prontuário + menu `...` (Visualizar, Editar, Confirmar, Cancelar, Financeiro, Excluir) usando `DropdownMenu` shadcn.
-- `TablePagination` — rodapé com "X de Y", page-size, Anterior/Próximo.
-- `EmptyState` / `TableSkeleton`.
+1. **Enrich SQL** — mesmo SELECT que o `enrichMovsList` faz, confirma que o backend está devolvendo o `paciente_nome` correto para o `lancamento_id` do movimento fictício.
+2. **Filtro SQL** — confirma que buscar por parte do nome (`SIM_TESTE1`, `SIM_TESTE2`, `SIM_TESTE3`) retornaria a linha através do novo caminho (enrich OU descrição), e não apenas por `descricao ILIKE`.
 
-Tokens: reutilizar os tokens semânticos existentes em `src/styles.css`. Nada de cores hardcoded — apenas `bg-background`, `bg-card`, `text-muted-foreground`, `border-border`, `primary`, e as tonalidades já definidas no HHP design system. Se faltar um tom claro (#F7F9FC como fundo de página) adiciono como token semântico novo, não como classe arbitrária.
+Não vou renderizar a UI — a lógica testada é a mesma que o React executa (mesmo SELECT em `fin_lancamentos`, `agendamentos`, `pacientes`), então validar SQL é equivalente e não deixa resíduo na sessão de nenhuma atendente real.
 
-### Fase 2 — Aplicar na tela de Agendas
-Refatorar **somente a camada de renderização** de `app.agenda.tsx`:
-- Substituir o header atual pelo `PageHeader` + `ActionToolbar`.
-- Substituir o bloco de filtros pelo `FilterCard` (mesmos estados, mesmos handlers).
-- Substituir os 4 indicadores pelos `KpiCard`.
-- Trocar a tabela por um wrapper visual: cabeçalho sticky, linhas maiores, hover, badges, células compostas, `RowActions`. **Sem trocar a fonte de dados**, sem TanStack Table por enquanto (evita regressão de ordenação/seleção que já funciona hoje). Se a tabela atual já é uma `<table>` simples, faço restilização + composição de células.
-- Trocar paginação pelo `TablePagination` (mesma lógica, novo visual).
-- Estados de carregamento vazios: Skeleton + EmptyState amigável.
+## Limpeza (obrigatória e no mesmo teste)
 
-Todas as ações, permissões, atalhos de teclado, modais, contadores, hooks de realtime e chamadas a `createServerFn`/RPC ficam intactos.
+Ao final, na ordem inversa das dependências:
 
-### Fase 3 — Microinterações e responsivo
-- Framer Motion sutil em: entrada dos KPIs, aparição de linhas (stagger leve, respeitando `prefers-reduced-motion`).
-- Hover states nas linhas e cards.
-- Responsivo: filtros reempilham (grid → 2 col → 1 col), tabela com scroll-x em telas <1024px, toolbar quebra em menu compacto no tablet.
-- Acessibilidade: `aria-label` em botões-ícone, foco visível `focus-visible:ring`, contraste AA nos badges.
+```
+DELETE FROM caixa_movimentos WHERE descricao ILIKE 'SIM\_%' OR descricao ILIKE '%SIM_TESTE%' OR sessao_id = <sessao_sim>;
+DELETE FROM fin_lancamentos  WHERE descricao ILIKE 'SIM\_%' OR descricao ILIKE '%SIM_TESTE%' OR descricao ILIKE 'MENSALIDADE 99/99%';
+DELETE FROM agendamentos     WHERE observacoes ILIKE 'SIM_%';
+DELETE FROM caixa_sessoes    WHERE observacoes = 'SIM_SESSAO_TESTE';
+DELETE FROM pacientes        WHERE nome LIKE 'SIM\_TESTE%';
+```
 
-### Fora de escopo (não farei sem novo pedido)
-- Reescrever `app.agenda.tsx` para reduzir as 6.068 linhas.
-- Trocar sidebar / header global do app.
-- Alterar RPC, filtros server-side, contadores, permissões, realtime.
-- Reescrever Agenda V2 (`agenda-v2-shell.tsx`) — é outra tela.
-- Substituir a tabela por TanStack Table (risco de regressão em seleção/ordenação). Posso avaliar em fase separada.
+Depois, uma checagem final:
 
----
+```
+SELECT COUNT(*) FROM pacientes         WHERE nome LIKE 'SIM\_%';
+SELECT COUNT(*) FROM caixa_movimentos  WHERE descricao ILIKE '%SIM_TESTE%';
+SELECT COUNT(*) FROM fin_lancamentos   WHERE descricao ILIKE '%SIM_TESTE%';
+SELECT COUNT(*) FROM agendamentos      WHERE observacoes ILIKE 'SIM_%';
+```
 
-## Validação por fase
-- Fase 1: build passa; componentes renderizam em isolamento (nenhum consumidor ainda).
-- Fase 2: abro a rota `/app/agenda` no preview, confirmo visualmente que todos filtros/ações/contadores continuam funcionais em uma passagem manual dos principais fluxos (aplicar filtro, paginar, abrir menu de ações, abrir modais principais).
-- Fase 3: verificação visual em 3 larguras (1440, 1024, 768).
+Todos devem retornar `0`. Se sobrar qualquer resíduo, aviso antes de encerrar.
 
-## Detalhes técnicos
-- Stack: React + TS + Tailwind v4 + shadcn/ui + Lucide + Framer Motion (já instalada? confirmar; se não, `bun add framer-motion`).
-- Sem TanStack Table nesta rodada (justificado acima).
-- Tokens em `src/styles.css`; nenhum `text-white`/`bg-[#...]` em componentes.
-- Componentes ficam em `src/components/agenda-v2/ui/` (não confundir com Agenda V2 shell).
+## Restrições respeitadas
 
-## O que preciso confirmar antes de começar
-1. **Autoriza começar pela Fase 1** (criar componentes visuais isolados) e depois seguir para Fase 2 sob sua confirmação, ou prefere que eu faça 1+2 direto?
-2. **Sidebar/header global**: mantenho como está nesta rodada, ou você quer que eu abra uma fase específica para eles depois?
-3. **TanStack Table**: fica de fora agora (risco de regressão). OK ou você quer que eu inclua já?
+- Todo registro criado tem prefixo `SIM_` e é apagado no mesmo teste.
+- Nenhuma sessão real de atendente é usada; a `caixa_sessoes` é criada fictícia e apagada.
+- Zero interação com registros reais de pacientes, agenda, contratos, mensalidades ou outros caixas.
+- Sem UI, sem chamadas a RPCs de pagamento real, sem NFS-e, sem impressão.
+
+## Entregável
+
+Ao final, mando um relatório curto por cenário: **antes / depois / status (passou ou falhou)**, e a confirmação do `COUNT(*) = 0` da limpeza.
