@@ -306,11 +306,11 @@ body.resumo-only .rows-full { display: none !important; }
         <CardContent className="p-3 grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
             <Label>De</Label>
-            <DateInputBR value={de} onChange={setDe} />
+            <DateInputBR value={de} onChange={(e) => setDe(e.target.value)} />
           </div>
           <div>
             <Label>Até</Label>
-            <DateInputBR value={ate} onChange={setAte} />
+            <DateInputBR value={ate} onChange={(e) => setAte(e.target.value)} />
           </div>
           <div>
             <Label>Médico</Label>
