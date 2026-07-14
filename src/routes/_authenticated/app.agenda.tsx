@@ -1123,6 +1123,30 @@ function AgendaPage() {
     setNotasHist(((nts as unknown as NotaHist[]) ?? []));
   };
 
+  const adicionarNotaHist = async () => {
+    if (!auditAg || !clinicaAtual) return;
+    const txt = notaTexto.trim();
+    if (!txt) return;
+    if (txt.length > 1000) { toast.error("Máximo 1000 caracteres"); return; }
+    setSavingNota(true);
+    const nome = (user?.user_metadata as { nome?: string } | null)?.nome ?? null;
+    const { data, error } = await supabase
+      .from("agendamento_historico_notas" as never)
+      .insert({
+        clinica_id: clinicaAtual.clinica_id,
+        agendamento_id: auditAg.id,
+        user_email: user?.email ?? null,
+        user_nome: nome,
+        texto: txt,
+      })
+      .select("id, user_email, user_nome, texto, created_at")
+      .single();
+    setSavingNota(false);
+    if (error) { mostrarErro(error); return; }
+    setNotasHist((prev) => [data as unknown as NotaHist, ...prev]);
+    setNotaTexto("");
+  };
+
   const cadastrarPacienteRapido = async (e: FormEvent) => {
     e.preventDefault();
     if (!podeEscrever) {
