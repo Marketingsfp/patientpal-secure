@@ -2157,6 +2157,7 @@ function Page() {
                         <TableHead>Data</TableHead>
                         <TableHead>Hora</TableHead>
                         <TableHead>Tipo</TableHead>
+                        <TableHead>Paciente</TableHead>
                         <TableHead>Descrição</TableHead>
                         <TableHead>Serviço</TableHead>
                         <TableHead>Médico</TableHead>
@@ -2168,7 +2169,7 @@ function Page() {
                     <TableBody>
                       {minhasMovsFiltrados.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center text-muted-foreground">
+                          <TableCell colSpan={10} className="text-center text-muted-foreground">
                             {filtrosAtivos
                               ? "Nenhum movimento corresponde aos filtros"
                               : isManager
@@ -2180,12 +2181,24 @@ function Page() {
                         const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
                         const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
                         const medico = enr?.medico ?? null;
+                        const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
                         return (
                         <TableRow key={m.id}>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
                           <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
-                          <TableCell>{m.descricao || "—"}</TableCell>
+                          <TableCell
+                            className="text-xs uppercase font-medium max-w-[220px] truncate"
+                            title={paciente ?? undefined}
+                          >
+                            {paciente || "—"}
+                          </TableCell>
+                          <TableCell
+                            className="max-w-[320px] truncate"
+                            title={m.descricao ?? undefined}
+                          >
+                            {m.descricao || "—"}
+                          </TableCell>
                           <TableCell className="text-xs">{servico || "—"}</TableCell>
                           <TableCell className="text-xs">{medico || "—"}</TableCell>
                           <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
