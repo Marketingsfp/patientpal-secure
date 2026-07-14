@@ -2654,6 +2654,15 @@ export function AtendimentosPage() {
                                   <Wallet className="h-3.5 w-3.5" />
                                 </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                title="Ver histórico"
+                                onClick={() => setHistoricoAtend(a)}
+                              >
+                                <History className="h-3.5 w-3.5" />
+                              </Button>
                               {podeEscrever && (
                                 <Button
                                   variant="ghost"
@@ -2748,6 +2757,15 @@ export function AtendimentosPage() {
                                   <Wallet className="h-3.5 w-3.5" />
                                 </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                title="Ver histórico"
+                                onClick={() => setHistoricoAtend(a)}
+                              >
+                                <History className="h-3.5 w-3.5" />
+                              </Button>
                               {podeEscrever && (
                                 <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" onClick={() => remove(a)}>
                                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
