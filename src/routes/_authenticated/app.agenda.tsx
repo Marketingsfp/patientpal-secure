@@ -4935,11 +4935,16 @@ function AgendaPage() {
       </Dialog>
 
       {/* Filtros */}
-      <div
-        className="rounded-lg border bg-card p-2 space-y-1.5 text-xs [&_input]:h-7 [&_input]:text-xs [&_button[role=combobox]]:h-7 [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
+      <section
+        className="rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)] text-xs [&_input]:h-9 [&_input]:text-xs [&_button[role=combobox]]:h-9 [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
         style={{ ["--clinic" as never]: corClinica }}
       >
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
+        <header className="flex items-center gap-2 px-4 md:px-5 pt-4">
+          <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold text-foreground">Filtros</h2>
+        </header>
+        <div className="p-4 md:p-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           <div className="space-y-0.5">
             <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Profissional</Label>
             <MedicoFiltroInput
@@ -5073,20 +5078,25 @@ function AgendaPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-end gap-1.5">
-            <Button variant="outline" size="sm" onClick={limparFiltros} className="h-7 text-xs flex-1"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
-            <Button size="sm" onClick={load} className="h-7 text-xs flex-1"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
-          </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-1.5">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
           <div className="flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2 text-xs cursor-pointer">
               <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
               Exibir apenas a data selecionada
             </label>
           </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={limparFiltros} className="h-8 text-xs">
+              <X className="h-3.5 w-3.5 mr-1.5" /> Limpar
+            </Button>
+            <Button size="sm" onClick={load} className="h-8 text-xs">
+              <Search className="h-3.5 w-3.5 mr-1.5" /> Exibir
+            </Button>
+          </div>
         </div>
-      </div>
+        </div>
+      </section>
 
       {viewMode === "dia" && (
       <>
