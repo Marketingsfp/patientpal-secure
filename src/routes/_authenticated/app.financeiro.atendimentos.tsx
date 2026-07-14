@@ -162,7 +162,7 @@ function FormaPagamentoIcon({ forma }: { forma: string | null | undefined }) {
   return <HelpCircle className="h-4 w-4 text-muted-foreground" aria-label={forma ?? ""} />;
 }
 
-export function AtendimentosPage() {
+function AtendimentosPage() {
   const { clinicaAtual } = useClinica();
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
   const podeEscrever = usePodeEscrever("financeiro");
