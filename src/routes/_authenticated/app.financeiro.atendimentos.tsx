@@ -1734,31 +1734,34 @@ export function AtendimentosPage() {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setPayingNow(true);
     try {
-      // Validação servidor-side: só pode pagar repasse de atendimentos efetivamente
-      // realizados (lançamento confirmado + agendamento com status 'realizado').
-      // Bloqueia o bug de repassar antes do paciente ter sido atendido.
+      // Pré-validação no cliente: só pode pagar repasse de atendimentos efetivamente
+      // realizados e cuja data marcada na agenda já chegou. A mesma regra também
+      // é reforçada no banco pela RPC pagar_repasse_medico.
       const agendaIdsCheck = selectedItems.filter((x) => x.origem === "agenda").map((x) => x.id);
       if (agendaIdsCheck.length) {
         const { data: lancs, error: eChk } = await supabase
           .from("fin_lancamentos")
-          .select("id, status, agendamento_id, agendamento:agendamentos(status)")
+          .select("id, status, agendamento_id, agendamento:agendamentos(status, inicio)")
           .in("id", agendaIdsCheck);
         if (eChk) throw eChk;
+        const hojeIso = new Date().toISOString().slice(0, 10);
         const bloq: string[] = [];
         for (const l of (lancs ?? []) as Array<{
           id: string;
           status: string | null;
           agendamento_id: string | null;
-          agendamento: { status: string | null } | null;
+          agendamento: { status: string | null; inicio: string | null } | null;
         }>) {
           const lancOk = l.status === "confirmado";
           const agStatus = l.agendamento?.status ?? null;
+          const dataAgenda = l.agendamento?.inicio?.slice(0, 10) ?? null;
           const agOk = agStatus === "realizado";
-          if (!lancOk || !agOk) bloq.push(l.id);
+          const dataOk = !!dataAgenda && dataAgenda <= hojeIso && dataAgenda <= payForm.data;
+          if (!lancOk || !agOk || !dataOk) bloq.push(l.id);
         }
         if (bloq.length) {
           toast.error(
-            `Não é possível pagar o repasse: ${bloq.length} atendimento(s) ainda não foram baixados/realizados. Confirme o pagamento no Caixa e marque o atendimento como realizado antes de gerar o repasse.`,
+            `Não é possível pagar o repasse: ${bloq.length} atendimento(s) ainda não estão liberados. O repasse só pode ser pago no dia marcado do atendimento ou depois, com o atendimento realizado.`,
           );
           setPayingNow(false);
           return;
