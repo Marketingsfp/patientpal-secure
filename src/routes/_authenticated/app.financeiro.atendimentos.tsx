@@ -3378,6 +3378,13 @@ function AtendimentosPage() {
           <ComprovantesTab />
         </TabsContent>
       </Tabs>
+      <HistoricoAtendimentoDialog
+        open={!!historicoAtend}
+        onClose={() => setHistoricoAtend(null)}
+        lancamentoId={historicoAtend?.id ?? null}
+        agendamentoId={historicoAtend?.agendamento_id ?? null}
+        clinicaId={clinicaAtual?.clinica_id ?? null}
+      />
     </div>
   );
 }
