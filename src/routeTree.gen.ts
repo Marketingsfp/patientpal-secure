@@ -90,6 +90,7 @@ import { Route as AuthenticatedAppCaixaRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAppBoletosRouteImport } from './routes/_authenticated/app.boletos'
 import { Route as AuthenticatedAppBackupsRouteImport } from './routes/_authenticated/app.backups'
 import { Route as AuthenticatedAppAuditoriaRouteImport } from './routes/_authenticated/app.auditoria'
+import { Route as AuthenticatedAppAtendimentosRouteImport } from './routes/_authenticated/app.atendimentos'
 import { Route as AuthenticatedAppAtendimentoMultiploRouteImport } from './routes/_authenticated/app.atendimento-multiplo'
 import { Route as AuthenticatedAppAtendimentoIaRouteImport } from './routes/_authenticated/app.atendimento-ia'
 import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authenticated/app.anamneses'
@@ -583,6 +584,12 @@ const AuthenticatedAppAuditoriaRoute =
     path: '/auditoria',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppAtendimentosRoute =
+  AuthenticatedAppAtendimentosRouteImport.update({
+    id: '/atendimentos',
+    path: '/atendimentos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppAtendimentoMultiploRoute =
   AuthenticatedAppAtendimentoMultiploRouteImport.update({
     id: '/atendimento-multiplo',
@@ -890,6 +897,7 @@ export interface FileRoutesByFullPath {
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   '/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
+  '/app/atendimentos': typeof AuthenticatedAppAtendimentosRoute
   '/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
   '/app/backups': typeof AuthenticatedAppBackupsRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -1017,6 +1025,7 @@ export interface FileRoutesByTo {
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
+  '/app/atendimentos': typeof AuthenticatedAppAtendimentosRoute
   '/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
   '/app/backups': typeof AuthenticatedAppBackupsRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -1146,6 +1155,7 @@ export interface FileRoutesById {
   '/_authenticated/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/_authenticated/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   '/_authenticated/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
+  '/_authenticated/app/atendimentos': typeof AuthenticatedAppAtendimentosRoute
   '/_authenticated/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
   '/_authenticated/app/backups': typeof AuthenticatedAppBackupsRoute
   '/_authenticated/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -1277,6 +1287,7 @@ export interface FileRouteTypes {
     | '/app/anamneses'
     | '/app/atendimento-ia'
     | '/app/atendimento-multiplo'
+    | '/app/atendimentos'
     | '/app/auditoria'
     | '/app/backups'
     | '/app/boletos'
@@ -1404,6 +1415,7 @@ export interface FileRouteTypes {
     | '/app/alertas-enfermagem'
     | '/app/anamneses'
     | '/app/atendimento-multiplo'
+    | '/app/atendimentos'
     | '/app/auditoria'
     | '/app/backups'
     | '/app/boletos'
@@ -1532,6 +1544,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/anamneses'
     | '/_authenticated/app/atendimento-ia'
     | '/_authenticated/app/atendimento-multiplo'
+    | '/_authenticated/app/atendimentos'
     | '/_authenticated/app/auditoria'
     | '/_authenticated/app/backups'
     | '/_authenticated/app/boletos'
@@ -2231,6 +2244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppAuditoriaRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/atendimentos': {
+      id: '/_authenticated/app/atendimentos'
+      path: '/atendimentos'
+      fullPath: '/app/atendimentos'
+      preLoaderRoute: typeof AuthenticatedAppAtendimentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/atendimento-multiplo': {
       id: '/_authenticated/app/atendimento-multiplo'
       path: '/atendimento-multiplo'
@@ -2709,6 +2729,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAnamnesesRoute: typeof AuthenticatedAppAnamnesesRoute
   AuthenticatedAppAtendimentoIaRoute: typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   AuthenticatedAppAtendimentoMultiploRoute: typeof AuthenticatedAppAtendimentoMultiploRoute
+  AuthenticatedAppAtendimentosRoute: typeof AuthenticatedAppAtendimentosRoute
   AuthenticatedAppAuditoriaRoute: typeof AuthenticatedAppAuditoriaRoute
   AuthenticatedAppBackupsRoute: typeof AuthenticatedAppBackupsRoute
   AuthenticatedAppBoletosRoute: typeof AuthenticatedAppBoletosRoute
@@ -2792,6 +2813,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppAtendimentoIaRouteWithChildren,
   AuthenticatedAppAtendimentoMultiploRoute:
     AuthenticatedAppAtendimentoMultiploRoute,
+  AuthenticatedAppAtendimentosRoute: AuthenticatedAppAtendimentosRoute,
   AuthenticatedAppAuditoriaRoute: AuthenticatedAppAuditoriaRoute,
   AuthenticatedAppBackupsRoute: AuthenticatedAppBackupsRoute,
   AuthenticatedAppBoletosRoute: AuthenticatedAppBoletosRoute,
