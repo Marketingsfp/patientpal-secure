@@ -1,41 +1,38 @@
-Tipo de pedido: erro visual/experiência do usuário no comprovante de repasse médico. Não é regra de negócio nem alteração de dados financeiros.
+## Ajuste
 
-Plano de correção:
+Mover **Comprovantes** do submenu lateral do Financeiro para uma aba na parte superior da tela de Atendimentos, ao lado do título "Atendimentos" (marcado com X na imagem).
 
-1. Trocar a estratégia de impressão atual
-   - Hoje o sistema tenta imprimir o comprovante de dentro do modal usando CSS `@media print`.
-   - Isso é frágil porque o modal usa camadas centralizadas, posição fixa e transformações; no print preview do navegador, isso pode deslocar o conteúdo e cortar a lateral.
-   - Vou parar de depender do layout da tela/modal para imprimir.
+## Como fica
 
-2. Criar impressão isolada do comprovante
-   - Ao clicar em “Imprimir” ou “Imprimir resumo (médico)”, o sistema vai copiar somente o conteúdo do comprovante para uma área/documento de impressão isolado.
-   - Essa impressão terá CSS próprio de A4, sem sidebar, sem fundo da tela, sem modal, sem transformações e sem dependência do restante do aplicativo.
-   - Resultado esperado: todos os dados devem aparecer alinhados dentro da folha, sem corte lateral.
+Na tela `/app/financeiro/atendimentos`, no topo, aparecerão duas abas:
 
-3. Manter exatamente os mesmos dados
-   - Não vou alterar cálculo de repasse, baixa de pagamento, reimpressão, dados do médico, paciente, serviço, conta ou total.
-   - A mudança será apenas na forma de preparar o conteúdo para impressão.
+```
+[ Atendimentos ]  [ Comprovantes ]
+```
 
-4. Ajustar o layout impresso para caber melhor
-   - Definir largura segura para A4.
-   - Reduzir espaçamentos da tabela na impressão.
-   - Permitir quebra de texto em nomes longos de pacientes, médicos e serviços.
-   - Manter valores e datas sem quebra indevida.
-   - Garantir que múltiplos médicos/comprovantes quebrem em páginas separadas corretamente.
+- **Atendimentos** — conteúdo atual, sem qualquer alteração.
+- **Comprovantes** — a listagem de repasses pagos (já implementada), agora renderizada dentro da mesma rota como aba.
 
-5. Remover/neutralizar o CSS de impressão anterior desse modal
-   - O bloco atual de `@media print` será substituído ou reduzido para não interferir.
-   - Isso evita que regras antigas continuem causando deslocamento ou corte.
+O conteúdo da aba Comprovantes é exatamente o que já foi construído: lista agrupada por médico + data de pagamento, com botões Visualizar e Imprimir 2ª via.
 
-6. Validação
-   - Abrir o comprovante de repasse e acionar a impressão.
-   - Verificar que o conteúdo começa dentro da margem esquerda da folha e que a tabela não fica cortada.
-   - Verificar também o botão “Imprimir resumo (médico)”.
+## Alterações técnicas
 
-Arquivos afetados:
+- `src/routes/_authenticated/app.financeiro.tsx`
+  Remover o item **Comprovantes** do submenu lateral (fica só Atendimentos, Estorno, etc. como antes).
 - `src/routes/_authenticated/app.financeiro.atendimentos.tsx`
+  Adicionar um seletor de abas (Tabs shadcn) no topo. Aba 1 = conteúdo atual; aba 2 = componente `ComprovantesTab` importado do novo arquivo.
+- `src/routes/_authenticated/app.financeiro.comprovantes.tsx`
+  Deixar de ser uma rota. Transformar em componente exportado `ComprovantesTab` (mesmo código já pronto, sem `createFileRoute`) para ser usado como conteúdo da aba. A URL `/app/financeiro/comprovantes` deixa de existir.
 
-Fora do escopo:
-- Não mexer em banco de dados.
-- Não mexer em regras de pagamento/repasse.
-- Não alterar outros relatórios ou comprovantes fora desta tela.
+## Nada muda
+
+- Regras de negócio, dados, agrupamento, impressão, permissões e RLS permanecem iguais.
+- A aba Atendimentos continua funcionando como hoje.
+- O comportamento e o layout do comprovante (2ª via) já validados não mudam.
+
+## Validação
+
+- Abrir `/app/financeiro/atendimentos` → ver as duas abas no topo.
+- Clicar em Comprovantes → ver a lista de repasses pagos.
+- Voltar em Atendimentos → tudo funcionando normalmente.
+- Confirmar que Comprovantes não aparece mais no menu lateral do Financeiro.

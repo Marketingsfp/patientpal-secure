@@ -59,6 +59,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ComprovantesTab } from "@/components/financeiro/comprovantes-tab";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/atendimentos")({
   component: AtendimentosPage,
@@ -2031,6 +2033,12 @@ export function AtendimentosPage() {
 
   return (
     <div className="space-y-3">
+      <Tabs defaultValue="atendimentos" className="space-y-3">
+        <TabsList>
+          <TabsTrigger value="atendimentos">Atendimentos</TabsTrigger>
+          <TabsTrigger value="comprovantes">Comprovantes</TabsTrigger>
+        </TabsList>
+        <TabsContent value="atendimentos" className="space-y-3 mt-0">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold leading-tight">Atendimentos</h1>
@@ -2133,17 +2141,6 @@ export function AtendimentosPage() {
                   <Undo2 className="h-4 w-4 mr-2 text-amber-600" />
                   Desfazer baixa
                   {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={!podeReimprimir}
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    if (podeReimprimir) reimprimirSelecionados();
-                  }}
-                >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Imprimir 2ª via
-                  {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -2829,17 +2826,6 @@ export function AtendimentosPage() {
                   {selectedBaixados.length ? ` (${selectedBaixados.length})` : ""}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  disabled={!podeReimprimir}
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    if (podeReimprimir) reimprimirSelecionados();
-                  }}
-                >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Imprimir 2ª via
-                  {selectedPagos.length ? ` (${selectedPagos.length})` : ""}
-                </DropdownMenuItem>
-                <DropdownMenuItem
                   disabled={selectedLaudoElegiveis.length === 0 || !podeEscrever}
                   onSelect={(e) => {
                     e.preventDefault();
@@ -3366,6 +3352,11 @@ export function AtendimentosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+        <TabsContent value="comprovantes" className="mt-0">
+          <ComprovantesTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
