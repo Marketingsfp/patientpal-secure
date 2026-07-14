@@ -114,7 +114,7 @@ export function SearchableMultiSelect({
               </Button>
             )}
           </div>
-          <CommandList className="max-h-[min(340px,var(--radix-popover-content-available-height))] overflow-y-auto overscroll-contain">
+          <CommandList className="max-h-[min(340px,var(--radix-popover-content-available-height,340px))] min-h-[240px] overflow-y-auto overscroll-contain">
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
               {options.map((o) => {
