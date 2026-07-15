@@ -1644,6 +1644,49 @@ function Page() {
     void load();
   };
 
+  // Desfazer fechamento de um caixa (admin/gestor/financeiro).
+  // Registra auditoria via caixa_movimentos.tipo='reabertura' e limpa
+  // os campos de fechamento da sessão, deixando-a novamente 'aberto'.
+  const desfazerFechamento = async () => {
+    const alvo = openReabrir;
+    if (!alvo || !clinicaAtual || !user) return;
+    const motivo = motivoReabrir.trim();
+    if (!motivo) { toast.error("Informe o motivo da reabertura."); return; }
+    const executorNome = user.user_metadata?.nome || user.email || "gestor";
+    const agora = new Date();
+    const marcador = `[Reaberto por ${executorNome} em ${agora.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })} — ${motivo}]`;
+    const novaObs = alvo.observacoes ? `${alvo.observacoes} | ${marcador}` : marcador;
+    setSaving(true);
+    const { error } = await supabase
+      .from("caixa_sessoes")
+      .update({
+        status: "aberto",
+        fechado_em: null,
+        valor_fechamento_informado: null,
+        valor_fechamento_calculado: null,
+        diferenca: null,
+        observacoes: novaObs,
+      })
+      .eq("id", alvo.id);
+    if (!error) {
+      await supabase.from("caixa_movimentos").insert({
+        sessao_id: alvo.id,
+        clinica_id: clinicaAtual.clinica_id,
+        user_id: user.id,
+        tipo: "reabertura",
+        valor: 0,
+        descricao: `Fechamento desfeito por ${executorNome} — motivo: ${motivo}`,
+      });
+    }
+    setSaving(false);
+    if (error) { mostrarErro(error); return; }
+    setOpenReabrir(null);
+    setMotivoReabrir("");
+    toast.success("Fechamento desfeito. O caixa foi reaberto.");
+    void loadTodos();
+    void load();
+  };
+
   // Fecha em lote todas as sessões marcadas — usa o saldo calculado como
   // valor informado (diferença = 0). Uma observação global identifica o
   // fechamento como feito pelo gestor.
