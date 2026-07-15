@@ -2567,6 +2567,7 @@ export type Database = {
           status: string
           tabela_legada: boolean
           taxa_adesao: number
+          titular_apenas_financeiro: boolean
           token_publico: string | null
           updated_at: string
           valor_mensal: number
@@ -2596,6 +2597,7 @@ export type Database = {
           status?: string
           tabela_legada?: boolean
           taxa_adesao?: number
+          titular_apenas_financeiro?: boolean
           token_publico?: string | null
           updated_at?: string
           valor_mensal?: number
@@ -2625,6 +2627,7 @@ export type Database = {
           status?: string
           tabela_legada?: boolean
           taxa_adesao?: number
+          titular_apenas_financeiro?: boolean
           token_publico?: string | null
           updated_at?: string
           valor_mensal?: number
