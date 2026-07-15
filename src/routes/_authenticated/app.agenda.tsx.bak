@@ -1007,7 +1007,7 @@ function AgendaPage() {
       .maybeSingle();
     if (data) {
       const base: any = { ...data };
-      const camposComplementares = ["telefone", "email", "cep", "logradouro", "numero", "bairro", "cidade", "estado", "foto_url"];
+      const camposComplementares = ["telefone","email","cep","logradouro","numero","bairro","cidade","estado","foto_url"];
       const faltando = camposComplementares.filter((k) => !base[k]);
       if (faltando.length > 0 && clinicaAtual) {
         try {
@@ -2183,70 +2183,70 @@ function AgendaPage() {
       return;
     }
     try {
-      // Verificação fresca + carga de procedimentos em PARALELO (cache 60s)
-      const [{ data: jaPagosLote }, procs] = await Promise.all([
-        supabase
-          .from("fin_lancamentos")
-          .select("agendamento_id")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .eq("tipo", "receita")
-          .eq("status", "confirmado")
-          .in("agendamento_id", ids),
-        getProcedimentosComValor(clinicaAtual.clinica_id),
-      ]);
-      if ((jaPagosLote ?? []).length > 0) {
-        const pagos = new Set(((jaPagosLote ?? []) as Array<{ agendamento_id: string | null }>)
-          .map((r) => r.agendamento_id).filter((x): x is string => !!x));
-        setPagosSet((prev) => { const n = new Set(prev); pagos.forEach((id) => n.add(id)); return n; });
-        toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
-        return;
-      }
-      let totalDinheiro = 0, totalPix = 0, totalDebito = 0, totalCredito = 0;
-      // Resolve todos os procedimentos em paralelo (cada um pode cair em
-      // fallback no banco; em paralelo o tempo total fica ~= 1 chamada).
-      const procsResolvidos = await Promise.all(
-        itens.map((it) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? rotuloFallbackProc(it.medico_id), procs)),
-      );
-      const pesos: Record<string, number> = {};
-      const rotulos: Record<string, string> = {};
-      (procsResolvidos as any[]).forEach((p, idx) => {
-        const valorCartao = valorCartaoProcedimento(p);
-        const valorDin = primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
-        totalDinheiro += valorDin;
-        totalPix += valorCartao;
-        totalDebito += valorCartao;
-        totalCredito += valorCartao;
-        // Peso p/ rateio: prioriza valor de cartão (cheio); se 0, usa dinheiro.
-        pesos[itens[idx].id] = valorCartao > 0 ? valorCartao : valorDin;
-        rotulos[itens[idx].id] = itens[idx].procedimento ?? rotuloFallbackProc(itens[idx].medico_id);
-      });
-      setPagamentoPesos(pesos);
-      setPagamentoRotulos(rotulos);
-      const paciente = itens[0].paciente_nome;
-      setPagamentoPacienteNome(paciente);
-      const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? rotuloFallbackProc(i.medico_id))).join(" + ")} (${itens.length} serviços)`;
-      const opcoes: FormaOpcao[] = [
-        { forma: "dinheiro", label: "Dinheiro", valor: totalDinheiro },
-        { forma: "pix", label: "Pix", valor: totalPix },
-        { forma: "cartao_debito", label: "Cartão de Débito", valor: totalDebito },
-        { forma: "cartao_credito", label: "Cartão de Crédito", valor: totalCredito },
-      ];
-      setFormaPagOpcoes(opcoes);
-      setFormaPagCtx({
-        agId: itens.map(i => i.id).join(","),
-        desc,
-        paciente,
-        procedimento: `${itens.map(i => (i.procedimento ?? rotuloFallbackProc(i.medico_id))).join(" + ")} (${itens.length} serviços)`,
-        medico: (() => {
-          const m = medicos.find((mm) => mm.id === itens[0].medico_id);
-          return m?.nome ?? undefined;
-        })(),
-        especialidade: (() => {
-          const m = medicos.find((mm) => mm.id === itens[0].medico_id);
-          return m?.especialidade_nome ?? undefined;
-        })(),
-      });
-      setFormaPagOpen(true);
+    // Verificação fresca + carga de procedimentos em PARALELO (cache 60s)
+    const [{ data: jaPagosLote }, procs] = await Promise.all([
+      supabase
+        .from("fin_lancamentos")
+        .select("agendamento_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .in("agendamento_id", ids),
+      getProcedimentosComValor(clinicaAtual.clinica_id),
+    ]);
+    if ((jaPagosLote ?? []).length > 0) {
+      const pagos = new Set(((jaPagosLote ?? []) as Array<{ agendamento_id: string | null }>)
+        .map((r) => r.agendamento_id).filter((x): x is string => !!x));
+      setPagosSet((prev) => { const n = new Set(prev); pagos.forEach((id) => n.add(id)); return n; });
+      toast.info("Há atendimentos já pagos na seleção. Desmarque-os antes de cobrar.");
+      return;
+    }
+    let totalDinheiro = 0, totalPix = 0, totalDebito = 0, totalCredito = 0;
+    // Resolve todos os procedimentos em paralelo (cada um pode cair em
+    // fallback no banco; em paralelo o tempo total fica ~= 1 chamada).
+    const procsResolvidos = await Promise.all(
+      itens.map((it) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, it.procedimento ?? rotuloFallbackProc(it.medico_id), procs)),
+    );
+    const pesos: Record<string, number> = {};
+    const rotulos: Record<string, string> = {};
+    (procsResolvidos as any[]).forEach((p, idx) => {
+      const valorCartao = valorCartaoProcedimento(p);
+      const valorDin = primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+      totalDinheiro += valorDin;
+      totalPix      += valorCartao;
+      totalDebito   += valorCartao;
+      totalCredito  += valorCartao;
+      // Peso p/ rateio: prioriza valor de cartão (cheio); se 0, usa dinheiro.
+      pesos[itens[idx].id] = valorCartao > 0 ? valorCartao : valorDin;
+      rotulos[itens[idx].id] = itens[idx].procedimento ?? rotuloFallbackProc(itens[idx].medico_id);
+    });
+    setPagamentoPesos(pesos);
+    setPagamentoRotulos(rotulos);
+    const paciente = itens[0].paciente_nome;
+    setPagamentoPacienteNome(paciente);
+    const desc = `${paciente} — ${itens.map(i => (i.procedimento ?? rotuloFallbackProc(i.medico_id))).join(" + ")} (${itens.length} serviços)`;
+    const opcoes: FormaOpcao[] = [
+      { forma: "dinheiro", label: "Dinheiro", valor: totalDinheiro },
+      { forma: "pix", label: "Pix", valor: totalPix },
+      { forma: "cartao_debito", label: "Cartão de Débito", valor: totalDebito },
+      { forma: "cartao_credito", label: "Cartão de Crédito", valor: totalCredito },
+    ];
+    setFormaPagOpcoes(opcoes);
+    setFormaPagCtx({
+      agId: itens.map(i => i.id).join(","),
+      desc,
+      paciente,
+      procedimento: `${itens.map(i => (i.procedimento ?? rotuloFallbackProc(i.medico_id))).join(" + ")} (${itens.length} serviços)`,
+      medico: (() => {
+        const m = medicos.find((mm) => mm.id === itens[0].medico_id);
+        return m?.nome ?? undefined;
+      })(),
+      especialidade: (() => {
+        const m = medicos.find((mm) => mm.id === itens[0].medico_id);
+        return m?.especialidade_nome ?? undefined;
+      })(),
+    });
+    setFormaPagOpen(true);
     } catch (e: any) {
       console.error("[cobrarSelecionados]", e);
       mostrarErro(e);
@@ -2610,10 +2610,10 @@ function AgendaPage() {
       );
       const editingItemIdsLiberar = editing?.id
         ? new Set<string>(
-          ((consumidosRows ?? []) as Array<{ orcamento_item_id: string; agendamento_id: string }>)
-            .filter((r) => r.agendamento_id === editing.id)
-            .map((r) => r.orcamento_item_id),
-        )
+            ((consumidosRows ?? []) as Array<{ orcamento_item_id: string; agendamento_id: string }>)
+              .filter((r) => r.agendamento_id === editing.id)
+              .map((r) => r.orcamento_item_id),
+          )
         : new Set<string>();
       const its = itsAll.filter((i) => !consumidos.has(i.id) || editingItemIdsLiberar.has(i.id));
       if (its.length === 0) {
@@ -2986,13 +2986,13 @@ function AgendaPage() {
         payload.tipo_atendimento === "particular"
           ? Promise.resolve(null)
           : obterInfoConvenioPaciente({
-            clinicaId: clinicaAtual.clinica_id,
-            pacienteId: payload.paciente_id,
-            medicoId: payload.medico_id,
-            procedimentoNome: payload.procedimento ?? "",
-            agendamentoId: novoId,
-            dataRef: payload.inicio ?? null,
-          }),
+              clinicaId: clinicaAtual.clinica_id,
+              pacienteId: payload.paciente_id,
+              medicoId: payload.medico_id,
+              procedimentoNome: payload.procedimento ?? "",
+              agendamentoId: novoId,
+              dataRef: payload.inicio ?? null,
+            }),
       ]);
       // Multi-exame: quando há mais de um procedimento (imagem ou laboratório),
       // o payload.procedimento vem concatenado ("A + B + C") e não encontra match
@@ -3007,9 +3007,9 @@ function AgendaPage() {
       for (const p of procsIndividuais as any[]) {
         const valorCartao = valorCartaoProcedimento(p);
         vDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
-        vPix += valorCartao;
-        vDebito += valorCartao;
-        vCredito += valorCartao;
+        vPix      += valorCartao;
+        vDebito   += valorCartao;
+        vCredito  += valorCartao;
       }
       let opcoes: FormaOpcao[] = [
         { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
@@ -3236,31 +3236,31 @@ function AgendaPage() {
       return;
     }
     try {
-      // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
-      // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
-      // que não bate com a tabela de procedimentos e zeraria as opções).
-      const opcoesOrc = a.orcamento_id ? await opcoesPagamentoDeOrcamento(a.orcamento_id) : null;
-      // Verificação fresca no banco: impede faturar duas vezes mesmo se o cache
-      // local estiver desatualizado (ex.: outro usuário pagou em outra aba, ou
-      // o pagamento foi transferido de uma ficha reagendada).
-      // Roda em paralelo: checagem de pago + lista de procedimentos (cache)
-      // + info de convênio do paciente. Antes era serial (3-5s); agora ~= a
-      // chamada mais lenta.
-      let [{ data: jaPagos }, lista, info] = await Promise.all([
-        supabase
-          .from("fin_lancamentos")
-          .select("id")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .eq("tipo", "receita")
-          .eq("status", "confirmado")
-          .eq("agendamento_id", a.id)
-          .limit(1),
-        getProcedimentosComValor(clinicaAtual.clinica_id),
-        // Atendimento marcado como "Particular" ignora o convênio do paciente
-        // de propósito — cobra valor cheio, sem desconto/bloqueio/gratuidade.
-        a.tipo_atendimento === "particular"
-          ? Promise.resolve(null)
-          : obterInfoConvenioPaciente({
+    // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
+    // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
+    // que não bate com a tabela de procedimentos e zeraria as opções).
+    const opcoesOrc = a.orcamento_id ? await opcoesPagamentoDeOrcamento(a.orcamento_id) : null;
+    // Verificação fresca no banco: impede faturar duas vezes mesmo se o cache
+    // local estiver desatualizado (ex.: outro usuário pagou em outra aba, ou
+    // o pagamento foi transferido de uma ficha reagendada).
+    // Roda em paralelo: checagem de pago + lista de procedimentos (cache)
+    // + info de convênio do paciente. Antes era serial (3-5s); agora ~= a
+    // chamada mais lenta.
+    let [{ data: jaPagos }, lista, info] = await Promise.all([
+      supabase
+        .from("fin_lancamentos")
+        .select("id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .eq("agendamento_id", a.id)
+        .limit(1),
+      getProcedimentosComValor(clinicaAtual.clinica_id),
+      // Atendimento marcado como "Particular" ignora o convênio do paciente
+      // de propósito — cobra valor cheio, sem desconto/bloqueio/gratuidade.
+      a.tipo_atendimento === "particular"
+        ? Promise.resolve(null)
+        : obterInfoConvenioPaciente({
             clinicaId: clinicaAtual.clinica_id,
             pacienteId: a.paciente_id,
             medicoId: a.medico_id,
@@ -3268,119 +3268,119 @@ function AgendaPage() {
             agendamentoId: a.id,
             dataRef: a.inicio ?? null,
           }),
-      ]);
-      if ((jaPagos ?? []).length > 0) {
-        toast.info("Este agendamento já foi pago.");
-        setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
+    ]);
+    if ((jaPagos ?? []).length > 0) {
+      toast.info("Este agendamento já foi pago.");
+      setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
+      return;
+    }
+    // Multi-exame (laboratório/imagem): quando o nome vem concatenado com " + ",
+    // resolvemos cada item individualmente e somamos. Para agendamento simples,
+    // o split retorna apenas um item e o comportamento permanece igual.
+    const nomesParaValorar = (a.procedimento ?? rotuloFallbackProc(a.medico_id))
+      .split(/\s+\+\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const procsIndividuais = await Promise.all(
+      (nomesParaValorar.length > 0 ? nomesParaValorar : [rotuloFallbackProc(a.medico_id)]).map((nome) =>
+        buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista),
+      ),
+    );
+    let vDinheiro = 0, vPix = 0, vDebito = 0, vCredito = 0;
+    for (const p of procsIndividuais as any[]) {
+      const valorCartao = valorCartaoProcedimento(p);
+      vDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+      vPix      += valorCartao;
+      vDebito   += valorCartao;
+      vCredito  += valorCartao;
+    }
+    let opcoes: FormaOpcao[] = [
+      { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
+      { forma: "pix", label: "Pix", valor: vPix },
+      { forma: "cartao_debito", label: "Cartão de Débito", valor: vDebito },
+      { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
+    ];
+    let descSuffix = "";
+    // Gratuidade: pergunta se quer usar agora ou depois (antes de qualquer
+    // registro). "Depois" → cobra particular sem consumir o benefício.
+    if (info?.desconto?.tipo === "gratuidade" && !opcoesOrc) {
+      const escolha = await perguntarGratuidade(info.convenioNome);
+      if (escolha === "cancel") return;
+      if (escolha === "depois") info = { ...info, desconto: null };
+    }
+    if (opcoesOrc) {
+      // Valores do orçamento já consideram desconto/convênio definidos na hora
+      // de gerar o orçamento — não aplicamos nada por cima.
+      opcoes = opcoesOrc;
+    } else if (info) {
+      if (!info.emDia) {
+        setAvisoConvenio({ tom: "error", mensagem: `Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.` });
+        descSuffix = ` — ${info.convenioNome} EM ATRASO`;
+      } else if (info.bloquear) {
+        setAvisoConvenio({ tom: "error", mensagem: info.avisoLimite ?? "Limite do convênio atingido — cobrança bloqueada." });
+        descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
+      } else if (info.desconto) {
+        opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
+        const rotulo =
+          info.desconto.tipo === "gratuidade"
+            ? "GRATUIDADE"
+            : info.desconto.tipo === "percentual"
+              ? `-${info.desconto.valor}%`
+              : info.desconto.tipo === "valor_fixo"
+                ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
+                : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+        descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
+        if (info.avisoLimite) setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
+        else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+      } else if (info.avisoLimite) {
+        setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
+        descSuffix = ` — ${info.convenioNome} (limite atingido)`;
+      } else {
+        setAvisoConvenio({ tom: "warning", mensagem: `Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.` });
+      }
+    }
+    // Procedimento sem valor (ex.: REVISÃO / retorno gratuito). Não abre o
+    // fluxo de cobrança — registra um lançamento de valor 0 (linha-sombra),
+    // marca como pago e avança o fluxo, do mesmo modo que um pagamento normal.
+    const totalOpcoes = opcoes.reduce((s, o) => s + (Number(o.valor) || 0), 0);
+    // Só auto-registra "SEM COBRANÇA" quando o procedimento foi encontrado
+    // no cadastro E realmente está com valor zero. Se nenhum procedimento
+    // casou (ex.: laboratório com nome genérico "EXAMES LABORATORIAIS" ou
+    // agendamento com procedimento em branco), abrimos o diálogo de forma
+    // de pagamento normalmente para o operador digitar o valor.
+    const algumProcCasou = (procsIndividuais as any[]).some((p) => p != null);
+    const ehLab = medicoEhLaboratorioFormulario(a.medico_id);
+    const ehGratuidadeConvenio = info?.desconto?.tipo === "gratuidade" && !opcoesOrc;
+    if (!opcoesOrc && totalOpcoes <= 0 && (algumProcCasou || ehGratuidadeConvenio) && !ehLab) {
+      const isGrat = ehGratuidadeConvenio;
+      const desc = isGrat
+        ? `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`
+        : `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix} — SEM COBRANÇA`;
+      if (!a.id) {
+        setAvisoConvenio({ tom: "error", mensagem: "Não foi possível registrar: agendamento sem identificador. Recarregue a agenda e tente novamente." });
         return;
       }
-      // Multi-exame (laboratório/imagem): quando o nome vem concatenado com " + ",
-      // resolvemos cada item individualmente e somamos. Para agendamento simples,
-      // o split retorna apenas um item e o comportamento permanece igual.
-      const nomesParaValorar = (a.procedimento ?? rotuloFallbackProc(a.medico_id))
-        .split(/\s+\+\s+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const procsIndividuais = await Promise.all(
-        (nomesParaValorar.length > 0 ? nomesParaValorar : [rotuloFallbackProc(a.medico_id)]).map((nome) =>
-          buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista),
-        ),
-      );
-      let vDinheiro = 0, vPix = 0, vDebito = 0, vCredito = 0;
-      for (const p of procsIndividuais as any[]) {
-        const valorCartao = valorCartaoProcedimento(p);
-        vDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
-        vPix += valorCartao;
-        vDebito += valorCartao;
-        vCredito += valorCartao;
-      }
-      let opcoes: FormaOpcao[] = [
-        { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
-        { forma: "pix", label: "Pix", valor: vPix },
-        { forma: "cartao_debito", label: "Cartão de Débito", valor: vDebito },
-        { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
-      ];
-      let descSuffix = "";
-      // Gratuidade: pergunta se quer usar agora ou depois (antes de qualquer
-      // registro). "Depois" → cobra particular sem consumir o benefício.
-      if (info?.desconto?.tipo === "gratuidade" && !opcoesOrc) {
-        const escolha = await perguntarGratuidade(info.convenioNome);
-        if (escolha === "cancel") return;
-        if (escolha === "depois") info = { ...info, desconto: null };
-      }
-      if (opcoesOrc) {
-        // Valores do orçamento já consideram desconto/convênio definidos na hora
-        // de gerar o orçamento — não aplicamos nada por cima.
-        opcoes = opcoesOrc;
-      } else if (info) {
-        if (!info.emDia) {
-          setAvisoConvenio({ tom: "error", mensagem: `Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.` });
-          descSuffix = ` — ${info.convenioNome} EM ATRASO`;
-        } else if (info.bloquear) {
-          setAvisoConvenio({ tom: "error", mensagem: info.avisoLimite ?? "Limite do convênio atingido — cobrança bloqueada." });
-          descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
-        } else if (info.desconto) {
-          opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
-          const rotulo =
-            info.desconto.tipo === "gratuidade"
-              ? "GRATUIDADE"
-              : info.desconto.tipo === "percentual"
-                ? `-${info.desconto.valor}%`
-                : info.desconto.tipo === "valor_fixo"
-                  ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
-                  : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-          descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
-          if (info.avisoLimite) setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
-          else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
-        } else if (info.avisoLimite) {
-          setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
-          descSuffix = ` — ${info.convenioNome} (limite atingido)`;
-        } else {
-          setAvisoConvenio({ tom: "warning", mensagem: `Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.` });
-        }
-      }
-      // Procedimento sem valor (ex.: REVISÃO / retorno gratuito). Não abre o
-      // fluxo de cobrança — registra um lançamento de valor 0 (linha-sombra),
-      // marca como pago e avança o fluxo, do mesmo modo que um pagamento normal.
-      const totalOpcoes = opcoes.reduce((s, o) => s + (Number(o.valor) || 0), 0);
-      // Só auto-registra "SEM COBRANÇA" quando o procedimento foi encontrado
-      // no cadastro E realmente está com valor zero. Se nenhum procedimento
-      // casou (ex.: laboratório com nome genérico "EXAMES LABORATORIAIS" ou
-      // agendamento com procedimento em branco), abrimos o diálogo de forma
-      // de pagamento normalmente para o operador digitar o valor.
-      const algumProcCasou = (procsIndividuais as any[]).some((p) => p != null);
-      const ehLab = medicoEhLaboratorioFormulario(a.medico_id);
-      const ehGratuidadeConvenio = info?.desconto?.tipo === "gratuidade" && !opcoesOrc;
-      if (!opcoesOrc && totalOpcoes <= 0 && (algumProcCasou || ehGratuidadeConvenio) && !ehLab) {
-        const isGrat = ehGratuidadeConvenio;
-        const desc = isGrat
-          ? `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`
-          : `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix} — SEM COBRANÇA`;
-        if (!a.id) {
-          setAvisoConvenio({ tom: "error", mensagem: "Não foi possível registrar: agendamento sem identificador. Recarregue a agenda e tente novamente." });
-          return;
-        }
-        // Abordagem B (RPC atômica): banco garante em uma única transação a
-        // criação do lançamento + movimento (e a abertura automática da sessão
-        // de caixa quando necessário). Se qualquer etapa falhar, tudo é
-        // revertido pelo Postgres — não há mais janela para lançamento órfão.
-        const nomeUsuario = (user?.user_metadata as { nome?: string } | null)?.nome ?? user?.email ?? null;
-        const { error: errRpc } = await supabase.rpc("fn_registrar_lancamento_e_caixa", {
-          p_lancamento: {
-            clinica_id: clinicaAtual.clinica_id,
-            tipo: "receita",
-            descricao: desc,
-            valor: 0,
-            data: new Date().toISOString().slice(0, 10),
-            status: "confirmado",
-            agendamento_id: a.id,
-            forma_pagamento: isGrat ? "convenio_gratuidade" : null,
-            observacoes: isGrat
-              ? `Gratuidade pelo convênio ${info?.convenioNome ?? ""}.`.trim()
-              : "Atendimento sem cobrança (procedimento sem valor).",
-          },
-          p_movimento: user?.id
-            ? {
+      // Abordagem B (RPC atômica): banco garante em uma única transação a
+      // criação do lançamento + movimento (e a abertura automática da sessão
+      // de caixa quando necessário). Se qualquer etapa falhar, tudo é
+      // revertido pelo Postgres — não há mais janela para lançamento órfão.
+      const nomeUsuario = (user?.user_metadata as { nome?: string } | null)?.nome ?? user?.email ?? null;
+      const { error: errRpc } = await supabase.rpc("fn_registrar_lancamento_e_caixa", {
+        p_lancamento: {
+          clinica_id: clinicaAtual.clinica_id,
+          tipo: "receita",
+          descricao: desc,
+          valor: 0,
+          data: new Date().toISOString().slice(0, 10),
+          status: "confirmado",
+          agendamento_id: a.id,
+          forma_pagamento: isGrat ? "convenio_gratuidade" : null,
+          observacoes: isGrat
+            ? `Gratuidade pelo convênio ${info?.convenioNome ?? ""}.`.trim()
+            : "Atendimento sem cobrança (procedimento sem valor).",
+        },
+        p_movimento: user?.id
+          ? {
               user_id: user.id,
               user_nome: nomeUsuario,
               tipo: "recebimento",
@@ -3388,67 +3388,67 @@ function AgendaPage() {
               descricao: desc,
               forma_pagamento: isGrat ? "convenio_gratuidade" : "sem_cobranca",
             }
-            : null,
-        });
-        if (errRpc) {
-          mostrarErro(errRpc, isGrat ? "falha ao registrar gratuidade" : "falha ao registrar atendimento sem cobrança");
-          return;
-        }
-        setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
-        // Auto check-in apenas se o atendimento for do mesmo dia.
-        try {
-          const hoje = new Date().toISOString().slice(0, 10);
-          if (a.inicio && new Date(a.inicio).toISOString().slice(0, 10) === hoje) {
-            const { error: errFluxo } = await supabase
-              .from("agendamentos")
-              .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
-              .eq("id", a.id);
-            if (errFluxo) {
-              mostrarErro(errFluxo, "registro salvo, mas falhou ao avançar o fluxo");
-            } else {
-              setEtapaMap((m) => { const n = new Map(m); n.set(a.id, "triagem"); return n; });
-            }
+          : null,
+      });
+      if (errRpc) {
+        mostrarErro(errRpc, isGrat ? "falha ao registrar gratuidade" : "falha ao registrar atendimento sem cobrança");
+        return;
+      }
+      setPagosSet((prev) => { const n = new Set(prev); n.add(a.id); return n; });
+      // Auto check-in apenas se o atendimento for do mesmo dia.
+      try {
+        const hoje = new Date().toISOString().slice(0, 10);
+        if (a.inicio && new Date(a.inicio).toISOString().slice(0, 10) === hoje) {
+          const { error: errFluxo } = await supabase
+            .from("agendamentos")
+            .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
+            .eq("id", a.id);
+          if (errFluxo) {
+            mostrarErro(errFluxo, "registro salvo, mas falhou ao avançar o fluxo");
+          } else {
+            setEtapaMap((m) => { const n = new Map(m); n.set(a.id, "triagem"); return n; });
           }
+        }
+      } catch (err) {
+        mostrarErro(err);
+      }
+      if (isGrat) {
+        toast.success(`Gratuidade aplicada pelo convênio ${info?.convenioNome ?? ""}.`);
+        // Imprime GR normalmente com forma "Convênio Gratuidade".
+        try {
+          const fichaStr = fichaPorId.get(a.id);
+          const fichaNumero = fichaStr && fichaStr !== "—" ? Number(fichaStr) : undefined;
+          await printGuiaAtendimento({
+            agendamentoId: a.id,
+            clinicaId: clinicaAtual.clinica_id,
+            usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
+            usuarioId: user?.id ?? null,
+            pagamento: {
+              valor: 0,
+              forma_pagamento: "convenio_gratuidade",
+              parcelas: null,
+              bandeira_cartao: null,
+            },
+            fichaNumero,
+          });
         } catch (err) {
           mostrarErro(err);
         }
-        if (isGrat) {
-          toast.success(`Gratuidade aplicada pelo convênio ${info?.convenioNome ?? ""}.`);
-          // Imprime GR normalmente com forma "Convênio Gratuidade".
-          try {
-            const fichaStr = fichaPorId.get(a.id);
-            const fichaNumero = fichaStr && fichaStr !== "—" ? Number(fichaStr) : undefined;
-            await printGuiaAtendimento({
-              agendamentoId: a.id,
-              clinicaId: clinicaAtual.clinica_id,
-              usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
-              usuarioId: user?.id ?? null,
-              pagamento: {
-                valor: 0,
-                forma_pagamento: "convenio_gratuidade",
-                parcelas: null,
-                bandeira_cartao: null,
-              },
-              fichaNumero,
-            });
-          } catch (err) {
-            mostrarErro(err);
-          }
-        } else {
-          toast.success("Atendimento sem cobrança registrado.");
-        }
-        return;
+      } else {
+        toast.success("Atendimento sem cobrança registrado.");
       }
-      setFormaPagOpcoes(opcoes);
-      setFormaPagCtx({
-        agId: a.id,
-        desc: `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`,
-        paciente: a.paciente_nome ?? "",
-        procedimento: `${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`,
-        medico: medicos.find((m) => m.id === a.medico_id)?.nome ?? undefined,
-        especialidade: medicos.find((m) => m.id === a.medico_id)?.especialidade_nome ?? undefined,
-      });
-      setFormaPagOpen(true);
+      return;
+    }
+    setFormaPagOpcoes(opcoes);
+    setFormaPagCtx({
+      agId: a.id,
+      desc: `${a.paciente_nome} — ${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`,
+      paciente: a.paciente_nome ?? "",
+      procedimento: `${a.procedimento ?? rotuloFallbackProc(a.medico_id)}${descSuffix}`,
+      medico: medicos.find((m) => m.id === a.medico_id)?.nome ?? undefined,
+      especialidade: medicos.find((m) => m.id === a.medico_id)?.especialidade_nome ?? undefined,
+    });
+    setFormaPagOpen(true);
     } catch (e: any) {
       console.error("[cobrarAgendamento]", e);
       mostrarErro(e);
@@ -3646,16 +3646,14 @@ function AgendaPage() {
       const descFinal = tomador.dependenteAtendido
         ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
         : descBase;
-      const res = await emitirNfseFn({
-        data: {
-          emitenteId: emitenteIdEscolhido,
-          pacienteId: pac.id,
-          agendamentoId: a.id,
-          valorServicos: Number(valor) || 0,
-          descricaoServicos: descFinal,
-          tomador,
-        }
-      });
+      const res = await emitirNfseFn({ data: {
+        emitenteId: emitenteIdEscolhido,
+        pacienteId: pac.id,
+        agendamentoId: a.id,
+        valorServicos: Number(valor) || 0,
+        descricaoServicos: descFinal,
+        tomador,
+      } });
       const nfseId = (res as { id?: string })?.id;
       if (nfseId) {
         toast.success("NFS-e enviada. Consultando status...");
@@ -3892,44 +3890,44 @@ function AgendaPage() {
             </Link>
           </Button>
           {podeEscrever && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" disabled={selecionados.size === 0}>
-                  Opções ({selecionados.size})
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={cobrarSelecionados}>
-                  💳 Cobrar selecionados (1 pagamento)
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={baixarLoteRealizado}>
-                  ✅ Baixar selecionados como Realizado
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={copiarPacienteSelecionado}
-                  disabled={selecionados.size !== 1}
-                >
-                  📋 Copiar dados do paciente
-                </DropdownMenuItem>
-                {isManager && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={abrirReagLote}>
-                      🔁 Reagendar selecionados
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={excluirSelecionados}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      🗑️ Excluir horários selecionados
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" disabled={selecionados.size === 0}>
+                Opções ({selecionados.size})
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={cobrarSelecionados}>
+                💳 Cobrar selecionados (1 pagamento)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={baixarLoteRealizado}>
+                ✅ Baixar selecionados como Realizado
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={copiarPacienteSelecionado}
+                disabled={selecionados.size !== 1}
+              >
+                📋 Copiar dados do paciente
+              </DropdownMenuItem>
+              {isManager && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={abrirReagLote}>
+                    🔁 Reagendar selecionados
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={excluirSelecionados}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    🗑️ Excluir horários selecionados
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           )}
           <Button
             variant="outline"
@@ -3967,401 +3965,401 @@ function AgendaPage() {
             <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
-            {podeEscrever && (
-              <DialogTrigger asChild>
-                <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-7 text-[11px] px-2 bg-primary hover:bg-primary/90 text-primary-foreground">
-                  <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
-                </Button>
-              </DialogTrigger>
-            )}
-            <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
-              <DialogHeader className="space-y-0 px-6 pt-1.5 pb-1 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
-                <DialogTitle className="text-sm font-semibold tracking-tight text-slate-900">
-                  {editing
-                    ? (pagosSet.has(editing.id) ? "Visualizar agendamento" : "Editar agendamento")
-                    : "Novo agendamento"}
-                </DialogTitle>
-                <p className="text-[11px] text-slate-500 leading-tight">
-                  {editing && pagosSet.has(editing.id)
-                    ? "Este agendamento já foi pago. Alterações exigem estorno."
-                    : "Preencha os dados abaixo. Campos com * são obrigatórios."}
-                </p>
-              </DialogHeader>
-              <form onSubmit={submit} className="space-y-1.5 px-6 py-2">
-                {editing && open && (
-                  <FichaEmUsoAlert agendamentoId={editing.id} />
-                )}
-                {editing && pagosSet.has(editing.id) && (
-                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 px-3 py-2 text-xs">
-                    <span className="mt-0.5">⚠️</span>
-                    Este agendamento já foi pago. Para alterações, estorne o pagamento no Financeiro.
-                  </div>
-                )}
-                <fieldset
-                  disabled={editing ? pagosSet.has(editing.id) : false}
-                  className="space-y-2 contents disabled:opacity-90"
-                >
-                  <div className="space-y-1 rounded-xl border border-primary/25 bg-primary/[0.04] p-2 text-xs">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Label className="text-[10px] font-semibold uppercase tracking-widest text-primary whitespace-nowrap">Nº do orçamento</Label>
-                      <Input
-                        inputMode="numeric"
-                        placeholder="Ex.: 123"
-                        value={form.orcamento_numero}
-                        onChange={(e) => setForm(f => ({ ...f, orcamento_numero: e.target.value.replace(/\D/g, "") }))}
-                        disabled={!!form.orcamento_id || (editing ? pagosSet.has(editing.id) : false)}
-                        className="max-w-[110px] h-8 bg-white"
-                      />
-                      {form.orcamento_id ? (
-                        <Button type="button" variant="outline" size="sm" onClick={limparOrcamento}
-                          disabled={editing ? pagosSet.has(editing.id) : false}>
-                          Limpar
-                        </Button>
-                      ) : (
-                        <Button type="button" variant="outline" size="sm" onClick={() => void buscarOrcamento()} disabled={buscandoOrc}>
-                          {buscandoOrc ? "Buscando…" : "Buscar"}
-                        </Button>
-                      )}
-                      {!form.orcamento_id && (
-                        <span className="text-[11px] text-slate-500 leading-snug flex-1 min-w-[140px]">
-                          Opcional — vincula qualquer orçamento (exames, consultas, procedimentos) em uma única ficha.
-                        </span>
-                      )}
-                    </div>
-                    {form.orcamento_id && (
-                      <div className="text-xs text-slate-600 space-y-1 pt-1 border-t border-primary/15">
-                        <p className="font-medium text-slate-900">
-                          Marcando {form.orcamento_itens.length} exame(s) em uma única ficha. Pagamento continua pelo orçamento.
-                        </p>
-                        {form.orcamento_itens.length > 0 && (
-                          <ul className="list-disc list-inside max-h-24 overflow-y-auto pl-1">
-                            {form.orcamento_itens.map((n, i) => <li key={i}>{n}</li>)}
-                          </ul>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Paciente <span className="text-rose-500">*</span></Label>
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <PatientSearchInput
-                          clinicaIdsOverride={clinicaAtual ? [clinicaAtual.clinica_id] : undefined}
-                          value={
-                            form.paciente_id
-                              ? { id: form.paciente_id, nome: form.paciente_nome, cpf: null, telefone: null, data_nascimento: null, clinica_id: clinicaAtual?.clinica_id ?? "" }
-                              : form.paciente_nome
-                                ? { id: "__pendente__", nome: form.paciente_nome, cpf: null, telefone: null, data_nascimento: null, clinica_id: clinicaAtual?.clinica_id ?? "" }
-                                : null
-                          }
-                          onSelect={(p) => {
-                            setForm(f => ({
-                              ...f,
-                              paciente_nome: p?.nome ?? "",
-                              paciente_id: p?.id ?? "",
-                            }));
-                          }}
-                          placeholder="Nome, CPF, nascimento (DD/MM/AAAA) ou prontuário…"
-                          autoFocus
-                          enableVoice
-                        />
-                      </div>
-                      {podeEscrever && (
-                        <Button type="button" variant="outline" size="icon" title="Cadastrar novo paciente"
-                          disabled={editing ? pagosSet.has(editing.id) : false}
-                          onClick={() => { setNovoPac(p => ({ ...p, nome: form.paciente_nome })); setNovoPacOpen(true); }}>
-                          <UserPlus className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    {editing && pagosSet.has(editing.id) && (
-                      <p className="text-xs text-amber-600">
-                        Este agendamento já está pago — o nome do paciente não pode ser alterado.
-                      </p>
-                    )}
-                    {form.paciente_nome && !form.paciente_id && (
-                      <p className="text-xs text-amber-600 font-medium">
-                        Paciente não cadastrado — use o botão ao lado para cadastrar antes de salvar.
-                      </p>
-                    )}
-                    {form.paciente_id && clinicaAtual && (
-                      <>
-                        <PacienteResumoBar
-                          key={`resumo-${form.paciente_id}`}
-                          pacienteId={form.paciente_id}
-                          clinicaId={clinicaAtual.clinica_id}
-                          onCompletarCadastro={() => setQuickCompleteOpen(true)}
-                        />
-                        <PacienteQuickActions
-                          key={form.paciente_id}
-                          pacienteId={form.paciente_id}
-                          clinicaId={clinicaAtual.clinica_id}
-                        />
-                      </>
-                    )}
-                  </div>
-                  {contratoPacienteInfo && (
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold text-slate-700">Tipo de atendimento</Label>
-                      <Select
-                        value={form.tipo_atendimento}
-                        onValueChange={(v) => setForm((f) => ({ ...f, tipo_atendimento: v as TipoAtendimento }))}
-                      >
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="convenio">
-                            Convênio — {contratoPacienteInfo.convenioNome}
-                          </SelectItem>
-                          <SelectItem value="particular">Particular (paga valor cheio)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {contratoPacienteInfo.qtdAtrasadas > 0 && form.tipo_atendimento === "particular" && (
-                        <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
-                          Paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em aberto no cartão
-                          ({contratoPacienteInfo.qtdAtrasadas} parcela(s) vencida(s)). Este atendimento será cobrado como Particular.
-                        </p>
-                      )}
-                      {contratoPacienteInfo.qtdAtrasadas > 0 && form.tipo_atendimento === "convenio" && (
-                        <p className="text-xs rounded-md border border-destructive/40 bg-destructive/5 text-destructive px-2 py-1.5">
-                          Convênio bloqueado: paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em atraso.
-                          Para agendar, mude para <b>Particular</b> ou regularize o débito.
-                        </p>
-                      )}
-                    </div>
+          {podeEscrever && (
+          <DialogTrigger asChild>
+            <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-7 text-[11px] px-2 bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
+            </Button>
+          </DialogTrigger>
+          )}
+          <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
+            <DialogHeader className="space-y-0 px-6 pt-1.5 pb-1 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
+              <DialogTitle className="text-sm font-semibold tracking-tight text-slate-900">
+                {editing
+                  ? (pagosSet.has(editing.id) ? "Visualizar agendamento" : "Editar agendamento")
+                  : "Novo agendamento"}
+              </DialogTitle>
+              <p className="text-[11px] text-slate-500 leading-tight">
+                {editing && pagosSet.has(editing.id)
+                  ? "Este agendamento já foi pago. Alterações exigem estorno."
+                  : "Preencha os dados abaixo. Campos com * são obrigatórios."}
+              </p>
+            </DialogHeader>
+            <form onSubmit={submit} className="space-y-1.5 px-6 py-2">
+              {editing && open && (
+                <FichaEmUsoAlert agendamentoId={editing.id} />
+              )}
+              {editing && pagosSet.has(editing.id) && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 px-3 py-2 text-xs">
+                  <span className="mt-0.5">⚠️</span>
+                  Este agendamento já foi pago. Para alterações, estorne o pagamento no Financeiro.
+                </div>
+              )}
+              <fieldset
+                disabled={editing ? pagosSet.has(editing.id) : false}
+                className="space-y-2 contents disabled:opacity-90"
+              >
+              <div className="space-y-1 rounded-xl border border-primary/25 bg-primary/[0.04] p-2 text-xs">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Label className="text-[10px] font-semibold uppercase tracking-widest text-primary whitespace-nowrap">Nº do orçamento</Label>
+                  <Input
+                    inputMode="numeric"
+                    placeholder="Ex.: 123"
+                    value={form.orcamento_numero}
+                    onChange={(e) => setForm(f => ({ ...f, orcamento_numero: e.target.value.replace(/\D/g, "") }))}
+                    disabled={!!form.orcamento_id || (editing ? pagosSet.has(editing.id) : false)}
+                    className="max-w-[110px] h-8 bg-white"
+                  />
+                  {form.orcamento_id ? (
+                    <Button type="button" variant="outline" size="sm" onClick={limparOrcamento}
+                      disabled={editing ? pagosSet.has(editing.id) : false}>
+                      Limpar
+                    </Button>
+                  ) : (
+                    <Button type="button" variant="outline" size="sm" onClick={() => void buscarOrcamento()} disabled={buscandoOrc}>
+                      {buscandoOrc ? "Buscando…" : "Buscar"}
+                    </Button>
                   )}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Forma de pagamento prevista</Label>
-                    <Select
-                      value={form.forma_pagamento_prevista || "nao_informado"}
-                      onValueChange={(v) => setForm((f) => ({ ...f, forma_pagamento_prevista: v === "nao_informado" ? "" : v }))}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="nao_informado">Não informada (definir na cobrança)</SelectItem>
-                        <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                        <SelectItem value="pix">PIX</SelectItem>
-                        <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
-                        <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[11px] text-slate-500">
-                      Registra como o paciente pretende pagar. A forma real ainda é definida na cobrança.
+                  {!form.orcamento_id && (
+                    <span className="text-[11px] text-slate-500 leading-snug flex-1 min-w-[140px]">
+                      Opcional — vincula qualquer orçamento (exames, consultas, procedimentos) em uma única ficha.
+                    </span>
+                  )}
+                </div>
+                {form.orcamento_id && (
+                  <div className="text-xs text-slate-600 space-y-1 pt-1 border-t border-primary/15">
+                    <p className="font-medium text-slate-900">
+                      Marcando {form.orcamento_itens.length} exame(s) em uma única ficha. Pagamento continua pelo orçamento.
                     </p>
+                    {form.orcamento_itens.length > 0 && (
+                      <ul className="list-disc list-inside max-h-24 overflow-y-auto pl-1">
+                        {form.orcamento_itens.map((n, i) => <li key={i}>{n}</li>)}
+                      </ul>
+                    )}
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Médico ou Exame <span className="text-rose-500">*</span></Label>
-                    <SearchableSelect
-                      value={form.medico_id || "none"}
-                      disabled={!!editing}
-                      onChange={(v) => {
-                        if (v.startsWith("exame:")) {
-                          const nome = v.slice(6);
-                          setForm(f => ({ ...f, medico_id: "", procedimento: nome, procedimentos: nome ? [nome] : [] }));
-                        } else {
-                          setForm(f => {
-                            const medico_id = v === "none" ? "" : v;
-                            const fim = f.inicio ? calcFimAuto(f.inicio, medico_id) : f.fim;
-                            // Pré-preenche o serviço com o procedimento padrão do médico (se houver)
-                            // e substitui apenas serviço vazio ou herdado da especialidade antiga.
-                            let procedimento = f.procedimento;
-                            if (medico_id) {
-                              const med = medicos.find((m) => m.id === medico_id);
-                              const padrao = procedimentoPadraoDoMedico(medico_id);
-                              const deveAplicarPadrao = !procedimento || normalizar(procedimento) === normalizar(med?.especialidade_nome ?? "");
-                              if (padrao && deveAplicarPadrao) {
-                                procedimento = padrao;
-                              }
-                            }
-                            return { ...f, medico_id, fim, procedimento, procedimentos: procedimento ? [procedimento] : [] };
-                          });
-                        }
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Paciente <span className="text-rose-500">*</span></Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <PatientSearchInput
+                      clinicaIdsOverride={clinicaAtual ? [clinicaAtual.clinica_id] : undefined}
+                      value={
+                        form.paciente_id
+                          ? { id: form.paciente_id, nome: form.paciente_nome, cpf: null, telefone: null, data_nascimento: null, clinica_id: clinicaAtual?.clinica_id ?? "" }
+                          : form.paciente_nome
+                            ? { id: "__pendente__", nome: form.paciente_nome, cpf: null, telefone: null, data_nascimento: null, clinica_id: clinicaAtual?.clinica_id ?? "" }
+                            : null
+                      }
+                      onSelect={(p) => {
+                        setForm(f => ({
+                          ...f,
+                          paciente_nome: p?.nome ?? "",
+                          paciente_id: p?.id ?? "",
+                        }));
                       }}
-                      placeholder="Selecione médico ou exame"
-                      searchPlaceholder="Buscar médico ou exame..."
-                      options={[
-                        { value: "none", label: "— Sem médico —" },
-                        ...medicos.map(m => ({ value: m.id, label: `👨‍⚕️ ${m.nome}` })),
-                        ...exames.map(e => ({ value: `exame:${e.nome}`, label: `🧪 ${e.nome}` })),
-                      ]}
+                      placeholder="Nome, CPF, nascimento (DD/MM/AAAA) ou prontuário…"
+                      autoFocus
+                      enableVoice
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-semibold text-slate-700">Data consulta/exame <span className="text-rose-500">*</span></Label>
-                        <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-semibold text-slate-700">Data de pagamento</Label>
-                        <Input
-                          type="text"
-                          value={form.data_pagamento
-                            ? new Date(form.data_pagamento + "T00:00:00").toLocaleDateString("pt-BR")
-                            : "—"}
-                          readOnly
-                          disabled
-                          tabIndex={-1}
-                          className="bg-slate-50 cursor-not-allowed text-slate-500"
-                        />
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-slate-500 pt-0.5">
-                      Preenchida automaticamente pelo sistema quando o pagamento for registrado.
-                    </p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Serviço</Label>
-                    {form.medico_id ? (
-                      (procOpcoesPorMedico.get(form.medico_id)?.length || procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
-                        <p className="text-[11px] text-slate-500">Mostrando apenas serviços configurados para este médico.</p>
-                      ) : procedimentoPadraoDoMedico(form.medico_id) ? (
-                        <p className="text-[11px] text-slate-500">
-                          Mostrando o serviço principal do médico. Cadastre mais serviços no cadastro do médico, se necessário.
-                        </p>
-                      ) : (
-                        <p className="text-xs text-amber-600">
-                          Este médico não possui serviços cadastrados. Configure-os no cadastro do médico.
-                        </p>
-                      )
-                    ) : (
-                      <p className="text-[11px] text-slate-500">Selecione um médico para ver os serviços disponíveis.</p>
-                    )}
-                    {(() => {
-                      const opts = opcoesServicoFormulario();
-                      const permiteMulti = !!form.medico_id
-                        && (medicoEhLaboratorioFormulario(form.medico_id) || opts.some((o) => procedimentoEhImagem(o.label)));
-                      const optsMulti = opts.filter((o) => o.value !== "none");
-                      return permiteMulti ? (
-                        <>
-                          <SearchableMultiSelect
-                            value={form.procedimentos.length > 0 ? form.procedimentos : (form.procedimento ? [form.procedimento] : [])}
-                            onChange={(values) => setForm((f) => ({
-                              ...f,
-                              procedimentos: values,
-                              procedimento: values.join(" + "),
-                            }))}
-                            placeholder="Selecione um ou mais serviços"
-                            searchPlaceholder="Buscar serviço..."
-                            options={optsMulti}
-                          />
-                          <p className="text-[11px] text-slate-500">
-                            {optsMulti.length} serviço{optsMulti.length === 1 ? "" : "s"} disponíve{optsMulti.length === 1 ? "l" : "is"} — role para ver todos.
-                            {form.procedimentos.length > 1 && (
-                              <span className="text-emerald-700"> {form.procedimentos.length} selecionados.</span>
-                            )}
-                          </p>
-                        </>
-                      ) : (
-                        <SearchableSelect
-                          value={form.procedimento || "none"}
-                          onChange={(v) => setForm(f => ({
-                            ...f,
-                            procedimento: v === "none" ? "" : v,
-                            procedimentos: v === "none" ? [] : [v],
-                          }))}
-                          placeholder="Selecione o serviço"
-                          searchPlaceholder="Buscar serviço..."
-                          options={opts}
-                        />
-                      );
-                    })()}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Status</Label>
-                    {editing && !isSlotLivre(editing.paciente_nome) ? (
-                      <Select value={form.status} onValueChange={(v) => setForm(f => ({ ...f, status: v as Status }))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
-                            <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input value={STATUS_LABEL[form.status]} disabled readOnly className="bg-slate-50 text-slate-500" />
-                    )}
-                    {(!editing || isSlotLivre(editing.paciente_nome)) && (
-                      <p className="text-[11px] text-slate-500">Status definido automaticamente. Pode ser alterado depois pelo menu de ações.</p>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-semibold text-slate-700">Observações</Label>
-                      <VoiceInput
-                        size="sm"
-                        currentValue={form.observacoes}
-                        onTranscript={(t) => setForm(f => ({ ...f, observacoes: t }))}
-                        title="Ditar observações"
-                      />
-                    </div>
-                    <Textarea value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} className="resize-none" placeholder="Anotações internas (opcional)…" />
-                  </div>
-                </fieldset>
-                <DialogFooter className="sticky bottom-0 bg-white pt-3 pb-2 -mx-6 px-6 border-t border-slate-200 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] mt-4 flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
-                  {editing && pagosSet.has(editing.id) ? (
-                    <Button type="button" variant="outline" onClick={() => setOpen(false)}>Fechar</Button>
-                  ) : (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setDescForm({
-                            tipo: descontoPendente?.tipo ?? "valor",
-                            input: descontoPendente?.input ?? "",
-                            motivo: descontoPendente?.motivo ?? "",
-                            autorizadoPor: descontoPendente?.autorizadoPor ?? "",
-                          });
-                          setDescontoDlgOpen(true);
-                        }}
-                        className={"sm:self-center " + (descontoPendente ? "border-amber-500 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30" : "")}
-                        title="Aplicar desconto (exige autorização da supervisão)"
-                      >
-                        {descontoPendente
-                          ? `Desconto: ${descontoPendente.tipo === "percentual" ? `${descontoPendente.input}%` : `R$ ${descontoPendente.input}`}`
-                          : "Desconto"}
-                      </Button>
-                      <div className="flex flex-nowrap gap-2 sm:justify-end">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
-                          Cancelar
-                        </Button>
-                        <Button
-                          type="button"
-                          disabled={saving || !form.paciente_id}
-                          onClick={(e) => { emitirNotaAposRef.current = false; submit(e as unknown as FormEvent, true); }}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-                          title="Salva, registra pagamento e imprime a GR em A4"
-                        >
-                          Pagar/Imprimir
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={saving || !form.paciente_id}
-                          onClick={async (e) => {
-                            e.preventDefault();
-                            const escolhido = await pickEmitenteNfse();
-                            if (!escolhido) {
-                              toast.error("Nenhum emitente NFS-e ativo. Cadastre em Configurações › NFS-e antes de emitir notas.");
-                              return;
-                            }
-                            emitenteNotaAposRef.current = escolhido;
-                            emitirNotaAposRef.current = true;
-                            submit(e as unknown as FormEvent, true);
-                          }}
-                          className="border-sky-600 text-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/30"
-                          title="Salva, registra pagamento, imprime a GR e abre a emissão da NFS-e (a nota é salva ao imprimir o A4)"
-                        >
-                          Pagar + NFS-e
-                        </Button>
-                        <Button type="submit" variant="secondary" data-primary disabled={saving || !form.paciente_id} title={!form.paciente_id ? "Selecione um paciente cadastrado antes de salvar" : undefined}>{saving ? "Salvando…" : "Salvar"}</Button>
-                      </div>
-                    </>
+                  {podeEscrever && (
+                  <Button type="button" variant="outline" size="icon" title="Cadastrar novo paciente"
+                    disabled={editing ? pagosSet.has(editing.id) : false}
+                    onClick={() => { setNovoPac(p => ({ ...p, nome: form.paciente_nome })); setNovoPacOpen(true); }}>
+                    <UserPlus className="h-4 w-4" />
+                  </Button>
                   )}
-                </DialogFooter>
-              </form>
-            </DialogContent>
+                </div>
+                {editing && pagosSet.has(editing.id) && (
+                  <p className="text-xs text-amber-600">
+                    Este agendamento já está pago — o nome do paciente não pode ser alterado.
+                  </p>
+                )}
+                {form.paciente_nome && !form.paciente_id && (
+                  <p className="text-xs text-amber-600 font-medium">
+                    Paciente não cadastrado — use o botão ao lado para cadastrar antes de salvar.
+                  </p>
+                )}
+                {form.paciente_id && clinicaAtual && (
+                  <>
+                    <PacienteResumoBar
+                      key={`resumo-${form.paciente_id}`}
+                      pacienteId={form.paciente_id}
+                      clinicaId={clinicaAtual.clinica_id}
+                      onCompletarCadastro={() => setQuickCompleteOpen(true)}
+                    />
+                    <PacienteQuickActions
+                      key={form.paciente_id}
+                      pacienteId={form.paciente_id}
+                      clinicaId={clinicaAtual.clinica_id}
+                    />
+                  </>
+                )}
+              </div>
+              {contratoPacienteInfo && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Tipo de atendimento</Label>
+                  <Select
+                    value={form.tipo_atendimento}
+                    onValueChange={(v) => setForm((f) => ({ ...f, tipo_atendimento: v as TipoAtendimento }))}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="convenio">
+                        Convênio — {contratoPacienteInfo.convenioNome}
+                      </SelectItem>
+                      <SelectItem value="particular">Particular (paga valor cheio)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {contratoPacienteInfo.qtdAtrasadas > 0 && form.tipo_atendimento === "particular" && (
+                    <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
+                      Paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em aberto no cartão
+                      ({contratoPacienteInfo.qtdAtrasadas} parcela(s) vencida(s)). Este atendimento será cobrado como Particular.
+                    </p>
+                  )}
+                  {contratoPacienteInfo.qtdAtrasadas > 0 && form.tipo_atendimento === "convenio" && (
+                    <p className="text-xs rounded-md border border-destructive/40 bg-destructive/5 text-destructive px-2 py-1.5">
+                      Convênio bloqueado: paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em atraso.
+                      Para agendar, mude para <b>Particular</b> ou regularize o débito.
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Forma de pagamento prevista</Label>
+                <Select
+                  value={form.forma_pagamento_prevista || "nao_informado"}
+                  onValueChange={(v) => setForm((f) => ({ ...f, forma_pagamento_prevista: v === "nao_informado" ? "" : v }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nao_informado">Não informada (definir na cobrança)</SelectItem>
+                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="cartao_credito">Cartão de Crédito</SelectItem>
+                    <SelectItem value="cartao_debito">Cartão de Débito</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-slate-500">
+                  Registra como o paciente pretende pagar. A forma real ainda é definida na cobrança.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Médico ou Exame <span className="text-rose-500">*</span></Label>
+                <SearchableSelect
+                  value={form.medico_id || "none"}
+                  disabled={!!editing}
+                  onChange={(v) => {
+                    if (v.startsWith("exame:")) {
+                      const nome = v.slice(6);
+                      setForm(f => ({ ...f, medico_id: "", procedimento: nome, procedimentos: nome ? [nome] : [] }));
+                    } else {
+                       setForm(f => {
+                         const medico_id = v === "none" ? "" : v;
+                         const fim = f.inicio ? calcFimAuto(f.inicio, medico_id) : f.fim;
+                         // Pré-preenche o serviço com o procedimento padrão do médico (se houver)
+                         // e substitui apenas serviço vazio ou herdado da especialidade antiga.
+                         let procedimento = f.procedimento;
+                         if (medico_id) {
+                           const med = medicos.find((m) => m.id === medico_id);
+                           const padrao = procedimentoPadraoDoMedico(medico_id);
+                           const deveAplicarPadrao = !procedimento || normalizar(procedimento) === normalizar(med?.especialidade_nome ?? "");
+                           if (padrao && deveAplicarPadrao) {
+                             procedimento = padrao;
+                           }
+                         }
+                          return { ...f, medico_id, fim, procedimento, procedimentos: procedimento ? [procedimento] : [] };
+                       });
+                    }
+                  }}
+                  placeholder="Selecione médico ou exame"
+                  searchPlaceholder="Buscar médico ou exame..."
+                  options={[
+                    { value: "none", label: "— Sem médico —" },
+                    ...medicos.map(m => ({ value: m.id, label: `👨‍⚕️ ${m.nome}` })),
+                    ...exames.map(e => ({ value: `exame:${e.nome}`, label: `🧪 ${e.nome}` })),
+                  ]}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Data consulta/exame <span className="text-rose-500">*</span></Label>
+                    <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Data de pagamento</Label>
+                    <Input
+                      type="text"
+                      value={form.data_pagamento
+                        ? new Date(form.data_pagamento + "T00:00:00").toLocaleDateString("pt-BR")
+                        : "—"}
+                      readOnly
+                      disabled
+                      tabIndex={-1}
+                      className="bg-slate-50 cursor-not-allowed text-slate-500"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-500 pt-0.5">
+                  Preenchida automaticamente pelo sistema quando o pagamento for registrado.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Serviço</Label>
+                {form.medico_id ? (
+                  (procOpcoesPorMedico.get(form.medico_id)?.length || procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
+                    <p className="text-[11px] text-slate-500">Mostrando apenas serviços configurados para este médico.</p>
+                  ) : procedimentoPadraoDoMedico(form.medico_id) ? (
+                    <p className="text-[11px] text-slate-500">
+                      Mostrando o serviço principal do médico. Cadastre mais serviços no cadastro do médico, se necessário.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-600">
+                      Este médico não possui serviços cadastrados. Configure-os no cadastro do médico.
+                    </p>
+                  )
+                ) : (
+                  <p className="text-[11px] text-slate-500">Selecione um médico para ver os serviços disponíveis.</p>
+                )}
+                {(() => {
+                  const opts = opcoesServicoFormulario();
+                  const permiteMulti = !!form.medico_id
+                    && (medicoEhLaboratorioFormulario(form.medico_id) || opts.some((o) => procedimentoEhImagem(o.label)));
+                  const optsMulti = opts.filter((o) => o.value !== "none");
+                  return permiteMulti ? (
+                    <>
+                      <SearchableMultiSelect
+                        value={form.procedimentos.length > 0 ? form.procedimentos : (form.procedimento ? [form.procedimento] : [])}
+                        onChange={(values) => setForm((f) => ({
+                          ...f,
+                          procedimentos: values,
+                          procedimento: values.join(" + "),
+                        }))}
+                        placeholder="Selecione um ou mais serviços"
+                        searchPlaceholder="Buscar serviço..."
+                        options={optsMulti}
+                      />
+                      <p className="text-[11px] text-slate-500">
+                        {optsMulti.length} serviço{optsMulti.length === 1 ? "" : "s"} disponíve{optsMulti.length === 1 ? "l" : "is"} — role para ver todos.
+                        {form.procedimentos.length > 1 && (
+                          <span className="text-emerald-700"> {form.procedimentos.length} selecionados.</span>
+                        )}
+                      </p>
+                    </>
+                  ) : (
+                    <SearchableSelect
+                      value={form.procedimento || "none"}
+                      onChange={(v) => setForm(f => ({
+                        ...f,
+                        procedimento: v === "none" ? "" : v,
+                        procedimentos: v === "none" ? [] : [v],
+                      }))}
+                      placeholder="Selecione o serviço"
+                      searchPlaceholder="Buscar serviço..."
+                      options={opts}
+                    />
+                  );
+                })()}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Status</Label>
+                {editing && !isSlotLivre(editing.paciente_nome) ? (
+                  <Select value={form.status} onValueChange={(v) => setForm(f => ({ ...f, status: v as Status }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
+                        <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input value={STATUS_LABEL[form.status]} disabled readOnly className="bg-slate-50 text-slate-500" />
+                )}
+                {(!editing || isSlotLivre(editing.paciente_nome)) && (
+                  <p className="text-[11px] text-slate-500">Status definido automaticamente. Pode ser alterado depois pelo menu de ações.</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-slate-700">Observações</Label>
+                  <VoiceInput
+                    size="sm"
+                    currentValue={form.observacoes}
+                    onTranscript={(t) => setForm(f => ({ ...f, observacoes: t }))}
+                    title="Ditar observações"
+                  />
+                </div>
+                <Textarea value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} className="resize-none" placeholder="Anotações internas (opcional)…" />
+              </div>
+              </fieldset>
+              <DialogFooter className="sticky bottom-0 bg-white pt-3 pb-2 -mx-6 px-6 border-t border-slate-200 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] mt-4 flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
+                {editing && pagosSet.has(editing.id) ? (
+                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>Fechar</Button>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDescForm({
+                          tipo: descontoPendente?.tipo ?? "valor",
+                          input: descontoPendente?.input ?? "",
+                          motivo: descontoPendente?.motivo ?? "",
+                          autorizadoPor: descontoPendente?.autorizadoPor ?? "",
+                        });
+                        setDescontoDlgOpen(true);
+                      }}
+                      className={"sm:self-center " + (descontoPendente ? "border-amber-500 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30" : "")}
+                      title="Aplicar desconto (exige autorização da supervisão)"
+                    >
+                      {descontoPendente
+                        ? `Desconto: ${descontoPendente.tipo === "percentual" ? `${descontoPendente.input}%` : `R$ ${descontoPendente.input}`}`
+                        : "Desconto"}
+                    </Button>
+                    <div className="flex flex-nowrap gap-2 sm:justify-end">
+                    <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="button"
+                      disabled={saving || !form.paciente_id}
+                      onClick={(e) => { emitirNotaAposRef.current = false; submit(e as unknown as FormEvent, true); }}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                      title="Salva, registra pagamento e imprime a GR em A4"
+                    >
+                      Pagar/Imprimir
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={saving || !form.paciente_id}
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        const escolhido = await pickEmitenteNfse();
+                        if (!escolhido) {
+                          toast.error("Nenhum emitente NFS-e ativo. Cadastre em Configurações › NFS-e antes de emitir notas.");
+                          return;
+                        }
+                        emitenteNotaAposRef.current = escolhido;
+                        emitirNotaAposRef.current = true;
+                        submit(e as unknown as FormEvent, true);
+                      }}
+                      className="border-sky-600 text-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/30"
+                      title="Salva, registra pagamento, imprime a GR e abre a emissão da NFS-e (a nota é salva ao imprimir o A4)"
+                    >
+                      Pagar + NFS-e
+                    </Button>
+                    <Button type="submit" variant="secondary" data-primary disabled={saving || !form.paciente_id} title={!form.paciente_id ? "Selecione um paciente cadastrado antes de salvar" : undefined}>{saving ? "Salvando…" : "Salvar"}</Button>
+                    </div>
+                  </>
+                )}
+              </DialogFooter>
+            </form>
+          </DialogContent>
           </Dialog>
         </div>
       </div>
@@ -4656,16 +4654,14 @@ function AgendaPage() {
                     const descFinal = tomador.dependenteAtendido
                       ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
                       : descBase;
-                    const res = await emitirNfseFn({
-                      data: {
-                        emitenteId: emitenteIdEscolhido,
-                        pacienteId: pac.id,
-                        agendamentoId: agId,
-                        valorServicos: Number(dados.valor) || 0,
-                        descricaoServicos: descFinal,
-                        tomador,
-                      }
-                    });
+                    const res = await emitirNfseFn({ data: {
+                      emitenteId: emitenteIdEscolhido,
+                      pacienteId: pac.id,
+                      agendamentoId: agId,
+                      valorServicos: Number(dados.valor) || 0,
+                      descricaoServicos: descFinal,
+                      tomador,
+                    } });
                     const nfseId = (res as { id?: string })?.id;
                     if (nfseId) {
                       toast.success("NFS-e enviada. Consultando status...");
@@ -4891,9 +4887,9 @@ function AgendaPage() {
                   onChange={(e) => {
                     const d = e.target.value.replace(/\D/g, "").slice(0, 11);
                     let v = d;
-                    if (d.length > 9) v = `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
-                    else if (d.length > 6) v = `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
-                    else if (d.length > 3) v = `${d.slice(0, 3)}.${d.slice(3)}`;
+                    if (d.length > 9) v = `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+                    else if (d.length > 6) v = `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`;
+                    else if (d.length > 3) v = `${d.slice(0,3)}.${d.slice(3)}`;
                     setNovoPac(p => ({ ...p, cpf: v }));
                   }}
                   inputMode="numeric"
@@ -4918,9 +4914,9 @@ function AgendaPage() {
                 onChange={(e) => {
                   const d = e.target.value.replace(/\D/g, "").slice(0, 11);
                   let v = d;
-                  if (d.length > 10) v = `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-                  else if (d.length > 6) v = `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-                  else if (d.length > 2) v = `(${d.slice(0, 2)}) ${d.slice(2)}`;
+                  if (d.length > 10) v = `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+                  else if (d.length > 6) v = `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+                  else if (d.length > 2) v = `(${d.slice(0,2)}) ${d.slice(2)}`;
                   else if (d.length > 0) v = `(${d}`;
                   setNovoPac(p => ({ ...p, telefone: v }));
                 }}
@@ -5290,7 +5286,7 @@ function AgendaPage() {
                 if (e.resolvido_em && e.status !== "pendente") {
                   const k: Kind =
                     e.status === "aprovado" ? "estorno_aprovado" :
-                      e.status === "rejeitado" ? "estorno_rejeitado" : "estorno_cancelado";
+                    e.status === "rejeitado" ? "estorno_rejeitado" : "estorno_cancelado";
                   items.push({
                     id: `est-res-${e.id}`,
                     when: e.resolvido_em,
@@ -5299,8 +5295,8 @@ function AgendaPage() {
                     body: (
                       <div>
                         {k === "estorno_aprovado" ? "Aprovou o estorno." :
-                          k === "estorno_rejeitado" ? "Rejeitou o estorno." :
-                            "Cancelou a solicitação de estorno."}
+                         k === "estorno_rejeitado" ? "Rejeitou o estorno." :
+                         "Cancelou a solicitação de estorno."}
                         {e.resposta ? <div className="text-muted-foreground whitespace-pre-wrap">Resposta: {e.resposta}</div> : null}
                       </div>
                     ),
@@ -5362,90 +5358,81 @@ function AgendaPage() {
         </DialogContent>
       </Dialog>
 
-    {/* 🔥 FILTROS AGRUPADOS EM LINHAS LÓGICAS */}
-<div
-  className="rounded-2xl border bg-card p-3 shadow-sm mb-10 [&_input]:h-8 [&_input]:text-xs [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:text-xs"
+      {/* 🔥 FILTROS AGRUPADOS EM LINHAS LÓGICAS */}
+      <div
+  className="rounded-2xl border bg-card p-3 shadow-sm [&_input]:h-8 [&_input]:text-xs [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:text-xs"
   style={{ ["--clinic" as never]: corClinica }}
 >
         {/* Linha 1: Filtros principais */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2">
+<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2">
+   {/* Profissional */}
+  <div className="space-y-0">
+    <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Profissional</Label>
+    <MedicoFiltroInput
+      medicos={medicos}
+      value={filtroMedico}
+      onChange={(v) => { if (!isMedicoOnly) { setFiltroMedico(v); setFiltroAgenda("todos"); } }}
+      disabled={isMedicoOnly}
+      onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
+      compact
+    />
+  </div>
+           <div className="space-y-0">
+    <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Agenda</Label>
+    {(() => {
+      let ags: { id: string; nome: string }[];
+      if (filtroMedico !== "todos") {
+        ags = agendasPorMedico.get(filtroMedico) ?? [];
+      } else {
+        const seen = new Set<string>();
+        ags = [];
+        for (const lista of agendasPorMedico.values()) {
+          for (const a of lista) {
+            if (!seen.has(a.id)) { seen.add(a.id); ags.push(a); }
+          }
+        }
+        ags.sort((a, b) => a.nome.localeCompare(b.nome));
+      }
+      const unica = ags.length <= 1;
+      const semProfissional = filtroMedico === "todos";
+      return (
+        <Select
+          value={filtroAgenda}
+          onValueChange={setFiltroAgenda}
+          disabled={unica || semProfissional}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder={semProfissional ? "Selecione" : (ags[0]?.nome ?? "—")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">TODAS</SelectItem>
+            {ags.map(a => (
+              <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    })()}
+  </div>
+           {/* Data */}
+  <div className="space-y-0">
+    <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Data</Label>
+    <DataRefField
+      dataRef={dataRef}
+      dataFim={dataFim}
+      setDataRef={setDataRef}
+      setDataFim={setDataFim}
+      shiftData={shiftData}
+      compact
+    />
+  </div>
 
-          {/* Profissional */}
-          <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Profissional</Label>
-            <MedicoFiltroInput
-              medicos={medicos}
-              value={filtroMedico}
-              onChange={(v) => { if (!isMedicoOnly) { setFiltroMedico(v); setFiltroAgenda("todos"); } }}
-              disabled={isMedicoOnly}
-              onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
-              compact
-            />
-          </div>
-
-          {/* Agenda */}
-          <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Agenda</Label>
-            {(() => {
-              let ags: { id: string; nome: string }[];
-              if (filtroMedico !== "todos") {
-                ags = agendasPorMedico.get(filtroMedico) ?? [];
-              } else {
-                const seen = new Set<string>();
-                ags = [];
-                for (const lista of agendasPorMedico.values()) {
-                  for (const a of lista) {
-                    if (!seen.has(a.id)) { seen.add(a.id); ags.push(a); }
-                  }
-                }
-                ags.sort((a, b) => a.nome.localeCompare(b.nome));
-              }
-              const unica = ags.length <= 1;
-              const semProfissional = filtroMedico === "todos";
-              return (
-                <Select
-                  value={filtroAgenda}
-                  onValueChange={setFiltroAgenda}
-                  disabled={unica || semProfissional}
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder={semProfissional ? "Selecione" : (ags[0]?.nome ?? "—")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">TODAS</SelectItem>
-                    {ags.map(a => (
-                      <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              );
-            })()}
-          </div>
-
-          {/* Data */}
-          <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Data</Label>
-            <DataRefField
-              dataRef={dataRef}
-              dataFim={dataFim}
-              setDataRef={setDataRef}
-              setDataFim={setDataFim}
-              shiftData={shiftData}
-              compact
-            />
-          </div>
-
-          {/* Cliente */}
-          <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Cliente</Label>
+        {/* Linha 2: Cliente + Ficha + Status + Especialidade */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="space-y-0.5">
+            <Label className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Cliente</Label>
             <div className="flex gap-1">
-              <Input
-                data-quick-search
-                value={filtroCliente}
-                onChange={(e) => setFiltroCliente(e.target.value)}
-                placeholder="Nome ou CPF…"
-                className="h-8 text-xs flex-1"
-              />
+              <Input data-quick-search value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Nome ou CPF…" />
               {podeEscrever && (
                 <Button
                   type="button"
@@ -5456,33 +5443,21 @@ function AgendaPage() {
                     setNovoPac({ nome: filtroCliente.trim(), cpf: "", telefone: "", data_nascimento: "", email: "" });
                     setNovoPacOpen(true);
                   }}
-                  className="h-8 w-8 shrink-0"
+                  className="h-9 w-9 shrink-0"
                 >
-                  <UserPlus className="h-3.5 w-3.5" />
+                  <UserPlus className="h-4 w-4" />
                 </Button>
               )}
             </div>
           </div>
-
-          {/* Nº Ficha */}
-          <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Nº Ficha</Label>
-            <Input
-              value={filtroFicha}
-              onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))}
-              placeholder="001"
-              inputMode="numeric"
-              className="h-8 text-xs"
-            />
+          <div className="space-y-0.5">
+            <Label className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Nº Ficha</Label>
+            <Input value={filtroFicha} onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 001" inputMode="numeric" />
           </div>
-
-          {/* Situação */}
-          <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Situação</Label>
+          <div className="space-y-0.5">
+            <Label className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">TODOS</SelectItem>
                 <SelectItem value="livres">Livres</SelectItem>
@@ -5493,436 +5468,523 @@ function AgendaPage() {
               </SelectContent>
             </Select>
           </div>
-
-          {/* Especialidade */}
-          <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Especialidade</Label>
+          <div className="space-y-0.5">
+            <Label className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">TODOS</SelectItem>
                 {especialidades.map(e => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
+        </div>
 
-          {/* Ações rápidas */}
-          <div className="space-y-0 flex items-end gap-1">
-            <Button
-              size="sm"
-              onClick={load}
-              className="h-8 text-xs flex-1 bg-primary hover:bg-primary/90"
+        {/* Linha 3: Atend. Múltiplo + Dia Semana + Ações */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+          <div className="space-y-0.5">
+            <Label className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Atend. Múltiplo</Label>
+            <button
+              type="button"
+              onClick={() => setFiltroApenasMultiplo((v) => !v)}
+              aria-pressed={filtroApenasMultiplo}
+              className={
+                "h-9 w-full rounded-md border px-3 text-xs font-medium transition-colors " +
+                (filtroApenasMultiplo
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-input bg-background text-muted-foreground hover:text-foreground")
+              }
+              title="Mostrar apenas agendamentos criados em Atendimento Múltiplo"
             >
-              <Search className="h-3 w-3 mr-1" /> Exibir
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={limparFiltros}
-              className="h-8 text-xs"
-            >
-              <X className="h-3 w-3" />
-            </Button>
+              {filtroApenasMultiplo ? "Somente múltiplos" : "Todos"}
+            </button>
           </div>
-        </div>
-        {/* KPIs REMOVIDOS */}
-
-          {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
-      <div className="h-8"></div>  {/* ← ADICIONE ESTA LINHA */}        
-        {/* Tabela - Com botões de ação na linha */}
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
-          <Table className="max-lg:table max-lg:overflow-visible">
-            <TableHeader className="sticky top-0 z-20">
-              <TableRow className="bg-muted">
-                <TableHead className="w-8" title="Selecione para ações em lote">
-                  <Checkbox
-                    checked={paginados.length > 0 && selecionados.size === paginados.length}
-                    onCheckedChange={toggleAll}
-                  />
-                </TableHead>
-                <TableHead className="w-14 text-center font-semibold text-xs uppercase text-muted-foreground">Ficha</TableHead>
-                <TableHead className="min-w-[130px] font-semibold text-xs uppercase text-muted-foreground">Profissional</TableHead>
-                <TableHead className="min-w-[150px] font-semibold text-xs uppercase text-muted-foreground">Cliente</TableHead>
-                <TableHead className="min-w-[110px] font-semibold text-xs uppercase text-muted-foreground">Serviço</TableHead>
-                <TableHead className="w-20 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
-                <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
-                <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
-                <TableHead className="w-[100px] text-right font-semibold text-xs uppercase text-muted-foreground">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
-              ) : !clinicaAtual ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
-              ) : paginados.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Nenhum agendamento encontrado.</TableCell></TableRow>
-              ) : paginados.map((a) => {
-                const fichaNum = fichaPorId.get(a.id) ?? "";
-                const realizado = a.status === "realizado";
-                const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
-                const hojeIsoLocal = new Date().toISOString().slice(0, 10);
-                const ehHoje = (a.inicio ?? "").slice(0, 10) === hojeIsoLocal;
-                const pagoHoje = pagosSet.has(a.id) && ehHoje;
-                const presente = !realizado && (pagoHoje || !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow));
-                const estornoPend = estornoPendAgs.has(a.id);
-                const ocultarPaciente = estornoPend && isMedicoOnly;
-                const ehLivre = isSlotLivre(a.paciente_nome);
-
-                // Cor de fundo da linha
-                let bgClass = "";
-                let borderLeft = "";
-                if (estornoPend) {
-                  bgClass = "bg-rose-50 hover:bg-rose-100";
-                  borderLeft = "border-l-4 border-rose-500";
-                } else if (realizado) {
-                  bgClass = "bg-emerald-50 hover:bg-emerald-100";
-                  borderLeft = "border-l-4 border-emerald-500";
-                } else if (presente) {
-                  bgClass = "bg-blue-50 hover:bg-blue-100";
-                  borderLeft = "border-l-4 border-blue-400";
-                }
-
-                return (
-                  <TableRow
-                    key={a.id}
-                    className={`${bgClass} ${borderLeft} transition-colors`}
-                  >
-                    {/* Checkbox */}
-                    <TableCell className="py-1.5">
-                      <Checkbox
-                        checked={selecionados.has(a.id)}
-                        onCheckedChange={() => toggleSel(a.id)}
-                        disabled={ehLivre || realizado}
-                      />
-                    </TableCell>
-
-                    {/* Ficha */}
-                    <TableCell className="text-center font-mono text-sm font-medium py-1.5">
-                      {fichaNum || "—"}
-                    </TableCell>
-
-                    {/* Profissional */}
-                    <TableCell className="py-1.5">
-                      {(() => {
-                        const label = medicoNomeAgendamento(a);
-                        const m = medicos.find((x) => x.id === a.medico_id);
-                        const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
-                        return (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-sm truncate max-w-[110px]" title={label}>
-                              {label}
-                            </span>
-                            {manual && (
-                              <span className="shrink-0 text-[9px] font-medium uppercase bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
-                                Papel
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </TableCell>
-
-                    {/* Cliente */}
-                    <TableCell className="py-1.5">
-                      {ocultarPaciente ? (
-                        <span className="text-xs italic text-rose-600">— aguardando estorno —</span>
-                      ) : ehLivre ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openSlot(a)}
-                          className="h-6 px-2 text-primary hover:text-primary/80 font-medium text-xs"
-                        >
-                          <UserPlus className="h-3 w-3 mr-1" />
-                          Agendar
-                        </Button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
-                          className="flex items-center gap-1.5 text-sm text-foreground hover:text-primary hover:underline max-w-full"
-                          title={a.paciente_nome}
-                        >
-                          {a.status === "confirmado" && (
-                            <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
-                          )}
-                          {a.paciente_id && (
-                            <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={16} />
-                          )}
-                          <span className="truncate max-w-[110px]">{a.paciente_nome}</span>
-                          {a.orcamento_numero && (
-                            <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
-                              ORÇ
-                            </span>
-                          )}
-                        </button>
-                      )}
-                    </TableCell>
-
-                    {/* Serviço */}
-                    <TableCell className="py-1.5">
-                      <ProcedimentoCell
-                        valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
-                        opcoes={opcoesProcedimentoMedico(a.medico_id)}
-                        padrao={
-                          procedimentoPadraoDoMedico(a.medico_id) ||
-                          (medicoEhLaboratorioFormulario(a.medico_id) ? "EXAMES LABORATORIAIS" : "")
-                        }
-                        semFallback={!!medicos.find((m) => m.id === a.medico_id)?.procedimento_padrao_em_branco}
-                        disabled={ehLivre}
-                        onChange={(novo) => atualizarProcedimento(a, novo)}
-                      />
-                    </TableCell>
-
-                    {/* Data */}
-                    <TableCell className="py-1.5 text-sm">
-                      {fmtData(a.inicio)}
-                    </TableCell>
-
-                    {/* Horário */}
-                    <TableCell className="py-1.5 text-sm font-medium text-emerald-600">
-                      {fmtHora(a.inicio)} - {fmtHora(a.fim)}
-                    </TableCell>
-
-                    {/* Situação */}
-                    <TableCell className="py-1.5">
-                      {ehLivre ? (
-                        <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 text-xs">
-                          Livre
-                        </Badge>
-                      ) : estornoPend ? (
-                        <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-xs">
-                          Estorno solicitado
-                        </Badge>
-                      ) : (
-                        <Badge className={`${STATUS_COR[a.status]} text-xs`}>
-                          {STATUS_LABEL[a.status]}
-                        </Badge>
-                      )}
-                    </TableCell>
-
-                    {/* Ações - Botões na linha + Menu */}
-                    <TableCell className="py-1.5 text-right">
-                      <div className="flex items-center justify-end gap-0.5">
-                        {/* Check-in (✅) - aparece apenas para pacientes presentes */}
-                        {!ehLivre && !realizado && (
-                          (() => {
-                            const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
-                            const pendenteCheckin = ["aguardando_recepcao", "recepcao"].includes(etapa);
-                            if (pagosSet.has(a.id) && pendenteCheckin && podeEscrever) {
-                              return (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  title="Confirmar presença (check-in)"
-                                  onClick={() => confirmarPresenca(a)}
-                                  className="h-7 w-7 rounded-md border border-emerald-300 text-emerald-600 hover:bg-emerald-50"
-                                >
-                                  <BadgeCheck className="h-3.5 w-3.5" />
-                                </Button>
-                              );
-                            }
-                            if (!pendenteCheckin && !ehLivre) {
-                              return (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  disabled
-                                  title="Check-in já realizado"
-                                  className="h-7 w-7 rounded-md border border-emerald-400 bg-emerald-50 text-emerald-600 disabled:opacity-100"
-                                >
-                                  <BadgeCheck className="h-3.5 w-3.5" />
-                                </Button>
-                              );
-                            }
-                            return null;
-                          })()
-                        )}
-
-                        {/* Pagar (💰) */}
-                        {!ehLivre && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title={(() => {
-                              if (!pagosSet.has(a.id)) return "Registrar pagamento";
-                              const info = pagoInfoMap.get(a.id);
-                              if (!info) return "Pago";
-                              const v = info.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-                              return `Pago • ${v}`;
-                            })()}
-                            onClick={() => cobrarAgendamento(a)}
-                            className={`h-7 w-7 rounded-md border-2 ${pagosSet.has(a.id)
-                                ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                                : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
-                              }`}
-                          >
-                            <DollarSign className="h-3.5 w-3.5" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
-                          </Button>
-                        )}
-
-                        {/* NFS-e (📄) */}
-                        {!ehLivre && (() => {
-                          const nf = nfseMap.get(a.id);
-                          const emitida = !!nf;
-                          const podeEmitir = pagosSet.has(a.id);
-                          if (!emitida && !podeEmitir) return null;
-                          return (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              title={emitida ? `NFS-e ${nf?.numero ?? ""}` : "Emitir NFS-e"}
-                              onClick={() => verOuEmitirNota(a)}
-                              className={`h-7 w-7 rounded-md border-2 ${emitida
-                                  ? "border-sky-400 bg-sky-50 text-sky-600 hover:bg-sky-100"
-                                  : "border-sky-200 text-sky-400 hover:border-sky-400 hover:bg-sky-50"
-                                }`}
-                            >
-                              <FileText className="h-3.5 w-3.5" strokeWidth={emitida ? 3 : 2.5} />
-                            </Button>
-                          );
-                        })()}
-
-                        {/* Menu (⋮) */}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 rounded-md hover:bg-slate-100 text-slate-400"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56">
-                            {/* Editar */}
-                            {podeEscrever && (
-                              <DropdownMenuItem onClick={() => openEdit(a)}>
-                                <Pencil className="h-4 w-4 mr-2" /> Editar
-                              </DropdownMenuItem>
-                            )}
-
-                            {/* Reagendar */}
-                            {podeEscrever && (
-                              <DropdownMenuItem
-                                onClick={() => iniciarReagendamento(a)}
-                                disabled={a.status === "realizado"}
-                              >
-                                <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
-                              </DropdownMenuItem>
-                            )}
-
-                            <DropdownMenuSeparator />
-
-                            {/* Imprimir GR */}
-                            <DropdownMenuItem
-                              onClick={() => imprimirGR(a)}
-                              disabled={!pagosSet.has(a.id)}
-                            >
-                              <Printer className="h-4 w-4 mr-2" /> Imprimir GR
-                              {!pagosSet.has(a.id) && (
-                                <span className="ml-2 text-xs text-muted-foreground">(pagar)</span>
-                              )}
-                            </DropdownMenuItem>
-
-                            {/* Comprovante */}
-                            <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
-                              <Printer className="h-4 w-4 mr-2" /> Comprovante
-                            </DropdownMenuItem>
-
-                            {/* Desmarcar paciente */}
-                            {podeEscrever && !ehLivre && a.status !== "realizado" && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => remove(a)} className="text-amber-600">
-                                  <UserMinus className="h-4 w-4 mr-2" /> Desmarcar paciente
-                                </DropdownMenuItem>
-                              </>
-                            )}
-
-                            {/* Mudar status */}
-                            {podeEscrever && !ehLivre && (
-                              <>
-                                <DropdownMenuSeparator />
-                                {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
-                                  <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
-                                    <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}
-                                  </DropdownMenuItem>
-                                ))}
-                              </>
-                            )}
-
-                            {/* Auditoria */}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
-                              <ShieldCheck className="h-4 w-4 mr-2" /> Histórico
-                            </DropdownMenuItem>
-
-                            {/* Reabrir (apenas realizado) */}
-                            {podeEscrever && a.status === "realizado" && (
-                              <DropdownMenuItem onClick={() => reabrirAtendimento(a)}>
-                                <Undo2 className="h-4 w-4 mr-2" /> Reabrir atendimento
-                              </DropdownMenuItem>
-                            )}
-
-                            {/* Excluir */}
-                            {podeEscrever && isManager && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => remove(a)}
-                                  className="text-destructive"
-                                  disabled={pagosSet.has(a.id)}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  {ehLivre ? "Excluir slot" : "Liberar horário"}
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-
-        <div className="flex justify-center">
-          <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
-        </div>
-
-        <div className="rounded-lg border bg-muted/30 p-4">
-          <h3 className="text-center font-semibold mb-3">Legenda</h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { cor: "#cfe3fb", borda: "#9fc3f3", label: "Confirmado pelo cliente" },
-              { cor: "#a8c8ed", borda: "#7aa9d8", label: "Presente na clínica" },
-              { cor: "#7fbfc2", borda: "#5a9ea1", label: "Em atendimento" },
-              { cor: "#d1f0d6", borda: "#8fd49a", label: "Atendido com sucesso" },
-              { cor: "#fde2c4", borda: "#f5c890", label: "Agenda de telemedicina" },
-              { cor: "#f8d2d6", borda: "#eea1a8", label: "Cancelado pelo cliente" },
-              { cor: "#fef3b6", borda: "#f0dc7a", label: "Atrasado para consulta" },
-              { cor: "#e0cdf0", borda: "#bea4d8", label: "Agendamento on-line" },
-              { cor: "#f7b6c0", borda: "#e88594", label: "Não comparecimento" },
-              { cor: "#fee2e2", borda: "#dc2626", label: "Estorno solicitado" },
-            ].map((s) => (
-              <div key={s.label} className="flex items-center gap-2 text-sm">
-                <span
-                  className="inline-block h-6 w-10 rounded border"
-                  style={{ background: s.cor, borderColor: s.borda }}
-                />
-                <span>{s.label}</span>
-              </div>
-            ))}
+          <div className="space-y-0.5">
+            <Label className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Dia Semana</Label>
+            <Select value={filtroDiaSemana} onValueChange={setFiltroDiaSemana}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">TODOS</SelectItem>
+                {DIAS_SEMANA.map((d, i) => <SelectItem key={d} value={String(i)}>{d}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-0.5">
+            <Label className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Exibir apenas data</Label>
+            <div className="flex items-center h-9">
+              <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
+              <span className="ml-2 text-xs text-muted-foreground">Data selecionada</span>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={limparFiltros} className="h-9 text-xs flex-1">
+              <X className="h-3.5 w-3.5 mr-1.5" /> Limpar
+            </Button>
+            <Button size="sm" onClick={load} className="h-9 text-xs flex-1">
+              <Search className="h-3.5 w-3.5 mr-1.5" /> Exibir
+            </Button>
           </div>
         </div>
       </div>
+
+      {viewMode === "dia" && (
+      <>
+      {pacienteCopia && (
+        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <CalendarDays className="h-4 w-4 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="font-semibold uppercase">Copiando paciente · {pacienteCopia.nome}</span>
+              <span className="ml-2 opacity-90 italic">Clique em um horário livre na agenda para agendar.</span>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => setPacienteCopia(null)}>
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+      {/* 🔥 KPIs COM CARDS MELHORADOS */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1 min-w-[280px]">
+          {/* Total */}
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <CalendarDays className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Total</div>
+              <div className="text-2xl font-bold text-slate-900 leading-none">{totais.total}</div>
+            </div>
+          </div>
+          {/* Confirmados */}
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+              <CheckCircle2 className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Confirmados</div>
+              <div className="text-2xl font-bold text-slate-900 leading-none">{totais.confirmados}</div>
+            </div>
+          </div>
+          {/* Realizados */}
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-100 text-sky-600">
+              <User className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Realizados</div>
+              <div className="text-2xl font-bold text-slate-900 leading-none">{totais.realizados}</div>
+            </div>
+          </div>
+          {/* Pendentes */}
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+              <Clock className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Pendentes</div>
+              <div className="text-2xl font-bold text-slate-900 leading-none">{totais.pendentes}</div>
+            </div>
+          </div>
+        </div>
+        <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
+      </div>
+
+      {/* Tabela - Com botões de ação na linha */}
+<div className="rounded-lg border border-border bg-card overflow-hidden">
+  <Table className="max-lg:table max-lg:overflow-visible">
+    <TableHeader className="sticky top-0 z-20">
+      <TableRow className="bg-muted">
+        <TableHead className="w-8" title="Selecione para ações em lote">
+          <Checkbox
+            checked={paginados.length > 0 && selecionados.size === paginados.length}
+            onCheckedChange={toggleAll}
+          />
+        </TableHead>
+        <TableHead className="w-14 text-center font-semibold text-xs uppercase text-muted-foreground">Ficha</TableHead>
+        <TableHead className="min-w-[130px] font-semibold text-xs uppercase text-muted-foreground">Profissional</TableHead>
+        <TableHead className="min-w-[150px] font-semibold text-xs uppercase text-muted-foreground">Cliente</TableHead>
+        <TableHead className="min-w-[110px] font-semibold text-xs uppercase text-muted-foreground">Serviço</TableHead>
+        <TableHead className="w-20 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
+        <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
+        <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
+        <TableHead className="w-[100px] text-right font-semibold text-xs uppercase text-muted-foreground">Ações</TableHead>
+      </TableRow>
+    </TableHeader>
+    <TableBody>
+      {loading ? (
+        <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+      ) : !clinicaAtual ? (
+        <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
+      ) : paginados.length === 0 ? (
+        <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Nenhum agendamento encontrado.</TableCell></TableRow>
+      ) : paginados.map((a) => {
+        const fichaNum = fichaPorId.get(a.id) ?? "";
+        const realizado = a.status === "realizado";
+        const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
+        const hojeIsoLocal = new Date().toISOString().slice(0, 10);
+        const ehHoje = (a.inicio ?? "").slice(0, 10) === hojeIsoLocal;
+        const pagoHoje = pagosSet.has(a.id) && ehHoje;
+        const presente = !realizado && (pagoHoje || !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow));
+        const estornoPend = estornoPendAgs.has(a.id);
+        const ocultarPaciente = estornoPend && isMedicoOnly;
+        const ehLivre = isSlotLivre(a.paciente_nome);
+        
+        // Cor de fundo da linha
+        let bgClass = "";
+        let borderLeft = "";
+        if (estornoPend) {
+          bgClass = "bg-rose-50 hover:bg-rose-100";
+          borderLeft = "border-l-4 border-rose-500";
+        } else if (realizado) {
+          bgClass = "bg-emerald-50 hover:bg-emerald-100";
+          borderLeft = "border-l-4 border-emerald-500";
+        } else if (presente) {
+          bgClass = "bg-blue-50 hover:bg-blue-100";
+          borderLeft = "border-l-4 border-blue-400";
+        }
+        
+        return (
+          <TableRow 
+            key={a.id} 
+            className={`${bgClass} ${borderLeft} transition-colors`}
+          >
+            {/* Checkbox */}
+            <TableCell className="py-1.5">
+              <Checkbox 
+                checked={selecionados.has(a.id)} 
+                onCheckedChange={() => toggleSel(a.id)}
+                disabled={ehLivre || realizado}
+              />
+            </TableCell>
+            
+            {/* Ficha */}
+            <TableCell className="text-center font-mono text-sm font-medium py-1.5">
+              {fichaNum || "—"}
+            </TableCell>
+            
+            {/* Profissional */}
+            <TableCell className="py-1.5">
+              {(() => {
+                const label = medicoNomeAgendamento(a);
+                const m = medicos.find((x) => x.id === a.medico_id);
+                const manual = m && m.usa_sistema === false && !recursoIds.has(m.id);
+                return (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm truncate max-w-[110px]" title={label}>
+                      {label}
+                    </span>
+                    {manual && (
+                      <span className="shrink-0 text-[9px] font-medium uppercase bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
+                        Papel
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+            </TableCell>
+            
+            {/* Cliente */}
+            <TableCell className="py-1.5">
+              {ocultarPaciente ? (
+                <span className="text-xs italic text-rose-600">— aguardando estorno —</span>
+              ) : ehLivre ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => openSlot(a)}
+                  className="h-6 px-2 text-primary hover:text-primary/80 font-medium text-xs"
+                >
+                  <UserPlus className="h-3 w-3 mr-1" />
+                  Agendar
+                </Button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
+                  className="flex items-center gap-1.5 text-sm text-foreground hover:text-primary hover:underline max-w-full"
+                  title={a.paciente_nome}
+                >
+                  {a.status === "confirmado" && (
+                    <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
+                  )}
+                  {a.paciente_id && (
+                    <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={16} />
+                  )}
+                  <span className="truncate max-w-[110px]">{a.paciente_nome}</span>
+                  {a.orcamento_numero && (
+                    <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
+                      ORÇ
+                    </span>
+                  )}
+                </button>
+              )}
+            </TableCell>
+            
+            {/* Serviço */}
+            <TableCell className="py-1.5">
+              <ProcedimentoCell
+                valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
+                opcoes={opcoesProcedimentoMedico(a.medico_id)}
+                padrao={
+                  procedimentoPadraoDoMedico(a.medico_id) ||
+                  (medicoEhLaboratorioFormulario(a.medico_id) ? "EXAMES LABORATORIAIS" : "")
+                }
+                semFallback={!!medicos.find((m) => m.id === a.medico_id)?.procedimento_padrao_em_branco}
+                disabled={ehLivre}
+                onChange={(novo) => atualizarProcedimento(a, novo)}
+              />
+            </TableCell>
+            
+            {/* Data */}
+            <TableCell className="py-1.5 text-sm">
+              {fmtData(a.inicio)}
+            </TableCell>
+            
+            {/* Horário */}
+            <TableCell className="py-1.5 text-sm font-medium text-emerald-600">
+              {fmtHora(a.inicio)} - {fmtHora(a.fim)}
+            </TableCell>
+            
+            {/* Situação */}
+            <TableCell className="py-1.5">
+              {ehLivre ? (
+                <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 text-xs">
+                  Livre
+                </Badge>
+              ) : estornoPend ? (
+                <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-xs">
+                  Estorno solicitado
+                </Badge>
+              ) : (
+                <Badge className={`${STATUS_COR[a.status]} text-xs`}>
+                  {STATUS_LABEL[a.status]}
+                </Badge>
+              )}
+            </TableCell>
+            
+            {/* Ações - Botões na linha + Menu */}
+            <TableCell className="py-1.5 text-right">
+              <div className="flex items-center justify-end gap-0.5">
+                {/* Check-in (✅) - aparece apenas para pacientes presentes */}
+                {!ehLivre && !realizado && (
+                  (() => {
+                    const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
+                    const pendenteCheckin = ["aguardando_recepcao", "recepcao"].includes(etapa);
+                    if (pagosSet.has(a.id) && pendenteCheckin && podeEscrever) {
+                      return (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Confirmar presença (check-in)"
+                          onClick={() => confirmarPresenca(a)}
+                          className="h-7 w-7 rounded-md border border-emerald-300 text-emerald-600 hover:bg-emerald-50"
+                        >
+                          <BadgeCheck className="h-3.5 w-3.5" />
+                        </Button>
+                      );
+                    }
+                    if (!pendenteCheckin && !ehLivre) {
+                      return (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled
+                          title="Check-in já realizado"
+                          className="h-7 w-7 rounded-md border border-emerald-400 bg-emerald-50 text-emerald-600 disabled:opacity-100"
+                        >
+                          <BadgeCheck className="h-3.5 w-3.5" />
+                        </Button>
+                      );
+                    }
+                    return null;
+                  })()
+                )}
+                
+                {/* Pagar (💰) */}
+                {!ehLivre && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title={(() => {
+                      if (!pagosSet.has(a.id)) return "Registrar pagamento";
+                      const info = pagoInfoMap.get(a.id);
+                      if (!info) return "Pago";
+                      const v = info.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+                      return `Pago • ${v}`;
+                    })()}
+                    onClick={() => cobrarAgendamento(a)}
+                    className={`h-7 w-7 rounded-md border-2 ${
+                      pagosSet.has(a.id)
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                        : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
+                    }`}
+                  >
+                    <DollarSign className="h-3.5 w-3.5" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
+                  </Button>
+                )}
+                
+                {/* NFS-e (📄) */}
+                {!ehLivre && (() => {
+                  const nf = nfseMap.get(a.id);
+                  const emitida = !!nf;
+                  const podeEmitir = pagosSet.has(a.id);
+                  if (!emitida && !podeEmitir) return null;
+                  return (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title={emitida ? `NFS-e ${nf?.numero ?? ""}` : "Emitir NFS-e"}
+                      onClick={() => verOuEmitirNota(a)}
+                      className={`h-7 w-7 rounded-md border-2 ${
+                        emitida
+                          ? "border-sky-400 bg-sky-50 text-sky-600 hover:bg-sky-100"
+                          : "border-sky-200 text-sky-400 hover:border-sky-400 hover:bg-sky-50"
+                      }`}
+                    >
+                      <FileText className="h-3.5 w-3.5" strokeWidth={emitida ? 3 : 2.5} />
+                    </Button>
+                  );
+                })()}
+                
+                {/* Menu (⋮) */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7 rounded-md hover:bg-slate-100 text-slate-400"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    {/* Editar */}
+                    {podeEscrever && (
+                      <DropdownMenuItem onClick={() => openEdit(a)}>
+                        <Pencil className="h-4 w-4 mr-2" /> Editar
+                      </DropdownMenuItem>
+                    )}
+                    
+                    {/* Reagendar */}
+                    {podeEscrever && (
+                      <DropdownMenuItem 
+                        onClick={() => iniciarReagendamento(a)}
+                        disabled={a.status === "realizado"}
+                      >
+                        <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
+                      </DropdownMenuItem>
+                    )}
+                    
+                    <DropdownMenuSeparator />
+                    
+                    {/* Imprimir GR */}
+                    <DropdownMenuItem 
+                      onClick={() => imprimirGR(a)}
+                      disabled={!pagosSet.has(a.id)}
+                    >
+                      <Printer className="h-4 w-4 mr-2" /> Imprimir GR
+                      {!pagosSet.has(a.id) && (
+                        <span className="ml-2 text-xs text-muted-foreground">(pagar)</span>
+                      )}
+                    </DropdownMenuItem>
+                    
+                    {/* Comprovante */}
+                    <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
+                      <Printer className="h-4 w-4 mr-2" /> Comprovante
+                    </DropdownMenuItem>
+                    
+                    {/* Desmarcar paciente */}
+                    {podeEscrever && !ehLivre && a.status !== "realizado" && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => remove(a)} className="text-amber-600">
+                          <UserMinus className="h-4 w-4 mr-2" /> Desmarcar paciente
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    
+                    {/* Mudar status */}
+                    {podeEscrever && !ehLivre && (
+                      <>
+                        <DropdownMenuSeparator />
+                        {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
+                          <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
+                            <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+                    
+                    {/* Auditoria */}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
+                      <ShieldCheck className="h-4 w-4 mr-2" /> Histórico
+                    </DropdownMenuItem>
+                    
+                    {/* Reabrir (apenas realizado) */}
+                    {podeEscrever && a.status === "realizado" && (
+                      <DropdownMenuItem onClick={() => reabrirAtendimento(a)}>
+                        <Undo2 className="h-4 w-4 mr-2" /> Reabrir atendimento
+                      </DropdownMenuItem>
+                    )}
+                    
+                    {/* Excluir */}
+                    {podeEscrever && isManager && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => remove(a)} 
+                          className="text-destructive"
+                          disabled={pagosSet.has(a.id)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" /> 
+                          {ehLivre ? "Excluir slot" : "Liberar horário"}
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </TableCell>
+          </TableRow>
+        );
+      })}
+    </TableBody>
+  </Table>
+</div>
+
+      <div className="flex justify-center">
+        <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
+      </div>
+
+      <div className="rounded-lg border bg-muted/30 p-4">
+        <h3 className="text-center font-semibold mb-3">Legenda</h3>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { cor: "#cfe3fb", borda: "#9fc3f3", label: "Confirmado pelo cliente" },
+            { cor: "#a8c8ed", borda: "#7aa9d8", label: "Presente na clínica" },
+            { cor: "#7fbfc2", borda: "#5a9ea1", label: "Em atendimento" },
+            { cor: "#d1f0d6", borda: "#8fd49a", label: "Atendido com sucesso" },
+            { cor: "#fde2c4", borda: "#f5c890", label: "Agenda de telemedicina" },
+            { cor: "#f8d2d6", borda: "#eea1a8", label: "Cancelado pelo cliente" },
+            { cor: "#fef3b6", borda: "#f0dc7a", label: "Atrasado para consulta" },
+            { cor: "#e0cdf0", borda: "#bea4d8", label: "Agendamento on-line" },
+            { cor: "#f7b6c0", borda: "#e88594", label: "Não comparecimento" },
+            { cor: "#fee2e2", borda: "#dc2626", label: "Estorno solicitado" },
+          ].map((s) => (
+            <div key={s.label} className="flex items-center gap-2 text-sm">
+              <span
+                className="inline-block h-6 w-10 rounded border"
+                style={{ background: s.cor, borderColor: s.borda }}
+              />
+              <span>{s.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      </>
+      )}
 
       {viewMode === "medico" && (
         <AgendaPorMedicoGrid
@@ -6304,9 +6366,10 @@ function FragmentDayCell({
             onClick={() => (ehLivre ? onSlotClick(ag) : (ocultarPaciente ? undefined : onAgClick(ag)))}
             disabled={ocultarPaciente}
             className={
-              `w-full text-left rounded-md px-2 py-1.5 text-xs leading-tight truncate hover:brightness-95 transition ${estornoPend
-                ? "bg-rose-100 text-rose-800 border border-rose-300"
-                : corStatus(ag.status)
+              `w-full text-left rounded-md px-2 py-1.5 text-xs leading-tight truncate hover:brightness-95 transition ${
+                estornoPend
+                  ? "bg-rose-100 text-rose-800 border border-rose-300"
+                  : corStatus(ag.status)
               } ${ocultarPaciente ? "cursor-not-allowed opacity-90" : ""}`
             }
             title={
@@ -6356,11 +6419,13 @@ function DataRefField({
 
   return (
     <div className="flex gap-1">
-      {/* SETAS REMOVIDAS */}
+      <Button variant="outline" size="icon" onClick={() => { setDataFim(null); shiftData(-1); }}>
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="flex-1 justify-start font-normal h-8 text-xs">
-            <CalendarDays className="h-3.5 w-3.5 mr-1.5" /> {label}
+          <Button variant="outline" className={`flex-1 justify-start font-normal ${compact ? "h-8 text-xs" : ""}`}>
+            <CalendarDays className="h-4 w-4 mr-2" /> {label}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
@@ -6434,6 +6499,9 @@ function DataRefField({
           )}
         </PopoverContent>
       </Popover>
+      <Button variant="outline" size="icon" onClick={() => { setDataFim(null); shiftData(1); }}>
+        <ChevronRight className="h-4 w-4" />
+      </Button>
     </div>
   );
 }
