@@ -323,18 +323,26 @@ export function AppShell() {
 
   const initial = (userName || user?.email || "?").trim().charAt(0).toUpperCase();
 
-  const filteredByGroup = subsystem
-    ? navRows.filter((r) => SUBSYSTEMS[subsystem].groups.includes(r.label))
-    : navRows;
+  // Bypass exclusivo do Rodrigo: vê todas as telas criadas, sem filtro de
+  // permissão nem de subsystem. Não afeta nenhum outro usuário.
+  const isRodrigoFullAccess = (user?.email ?? "").toLowerCase() === "rodrigorss2301@gmail.com";
+
+  const filteredByGroup = isRodrigoFullAccess
+    ? navRows
+    : subsystem
+      ? navRows.filter((r) => SUBSYSTEMS[subsystem].groups.includes(r.label))
+      : navRows;
   const scopedNavRows = filteredByGroup.map((row) => {
     if (row.label !== "Gestão") return row;
     const gestaoPessoasItems = new Set(["/app/funcionarios", "/app/cargos", "/app/setores"]);
-    const items = subsystem === "gestao-pessoas"
+    const items = !isRodrigoFullAccess && subsystem === "gestao-pessoas"
       ? row.items.filter((it) => !isParent(it) && gestaoPessoasItems.has(it.to))
       : row.items.filter((it) => isParent(it) || !gestaoPessoasItems.has(it.to));
     return { ...row, items };
   }).filter((row) => row.items.length > 0);
-  const permissionFilteredRows = scopedNavRows
+  const permissionFilteredRows = isRodrigoFullAccess
+    ? scopedNavRows
+    : scopedNavRows
     .map((row) => {
       const items = row.items
         .map((item) => {
