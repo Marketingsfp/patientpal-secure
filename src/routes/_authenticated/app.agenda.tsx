@@ -6596,11 +6596,11 @@ function AgendaPage() {
                     onCheckedChange={toggleAll}
                   />
                 </TableHead>
-                <TableHead className="w-20 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
-                <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
                 <TableHead className="w-14 text-center font-semibold text-xs uppercase text-muted-foreground">
                   Ficha
                 </TableHead>
+                <TableHead className="w-20 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
+                <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
                 <TableHead className="min-w-[130px] font-semibold text-xs uppercase text-muted-foreground">
                   Profissional
                 </TableHead>
@@ -6674,17 +6674,17 @@ function AgendaPage() {
                         />
                       </TableCell>
 
+                      {/* Ficha */}
+                      <TableCell className="text-center font-mono text-sm font-medium py-1.5">
+                        {fichaNum || "—"}
+                      </TableCell>
+
                       {/* Data */}
                       <TableCell className="py-1.5 text-sm">{fmtData(a.inicio)}</TableCell>
 
                       {/* Horário */}
                       <TableCell className="py-1.5 text-sm font-medium text-emerald-600">
                         {fmtHora(a.inicio)} - {fmtHora(a.fim)}
-                      </TableCell>
-
-                      {/* Ficha */}
-                      <TableCell className="text-center font-mono text-sm font-medium py-1.5">
-                        {fichaNum || "—"}
                       </TableCell>
 
                       {/* Profissional */}
