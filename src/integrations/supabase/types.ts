@@ -8755,6 +8755,7 @@ export type Database = {
         | "recebimento"
         | "despesa"
         | "fechamento"
+        | "estorno"
       caixa_sessao_status: "aberto" | "fechado"
       chat_canal_tipo: "direto" | "grupo" | "setor"
       crm_status: "aberta" | "ganha" | "perdida"
@@ -8988,6 +8989,7 @@ export const Constants = {
         "recebimento",
         "despesa",
         "fechamento",
+        "estorno",
       ],
       caixa_sessao_status: ["aberto", "fechado"],
       chat_canal_tipo: ["direto", "grupo", "setor"],
