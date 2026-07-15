@@ -18,6 +18,7 @@ import {
   Mail,
   AlertTriangle,
   Loader2,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
