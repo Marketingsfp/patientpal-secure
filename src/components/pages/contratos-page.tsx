@@ -1693,6 +1693,10 @@ function DetalheContrato({
   const [admObs, setAdmObs] = useState<string>(contrato.observacoes ?? "");
   const [admFaixaId, setAdmFaixaId] = useState<string>("");
   const [savingAdm, setSavingAdm] = useState(false);
+  const [apenasFinanceiro, setApenasFinanceiro] = useState<boolean>(
+    !!(contrato as any).titular_apenas_financeiro,
+  );
+  const [savingApenasFin, setSavingApenasFin] = useState(false);
   const [retroDialog, setRetroDialog] = useState<{ open: boolean; parcelasPagas: string; dataInicio: string } | null>(null);
   const [regerandoRetro, setRegerandoRetro] = useState(false);
   useEffect(() => {
@@ -1701,6 +1705,7 @@ function DetalheContrato({
     setAdmTaxaAdesao(String(Number(contrato.taxa_adesao ?? 0).toFixed(2)));
     setAdmForma(contrato.forma_pagamento ?? "");
     setAdmObs(contrato.observacoes ?? "");
+    setApenasFinanceiro(!!(contrato as any).titular_apenas_financeiro);
   }, [contrato.id]);
 
   // Carrega lista de convênios ativos (ADM)
