@@ -2136,36 +2136,24 @@ function Page() {
 
               {/* ---------- Movimentos ---------- */}
               <TabsContent value="movimentos" className="space-y-4 pt-4">
-                {!minhaSessao ? (
-                  <Card>
-                    <CardContent className="py-10 text-center text-muted-foreground">
-                      Abra um caixa para visualizar os movimentos.
-                    </CardContent>
-                  </Card>
-                ) : (
               <Card>
                 <CardHeader className="gap-3">
                   <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
                     <CardTitle className="text-base">
-                      {isManager ? "Movimentos da sessão" : "Movimentos de hoje"}
+                      Meus movimentos
                       {filtrosAtivos && (
                         <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          ({minhasMovsFiltrados.length} de {minhasMovs.length})
+                          ({minhasMovsFiltrados.length} de {minhasMovsHist.length})
                         </span>
                       )}
                     </CardTitle>
                     <div className="flex items-center gap-2">
-                      {!isManager && (
-                        <span className="text-xs text-muted-foreground">
-                          {new Date().toLocaleDateString("pt-BR")}
-                        </span>
-                      )}
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => imprimirRelatorioMovs(
                           minhasMovsFiltrados,
-                          isManager ? periodoLabel : new Date().toLocaleDateString("pt-BR"),
+                          periodoLabel,
                         )}
                         disabled={minhasMovsFiltrados.length === 0}
                       >
@@ -2174,8 +2162,7 @@ function Page() {
                     </div>
                   </div>
                   <div className="flex items-end gap-2 flex-wrap">
-                    {isManager && (
-                      <div>
+                    <div>
                         <Label className="text-xs">Período</Label>
                         <Popover open={openCal} onOpenChange={setOpenCal}>
                           <PopoverTrigger asChild>
