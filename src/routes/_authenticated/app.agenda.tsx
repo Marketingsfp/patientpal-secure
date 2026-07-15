@@ -2442,7 +2442,12 @@ function AgendaPage() {
       // enfermagem, mapeados como "médicos virtuais" no load()). Slots sem
       // profissional atribuído são numerados em um bucket próprio por dia.
       const prof = a.medico_id ?? "__sem_profissional__";
-      const chave = `${dia}::${prof}`;
+      // Cada agenda do médico tem sua própria sequência de fichas (001, 002…).
+      // Sem esta separação por agenda_id, duas agendas do mesmo médico geradas
+      // no mesmo dia compartilhariam o contador e a numeração ficaria
+      // intercalada entre elas.
+      const agenda = a.agenda_id ?? "__sem_agenda__";
+      const chave = `${dia}::${prof}::${agenda}`;
       const n = (contadores.get(chave) ?? 0) + 1;
       contadores.set(chave, n);
       m.set(a.id, String(n).padStart(3, "0"));
