@@ -1596,7 +1596,7 @@ function AgendaPage() {
     // anteriores serão descartadas antes de pintar (evita corridas do
     // realtime + filtros que faziam agendamentos "sumirem" ou reordenarem).
     const seq = ++loadSeqRef.current;
-    if (!background || itemsRef.current.length === 0) setLoading(true);
+    if (!background) setLoading(true);
     let q = supabase
       .from("agendamentos")
       .select(
