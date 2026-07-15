@@ -176,19 +176,8 @@ export function PainelPage() {
     const clinicaId = clinicaAtual.clinica_id;
 
     const carregar = async () => {
-      const hoje = new Date().toISOString().slice(0, 10);
-      const { data } = await supabase
-        .from("senhas")
-        .select("id, codigo, tipo, status, guiche, chamada_em, paciente_id, pacientes(nome)")
-        .eq("clinica_id", clinicaId)
-        .eq("data_dia", hoje)
-        .in("status", ["chamada", "atendida"])
-        .order("chamada_em", { ascending: false })
-        .limit(6);
-      const lista = ((data ?? []) as Array<Senha & { pacientes?: { nome: string } | null }>).map((s) => ({
-        ...s,
-        paciente_nome: s.pacientes?.nome ?? null,
-      })) as Senha[];
+      const { data } = await supabase.rpc("painel_senhas_publicas", { _clinica_id: clinicaId });
+      const lista = ((data ?? []) as Senha[]);
       setAtual(lista[0] ?? null);
       setHistorico(lista.slice(1));
 
