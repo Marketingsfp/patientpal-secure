@@ -230,7 +230,7 @@ function pacienteFromDescricao(desc: string | null): string | null {
   const mens = desc.match(/CONTRATO\s+#\S+\s+-\s+(.+?)\s*$/i);
   if (mens) return mens[1].trim() || null;
   // Descarta descrições sem paciente (sangria/suprimento/fechamento/etc.)
-  if (/^\s*(abertura|fechamento|sangria|suprimento|estorno)\b/i.test(desc)) return null;
+  if (/^\s*(abertura|fechamento|reabertura|sangria|suprimento|estorno|fechamento\s+desfeito)\b/i.test(desc)) return null;
   if (/^\s*\[caixa\]/i.test(desc)) return null;
   const clean = desc.replace(/^Recebimento\s+—\s+/i, "");
   // Nome vem antes do PRIMEIRO separador " — " ou " · "
