@@ -4265,7 +4265,11 @@ function AgendaPage() {
         toast.error("Emissão cancelada.");
         return;
       }
-      const descBase = a.procedimento || "Serviços prestados";
+      const descBase = montarDiscriminacaoNfse({
+        procedimento: a.procedimento,
+        pacienteNome: pac.nome,
+        dataReferencia: a.inicio,
+      });
       const descFinal = tomador.dependenteAtendido ? `${descBase} — Atendido: ${tomador.dependenteAtendido}` : descBase;
       const res = await emitirNfseFn({
         data: {
@@ -5434,7 +5438,11 @@ function AgendaPage() {
                       toast.error("Emissão cancelada.");
                       return;
                     }
-                    const descBase = ag.procedimento || pagamentoDesc || "Serviços prestados";
+                    const descBase = montarDiscriminacaoNfse({
+                      procedimento: ag.procedimento || pagamentoDesc,
+                      pacienteNome: pac.nome,
+                      dataReferencia: ag.inicio,
+                    });
                     const descFinal = tomador.dependenteAtendido
                       ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
                       : descBase;
