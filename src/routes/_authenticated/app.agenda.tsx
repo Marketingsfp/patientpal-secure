@@ -2442,14 +2442,14 @@ function AgendaPage() {
       // enfermagem, mapeados como "médicos virtuais" no load()). Slots sem
       // profissional atribuído são numerados em um bucket próprio por dia.
       const prof = a.medico_id ?? "__sem_profissional__";
-      // Sequência ÚNICA por médico/dia — NÃO separa por agenda. Um médico com
-      // mais de uma agenda no mesmo dia (ex.: EXAMES + CONSULTAS) compartilha
-      // um só contador, então a ficha é única e crescente por horário na Lista
-      // unificada. Separar por agenda (agenda_id na chave) fazia cada agenda ter
-      // sua própria sequência 001,002… e, como a Lista junta as agendas, os
-      // números colidiam (dois "020", dois "021"). Decisão do gestor após ver
-      // ao vivo: preferir fila única sem números repetidos.
-      const chave = `${dia}::${prof}`;
+      // Cada agenda do médico tem sua própria sequência de fichas (001, 002…).
+      // Decisão confirmada com o gestor: ao filtrar por uma agenda específica
+      // (ex.: só CONSULTAS), a numeração fica limpa e sequencial — é assim que
+      // a ficha física funciona por fila. Na Lista SEM filtro de agenda
+      // (todas juntas), números iguais entre agendas diferentes são esperados
+      // (são filas distintas), não duplicação.
+      const agenda = a.agenda_id ?? "__sem_agenda__";
+      const chave = `${dia}::${prof}::${agenda}`;
       const n = (contadores.get(chave) ?? 0) + 1;
       contadores.set(chave, n);
       m.set(a.id, String(n).padStart(3, "0"));
