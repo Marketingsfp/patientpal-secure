@@ -2860,12 +2860,45 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     onSelect={(p) => setAdmPaciente(p)}
                     placeholder="Buscar paciente por nome ou CPF…"
                   />
+                  <ApenasFinanceiroToggle
+                    contratoId={contrato.id}
+                    checked={apenasFinanceiro}
+                    saving={savingApenasFin}
+                    disabled={cancelado && !isAdmin}
+                    onChange={async (v) => {
+                      setSavingApenasFin(true);
+                      const { error } = await supabase
+                        .from("contratos_assinatura")
+                        .update({ titular_apenas_financeiro: v } as any)
+                        .eq("id", contrato.id);
+                      if (error) {
+                        setSavingApenasFin(false);
+                        mostrarErro(error);
+                        return;
+                      }
+                      (contrato as any).titular_apenas_financeiro = v;
+                      setApenasFinanceiro(v);
+                      const novoTotal = (v ? 0 : 1) + depsAtivos.length;
+                      await recalcularParcelasAbertas(novoTotal);
+                      setSavingApenasFin(false);
+                      toast.success(v
+                        ? "Marcado como Titular financeiro (não utiliza os benefícios)."
+                        : "Titular passa a usufruir dos benefícios normalmente.");
+                    }}
+                  />
                 </div>
               ) : (
-                <DadosField
-                  label="Paciente titular"
-                  value={`${contrato.paciente_nome}${pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}`}
-                />
+                <>
+                  <DadosField
+                    label="Paciente titular"
+                    value={`${contrato.paciente_nome}${pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}`}
+                  />
+                  {apenasFinanceiro ? (
+                    <div className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                      <Info className="h-3.5 w-3.5" /> Titular financeiro — não utiliza os benefícios.
+                    </div>
+                  ) : null}
+                </>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {isAdmin && podeEscrever ? (
