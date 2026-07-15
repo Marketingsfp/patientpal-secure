@@ -6020,7 +6020,81 @@ function AgendaPage() {
                 type Item = { id: string; when: string; quem: string; kind: Kind; body: React.ReactNode };
                 const items: Item[] = [];
 
+                // --- Detecção de reagendamento ------------------------------------------
+                // Trilha gravada em observacoes pelo RPC clássico e pelo reagendarAgendamento V2:
+                //   "[Reagendado em ...] de <inicio antigo> para <inicio novo>"
+                // A linha que RECEBE o paciente (destino) tem essa linha nova em depois.observacoes.
+                // A linha que fica DISPONÍVEL (origem) é o par gêmeo (mesmo user, ±5s).
+                const medicoNomePorId = new Map<string, string>();
+                for (const m of medicos) medicoNomePorId.set(m.id, m.nome);
+                const reagTrilha = /\[Reagendado(?: em lote)? em [^\]]+\]/;
+                const suprimirRowIds = new Set<string>();
+                const enrichReag = new Map<string, { fichaOrigem: string | null; fichaDestino: string | null; novoInicio: unknown; medicoNome: string; oldInicio: unknown }>();
+                const destinoCandidatos = auditRows.filter((r) => {
+                  if (r.table_name !== "agendamentos" || r.action !== "UPDATE") return false;
+                  const a = (r.dados_antes ?? {}) as Record<string, unknown>;
+                  const d = (r.dados_depois ?? {}) as Record<string, unknown>;
+                  const obsAntes = typeof a.observacoes === "string" ? a.observacoes : "";
+                  const obsDepois = typeof d.observacoes === "string" ? d.observacoes : "";
+                  if (!reagTrilha.test(obsDepois)) return false;
+                  // trilha nova (não existia antes)
+                  const linhasNovas = obsDepois.split("\n").filter((l) => reagTrilha.test(l) && !obsAntes.includes(l));
+                  if (linhasNovas.length === 0) return false;
+                  return true;
+                });
+                for (const dest of destinoCandidatos) {
+                  const a = (dest.dados_antes ?? {}) as Record<string, unknown>;
+                  const d = (dest.dados_depois ?? {}) as Record<string, unknown>;
+                  const antesLivreDest = isSlot(a.paciente_nome);
+                  const depoisLivreDest = isSlot(d.paciente_nome);
+                  const pacienteMudouDest = JSON.stringify(a.paciente_nome) !== JSON.stringify(d.paciente_nome);
+                  const medicoId = typeof d.medico_id === "string" ? d.medico_id : (typeof a.medico_id === "string" ? a.medico_id : "");
+                  const medicoNome = medicoNomePorId.get(medicoId) ?? "—";
+                  let fichaOrigem: string | null = null;
+                  // Caso clássico: par gêmeo "liberou horário" na origem.
+                  if (pacienteMudouDest && antesLivreDest && !depoisLivreDest) {
+                    const destTs = new Date(dest.created_at).getTime();
+                    const par = auditRows.find((x) => {
+                      if (x.id === dest.id) return false;
+                      if (x.table_name !== "agendamentos" || x.action !== "UPDATE") return false;
+                      if (x.user_email !== dest.user_email) return false;
+                      if (Math.abs(new Date(x.created_at).getTime() - destTs) > 5000) return false;
+                      const xa = (x.dados_antes ?? {}) as Record<string, unknown>;
+                      const xd = (x.dados_depois ?? {}) as Record<string, unknown>;
+                      // origem: paciente vira DISPONÍVEL, e o paciente que saiu bate com o que entrou no destino
+                      if (isSlot(xa.paciente_nome) || !isSlot(xd.paciente_nome)) return false;
+                      return String(xa.paciente_nome ?? "") === String(d.paciente_nome ?? "");
+                    });
+                    if (par) {
+                      suprimirRowIds.add(par.id);
+                      const pa = (par.dados_antes ?? {}) as Record<string, unknown>;
+                      fichaOrigem = pa.ficha_numero != null ? String(pa.ficha_numero) : null;
+                    }
+                  }
+                  enrichReag.set(dest.id, {
+                    fichaOrigem,
+                    fichaDestino: d.ficha_numero != null ? String(d.ficha_numero) : null,
+                    novoInicio: d.inicio,
+                    oldInicio: a.inicio,
+                    medicoNome,
+                  });
+                }
+                const renderReagBody = (info: { fichaOrigem: string | null; fichaDestino: string | null; novoInicio: unknown; medicoNome: string; oldInicio: unknown }) => (
+                  <div className="space-y-0.5">
+                    <div>
+                      Reagendou{info.fichaDestino ? <> para ficha <b>#{info.fichaDestino}</b></> : null} · <b>{fmtDateTime(info.novoInicio)}</b>
+                    </div>
+                    <div>Profissional: <b>{info.medicoNome}</b></div>
+                    {(info.fichaOrigem || info.oldInicio) ? (
+                      <div className="text-muted-foreground">
+                        vindo de {info.fichaOrigem ? <>ficha <b>#{info.fichaOrigem}</b> · </> : null}<b>{fmtDateTime(info.oldInicio)}</b>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+
                 for (const r of auditRows) {
+                  if (suprimirRowIds.has(r.id)) continue;
                   const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
                   const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
                   const isLanc = r.table_name === "fin_lancamentos";
@@ -6091,6 +6165,19 @@ function AgendaPage() {
                   const pacienteMudou = set.has("paciente_nome");
                   const antesLivre = isSlot(antes.paciente_nome);
                   const depoisLivre = isSlot(depois.paciente_nome);
+
+                  // Reagendamento (destino) — detectado pela trilha em observacoes.
+                  const reagInfo = enrichReag.get(r.id);
+                  if (reagInfo) {
+                    items.push({
+                      id: r.id,
+                      when: r.created_at,
+                      quem,
+                      kind: "reagendou",
+                      body: renderReagBody(reagInfo),
+                    });
+                    continue;
+                  }
 
                   // Agendou paciente (slot → alocado)
                   if (pacienteMudou && antesLivre && !depoisLivre) {
