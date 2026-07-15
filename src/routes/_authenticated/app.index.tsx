@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Users, HeartPulse, CheckCircle2 } from "lucide-react";
+import { HeartPulse, CheckCircle2, Users } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card } from "@/components/ui/card";
