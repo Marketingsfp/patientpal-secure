@@ -259,7 +259,11 @@ function Page() {
             </TableRow></TableHeader>
             <TableBody>{items.map((n) => (
               <TableRow key={n.id}>
-                <TableCell className="text-sm">{new Date(n.data_emissao).toLocaleDateString("pt-BR")}</TableCell>
+                <TableCell className="text-sm">{
+                  /^\d{4}-\d{2}-\d{2}$/.test(n.data_emissao)
+                    ? new Date(`${n.data_emissao}T12:00:00`).toLocaleDateString("pt-BR")
+                    : new Date(n.data_emissao).toLocaleDateString("pt-BR")
+                }</TableCell>
                 <TableCell className="text-sm">{n.numero ?? "—"} {n.serie && `/ ${n.serie}`}</TableCell>
                 <TableCell className="text-sm">{n.paciente_id ? pacMap.get(n.paciente_id) ?? "—" : "—"}</TableCell>
                 <TableCell><Badge variant={n.status === "emitida" ? "default" : "secondary"}>{n.status}</Badge></TableCell>
