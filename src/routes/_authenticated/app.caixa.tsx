@@ -1755,7 +1755,7 @@ function Page() {
     const cats = new Map<string, Cat>();
     let totPag = 0, totReceb = 0;
     for (const m of movs) {
-      if (m.tipo === "abertura" || m.tipo === "fechamento") continue;
+      if (m.tipo === "abertura" || m.tipo === "fechamento" || m.tipo === "reabertura") continue;
       const key = TIPO_LABEL[m.tipo];
       const cat = cats.get(key) ?? { label: key, pagamento: 0, recebimento: 0 };
       const v = Number(m.valor || 0);
@@ -1771,7 +1771,7 @@ function Page() {
     type Forma = { label: string; pagamento: number; recebimento: number };
     const formas = new Map<string, Forma>();
     for (const m of movs) {
-      if (m.tipo === "abertura" || m.tipo === "fechamento") continue;
+      if (m.tipo === "abertura" || m.tipo === "fechamento" || m.tipo === "reabertura") continue;
       const bucket = normalizarForma(m.forma_pagamento) || "—";
       const label = bucket.toUpperCase();
       const f = formas.get(label) ?? { label, pagamento: 0, recebimento: 0 };
@@ -1785,7 +1785,12 @@ function Page() {
       accF += f.recebimento - f.pagamento;
       return '<tr><td>' + esc(f.label) + '</td><td style="text-align:right;">' + fmt(f.pagamento) + '</td><td style="text-align:right;">' + fmt(f.recebimento) + '</td><td style="text-align:right;">' + fmt(accF) + '</td></tr>';
     }).join("");
-    const qtd = movs.filter((m) => m.tipo !== "abertura" && m.tipo !== "fechamento").length;
+    const qtd = movs.filter((m) => m.tipo !== "abertura" && m.tipo !== "fechamento" && m.tipo !== "reabertura").length;
+    const reaberturas = movs.filter((m) => m.tipo === "reabertura");
+    const linhasReabertura = reaberturas.length === 0 ? "" :
+      '<div style="margin-top:10px;font-size:11px;color:#7c3aed;"><strong>Reaberturas de fechamento:</strong><ul style="margin:4px 0 0 16px;padding:0;">' +
+      reaberturas.map((m) => '<li>' + esc(new Date(m.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })) + ' — ' + esc(m.descricao || "sem detalhes") + '</li>').join("") +
+      '</ul></div>';
     const emissao = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
     const style = 'body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;} h1{font-size:16px;margin:0 0 6px;text-align:center;letter-spacing:.5px;} .meta{font-size:11px;color:#475569;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;} table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;} th,td{padding:5px 6px;border-bottom:1px solid #cbd5e1;} thead th{border-bottom:2px solid #0f172a;text-align:left;} thead th.n{text-align:right;} tfoot td{border-top:2px solid #0f172a;font-weight:700;} .right{text-align:right;}';
     const empty = '<tr><td colspan="4" style="text-align:center;color:#64748b;">Sem movimentos</td></tr>';
