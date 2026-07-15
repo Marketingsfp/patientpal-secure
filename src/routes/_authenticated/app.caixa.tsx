@@ -1187,8 +1187,19 @@ function Page() {
       boleto: 0, transferencia: 0, convenio: 0, outros: 0,
     };
     movsDoDiaFechamento.forEach((m) => {
-      if (m.tipo !== "recebimento" && m.tipo !== "suprimento" && m.tipo !== "estorno") return;
-      const sinal = m.tipo === "estorno" ? -1 : 1;
+      // "Esperado por forma" deve refletir o SALDO LÍQUIDO por forma no dia,
+      // batendo com o saldo do caixa (entradas − saídas). Por isso incluímos
+      // também sangria e despesa com sinal negativo. Abertura/fechamento não
+      // entram (abertura é saldo inicial, fechamento é registro contábil).
+      if (
+        m.tipo !== "recebimento" &&
+        m.tipo !== "suprimento" &&
+        m.tipo !== "estorno" &&
+        m.tipo !== "sangria" &&
+        m.tipo !== "despesa"
+      ) return;
+      const sinal =
+        m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
       const v = Number(m.valor || 0) * sinal;
       const bucket = normalizarForma(m.forma_pagamento);
       if (bucket === "misto") {
@@ -1329,8 +1340,17 @@ function Page() {
     };
     todosMovs.forEach((m) => {
       if (m.sessao_id !== sid) return;
-      if (m.tipo !== "recebimento" && m.tipo !== "suprimento" && m.tipo !== "estorno") return;
-      const sinal = m.tipo === "estorno" ? -1 : 1;
+      // Saldo líquido por forma na sessão (usado nos modais de fechamento):
+      // entradas − saídas por forma, para bater com o saldo do caixa.
+      if (
+        m.tipo !== "recebimento" &&
+        m.tipo !== "suprimento" &&
+        m.tipo !== "estorno" &&
+        m.tipo !== "sangria" &&
+        m.tipo !== "despesa"
+      ) return;
+      const sinal =
+        m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
       const v = Number(m.valor || 0) * sinal;
       const bucket = normalizarForma(m.forma_pagamento);
       if (bucket === "misto") {
