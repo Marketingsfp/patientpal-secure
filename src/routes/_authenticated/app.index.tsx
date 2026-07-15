@@ -28,13 +28,6 @@ const CARDS: CardDef[] = [
     icon: HeartPulse,
     accent: "var(--primary)",
   },
-  {
-    id: "gestao-pessoas",
-    title: "Gestão de Pessoas",
-    desc: "Ponto, férias, holerites, treinamentos e cursos.",
-    icon: Users,
-    accent: "var(--primary)",
-  },
 ];
 
 function corDaClinica(nome?: string): string {
