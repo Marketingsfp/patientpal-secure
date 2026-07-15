@@ -141,20 +141,6 @@ export function TotemPage() {
     await ensureFaceModels();
     setScanMsg("Detectando rosto…");
 
-    // Carrega biometrias ativas da clínica
-    const { data: bios } = await supabase
-      .from("paciente_biometria")
-      .select("paciente_id, descriptor, pacientes!inner(nome)")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .is("revogado_em", null);
-
-    const ativas: { paciente_id: string; nome: string; descriptor: number[] }[] =
-      (bios ?? []).map((b: any) => ({
-        paciente_id: b.paciente_id,
-        nome: b.pacientes?.nome ?? "",
-        descriptor: Array.isArray(b.descriptor) ? b.descriptor : [],
-      })).filter((b) => b.descriptor.length === 128);
-
     // Tenta detectar até 10 vezes (~5s)
     let descritor: Float32Array | null = null;
     for (let i = 0; i < 10; i++) {
@@ -172,17 +158,18 @@ export function TotemPage() {
       return;
     }
 
-    // Procura match
-    let melhor: { paciente_id: string; nome: string; dist: number } | null = null;
-    for (const bio of ativas) {
-      const d = euclidean(descritor, bio.descriptor);
-      if (!melhor || d < melhor.dist) melhor = { paciente_id: bio.paciente_id, nome: bio.nome, dist: d };
-    }
-
-    if (melhor && melhor.dist <= FACE_MATCH_THRESHOLD) {
-      setScanMsg(`Olá, ${melhor.nome}!`);
-      await emitir(tipo, melhor.paciente_id, true);
-      setTicket((prev) => prev ? { ...prev, nome: melhor!.nome } : prev);
+    // Busca match no servidor (não expõe descritores dos outros pacientes).
+    const descriptorArr = Array.from(descritor);
+    const { data: matchData } = await supabase.rpc("totem_match_biometria", {
+      _clinica_id: clinicaAtual.clinica_id,
+      _descriptor: descriptorArr,
+      _threshold: FACE_MATCH_THRESHOLD,
+    });
+    const match = Array.isArray(matchData) ? matchData[0] : matchData;
+    if (match?.paciente_id) {
+      setScanMsg(`Olá, ${match.nome}!`);
+      await emitir(tipo, match.paciente_id, true);
+      setTicket((prev) => prev ? { ...prev, nome: match.nome } : prev);
       return;
     }
 
@@ -191,7 +178,7 @@ export function TotemPage() {
     setManual({ nome: "", cpf: "", telefone: "" });
     setStep("manual");
     // Guarda descritor temporariamente
-    (window as any).__totem_descriptor = Array.from(descritor);
+    (window as any).__totem_descriptor = descriptorArr;
   }
 
   async function concluirManual(e: React.FormEvent) {
@@ -204,51 +191,23 @@ export function TotemPage() {
     }
     setBusy(true);
 
-    let pacienteId: string | undefined;
-    // Tenta achar por CPF
-    if (manual.cpf.trim().length >= 11) {
-      const { data: existente } = await supabase
-        .from("pacientes")
-        .select("id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("cpf", manual.cpf.trim())
-        .maybeSingle();
-      pacienteId = existente?.id;
-    }
-
-    if (!pacienteId) {
-      const { data: novo, error } = await supabase
-        .from("pacientes")
-        .insert({
-          clinica_id: clinicaAtual.clinica_id,
-          nome,
-          cpf: manual.cpf.trim() || null,
-          telefone: manual.telefone.trim() || null,
-          consentimento_lgpd_em: new Date().toISOString(),
-        })
-        .select("id")
-        .single();
-      if (error || !novo) {
-        setBusy(false);
-        mostrarErro(error);
-        return;
-      }
-      pacienteId = novo.id;
-    }
-
-    // Salva biometria se houver descritor
     const desc = (window as any).__totem_descriptor as number[] | undefined;
-    if (desc && pacienteId) {
-      await supabase.from("paciente_biometria").insert({
-        clinica_id: clinicaAtual.clinica_id,
-        paciente_id: pacienteId,
-        descriptor: desc,
-      });
-      delete (window as any).__totem_descriptor;
+    const { data: pacienteId, error } = await supabase.rpc("totem_upsert_paciente", {
+      _clinica_id: clinicaAtual.clinica_id,
+      _nome: nome,
+      _cpf: manual.cpf.trim() || null,
+      _telefone: manual.telefone.trim() || null,
+      _descriptor: desc ?? null,
+    });
+    if (error || !pacienteId) {
+      setBusy(false);
+      mostrarErro(error);
+      return;
     }
+    if (desc) delete (window as any).__totem_descriptor;
 
     setBusy(false);
-    await emitir(tipo, pacienteId, !!desc);
+    await emitir(tipo, pacienteId as string, !!desc);
   }
 
   if (loading) {
