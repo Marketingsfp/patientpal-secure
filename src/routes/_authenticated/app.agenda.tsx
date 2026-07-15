@@ -143,6 +143,7 @@ type MedicoProcedimentoRef = {
   especialidade_id?: string | null;
   created_at?: string | null;
 };
+type LoadAgendaOptions = { background?: boolean };
 
 const STATUS_LABEL: Record<Status, string> = {
   agendado: "Agendado",
@@ -905,6 +906,10 @@ function AgendaPage() {
   // Sequencial das cargas — descarta respostas de load() antigas que
   // chegariam fora de ordem e piscariam/reordenariam a lista.
   const loadSeqRef = useRef(0);
+  // Refs usados pelo refresh automático para não depender de uma versão antiga
+  // da função load() presa no efeito do realtime.
+  const latestAgendaLoadRef = useRef<((options?: LoadAgendaOptions) => Promise<void>) | null>(null);
+  const itemsRef = useRef<Agendamento[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Agendamento | null>(null);
   const [form, setForm] = useState(EMPTY);
@@ -1580,13 +1585,18 @@ function AgendaPage() {
     toast.success("Paciente cadastrado");
   };
 
-  const load = async () => {
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  const load = async (options: LoadAgendaOptions = {}) => {
     if (!clinicaAtual) return;
+    const background = options.background === true;
     // Marca esta chamada como a mais recente. Respostas de cargas
     // anteriores serão descartadas antes de pintar (evita corridas do
     // realtime + filtros que faziam agendamentos "sumirem" ou reordenarem).
     const seq = ++loadSeqRef.current;
-    setLoading(true);
+    if (!background || itemsRef.current.length === 0) setLoading(true);
     let q = supabase
       .from("agendamentos")
       .select(
@@ -1631,6 +1641,7 @@ function AgendaPage() {
         if (seq !== loadSeqRef.current) return;
         setLoading(false);
         setItems([]);
+        itemsRef.current = [];
         setPage(1);
         return;
       }
@@ -1692,10 +1703,18 @@ function AgendaPage() {
       medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
       orcamento_numero: a.orcamento_numero ?? a.orcamento?.numero ?? null,
     }));
-    setItems(mapped as Agendamento[]);
-    setPage(1);
-    setSelecionados(new Set());
-    const agendaRows = (mapped ?? []) as unknown as Array<Agendamento & { fluxo_etapa?: string | null }>;
+    const mappedItems = mapped as Agendamento[];
+    setItems(mappedItems);
+    itemsRef.current = mappedItems;
+    if (background) {
+      setPage((prev) => Math.min(prev, Math.max(1, Math.ceil(mappedItems.length / PAGE_SIZE))));
+      const validIds = new Set(mappedItems.map((a) => a.id));
+      setSelecionados((prev) => new Set(Array.from(prev).filter((id) => validIds.has(id))));
+    } else {
+      setPage(1);
+      setSelecionados(new Set());
+    }
+    const agendaRows = (mappedItems ?? []) as unknown as Array<Agendamento & { fluxo_etapa?: string | null }>;
     setEtapaMap(new Map(agendaRows.map((r) => [r.id, r.fluxo_etapa ?? "aguardando_recepcao"] as [string, string])));
     // Busca dados auxiliares dos pacientes em paralelo para não atrasar a agenda.
     const pacIds = Array.from(
@@ -1823,6 +1842,10 @@ function AgendaPage() {
       setNfseMap(new Map());
     }
   };
+
+  useEffect(() => {
+    latestAgendaLoadRef.current = load;
+  });
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
@@ -2120,7 +2143,7 @@ function AgendaPage() {
   }, [clinicaAtual?.clinica_id]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData, filtroStatus, filtroMedico, filtroCliente]);
 
   // Realtime: recarrega quando agendamentos mudam (outro recepcionista,
@@ -2131,7 +2154,7 @@ function AgendaPage() {
     const schedule = () => {
       if (t) clearTimeout(t);
       t = setTimeout(() => {
-        void load();
+        void latestAgendaLoadRef.current?.({ background: true });
       }, 800);
     };
     const ch = supabase
@@ -6707,7 +6730,7 @@ function AgendaPage() {
 
           {/* Ações rápidas */}
           <div className="space-y-0 flex items-end gap-1">
-            <Button size="sm" onClick={load} className="h-8 text-xs flex-1 bg-primary hover:bg-primary/90">
+            <Button size="sm" onClick={() => void load()} className="h-8 text-xs flex-1 bg-primary hover:bg-primary/90">
               <Search className="h-3 w-3 mr-1" /> Exibir
             </Button>
             <Button variant="outline" size="sm" onClick={limparFiltros} className="h-8 text-xs">
