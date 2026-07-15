@@ -18,9 +18,11 @@ import { Loader2 } from "lucide-react";
  */
 export function PublicClinicaProvider({
   clinicaId,
+  token,
   children,
 }: {
-  clinicaId: string;
+  clinicaId?: string;
+  token?: string;
   children: ReactNode;
 }) {
   const [membership, setMembership] = useState<ClinicaMembership | null>(null);
@@ -32,27 +34,47 @@ export function PublicClinicaProvider({
     setLoading(true);
     setErro(null);
     (async () => {
-      const { data, error } = await supabase
-        .from("clinicas")
-        .select("id, nome, cidade, estado, branding, base_importada")
-        .eq("id", clinicaId)
-        .maybeSingle();
+      type ClinicaRow = {
+        id: string;
+        nome: string;
+        cidade: string | null;
+        estado: string | null;
+        branding: unknown;
+        base_importada: boolean | null;
+      };
+      let data: ClinicaRow | null = null;
+      let error: unknown = null;
+      if (token) {
+        const res = await supabase.rpc("resolver_clinica_por_token", { _token: token });
+        const arr = (res.data ?? []) as ClinicaRow[];
+        data = arr[0] ?? null;
+        error = res.error;
+      } else if (clinicaId) {
+        const res = await supabase
+          .from("clinicas")
+          .select("id, nome, cidade, estado, branding, base_importada")
+          .eq("id", clinicaId)
+          .maybeSingle();
+        data = (res.data as ClinicaRow | null) ?? null;
+        error = res.error;
+      }
       if (cancelado) return;
-      if (error || !data) {
+      const row = data;
+      if (error || !row) {
         setErro("Clínica não encontrada ou sem acesso público.");
         setMembership(null);
       } else {
         setMembership({
-          id: `public-${data.id}`,
-          clinica_id: data.id,
+          id: `public-${row.id}`,
+          clinica_id: row.id,
           role: "public",
           clinica: {
-            id: data.id,
-            nome: data.nome,
-            cidade: data.cidade,
-            estado: data.estado,
-            branding: (data.branding ?? null) as ClinicaBranding | null,
-            base_importada: data.base_importada,
+            id: row.id,
+            nome: row.nome,
+            cidade: row.cidade,
+            estado: row.estado,
+            branding: (row.branding ?? null) as ClinicaBranding | null,
+            base_importada: row.base_importada,
           },
         });
       }
@@ -61,7 +83,7 @@ export function PublicClinicaProvider({
     return () => {
       cancelado = true;
     };
-  }, [clinicaId]);
+  }, [clinicaId, token]);
 
   if (erro) {
     return (
@@ -69,7 +91,7 @@ export function PublicClinicaProvider({
         <div className="text-center space-y-2 max-w-md">
           <h1 className="text-2xl font-semibold">Clínica não encontrada</h1>
           <p className="text-muted-foreground">{erro}</p>
-          <p className="text-xs text-muted-foreground">ID informado: {clinicaId}</p>
+          <p className="text-xs text-muted-foreground">Referência: {token ?? clinicaId}</p>
         </div>
       </div>
     );

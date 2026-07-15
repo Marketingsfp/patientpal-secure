@@ -2377,6 +2377,7 @@ export type Database = {
           paytime_recipient_id: string | null
           raio_metros: number
           telefone: string | null
+          token_publico: string | null
           updated_at: string
         }
         Insert: {
@@ -2398,6 +2399,7 @@ export type Database = {
           paytime_recipient_id?: string | null
           raio_metros?: number
           telefone?: string | null
+          token_publico?: string | null
           updated_at?: string
         }
         Update: {
@@ -2419,6 +2421,7 @@ export type Database = {
           paytime_recipient_id?: string | null
           raio_metros?: number
           telefone?: string | null
+          token_publico?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -8585,6 +8588,17 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      resolver_clinica_por_token: {
+        Args: { _token: string }
+        Returns: {
+          base_importada: boolean
+          branding: Json
+          cidade: string
+          estado: string
+          id: string
+          nome: string
+        }[]
       }
       salvar_agendamento_e_vincular_orcamento: {
         Args: {
