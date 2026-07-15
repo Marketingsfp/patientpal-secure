@@ -1,47 +1,48 @@
-## Problemas
+## Problema
 
-Duas coisas quebradas ao criar/pagar mais de um atendimento juntos (multi-exame de imagem — ex.: CAPSULOTOMIA + CERATOMETRIA no mesmo horário):
+No modal **Fechar caixa**, a soma do "Total conferido esperado" por forma de pagamento **não bate com o Saldo atual** do dia. No caso da Mayra: Saldo R$ 245,00 vs Total esperado R$ 335,00 (diferença = R$ 90 de sangria em dinheiro).
 
-**1) Numeração da ficha** (Foto 2)
-Quando você agenda 2 exames de imagem no mesmo horário, o sistema salva a "linha original" (o slot que já existia com número da agenda, ex.: 020) como principal e cria uma linha nova (irmã) para o segundo exame — **sem `agenda_id`**. O cálculo da ficha usa a agenda como parte da chave, então a irmã cai num bucket separado (`__sem_agenda__`) e começa em 001. Resultado: uma linha com ficha 020, outra com ficha 001.
+**Causa:** o cálculo `porFormaDoDiaFechamento` (arquivo `src/routes/_authenticated/app.caixa.tsx`, linhas ~1184–1209) considera apenas `recebimento`, `suprimento` e `estorno`. **Sangrias e despesas não são descontadas** da forma correspondente (normalmente Dinheiro). Já o Saldo atual desconta tudo, então os dois valores divergem.
 
-**2) Nome do paciente na 2ª linha do Movimento de Caixa** (Foto 1)
-Ao gerar a cobrança agrupada logo depois de criar um multi-exame, o fluxo passa por `formaPagCtx` sem popular os estados `pagamentoPacienteNome`, `pagamentoRotulos` e `pagamentoPesos`. Aí, na hora de gravar o rateio (`onSavedWithData` → RPC `finalizar_pagamento_agrupado`), a descrição de cada `caixa_movimentos` fica com o nome do paciente **vazio**: literalmente `" — CONSULTA (1/2 do grupo)"` e `" — CONSULTA (2/2 do grupo)"`. Confirmei no banco. A 1ª linha ainda "aparece com nome" na coluna Paciente porque o enriquecimento acha o paciente via `agendamento_id`; a 2ª tem o mesmo dado disponível, então na verdade o problema real é **a descrição sem nome** — corrigir isso conserta as duas linhas de uma vez (e também os relatórios/comprovantes que usam `descricao`).
+## O que muda
 
-## Correções (mínimas e focadas)
+Ajustar o cálculo do "Esperado por forma" no fechamento para também **subtrair** os movimentos de saída (`sangria` e `despesa`) da forma de pagamento correspondente. Assim:
 
-### 1. Irmãs herdam o `agenda_id` do principal — nova migration
-Nova migration ajustando `salvar_agendamento_multi_imagem` para, ao inserir cada linha-irmã, gravar `agenda_id` = `agenda_id` da linha principal (lida logo após o UPDATE/INSERT do principal). Nada mais muda na RPC.
+```text
+Esperado(forma) = recebimentos(forma)
+                + suprimentos(forma)
+                − estornos(forma)
+                − sangrias(forma)
+                − despesas(forma)
+```
 
-Backfill único no mesmo arquivo: nas linhas irmãs existentes (`atendimento_grupo_id IS NOT NULL AND agenda_id IS NULL`), copiar o `agenda_id` do irmão do mesmo grupo que tenha valor — evita que fichas antigas continuem intercaladas 001/020.
+E a soma de todas as formas passa a bater com o Saldo do dia (Entradas − Saídas), independente do valor de abertura (que continua fora do "por forma", como saldo inicial).
 
-Efeito: todas as linhas do multi-exame passam a compartilhar a mesma agenda → numeração de ficha volta a ser sequencial dentro da agenda daquele médico.
+## Arquivos alterados
 
-### 2. Descrição da cobrança agrupada sempre com o nome do paciente
-Ajuste pontual em `src/routes/_authenticated/app.agenda.tsx`, dentro de `onSavedWithData` (a partir da linha ~5317, onde monta `itensRateio`):
+- `src/routes/_authenticated/app.caixa.tsx` — função `porFormaDoDiaFechamento` (fechamento do próprio caixa) e o cálculo equivalente dentro do modal **Fechar caixa de outro operador** (linhas ~2461, usa `entradasPorFormaSessao`) para aplicar a mesma regra.
+- Se necessário, ajustar também `entradasPorFormaSessao` para incluir saídas quando usada no contexto de fechamento (avaliar se ela é usada em outro lugar apenas como "entradas brutas" — se for, criar uma variante `saldoPorFormaSessao`).
 
-- Antes de usar `pagamentoPacienteNome`, calcular um fallback:
-  `const pacNome = pagamentoPacienteNome || items.find(x => x.id === agId)?.paciente_nome || "";`
-- Antes de usar `pagamentoRotulos[id] ?? "CONSULTA"`, calcular um fallback por id:
-  `const rot = (id) => pagamentoRotulos[id] || items.find(x => x.id === id)?.procedimento || rotuloFallbackProc(items.find(x => x.id === id)?.medico_id) || "CONSULTA";`
-- Usar `pacNome` e `rot(id)` na montagem das duas descrições (principal `1/N` e extras `i/N`).
+## Regras de sinal
 
-Isso não muda regra de negócio, forma de pagamento, valores, rateio, RLS ou impressão — só garante que a descrição gravada em `fin_lancamentos.descricao` e `caixa_movimentos.descricao` tenha sempre `PACIENTE — PROCEDIMENTO (i/N do grupo)`, independentemente de qual fluxo abriu a cobrança (multi-exame criado agora, seleção múltipla, cobrança de linha única, etc.).
-
-Efeito no Movimento de Caixa: as duas linhas passam a mostrar o nome do paciente (coluna Paciente pelo enriquecimento e coluna Descrição pelo próprio texto salvo).
+- `recebimento`, `suprimento` → soma na forma correspondente.
+- `estorno`, `sangria`, `despesa` → subtrai da forma correspondente.
+- `abertura`, `fechamento` → ignorados (não têm forma de pagamento operacional).
+- Forma "misto": aplicar o mesmo tratamento por parcela, respeitando o sinal do tipo.
 
 ## Fora do escopo
-- Não vou renumerar fichas antigas nem tocar em `ficha_numero` de nenhuma linha existente — a numeração é calculada em runtime pela agenda.
-- Não vou mexer em `finalizar_pagamento_agrupado` (só na descrição que o front envia).
-- Não vou tocar em enfermagem/triagem/pagamento/estorno/repasse.
+
+- Não altero regras de negócio de sangria/suprimento/estorno em si.
+- Não altero o cálculo do Saldo atual (já está correto).
+- Não altero UI do modal além do valor exibido em "Esperado" (que passa a refletir o líquido real).
 
 ## Validação
-1. Criar um multi-exame para um paciente (2 procedimentos no mesmo horário) na agenda do Dr. João Hélio.
-2. Conferir na lista da agenda: as duas linhas mostram fichas sequenciais dentro da agenda (ex.: 020 e 021), sem 001 fora de ordem.
-3. Cobrar as duas juntas (Misto ou qualquer forma).
-4. Abrir Caixa → Movimentos: as duas linhas devem mostrar o nome do paciente tanto na coluna Paciente quanto na coluna Descrição (`QUEDIMA … — CAPSULOTOMIA (1/2 do grupo)` e `QUEDIMA … — CERATOMETRIA (2/2 do grupo)`).
-5. Rodar o mesmo teste com Atendimento Múltiplo (paciente com serviços diferentes) para confirmar que continua funcionando.
+
+1. Reproduzir cenário da Mayra: entradas R$ 405 (Dinheiro 200 + PIX 135 + Débito 90 – ex.), sangria R$ 90 em dinheiro, despesa R$ 10 em Outros.
+2. Antes: Total esperado = 335, Saldo = 245 (diferença 90 — bug).
+3. Depois: Total esperado = 245 (Dinheiro 110, PIX 135, Débito 90, Outros 0 — igual à imagem, mas somando 245 = Saldo).
+4. Conferir também o modal de fechamento de terceiros (gestor) com os mesmos números.
 
 ## Riscos
-- Migration de backfill toca só linhas com `atendimento_grupo_id` e `agenda_id IS NULL` — impacto restrito ao histórico do multi-exame. Reversível manualmente se necessário.
-- Alteração de front é local e presentacional (só monta a string) — sem risco de duplicidade de lançamento nem de cobrança dobrada.
+
+Baixo — mudança limitada a como o "Esperado" é apresentado e conferido. Nada é gravado diferente no banco: `valor_fechamento_calculado` já é o saldo líquido, o ajuste apenas alinha a conferência por forma com esse saldo.
