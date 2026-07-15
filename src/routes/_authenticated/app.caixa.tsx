@@ -2219,7 +2219,6 @@ function Page() {
                           </PopoverContent>
                         </Popover>
                       </div>
-                    )}
                     <div>
                       <Label className="text-xs">Médico</Label>
                       <Select value={meuMedico} onValueChange={setMeuMedico}>
@@ -2368,7 +2367,6 @@ function Page() {
                   </Table>
                 </CardContent>
               </Card>
-                )}
               </TabsContent>
 
               {/* ---------- Histórico ---------- */}
