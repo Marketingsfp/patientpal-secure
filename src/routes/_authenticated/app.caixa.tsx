@@ -146,7 +146,7 @@ function CaixaRouteDispatcher() {
   return <Page />;
 }
 
-type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento";
+type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento" | "estorno";
 interface Sessao {
   id: string; clinica_id: string; user_id: string; user_nome: string | null;
   aberto_em: string; valor_abertura: number;
@@ -180,10 +180,11 @@ const fmtDT = (s: string | null) =>
 const TIPO_LABEL: Record<MovTipo, string> = {
   abertura: "Abertura", sangria: "Sangria", suprimento: "Suprimento",
   recebimento: "Recebimento", despesa: "Despesa", fechamento: "Fechamento",
+  estorno: "Estorno",
 };
 const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
   abertura: 1, suprimento: 1, recebimento: 1,
-  sangria: -1, despesa: -1, fechamento: 0,
+  sangria: -1, despesa: -1, fechamento: 0, estorno: -1,
 };
 const TIPO_CLASS: Record<MovTipo, string> = {
   abertura: "bg-sky-100 text-sky-700 border-sky-300 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800",
@@ -192,6 +193,7 @@ const TIPO_CLASS: Record<MovTipo, string> = {
   sangria: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
   despesa: "bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800",
   fechamento: "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700",
+  estorno: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300 dark:bg-fuchsia-950 dark:text-fuchsia-300 dark:border-fuchsia-800",
 };
 
 const SESSAO_FIELDS = "id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, valor_fechamento_informado, valor_fechamento_calculado, diferenca, status, observacoes";
@@ -227,7 +229,7 @@ function pacienteFromDescricao(desc: string | null): string | null {
   const mens = desc.match(/CONTRATO\s+#\S+\s+-\s+(.+?)\s*$/i);
   if (mens) return mens[1].trim() || null;
   // Descarta descrições sem paciente (sangria/suprimento/fechamento/etc.)
-  if (/^\s*(abertura|fechamento|sangria|suprimento)\b/i.test(desc)) return null;
+  if (/^\s*(abertura|fechamento|sangria|suprimento|estorno)\b/i.test(desc)) return null;
   if (/^\s*\[caixa\]/i.test(desc)) return null;
   const clean = desc.replace(/^Recebimento\s+—\s+/i, "");
   // Nome vem antes do PRIMEIRO separador " — " ou " · "
@@ -1023,6 +1025,7 @@ function Page() {
       // (dados antigos) o saldo já fica correto.
       if (m.lancamento_id && lancsCancelados.has(m.lancamento_id)) {
         if (m.tipo === "recebimento") return acc;
+        if (m.tipo === "estorno") return acc;
         if (
           m.tipo === "sangria" &&
           (m.descricao ?? "").toLowerCase().startsWith("estorno")
@@ -1037,7 +1040,7 @@ function Page() {
   const resumoTipos = useMemo(() => {
     const r: Record<MovTipo, number> = {
       abertura: 0, sangria: 0, suprimento: 0,
-      recebimento: 0, despesa: 0, fechamento: 0,
+      recebimento: 0, despesa: 0, fechamento: 0, estorno: 0,
     };
     minhasMovs.forEach((m) => { r[m.tipo] += Number(m.valor || 0); });
     return r;
@@ -1153,7 +1156,7 @@ function Page() {
         } else {
           r.porForma[bucket] = (r.porForma[bucket] ?? 0) + v;
         }
-      } else if (m.tipo === "sangria" || m.tipo === "despesa") {
+      } else if (m.tipo === "sangria" || m.tipo === "despesa" || m.tipo === "estorno") {
         r.saidas += v;
       }
     }
@@ -3106,7 +3109,10 @@ function Page() {
                   const v = Number(m.valor || 0);
                   if (m.tipo === "recebimento") { tot.recebimento += v; qtdReceb++; }
                   else if (m.tipo === "sangria") tot.sangria += v;
-                  if ((m.descricao ?? "").toLowerCase().includes("estorno")) tot.estorno += v;
+                  else if (m.tipo === "estorno") tot.estorno += v;
+                  if (m.tipo !== "estorno" && (m.descricao ?? "").toLowerCase().includes("estorno")) {
+                    tot.estorno += v;
+                  }
                 });
                 const diff = Number(openDetalhe.diferenca || 0);
                 const media = qtdReceb > 0 ? tot.recebimento / qtdReceb : 0;
@@ -3233,7 +3239,7 @@ function Page() {
                   {minhasMovs
                     .filter((m) => {
                       if (caixaDrill === "entradas") return m.tipo === "suprimento" || m.tipo === "recebimento";
-                      if (caixaDrill === "saidas") return m.tipo === "sangria" || m.tipo === "despesa";
+                      if (caixaDrill === "saidas") return m.tipo === "sangria" || m.tipo === "despesa" || m.tipo === "estorno";
                       return true;
                     })
                     .map((m) => (
