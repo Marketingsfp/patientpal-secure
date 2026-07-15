@@ -1506,6 +1506,7 @@ function AgendaPage() {
         .limit(200);
       const ids = (pacsCpf ?? []).map((p: { id: string }) => p.id);
       if (ids.length === 0) {
+        if (seq !== loadSeqRef.current) return;
         setLoading(false);
         setItems([]);
         setPage(1);
@@ -1543,6 +1544,9 @@ function AgendaPage() {
       q = q.range(0, 9999);
     }
     const { data, error } = await q;
+    // Descarta se uma carga mais nova já começou — evita que uma resposta
+    // antiga "vença" a mais recente e some com os agendamentos.
+    if (seq !== loadSeqRef.current) return;
     setLoading(false);
     if (error) {
       mostrarErro(error);
