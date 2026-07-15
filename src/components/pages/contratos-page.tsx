@@ -1230,6 +1230,25 @@ function NovoContratoForm({
                       </Button>
                     </div>
                   ) : null}
+                  <div className="flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2">
+                    <input
+                      id="tit-apenas-fin-novo"
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={titularApenasFinanceiro}
+                      onChange={(e) => setTitularApenasFinanceiro(e.target.checked)}
+                    />
+                    <label htmlFor="tit-apenas-fin-novo" className="text-sm cursor-pointer">
+                      <span className="font-medium">Apenas titular financeiro</span>
+                      <span className="text-muted-foreground"> — paga o plano, mas não usufrui dos benefícios.</span>
+                      <span
+                        className="ml-1 inline-flex items-center text-muted-foreground"
+                        title="Marque quando o titular apenas paga o contrato e não usufrui dos benefícios. Ele NÃO conta na quantidade de vidas do plano e aparecerá na carteirinha com o selo 'Titular financeiro — Não utiliza os benefícios'."
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </span>
+                    </label>
+                  </div>
                 </div>
               ) : (
                 <PatientSearchInput
