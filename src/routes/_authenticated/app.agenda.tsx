@@ -3,7 +3,6 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { EncerrarExpedienteButton } from "@/components/medicos/EncerrarExpedienteButton";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
@@ -143,7 +142,6 @@ type MedicoProcedimentoRef = {
   especialidade_id?: string | null;
   created_at?: string | null;
 };
-type LoadAgendaOptions = { background?: boolean };
 
 const STATUS_LABEL: Record<Status, string> = {
   agendado: "Agendado",
@@ -903,13 +901,6 @@ function AgendaPage() {
   const [medicoEspec, setMedicoEspec] = useState<Map<string, Set<string>>>(new Map());
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [loading, setLoading] = useState(false);
-  // Sequencial das cargas — descarta respostas de load() antigas que
-  // chegariam fora de ordem e piscariam/reordenariam a lista.
-  const loadSeqRef = useRef(0);
-  // Refs usados pelo refresh automático para não depender de uma versão antiga
-  // da função load() presa no efeito do realtime.
-  const latestAgendaLoadRef = useRef<((options?: LoadAgendaOptions) => Promise<void>) | null>(null);
-  const itemsRef = useRef<Agendamento[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Agendamento | null>(null);
   const [form, setForm] = useState(EMPTY);
@@ -1285,15 +1276,6 @@ function AgendaPage() {
   const [nomePorUidExtra, setNomePorUidExtra] = useState<Map<string, string>>(new Map());
   const [notaTexto, setNotaTexto] = useState("");
   const [savingNota, setSavingNota] = useState(false);
-  // Enriquecimento de reagendamento por linha do audit_log.
-  // Chave: id da linha de audit_log; valor: dados da ficha gêmea (contraparte).
-  type ReagInfo = {
-    direcao: "veio_de" | "foi_para";
-    fichaNumero: number | null;
-    inicio: string | null;
-    medicoNome: string | null;
-  };
-  const [reagEnrich, setReagEnrich] = useState<Map<string, ReagInfo>>(new Map());
 
   // Visão "Por médico — vários dias" (estilo planilha)
   const [viewMode, setViewMode] = useState<"dia" | "medico">("dia");
@@ -1359,119 +1341,6 @@ function AgendaPage() {
     );
     setAuditLoading(false);
     setAuditRows(todos);
-    setReagEnrich(new Map());
-    // Detectar reagendamentos: para cada UPDATE em agendamentos onde o
-    // paciente entrou/saiu do slot, procurar a linha "gêmea" na mesma
-    // janela de tempo (±5s) — a RPC de reagendar altera as duas fichas na
-    // mesma transação. Isso nos permite mostrar ficha/horário/profissional
-    // da contraparte no histórico.
-    void (async () => {
-      const agRows = (agAudit as unknown as AuditRow[]) ?? [];
-      type Cand = {
-        row: AuditRow;
-        pacienteNome: string;
-        direcao: "veio_de" | "foi_para";
-      };
-      const cands: Cand[] = [];
-      for (const r of agRows) {
-        if (r.action !== "UPDATE") continue;
-        const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
-        const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
-        const antesNome = antes.paciente_nome as string | null | undefined;
-        const depoisNome = depois.paciente_nome as string | null | undefined;
-        if (JSON.stringify(antesNome) === JSON.stringify(depoisNome)) continue;
-        const antesLivre = isSlotLivre(antesNome);
-        const depoisLivre = isSlotLivre(depoisNome);
-        if (antesLivre && !depoisLivre && depoisNome) {
-          cands.push({ row: r, pacienteNome: depoisNome, direcao: "veio_de" });
-        } else if (!antesLivre && depoisLivre && antesNome) {
-          cands.push({ row: r, pacienteNome: antesNome, direcao: "foi_para" });
-        }
-      }
-      if (cands.length === 0) return;
-      // Uma janela ampla que cubra todas as candidatas.
-      const times = cands.map((c) => new Date(c.row.created_at).getTime());
-      const minT = Math.min(...times) - 6000;
-      const maxT = Math.max(...times) + 6000;
-      const { data: twinsData } = await supabase
-        .from("audit_log" as never)
-        .select("id, record_id, action, created_at, dados_antes, dados_depois")
-        .eq("table_name", "agendamentos")
-        .neq("record_id", a.id)
-        .gte("created_at", new Date(minT).toISOString())
-        .lte("created_at", new Date(maxT).toISOString())
-        .limit(500);
-      const twins = (twinsData as unknown as Array<{
-        id: string;
-        record_id: string;
-        action: string;
-        created_at: string;
-        dados_antes: Record<string, unknown> | null;
-        dados_depois: Record<string, unknown> | null;
-      }> | null) ?? [];
-      const enrich = new Map<string, ReagInfo>();
-      const gemeoIds = new Set<string>();
-      // (row id, gemeo record_id, direcao)
-      const pending: Array<{ auditId: string; gemeoId: string; direcao: "veio_de" | "foi_para" }> = [];
-      for (const c of cands) {
-        const tC = new Date(c.row.created_at).getTime();
-        let best: (typeof twins)[number] | null = null;
-        let bestDelta = Infinity;
-        for (const t of twins) {
-          if (t.action !== "UPDATE") continue;
-          const ta = (t.dados_antes ?? {}) as Record<string, unknown>;
-          const td = (t.dados_depois ?? {}) as Record<string, unknown>;
-          const antesNome = ta.paciente_nome as string | null | undefined;
-          const depoisNome = td.paciente_nome as string | null | undefined;
-          const antesLivre = isSlotLivre(antesNome);
-          const depoisLivre = isSlotLivre(depoisNome);
-          // Direção oposta com o MESMO paciente.
-          const oposto =
-            c.direcao === "veio_de"
-              ? !antesLivre && depoisLivre && antesNome === c.pacienteNome
-              : antesLivre && !depoisLivre && depoisNome === c.pacienteNome;
-          if (!oposto) continue;
-          const delta = Math.abs(new Date(t.created_at).getTime() - tC);
-          if (delta > 6000) continue;
-          if (delta < bestDelta) {
-            best = t;
-            bestDelta = delta;
-          }
-        }
-        if (best) {
-          gemeoIds.add(best.record_id);
-          pending.push({ auditId: c.row.id, gemeoId: best.record_id, direcao: c.direcao });
-        }
-      }
-      if (pending.length === 0) return;
-      const { data: ags } = await supabase
-        .from("agendamentos")
-        .select("id, ficha_numero, inicio, medico_id")
-        .in("id", Array.from(gemeoIds));
-      const agMap = new Map<string, { ficha_numero: number | null; inicio: string | null; medico_id: string | null }>();
-      ((ags ?? []) as Array<{ id: string; ficha_numero: number | null; inicio: string | null; medico_id: string | null }>).forEach((x) => {
-        agMap.set(x.id, { ficha_numero: x.ficha_numero, inicio: x.inicio, medico_id: x.medico_id });
-      });
-      const medIds = Array.from(new Set(Array.from(agMap.values()).map((v) => v.medico_id).filter(Boolean) as string[]));
-      const medMap = new Map<string, string>();
-      if (medIds.length > 0) {
-        const { data: meds } = await supabase.from("medicos").select("id, nome").in("id", medIds);
-        ((meds ?? []) as Array<{ id: string; nome: string | null }>).forEach((m) => {
-          if (m.nome) medMap.set(m.id, m.nome);
-        });
-      }
-      for (const p of pending) {
-        const g = agMap.get(p.gemeoId);
-        if (!g) continue;
-        enrich.set(p.auditId, {
-          direcao: p.direcao,
-          fichaNumero: g.ficha_numero,
-          inicio: g.inicio,
-          medicoNome: g.medico_id ? medMap.get(g.medico_id) ?? null : null,
-        });
-      }
-      if (enrich.size > 0) setReagEnrich(enrich);
-    })();
     const { data: nts } = await supabase
       .from("agendamento_historico_notas" as never)
       .select("id, user_email, user_nome, texto, created_at")
@@ -1585,28 +1454,16 @@ function AgendaPage() {
     toast.success("Paciente cadastrado");
   };
 
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
-
-  const load = async (options: LoadAgendaOptions = {}) => {
+  const load = async () => {
     if (!clinicaAtual) return;
-    const background = options.background === true;
-    // Marca esta chamada como a mais recente. Respostas de cargas
-    // anteriores serão descartadas antes de pintar (evita corridas do
-    // realtime + filtros que faziam agendamentos "sumirem" ou reordenarem).
-    const seq = ++loadSeqRef.current;
-    if (!background) setLoading(true);
+    setLoading(true);
     let q = supabase
       .from("agendamentos")
       .select(
         "id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never,
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("inicio", { ascending: false })
-      // Desempate estável: sem isso, agendamentos no mesmo horário
-      // trocam de ordem a cada refetch.
-      .order("id", { ascending: true });
+      .order("inicio", { ascending: false });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
     // então não restringe por status no servidor — filtra em memória.
     const statusEspecifico =
@@ -1638,10 +1495,8 @@ function AgendaPage() {
         .limit(200);
       const ids = (pacsCpf ?? []).map((p: { id: string }) => p.id);
       if (ids.length === 0) {
-        if (seq !== loadSeqRef.current) return;
         setLoading(false);
         setItems([]);
-        itemsRef.current = [];
         setPage(1);
         return;
       }
@@ -1677,9 +1532,6 @@ function AgendaPage() {
       q = q.range(0, 9999);
     }
     const { data, error } = await q;
-    // Descarta se uma carga mais nova já começou — evita que uma resposta
-    // antiga "vença" a mais recente e some com os agendamentos.
-    if (seq !== loadSeqRef.current) return;
     setLoading(false);
     if (error) {
       mostrarErro(error);
@@ -1703,18 +1555,10 @@ function AgendaPage() {
       medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
       orcamento_numero: a.orcamento_numero ?? a.orcamento?.numero ?? null,
     }));
-    const mappedItems = mapped as Agendamento[];
-    setItems(mappedItems);
-    itemsRef.current = mappedItems;
-    if (background) {
-      setPage((prev) => Math.min(prev, Math.max(1, Math.ceil(mappedItems.length / PAGE_SIZE))));
-      const validIds = new Set(mappedItems.map((a) => a.id));
-      setSelecionados((prev) => new Set(Array.from(prev).filter((id) => validIds.has(id))));
-    } else {
-      setPage(1);
-      setSelecionados(new Set());
-    }
-    const agendaRows = (mappedItems ?? []) as unknown as Array<Agendamento & { fluxo_etapa?: string | null }>;
+    setItems(mapped as Agendamento[]);
+    setPage(1);
+    setSelecionados(new Set());
+    const agendaRows = (mapped ?? []) as unknown as Array<Agendamento & { fluxo_etapa?: string | null }>;
     setEtapaMap(new Map(agendaRows.map((r) => [r.id, r.fluxo_etapa ?? "aguardando_recepcao"] as [string, string])));
     // Busca dados auxiliares dos pacientes em paralelo para não atrasar a agenda.
     const pacIds = Array.from(
@@ -1842,10 +1686,6 @@ function AgendaPage() {
       setNfseMap(new Map());
     }
   };
-
-  useEffect(() => {
-    latestAgendaLoadRef.current = load;
-  });
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
@@ -2143,7 +1983,7 @@ function AgendaPage() {
   }, [clinicaAtual?.clinica_id]);
 
   useEffect(() => {
-    void load();
+    load();
   }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData, filtroStatus, filtroMedico, filtroCliente]);
 
   // Realtime: recarrega quando agendamentos mudam (outro recepcionista,
@@ -2154,8 +1994,8 @@ function AgendaPage() {
     const schedule = () => {
       if (t) clearTimeout(t);
       t = setTimeout(() => {
-        void latestAgendaLoadRef.current?.({ background: true });
-      }, 800);
+        void load();
+      }, 400);
     };
     const ch = supabase
       .channel(`agenda-rt-${clinicaAtual.clinica_id}`)
@@ -4424,11 +4264,7 @@ function AgendaPage() {
         toast.error("Emissão cancelada.");
         return;
       }
-      const descBase = montarDiscriminacaoNfse({
-        procedimento: a.procedimento,
-        pacienteNome: pac.nome,
-        dataReferencia: a.inicio,
-      });
+      const descBase = a.procedimento || "Serviços prestados";
       const descFinal = tomador.dependenteAtendido ? `${descBase} — Atendido: ${tomador.dependenteAtendido}` : descBase;
       const res = await emitirNfseFn({
         data: {
@@ -5597,11 +5433,7 @@ function AgendaPage() {
                       toast.error("Emissão cancelada.");
                       return;
                     }
-                    const descBase = montarDiscriminacaoNfse({
-                      procedimento: ag.procedimento || pagamentoDesc,
-                      pacienteNome: pac.nome,
-                      dataReferencia: ag.inicio,
-                    });
+                    const descBase = ag.procedimento || pagamentoDesc || "Serviços prestados";
                     const descFinal = tomador.dependenteAtendido
                       ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
                       : descBase;
@@ -6262,24 +6094,6 @@ function AgendaPage() {
 
                   // Agendou paciente (slot → alocado)
                   if (pacienteMudou && antesLivre && !depoisLivre) {
-                    const info = reagEnrich.get(r.id);
-                    if (info && info.direcao === "veio_de") {
-                      const ficha = info.fichaNumero != null ? String(info.fichaNumero).padStart(3, "0") : "—";
-                      items.push({
-                        id: r.id,
-                        when: r.created_at,
-                        quem,
-                        kind: "reagendou",
-                        body: (
-                          <>
-                            <b>{String(depois.paciente_nome ?? "—")}</b> reagendado — veio da ficha <b>#{ficha}</b>
-                            {info.inicio ? <> · <b>{fmtDateTime(info.inicio)}</b></> : null}
-                            {info.medicoNome ? <> · Prof. <b>{info.medicoNome}</b></> : null}.
-                          </>
-                        ),
-                      });
-                      continue;
-                    }
                     items.push({
                       id: r.id,
                       when: r.created_at,
@@ -6295,24 +6109,6 @@ function AgendaPage() {
                   }
                   // Liberou horário (alocado → slot)
                   if (pacienteMudou && !antesLivre && depoisLivre) {
-                    const info = reagEnrich.get(r.id);
-                    if (info && info.direcao === "foi_para") {
-                      const ficha = info.fichaNumero != null ? String(info.fichaNumero).padStart(3, "0") : "—";
-                      items.push({
-                        id: r.id,
-                        when: r.created_at,
-                        quem,
-                        kind: "reagendou",
-                        body: (
-                          <>
-                            <b>{String(antes.paciente_nome ?? "—")}</b> reagendado — movido para ficha <b>#{ficha}</b>
-                            {info.inicio ? <> · <b>{fmtDateTime(info.inicio)}</b></> : null}
-                            {info.medicoNome ? <> · Prof. <b>{info.medicoNome}</b></> : null}.
-                          </>
-                        ),
-                      });
-                      continue;
-                    }
                     items.push({
                       id: r.id,
                       when: r.created_at,
@@ -6730,7 +6526,7 @@ function AgendaPage() {
 
           {/* Ações rápidas */}
           <div className="space-y-0 flex items-end gap-1">
-            <Button size="sm" onClick={() => void load()} className="h-8 text-xs flex-1 bg-primary hover:bg-primary/90">
+            <Button size="sm" onClick={load} className="h-8 text-xs flex-1 bg-primary hover:bg-primary/90">
               <Search className="h-3 w-3 mr-1" /> Exibir
             </Button>
             <Button variant="outline" size="sm" onClick={limparFiltros} className="h-8 text-xs">
@@ -6861,15 +6657,7 @@ function AgendaPage() {
                         {ocultarPaciente ? (
                           <span className="text-xs italic text-rose-600">— aguardando estorno —</span>
                         ) : ehLivre ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openSlot(a)}
-                            className="h-6 px-2 text-primary hover:text-primary/80 font-medium text-xs"
-                          >
-                            <UserPlus className="h-3 w-3 mr-1" />
-                            Agendar
-                          </Button>
+                          <span className="text-sm font-medium text-primary/60">Nenhum paciente agendado</span>
                         ) : (
                           <button
                             type="button"
@@ -6915,11 +6703,17 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Situação */}
-                      <TableCell className="py-1.5">
+                      <TableCell className="py-2.5">
                         {ehLivre ? (
-                          <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 text-xs">
-                            Livre
-                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openSlot(a)}
+                            className="h-7 px-3 text-emerald-600 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 font-medium text-xs w-full"
+                          >
+                            <UserPlus className="h-3 w-3 mr-1.5" />
+                            Agendar
+                          </Button>
                         ) : estornoPend ? (
                           <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-xs">
                             Estorno solicitado
