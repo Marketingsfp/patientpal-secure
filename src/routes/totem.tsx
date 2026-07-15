@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Accessibility, Stethoscope, Hash, RotateCcw, Camera, ShieldCheck, X, ArrowLeft, Loader2 } from "lucide-react";
-import { detectDescriptor, ensureFaceModels, euclidean, FACE_MATCH_THRESHOLD } from "@/lib/face-recognition";
+import { detectDescriptor, ensureFaceModels, FACE_MATCH_THRESHOLD } from "@/lib/face-recognition";
 import { imprimirSenhaTotem, gerarSenhaPdfBase64 } from "@/lib/print-senha";
 import { imprimirDocumentoSilencioso } from "@/utils/printService";
 
