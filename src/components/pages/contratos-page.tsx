@@ -2283,7 +2283,8 @@ function DetalheContrato({
   const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
 
   // ---- Dados da venda (aba "Dados") ----
-  const totalVidasAtual = 1 + deps.filter((d) => d.ativo).length;
+  const titularConta = apenasFinanceiro ? 0 : 1;
+  const totalVidasAtual = titularConta + deps.filter((d) => d.ativo).length;
   const faixasElegiveis = faixas.filter(
     (f) => totalVidasAtual >= f.vidas_de && (f.vidas_ate == null || totalVidasAtual <= f.vidas_ate),
   );
