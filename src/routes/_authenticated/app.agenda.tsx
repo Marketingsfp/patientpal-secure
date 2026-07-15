@@ -1454,8 +1454,17 @@ function AgendaPage() {
     toast.success("Paciente cadastrado");
   };
 
+  // Sequência de load: cada chamada recebe um id crescente; respostas de um
+  // load antigo que chegam depois de um mais novo são descartadas (evita que
+  // um refresh em corrida sobrescreva a lista atual).
+  const loadReqId = useRef(0);
+  // Aponta sempre para o `load` mais recente — usado pelo handler realtime
+  // para não cair em stale closure (ver comentário na assinatura realtime).
+  const loadFnRef = useRef<() => void>(() => {});
+
   const load = async () => {
     if (!clinicaAtual) return;
+    const reqId = ++loadReqId.current;
     setLoading(true);
     let q = supabase
       .from("agendamentos")
@@ -1495,6 +1504,7 @@ function AgendaPage() {
         .limit(200);
       const ids = (pacsCpf ?? []).map((p: { id: string }) => p.id);
       if (ids.length === 0) {
+        if (reqId !== loadReqId.current) return;
         setLoading(false);
         setItems([]);
         setPage(1);
@@ -1532,6 +1542,8 @@ function AgendaPage() {
       q = q.range(0, 9999);
     }
     const { data, error } = await q;
+    // Descarta a resposta se um load mais novo já começou (refresh em corrida).
+    if (reqId !== loadReqId.current) return;
     setLoading(false);
     if (error) {
       mostrarErro(error);
@@ -1986,6 +1998,13 @@ function AgendaPage() {
     load();
   }, [clinicaAtual?.clinica_id, dataRef, dataFim, apenasData, filtroStatus, filtroMedico, filtroCliente]);
 
+  // Mantém a ref sempre apontando para o `load` atual (com os filtros/data
+  // vigentes). Sem isso, a assinatura realtime abaixo — que só re-roda quando
+  // a clínica muda — chamaria um `load` "congelado" no estado do mount,
+  // fazendo agendamentos "sumirem" no refresh automático (a lista era
+  // sobrescrita com o recorte antigo) até uma nova pesquisa manual.
+  loadFnRef.current = load;
+
   // Realtime: recarrega quando agendamentos mudam (outro recepcionista,
   // pagamento no caixa, etc.). Debounce simples para evitar refetch em rajada.
   useEffect(() => {
@@ -1994,7 +2013,7 @@ function AgendaPage() {
     const schedule = () => {
       if (t) clearTimeout(t);
       t = setTimeout(() => {
-        void load();
+        void loadFnRef.current();
       }, 400);
     };
     const ch = supabase
