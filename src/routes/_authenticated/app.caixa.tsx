@@ -2882,6 +2882,46 @@ function Page() {
         </DialogContent>
       </Dialog>
 
+      {/* === Modal Desfazer fechamento (admin/gestor/financeiro) === */}
+      <Dialog open={!!openReabrir} onOpenChange={(o) => { if (!o) { setOpenReabrir(null); setMotivoReabrir(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Desfazer fechamento do caixa</DialogTitle>
+            {openReabrir && (
+              <DialogDescription>
+                Operador: <strong className="uppercase">{openReabrir.user_nome || openReabrir.user_id.slice(0, 8)}</strong>
+                <br />
+                Calculado: <strong>{fmt(Number(openReabrir.valor_fechamento_calculado || 0))}</strong>
+                {" · "}Informado: <strong>{fmt(Number(openReabrir.valor_fechamento_informado || 0))}</strong>
+                {" · "}Diferença: <strong>{fmt(Number(openReabrir.diferenca || 0))}</strong>
+                <br />
+                <span className="text-xs text-muted-foreground">
+                  O caixa voltará ao status "aberto". O histórico de fechamento
+                  fica registrado e uma linha de reabertura será adicionada aos
+                  movimentos do operador.
+                </span>
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="motivo-reabrir">Motivo (obrigatório)</Label>
+            <Textarea
+              id="motivo-reabrir"
+              value={motivoReabrir}
+              onChange={(e) => setMotivoReabrir(e.target.value)}
+              placeholder="Ex.: valor informado incorreto, sangria pendente..."
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setOpenReabrir(null); setMotivoReabrir(""); }}>Cancelar</Button>
+            <Button variant="destructive" disabled={saving || !motivoReabrir.trim()} onClick={() => void desfazerFechamento()}>
+              <Undo2 className="h-4 w-4 mr-2" /> Reabrir caixa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* === Modal Fechar caixa de OUTRO usuário (gestor/admin) === */}
       <Dialog open={!!openFecharTerceiro} onOpenChange={(o) => { if (!o) setOpenFecharTerceiro(null); }}>
         <DialogContent>
