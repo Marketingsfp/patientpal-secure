@@ -440,7 +440,7 @@ function Page() {
       if (nome) set.add(nome);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [minhasMovs, enrichPorLanc]);
+  }, [minhasMovsHist, enrichPorLanc]);
 
   const filtrosAtivos =
     meuPeriodo !== "hoje" || meuMedico !== "__all__" || meuPaciente.trim() !== "";
