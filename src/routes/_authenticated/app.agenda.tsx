@@ -902,6 +902,9 @@ function AgendaPage() {
   const [medicoEspec, setMedicoEspec] = useState<Map<string, Set<string>>>(new Map());
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [loading, setLoading] = useState(false);
+  // Sequencial das cargas — descarta respostas de load() antigas que
+  // chegariam fora de ordem e piscariam/reordenariam a lista.
+  const loadSeqRef = useRef(0);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Agendamento | null>(null);
   const [form, setForm] = useState(EMPTY);
@@ -1457,6 +1460,10 @@ function AgendaPage() {
 
   const load = async () => {
     if (!clinicaAtual) return;
+    // Marca esta chamada como a mais recente. Respostas de cargas
+    // anteriores serão descartadas antes de pintar (evita corridas do
+    // realtime + filtros que faziam agendamentos "sumirem" ou reordenarem).
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     let q = supabase
       .from("agendamentos")
@@ -1464,7 +1471,10 @@ function AgendaPage() {
         "id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never,
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("inicio", { ascending: false });
+      .order("inicio", { ascending: false })
+      // Desempate estável: sem isso, agendamentos no mesmo horário
+      // trocam de ordem a cada refetch.
+      .order("id", { ascending: true });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
     // então não restringe por status no servidor — filtra em memória.
     const statusEspecifico =
@@ -1496,6 +1506,7 @@ function AgendaPage() {
         .limit(200);
       const ids = (pacsCpf ?? []).map((p: { id: string }) => p.id);
       if (ids.length === 0) {
+        if (seq !== loadSeqRef.current) return;
         setLoading(false);
         setItems([]);
         setPage(1);
@@ -1533,6 +1544,9 @@ function AgendaPage() {
       q = q.range(0, 9999);
     }
     const { data, error } = await q;
+    // Descarta se uma carga mais nova já começou — evita que uma resposta
+    // antiga "vença" a mais recente e some com os agendamentos.
+    if (seq !== loadSeqRef.current) return;
     setLoading(false);
     if (error) {
       mostrarErro(error);
@@ -1996,7 +2010,7 @@ function AgendaPage() {
       if (t) clearTimeout(t);
       t = setTimeout(() => {
         void load();
-      }, 400);
+      }, 800);
     };
     const ch = supabase
       .channel(`agenda-rt-${clinicaAtual.clinica_id}`)
