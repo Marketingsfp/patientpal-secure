@@ -129,6 +129,7 @@ export const CENTROS: Centro[] = [
       { path: "/app/hr-ponto", label: "RH · Ponto", icon: Users },
       { path: "/app/integration-secrets", label: "Integrações", icon: ArrowRightLeft },
       { path: "/app/configuracoes/nfse", label: "Configuração NFS-e", icon: Receipt },
+      { path: "/app/configuracoes/painel-totem", label: "Painel & Totem", icon: KeyRound },
     ],
   },
 ];
