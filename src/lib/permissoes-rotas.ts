@@ -108,6 +108,7 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/financeiro/relatorios": "financeiro",
   "/app/funcionarios": "funcionarios",
   "/app/configuracoes/nfse": "nfse",
+  "/app/configuracoes/painel-totem": "clinicas",
   "/app/nfse": "nfse",
   "/app/relatorios": "relatorios",
   "/app/auditoria": "auditoria",
