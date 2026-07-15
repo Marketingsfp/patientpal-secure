@@ -18,9 +18,11 @@ import { Loader2 } from "lucide-react";
  */
 export function PublicClinicaProvider({
   clinicaId,
+  token,
   children,
 }: {
-  clinicaId: string;
+  clinicaId?: string;
+  token?: string;
   children: ReactNode;
 }) {
   const [membership, setMembership] = useState<ClinicaMembership | null>(null);
@@ -32,11 +34,28 @@ export function PublicClinicaProvider({
     setLoading(true);
     setErro(null);
     (async () => {
-      const { data, error } = await supabase
-        .from("clinicas")
-        .select("id, nome, cidade, estado, branding, base_importada")
-        .eq("id", clinicaId)
-        .maybeSingle();
+      let data: {
+        id: string;
+        nome: string;
+        cidade: string | null;
+        estado: string | null;
+        branding: unknown;
+        base_importada: boolean | null;
+      } | null = null;
+      let error: unknown = null;
+      if (token) {
+        const res = await supabase.rpc("resolver_clinica_por_token", { _token: token });
+        data = (res.data?.[0] ?? null) as typeof data;
+        error = res.error;
+      } else if (clinicaId) {
+        const res = await supabase
+          .from("clinicas")
+          .select("id, nome, cidade, estado, branding, base_importada")
+          .eq("id", clinicaId)
+          .maybeSingle();
+        data = res.data as typeof data;
+        error = res.error;
+      }
       if (cancelado) return;
       if (error || !data) {
         setErro("Clínica não encontrada ou sem acesso público.");
@@ -61,7 +80,7 @@ export function PublicClinicaProvider({
     return () => {
       cancelado = true;
     };
-  }, [clinicaId]);
+  }, [clinicaId, token]);
 
   if (erro) {
     return (
@@ -69,7 +88,7 @@ export function PublicClinicaProvider({
         <div className="text-center space-y-2 max-w-md">
           <h1 className="text-2xl font-semibold">Clínica não encontrada</h1>
           <p className="text-muted-foreground">{erro}</p>
-          <p className="text-xs text-muted-foreground">ID informado: {clinicaId}</p>
+          <p className="text-xs text-muted-foreground">Referência: {token ?? clinicaId}</p>
         </div>
       </div>
     );
