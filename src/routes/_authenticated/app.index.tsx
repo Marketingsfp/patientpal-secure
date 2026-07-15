@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Users, HeartPulse, CheckCircle2 } from "lucide-react";
+import { HeartPulse, CheckCircle2, Users } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import { Card } from "@/components/ui/card";
@@ -26,13 +26,6 @@ const CARDS: CardDef[] = [
     title: "Gestor Clínico",
     desc: "Agenda, atendimento, financeiro, marketing, cadastros e gestão.",
     icon: HeartPulse,
-    accent: "var(--primary)",
-  },
-  {
-    id: "gestao-pessoas",
-    title: "Gestão de Pessoas",
-    desc: "Ponto, férias, holerites, treinamentos e cursos.",
-    icon: Users,
     accent: "var(--primary)",
   },
 ];
