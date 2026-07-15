@@ -1123,7 +1123,7 @@ function Page() {
         // Diferença (ex.: obs ainda não carregada, ou parcela sem label
         // reconhecido) vai para "outros" para preservar o total.
         const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r.outros += resto;
+        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
       } else {
         r[bucket] += v;
       }
@@ -1171,7 +1171,7 @@ function Page() {
             somado += val ?? 0;
           }
           const resto = v - somado;
-          if (Math.abs(resto) > 0.005) r.porForma.outros += resto;
+          if (Math.abs(resto) > 0.005) r.porForma.dinheiro += resto;
         } else {
           r.porForma[bucket] = (r.porForma[bucket] ?? 0) + v;
         }
@@ -1384,7 +1384,7 @@ function Page() {
           somado += (val ?? 0) * sinal;
         }
         const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r.outros += resto;
+        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
       } else {
         r[bucket] = (r[bucket] ?? 0) + v;
       }
@@ -2832,7 +2832,7 @@ function Page() {
                         pf[k] = (pf[k] ?? 0) + (val ?? 0) * sinal; somado += (val ?? 0) * sinal;
                       }
                       const resto = v - somado;
-                      if (Math.abs(resto) > 0.005) pf.outros = (pf.outros ?? 0) + resto;
+                      if (Math.abs(resto) > 0.005) pf.dinheiro = (pf.dinheiro ?? 0) + resto;
                     } else {
                       pf[bucket] = (pf[bucket] ?? 0) + v;
                     }
