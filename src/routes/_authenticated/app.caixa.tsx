@@ -1422,6 +1422,13 @@ function Page() {
         : "Selecione de quem o dinheiro está sendo recebido");
       return;
     }
+    // Estorno avulso não tem seletor de destino (não é transferência entre
+    // membros da equipe) — a descrição é o único registro de quem/o que
+    // está sendo estornado, então é obrigatória aqui.
+    if (openMov.tipo === "estorno" && !movDesc.trim()) {
+      toast.error("Descreva o motivo/paciente do estorno");
+      return;
+    }
     const destinoNome = ehTransfer
       ? (membrosClinica.find((m) => m.user_id === movDestinoUserId)?.nome ?? null)
       : null;
@@ -1469,7 +1476,7 @@ function Page() {
     setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
     setMovBandeira(""); setMovParcelas("1"); setMovDestinoUserId("");
     toast.success(`${TIPO_LABEL[tipoLancado]} registrada`);
-    if (tipoLancado === "sangria" || tipoLancado === "suprimento") {
+    if (tipoLancado === "sangria" || tipoLancado === "suprimento" || tipoLancado === "estorno") {
       printComprovanteCaixa({
         tipo: tipoLancado,
         clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
@@ -1930,6 +1937,9 @@ function Page() {
                 </Button>
                 <Button variant="outline" onClick={() => setOpenMov({ tipo: "sangria" })}>
                   <ArrowUpFromLine className="h-4 w-4 mr-2 text-rose-600" /> Sangria
+                </Button>
+                <Button variant="outline" onClick={() => setOpenMov({ tipo: "estorno" })}>
+                  <Undo2 className="h-4 w-4 mr-2 text-fuchsia-600" /> Estorno
                 </Button>
                 {podeLancarRecebDespesa && (
                   <>
@@ -2597,6 +2607,7 @@ function Page() {
               {openMov?.tipo === "suprimento" && "Adição de dinheiro ao caixa."}
               {openMov?.tipo === "recebimento" && "Entrada de pagamento avulsa."}
               {openMov?.tipo === "despesa" && "Pagamento avulso de despesa pelo caixa."}
+              {openMov?.tipo === "estorno" && "Devolução de dinheiro ao paciente fora do fluxo de solicitação de estorno (ex.: troco, valor cobrado a mais). Descreva o motivo/paciente abaixo."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={lancarMov} className="space-y-3">

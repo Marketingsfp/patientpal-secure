@@ -15,7 +15,7 @@ const fmtDT = (d: Date) => {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
-export type ComprovanteCaixaTipo = "sangria" | "suprimento" | "fechamento";
+export type ComprovanteCaixaTipo = "sangria" | "suprimento" | "fechamento" | "estorno";
 
 export interface ComprovanteCaixaInput {
   tipo: ComprovanteCaixaTipo;
@@ -39,12 +39,14 @@ const TITULOS: Record<ComprovanteCaixaTipo, string> = {
   sangria: "COMPROVANTE DE SANGRIA",
   suprimento: "COMPROVANTE DE SUPRIMENTO",
   fechamento: "COMPROVANTE DE FECHAMENTO DE CAIXA",
+  estorno: "COMPROVANTE DE ESTORNO",
 };
 
 const SUBTITULOS: Record<ComprovanteCaixaTipo, string> = {
   sangria: "Retirada de dinheiro do caixa",
   suprimento: "Adição de dinheiro ao caixa",
   fechamento: "Conferência e encerramento do caixa",
+  estorno: "Devolução de valor ao paciente",
 };
 
 export function printComprovanteCaixa(input: ComprovanteCaixaInput) {
