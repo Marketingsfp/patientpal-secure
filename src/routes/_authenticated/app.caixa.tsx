@@ -2701,15 +2701,16 @@ function Page() {
                     : minhasMovs;
                   const pf: Record<string, number> = {};
                   filtrados.forEach((m) => {
-                    if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
-                    const v = Number(m.valor || 0);
+                    if (m.tipo !== "recebimento" && m.tipo !== "suprimento" && m.tipo !== "estorno") return;
+                    const sinal = m.tipo === "estorno" ? -1 : 1;
+                    const v = Number(m.valor || 0) * sinal;
                     const bucket = normalizarForma(m.forma_pagamento);
                     if (bucket === "misto") {
                       const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
                       const partes = decomporMistoObs(obs);
                       let somado = 0;
                       for (const [k, val] of Object.entries(partes)) {
-                        pf[k] = (pf[k] ?? 0) + (val ?? 0); somado += val ?? 0;
+                        pf[k] = (pf[k] ?? 0) + (val ?? 0) * sinal; somado += (val ?? 0) * sinal;
                       }
                       const resto = v - somado;
                       if (Math.abs(resto) > 0.005) pf.outros = (pf.outros ?? 0) + resto;
