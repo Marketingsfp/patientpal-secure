@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { EncerrarExpedienteButton } from "@/components/medicos/EncerrarExpedienteButton";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
@@ -4264,7 +4265,11 @@ function AgendaPage() {
         toast.error("Emissão cancelada.");
         return;
       }
-      const descBase = a.procedimento || "Serviços prestados";
+      const descBase = montarDiscriminacaoNfse({
+        procedimento: a.procedimento,
+        pacienteNome: pac.nome,
+        dataReferencia: a.inicio,
+      });
       const descFinal = tomador.dependenteAtendido ? `${descBase} — Atendido: ${tomador.dependenteAtendido}` : descBase;
       const res = await emitirNfseFn({
         data: {
@@ -5433,7 +5438,11 @@ function AgendaPage() {
                       toast.error("Emissão cancelada.");
                       return;
                     }
-                    const descBase = ag.procedimento || pagamentoDesc || "Serviços prestados";
+                    const descBase = montarDiscriminacaoNfse({
+                      procedimento: ag.procedimento || pagamentoDesc,
+                      pacienteNome: pac.nome,
+                      dataReferencia: ag.inicio,
+                    });
                     const descFinal = tomador.dependenteAtendido
                       ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
                       : descBase;

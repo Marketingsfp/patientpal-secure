@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { useServerFn } from "@tanstack/react-start";
@@ -650,7 +651,16 @@ function AtendimentosPage() {
         },
       });
       if (!tomador) { setNfseEmitting(false); toast.error("Emissão cancelada."); return; }
-      const descBase = nfseDesc || "Serviços prestados";
+      // Sempre compõe a discriminação com procedimento + paciente + data de
+      // referência, mesmo se o usuário deixou o campo do diálogo em branco.
+      const dataRef = a.agendamento_inicio ?? a.data;
+      const descBase = (nfseDesc && nfseDesc.trim())
+        ? nfseDesc.trim()
+        : montarDiscriminacaoNfse({
+            procedimento: a.procedimento,
+            pacienteNome: p.nome,
+            dataReferencia: dataRef,
+          });
       const descFinal = tomador.dependenteAtendido
         ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
         : descBase;

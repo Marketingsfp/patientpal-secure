@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Plus, FileText, Pencil, Trash2, ExternalLink, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -165,9 +166,16 @@ function Page() {
       if (cpfLimpo.length !== 11 && cpfLimpo.length !== 14) {
         throw new Error("CPF/CNPJ do tomador é obrigatório (11 ou 14 dígitos).");
       }
+      const descBase = (descricao && descricao.trim())
+        ? descricao.trim()
+        : montarDiscriminacaoNfse({
+            procedimento: null,
+            pacienteNome: p.nome,
+            dataReferencia: n.data_emissao,
+          });
       const descFinal = tomador.dependenteAtendido
-        ? `${descricao || "Serviços prestados"} — Atendido: ${tomador.dependenteAtendido}`
-        : (descricao || "Serviços prestados");
+        ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
+        : descBase;
       const res = await emitirFn({ data: {
         emitenteId,
         pacienteId: p.id,
@@ -259,7 +267,11 @@ function Page() {
             </TableRow></TableHeader>
             <TableBody>{items.map((n) => (
               <TableRow key={n.id}>
-                <TableCell className="text-sm">{new Date(n.data_emissao).toLocaleDateString("pt-BR")}</TableCell>
+                <TableCell className="text-sm">{
+                  /^\d{4}-\d{2}-\d{2}$/.test(n.data_emissao)
+                    ? new Date(`${n.data_emissao}T12:00:00`).toLocaleDateString("pt-BR")
+                    : new Date(n.data_emissao).toLocaleDateString("pt-BR")
+                }</TableCell>
                 <TableCell className="text-sm">{n.numero ?? "—"} {n.serie && `/ ${n.serie}`}</TableCell>
                 <TableCell className="text-sm">{n.paciente_id ? pacMap.get(n.paciente_id) ?? "—" : "—"}</TableCell>
                 <TableCell><Badge variant={n.status === "emitida" ? "default" : "secondary"}>{n.status}</Badge></TableCell>
