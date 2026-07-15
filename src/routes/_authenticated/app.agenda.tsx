@@ -902,6 +902,9 @@ function AgendaPage() {
   const [medicoEspec, setMedicoEspec] = useState<Map<string, Set<string>>>(new Map());
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [loading, setLoading] = useState(false);
+  // Sequencial das cargas — descarta respostas de load() antigas que
+  // chegariam fora de ordem e piscariam/reordenariam a lista.
+  const loadSeqRef = useRef(0);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Agendamento | null>(null);
   const [form, setForm] = useState(EMPTY);
