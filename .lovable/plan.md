@@ -1,47 +1,70 @@
-## Problemas
+## Objetivo
 
-Duas coisas quebradas ao criar/pagar mais de um atendimento juntos (multi-exame de imagem — ex.: CAPSULOTOMIA + CERATOMETRIA no mesmo horário):
+Permitir que perfis **admin** e **financeiro** (também **gestor**, mesmo grupo já existente na tela) **desfaçam o fechamento de um caixa** direto pela aba "Todos (Financeiro)". A ação fica auditada no próprio caixa do operador (aba Movimentos) e no relatório impresso.
 
-**1) Numeração da ficha** (Foto 2)
-Quando você agenda 2 exames de imagem no mesmo horário, o sistema salva a "linha original" (o slot que já existia com número da agenda, ex.: 020) como principal e cria uma linha nova (irmã) para o segundo exame — **sem `agenda_id`**. O cálculo da ficha usa a agenda como parte da chave, então a irmã cai num bucket separado (`__sem_agenda__`) e começa em 001. Resultado: uma linha com ficha 020, outra com ficha 001.
+## UX
 
-**2) Nome do paciente na 2ª linha do Movimento de Caixa** (Foto 1)
-Ao gerar a cobrança agrupada logo depois de criar um multi-exame, o fluxo passa por `formaPagCtx` sem popular os estados `pagamentoPacienteNome`, `pagamentoRotulos` e `pagamentoPesos`. Aí, na hora de gravar o rateio (`onSavedWithData` → RPC `finalizar_pagamento_agrupado`), a descrição de cada `caixa_movimentos` fica com o nome do paciente **vazio**: literalmente `" — CONSULTA (1/2 do grupo)"` e `" — CONSULTA (2/2 do grupo)"`. Confirmei no banco. A 1ª linha ainda "aparece com nome" na coluna Paciente porque o enriquecimento acha o paciente via `agendamento_id`; a 2ª tem o mesmo dado disponível, então na verdade o problema real é **a descrição sem nome** — corrigir isso conserta as duas linhas de uma vez (e também os relatórios/comprovantes que usam `descricao`).
+Na tabela da aba "Todos (Financeiro)" (`src/routes/_authenticated/app.caixa.tsx`, coluna de ações — hoje mostra o olho de detalhe e o cadeado para fechar caixas abertos):
 
-## Correções (mínimas e focadas)
+- Para linhas com `statusDia = "fechado"`, adicionar um novo ícone **Desfazer fechamento** (`Unlock`/`RotateCcw`), visível apenas para admin/gestor/financeiro (`podeLancarRecebDespesa`, já existe).
+- Ao clicar: abrir um pequeno diálogo de confirmação exigindo **motivo obrigatório** (textarea) e mostrando: operador, dia, valor calculado e informado do fechamento em questão. Botão "Reabrir caixa" (destructive) + Cancelar.
 
-### 1. Irmãs herdam o `agenda_id` do principal — nova migration
-Nova migration ajustando `salvar_agendamento_multi_imagem` para, ao inserir cada linha-irmã, gravar `agenda_id` = `agenda_id` da linha principal (lida logo após o UPDATE/INSERT do principal). Nada mais muda na RPC.
+## Regras
 
-Backfill único no mesmo arquivo: nas linhas irmãs existentes (`atendimento_grupo_id IS NOT NULL AND agenda_id IS NULL`), copiar o `agenda_id` do irmão do mesmo grupo que tenha valor — evita que fichas antigas continuem intercaladas 001/020.
+1. Localiza a `caixa_sessoes` do dia/operador com `status = 'fechado'` (a linha da tabela já tem `sessoes[]`; usar a sessão que tem `fechado_em` naquele dia).
+2. Atualiza a sessão:
+   - `status = 'aberto'`
+   - `fechado_em = null`
+   - `valor_fechamento_informado = null`, `valor_fechamento_calculado = null`, `diferenca = null`
+   - Anexa em `observacoes` uma linha `[Fechamento desfeito por FULANO em DATA/HORA — motivo]` (preserva histórico anterior com ` | `).
+3. Insere um **novo movimento de auditoria** em `caixa_movimentos` com:
+   - `tipo = 'reabertura'` (novo tipo — coluna é texto livre, sem CHECK/enum, já confirmado no banco).
+   - `valor = 0` (não afeta saldo).
+   - `descricao = "Fechamento desfeito por FULANO — motivo: ..."`
+   - `forma_pagamento = null`, sessão/clínica/user do executor.
+4. Não altera nem apaga a linha original de `caixa_movimentos.tipo = 'fechamento'` — ela **permanece visível** no histórico, seguida da nova linha de reabertura. Isso preserva a trilha completa (foi fechado, depois reaberto).
 
-Efeito: todas as linhas do multi-exame passam a compartilhar a mesma agenda → numeração de ficha volta a ser sequencial dentro da agenda daquele médico.
+## Suporte ao novo tipo "reabertura"
 
-### 2. Descrição da cobrança agrupada sempre com o nome do paciente
-Ajuste pontual em `src/routes/_authenticated/app.agenda.tsx`, dentro de `onSavedWithData` (a partir da linha ~5317, onde monta `itensRateio`):
+Em `src/routes/_authenticated/app.caixa.tsx`:
 
-- Antes de usar `pagamentoPacienteNome`, calcular um fallback:
-  `const pacNome = pagamentoPacienteNome || items.find(x => x.id === agId)?.paciente_nome || "";`
-- Antes de usar `pagamentoRotulos[id] ?? "CONSULTA"`, calcular um fallback por id:
-  `const rot = (id) => pagamentoRotulos[id] || items.find(x => x.id === id)?.procedimento || rotuloFallbackProc(items.find(x => x.id === id)?.medico_id) || "CONSULTA";`
-- Usar `pacNome` e `rot(id)` na montagem das duas descrições (principal `1/N` e extras `i/N`).
+- Ampliar o tipo `MovTipo` para incluir `"reabertura"`.
+- `TIPO_LABEL.reabertura = "Reabertura"`.
+- `TIPO_SINAL.reabertura = 0` (não soma nem subtrai).
+- `TIPO_CLASS.reabertura` = classe própria (azul/violeta) para destaque no badge.
+- Filtro `pacienteFromDescricao` já ignora prefixos administrativos — adicionar `reabertura` no regex de exclusão (linha ~232) para não tentar extrair paciente.
+- **Relatório impresso** (`imprimirRelatorioMovs`, linha 1704): incluir `reabertura` na lista de tipos ignorados no agrupamento por categoria/forma (assim como `abertura` e `fechamento`), mas **mantê-la visível** na tabela detalhada de movimentos ("Movimentos da sessão") do operador — que já lista todos os movimentos brutos ordenados por data.
+- **Contagem de sangria/estorno** (`calcSangriaSessao`, `calcEstornoSessao`) — não muda, filtra por tipo específico.
+- `entradasPorFormaSessao` / `porFormaDoDiaFechamento` — já filtram por tipos específicos, `reabertura` fica de fora naturalmente.
 
-Isso não muda regra de negócio, forma de pagamento, valores, rateio, RLS ou impressão — só garante que a descrição gravada em `fin_lancamentos.descricao` e `caixa_movimentos.descricao` tenha sempre `PACIENTE — PROCEDIMENTO (i/N do grupo)`, independentemente de qual fluxo abriu a cobrança (multi-exame criado agora, seleção múltipla, cobrança de linha única, etc.).
+## Permissão
 
-Efeito no Movimento de Caixa: as duas linhas passam a mostrar o nome do paciente (coluna Paciente pelo enriquecimento e coluna Descrição pelo próprio texto salvo).
+- Botão só aparece para `podeLancarRecebDespesa` (admin/gestor/financeiro).
+- Recepcionistas não veem o botão.
+- Não crio nova RPC nem migration — apenas UPDATE e INSERT via cliente Supabase, respeitando as RLS existentes de `caixa_sessoes` e `caixa_movimentos`. Se a RLS bloquear o update de sessão alheia por um financeiro/admin, o toast de erro mostra a mensagem original e eu revisito com uma migration em turno seguinte. **Verificação prévia**: rodar `select` das policies dessas tabelas antes de aplicar o botão, para confirmar que admin/gestor/financeiro conseguem atualizar sessão de outro `user_id`. Se não conseguirem, adiciono uma policy nova nesse mesmo pacote de mudanças.
+
+## Onde a reabertura aparece
+
+- **Aba "Todos (Financeiro)"**: o dia volta ao status "aberto" imediatamente após a ação (o `loadTodos` roda no callback), sem `informado` nem `diferença`.
+- **Aba "Meu caixa" da Mayra**: o caixa volta a estar aberto; a lista de Movimentos mostra: `Abertura → ...movs... → Fechamento (do dia X) → Reabertura por FULANO`.
+- **Modal "Ver detalhes"**: as duas linhas (fechamento + reabertura) aparecem em ordem cronológica.
+- **Relatório impresso** (botão "Relatório" da sessão): a linha "Reabertura" **NÃO** entra no agrupamento GERAL/por forma (evita poluir totais). Aparece apenas no rodapé de contagem de registros — pode-se opcionalmente exibir um bloco textual "Reaberturas: 1 (motivo: ...)" abaixo da tabela. **Decisão adotada**: incluir esse bloco textual auxiliar, curto, ao final do HTML do relatório.
 
 ## Fora do escopo
-- Não vou renumerar fichas antigas nem tocar em `ficha_numero` de nenhuma linha existente — a numeração é calculada em runtime pela agenda.
-- Não vou mexer em `finalizar_pagamento_agrupado` (só na descrição que o front envia).
-- Não vou tocar em enfermagem/triagem/pagamento/estorno/repasse.
+
+- Não permito editar valores já registrados (recebimentos, sangrias) na reabertura — o operador reabre, corrige lançando novos movimentos (sangria/estorno/etc.) e fecha de novo normalmente.
+- Não altero regras de negócio do fechamento em si.
+- Sem alterações em `fin_lancamentos` (o financeiro continua como está).
 
 ## Validação
-1. Criar um multi-exame para um paciente (2 procedimentos no mesmo horário) na agenda do Dr. João Hélio.
-2. Conferir na lista da agenda: as duas linhas mostram fichas sequenciais dentro da agenda (ex.: 020 e 021), sem 001 fora de ordem.
-3. Cobrar as duas juntas (Misto ou qualquer forma).
-4. Abrir Caixa → Movimentos: as duas linhas devem mostrar o nome do paciente tanto na coluna Paciente quanto na coluna Descrição (`QUEDIMA … — CAPSULOTOMIA (1/2 do grupo)` e `QUEDIMA … — CERATOMETRIA (2/2 do grupo)`).
-5. Rodar o mesmo teste com Atendimento Múltiplo (paciente com serviços diferentes) para confirmar que continua funcionando.
+
+1. Fazer login como admin/financeiro, ir em Caixa → Todos (Financeiro), filtrar o dia da Mayra (15/07/2026).
+2. Clicar em "Desfazer fechamento" na linha, digitar motivo e confirmar.
+3. Conferir na tabela: status volta para "aberto", Informado/Diferença zeram.
+4. Trocar para o operador afetado (ou usar o botão de detalhe): a linha `Reabertura` deve aparecer em Movimentos, com o nome do executor e o motivo.
+5. Imprimir o relatório: a linha de reabertura aparece como bloco textual auxiliar, sem alterar os totais Pagamento/Recebimento.
 
 ## Riscos
-- Migration de backfill toca só linhas com `atendimento_grupo_id` e `agenda_id IS NULL` — impacto restrito ao histórico do multi-exame. Reversível manualmente se necessário.
-- Alteração de front é local e presentacional (só monta a string) — sem risco de duplicidade de lançamento nem de cobrança dobrada.
+
+- Baixo/médio. Ação sensível (reverte fechamento contábil), mas totalmente auditada via `caixa_movimentos` + `observacoes`. Nada é apagado. Requer motivo obrigatório.
+- Se surgir bloqueio de RLS ao reabrir sessão alheia, entrego junto uma migration adicionando policy de UPDATE para admin/gestor/financeiro sobre `caixa_sessoes` (limitada à mesma clínica). Verifico as policies antes de decidir.
