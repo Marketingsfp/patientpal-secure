@@ -25,6 +25,7 @@ interface Cartao {
   plano_nome: string; plano_tipo: string; descricao_beneficios: string | null;
   clinica_nome: string | null; clinica_telefone: string | null;
   papel: "titular" | "dependente"; titular_email: string | null;
+  titular_apenas_financeiro?: boolean;
   dependentes: Dependente[]; mensalidades: Mensalidade[];
 }
 
@@ -104,7 +105,14 @@ function MeusCartoesPage() {
                       <CreditCard className="h-5 w-5 opacity-80" />
                     </div>
                     <p className="mt-4 text-lg font-semibold leading-tight">{c.paciente_nome}</p>
-                    <p className="text-xs opacity-80 capitalize">{c.papel}</p>
+                    <p className="text-xs opacity-80 capitalize">
+                      {c.papel === "titular" && c.titular_apenas_financeiro ? "Titular financeiro" : c.papel}
+                    </p>
+                    {c.papel === "titular" && c.titular_apenas_financeiro ? (
+                      <p className="mt-1 inline-block text-[10px] font-semibold uppercase tracking-wider bg-white/20 rounded px-2 py-0.5">
+                        Não utiliza benefícios
+                      </p>
+                    ) : null}
                     <div className="mt-4 flex items-end justify-between text-xs">
                       <div>
                         <p className="opacity-70">Contrato</p>
