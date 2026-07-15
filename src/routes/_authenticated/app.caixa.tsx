@@ -67,6 +67,21 @@ function normalizarForma(f: string | null | undefined): FormaBucket {
 }
 
 /**
+ * Bucket efetivo do movimento para agrupamento por forma de pagamento.
+ * Sangria, suprimento e despesa mexem no dinheiro físico do caixa: quando
+ * chegam sem `forma_pagamento`, contam como "dinheiro" (em vez de cair em
+ * "outros"). Se, no futuro, algum desses lançamentos vier com forma
+ * explícita, a forma informada é respeitada.
+ */
+function bucketDeMov(m: { tipo: string; forma_pagamento: string | null }): FormaBucket {
+  const bruto = normalizarForma(m.forma_pagamento);
+  if (bruto === "outros" && (m.tipo === "sangria" || m.tipo === "suprimento" || m.tipo === "despesa")) {
+    return "dinheiro";
+  }
+  return bruto;
+}
+
+/**
  * Extrai as parcelas de um pagamento misto a partir do trecho
  * `Pagamento misto: Dinheiro R$ 60,00; PIX R$ 50,00 | ...` gravado em
  * `fin_lancamentos.observacoes`. Retorna somas por bucket já normalizado.
@@ -1096,7 +1111,7 @@ function Page() {
       if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
       const v = Number(m.valor || 0);
       r.total += v;
-      const bucket = normalizarForma(m.forma_pagamento);
+      const bucket = bucketDeMov(m);
       if (bucket === "misto") {
         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
         const partes = decomporMistoObs(obs);
@@ -1108,7 +1123,7 @@ function Page() {
         // Diferença (ex.: obs ainda não carregada, ou parcela sem label
         // reconhecido) vai para "outros" para preservar o total.
         const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r.outros += resto;
+        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
       } else {
         r[bucket] += v;
       }
@@ -1146,7 +1161,7 @@ function Page() {
       r.saldo += sinal * v;
       if (m.tipo === "recebimento" || m.tipo === "suprimento") {
         r.entradas += v;
-        const bucket = normalizarForma(m.forma_pagamento);
+        const bucket = bucketDeMov(m);
         if (bucket === "misto") {
           const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
           const partes = decomporMistoObs(obs);
@@ -1156,7 +1171,7 @@ function Page() {
             somado += val ?? 0;
           }
           const resto = v - somado;
-          if (Math.abs(resto) > 0.005) r.porForma.outros += resto;
+          if (Math.abs(resto) > 0.005) r.porForma.dinheiro += resto;
         } else {
           r.porForma[bucket] = (r.porForma[bucket] ?? 0) + v;
         }
@@ -1205,7 +1220,7 @@ function Page() {
       const sinal =
         m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
       const v = Number(m.valor || 0) * sinal;
-      const bucket = normalizarForma(m.forma_pagamento);
+      const bucket = bucketDeMov(m);
       if (bucket === "misto") {
         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
         const partes = decomporMistoObs(obs);
@@ -1215,7 +1230,10 @@ function Page() {
           somado += (val ?? 0) * sinal;
         }
         const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r.outros += resto;
+        // Sem decomposição (pagamento agrupado, obs sem "Pagamento misto:"),
+        // o resto cai em Dinheiro — a UI não deve exibir "Outros" para
+        // recebimentos reais. O operador pode ajustar no modal de fechamento.
+        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
       } else {
         r[bucket] = (r[bucket] ?? 0) + v;
       }
@@ -1356,7 +1374,7 @@ function Page() {
       const sinal =
         m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
       const v = Number(m.valor || 0) * sinal;
-      const bucket = normalizarForma(m.forma_pagamento);
+      const bucket = bucketDeMov(m);
       if (bucket === "misto") {
         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
         const partes = decomporMistoObs(obs);
@@ -1366,7 +1384,7 @@ function Page() {
           somado += (val ?? 0) * sinal;
         }
         const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r.outros += resto;
+        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
       } else {
         r[bucket] = (r[bucket] ?? 0) + v;
       }
@@ -1669,14 +1687,15 @@ function Page() {
       })
       .eq("id", alvo.id);
     if (!error) {
-      await supabase.from("caixa_movimentos").insert({
-        sessao_id: alvo.id,
-        clinica_id: clinicaAtual.clinica_id,
-        user_id: user.id,
-        tipo: "reabertura",
-        valor: 0,
-        descricao: `Fechamento desfeito por ${executorNome} — motivo: ${motivo}`,
-      });
+      // Remove o(s) movimento(s) de fechamento desta sessão para que o caixa
+      // do operador volte exatamente ao estado anterior (saldo, lista de
+      // movimentos e totais). A auditoria da reabertura fica registrada no
+      // campo `observacoes` da sessão (marcador com executor, data e motivo).
+      await supabase
+        .from("caixa_movimentos")
+        .delete()
+        .eq("sessao_id", alvo.id)
+        .eq("tipo", "fechamento");
     }
     setSaving(false);
     if (error) { mostrarErro(error); return; }
@@ -2804,7 +2823,7 @@ function Page() {
                     if (m.tipo !== "recebimento" && m.tipo !== "suprimento" && m.tipo !== "estorno") return;
                     const sinal = m.tipo === "estorno" ? -1 : 1;
                     const v = Number(m.valor || 0) * sinal;
-                    const bucket = normalizarForma(m.forma_pagamento);
+                    const bucket = bucketDeMov(m);
                     if (bucket === "misto") {
                       const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
                       const partes = decomporMistoObs(obs);
@@ -2813,7 +2832,7 @@ function Page() {
                         pf[k] = (pf[k] ?? 0) + (val ?? 0) * sinal; somado += (val ?? 0) * sinal;
                       }
                       const resto = v - somado;
-                      if (Math.abs(resto) > 0.005) pf.outros = (pf.outros ?? 0) + resto;
+                      if (Math.abs(resto) > 0.005) pf.dinheiro = (pf.dinheiro ?? 0) + resto;
                     } else {
                       pf[bucket] = (pf[bucket] ?? 0) + v;
                     }
@@ -2835,7 +2854,10 @@ function Page() {
             {minhaSessao && (() => {
               const porForma = porFormaDoDiaFechamento;
               const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
-              const chaves = ordem;
+              // "Outros" só aparece se realmente houver saldo residual (ex.: parcela
+              // de pagamento misto ainda não decomposta). Sangria/suprimento/despesa
+              // agora contam em "Dinheiro" via bucketDeMov.
+              const chaves = ordem.filter((k) => k !== "outros" || Math.abs(porForma[k] ?? 0) > 0.005);
               const totalConferido = Object.values(conferidoOwn)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
@@ -2945,7 +2967,7 @@ function Page() {
             {openFecharTerceiro && (() => {
               const porForma = entradasPorFormaSessao(openFecharTerceiro.id);
               const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
-              const chaves = ordem;
+              const chaves = ordem.filter((k) => k !== "outros" || Math.abs(porForma[k] ?? 0) > 0.005);
               const totalConferido = Object.values(conferidoTerceiro)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
