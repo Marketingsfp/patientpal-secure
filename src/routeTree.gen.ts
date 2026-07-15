@@ -20,6 +20,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PacienteIndexRouteImport } from './routes/paciente.index'
 import { Route as VerificarCodigoRouteImport } from './routes/verificar.$codigo'
+import { Route as PainelClinicaIdRouteImport } from './routes/painel.$clinicaId'
 import { Route as PacientePerfilRouteImport } from './routes/paciente.perfil'
 import { Route as PacienteFinanceiroRouteImport } from './routes/paciente.financeiro'
 import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
@@ -192,6 +193,11 @@ const VerificarCodigoRoute = VerificarCodigoRouteImport.update({
   id: '/verificar/$codigo',
   path: '/verificar/$codigo',
   getParentRoute: () => rootRouteImport,
+} as any)
+const PainelClinicaIdRoute = PainelClinicaIdRouteImport.update({
+  id: '/$clinicaId',
+  path: '/$clinicaId',
+  getParentRoute: () => PainelRoute,
 } as any)
 const PacientePerfilRoute = PacientePerfilRouteImport.update({
   id: '/paciente/perfil',
@@ -877,7 +883,7 @@ export interface FileRoutesByFullPath {
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
-  '/painel': typeof PainelRoute
+  '/painel': typeof PainelRouteWithChildren
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
@@ -889,6 +895,7 @@ export interface FileRoutesByFullPath {
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/paciente/financeiro': typeof PacienteFinanceiroRoute
   '/paciente/perfil': typeof PacientePerfilRoute
+  '/painel/$clinicaId': typeof PainelClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
@@ -1007,7 +1014,7 @@ export interface FileRoutesByTo {
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
-  '/painel': typeof PainelRoute
+  '/painel': typeof PainelRouteWithChildren
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
@@ -1018,6 +1025,7 @@ export interface FileRoutesByTo {
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/paciente/financeiro': typeof PacienteFinanceiroRoute
   '/paciente/perfil': typeof PacientePerfilRoute
+  '/painel/$clinicaId': typeof PainelClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente': typeof PacienteIndexRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
@@ -1135,7 +1143,7 @@ export interface FileRoutesById {
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
-  '/painel': typeof PainelRoute
+  '/painel': typeof PainelRouteWithChildren
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
@@ -1147,6 +1155,7 @@ export interface FileRoutesById {
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/paciente/financeiro': typeof PacienteFinanceiroRoute
   '/paciente/perfil': typeof PacientePerfilRoute
+  '/painel/$clinicaId': typeof PainelClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
@@ -1279,6 +1288,7 @@ export interface FileRouteTypes {
     | '/paciente/consultas'
     | '/paciente/financeiro'
     | '/paciente/perfil'
+    | '/painel/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente/'
     | '/app/agenda'
@@ -1408,6 +1418,7 @@ export interface FileRouteTypes {
     | '/paciente/consultas'
     | '/paciente/financeiro'
     | '/paciente/perfil'
+    | '/painel/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente'
     | '/app/agenda'
@@ -1536,6 +1547,7 @@ export interface FileRouteTypes {
     | '/paciente/consultas'
     | '/paciente/financeiro'
     | '/paciente/perfil'
+    | '/painel/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente/'
     | '/_authenticated/app/agenda'
@@ -1656,7 +1668,7 @@ export interface RootRouteChildren {
   AutoatendimentoRoute: typeof AutoatendimentoRoute
   DiagnosticoRoute: typeof DiagnosticoRoute
   LoginRoute: typeof LoginRoute
-  PainelRoute: typeof PainelRoute
+  PainelRoute: typeof PainelRouteWithChildren
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TotemRoute: typeof TotemRoute
@@ -1753,6 +1765,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/verificar/$codigo'
       preLoaderRoute: typeof VerificarCodigoRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/painel/$clinicaId': {
+      id: '/painel/$clinicaId'
+      path: '/$clinicaId'
+      fullPath: '/painel/$clinicaId'
+      preLoaderRoute: typeof PainelClinicaIdRouteImport
+      parentRoute: typeof PainelRoute
     }
     '/paciente/perfil': {
       id: '/paciente/perfil'
@@ -2915,13 +2934,24 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface PainelRouteChildren {
+  PainelClinicaIdRoute: typeof PainelClinicaIdRoute
+}
+
+const PainelRouteChildren: PainelRouteChildren = {
+  PainelClinicaIdRoute: PainelClinicaIdRoute,
+}
+
+const PainelRouteWithChildren =
+  PainelRoute._addFileChildren(PainelRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AutoatendimentoRoute: AutoatendimentoRoute,
   DiagnosticoRoute: DiagnosticoRoute,
   LoginRoute: LoginRoute,
-  PainelRoute: PainelRoute,
+  PainelRoute: PainelRouteWithChildren,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TotemRoute: TotemRoute,
