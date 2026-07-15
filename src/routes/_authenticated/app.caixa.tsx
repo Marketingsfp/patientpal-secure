@@ -344,6 +344,12 @@ function Page() {
   const [loading, setLoading] = useState(true);
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
+  // Movimentos do próprio usuário ao longo das ~20 sessões mais recentes
+  // (aberta + fechadas). Usado APENAS na aba "Meu caixa → Movimentos" para
+  // permitir visualizar/estornar lançamentos retroativos. NÃO é usado nos
+  // cálculos de Saldo/Totais — esses continuam presos à sessão aberta atual
+  // via `minhasMovs`.
+  const [minhasMovsHist, setMinhasMovsHist] = useState<Mov[]>([]);
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
   // Solicitações de estorno vinculadas às movimentações visíveis
   // (chave = lancamento_id, valor = status). Usado para trocar o botão
