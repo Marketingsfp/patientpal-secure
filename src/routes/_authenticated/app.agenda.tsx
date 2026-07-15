@@ -5314,7 +5314,25 @@ function AgendaPage() {
             const obsOriginal = (principalRow as { observacoes?: string | null } | null)?.observacoes ?? "";
             const idxMisto = obsOriginal.indexOf("Pagamento misto:");
             const trechoMisto = idxMisto >= 0 ? obsOriginal.slice(idxMisto).split(" | ")[0] : "";
-            const rotuloPrincipal = pagamentoRotulos[agId] ?? "CONSULTA";
+            // Fallback do nome do paciente e do rótulo do procedimento:
+            // quando o fluxo que abriu a cobrança (ex.: multi-imagem criado
+            // logo antes) não populou pagamentoPacienteNome / pagamentoRotulos,
+            // buscamos direto na lista de agendamentos carregada. Sem isso,
+            // as descrições vão para o banco como " — CONSULTA (i/N do grupo)"
+            // e o Movimento de Caixa mostra a linha sem paciente.
+            const pacNomeFallback = (id: string) =>
+              items.find((x) => x.id === id)?.paciente_nome ?? "";
+            const rotuloFallback = (id: string) => {
+              const it = items.find((x) => x.id === id);
+              return (
+                pagamentoRotulos[id] ||
+                it?.procedimento ||
+                rotuloFallbackProc(it?.medico_id) ||
+                "CONSULTA"
+              );
+            };
+            const pacNome = pagamentoPacienteNome || pacNomeFallback(agId);
+            const rotuloPrincipal = rotuloFallback(agId);
 
             // 2) Atualiza o principal + insere os N-1 extras (fin_lancamentos e
             //    caixa_movimentos) numa única transação (RPC) — antes eram ~6
@@ -5325,8 +5343,8 @@ function AgendaPage() {
               valor: valoresRat[i],
               descricao:
                 i === 0
-                  ? `${pagamentoPacienteNome} — ${rotuloPrincipal} (1/${N} do grupo)`
-                  : `${pagamentoPacienteNome} — ${pagamentoRotulos[id] ?? "CONSULTA"} (${i + 1}/${N} do grupo)`,
+                  ? `${pacNome} — ${rotuloPrincipal} (1/${N} do grupo)`
+                  : `${pacNome || pacNomeFallback(id)} — ${rotuloFallback(id)} (${i + 1}/${N} do grupo)`,
               observacoes: [`Pagamento agrupado (grupo ${grupoId}) — ${i + 1}/${N} atendimentos`, trechoMisto]
                 .filter(Boolean)
                 .join(" | "),
