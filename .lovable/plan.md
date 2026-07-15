@@ -1,63 +1,73 @@
+## Objetivo
+
+Permitir marcar o **paciente titular** de um contrato do Cartão Benefícios como **"Titular financeiro"** (paga o plano, mas não usufrui dos benefícios). A marcação fica visível na ficha do contrato, na carteirinha impressa/digital, no portal do paciente, e afeta a contagem de vidas usadas na faixa de preço.
+
+## 1) Banco — nova coluna
+
+Nova coluna em `contratos_assinatura`:
+
+- `titular_apenas_financeiro boolean NOT NULL DEFAULT false`
+
+Sem trigger, sem regeração automática de faixa. A recontagem passa a considerar essa flag no cálculo de vidas.
+
+## 2) UI — página do contrato (`src/components/pages/contratos-page.tsx`)
+
+Ao lado do nome do **Paciente titular** (bloco onde hoje ficam os badges de e-mail/foto/duplicidade):
+
+- Adicionar um **checkbox / toggle**: "**Apenas titular financeiro** (não utiliza os benefícios)".
+- Ícone de informação (`Info` do lucide) com tooltip:
+  > "Marque quando o titular apenas paga o contrato e não usufrui dos benefícios. Ele **não conta** na quantidade de vidas do plano, mas aparecerá na carteirinha com o selo 'Titular financeiro — não utiliza'."
+- Ao marcar/desmarcar: se o contrato já existe, salva imediatamente (`update` em `contratos_assinatura`) e recalcula a faixa sugerida.
+- Se ainda é um contrato novo (draft), guarda no estado local e envia no create.
+
+**Contagem de vidas (faixa de preço):**
+- Substituir `vidasAtuais = (titular ? 1 : 0) + deps.length` por `vidasAtuais = (titular && !titularApenasFinanceiro ? 1 : 0) + deps.length`.
+- Aplicar na pré-seleção de faixa e na exibição do "Nº de pessoas no contrato".
+
+**Aba "Resumo" do contrato existente:** exibir uma linha destacada `"Titular apenas financeiro — não utiliza os benefícios"` quando marcado, com o mesmo tooltip explicativo.
+
+## 3) Cartão impresso/digital (`src/lib/print-cartao.ts`)
+
+- Ler `titular_apenas_financeiro` do contrato.
+- Quando `true`, no cartão do titular:
+  - Rótulo `TITULAR` → `TITULAR FINANCEIRO`.
+  - Adicionar faixa/selo discreto no rodapé do cartão: `"Não utiliza os benefícios"`.
+- Dependentes não mudam.
+
+## 4) Portal do paciente (`src/routes/paciente.cartoes.tsx` e RPC `meus_cartoes`)
+
+- Incluir `titular_apenas_financeiro` no retorno da RPC `meus_cartoes` (edição da function; parte do mesmo migration).
+- Quando `papel = "titular"` e a flag for `true`:
+  - Na carteirinha, mudar o subtítulo `capitalize(papel)` de "Titular" para "Titular financeiro".
+  - Abaixo do nome, badge branca semitransparente: `"Não utiliza benefícios"`.
+  - Mantém tudo o resto (mensalidades, dependentes).
+
+## 5) Não faz parte do escopo
+
+- Não altera regras de repasse, faturamento, ou vínculo de consultas.
+- Não bloqueia agendamento/atendimento do titular financeiro no sistema — a marcação é informativa/comercial (o convênio dele simplesmente não deve ser usado; a clínica continua controlando isso operacionalmente).
+- Não altera o cálculo já persistido do `valor_mensal` de contratos antigos; só afeta a **sugestão de faixa** ao editar e o campo `titular_apenas_financeiro`.
+
 ## Antes / Depois
 
-**Antes:**
-- Na aba **Meu caixa → Movimentos**, o atendente enxerga apenas os movimentos da **sessão de caixa aberta no momento**. Quando fecha a sessão de um dia e abre outra no dia seguinte, tudo o que foi lançado em dias anteriores desaparece da tela dele.
-- Sem sessão aberta, aparece só a mensagem "Abra um caixa para visualizar os movimentos" — nem o histórico do próprio usuário é exibido.
-- O filtro de "Período" (Hoje / Semana / Quinzena / Mês / Todos / intervalo) hoje só aparece para **gestor/admin**. O atendente vê apenas "Movimentos de hoje", sem seletor.
-- Confirmado no banco: o recebimento da paciente **ROSENETE COSTA DA SILVA** (R$ 10, misto) foi lançado por **SUELLEN ALEXANDRE BATISTA** em 14/07/2026 dentro da sessão dela daquele dia, que já foi fechada. Por isso não aparece hoje na tela dela.
+**Antes:** todo titular consta como beneficiário; a faixa sempre soma titular + dependentes; não há como registrar que o titular só paga.
 
-**Depois:**
-- A aba **Meu caixa → Movimentos** passa a mostrar os movimentos do próprio usuário **em todas as sessões recentes dele** (sessão aberta atual + últimas sessões fechadas — as mesmas 20 que o "Meu histórico" já carrega hoje).
-- O filtro de **Período** fica disponível também para o atendente, com "Hoje" como padrão (mesmo comportamento visual atual), mas com a opção de escolher Semana, Quinzena, Mês, intervalo ou "Todos".
-- Se o usuário não tiver sessão aberta, a aba **Movimentos** deixa de bloquear a visualização: mostra o histórico dele mesmo assim (a mensagem "Abra um caixa…" fica apenas para as ações que exigem sessão aberta, como novo lançamento).
-- O botão **Solicitar estorno** continua aparecendo para todo movimento do tipo "Recebimento" (regra atual), inclusive nos retroativos — a solicitação vai para o financeiro como já vai hoje. Se já existe uma solicitação em aberto para aquele lançamento, aparece "Aguardando aprovação"; se já foi estornado, aparece "Estornado".
+**Depois:** um checkbox ao lado do titular marca "apenas financeiro"; a faixa passa a contar só quem usufrui; a carteirinha, o resumo do contrato e o portal do paciente exibem o selo "Titular financeiro — não utiliza".
 
-## Escopo
+## Validação
 
-- **Dentro do escopo:** apenas a aba "Meu caixa → Movimentos" da tela `/app/caixa`.
-- **Fora do escopo (não vou tocar):**
-  - Aba "Saldo": continua somando **apenas a sessão aberta atual** (mudar isso quebraria o saldo do caixa).
-  - Aba "Aguardando" (fila de cobrança).
-  - Aba "Histórico".
-  - Aba "Todos (Financeiro)" e "Repasse médico".
-  - Fluxo de aprovação de estorno pelo financeiro (`estorno_solicitacoes`) — nenhuma mudança de regra.
-  - Regras de permissão (`podeEscrever`) e RLS.
-  - Estrutura de tabelas.
+1. Abrir um contrato existente, marcar "Apenas titular financeiro", salvar → a contagem de vidas cai em 1 e a faixa sugerida é recalculada.
+2. Imprimir o cartão → titular sai com rótulo `TITULAR FINANCEIRO` + "Não utiliza os benefícios"; dependentes inalterados.
+3. Logar no portal como o titular → carteirinha mostra "Titular financeiro" e badge "Não utiliza benefícios"; mensalidades continuam listadas.
+4. Desmarcar a flag → tudo volta ao comportamento anterior.
 
-## Áreas críticas
+## Detalhes técnicos
 
-Módulo Caixa / Financeiro. Mudança é apenas de **exibição**: não altera saldo, fechamento, dados salvos, cálculo de repasse, nem cria/edita/exclui movimento algum. O botão "Solicitar estorno" reaproveita o dialog que já existe (`SolicitarEstornoDialog`) — só passa a estar disponível para linhas retroativas.
-
-## Riscos e mitigação
-
-- Risco 1: contaminar o **Saldo** e os **totais por tipo** (que hoje somam `minhasMovs`) com movimentos de dias anteriores → **mitigação:** manter `minhasMovs` como está (só sessão aberta) e criar uma lista separada `minhasMovsHist` só para a tabela da aba Movimentos.
-- Risco 2: o filtro padrão "Hoje" continua vigente, então a tela abre visualmente igual ao que o atendente já conhece — a diferença é a possibilidade de mudar o período.
-- Risco 3: performance — a consulta extra é pelas mesmas ~20 sessões já carregadas em `histRes`, então é um único `IN (sessao_id, …)` a mais; enriquecimento (paciente/serviço/médico) reaproveita a função `enrichMovsList` já existente.
-
-## Detalhes técnicos (para revisão)
-
-Arquivo único: `src/routes/_authenticated/app.caixa.tsx`.
-
-1. Em `load()` (~linhas 554–714):
-   - Manter o fetch atual de `minhasMovs` (movimentos da sessão aberta) para não afetar Saldo/Totais.
-   - Adicionar um novo estado `minhasMovsHist: Mov[]` populado com o UNION de movimentos das sessões em `histRes` (inclui a aberta se existir) — usa `IN (sessao_id, …)` limitado às 20 sessões que já carregamos.
-   - Rodar `enrichMovsList` sobre `minhasMovsHist` e usar o resultado no `enrichPorLanc` (a tabela Movimentos já consulta esse mapa).
-2. `minhasMovsFiltrados` (~linha 366) passa a se basear em `minhasMovsHist` em vez de `minhasMovs`. `medicosDisponiveis` idem.
-3. Aba "Movimentos" (~linha 2126–2374):
-   - Remover o gate `!minhaSessao` que hoje esconde a tabela — o card passa a renderizar mesmo sem sessão aberta.
-   - Mover o seletor de **Período** para fora do bloco `isManager` (fica visível para todos). Título passa a "Meus movimentos" com contagem de período.
-   - Não mexer no botão de Solicitar estorno / Aguardando / Estornado (já funciona por `lancamento_id`).
-4. `mistoObs` (linhas ~1110–1132) continua alimentado só por `minhasMovs` — a coluna "Forma" da linha retroativa vai exibir "misto" sem o detalhamento entre parênteses, o que é o comportamento atual quando o detalhe do misto não está em cache. (Se depois quiserem detalhar misto retroativo, é uma segunda pequena entrega.)
-
-## Validação depois de aplicar
-
-1. Logar como **Suellen** e abrir Caixa → Meu caixa → Movimentos.
-2. Confirmar que o recebimento de **ROSENETE COSTA DA SILVA** de 14/07/2026 (R$ 10, misto, Dr. Diogo Del Cima) aparece ao mudar o Período para "Última semana" ou "Todos".
-3. Conferir que o botão "Solicitar estorno" aparece na linha do Rosenete e abre o mesmo diálogo já existente.
-4. Confirmar que o **Saldo** e os totais por tipo continuam iguais aos de antes (só somando a sessão aberta atual).
-5. Conferir que gestor/admin continuam com o mesmo comportamento de antes na aba Movimentos.
-
-## Pendências / dúvidas
-
-- Se a clínica quiser **restringir** o estorno retroativo a um limite (ex.: só dos últimos 30 dias), preciso dessa regra antes — hoje o botão fica disponível para qualquer recebimento visível, sem limite de tempo, seguindo a regra atual.
-- Se preferirem carregar mais que as últimas 20 sessões do usuário (ex.: 60 dias), me avisem — hoje o `histRes` já limita em 20 e vou seguir o mesmo limite.
+- Migração:
+  ```sql
+  ALTER TABLE public.contratos_assinatura
+    ADD COLUMN titular_apenas_financeiro boolean NOT NULL DEFAULT false;
+  ```
+  E `CREATE OR REPLACE FUNCTION public.meus_cartoes(...)` para incluir a nova coluna no JSON retornado (mantendo a assinatura atual).
+- Não altera RLS nem GRANTs (coluna nova em tabela existente).
+- Arquivos tocados: `contratos-page.tsx`, `print-cartao.ts`, `paciente.cartoes.tsx`, função `meus_cartoes` (migration).
