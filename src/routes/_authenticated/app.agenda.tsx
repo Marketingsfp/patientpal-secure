@@ -1280,6 +1280,15 @@ function AgendaPage() {
   const [nomePorUidExtra, setNomePorUidExtra] = useState<Map<string, string>>(new Map());
   const [notaTexto, setNotaTexto] = useState("");
   const [savingNota, setSavingNota] = useState(false);
+  // Enriquecimento de reagendamento por linha do audit_log.
+  // Chave: id da linha de audit_log; valor: dados da ficha gêmea (contraparte).
+  type ReagInfo = {
+    direcao: "veio_de" | "foi_para";
+    fichaNumero: number | null;
+    inicio: string | null;
+    medicoNome: string | null;
+  };
+  const [reagEnrich, setReagEnrich] = useState<Map<string, ReagInfo>>(new Map());
 
   // Visão "Por médico — vários dias" (estilo planilha)
   const [viewMode, setViewMode] = useState<"dia" | "medico">("dia");
