@@ -195,8 +195,8 @@ export function TotemPage() {
     const { data: pacienteId, error } = await supabase.rpc("totem_upsert_paciente", {
       _clinica_id: clinicaAtual.clinica_id,
       _nome: nome,
-      _cpf: manual.cpf.trim() || null,
-      _telefone: manual.telefone.trim() || null,
+      _cpf: manual.cpf.trim() || undefined,
+      _telefone: manual.telefone.trim() || undefined,
       _descriptor: desc ?? null,
     });
     if (error || !pacienteId) {
