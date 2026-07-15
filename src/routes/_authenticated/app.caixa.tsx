@@ -1669,14 +1669,15 @@ function Page() {
       })
       .eq("id", alvo.id);
     if (!error) {
-      await supabase.from("caixa_movimentos").insert({
-        sessao_id: alvo.id,
-        clinica_id: clinicaAtual.clinica_id,
-        user_id: user.id,
-        tipo: "reabertura",
-        valor: 0,
-        descricao: `Fechamento desfeito por ${executorNome} — motivo: ${motivo}`,
-      });
+      // Remove o(s) movimento(s) de fechamento desta sessão para que o caixa
+      // do operador volte exatamente ao estado anterior (saldo, lista de
+      // movimentos e totais). A auditoria da reabertura fica registrada no
+      // campo `observacoes` da sessão (marcador com executor, data e motivo).
+      await supabase
+        .from("caixa_movimentos")
+        .delete()
+        .eq("sessao_id", alvo.id)
+        .eq("tipo", "fechamento");
     }
     setSaving(false);
     if (error) { mostrarErro(error); return; }
