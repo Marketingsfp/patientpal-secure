@@ -179,6 +179,12 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/lgpd", label: "LGPD", icon: ShieldCheck },
     ],
   },
+  {
+    label: "Configurações",
+    items: [
+    { to: "/app/configuracoes/painel-totem", label: "Painel & Totem", icon: KeyRound },
+    ],
+  },
 ];
 
 export function AppShell() {
