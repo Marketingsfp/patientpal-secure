@@ -1230,7 +1230,10 @@ function Page() {
           somado += (val ?? 0) * sinal;
         }
         const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r.outros += resto;
+        // Sem decomposição (pagamento agrupado, obs sem "Pagamento misto:"),
+        // o resto cai em Dinheiro — a UI não deve exibir "Outros" para
+        // recebimentos reais. O operador pode ajustar no modal de fechamento.
+        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
       } else {
         r[bucket] = (r[bucket] ?? 0) + v;
       }
