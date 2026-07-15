@@ -2010,7 +2010,7 @@ function AgendaPage() {
       if (t) clearTimeout(t);
       t = setTimeout(() => {
         void load();
-      }, 400);
+      }, 800);
     };
     const ch = supabase
       .channel(`agenda-rt-${clinicaAtual.clinica_id}`)
