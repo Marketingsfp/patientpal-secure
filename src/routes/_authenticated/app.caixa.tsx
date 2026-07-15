@@ -3105,17 +3105,25 @@ function Page() {
               {(() => {
                 const tot = { recebimento: 0, sangria: 0, estorno: 0 };
                 let qtdReceb = 0;
+                let qtdEstornoReceb = 0;
                 detalheMovs.forEach((m) => {
                   const v = Number(m.valor || 0);
                   if (m.tipo === "recebimento") { tot.recebimento += v; qtdReceb++; }
                   else if (m.tipo === "sangria") tot.sangria += v;
-                  else if (m.tipo === "estorno") tot.estorno += v;
+                  else if (m.tipo === "estorno") { tot.estorno += v; qtdEstornoReceb++; }
                   if (m.tipo !== "estorno" && (m.descricao ?? "").toLowerCase().includes("estorno")) {
                     tot.estorno += v;
+                    qtdEstornoReceb++;
                   }
                 });
+                // Recebimentos líquidos: o estorno desconta do recebimento do
+                // mesmo movimento, então nem o valor nem a contagem entram no
+                // total exibido — a linha original continua na tabela como
+                // rastro de auditoria.
+                const recebLiquido = tot.recebimento - tot.estorno;
+                const qtdRecebLiquido = Math.max(0, qtdReceb - qtdEstornoReceb);
                 const diff = Number(openDetalhe.diferenca || 0);
-                const media = qtdReceb > 0 ? tot.recebimento / qtdReceb : 0;
+                const media = qtdRecebLiquido > 0 ? recebLiquido / qtdRecebLiquido : 0;
                 return (
                   <>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
@@ -3125,8 +3133,11 @@ function Page() {
                       </div>
                       <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Recebimentos</p>
-                        <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{fmt(tot.recebimento)}</p>
-                        <p className="text-[11px] text-muted-foreground">{qtdReceb} lançamento{qtdReceb === 1 ? "" : "s"}</p>
+                        <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{fmt(recebLiquido)}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {qtdRecebLiquido} lançamento{qtdRecebLiquido === 1 ? "" : "s"}
+                          {qtdEstornoReceb > 0 ? ` · ${qtdEstornoReceb} estornado${qtdEstornoReceb === 1 ? "" : "s"}` : ""}
+                        </p>
                       </div>
                       <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Sangrias</p>
@@ -3135,7 +3146,7 @@ function Page() {
                       <div className="rounded-lg border bg-sky-50 dark:bg-sky-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Média / atendimento</p>
                         <p className="text-base font-bold text-sky-700 dark:text-sky-400">{fmt(media)}</p>
-                        <p className="text-[11px] text-muted-foreground">{qtdReceb} atendimento{qtdReceb === 1 ? "" : "s"}</p>
+                        <p className="text-[11px] text-muted-foreground">{qtdRecebLiquido} atendimento{qtdRecebLiquido === 1 ? "" : "s"}</p>
                       </div>
                       <div className="rounded-lg border bg-fuchsia-50 dark:bg-fuchsia-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Estornos</p>
