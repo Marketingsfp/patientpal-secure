@@ -67,6 +67,21 @@ function normalizarForma(f: string | null | undefined): FormaBucket {
 }
 
 /**
+ * Bucket efetivo do movimento para agrupamento por forma de pagamento.
+ * Sangria, suprimento e despesa mexem no dinheiro físico do caixa: quando
+ * chegam sem `forma_pagamento`, contam como "dinheiro" (em vez de cair em
+ * "outros"). Se, no futuro, algum desses lançamentos vier com forma
+ * explícita, a forma informada é respeitada.
+ */
+function bucketDeMov(m: { tipo: string; forma_pagamento: string | null }): FormaBucket {
+  const bruto = normalizarForma(m.forma_pagamento);
+  if (bruto === "outros" && (m.tipo === "sangria" || m.tipo === "suprimento" || m.tipo === "despesa")) {
+    return "dinheiro";
+  }
+  return bruto;
+}
+
+/**
  * Extrai as parcelas de um pagamento misto a partir do trecho
  * `Pagamento misto: Dinheiro R$ 60,00; PIX R$ 50,00 | ...` gravado em
  * `fin_lancamentos.observacoes`. Retorna somas por bucket já normalizado.
