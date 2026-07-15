@@ -6571,6 +6571,8 @@ function AgendaPage() {
                     onCheckedChange={toggleAll}
                   />
                 </TableHead>
+                <TableHead className="w-20 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
+                <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
                 <TableHead className="w-14 text-center font-semibold text-xs uppercase text-muted-foreground">
                   Ficha
                 </TableHead>
@@ -6583,8 +6585,6 @@ function AgendaPage() {
                 <TableHead className="min-w-[110px] font-semibold text-xs uppercase text-muted-foreground">
                   Serviço
                 </TableHead>
-                <TableHead className="w-20 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
-                <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
                 <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
                 <TableHead className="w-[100px] text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
                   Ações
@@ -6647,6 +6647,14 @@ function AgendaPage() {
                           onCheckedChange={() => toggleSel(a.id)}
                           disabled={ehLivre || realizado}
                         />
+                      </TableCell>
+
+                      {/* Data */}
+                      <TableCell className="py-1.5 text-sm">{fmtData(a.inicio)}</TableCell>
+
+                      {/* Horário */}
+                      <TableCell className="py-1.5 text-sm font-medium text-emerald-600">
+                        {fmtHora(a.inicio)} - {fmtHora(a.fim)}
                       </TableCell>
 
                       {/* Ficha */}
@@ -6715,14 +6723,6 @@ function AgendaPage() {
                           disabled={ehLivre}
                           onChange={(novo) => atualizarProcedimento(a, novo)}
                         />
-                      </TableCell>
-
-                      {/* Data */}
-                      <TableCell className="py-1.5 text-sm">{fmtData(a.inicio)}</TableCell>
-
-                      {/* Horário */}
-                      <TableCell className="py-1.5 text-sm font-medium text-emerald-600">
-                        {fmtHora(a.inicio)} - {fmtHora(a.fim)}
                       </TableCell>
 
                       {/* Situação */}
