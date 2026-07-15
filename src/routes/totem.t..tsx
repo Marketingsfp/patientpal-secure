@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { TotemPage } from "./totem";
 import { PublicClinicaProvider } from "@/components/public-clinica-provider";
 
-export const Route = createFileRoute("/totem/t/$token")({
+export const Route = createFileRoute("/totem/t/")({
   component: TotemPublicoTokenRoute,
   head: () => ({
     meta: [

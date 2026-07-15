@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PainelPage } from "./painel";
 import { PublicClinicaProvider } from "@/components/public-clinica-provider";
 
-export const Route = createFileRoute("/painel/t/$token")({
+export const Route = createFileRoute("/painel/t/")({
   component: PainelPublicoTokenRoute,
   head: () => ({
     meta: [
