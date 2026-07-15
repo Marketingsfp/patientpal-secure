@@ -146,7 +146,7 @@ function CaixaRouteDispatcher() {
   return <Page />;
 }
 
-type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento" | "estorno";
+type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento" | "estorno" | "reabertura";
 interface Sessao {
   id: string; clinica_id: string; user_id: string; user_nome: string | null;
   aberto_em: string; valor_abertura: number;
@@ -180,11 +180,11 @@ const fmtDT = (s: string | null) =>
 const TIPO_LABEL: Record<MovTipo, string> = {
   abertura: "Abertura", sangria: "Sangria", suprimento: "Suprimento",
   recebimento: "Recebimento", despesa: "Despesa", fechamento: "Fechamento",
-  estorno: "Estorno",
+  estorno: "Estorno", reabertura: "Reabertura",
 };
 const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
   abertura: 1, suprimento: 1, recebimento: 1,
-  sangria: -1, despesa: -1, fechamento: 0, estorno: -1,
+  sangria: -1, despesa: -1, fechamento: 0, estorno: -1, reabertura: 0,
 };
 const TIPO_CLASS: Record<MovTipo, string> = {
   abertura: "bg-sky-100 text-sky-700 border-sky-300 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800",
@@ -194,6 +194,7 @@ const TIPO_CLASS: Record<MovTipo, string> = {
   despesa: "bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800",
   fechamento: "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700",
   estorno: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300 dark:bg-fuchsia-950 dark:text-fuchsia-300 dark:border-fuchsia-800",
+  reabertura: "bg-violet-100 text-violet-700 border-violet-300 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800",
 };
 
 const SESSAO_FIELDS = "id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, valor_fechamento_informado, valor_fechamento_calculado, diferenca, status, observacoes";
@@ -229,7 +230,7 @@ function pacienteFromDescricao(desc: string | null): string | null {
   const mens = desc.match(/CONTRATO\s+#\S+\s+-\s+(.+?)\s*$/i);
   if (mens) return mens[1].trim() || null;
   // Descarta descrições sem paciente (sangria/suprimento/fechamento/etc.)
-  if (/^\s*(abertura|fechamento|sangria|suprimento|estorno)\b/i.test(desc)) return null;
+  if (/^\s*(abertura|fechamento|reabertura|sangria|suprimento|estorno|fechamento\s+desfeito)\b/i.test(desc)) return null;
   if (/^\s*\[caixa\]/i.test(desc)) return null;
   const clean = desc.replace(/^Recebimento\s+—\s+/i, "");
   // Nome vem antes do PRIMEIRO separador " — " ou " · "
@@ -492,6 +493,9 @@ function Page() {
   const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
   // Fechamento em lote (por dia) — gestor
   const [openLote, setOpenLote] = useState(false);
+  // Desfazer fechamento (admin/gestor/financeiro)
+  const [openReabrir, setOpenReabrir] = useState<Sessao | null>(null);
+  const [motivoReabrir, setMotivoReabrir] = useState("");
   const [loteSelecionados, setLoteSelecionados] = useState<Record<string, boolean>>({});
   const [obsLote, setObsLote] = useState("");
 
@@ -1040,7 +1044,7 @@ function Page() {
   const resumoTipos = useMemo(() => {
     const r: Record<MovTipo, number> = {
       abertura: 0, sangria: 0, suprimento: 0,
-      recebimento: 0, despesa: 0, fechamento: 0, estorno: 0,
+      recebimento: 0, despesa: 0, fechamento: 0, estorno: 0, reabertura: 0,
     };
     minhasMovs.forEach((m) => { r[m.tipo] += Number(m.valor || 0); });
     return r;
@@ -1640,6 +1644,49 @@ function Page() {
     void load();
   };
 
+  // Desfazer fechamento de um caixa (admin/gestor/financeiro).
+  // Registra auditoria via caixa_movimentos.tipo='reabertura' e limpa
+  // os campos de fechamento da sessão, deixando-a novamente 'aberto'.
+  const desfazerFechamento = async () => {
+    const alvo = openReabrir;
+    if (!alvo || !clinicaAtual || !user) return;
+    const motivo = motivoReabrir.trim();
+    if (!motivo) { toast.error("Informe o motivo da reabertura."); return; }
+    const executorNome = user.user_metadata?.nome || user.email || "gestor";
+    const agora = new Date();
+    const marcador = `[Reaberto por ${executorNome} em ${agora.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })} — ${motivo}]`;
+    const novaObs = alvo.observacoes ? `${alvo.observacoes} | ${marcador}` : marcador;
+    setSaving(true);
+    const { error } = await supabase
+      .from("caixa_sessoes")
+      .update({
+        status: "aberto",
+        fechado_em: null,
+        valor_fechamento_informado: null,
+        valor_fechamento_calculado: null,
+        diferenca: null,
+        observacoes: novaObs,
+      })
+      .eq("id", alvo.id);
+    if (!error) {
+      await supabase.from("caixa_movimentos").insert({
+        sessao_id: alvo.id,
+        clinica_id: clinicaAtual.clinica_id,
+        user_id: user.id,
+        tipo: "reabertura",
+        valor: 0,
+        descricao: `Fechamento desfeito por ${executorNome} — motivo: ${motivo}`,
+      });
+    }
+    setSaving(false);
+    if (error) { mostrarErro(error); return; }
+    setOpenReabrir(null);
+    setMotivoReabrir("");
+    toast.success("Fechamento desfeito. O caixa foi reaberto.");
+    void loadTodos();
+    void load();
+  };
+
   // Fecha em lote todas as sessões marcadas — usa o saldo calculado como
   // valor informado (diferença = 0). Uma observação global identifica o
   // fechamento como feito pelo gestor.
@@ -1708,7 +1755,7 @@ function Page() {
     const cats = new Map<string, Cat>();
     let totPag = 0, totReceb = 0;
     for (const m of movs) {
-      if (m.tipo === "abertura" || m.tipo === "fechamento") continue;
+      if (m.tipo === "abertura" || m.tipo === "fechamento" || m.tipo === "reabertura") continue;
       const key = TIPO_LABEL[m.tipo];
       const cat = cats.get(key) ?? { label: key, pagamento: 0, recebimento: 0 };
       const v = Number(m.valor || 0);
@@ -1724,7 +1771,7 @@ function Page() {
     type Forma = { label: string; pagamento: number; recebimento: number };
     const formas = new Map<string, Forma>();
     for (const m of movs) {
-      if (m.tipo === "abertura" || m.tipo === "fechamento") continue;
+      if (m.tipo === "abertura" || m.tipo === "fechamento" || m.tipo === "reabertura") continue;
       const bucket = normalizarForma(m.forma_pagamento) || "—";
       const label = bucket.toUpperCase();
       const f = formas.get(label) ?? { label, pagamento: 0, recebimento: 0 };
@@ -1738,7 +1785,12 @@ function Page() {
       accF += f.recebimento - f.pagamento;
       return '<tr><td>' + esc(f.label) + '</td><td style="text-align:right;">' + fmt(f.pagamento) + '</td><td style="text-align:right;">' + fmt(f.recebimento) + '</td><td style="text-align:right;">' + fmt(accF) + '</td></tr>';
     }).join("");
-    const qtd = movs.filter((m) => m.tipo !== "abertura" && m.tipo !== "fechamento").length;
+    const qtd = movs.filter((m) => m.tipo !== "abertura" && m.tipo !== "fechamento" && m.tipo !== "reabertura").length;
+    const reaberturas = movs.filter((m) => m.tipo === "reabertura");
+    const linhasReabertura = reaberturas.length === 0 ? "" :
+      '<div style="margin-top:10px;font-size:11px;color:#7c3aed;"><strong>Reaberturas de fechamento:</strong><ul style="margin:4px 0 0 16px;padding:0;">' +
+      reaberturas.map((m) => '<li>' + esc(new Date(m.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })) + ' — ' + esc(m.descricao || "sem detalhes") + '</li>').join("") +
+      '</ul></div>';
     const emissao = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
     const style = 'body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;} h1{font-size:16px;margin:0 0 6px;text-align:center;letter-spacing:.5px;} .meta{font-size:11px;color:#475569;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;} table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;} th,td{padding:5px 6px;border-bottom:1px solid #cbd5e1;} thead th{border-bottom:2px solid #0f172a;text-align:left;} thead th.n{text-align:right;} tfoot td{border-top:2px solid #0f172a;font-weight:700;} .right{text-align:right;}';
     const empty = '<tr><td colspan="4" style="text-align:center;color:#64748b;">Sem movimentos</td></tr>';
@@ -1752,6 +1804,7 @@ function Page() {
       '<table><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + (linhasForma || empty) + '</tbody>' +
       '<tfoot><tr><td>TOTAL</td><td class="right">' + fmt(totPag) + '</td><td class="right">' + fmt(totReceb) + '</td><td class="right">' + fmt(totReceb - totPag) + '</td></tr></tfoot></table>' +
       '<div class="meta"><span>' + qtd + ' registro' + (qtd === 1 ? '' : 's') + '</span></div>' +
+      linhasReabertura +
       '<script>window.onload=function(){window.print();}</script></body></html>';
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
@@ -2495,6 +2548,22 @@ function Page() {
                                 <Lock className="h-4 w-4" />
                               </Button>
                             )}
+                            {!sAberta && l.statusDia === "fechado" && podeLancarRecebDespesa && (() => {
+                              const sFechada = [...l.sessoes]
+                                .filter((x) => x.status === "fechado" && x.fechado_em)
+                                .sort((a, b) => (b.fechado_em || "").localeCompare(a.fechado_em || ""))[0];
+                              if (!sFechada) return null;
+                              return (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Desfazer fechamento (reabrir caixa)"
+                                  onClick={() => { setOpenReabrir(sFechada); setMotivoReabrir(""); }}
+                                >
+                                  <Undo2 className="h-4 w-4 text-amber-700" />
+                                </Button>
+                              );
+                            })()}
                           </TableCell>
                         </TableRow>
                       );
@@ -2816,6 +2885,46 @@ function Page() {
               <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* === Modal Desfazer fechamento (admin/gestor/financeiro) === */}
+      <Dialog open={!!openReabrir} onOpenChange={(o) => { if (!o) { setOpenReabrir(null); setMotivoReabrir(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Desfazer fechamento do caixa</DialogTitle>
+            {openReabrir && (
+              <DialogDescription>
+                Operador: <strong className="uppercase">{openReabrir.user_nome || openReabrir.user_id.slice(0, 8)}</strong>
+                <br />
+                Calculado: <strong>{fmt(Number(openReabrir.valor_fechamento_calculado || 0))}</strong>
+                {" · "}Informado: <strong>{fmt(Number(openReabrir.valor_fechamento_informado || 0))}</strong>
+                {" · "}Diferença: <strong>{fmt(Number(openReabrir.diferenca || 0))}</strong>
+                <br />
+                <span className="text-xs text-muted-foreground">
+                  O caixa voltará ao status "aberto". O histórico de fechamento
+                  fica registrado e uma linha de reabertura será adicionada aos
+                  movimentos do operador.
+                </span>
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="motivo-reabrir">Motivo (obrigatório)</Label>
+            <Textarea
+              id="motivo-reabrir"
+              value={motivoReabrir}
+              onChange={(e) => setMotivoReabrir(e.target.value)}
+              placeholder="Ex.: valor informado incorreto, sangria pendente..."
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setOpenReabrir(null); setMotivoReabrir(""); }}>Cancelar</Button>
+            <Button variant="destructive" disabled={saving || !motivoReabrir.trim()} onClick={() => void desfazerFechamento()}>
+              <Undo2 className="h-4 w-4 mr-2" /> Reabrir caixa
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
