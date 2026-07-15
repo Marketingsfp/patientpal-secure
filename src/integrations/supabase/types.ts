@@ -8363,6 +8363,10 @@ export type Database = {
         Args: { _canal_id: string; _user_id: string }
         Returns: boolean
       }
+      is_financeiro_clinica: {
+        Args: { _clinica_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_medico: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
