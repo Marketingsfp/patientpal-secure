@@ -149,6 +149,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
     { to: "/app/medicos", label: "Médicos", icon: Stethoscope },
     { to: "/app/estoque", label: "Estoque", icon: LayoutGrid },
+    { to: "/app/clientes/duplicados", label: "Duplicados / Merge", icon: Users },
     ],
   },
   {
