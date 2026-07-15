@@ -146,7 +146,7 @@ function CaixaRouteDispatcher() {
   return <Page />;
 }
 
-type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento" | "estorno";
+type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento" | "estorno" | "reabertura";
 interface Sessao {
   id: string; clinica_id: string; user_id: string; user_nome: string | null;
   aberto_em: string; valor_abertura: number;
@@ -180,11 +180,11 @@ const fmtDT = (s: string | null) =>
 const TIPO_LABEL: Record<MovTipo, string> = {
   abertura: "Abertura", sangria: "Sangria", suprimento: "Suprimento",
   recebimento: "Recebimento", despesa: "Despesa", fechamento: "Fechamento",
-  estorno: "Estorno",
+  estorno: "Estorno", reabertura: "Reabertura",
 };
 const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
   abertura: 1, suprimento: 1, recebimento: 1,
-  sangria: -1, despesa: -1, fechamento: 0, estorno: -1,
+  sangria: -1, despesa: -1, fechamento: 0, estorno: -1, reabertura: 0,
 };
 const TIPO_CLASS: Record<MovTipo, string> = {
   abertura: "bg-sky-100 text-sky-700 border-sky-300 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800",
@@ -194,6 +194,7 @@ const TIPO_CLASS: Record<MovTipo, string> = {
   despesa: "bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800",
   fechamento: "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700",
   estorno: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300 dark:bg-fuchsia-950 dark:text-fuchsia-300 dark:border-fuchsia-800",
+  reabertura: "bg-violet-100 text-violet-700 border-violet-300 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800",
 };
 
 const SESSAO_FIELDS = "id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, valor_fechamento_informado, valor_fechamento_calculado, diferenca, status, observacoes";
