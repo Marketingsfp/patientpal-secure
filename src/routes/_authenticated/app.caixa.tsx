@@ -3109,7 +3109,10 @@ function Page() {
                   const v = Number(m.valor || 0);
                   if (m.tipo === "recebimento") { tot.recebimento += v; qtdReceb++; }
                   else if (m.tipo === "sangria") tot.sangria += v;
-                  if ((m.descricao ?? "").toLowerCase().includes("estorno")) tot.estorno += v;
+                  else if (m.tipo === "estorno") tot.estorno += v;
+                  if (m.tipo !== "estorno" && (m.descricao ?? "").toLowerCase().includes("estorno")) {
+                    tot.estorno += v;
+                  }
                 });
                 const diff = Number(openDetalhe.diferenca || 0);
                 const media = qtdReceb > 0 ? tot.recebimento / qtdReceb : 0;
