@@ -513,19 +513,6 @@ export function AppShell() {
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
         </div>
-        {subsystemLabel && (
-          <div className={`${collapsed ? "px-1 py-2" : "px-3 py-2"} border-b border-white/10`}>
-            <button
-              type="button"
-              onClick={() => { setSubsystem(null); navigate({ to: "/app" }); }}
-              title="Trocar subsistema"
-              className={`w-full flex items-center gap-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors text-white text-xs font-medium ${collapsed ? "justify-center px-2 py-2" : "px-3 py-2"}`}
-            >
-              <LayoutGrid className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="flex-1 truncate text-left">Menu</span>}
-            </button>
-          </div>
-        )}
         <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto">
           {visibleNavRows.map((row) => {
             const leafIsActive = (to: string, hash?: string) => {
