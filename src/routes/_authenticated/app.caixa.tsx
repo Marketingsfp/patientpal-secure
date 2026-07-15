@@ -493,6 +493,9 @@ function Page() {
   const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
   // Fechamento em lote (por dia) — gestor
   const [openLote, setOpenLote] = useState(false);
+  // Desfazer fechamento (admin/gestor/financeiro)
+  const [openReabrir, setOpenReabrir] = useState<Sessao | null>(null);
+  const [motivoReabrir, setMotivoReabrir] = useState("");
   const [loteSelecionados, setLoteSelecionados] = useState<Record<string, boolean>>({});
   const [obsLote, setObsLote] = useState("");
 
