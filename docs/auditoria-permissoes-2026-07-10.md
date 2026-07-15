@@ -111,15 +111,15 @@ A tela não configura exceções individuais. O acesso efetivo de cada usuário 
 
 ## Estado real da clínica analisada
 
-| Perfil | Usuários ativos | Matriz salva |
-|---|---:|---:|
-| Admin | 10 | 1/57, mas runtime concede tudo |
-| Médico | 6 | 43/57 |
-| Recepção | 19 | 15/57 |
-| Enfermeiro | 3 | 13/57 |
-| Financeiro | 2 | 18/57 |
-| Caixa | 1 | 11/57 |
-| Gestor | 0 | sem linhas; usa preset enquanto não for salvo |
+| Perfil     | Usuários ativos |                                  Matriz salva |
+| ---------- | --------------: | --------------------------------------------: |
+| Admin      |              10 |                1/57, mas runtime concede tudo |
+| Médico     |               6 |                                         43/57 |
+| Recepção   |              19 |                                         15/57 |
+| Enfermeiro |               3 |                                         13/57 |
+| Financeiro |               2 |                                         18/57 |
+| Caixa      |               1 |                                         11/57 |
+| Gestor     |               0 | sem linhas; usa preset enquanto não for salvo |
 
 ## Avaliação por perfil
 
