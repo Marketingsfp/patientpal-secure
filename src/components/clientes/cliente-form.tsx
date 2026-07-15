@@ -689,10 +689,16 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
 
   const fieldProps = (field: keyof FormState) => {
     const active = recording && voiceField === field;
+    // Campos que devem aceitar apenas letras (com acentos), espaço, hífen e apóstrofo.
+    const somenteLetras = field === "nome" || field === "responsavel_nome";
+    const sanitize = (v: string) =>
+      somenteLetras
+        ? v.replace(/[^\p{L}\s'’\-\.]/gu, "").replace(/\s{2,}/g, " ")
+        : v;
     return {
       field: field as string,
       value: form[field] as string,
-      onChange: (v: string) => setForm(f => ({ ...f, [field]: v } as FormState)),
+      onChange: (v: string) => setForm(f => ({ ...f, [field]: sanitize(v) } as FormState)),
       onVoice: () => active ? stopVoice() : startVoice(field),
       voiceActive: active,
       speechSupported,
