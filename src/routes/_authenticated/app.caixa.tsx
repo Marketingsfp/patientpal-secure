@@ -2851,7 +2851,10 @@ function Page() {
             {minhaSessao && (() => {
               const porForma = porFormaDoDiaFechamento;
               const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
-              const chaves = ordem;
+              // "Outros" só aparece se realmente houver saldo residual (ex.: parcela
+              // de pagamento misto ainda não decomposta). Sangria/suprimento/despesa
+              // agora contam em "Dinheiro" via bucketDeMov.
+              const chaves = ordem.filter((k) => k !== "outros" || Math.abs(porForma[k] ?? 0) > 0.005);
               const totalConferido = Object.values(conferidoOwn)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
@@ -2961,7 +2964,7 @@ function Page() {
             {openFecharTerceiro && (() => {
               const porForma = entradasPorFormaSessao(openFecharTerceiro.id);
               const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
-              const chaves = ordem;
+              const chaves = ordem.filter((k) => k !== "outros" || Math.abs(porForma[k] ?? 0) > 0.005);
               const totalConferido = Object.values(conferidoTerceiro)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
