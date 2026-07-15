@@ -6438,7 +6438,7 @@ function AgendaPage() {
 
           {/* Agenda */}
           <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Agenda</Label>
+            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Tipo</Label>
             {(() => {
               let ags: { id: string; nome: string }[];
               if (filtroMedico !== "todos") {
