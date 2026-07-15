@@ -2542,6 +2542,22 @@ function Page() {
                                 <Lock className="h-4 w-4" />
                               </Button>
                             )}
+                            {!sAberta && l.statusDia === "fechado" && podeLancarRecebDespesa && (() => {
+                              const sFechada = [...l.sessoes]
+                                .filter((x) => x.status === "fechado" && x.fechado_em)
+                                .sort((a, b) => (b.fechado_em || "").localeCompare(a.fechado_em || ""))[0];
+                              if (!sFechada) return null;
+                              return (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Desfazer fechamento (reabrir caixa)"
+                                  onClick={() => { setOpenReabrir(sFechada); setMotivoReabrir(""); }}
+                                >
+                                  <Undo2 className="h-4 w-4 text-amber-700" />
+                                </Button>
+                              );
+                            })()}
                           </TableCell>
                         </TableRow>
                       );
