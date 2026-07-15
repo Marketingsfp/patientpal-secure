@@ -86,12 +86,13 @@ export const baixarBackupDoDia = createServerFn({ method: "POST" })
 export const dispararBackupAgora = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: mem } = await context.supabase
+    const { data: mems } = await context.supabase
       .from("clinica_memberships")
       .select("role")
       .eq("user_id", context.userId)
-      .maybeSingle();
-    if ((mem as { role?: string } | null)?.role !== "admin") {
+      .eq("role", "admin")
+      .limit(1);
+    if (!mems || mems.length === 0) {
       throw new Error("Somente administradores podem disparar backup");
     }
     const projectId = process.env.SUPABASE_PROJECT_ID!;
