@@ -50,12 +50,9 @@ export function PublicClinicaProvider({
         data = arr[0] ?? null;
         error = res.error;
       } else if (clinicaId) {
-        const res = await supabase
-          .from("clinicas")
-          .select("id, nome, cidade, estado, branding, base_importada")
-          .eq("id", clinicaId)
-          .maybeSingle();
-        data = (res.data as ClinicaRow | null) ?? null;
+        const res = await supabase.rpc("resolver_clinica_publica", { _clinica_id: clinicaId });
+        const arr = (res.data ?? []) as ClinicaRow[];
+        data = arr[0] ?? null;
         error = res.error;
       }
       if (cancelado) return;
