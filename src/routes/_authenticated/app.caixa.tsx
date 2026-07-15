@@ -682,38 +682,43 @@ function Page() {
       return { enrich, cancelados };
     };
 
-    if (aberta) {
+    // Sessões recentes do usuário (aberta + últimas fechadas).
+    // Carregamos os movimentos de TODAS elas em uma única consulta e
+    // dividimos em duas listas:
+    //   - minhasMovs      → só a sessão aberta atual (base para Saldo/Totais)
+    //   - minhasMovsHist  → todas as sessões recentes (base para a aba
+    //                       "Meu caixa → Movimentos", permitindo ver e
+    //                       solicitar estorno de lançamentos retroativos)
+    const histSessoes = (histRes.data ?? []) as Sessao[];
+    const sessaoIds = new Set<string>(histSessoes.map((s) => s.id));
+    if (aberta) sessaoIds.add((aberta as Sessao).id);
+    const idsArr = Array.from(sessaoIds);
+    let movsHist: Mov[] = [];
+    if (idsArr.length > 0) {
       const { data: movs } = await supabase
         .from("caixa_movimentos")
         .select(MOV_FIELDS)
-        .eq("sessao_id", (aberta as Sessao).id)
-        .order("created_at", { ascending: true });
-      const movsList = (movs ?? []) as Mov[];
-      setMinhasMovs(movsList);
-      const { enrich, cancelados } = await enrichMovsList(movsList);
-      setEnrichPorLanc(enrich);
-      setLancsCancelados(cancelados);
-    } else {
-      // Sem sessão aberta: mostra movimentos das sessões recentes do
-      // próprio usuário e AINDA ASSIM roda o enriquecimento — sem isso,
-      // as colunas Paciente/Serviço/Médico ficavam vazias e o filtro
-      // por médico não listava opções, mesmo com movimentos visíveis.
-      const histSessoes = (histRes.data ?? []) as Sessao[];
-      const histIds = histSessoes.map((s) => s.id);
-      let movsList: Mov[] = [];
-      if (histIds.length > 0) {
-        const { data: movs } = await supabase
-          .from("caixa_movimentos")
-          .select(MOV_FIELDS)
-          .in("sessao_id", histIds)
-          .order("created_at", { ascending: false });
-        movsList = (movs ?? []) as Mov[];
-      }
-      setMinhasMovs(movsList);
-      const { enrich, cancelados } = await enrichMovsList(movsList);
-      setEnrichPorLanc(enrich);
-      setLancsCancelados(cancelados);
+        .in("sessao_id", idsArr)
+        .order("created_at", { ascending: false });
+      movsHist = (movs ?? []) as Mov[];
     }
+    setMinhasMovsHist(movsHist);
+    if (aberta) {
+      // Sessão aberta: `minhasMovs` recebe apenas os movimentos da sessão
+      // atual (ordem crescente, como antes) para manter Saldo/Totais
+      // idênticos ao comportamento anterior.
+      const sid = (aberta as Sessao).id;
+      const abertaMovs = movsHist
+        .filter((m) => m.sessao_id === sid)
+        .slice()
+        .sort((a, b) => a.created_at.localeCompare(b.created_at));
+      setMinhasMovs(abertaMovs);
+    } else {
+      setMinhasMovs([]);
+    }
+    const { enrich, cancelados } = await enrichMovsList(movsHist);
+    setEnrichPorLanc(enrich);
+    setLancsCancelados(cancelados);
 
     setMinhasSessoes((histRes.data ?? []) as Sessao[]);
     setLoading(false);
