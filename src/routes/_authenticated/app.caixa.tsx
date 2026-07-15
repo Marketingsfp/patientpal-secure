@@ -2280,9 +2280,7 @@ function Page() {
                           <TableCell colSpan={10} className="text-center text-muted-foreground">
                             {filtrosAtivos
                               ? "Nenhum movimento corresponde aos filtros"
-                              : isManager
-                                ? "Sem movimentos no período"
-                                : "Sem movimentos hoje"}
+                              : "Sem movimentos no período"}
                           </TableCell>
                         </TableRow>
                       ) : minhasMovsFiltrados.map((m) => {
