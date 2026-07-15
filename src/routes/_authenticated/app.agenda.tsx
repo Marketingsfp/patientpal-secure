@@ -6557,11 +6557,15 @@ function AgendaPage() {
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
         <div className="h-8"></div> {/* ← ADICIONE ESTA LINHA */}
         {/* Tabela - Com botões de ação na linha */}
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
+        {/* Sem overflow-hidden aqui: um ancestral com overflow != visible vira
+            o contexto de scroll do sticky, e como este div nunca rola
+            internamente (quem rola é o <main> do app-shell), o cabeçalho
+            "sticky top-0" parava de acompanhar o scroll da página. */}
+        <div className="rounded-lg border border-border bg-card">
           <Table className="max-lg:table max-lg:overflow-visible">
             <TableHeader className="sticky top-0 z-20">
               <TableRow className="bg-muted">
-                <TableHead className="w-8" title="Selecione para ações em lote">
+                <TableHead className="w-8 rounded-tl-lg" title="Selecione para ações em lote">
                   <Checkbox
                     checked={paginados.length > 0 && selecionados.size === paginados.length}
                     onCheckedChange={toggleAll}
@@ -6582,7 +6586,7 @@ function AgendaPage() {
                 <TableHead className="w-20 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
                 <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
                 <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
-                <TableHead className="w-[100px] text-right font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="w-[100px] text-right font-semibold text-xs uppercase text-muted-foreground rounded-tr-lg">
                   Ações
                 </TableHead>
               </TableRow>
@@ -7308,6 +7312,11 @@ function AgendaPorMedicoGrid({
     return `${dd}/${mm} — ${diasSemana[d.getDay()]}`;
   };
 
+  // Precisa de altura limitada + overflow-auto nos dois eixos abaixo: o
+  // scroll horizontal (muitas colunas de dia) já obrigava overflow != visible
+  // aqui, o que vira o contexto do sticky — sem uma altura própria, esse div
+  // nunca rolava verticalmente por conta própria (quem rolava era o <main>
+  // por fora) e o cabeçalho "sticky top-0" não tinha efeito nenhum.
   return (
     <div className="space-y-3">
       {!medicoId ? (
@@ -7315,12 +7324,12 @@ function AgendaPorMedicoGrid({
           Selecione um profissional no filtro acima para visualizar a agenda por médico.
         </div>
       ) : (
-        <div className="rounded-2xl border bg-card overflow-x-auto">
+        <div className="rounded-2xl border bg-card overflow-auto max-h-[70vh]">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-muted/40">
                 <th
-                  className="sticky left-0 z-10 bg-muted/60 px-3 py-2 text-xs font-semibold text-muted-foreground border-r"
+                  className="sticky left-0 top-0 z-20 bg-muted/60 px-3 py-2 text-xs font-semibold text-muted-foreground border-r"
                   style={{ minWidth: 88 }}
                 >
                   Hora
@@ -7376,7 +7385,7 @@ function FragmentDayHeader({ dia, fmtCabecalho }: { dia: string; fmtCabecalho: (
   return (
     <>
       <th
-        className="px-2 py-2 text-xs font-semibold text-muted-foreground border-r bg-muted/40"
+        className="sticky top-0 z-10 px-2 py-2 text-xs font-semibold text-muted-foreground border-r bg-muted/40"
         style={{ minWidth: 70 }}
       >
         Hora
@@ -7384,7 +7393,7 @@ function FragmentDayHeader({ dia, fmtCabecalho }: { dia: string; fmtCabecalho: (
         Fim
       </th>
       <th
-        className="px-3 py-2 text-xs font-semibold text-foreground border-r bg-muted/40 text-left"
+        className="sticky top-0 z-10 px-3 py-2 text-xs font-semibold text-foreground border-r bg-muted/40 text-left"
         style={{ minWidth: 180 }}
       >
         {fmtCabecalho(dia)}
