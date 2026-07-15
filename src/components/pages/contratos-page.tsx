@@ -1059,6 +1059,13 @@ function NovoContratoForm({
       return toast.error("Falha ao criar contrato: retorno inesperado da função de banco.");
     }
 
+    if (titularApenasFinanceiro) {
+      await supabase
+        .from("contratos_assinatura")
+        .update({ titular_apenas_financeiro: true } as any)
+        .eq("id", contrato.id);
+    }
+
     setSaving(false);
     toast.success(`Contrato #${contrato.numero} criado com ${convenio.num_parcelas} mensalidades${taxaAdesao > 0 && mensalidadesJaPagas === 0 ? " e taxa de adesao separada" : ""}`);
 
