@@ -2468,7 +2468,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
     setIncTipo("dependente");
     // Recalcula valor das parcelas em aberto conforme a nova quantidade de vidas
     // (titular + dependentes ativos, incluindo o recém-incluído)
-    await recalcularParcelasAbertas(depsAtivos.length + 2);
+    await recalcularParcelasAbertas(titularConta + depsAtivos.length + 1);
     await load();
     abrirTermoSeAssinado(novoDep, "Inclusão");
   };
@@ -2490,7 +2490,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
     setExcAlvo(null);
     // Recalcula valor das parcelas em aberto conforme nova qtd de vidas
     // (titular = 1 + dependentes ativos restantes = depsAtivos.length - 1)
-    await recalcularParcelasAbertas(1 + Math.max(0, depsAtivos.length - 1));
+    await recalcularParcelasAbertas(titularConta + Math.max(0, depsAtivos.length - 1));
     await load();
     abrirTermoSeAssinado(alvo, "Exclusão");
   };
