@@ -1041,7 +1041,7 @@ function Page() {
   const resumoTipos = useMemo(() => {
     const r: Record<MovTipo, number> = {
       abertura: 0, sangria: 0, suprimento: 0,
-      recebimento: 0, despesa: 0, fechamento: 0, estorno: 0,
+      recebimento: 0, despesa: 0, fechamento: 0, estorno: 0, reabertura: 0,
     };
     minhasMovs.forEach((m) => { r[m.tipo] += Number(m.valor || 0); });
     return r;
