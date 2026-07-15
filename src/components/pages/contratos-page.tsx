@@ -802,6 +802,7 @@ function NovoContratoForm({
   const [titular, setTitular] = useState<Paciente | null>(null);
   const [clientes, setClientes] = useState<Paciente[]>([]);
   const [titularOpen, setTitularOpen] = useState(false);
+  const [titularApenasFinanceiro, setTitularApenasFinanceiro] = useState(false);
   const [depOpen, setDepOpen] = useState(false);
   const [valor, setValor] = useState(0);
   const [taxa, setTaxa] = useState(0);
@@ -925,13 +926,13 @@ function NovoContratoForm({
       setValor(Number(convenio.valor_mensal));
       return;
     }
-    const vidasAtuais = (titular ? 1 : 0) + deps.length;
+    const vidasAtuais = (titular && !titularApenasFinanceiro ? 1 : 0) + deps.length;
     const inicial =
       faixas.find((f) => vidasAtuais >= f.vidas_de && (f.vidas_ate == null || vidasAtuais <= f.vidas_ate)) ?? faixas[0];
     setFaixaId(inicial.id);
     setValor(Number(inicial.valor_mensal));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [faixas]);
+  }, [faixas, titularApenasFinanceiro]);
 
   // Quando o usuário muda a faixa manualmente, atualiza o valor mensal
   useEffect(() => {
