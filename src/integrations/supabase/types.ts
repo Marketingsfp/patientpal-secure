@@ -8430,6 +8430,7 @@ export type Database = {
           valor_repasse_padrao: number
         }[]
       }
+      merge_pacientes: { Args: { _ids: string[] }; Returns: string }
       meus_cartoes: { Args: never; Returns: Json }
       minhas_consultas: {
         Args: never
