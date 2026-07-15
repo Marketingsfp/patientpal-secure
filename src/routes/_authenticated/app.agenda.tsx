@@ -6239,6 +6239,24 @@ function AgendaPage() {
 
                   // Agendou paciente (slot → alocado)
                   if (pacienteMudou && antesLivre && !depoisLivre) {
+                    const info = reagEnrich.get(r.id);
+                    if (info && info.direcao === "veio_de") {
+                      const ficha = info.fichaNumero != null ? String(info.fichaNumero).padStart(3, "0") : "—";
+                      items.push({
+                        id: r.id,
+                        when: r.created_at,
+                        quem,
+                        kind: "reagendou",
+                        body: (
+                          <>
+                            <b>{String(depois.paciente_nome ?? "—")}</b> reagendado — veio da ficha <b>#{ficha}</b>
+                            {info.inicio ? <> · <b>{fmtDateTime(info.inicio)}</b></> : null}
+                            {info.medicoNome ? <> · Prof. <b>{info.medicoNome}</b></> : null}.
+                          </>
+                        ),
+                      });
+                      continue;
+                    }
                     items.push({
                       id: r.id,
                       when: r.created_at,
@@ -6254,6 +6272,24 @@ function AgendaPage() {
                   }
                   // Liberou horário (alocado → slot)
                   if (pacienteMudou && !antesLivre && depoisLivre) {
+                    const info = reagEnrich.get(r.id);
+                    if (info && info.direcao === "foi_para") {
+                      const ficha = info.fichaNumero != null ? String(info.fichaNumero).padStart(3, "0") : "—";
+                      items.push({
+                        id: r.id,
+                        when: r.created_at,
+                        quem,
+                        kind: "reagendou",
+                        body: (
+                          <>
+                            <b>{String(antes.paciente_nome ?? "—")}</b> reagendado — movido para ficha <b>#{ficha}</b>
+                            {info.inicio ? <> · <b>{fmtDateTime(info.inicio)}</b></> : null}
+                            {info.medicoNome ? <> · Prof. <b>{info.medicoNome}</b></> : null}.
+                          </>
+                        ),
+                      });
+                      continue;
+                    }
                     items.push({
                       id: r.id,
                       when: r.created_at,
