@@ -18,6 +18,7 @@ import {
   Mail,
   AlertTriangle,
   Loader2,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -801,6 +802,7 @@ function NovoContratoForm({
   const [titular, setTitular] = useState<Paciente | null>(null);
   const [clientes, setClientes] = useState<Paciente[]>([]);
   const [titularOpen, setTitularOpen] = useState(false);
+  const [titularApenasFinanceiro, setTitularApenasFinanceiro] = useState(false);
   const [depOpen, setDepOpen] = useState(false);
   const [valor, setValor] = useState(0);
   const [taxa, setTaxa] = useState(0);
@@ -924,13 +926,13 @@ function NovoContratoForm({
       setValor(Number(convenio.valor_mensal));
       return;
     }
-    const vidasAtuais = (titular ? 1 : 0) + deps.length;
+    const vidasAtuais = (titular && !titularApenasFinanceiro ? 1 : 0) + deps.length;
     const inicial =
       faixas.find((f) => vidasAtuais >= f.vidas_de && (f.vidas_ate == null || vidasAtuais <= f.vidas_ate)) ?? faixas[0];
     setFaixaId(inicial.id);
     setValor(Number(inicial.valor_mensal));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [faixas]);
+  }, [faixas, titularApenasFinanceiro]);
 
   // Quando o usuário muda a faixa manualmente, atualiza o valor mensal
   useEffect(() => {
@@ -1055,6 +1057,13 @@ function NovoContratoForm({
     if (!contrato?.id) {
       setSaving(false);
       return toast.error("Falha ao criar contrato: retorno inesperado da função de banco.");
+    }
+
+    if (titularApenasFinanceiro) {
+      await supabase
+        .from("contratos_assinatura")
+        .update({ titular_apenas_financeiro: true } as any)
+        .eq("id", contrato.id);
     }
 
     setSaving(false);
@@ -1221,6 +1230,25 @@ function NovoContratoForm({
                       </Button>
                     </div>
                   ) : null}
+                  <div className="flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2">
+                    <input
+                      id="tit-apenas-fin-novo"
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={titularApenasFinanceiro}
+                      onChange={(e) => setTitularApenasFinanceiro(e.target.checked)}
+                    />
+                    <label htmlFor="tit-apenas-fin-novo" className="text-sm cursor-pointer">
+                      <span className="font-medium">Apenas titular financeiro</span>
+                      <span className="text-muted-foreground"> — paga o plano, mas não usufrui dos benefícios.</span>
+                      <span
+                        className="ml-1 inline-flex items-center text-muted-foreground"
+                        title="Marque quando o titular apenas paga o contrato e não usufrui dos benefícios. Ele NÃO conta na quantidade de vidas do plano e aparecerá na carteirinha com o selo 'Titular financeiro — Não utiliza os benefícios'."
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </span>
+                    </label>
+                  </div>
                 </div>
               ) : (
                 <PatientSearchInput
@@ -1608,6 +1636,41 @@ function DetalheContrato({
       <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">{value || "—"}</div>
     </div>
   );
+  const ApenasFinanceiroToggle = ({
+    contratoId: _cid,
+    checked,
+    saving,
+    disabled,
+    onChange,
+  }: {
+    contratoId: string;
+    checked: boolean;
+    saving: boolean;
+    disabled?: boolean;
+    onChange: (v: boolean) => Promise<void> | void;
+  }) => (
+    <div className="flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2 mt-1">
+      <input
+        id={`tit-apenas-fin-${_cid}`}
+        type="checkbox"
+        className="mt-0.5"
+        checked={checked}
+        disabled={saving || disabled}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <label htmlFor={`tit-apenas-fin-${_cid}`} className="text-sm cursor-pointer">
+        <span className="font-medium">Apenas titular financeiro</span>
+        <span className="text-muted-foreground"> — paga o plano, mas não usufrui dos benefícios.</span>
+        <span
+          className="ml-1 inline-flex items-center text-muted-foreground"
+          title="Marque quando o titular apenas paga o contrato e não usufrui dos benefícios. Ele NÃO conta na quantidade de vidas do plano e aparecerá na carteirinha com o selo 'Titular financeiro — Não utiliza os benefícios'."
+        >
+          <Info className="h-3.5 w-3.5" />
+        </span>
+        {saving ? <span className="ml-2 text-xs text-muted-foreground">salvando…</span> : null}
+      </label>
+    </div>
+  );
   const [mens, setMens] = useState<Mens[]>([]);
   const [extraRecebido, setExtraRecebido] = useState<{ total: number; count: number }>({ total: 0, count: 0 });
   const [drill, setDrill] = useState<null | "pagas" | "recebido" | "areceber">(null);
@@ -1665,6 +1728,10 @@ function DetalheContrato({
   const [admObs, setAdmObs] = useState<string>(contrato.observacoes ?? "");
   const [admFaixaId, setAdmFaixaId] = useState<string>("");
   const [savingAdm, setSavingAdm] = useState(false);
+  const [apenasFinanceiro, setApenasFinanceiro] = useState<boolean>(
+    !!(contrato as any).titular_apenas_financeiro,
+  );
+  const [savingApenasFin, setSavingApenasFin] = useState(false);
   const [retroDialog, setRetroDialog] = useState<{ open: boolean; parcelasPagas: string; dataInicio: string } | null>(null);
   const [regerandoRetro, setRegerandoRetro] = useState(false);
   useEffect(() => {
@@ -1673,6 +1740,7 @@ function DetalheContrato({
     setAdmTaxaAdesao(String(Number(contrato.taxa_adesao ?? 0).toFixed(2)));
     setAdmForma(contrato.forma_pagamento ?? "");
     setAdmObs(contrato.observacoes ?? "");
+    setApenasFinanceiro(!!(contrato as any).titular_apenas_financeiro);
   }, [contrato.id]);
 
   // Carrega lista de convênios ativos (ADM)
@@ -2250,7 +2318,8 @@ function DetalheContrato({
   const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
 
   // ---- Dados da venda (aba "Dados") ----
-  const totalVidasAtual = 1 + deps.filter((d) => d.ativo).length;
+  const titularConta = apenasFinanceiro ? 0 : 1;
+  const totalVidasAtual = titularConta + deps.filter((d) => d.ativo).length;
   const faixasElegiveis = faixas.filter(
     (f) => totalVidasAtual >= f.vidas_de && (f.vidas_ate == null || totalVidasAtual <= f.vidas_ate),
   );
@@ -2434,7 +2503,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
     setIncTipo("dependente");
     // Recalcula valor das parcelas em aberto conforme a nova quantidade de vidas
     // (titular + dependentes ativos, incluindo o recém-incluído)
-    await recalcularParcelasAbertas(depsAtivos.length + 2);
+    await recalcularParcelasAbertas(titularConta + depsAtivos.length + 1);
     await load();
     abrirTermoSeAssinado(novoDep, "Inclusão");
   };
@@ -2456,7 +2525,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
     setExcAlvo(null);
     // Recalcula valor das parcelas em aberto conforme nova qtd de vidas
     // (titular = 1 + dependentes ativos restantes = depsAtivos.length - 1)
-    await recalcularParcelasAbertas(1 + Math.max(0, depsAtivos.length - 1));
+    await recalcularParcelasAbertas(titularConta + Math.max(0, depsAtivos.length - 1));
     await load();
     abrirTermoSeAssinado(alvo, "Exclusão");
   };
@@ -2550,6 +2619,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     ) : null}
                     <div className="text-muted-foreground mt-0.5">O plano e todos os benefícios foram cancelados.</div>
                   </div>
+                </div>
+              ) : null}
+              {apenasFinanceiro ? (
+                <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
+                  <Info className="h-4 w-4 shrink-0" />
+                  <span>
+                    <strong>Titular financeiro</strong> — {contrato.paciente_nome} paga o plano, mas <strong>não utiliza</strong> os benefícios. Não conta na quantidade de vidas do contrato.
+                  </span>
                 </div>
               ) : null}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
@@ -2826,12 +2903,45 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     onSelect={(p) => setAdmPaciente(p)}
                     placeholder="Buscar paciente por nome ou CPF…"
                   />
+                  <ApenasFinanceiroToggle
+                    contratoId={contrato.id}
+                    checked={apenasFinanceiro}
+                    saving={savingApenasFin}
+                    disabled={cancelado && !isAdmin}
+                    onChange={async (v) => {
+                      setSavingApenasFin(true);
+                      const { error } = await supabase
+                        .from("contratos_assinatura")
+                        .update({ titular_apenas_financeiro: v } as any)
+                        .eq("id", contrato.id);
+                      if (error) {
+                        setSavingApenasFin(false);
+                        mostrarErro(error);
+                        return;
+                      }
+                      (contrato as any).titular_apenas_financeiro = v;
+                      setApenasFinanceiro(v);
+                      const novoTotal = (v ? 0 : 1) + depsAtivos.length;
+                      await recalcularParcelasAbertas(novoTotal);
+                      setSavingApenasFin(false);
+                      toast.success(v
+                        ? "Marcado como Titular financeiro (não utiliza os benefícios)."
+                        : "Titular passa a usufruir dos benefícios normalmente.");
+                    }}
+                  />
                 </div>
               ) : (
-                <DadosField
-                  label="Paciente titular"
-                  value={`${contrato.paciente_nome}${pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}`}
-                />
+                <>
+                  <DadosField
+                    label="Paciente titular"
+                    value={`${contrato.paciente_nome}${pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}`}
+                  />
+                  {apenasFinanceiro ? (
+                    <div className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                      <Info className="h-3.5 w-3.5" /> Titular financeiro — não utiliza os benefícios.
+                    </div>
+                  ) : null}
+                </>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {isAdmin && podeEscrever ? (
