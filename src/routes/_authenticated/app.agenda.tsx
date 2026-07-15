@@ -1354,6 +1354,119 @@ function AgendaPage() {
     );
     setAuditLoading(false);
     setAuditRows(todos);
+    setReagEnrich(new Map());
+    // Detectar reagendamentos: para cada UPDATE em agendamentos onde o
+    // paciente entrou/saiu do slot, procurar a linha "gêmea" na mesma
+    // janela de tempo (±5s) — a RPC de reagendar altera as duas fichas na
+    // mesma transação. Isso nos permite mostrar ficha/horário/profissional
+    // da contraparte no histórico.
+    void (async () => {
+      const agRows = (agAudit as unknown as AuditRow[]) ?? [];
+      type Cand = {
+        row: AuditRow;
+        pacienteNome: string;
+        direcao: "veio_de" | "foi_para";
+      };
+      const cands: Cand[] = [];
+      for (const r of agRows) {
+        if (r.action !== "UPDATE") continue;
+        const antes = (r.dados_antes ?? {}) as Record<string, unknown>;
+        const depois = (r.dados_depois ?? {}) as Record<string, unknown>;
+        const antesNome = antes.paciente_nome as string | null | undefined;
+        const depoisNome = depois.paciente_nome as string | null | undefined;
+        if (JSON.stringify(antesNome) === JSON.stringify(depoisNome)) continue;
+        const antesLivre = isSlotLivre(antesNome);
+        const depoisLivre = isSlotLivre(depoisNome);
+        if (antesLivre && !depoisLivre && depoisNome) {
+          cands.push({ row: r, pacienteNome: depoisNome, direcao: "veio_de" });
+        } else if (!antesLivre && depoisLivre && antesNome) {
+          cands.push({ row: r, pacienteNome: antesNome, direcao: "foi_para" });
+        }
+      }
+      if (cands.length === 0) return;
+      // Uma janela ampla que cubra todas as candidatas.
+      const times = cands.map((c) => new Date(c.row.created_at).getTime());
+      const minT = Math.min(...times) - 6000;
+      const maxT = Math.max(...times) + 6000;
+      const { data: twinsData } = await supabase
+        .from("audit_log" as never)
+        .select("id, record_id, action, created_at, dados_antes, dados_depois")
+        .eq("table_name", "agendamentos")
+        .neq("record_id", a.id)
+        .gte("created_at", new Date(minT).toISOString())
+        .lte("created_at", new Date(maxT).toISOString())
+        .limit(500);
+      const twins = (twinsData as unknown as Array<{
+        id: string;
+        record_id: string;
+        action: string;
+        created_at: string;
+        dados_antes: Record<string, unknown> | null;
+        dados_depois: Record<string, unknown> | null;
+      }> | null) ?? [];
+      const enrich = new Map<string, ReagInfo>();
+      const gemeoIds = new Set<string>();
+      // (row id, gemeo record_id, direcao)
+      const pending: Array<{ auditId: string; gemeoId: string; direcao: "veio_de" | "foi_para" }> = [];
+      for (const c of cands) {
+        const tC = new Date(c.row.created_at).getTime();
+        let best: (typeof twins)[number] | null = null;
+        let bestDelta = Infinity;
+        for (const t of twins) {
+          if (t.action !== "UPDATE") continue;
+          const ta = (t.dados_antes ?? {}) as Record<string, unknown>;
+          const td = (t.dados_depois ?? {}) as Record<string, unknown>;
+          const antesNome = ta.paciente_nome as string | null | undefined;
+          const depoisNome = td.paciente_nome as string | null | undefined;
+          const antesLivre = isSlotLivre(antesNome);
+          const depoisLivre = isSlotLivre(depoisNome);
+          // Direção oposta com o MESMO paciente.
+          const oposto =
+            c.direcao === "veio_de"
+              ? !antesLivre && depoisLivre && antesNome === c.pacienteNome
+              : antesLivre && !depoisLivre && depoisNome === c.pacienteNome;
+          if (!oposto) continue;
+          const delta = Math.abs(new Date(t.created_at).getTime() - tC);
+          if (delta > 6000) continue;
+          if (delta < bestDelta) {
+            best = t;
+            bestDelta = delta;
+          }
+        }
+        if (best) {
+          gemeoIds.add(best.record_id);
+          pending.push({ auditId: c.row.id, gemeoId: best.record_id, direcao: c.direcao });
+        }
+      }
+      if (pending.length === 0) return;
+      const { data: ags } = await supabase
+        .from("agendamentos")
+        .select("id, ficha_numero, inicio, medico_id")
+        .in("id", Array.from(gemeoIds));
+      const agMap = new Map<string, { ficha_numero: number | null; inicio: string | null; medico_id: string | null }>();
+      ((ags ?? []) as Array<{ id: string; ficha_numero: number | null; inicio: string | null; medico_id: string | null }>).forEach((x) => {
+        agMap.set(x.id, { ficha_numero: x.ficha_numero, inicio: x.inicio, medico_id: x.medico_id });
+      });
+      const medIds = Array.from(new Set(Array.from(agMap.values()).map((v) => v.medico_id).filter(Boolean) as string[]));
+      const medMap = new Map<string, string>();
+      if (medIds.length > 0) {
+        const { data: meds } = await supabase.from("medicos").select("id, nome").in("id", medIds);
+        ((meds ?? []) as Array<{ id: string; nome: string | null }>).forEach((m) => {
+          if (m.nome) medMap.set(m.id, m.nome);
+        });
+      }
+      for (const p of pending) {
+        const g = agMap.get(p.gemeoId);
+        if (!g) continue;
+        enrich.set(p.auditId, {
+          direcao: p.direcao,
+          fichaNumero: g.ficha_numero,
+          inicio: g.inicio,
+          medicoNome: g.medico_id ? medMap.get(g.medico_id) ?? null : null,
+        });
+      }
+      if (enrich.size > 0) setReagEnrich(enrich);
+    })();
     const { data: nts } = await supabase
       .from("agendamento_historico_notas" as never)
       .select("id, user_email, user_nome, texto, created_at")
