@@ -1111,7 +1111,7 @@ function Page() {
       if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
       const v = Number(m.valor || 0);
       r.total += v;
-      const bucket = normalizarForma(m.forma_pagamento);
+      const bucket = bucketDeMov(m);
       if (bucket === "misto") {
         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
         const partes = decomporMistoObs(obs);
@@ -1161,7 +1161,7 @@ function Page() {
       r.saldo += sinal * v;
       if (m.tipo === "recebimento" || m.tipo === "suprimento") {
         r.entradas += v;
-        const bucket = normalizarForma(m.forma_pagamento);
+        const bucket = bucketDeMov(m);
         if (bucket === "misto") {
           const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
           const partes = decomporMistoObs(obs);
@@ -1220,7 +1220,7 @@ function Page() {
       const sinal =
         m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
       const v = Number(m.valor || 0) * sinal;
-      const bucket = normalizarForma(m.forma_pagamento);
+      const bucket = bucketDeMov(m);
       if (bucket === "misto") {
         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
         const partes = decomporMistoObs(obs);
@@ -1371,7 +1371,7 @@ function Page() {
       const sinal =
         m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
       const v = Number(m.valor || 0) * sinal;
-      const bucket = normalizarForma(m.forma_pagamento);
+      const bucket = bucketDeMov(m);
       if (bucket === "misto") {
         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
         const partes = decomporMistoObs(obs);
@@ -2820,7 +2820,7 @@ function Page() {
                     if (m.tipo !== "recebimento" && m.tipo !== "suprimento" && m.tipo !== "estorno") return;
                     const sinal = m.tipo === "estorno" ? -1 : 1;
                     const v = Number(m.valor || 0) * sinal;
-                    const bucket = normalizarForma(m.forma_pagamento);
+                    const bucket = bucketDeMov(m);
                     if (bucket === "misto") {
                       const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
                       const partes = decomporMistoObs(obs);
