@@ -371,7 +371,7 @@ function Page() {
   const [openCal, setOpenCal] = useState(false);
   const minhasMovsFiltrados = useMemo<Mov[]>(() => {
     // 1) filtro de período (data)
-    let base: Mov[] = minhasMovs;
+    let base: Mov[] = minhasMovsHist;
     if (meuPeriodo !== "todos") {
       const now = new Date();
       const fim = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
@@ -429,12 +429,12 @@ function Page() {
       });
     }
     return base;
-  }, [minhasMovs, meuPeriodo, meuDataIni, meuDataFim, meuMedico, meuPaciente, enrichPorLanc]);
+  }, [minhasMovsHist, meuPeriodo, meuDataIni, meuDataFim, meuMedico, meuPaciente, enrichPorLanc]);
 
   // Lista de médicos distintos presentes nos movimentos carregados.
   const medicosDisponiveis = useMemo<string[]>(() => {
     const set = new Set<string>();
-    for (const m of minhasMovs) {
+    for (const m of minhasMovsHist) {
       const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
       const nome = (enr?.medico ?? "").trim();
       if (nome) set.add(nome);
