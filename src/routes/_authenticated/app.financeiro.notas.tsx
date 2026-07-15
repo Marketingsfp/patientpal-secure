@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Plus, FileText, Pencil, Trash2, ExternalLink, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { montarDiscriminacaoNfse } from "@/lib/nfse-descricao";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -165,9 +166,16 @@ function Page() {
       if (cpfLimpo.length !== 11 && cpfLimpo.length !== 14) {
         throw new Error("CPF/CNPJ do tomador é obrigatório (11 ou 14 dígitos).");
       }
+      const descBase = (descricao && descricao.trim())
+        ? descricao.trim()
+        : montarDiscriminacaoNfse({
+            procedimento: null,
+            pacienteNome: p.nome,
+            dataReferencia: n.data_emissao,
+          });
       const descFinal = tomador.dependenteAtendido
-        ? `${descricao || "Serviços prestados"} — Atendido: ${tomador.dependenteAtendido}`
-        : (descricao || "Serviços prestados");
+        ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
+        : descBase;
       const res = await emitirFn({ data: {
         emitenteId,
         pacienteId: p.id,
