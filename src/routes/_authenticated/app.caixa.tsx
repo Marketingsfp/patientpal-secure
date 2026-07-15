@@ -1804,6 +1804,7 @@ function Page() {
       '<table><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + (linhasForma || empty) + '</tbody>' +
       '<tfoot><tr><td>TOTAL</td><td class="right">' + fmt(totPag) + '</td><td class="right">' + fmt(totReceb) + '</td><td class="right">' + fmt(totReceb - totPag) + '</td></tr></tfoot></table>' +
       '<div class="meta"><span>' + qtd + ' registro' + (qtd === 1 ? '' : 's') + '</span></div>' +
+      linhasReabertura +
       '<script>window.onload=function(){window.print();}</script></body></html>';
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
