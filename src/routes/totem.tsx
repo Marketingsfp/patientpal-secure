@@ -33,7 +33,7 @@ const TIPOS: { tipo: TipoSenha; titulo: string; sub: string; Icon: typeof Hash; 
 
 type Step = "home" | "consent" | "scan" | "manual" | "ticket";
 
-function TotemPage() {
+export function TotemPage() {
   const navigate = useNavigate();
   const { clinicaAtual, loading } = useClinica();
   const [step, setStep] = useState<Step>("home");

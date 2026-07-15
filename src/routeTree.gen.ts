@@ -20,6 +20,8 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PacienteIndexRouteImport } from './routes/paciente.index'
 import { Route as VerificarCodigoRouteImport } from './routes/verificar.$codigo'
+import { Route as TotemClinicaIdRouteImport } from './routes/totem.$clinicaId'
+import { Route as PainelClinicaIdRouteImport } from './routes/painel.$clinicaId'
 import { Route as PacientePerfilRouteImport } from './routes/paciente.perfil'
 import { Route as PacienteFinanceiroRouteImport } from './routes/paciente.financeiro'
 import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
@@ -192,6 +194,16 @@ const VerificarCodigoRoute = VerificarCodigoRouteImport.update({
   id: '/verificar/$codigo',
   path: '/verificar/$codigo',
   getParentRoute: () => rootRouteImport,
+} as any)
+const TotemClinicaIdRoute = TotemClinicaIdRouteImport.update({
+  id: '/$clinicaId',
+  path: '/$clinicaId',
+  getParentRoute: () => TotemRoute,
+} as any)
+const PainelClinicaIdRoute = PainelClinicaIdRouteImport.update({
+  id: '/$clinicaId',
+  path: '/$clinicaId',
+  getParentRoute: () => PainelRoute,
 } as any)
 const PacientePerfilRoute = PacientePerfilRouteImport.update({
   id: '/paciente/perfil',
@@ -877,10 +889,10 @@ export interface FileRoutesByFullPath {
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
-  '/painel': typeof PainelRoute
+  '/painel': typeof PainelRouteWithChildren
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/totem': typeof TotemRoute
+  '/totem': typeof TotemRouteWithChildren
   '/app': typeof AuthenticatedAppRouteWithChildren
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
@@ -889,6 +901,8 @@ export interface FileRoutesByFullPath {
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/paciente/financeiro': typeof PacienteFinanceiroRoute
   '/paciente/perfil': typeof PacientePerfilRoute
+  '/painel/$clinicaId': typeof PainelClinicaIdRoute
+  '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
@@ -1007,10 +1021,10 @@ export interface FileRoutesByTo {
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
-  '/painel': typeof PainelRoute
+  '/painel': typeof PainelRouteWithChildren
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/totem': typeof TotemRoute
+  '/totem': typeof TotemRouteWithChildren
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -1018,6 +1032,8 @@ export interface FileRoutesByTo {
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/paciente/financeiro': typeof PacienteFinanceiroRoute
   '/paciente/perfil': typeof PacientePerfilRoute
+  '/painel/$clinicaId': typeof PainelClinicaIdRoute
+  '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente': typeof PacienteIndexRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
@@ -1135,10 +1151,10 @@ export interface FileRoutesById {
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
-  '/painel': typeof PainelRoute
+  '/painel': typeof PainelRouteWithChildren
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/totem': typeof TotemRoute
+  '/totem': typeof TotemRouteWithChildren
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
@@ -1147,6 +1163,8 @@ export interface FileRoutesById {
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/paciente/financeiro': typeof PacienteFinanceiroRoute
   '/paciente/perfil': typeof PacientePerfilRoute
+  '/painel/$clinicaId': typeof PainelClinicaIdRoute
+  '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
@@ -1279,6 +1297,8 @@ export interface FileRouteTypes {
     | '/paciente/consultas'
     | '/paciente/financeiro'
     | '/paciente/perfil'
+    | '/painel/$clinicaId'
+    | '/totem/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente/'
     | '/app/agenda'
@@ -1408,6 +1428,8 @@ export interface FileRouteTypes {
     | '/paciente/consultas'
     | '/paciente/financeiro'
     | '/paciente/perfil'
+    | '/painel/$clinicaId'
+    | '/totem/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente'
     | '/app/agenda'
@@ -1536,6 +1558,8 @@ export interface FileRouteTypes {
     | '/paciente/consultas'
     | '/paciente/financeiro'
     | '/paciente/perfil'
+    | '/painel/$clinicaId'
+    | '/totem/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente/'
     | '/_authenticated/app/agenda'
@@ -1656,10 +1680,10 @@ export interface RootRouteChildren {
   AutoatendimentoRoute: typeof AutoatendimentoRoute
   DiagnosticoRoute: typeof DiagnosticoRoute
   LoginRoute: typeof LoginRoute
-  PainelRoute: typeof PainelRoute
+  PainelRoute: typeof PainelRouteWithChildren
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
-  TotemRoute: typeof TotemRoute
+  TotemRoute: typeof TotemRouteWithChildren
   CheckinTokenRoute: typeof CheckinTokenRoute
   LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
@@ -1753,6 +1777,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/verificar/$codigo'
       preLoaderRoute: typeof VerificarCodigoRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/totem/$clinicaId': {
+      id: '/totem/$clinicaId'
+      path: '/$clinicaId'
+      fullPath: '/totem/$clinicaId'
+      preLoaderRoute: typeof TotemClinicaIdRouteImport
+      parentRoute: typeof TotemRoute
+    }
+    '/painel/$clinicaId': {
+      id: '/painel/$clinicaId'
+      path: '/$clinicaId'
+      fullPath: '/painel/$clinicaId'
+      preLoaderRoute: typeof PainelClinicaIdRouteImport
+      parentRoute: typeof PainelRoute
     }
     '/paciente/perfil': {
       id: '/paciente/perfil'
@@ -2915,16 +2953,37 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface PainelRouteChildren {
+  PainelClinicaIdRoute: typeof PainelClinicaIdRoute
+}
+
+const PainelRouteChildren: PainelRouteChildren = {
+  PainelClinicaIdRoute: PainelClinicaIdRoute,
+}
+
+const PainelRouteWithChildren =
+  PainelRoute._addFileChildren(PainelRouteChildren)
+
+interface TotemRouteChildren {
+  TotemClinicaIdRoute: typeof TotemClinicaIdRoute
+}
+
+const TotemRouteChildren: TotemRouteChildren = {
+  TotemClinicaIdRoute: TotemClinicaIdRoute,
+}
+
+const TotemRouteWithChildren = TotemRoute._addFileChildren(TotemRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AutoatendimentoRoute: AutoatendimentoRoute,
   DiagnosticoRoute: DiagnosticoRoute,
   LoginRoute: LoginRoute,
-  PainelRoute: PainelRoute,
+  PainelRoute: PainelRouteWithChildren,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
-  TotemRoute: TotemRoute,
+  TotemRoute: TotemRouteWithChildren,
   CheckinTokenRoute: CheckinTokenRoute,
   LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
@@ -2942,13 +3001,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

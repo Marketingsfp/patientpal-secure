@@ -34,7 +34,7 @@ type Senha = {
   paciente_nome?: string | null;
 };
 
-function PainelPage() {
+export function PainelPage() {
   const { clinicaAtual, loading } = useClinica();
   const [atual, setAtual] = useState<Senha | null>(null);
   const [historico, setHistorico] = useState<Senha[]>([]);
