@@ -67,6 +67,21 @@ function normalizarForma(f: string | null | undefined): FormaBucket {
 }
 
 /**
+ * Bucket efetivo do movimento para agrupamento por forma de pagamento.
+ * Sangria, suprimento e despesa mexem no dinheiro físico do caixa: quando
+ * chegam sem `forma_pagamento`, contam como "dinheiro" (em vez de cair em
+ * "outros"). Se, no futuro, algum desses lançamentos vier com forma
+ * explícita, a forma informada é respeitada.
+ */
+function bucketDeMov(m: { tipo: string; forma_pagamento: string | null }): FormaBucket {
+  const bruto = normalizarForma(m.forma_pagamento);
+  if (bruto === "outros" && (m.tipo === "sangria" || m.tipo === "suprimento" || m.tipo === "despesa")) {
+    return "dinheiro";
+  }
+  return bruto;
+}
+
+/**
  * Extrai as parcelas de um pagamento misto a partir do trecho
  * `Pagamento misto: Dinheiro R$ 60,00; PIX R$ 50,00 | ...` gravado em
  * `fin_lancamentos.observacoes`. Retorna somas por bucket já normalizado.
@@ -1096,7 +1111,7 @@ function Page() {
       if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
       const v = Number(m.valor || 0);
       r.total += v;
-      const bucket = normalizarForma(m.forma_pagamento);
+      const bucket = bucketDeMov(m);
       if (bucket === "misto") {
         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
         const partes = decomporMistoObs(obs);
@@ -1146,7 +1161,7 @@ function Page() {
       r.saldo += sinal * v;
       if (m.tipo === "recebimento" || m.tipo === "suprimento") {
         r.entradas += v;
-        const bucket = normalizarForma(m.forma_pagamento);
+        const bucket = bucketDeMov(m);
         if (bucket === "misto") {
           const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
           const partes = decomporMistoObs(obs);
@@ -1205,7 +1220,7 @@ function Page() {
       const sinal =
         m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
       const v = Number(m.valor || 0) * sinal;
-      const bucket = normalizarForma(m.forma_pagamento);
+      const bucket = bucketDeMov(m);
       if (bucket === "misto") {
         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
         const partes = decomporMistoObs(obs);
@@ -1356,7 +1371,7 @@ function Page() {
       const sinal =
         m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
       const v = Number(m.valor || 0) * sinal;
-      const bucket = normalizarForma(m.forma_pagamento);
+      const bucket = bucketDeMov(m);
       if (bucket === "misto") {
         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
         const partes = decomporMistoObs(obs);
@@ -2805,7 +2820,7 @@ function Page() {
                     if (m.tipo !== "recebimento" && m.tipo !== "suprimento" && m.tipo !== "estorno") return;
                     const sinal = m.tipo === "estorno" ? -1 : 1;
                     const v = Number(m.valor || 0) * sinal;
-                    const bucket = normalizarForma(m.forma_pagamento);
+                    const bucket = bucketDeMov(m);
                     if (bucket === "misto") {
                       const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
                       const partes = decomporMistoObs(obs);
@@ -2836,7 +2851,10 @@ function Page() {
             {minhaSessao && (() => {
               const porForma = porFormaDoDiaFechamento;
               const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
-              const chaves = ordem;
+              // "Outros" só aparece se realmente houver saldo residual (ex.: parcela
+              // de pagamento misto ainda não decomposta). Sangria/suprimento/despesa
+              // agora contam em "Dinheiro" via bucketDeMov.
+              const chaves = ordem.filter((k) => k !== "outros" || Math.abs(porForma[k] ?? 0) > 0.005);
               const totalConferido = Object.values(conferidoOwn)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
@@ -2946,7 +2964,7 @@ function Page() {
             {openFecharTerceiro && (() => {
               const porForma = entradasPorFormaSessao(openFecharTerceiro.id);
               const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
-              const chaves = ordem;
+              const chaves = ordem.filter((k) => k !== "outros" || Math.abs(porForma[k] ?? 0) > 0.005);
               const totalConferido = Object.values(conferidoTerceiro)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
