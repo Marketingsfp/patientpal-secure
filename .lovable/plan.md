@@ -1,89 +1,98 @@
 
 ## O que está acontecendo
 
-Você descreveu dois sintomas juntos durante o refresh automático da agenda:
-1. A página fica em branco por um instante.
-2. Os agendamentos mudam de ordem ou "somem" (ficam invisíveis) e depois voltam.
+No modal **Histórico** do agendamento (fotos 1 e 3), quando um paciente foi **reagendado** de uma ficha para outra, a timeline mostra apenas:
 
-Analisei o código responsável (`src/routes/_authenticated/app.agenda.tsx` — Agenda principal — e `src/components/agenda-v2/agenda-v2-shell.tsx` — Agenda V2). O comportamento não é aleatório: são **três problemas técnicos combinados**. Todos são de front-end/consulta, não de banco.
+- "Agendou o paciente X" no destino (foto 1 — ficha 32)
+- "Slot da agenda gerado (horário disponibilizado)" na ficha antiga
 
-## Diagnóstico (linguagem simples)
+Falta o que a foto 2 (outro sistema) mostra e o que você pediu antes:
 
-### Problema 1 — Corrida entre múltiplas cargas ao mesmo tempo (causa principal do "somem")
+> "REAGENDADO DE 15/07/2026 15:45 COM PROFISSIONAL ROSANGELA SCHMITZ RIOLINO"
 
-Na Agenda principal existe uma inscrição de tempo-real (`postgres_changes`) que dispara a função `load()` toda vez que qualquer agendamento da clínica é alterado (por outro operador, pelo caixa, por um pagamento, etc.). Essa função:
+O ajuste anterior tentou tratar o reagendamento **na listagem da agenda** (nas linhas coloridas), não no **modal Histórico**. Por isso, ao abrir o Histórico, a informação continua ausente. Precisa mudar o modal.
 
-- Faz várias consultas em sequência (agendamentos → pacientes → contratos → dependentes → pagamentos → NFS-e).
-- **Não tem cancelamento**: se um evento de tempo-real dispara enquanto uma carga anterior ainda não terminou, as duas rodam em paralelo e escrevem no mesmo estado `items`.
-- A carga que **termina por último** vence, mesmo quando começou primeiro. Como cada consulta demora um tempo diferente (rede, tamanho da resposta), é normal a resposta mais antiga chegar depois. Resultado: a tela pisca com uma lista incompleta/desatualizada, os cards trocam de posição ou desaparecem por segundos.
+## Diagnóstico
 
-Sintoma equivalente que você relatou: "os agendamentos mudam de ordem ou somem".
+O modal (`abrirAuditoria`, `src/routes/_authenticated/app.agenda.tsx:1308`) carrega apenas o `audit_log` do agendamento que você está vendo (`record_id = a.id`). Ele não sabe que a linha "Agendou" na ficha 32 é o par gêmeo da linha "Liberou horário" na ficha 33 — porque essa outra linha vive num `record_id` diferente e nunca é buscada.
 
-### Problema 2 — Ordenação sem critério de desempate
+Sinais que temos para detectar o par:
 
-A consulta principal ordena só por `inicio` (ASC ou DESC, depende da versão). Quando dois agendamentos têm o mesmo horário — muito comum na agenda de eletrocardiograma, USG, enfermagem, pacotes — o Postgres pode devolver eles em ordem diferente a cada refetch. Isso soma ao efeito de "mudam de ordem" mesmo quando os dados estão certos.
+1. `dados_depois.observacoes` já contém uma trilha `"[Reagendado em ...] de <dataHora antiga> para <dataHora nova>"` — escrita pelo RPC `reagendar_atendimento` (linhas 1085 e 2957 do arquivo, também em `src/lib/agenda/reagendar-agendamento.functions.ts:184`). Isso identifica o **momento** do reagendamento no lado destino.
+2. As duas linhas de `audit_log` (destino "slot→alocado" e origem "alocado→slot") acontecem dentro da mesma transação (RPC), então ficam dentro de ±5 segundos, mesma `clinica_id`, mesmo `paciente_nome`.
 
-### Problema 3 — Tela em branco no início do refresh
-
-Durante o carregamento inicial após F5 (ou quando o React Query invalida a chave), a Agenda:
-
-- Começa com `items = []` e `loading = false` (a Agenda principal não mostra skeleton até `clinicaAtual` estar disponível).
-- Só liga o `loading` **depois** que a `clinicaAtual` chega do contexto — o que leva alguns milissegundos (auth → contexto de clínica → efeito).
-- Nessa janela, a UI renderiza o estado "sem agendamentos" (vazio), não o estado "carregando".
-
-Na Agenda V2 o efeito é parecido: quando a chave do React Query muda (clinicaId ou dia), `agsQuery.data` volta a ser `undefined` e a lista renderiza vazia até o novo fetch responder (não há `placeholderData`/`keepPreviousData`).
-
-## Por que só notei agora / por que é intermitente
-
-- Nas conexões rápidas as cargas terminam antes do próximo evento de tempo-real chegar → a corrida quase não acontece.
-- Quando a clínica tem muito volume no dia (várias mudanças por minuto no caixa/recepção), a inscrição em tempo-real dispara em rajada e a corrida vira regra.
-- Nos horários com muitos agendamentos no mesmo minuto, o desempate ausente amplifica a sensação de "ordem trocada".
+Ou seja, dá para identificar o par sem alterar banco.
 
 ## Escopo do que será feito
 
-Ficam dentro do escopo (Agenda, apenas front-end / consultas):
+Fica dentro do escopo (apenas o modal Histórico):
 
-1. **Cancelamento e serialização das cargas em `app.agenda.tsx`** — cada nova `load()` invalida a anterior; respostas que chegam fora de ordem são descartadas.
-2. **Debounce ampliado + agrupamento** do canal de tempo-real (`agendamentos`) para evitar refetch em rajada — hoje é 400ms, subir para ~800ms e coalescer eventos.
-3. **Estado de carregamento correto no primeiro render** — ligar `loading = true` enquanto `clinicaAtual` não chegou, e manter os `items` anteriores visíveis (não zerar) durante um refetch em segundo plano.
-4. **Ordenação estável** — adicionar desempate por `id` na consulta principal (e na V2), para que agendamentos com mesmo `inicio` sempre apareçam na mesma ordem.
-5. **Agenda V2** — usar `placeholderData: keepPreviousData` no `agsQuery`, para não voltar a `undefined` durante refetch/troca de dia. Manter o dado anterior visível até o novo chegar.
+1. **Buscar o par gêmeo** ao abrir o Histórico: para cada linha `UPDATE` do agendamento atual que muda `paciente_nome` (slot→alocado ou alocado→slot), consultar `audit_log` no mesmo `clinica_id`, tabela `agendamentos`, `record_id ≠` este, com `created_at` dentro de ±5s, movendo o mesmo `paciente_nome` no sentido oposto.
+2. Se achou o par, buscar em `agendamentos` os dados da ficha gêmea (`ficha_numero`, `inicio`, `medico_id`) e em `medicos` (`nome`) para exibir na timeline.
+3. **Substituir os rótulos**:
+   - Destino (ficha atual = 32, era "Agendou o paciente X"): passa a ser **"Reagendou · veio da ficha #033 · 15/07/2026 15:45 · Profissional Rosangela Schmitz Riolino"**.
+   - Origem (ficha atual = 33, era "Liberou horário"): passa a ser **"Reagendou · paciente movido para ficha #032 · 15/07/2026 16:30 · Profissional Rosangela Schmitz Riolino"**.
+   - Rótulo/cor: usa o `kind: "reagendou"` já existente (âmbar).
+4. **Fallback** quando não achar o gêmeo (registros muito antigos, log truncado, etc.): tentar extrair as datas da trilha em `depois.observacoes` (`[Reagendado em ...]`). Se ainda assim não der, mantém o comportamento atual ("Agendou" / "Liberou horário") — nada regride.
 
-Ficam **fora do escopo** desta correção (para não misturar assuntos):
-- Não vou mexer em regra de negócio (cobrança, NFS-e, reagendamento, etc.).
-- Não vou refatorar `load()` inteiro — só adicionar cancelamento, debounce e ordenação.
-- Não vou trocar o modelo de estado (continua `useState` na Agenda principal e React Query na V2).
-- Não vou alterar RLS, tabelas nem edge functions.
+Fica fora do escopo:
+
+- Não vou mexer no RPC `reagendar_atendimento`, no fluxo em lote, nem no banco/RLS.
+- Não vou tocar na renderização da grade de fichas (a mudança anterior no render fica como está).
+- Não vou incluir reagendamento entre clínicas diferentes (foge do caso relatado).
 
 ## Detalhes técnicos (para revisão do time)
 
-Arquivos e trechos que serão alterados:
+Arquivo: `src/routes/_authenticated/app.agenda.tsx`
 
-- `src/routes/_authenticated/app.agenda.tsx`
-  - Adicionar `loadSeqRef = useRef(0)` e `abortRef = useRef<AbortController | null>(null)`. No início de `load()`, incrementar `seq`, abortar o controller anterior e criar um novo. Antes de cada `setItems/setPagos/setNfse/...`, checar `if (seq !== loadSeqRef.current) return` para descartar respostas obsoletas.
-  - Trocar o debounce do canal realtime (linha ~1990) de 400ms para 800ms e agrupar múltiplos eventos numa única chamada.
-  - Trocar `.order("inicio", { ascending: false })` para `.order("inicio", { ascending: false }).order("id", { ascending: true })`.
-  - Ligar `setLoading(true)` também quando `clinicaAtual` ainda é `null` no primeiro render (ou usar `useClinica().loading` para exibir skeleton).
-  - Não zerar `items` no início do refetch — deixar a lista anterior visível até a nova chegar (mantém a tela "não em branco").
+Em `abrirAuditoria` (linha 1308), depois de carregar `agAudit`:
 
-- `src/components/agenda-v2/agenda-v2-shell.tsx`
-  - No `useQuery` das linhas 302–318 e no prefetch das linhas 337–351: adicionar `.order("id", { ascending: true })` como desempate.
-  - Adicionar `placeholderData: keepPreviousData` (import de `@tanstack/react-query`) no `agsQuery` para manter dados anteriores durante refetch/troca de dia.
+1. Filtrar linhas candidatas: `action === "UPDATE"` e `paciente_nome` mudou (slot↔alocado).
+2. Para cada candidata, consultar:
+   ```
+   supabase.from("audit_log")
+     .select("id, record_id, dados_antes, dados_depois, created_at")
+     .eq("table_name", "agendamentos")
+     .neq("record_id", a.id)
+     .gte("created_at", <candidata.created_at - 5s>)
+     .lte("created_at", <candidata.created_at + 5s>)
+     .limit(20)
+   ```
+   Fazer isso em batch (uma consulta com `.or()` cobrindo todas as janelas) para não estourar rate.
+3. Bater no cliente: mesmo `paciente_nome`, direção oposta.
+4. Para cada par encontrado, coletar `record_id` do gêmeo e buscar de uma vez:
+   ```
+   supabase.from("agendamentos")
+     .select("id, ficha_numero, inicio, medico_id, enfermagem_recurso_id")
+     .in("id", <ids gêmeos>)
+   ```
+   e `medicos` por `id`.
+5. Guardar em um `Map<auditRowId, { fichaGemea, inicioGemea, medicoNome }>` (`enrichReag`).
+6. No render (linhas ~6118 e ~6134), antes de emitir `agendou`/`liberou`, checar o mapa:
+   - Se destino tem gêmeo (origem), emite `kind: "reagendou"` com corpo "Reagendou · veio da ficha #NNN · <data hora> · Profissional <nome>".
+   - Se origem tem gêmeo (destino), emite `kind: "reagendou"` com corpo "Reagendou · movido para ficha #NNN · <data hora> · Profissional <nome>".
+7. Fallback trilha: se `depois.observacoes` (destino) contém `[Reagendado em ...] de <X> para <Y>`, parseia X e Y para exibir data/hora mesmo sem gêmeo; ficha e profissional ficam em branco quando não há gêmeo.
+
+Formato de exibição (mantém consistência visual):
+
+- Destino: **"Reagendou"** (chip âmbar) — corpo: `Veio da ficha #033 · 15/07/2026 15:45 · Prof. Rosangela Schmitz Riolino`.
+- Origem: **"Reagendou"** (chip âmbar) — corpo: `Paciente movido para ficha #032 · 15/07/2026 16:30 · Prof. Rosangela Schmitz Riolino`.
 
 ## Antes e depois (validação)
 
-- **Antes:** F5 ou evento de tempo-real deixa a Agenda em branco por 300–1500ms e/ou reordena/some com os cards.
-- **Depois:** F5 mostra skeleton até a resposta chegar; refetch de tempo-real não pisca (a lista anterior fica visível e é substituída atomicamente); ordem de agendamentos com o mesmo horário fica estável entre refetches.
+- **Antes:** Histórico da ficha 32 mostra apenas "Agendou o paciente Quedima…". Histórico da ficha 33 mostra apenas "Slot da agenda gerado" (ou "Liberou horário", dependendo do caso).
+- **Depois:** As duas fichas mostram um item **"Reagendou"** com origem/destino (ficha + data/hora + profissional), no formato da foto 2.
 - **Como vou validar:**
-  - Abrir a Agenda principal, disparar uma alteração de agendamento em outra aba (mudança de status) e conferir que a lista NÃO some/pisca.
-  - Trocar de dia na Agenda V2 e confirmar que a lista anterior permanece até a nova chegar (sem tela vazia).
-  - Refresh (F5) mostrando skeleton em vez de "sem agendamentos".
-  - Verificar via console/network que só há UMA request `agendamentos` ativa por vez após rajada de eventos.
+  1. Abrir o Histórico da ficha 32 (Eletrocardiograma, paciente QUEDIMA SUELEN) — deve aparecer uma entrada "Reagendou · veio da ficha #033 · 15/07/2026 15:45 · Prof. …".
+  2. Abrir o Histórico da ficha 33 do mesmo dia — deve aparecer "Reagendou · movido para ficha #032 · 15/07/2026 16:30 · Prof. …".
+  3. Abrir o Histórico de um agendamento **normal** (sem reagendamento) — continua mostrando "Agendou o paciente X", sem regressão.
+  4. Verificar visualmente: sem duplicação (não pode aparecer "Agendou" **e** "Reagendou" para o mesmo evento).
 
 ## Pendências / riscos
 
-- **Risco baixo, área crítica (agenda):** As mudanças são apenas de fluxo de UI e ordenação — não alteram cálculos, cobrança nem status. Ainda assim vou preservar o comportamento atual dos filtros/data/paginação.
-- **Regra de negócio:** nada aqui é regra de negócio; caso o time queira mudar a política de refetch (ex.: só recarregar quando a mudança for de outro usuário), isso é uma decisão separada e não está incluída.
-- **Se após esta correção o refresh ainda parecer "estranho"**, o próximo passo (fora deste escopo) seria trocar o `load()` monolítico da Agenda principal por queries do React Query com `keepPreviousData`, igualando a V2.
+- **Regra de negócio:** nenhuma mudança de negócio — só apresentação do histórico.
+- **Risco:** o pareamento por janela de ±5s pode, em teoria, casar dois eventos coincidentes sem serem reagendamento. Mitigação: exigir mesmo `paciente_nome` e sentido oposto; se houver mais de um candidato, priorizar o mais próximo no tempo.
+- **Reagendamentos muito antigos** sem par no `audit_log` (log expirado) caem no fallback da trilha em `observacoes`, com ficha/profissional em branco.
+- **LGPD / auditoria:** não altero conteúdo do `audit_log`; só leio.
 
-Se aprovar, aplico exatamente estes cinco pontos e reporto o antes/depois com testes rápidos.
+Se aprovar, aplico apenas essa alteração no modal Histórico e valido nos dois lados (ficha 32 e ficha 33 do caso relatado).
