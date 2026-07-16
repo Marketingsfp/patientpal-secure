@@ -98,16 +98,23 @@ export function TotemPage() {
       return;
     }
     setBusy(true);
-    const { data, error } = await supabase.rpc("emitir_senha", {
-      _clinica_id: clinicaAtual.clinica_id,
-      _tipo,
-    });
+    // Usa a RPC pública quando não há sessão (totem em quiosque via URL com token);
+    // clínicas com token público habilitado emitem sem exigir login.
+    const { data: { session } } = await supabase.auth.getSession();
+    const rpcName = session ? "emitir_senha" : "emitir_senha_publica";
+    const args: Record<string, unknown> = session
+      ? { _clinica_id: clinicaAtual.clinica_id, _tipo }
+      : { _clinica_id: clinicaAtual.clinica_id, _tipo };
+    const { data, error } = await (supabase.rpc as unknown as (
+      fn: string,
+      a: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: unknown }>)(rpcName, args);
     setBusy(false);
     if (error || !data) {
       mostrarErro(error);
       return;
     }
-    const row = Array.isArray(data) ? data[0] : data;
+    const row = (Array.isArray(data) ? data[0] : data) as { codigo: string };
     setTicket({ codigo: row.codigo, tipo: _tipo });
     setStep("ticket");
     // Impressão automática da senha.
