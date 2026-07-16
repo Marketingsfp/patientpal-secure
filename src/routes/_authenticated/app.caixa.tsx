@@ -488,6 +488,85 @@ function Page() {
   const linhaVazia = (): LinhaPag => ({ forma: "dinheiro", valor: "0", bandeira: "", parcelas: "1" });
   const [cobrancaLinhas, setCobrancaLinhas] = useState<LinhaPag[]>([linhaVazia()]);
 
+  // Edição inline da "Forma" nas tabelas de Movimentos. Só liberada para
+  // quem tem permissão de escrita no módulo caixa e apenas para movimentos
+  // simples (não-mistos), em tipos que fazem sentido (recebimento, despesa,
+  // estorno). Atualiza tanto `caixa_movimentos.forma_pagamento` quanto o
+  // `fin_lancamentos.forma_pagamento` associado (quando existir), para que
+  // relatórios financeiros e resumos por moeda fiquem coerentes.
+  const FORMAS_EDITAVEIS: Array<{ value: string; label: string }> = [
+    { value: "dinheiro", label: "Dinheiro" },
+    { value: "pix", label: "PIX" },
+    { value: "cartao_debito", label: "Cartão débito" },
+    { value: "cartao_credito", label: "Cartão crédito" },
+    { value: "boleto", label: "Boleto" },
+    { value: "transferencia", label: "Transferência" },
+    { value: "convenio", label: "Convênio" },
+  ];
+  const TIPOS_FORMA_EDITAVEL = new Set<MovTipo>(["recebimento", "despesa", "estorno"]);
+  const [salvandoFormaId, setSalvandoFormaId] = useState<string | null>(null);
+
+  async function alterarFormaMov(m: Mov, nova: string) {
+    if (!m || !nova || nova === (m.forma_pagamento ?? "")) return;
+    setSalvandoFormaId(m.id);
+    try {
+      const { error: eMov } = await supabase
+        .from("caixa_movimentos")
+        .update({ forma_pagamento: nova })
+        .eq("id", m.id);
+      if (eMov) throw eMov;
+      if (m.lancamento_id) {
+        const { error: eLanc } = await supabase
+          .from("fin_lancamentos")
+          .update({ forma_pagamento: nova })
+          .eq("id", m.lancamento_id);
+        if (eLanc) throw eLanc;
+      }
+      const patchLista = (lista: Mov[]) =>
+        lista.map((x) => (x.id === m.id ? { ...x, forma_pagamento: nova } : x));
+      setMinhasMovs((prev) => patchLista(prev));
+      setMinhasMovsHist((prev) => patchLista(prev));
+      setTodosMovs((prev) => patchLista(prev));
+      setDetalheMovs((prev) => patchLista(prev));
+      toast.success("Forma de pagamento atualizada.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha ao atualizar";
+      toast.error(msg);
+    } finally {
+      setSalvandoFormaId(null);
+    }
+  }
+
+  function FormaCellEditavel({ m }: { m: Mov }) {
+    const bucket = normalizarForma(m.forma_pagamento);
+    const editavel =
+      podeEscrever && bucket !== "misto" && TIPOS_FORMA_EDITAVEL.has(m.tipo);
+    if (!editavel) {
+      return <span className="text-xs">{formatarFormaPagamento(m, mistoObs)}</span>;
+    }
+    const atual = (m.forma_pagamento ?? "").trim();
+    const known = FORMAS_EDITAVEIS.some((f) => f.value === atual);
+    return (
+      <Select
+        value={known ? atual : ""}
+        onValueChange={(v) => { void alterarFormaMov(m, v); }}
+        disabled={salvandoFormaId === m.id}
+      >
+        <SelectTrigger className="h-7 text-xs w-[150px]">
+          <SelectValue placeholder={atual || "Selecione"} />
+        </SelectTrigger>
+        <SelectContent>
+          {FORMAS_EDITAVEIS.map((f) => (
+            <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+          ))}
+          {atual && !known && (
+            <SelectItem value={atual}>{atual}</SelectItem>
+          )}
+        </SelectContent>
+      </Select>
+    );
+  }
+
   // Formularios
   const [valorAbertura, setValorAbertura] = useState("0");
   const [obsAbertura, setObsAbertura] = useState("");
