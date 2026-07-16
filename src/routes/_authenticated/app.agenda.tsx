@@ -4556,7 +4556,7 @@ function AgendaPage() {
           <EncerrarExpedienteButton />
           <Button
             asChild
-            variant="default"
+            variant="outline"
             size="sm"
             className="h-7 text-[11px] px-2"
             title="Agendamento rápido em 4 passos"
