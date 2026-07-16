@@ -740,7 +740,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
   const ticketHtml = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1131,7 +1131,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
 
   // Cabeçalho da clínica (reutilizado em cada GR)
   const headerClinica = `
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1366,7 +1366,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
 
   const ticketHtml = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1561,7 +1561,7 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
 
   const ticketHtml = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1756,7 +1756,7 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
   const viaTextoMens = `IMPRESSÃO Nº ${viaNumeroMens}`;
   const ticketMens = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1824,7 +1824,7 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
   const viaTextoTaxa = `IMPRESSÃO Nº ${viaNumeroTaxa}`;
   const ticketTaxa = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
