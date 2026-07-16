@@ -114,7 +114,7 @@ export function TotemPage() {
       mostrarErro(error);
       return;
     }
-    const row = Array.isArray(data) ? data[0] : data;
+    const row = (Array.isArray(data) ? data[0] : data) as { codigo: string };
     setTicket({ codigo: row.codigo, tipo: _tipo });
     setStep("ticket");
     // Impressão automática da senha.
