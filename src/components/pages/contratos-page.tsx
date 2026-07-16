@@ -2365,7 +2365,13 @@ function DetalheContrato({
     manual: "Manual",
   };
   const formaLabel = formaLabelMap[contrato.forma_pagamento ?? ""] ?? contrato.forma_pagamento ?? "—";
-  const maxDep = Number(convenio?.max_dependentes ?? 0) || 0;
+  const convenioMaxDep = Number(convenio?.max_dependentes ?? 0) || 0;
+  const faixaSelecionadaEdicao = admFaixaId ? faixas.find((f) => f.id === admFaixaId) : faixaAtual;
+  const titularOcupaVaga = apenasFinanceiro ? 0 : 1;
+  const maxDep =
+    faixaSelecionadaEdicao && faixaSelecionadaEdicao.vidas_ate != null
+      ? Math.max(0, Number(faixaSelecionadaEdicao.vidas_ate) - titularOcupaVaga)
+      : convenioMaxDep;
   const depsAtivos = deps.filter((d) => d.ativo);
 
   const renderTermo = (dep: Dep, movimento: "Inclusão" | "Exclusão"): string => {
