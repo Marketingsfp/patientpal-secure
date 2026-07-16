@@ -107,19 +107,44 @@ export function ComprovantesTab() {
     if (!clinicaId) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("fin_atendimentos")
-        .select(
-          "id, data, procedimento, valor_medico, valor_laudo, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, medico_id, paciente_id, medicos:medico_id(nome), pacientes:paciente_id(nome)",
-        )
-        .eq("clinica_id", clinicaId)
-        .eq("repasse_pago", true)
-        .gte("repasse_pago_em", de)
-        .lte("repasse_pago_em", ate)
-        .order("repasse_pago_em", { ascending: false })
-        .limit(5000);
-      if (error) throw error;
-      const mapped: Row[] = (data ?? []).map((r: Record<string, unknown>) => ({
+      const [atRes, lcRes] = await Promise.all([
+        supabase
+          .from("fin_atendimentos")
+          .select(
+            "id, data, procedimento, valor_medico, valor_laudo, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, medico_id, paciente_id, medicos:medico_id(nome), pacientes:paciente_id(nome)",
+          )
+          .eq("clinica_id", clinicaId)
+          .eq("repasse_pago", true)
+          .gte("repasse_pago_em", de)
+          .lte("repasse_pago_em", ate)
+          .order("repasse_pago_em", { ascending: false })
+          .limit(5000),
+        supabase
+          .from("fin_lancamentos")
+          .select(
+            "id, data, descricao, valor, valor_medico_override, valor_laudo, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, medico_id, paciente_id, medicos:medico_id(nome), pacientes:paciente_id(nome)",
+          )
+          .eq("clinica_id", clinicaId)
+          .eq("repasse_pago", true)
+          .gte("repasse_pago_em", de)
+          .lte("repasse_pago_em", ate)
+          .order("repasse_pago_em", { ascending: false })
+          .limit(5000),
+      ]);
+      if (atRes.error) throw atRes.error;
+      if (lcRes.error) throw lcRes.error;
+      // Extrai o nome do paciente/procedimento da descrição do lançamento
+      // quando não houver relacionamento direto — as descrições seguem o
+      // padrão "NOME PACIENTE — PROCEDIMENTO — extras".
+      const parseDescricao = (desc: string | null) => {
+        if (!desc) return { paciente: null as string | null, procedimento: null as string | null };
+        const partes = desc.split(" — ");
+        return {
+          paciente: partes[0]?.trim() || null,
+          procedimento: partes[1]?.trim() || null,
+        };
+      };
+      const mappedAt: Row[] = (atRes.data ?? []).map((r: Record<string, unknown>) => ({
         id: r.id as string,
         data: r.data as string,
         procedimento: (r.procedimento as string) ?? null,
@@ -137,7 +162,31 @@ export function ComprovantesTab() {
         paciente_nome:
           (r.pacientes as { nome?: string } | null)?.nome ?? null,
       }));
-      setRows(mapped);
+      const mappedLc: Row[] = (lcRes.data ?? []).map((r: Record<string, unknown>) => {
+        const info = parseDescricao((r.descricao as string) ?? null);
+        const valorMed =
+          r.valor_medico_override != null
+            ? Number(r.valor_medico_override)
+            : Number(r.valor) || 0;
+        return {
+          id: r.id as string,
+          data: (r.data as string) ?? "",
+          procedimento: info.procedimento,
+          valor_medico: valorMed,
+          valor_laudo: Number(r.valor_laudo) || 0,
+          repasse_pago_em: (r.repasse_pago_em as string) ?? null,
+          repasse_pago_at: (r.repasse_pago_at as string) ?? null,
+          repasse_forma_pagamento: (r.repasse_forma_pagamento as string) ?? null,
+          repasse_conta_id: (r.repasse_conta_id as string) ?? null,
+          repasse_lancamento_id: (r.repasse_lancamento_id as string) ?? null,
+          medico_id: (r.medico_id as string) ?? null,
+          medico_nome: (r.medicos as { nome?: string } | null)?.nome ?? null,
+          paciente_id: (r.paciente_id as string) ?? null,
+          paciente_nome:
+            (r.pacientes as { nome?: string } | null)?.nome ?? info.paciente,
+        };
+      });
+      setRows([...mappedAt, ...mappedLc]);
     } catch (err) {
       toast.error("Erro ao carregar comprovantes: " + (err as Error).message);
     } finally {
