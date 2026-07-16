@@ -5490,15 +5490,18 @@ function AgendaPage() {
                         municipio: pac.cidade ?? undefined,
                         uf: pac.estado ?? undefined,
                       },
+                      valorBase: Number(dados.valor) || 0,
                     });
                     if (!tomador) {
                       toast.error("Emissão cancelada.");
                       return;
                     }
+                    const parcial = aplicarValorParcial(Number(dados.valor) || 0, tomador);
                     const descBase = ag.procedimento || pagamentoDesc || "Serviços prestados";
-                    const descSugerida = tomador.dependenteAtendido
+                    const descComDep = tomador.dependenteAtendido
                       ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
                       : descBase;
+                    const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
                     const descFinal = await pedirDescricaoNfse(descSugerida);
                     if (!descFinal) { toast.error("Emissão cancelada."); return; }
                     const res = await emitirNfseFn({
@@ -5506,7 +5509,7 @@ function AgendaPage() {
                         emitenteId: emitenteIdEscolhido,
                         pacienteId: pac.id,
                         agendamentoId: agId,
-                        valorServicos: Number(dados.valor) || 0,
+                        valorServicos: parcial.valor,
                         descricaoServicos: descFinal,
                         tomador,
                       },
