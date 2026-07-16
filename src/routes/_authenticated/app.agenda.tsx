@@ -73,6 +73,7 @@ import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
 import { usePickTomador } from "@/components/nfse/use-pick-tomador";
+import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 import { useAuth } from "@/hooks/use-auth";
 import {
   getProcedimentosAgenda,
@@ -847,6 +848,7 @@ function AgendaPage() {
   const { user } = useAuth();
   const { pick: pickEmitenteNfse, dialog: emitenteNfseDialog } = usePickEmitente();
   const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
+  const { prompt: pedirDescricaoNfse, dialog: descricaoNfseDialog } = usePromptDescricaoNfse();
   const [dataRef, setDataRef] = useState(() => {
     const d = new Date();
     // se hoje for sáb/dom, avança para o próximo dia útil (funcionamento)
@@ -4291,7 +4293,9 @@ function AgendaPage() {
         return;
       }
       const descBase = a.procedimento || "Serviços prestados";
-      const descFinal = tomador.dependenteAtendido ? `${descBase} — Atendido: ${tomador.dependenteAtendido}` : descBase;
+      const descSugerida = tomador.dependenteAtendido ? `${descBase} — Atendido: ${tomador.dependenteAtendido}` : descBase;
+      const descFinal = await pedirDescricaoNfse(descSugerida);
+      if (!descFinal) { toast.error("Emissão cancelada."); return; }
       const res = await emitirNfseFn({
         data: {
           emitenteId: emitenteIdEscolhido,
@@ -5478,9 +5482,11 @@ function AgendaPage() {
                       return;
                     }
                     const descBase = ag.procedimento || pagamentoDesc || "Serviços prestados";
-                    const descFinal = tomador.dependenteAtendido
+                    const descSugerida = tomador.dependenteAtendido
                       ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
                       : descBase;
+                    const descFinal = await pedirDescricaoNfse(descSugerida);
+                    if (!descFinal) { toast.error("Emissão cancelada."); return; }
                     const res = await emitirNfseFn({
                       data: {
                         emitenteId: emitenteIdEscolhido,
