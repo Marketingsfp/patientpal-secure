@@ -516,7 +516,6 @@ export const cancelarNfse = createServerFn({ method: "POST" })
  * Reenvia uma NFS-e a partir de um registro existente (status=erro).
  * Reusa emitente/tomador/valor/descrição da nota original.
  */
-export const reenviarNfse = createServerFn({ method: "POST" })
 /**
  * Avança o contador rps_proximo_numero do emitente. Existe porque o UPDATE
  * direto pelo client pode ser bloqueado silenciosamente por RLS (só managers
@@ -559,6 +558,10 @@ export const avancarRpsProximoNumero = createServerFn({ method: "POST" })
     return { ok: true, novo_numero: data.novo_numero, anterior };
   });
 
+/**
+ * Reenvia uma NFS-e a partir de um registro existente (status=erro).
+ * Reusa emitente/tomador/valor/descrição da nota original.
+ */
 export const reenviarNfse = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
