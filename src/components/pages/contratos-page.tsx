@@ -1239,7 +1239,8 @@ function NovoContratoForm({
                       </Button>
                     </div>
                   ) : null}
-                  <div className="flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2">
+                  </div>
+                  <div className="flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2 md:self-stretch md:min-w-[260px] md:max-w-[340px]">
                     <input
                       id="tit-apenas-fin-novo"
                       type="checkbox"
