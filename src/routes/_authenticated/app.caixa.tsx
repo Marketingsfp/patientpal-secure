@@ -506,8 +506,55 @@ function Page() {
   const TIPOS_FORMA_EDITAVEL = new Set<MovTipo>(["recebimento", "despesa", "estorno"]);
   const [salvandoFormaId, setSalvandoFormaId] = useState<string | null>(null);
 
+  // Diálogo de detalhes do cartão (crédito/débito) na edição inline da Forma.
+  type CartaoDetalhes = {
+    bandeira: string;
+    parcelas: string;
+    data: string;
+    autorizacao: string;
+    valorLiquido: string;
+  };
+  const [cartaoEditFor, setCartaoEditFor] = useState<{ mov: Mov; forma: "cartao_credito" | "cartao_debito" } | null>(null);
+  const [cartaoEdit, setCartaoEdit] = useState<CartaoDetalhes>({
+    bandeira: "", parcelas: "1", data: "", autorizacao: "", valorLiquido: "",
+  });
+  const [salvandoCartao, setSalvandoCartao] = useState(false);
+
   async function alterarFormaMov(m: Mov, nova: string) {
     if (!m || !nova || nova === (m.forma_pagamento ?? "")) return;
+    // Cartão exige coleta de dados adicionais → abre o diálogo em vez de gravar direto.
+    if (nova === "cartao_credito" || nova === "cartao_debito") {
+      // Pré-carrega valores existentes do lançamento (se houver) para permitir edição.
+      let prefill: Partial<CartaoDetalhes> = {};
+      if (m.lancamento_id) {
+        const { data } = await supabase
+          .from("fin_lancamentos")
+          .select("bandeira_cartao, parcelas, data_cartao, autorizacao_cartao, valor_liquido_cartao, valor")
+          .eq("id", m.lancamento_id)
+          .maybeSingle();
+        const row = (data ?? null) as
+          | { bandeira_cartao: string | null; parcelas: number | null; data_cartao: string | null; autorizacao_cartao: string | null; valor_liquido_cartao: number | null; valor: number | null }
+          | null;
+        if (row) {
+          prefill = {
+            bandeira: row.bandeira_cartao ?? "",
+            parcelas: String(row.parcelas ?? 1),
+            data: row.data_cartao ?? "",
+            autorizacao: row.autorizacao_cartao ?? "",
+            valorLiquido: row.valor_liquido_cartao != null ? String(row.valor_liquido_cartao) : String(row.valor ?? m.valor ?? ""),
+          };
+        }
+      }
+      setCartaoEdit({
+        bandeira: prefill.bandeira ?? "",
+        parcelas: prefill.parcelas ?? "1",
+        data: prefill.data ?? new Date().toISOString().slice(0, 10),
+        autorizacao: prefill.autorizacao ?? "",
+        valorLiquido: prefill.valorLiquido ?? String(m.valor ?? ""),
+      });
+      setCartaoEditFor({ mov: m, forma: nova });
+      return;
+    }
     setSalvandoFormaId(m.id);
     try {
       const { error: eMov } = await supabase
@@ -534,6 +581,54 @@ function Page() {
       toast.error(msg);
     } finally {
       setSalvandoFormaId(null);
+    }
+  }
+
+  async function confirmarCartaoEdit() {
+    if (!cartaoEditFor) return;
+    const { mov: m, forma: nova } = cartaoEditFor;
+    if (!cartaoEdit.bandeira) {
+      toast.error("Selecione a bandeira do cartão.");
+      return;
+    }
+    const parcelasNum = nova === "cartao_credito" ? Math.max(1, Number(cartaoEdit.parcelas) || 1) : 1;
+    const liquidoNum = cartaoEdit.valorLiquido ? Number(String(cartaoEdit.valorLiquido).replace(",", ".")) : null;
+    setSalvandoCartao(true);
+    try {
+      const { error: eMov } = await supabase
+        .from("caixa_movimentos")
+        .update({ forma_pagamento: nova })
+        .eq("id", m.id);
+      if (eMov) throw eMov;
+      if (m.lancamento_id) {
+        const patchLanc: Record<string, unknown> = {
+          forma_pagamento: nova,
+          bandeira_cartao: cartaoEdit.bandeira,
+          parcelas: parcelasNum,
+          data_cartao: cartaoEdit.data || null,
+          autorizacao_cartao: cartaoEdit.autorizacao || null,
+          valor_liquido_cartao: liquidoNum,
+        };
+        const { error: eLanc } = await supabase
+          .from("fin_lancamentos")
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .update(patchLanc as any)
+          .eq("id", m.lancamento_id);
+        if (eLanc) throw eLanc;
+      }
+      const patchLista = (lista: Mov[]) =>
+        lista.map((x) => (x.id === m.id ? { ...x, forma_pagamento: nova } : x));
+      setMinhasMovs((prev) => patchLista(prev));
+      setMinhasMovsHist((prev) => patchLista(prev));
+      setTodosMovs((prev) => patchLista(prev));
+      setDetalheMovs((prev) => patchLista(prev));
+      toast.success("Forma de pagamento atualizada.");
+      setCartaoEditFor(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha ao atualizar";
+      toast.error(msg);
+    } finally {
+      setSalvandoCartao(false);
     }
   }
 
