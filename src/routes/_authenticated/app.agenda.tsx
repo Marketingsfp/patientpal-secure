@@ -72,7 +72,7 @@ import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
-import { usePickTomador } from "@/components/nfse/use-pick-tomador";
+import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -4297,13 +4297,16 @@ function AgendaPage() {
           municipio: pac.cidade ?? undefined,
           uf: pac.estado ?? undefined,
         },
+        valorBase: Number(valor) || 0,
       });
       if (!tomador) {
         toast.error("Emissão cancelada.");
         return;
       }
+      const parcial = aplicarValorParcial(Number(valor) || 0, tomador);
       const descBase = a.procedimento || "Serviços prestados";
-      const descSugerida = tomador.dependenteAtendido ? `${descBase} — Atendido: ${tomador.dependenteAtendido}` : descBase;
+      const descComDep = tomador.dependenteAtendido ? `${descBase} — Atendido: ${tomador.dependenteAtendido}` : descBase;
+      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
       const descFinal = await pedirDescricaoNfse(descSugerida);
       if (!descFinal) { toast.error("Emissão cancelada."); return; }
       const res = await emitirNfseFn({
@@ -4311,7 +4314,7 @@ function AgendaPage() {
           emitenteId: emitenteIdEscolhido,
           pacienteId: pac.id,
           agendamentoId: a.id,
-          valorServicos: Number(valor) || 0,
+          valorServicos: parcial.valor,
           descricaoServicos: descFinal,
           tomador,
         },
@@ -5487,15 +5490,18 @@ function AgendaPage() {
                         municipio: pac.cidade ?? undefined,
                         uf: pac.estado ?? undefined,
                       },
+                      valorBase: Number(dados.valor) || 0,
                     });
                     if (!tomador) {
                       toast.error("Emissão cancelada.");
                       return;
                     }
+                    const parcial = aplicarValorParcial(Number(dados.valor) || 0, tomador);
                     const descBase = ag.procedimento || pagamentoDesc || "Serviços prestados";
-                    const descSugerida = tomador.dependenteAtendido
+                    const descComDep = tomador.dependenteAtendido
                       ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
                       : descBase;
+                    const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
                     const descFinal = await pedirDescricaoNfse(descSugerida);
                     if (!descFinal) { toast.error("Emissão cancelada."); return; }
                     const res = await emitirNfseFn({
@@ -5503,7 +5509,7 @@ function AgendaPage() {
                         emitenteId: emitenteIdEscolhido,
                         pacienteId: pac.id,
                         agendamentoId: agId,
-                        valorServicos: Number(dados.valor) || 0,
+                        valorServicos: parcial.valor,
                         descricaoServicos: descFinal,
                         tomador,
                       },
