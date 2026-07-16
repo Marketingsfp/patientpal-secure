@@ -2875,10 +2875,21 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                   Reverter
                                 </Button>
                               ) : (
-                                <Button size="sm" disabled={cancelado && !isAdmin} onClick={() => abrirFormaPag(m)}>
-                                  <Check className="h-3 w-3 mr-1" />
-                                  Pagar
-                                </Button>
+                                <>
+                                  <Button size="sm" disabled={cancelado && !isAdmin} onClick={() => abrirFormaPag(m)}>
+                                    <Check className="h-3 w-3 mr-1" />
+                                    Pagar
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    title="Marcar como paga historicamente (sem lançar no caixa)"
+                                    disabled={cancelado && !isAdmin}
+                                    onClick={() => marcarPagaHistorica(m)}
+                                  >
+                                    Paga (histórica)
+                                  </Button>
+                                </>
                               ))}
                               {isAdmin && podeEscrever ? (
                                 <Button
