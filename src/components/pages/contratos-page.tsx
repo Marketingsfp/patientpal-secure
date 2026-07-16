@@ -1161,8 +1161,9 @@ function NovoContratoForm({
             <div className="col-span-2">
               <Label>Paciente titular</Label>
               {titular ? (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] items-start">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
                     <span className="font-medium flex items-center gap-2">
                       {titular.nome} {titular.cpf ? `— ${titular.cpf}` : ""}
                       {titular.face_descriptor && titular.face_descriptor.length > 0 ? (
