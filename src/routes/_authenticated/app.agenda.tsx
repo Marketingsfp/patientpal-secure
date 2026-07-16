@@ -2232,19 +2232,11 @@ function AgendaPage() {
   const medicoEhLaboratorioFormulario = (medicoId: string | null | undefined) => {
     if (!medicoId) return false;
     const med = medicos.find((m) => m.id === medicoId);
-    // Preferência: se qualquer procedimento configurado para o médico é
-    // laboratório (`tipo_procedimento='laboratorio'`), assume lab.
-    const opts = opcoesProcedimentoMedico(
-      medicoId,
-      editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
-    );
-    if (
-      opts.some((o) => {
-        const p = procedimentosList.find((pp) => pp.id === o.id);
-        return (p?.tipo_procedimento ?? "").toLowerCase() === "laboratorio";
-      })
-    )
-      return true;
+    // Regra (2026-07-16): médico só é tratado como "de laboratório" quando
+    // a especialidade dele contém "Laborat". Procedimentos avulsos com
+    // `tipo_procedimento='laboratorio'` cadastrados em médicos de outras
+    // especialidades (ex.: dermato/clínico com uma cobrança de análise)
+    // NÃO reclassificam o médico como laboratório.
     if (normalizar(med?.especialidade_nome ?? "").includes("laborat")) return true;
     const espIds = medicoEspec.get(medicoId);
     if (!espIds || espIds.size === 0) return false;
@@ -3459,9 +3451,14 @@ function AgendaPage() {
           .filter(Boolean),
       ),
     );
-    // Serviço é opcional — quando não informado, o agendamento é salvo sem
-    // procedimento e a cobrança pode ser feita via "Valor manual".
+    // Regra (2026-07-16): procedimento passou a ser OBRIGATÓRIO em todo
+    // agendamento de paciente. Elimina o rótulo de fallback ("CONSULTA" /
+    // "EXAMES LABORATORIAIS") aparecer em cima de campo vazio.
     const procedimentoTexto = procedimentosParaSalvar.join(" + ");
+    if (!procedimentoTexto.trim()) {
+      toast.error("Selecione o procedimento antes de salvar.");
+      return;
+    }
     const multiExamesModo =
       procedimentosParaSalvar.length > 1
         ? medicoEhLaboratorioFormulario(form.medico_id)
