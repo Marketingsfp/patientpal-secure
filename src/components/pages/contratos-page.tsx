@@ -2761,7 +2761,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           </TableCell>
                         </TableRow>
                       ) : null}
-                      {mens.map((m) => (
+                      {mensalidades.map((m) => (
                         <TableRow key={m.id}>
                           <TableCell>
                             {isAdesao(m) ? (
