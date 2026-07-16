@@ -44,14 +44,22 @@ export function PainelPage() {
   const filaFalaRef = useRef<Array<{ key: string; senha: Senha }>>([]);
   const falandoRef = useRef<boolean>(false);
   const vozFemininaRef = useRef<SpeechSynthesisVoice | null>(null);
-  const [theme, setTheme] = useState<"dark" | "light">(() => {
-    if (typeof window === "undefined") return "dark";
-    return (localStorage.getItem("painel-theme") as "dark" | "light") ?? "dark";
+  // Modo automático: claro das 06h às 17h; escuro das 17h às 06h.
+  // Sem botão manual — a troca acontece sozinha ao longo do dia.
+  const [isLight, setIsLight] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const h = new Date().getHours();
+    return h >= 6 && h < 17;
   });
-  const isLight = theme === "light";
   useEffect(() => {
-    if (typeof window !== "undefined") localStorage.setItem("painel-theme", theme);
-  }, [theme]);
+    const tick = () => {
+      const h = new Date().getHours();
+      setIsLight(h >= 6 && h < 17);
+    };
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   // Destrava o áudio automaticamente no primeiro gesto do usuário em
   // QUALQUER lugar da página (política de autoplay dos navegadores).
