@@ -1,35 +1,61 @@
-## O que vai acontecer
+## Diagnóstico primeiro (antes de qualquer alteração)
 
-Dar baixa nas 12 mensalidades pendentes do contrato **20260369 — DEBORA CATARINA TENORIO L** marcando-as como **pagas na data de hoje (16/07/2026)**, **sem gerar receita** no módulo financeiro (nenhum lançamento em `fin_lancamentos`).
+Verifiquei no banco os pagamentos das mensalidades dos últimos 30 dias:
 
-## Escopo — o que muda no banco
+| Caso | Vai pro caixa hoje? |
+|------|--------------------|
+| Mensalidade paga via "Registrar pagamento" (LancamentoDialog) | **Sim** — todas as 9 amostras têm movimento de caixa vinculado ao usuário que fez |
+| Taxa de adesão (RPC separada) | **Sim** — mesmo RPC atômica, movimento no caixa do operador |
+| Consulta com desconto do cartão (Agenda → Pagamento) | **Sim** — mesmo LancamentoDialog |
+| Mensalidade marcada como "paga historicamente" (botão Other) | **Não** — é intencional; regra da governança "sem gerar receita" |
+| Pagamentos importados / MJ / manuais antigos (`forma = manual`, sem `lancamento_id`) | **Não** — legados anteriores ao RPC atômico |
 
-**Tabela `contrato_mensalidades`** (12 linhas, contrato_id `f25e1deb-1733-4421-9f1c-3e98edc19ffc`):
-- `status` → `pago`
-- `pago_em` → `2026-07-16`
-- `valor_pago` → mesmo valor da parcela (R$ 155,00)
-- `forma_pagamento` → `manual`
-- `observacoes` → `"Baixa manual — contrato renovado no 20260370 (16/07/2026)"`
-- `lancamento_id` fica `NULL` (é isso que garante que nenhuma receita é criada)
+**Conclusão sobre o caixa:** o fluxo padrão já cai no caixa do usuário logado. Não precisa código novo — a RPC `fn_registrar_lancamento_e_caixa` já abre sessão automaticamente pro operador se não houver uma aberta. Vou apenas confirmar isso na resposta e deixar a regra visível.
 
-Nenhuma outra tabela é tocada. O status do contrato 20260369 permanece `ativo` (posso cancelar depois se você pedir).
+**Gap real → NFS-e:** hoje **não existe botão de "Emitir NFS-e" nas telas onde esses pagamentos são feitos**:
+- Mensalidade e taxa de adesão (aba Parcelas do contrato) — só imprime GR, sem emissão fiscal.
+- Consulta com desconto do cartão benefício → **já tem** botão de NFS-e na Agenda e em Financeiro › Atendimentos (herda do fluxo padrão, reaproveita `pickTomador` com % e endereço).
 
-## Fora do escopo
+## Escopo desta alteração
 
-- Não altero o contrato 20260370 (renovado).
-- Não crio nada em `fin_lancamentos` (é justamente o "sem gerar receita").
-- Não mexo em `caixa_movimentos`, `boletos`, `pagamentos`, `nfse` ou qualquer integração.
-- Não altero código.
+Só código de UI (front). Nenhuma alteração em RPC, tabela, RLS, contrato, financeiro core ou regra de repasse.
 
-## Validação
+### 1. Botão "Emitir NFS-e" na aba Parcelas (mensalidade + taxa adesão)
 
-- Consulta antes: 12 mensalidades pendentes, `pago_em NULL`, `lancamento_id NULL`.
-- Executar o UPDATE.
-- Consulta depois: as 12 devem estar `status = 'pago'`, `pago_em = 2026-07-16`, `valor_pago = 155.00`, `lancamento_id` ainda `NULL`.
-- Conferir no financeiro que **não** apareceu receita nova de R$ 1.860,00 no dia 16/07.
+Em `src/components/pages/contratos-page.tsx`, na linha de cada parcela paga:
+- Adicionar botão `Emitir NFS-e` visível apenas quando `status = pago` E `lancamento_id != null` (parcelas históricas/manuais ficam sem botão, com tooltip "não gera NFS-e — pagamento fora do sistema").
+- Se a parcela já tem NFS-e emitida (procurar `nfse.pagamento_id = lancamento_id`), o botão troca por link "NFS-e nº X • PDF" + botão "Cancelar" (fora do escopo desta rodada).
+- Fluxo idêntico ao já existente: chama `pickTomadorNfse` (bloqueia endereço, escolhe % — o operador escolhe no momento) → `pedirDescricaoNfse` → `emitirNfse` → grava `pagamento_id = lancamento_id` na nfse.
+- Descrição sugerida:
+  - Mensalidade: `Mensalidade N/12 — Cartão Benefício <Convênio> — Contrato #<numero> — <Paciente>`
+  - Taxa adesão: `Taxa de adesão — Cartão Benefício <Convênio> — Contrato #<numero> — <Paciente>`
 
-## Riscos e pontos de atenção
+### 2. Confirmar botão NFS-e na Agenda para consulta paga com cartão
 
-- Operação em produção, mas totalmente reversível: se precisar, dá para voltar as 12 linhas ao estado anterior (status = `pendente`, `pago_em` = NULL, `valor_pago` = NULL) — desde que você me avise antes que alguma outra ação seja tomada em cima delas.
-- O contrato 20260369 continuará `ativo` na listagem, agora com 12/12 parcelas pagas. Se preferir que ele também apareça como "encerrado", me peça um segundo passo para cancelar o contrato.
-- Nenhum impacto em agenda, prontuário, LGPD, permissões ou repasses.
+Já existe. Vou apenas verificar que a descrição sugerida inclua o rótulo "Cartão Consulta" quando `isCartaoConsultaDesc(descricao_lancamento)` for verdadeiro, pra o operador identificar rapidamente na hora de confirmar.
+
+### 3. Emitente
+
+Reusa o mesmo picker de emitente. Regra existente no `emitirNfse` já força o CNPJ correto (consulta → CASA DE SAUDE; exame → MA IMAGENS). Mensalidade e taxa de adesão não batem em nenhum dos dois filtros — sai no emitente escolhido pelo operador. **Confirmar com você:** hoje as mensalidades devem sair em qual CNPJ? Se sempre no mesmo, adiciono a mesma regra automática (detecção pela descrição `MENSALIDADE`/`ADESAO`) — se não, deixo livre.
+
+## Impacto (4 eixos)
+
+- 💰 **Financeiro:** neutro — só emite documento fiscal já existente no banco (o pagamento já está lançado). Nenhum risco de duplicidade porque grava `pagamento_id = lancamento_id` e checa antes.
+- ⏱️ **Operacional:** elimina 4-5 cliques (hoje precisa ir em Financeiro › Notas e criar tudo manualmente).
+- 😊 **Experiência:** paciente recebe NFS-e da mensalidade automaticamente (email) sem passar de novo na recepção.
+- 🛡️ **Segurança:** respeita `usePodeEscrever("financeiro")` no botão, mesmo controle de acesso das outras emissões.
+
+## Fora do escopo (proponho tratar depois se quiser)
+
+- Cancelamento/estorno de NFS-e a partir da aba Parcelas.
+- Emissão em lote de várias mensalidades de uma vez.
+- Regra "auto-emitir NFS-e ao dar baixa" (checkbox no LancamentoDialog já existe, mas não dispara nada hoje).
+- Backfill de NFS-e para mensalidades já pagas antes desta alteração.
+
+## Ponto que preciso confirmar
+
+**Qual emitente (CNPJ) deve ser usado para mensalidade e taxa de adesão do cartão benefício?** Opções:
+1. Sempre um CNPJ específico (me diga qual, mesmo padrão de "consulta → 31.919.483/0003-18").
+2. Deixar o operador escolher no diálogo (mesmo comportamento atual das notas avulsas).
+
+Aguardo essa resposta antes de aplicar.

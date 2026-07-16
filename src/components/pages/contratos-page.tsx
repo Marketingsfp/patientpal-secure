@@ -63,6 +63,9 @@ import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { EditarPacienteRapidoDialog } from "@/components/contratos/editar-paciente-rapido-dialog";
 import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
+import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
+import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
+import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -1686,6 +1689,16 @@ function DetalheContrato({
   const [faixas, setFaixas] = useState<Faixa[]>([]);
   const [loading, setLoading] = useState(true);
   const gerarBoletosFn = useServerFn(gerarBoletosContrato);
+  // NFS-e a partir da parcela paga (mensalidade/taxa adesão).
+  // Reaproveita o mesmo picker/prompt usados no Financeiro › Atendimentos.
+  const emitirNfseFn = useServerFn(emitirNfse);
+  const consultarNfseFn = useServerFn(consultarNfse);
+  const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
+  const { prompt: pedirDescricaoNfse, dialog: descricaoNfseDialog } = usePromptDescricaoNfse();
+  const [emitentes, setEmitentes] = useState<Array<{ id: string; nome: string }>>([]);
+  const [emitenteId, setEmitenteId] = useState<string>("");
+  const [nfsePorLancamento, setNfsePorLancamento] = useState<Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }>>({});
+  const [nfseEmitindoId, setNfseEmitindoId] = useState<string | null>(null);
 
   // Inclusão/exclusão de dependentes pós-venda
   const [incOpen, setIncOpen] = useState(false);
@@ -2185,6 +2198,55 @@ function DetalheContrato({
     load(); /* eslint-disable-next-line */
   }, [contrato.id]);
 
+  // Carrega emitentes NFS-e ativos da clínica (para o botão "Emitir NFS-e"
+  // nas parcelas). Se não houver emitente cadastrado, o botão avisa o usuário.
+  useEffect(() => {
+    if (!clinicaAtual?.clinica_id) { setEmitentes([]); setEmitenteId(""); return; }
+    let cancel = false;
+    void supabase
+      .from("nfse_emitentes")
+      .select("id, nome")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true)
+      .order("nome")
+      .then(({ data }) => {
+        if (cancel) return;
+        const list = (data ?? []) as Array<{ id: string; nome: string }>;
+        setEmitentes(list);
+        setEmitenteId((prev) => prev || (list[0]?.id ?? ""));
+      });
+    return () => { cancel = true; };
+  }, [clinicaAtual?.clinica_id]);
+
+  // Carrega NFS-e já emitidas para as parcelas deste contrato (indexadas por
+  // lancamento_id da parcela). Assim conseguimos: (1) esconder o botão de
+  // emitir; (2) mostrar o número/link do PDF.
+  useEffect(() => {
+    const ids = mens
+      .map((m) => m.lancamento_id)
+      .filter((v): v is string => !!v);
+    if (!ids.length || !clinicaAtual?.clinica_id) {
+      setNfsePorLancamento({});
+      return;
+    }
+    let cancel = false;
+    void supabase
+      .from("nfse")
+      .select("id, numero, status, url_pdf, pagamento_id")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .in("pagamento_id", ids)
+      .neq("status", "cancelada")
+      .then(({ data }) => {
+        if (cancel) return;
+        const map: Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }> = {};
+        for (const r of (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string }>) {
+          map[r.pagamento_id] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
+        }
+        setNfsePorLancamento(map);
+      });
+    return () => { cancel = true; };
+  }, [mens, clinicaAtual?.clinica_id]);
+
   // Sincroniza a faixa "admin" com a faixa vigente (baseada no valor_mensal atual)
   useEffect(() => {
     if (!faixas.length) {
@@ -2301,6 +2363,94 @@ function DetalheContrato({
     setPagMens(m);
     setFormaPagOpen(true);
   };
+
+  // Emite NFS-e a partir de uma parcela paga (mensalidade ou taxa de adesão).
+  // Reutiliza o mesmo picker/prompt do módulo Financeiro › Atendimentos,
+  // com bloqueio de endereço e escolha de percentual do valor.
+  const emitirNfseParcela = async (m: Mens) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!clinicaAtual) return;
+    if (!m.lancamento_id) {
+      toast.error("Esta parcela não tem lançamento financeiro vinculado — não é possível emitir NFS-e.");
+      return;
+    }
+    if (!emitentes.length || !emitenteId) {
+      toast.error("Cadastre um emitente ativo em Configurações › NFS-e antes de emitir.");
+      return;
+    }
+    const pac = pacienteFull ?? {};
+    const nomePac = contrato.paciente_nome ?? "";
+    if (!nomePac) { toast.error("Contrato sem paciente vinculado."); return; }
+    const valorBase = Number(m.valor_pago ?? m.valor) || 0;
+    if (valorBase <= 0) { toast.error("Valor pago da parcela é zero."); return; }
+    setNfseEmitindoId(m.id);
+    try {
+      const tomador = await pickTomadorNfse({
+        paciente: {
+          nome: nomePac,
+          cpfCnpj: pac.cpf ?? undefined,
+          email: pac.email ?? undefined,
+          cep: pac.cep ?? undefined,
+          logradouro: pac.logradouro ?? undefined,
+          numero: pac.numero ?? undefined,
+          bairro: pac.bairro ?? undefined,
+          municipio: pac.cidade ?? undefined,
+          uf: pac.estado ?? undefined,
+        },
+        valorBase,
+      });
+      if (!tomador) { toast.error("Emissão cancelada."); return; }
+      const parcial = aplicarValorParcial(valorBase, tomador);
+      const convNome = convenio?.nome ? ` — Cartão Benefício ${convenio.nome}` : " — Cartão Benefício";
+      const rotulo = isAdesao(m)
+        ? `Taxa de adesão${convNome} — Contrato #${contrato.numero} — ${nomePac}`
+        : `Mensalidade ${m.numero_parcela}/${mensalidades.length}${convNome} — Contrato #${contrato.numero} — ${nomePac}`;
+      const descComDep = tomador.dependenteAtendido
+        ? `${rotulo} — Atendido: ${tomador.dependenteAtendido}`
+        : rotulo;
+      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
+      const descFinal = await pedirDescricaoNfse(descSugerida);
+      if (!descFinal) { toast.error("Emissão cancelada."); return; }
+      const paciente_id = (contrato as { paciente_id?: string | null }).paciente_id ?? undefined;
+      const res = await emitirNfseFn({
+        data: {
+          emitenteId,
+          pacienteId: paciente_id,
+          pagamentoId: m.lancamento_id,
+          valorServicos: parcial.valor,
+          descricaoServicos: descFinal,
+          tomador,
+        },
+      });
+      const nfseId = (res as { id?: string })?.id;
+      toast.success("NFS-e enviada. Consultando status...");
+      if (nfseId) {
+        await new Promise((r) => setTimeout(r, 4000));
+        await consultarNfseFn({ data: { id: nfseId } });
+      }
+      // Recarrega o mapa de NFS-e emitidas para trocar o botão pelo link.
+      const { data } = await supabase
+        .from("nfse")
+        .select("id, numero, status, url_pdf, pagamento_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .in("pagamento_id", [m.lancamento_id])
+        .neq("status", "cancelada");
+      const row = (data ?? [])[0] as
+        | { id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string }
+        | undefined;
+      if (row) {
+        setNfsePorLancamento((prev) => ({
+          ...prev,
+          [row.pagamento_id]: { id: row.id, numero: row.numero, status: row.status, pdf_url: row.url_pdf },
+        }));
+      }
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setNfseEmitindoId(null);
+    }
+  };
+
   // Multa de 10% + juros de 0,33% ao dia para parcelas vencidas
   const calcValorComJuros = (m: Mens | null): number => {
     if (!m) return 0;
@@ -2889,9 +3039,42 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           <TableCell>
                             <div className="flex items-center gap-1 justify-end">
                               {podeEscrever && (m.status === "pago" ? (
-                                <Button size="sm" variant="outline" onClick={() => reverterMensalidade(m)}>
-                                  Reverter
-                                </Button>
+                                <>
+                                  {m.lancamento_id ? (
+                                    nfsePorLancamento[m.lancamento_id] ? (
+                                      <a
+                                        href={nfsePorLancamento[m.lancamento_id].pdf_url ?? "#"}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs inline-flex items-center gap-1 rounded-md border px-2 h-8 hover:bg-muted"
+                                        title={`NFS-e ${nfsePorLancamento[m.lancamento_id].numero ?? "emitida"} — ${nfsePorLancamento[m.lancamento_id].status ?? ""}`}
+                                      >
+                                        <FileText className="h-3 w-3" />
+                                        NFS-e {nfsePorLancamento[m.lancamento_id].numero ?? ""}
+                                      </a>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        title="Emitir NFS-e desta parcela"
+                                        disabled={nfseEmitindoId === m.id}
+                                        onClick={() => emitirNfseParcela(m)}
+                                      >
+                                        {nfseEmitindoId === m.id ? (
+                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                        ) : (
+                                          <FileText className="h-3 w-3 mr-1" />
+                                        )}
+                                        NFS-e
+                                      </Button>
+                                    )
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground" title="Parcela paga fora do sistema — não gera NFS-e">—</span>
+                                  )}
+                                  <Button size="sm" variant="outline" onClick={() => reverterMensalidade(m)}>
+                                    Reverter
+                                  </Button>
+                                </>
                               ) : (
                                 <>
                                   <Button size="sm" disabled={cancelado && !isAdmin} onClick={() => abrirFormaPag(m)}>
@@ -3547,6 +3730,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
           setPagInitialForma("");
         }}
       />
+
+      {/* Diálogos usados pela emissão de NFS-e a partir das parcelas */}
+      {tomadorNfseDialog}
+      {descricaoNfseDialog}
 
       <Dialog open={incOpen} onOpenChange={setIncOpen}>
         <DialogContent className="max-w-md">
