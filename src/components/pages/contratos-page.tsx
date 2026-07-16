@@ -3039,9 +3039,42 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           <TableCell>
                             <div className="flex items-center gap-1 justify-end">
                               {podeEscrever && (m.status === "pago" ? (
-                                <Button size="sm" variant="outline" onClick={() => reverterMensalidade(m)}>
-                                  Reverter
-                                </Button>
+                                <>
+                                  {m.lancamento_id ? (
+                                    nfsePorLancamento[m.lancamento_id] ? (
+                                      <a
+                                        href={nfsePorLancamento[m.lancamento_id].pdf_url ?? "#"}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs inline-flex items-center gap-1 rounded-md border px-2 h-8 hover:bg-muted"
+                                        title={`NFS-e ${nfsePorLancamento[m.lancamento_id].numero ?? "emitida"} — ${nfsePorLancamento[m.lancamento_id].status ?? ""}`}
+                                      >
+                                        <FileText className="h-3 w-3" />
+                                        NFS-e {nfsePorLancamento[m.lancamento_id].numero ?? ""}
+                                      </a>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        title="Emitir NFS-e desta parcela"
+                                        disabled={nfseEmitindoId === m.id}
+                                        onClick={() => emitirNfseParcela(m)}
+                                      >
+                                        {nfseEmitindoId === m.id ? (
+                                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                        ) : (
+                                          <FileText className="h-3 w-3 mr-1" />
+                                        )}
+                                        NFS-e
+                                      </Button>
+                                    )
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground" title="Parcela paga fora do sistema — não gera NFS-e">—</span>
+                                  )}
+                                  <Button size="sm" variant="outline" onClick={() => reverterMensalidade(m)}>
+                                    Reverter
+                                  </Button>
+                                </>
                               ) : (
                                 <>
                                   <Button size="sm" disabled={cancelado && !isAdmin} onClick={() => abrirFormaPag(m)}>
