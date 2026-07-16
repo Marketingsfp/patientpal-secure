@@ -2006,19 +2006,25 @@ function DetalheContrato({
         .eq("status", "pendente")
         .neq("numero_parcela", 0)
         .gt("vencimento", hoje);
-      // próximo número
-      const { data: maxRow } = await supabase
+      // Conta parcelas restantes (≠0) — geralmente pagas/atrasadas anteriores a hoje.
+      // Todo contrato deve ter no máximo 12 mensalidades: gera só o que falta.
+      const { data: restantes } = await supabase
         .from("contrato_mensalidades")
         .select("numero_parcela")
         .eq("contrato_id", contrato.id)
         .neq("numero_parcela", 0)
-        .order("numero_parcela", { ascending: false })
-        .limit(1);
-      let prox = ((maxRow?.[0]?.numero_parcela ?? 0) as number) + 1;
+        .order("numero_parcela", { ascending: false });
+      const existentes = restantes ?? [];
+      const maxExistente = existentes.reduce(
+        (mx, r) => Math.max(mx, Number((r as { numero_parcela: number }).numero_parcela) || 0),
+        0,
+      );
+      const restantesParaGerar = Math.max(0, 12 - existentes.length);
+      let prox = maxExistente + 1;
       const inicio = new Date();
       inicio.setDate(1);
       const rows: any[] = [];
-      for (let i = 1; i <= 12; i++) {
+      for (let i = 1; i <= restantesParaGerar; i++) {
         const ref = new Date(inicio.getFullYear(), inicio.getMonth() + i, 1);
         const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
         const d = Math.min(dia, lastDay);
@@ -2032,12 +2038,14 @@ function DetalheContrato({
           status: "pendente",
         });
       }
-      const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows);
-      if (insErr) {
-        setSavingDados(false);
-        mostrarErro(insErr, "dados salvos, mas falha ao gerar parcelas");
-        await load();
-        return;
+      if (rows.length > 0) {
+        const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows);
+        if (insErr) {
+          setSavingDados(false);
+          mostrarErro(insErr, "dados salvos, mas falha ao gerar parcelas");
+          await load();
+          return;
+        }
       }
     }
     setSavingDados(false);
