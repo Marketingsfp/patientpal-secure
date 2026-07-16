@@ -135,6 +135,23 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       .filter(Boolean)));
     const multiModo = procedimentos.length > 1 ? data.multi_exames_modo ?? null : null;
 
+    // ---------- 0. Procedimento obrigatório (2026-07-16) ----------
+    // Vale para agendamentos de paciente real (paciente_id preenchido).
+    // Slots operacionais (DISPONÍVEL/BLOQUEIO) não têm paciente_id e ficam
+    // fora dessa checagem.
+    if (payload.paciente_id) {
+      const textoPayload = String(payload.procedimento ?? "").trim();
+      const temProcedimentoNaLista = procedimentos.length > 0;
+      if (!textoPayload && !temProcedimentoNaLista) {
+        return {
+          ok: false,
+          validation_error: {
+            message: "Selecione o procedimento antes de salvar o agendamento.",
+          },
+        };
+      }
+    }
+
     // ---------- 1. Paciente com telefone e data_nascimento (2422-2436) ----------
     if (checagens.validar_paciente_completo && payload.paciente_id) {
       const { data: pacCheck } = await supabase
