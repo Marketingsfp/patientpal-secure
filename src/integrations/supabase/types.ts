@@ -3538,6 +3538,7 @@ export type Database = {
       fin_lancamentos: {
         Row: {
           agendamento_id: string | null
+          autorizacao_cartao: string | null
           bandeira_cartao: string | null
           categoria_id: string | null
           clinica_id: string
@@ -3545,6 +3546,7 @@ export type Database = {
           created_at: string
           criado_por: string | null
           data: string
+          data_cartao: string | null
           data_vencimento: string | null
           descricao: string
           emitir_nfse: boolean
@@ -3574,10 +3576,12 @@ export type Database = {
           updated_at: string
           valor: number
           valor_laudo: number
+          valor_liquido_cartao: number | null
           valor_medico_override: number | null
         }
         Insert: {
           agendamento_id?: string | null
+          autorizacao_cartao?: string | null
           bandeira_cartao?: string | null
           categoria_id?: string | null
           clinica_id: string
@@ -3585,6 +3589,7 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           data?: string
+          data_cartao?: string | null
           data_vencimento?: string | null
           descricao: string
           emitir_nfse?: boolean
@@ -3614,10 +3619,12 @@ export type Database = {
           updated_at?: string
           valor: number
           valor_laudo?: number
+          valor_liquido_cartao?: number | null
           valor_medico_override?: number | null
         }
         Update: {
           agendamento_id?: string | null
+          autorizacao_cartao?: string | null
           bandeira_cartao?: string | null
           categoria_id?: string | null
           clinica_id?: string
@@ -3625,6 +3632,7 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           data?: string
+          data_cartao?: string | null
           data_vencimento?: string | null
           descricao?: string
           emitir_nfse?: boolean
@@ -3654,6 +3662,7 @@ export type Database = {
           updated_at?: string
           valor?: number
           valor_laudo?: number
+          valor_liquido_cartao?: number | null
           valor_medico_override?: number | null
         }
         Relationships: [
