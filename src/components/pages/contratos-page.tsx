@@ -2198,6 +2198,55 @@ function DetalheContrato({
     load(); /* eslint-disable-next-line */
   }, [contrato.id]);
 
+  // Carrega emitentes NFS-e ativos da clínica (para o botão "Emitir NFS-e"
+  // nas parcelas). Se não houver emitente cadastrado, o botão avisa o usuário.
+  useEffect(() => {
+    if (!clinicaAtual?.clinica_id) { setEmitentes([]); setEmitenteId(""); return; }
+    let cancel = false;
+    void supabase
+      .from("nfse_emitentes")
+      .select("id, nome")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .eq("ativo", true)
+      .order("nome")
+      .then(({ data }) => {
+        if (cancel) return;
+        const list = (data ?? []) as Array<{ id: string; nome: string }>;
+        setEmitentes(list);
+        setEmitenteId((prev) => prev || (list[0]?.id ?? ""));
+      });
+    return () => { cancel = true; };
+  }, [clinicaAtual?.clinica_id]);
+
+  // Carrega NFS-e já emitidas para as parcelas deste contrato (indexadas por
+  // lancamento_id da parcela). Assim conseguimos: (1) esconder o botão de
+  // emitir; (2) mostrar o número/link do PDF.
+  useEffect(() => {
+    const ids = mens
+      .map((m) => m.lancamento_id)
+      .filter((v): v is string => !!v);
+    if (!ids.length || !clinicaAtual?.clinica_id) {
+      setNfsePorLancamento({});
+      return;
+    }
+    let cancel = false;
+    void supabase
+      .from("nfse")
+      .select("id, numero, status, pdf_url, pagamento_id")
+      .eq("clinica_id", clinicaAtual.clinica_id)
+      .in("pagamento_id", ids)
+      .neq("status", "cancelado")
+      .then(({ data }) => {
+        if (cancel) return;
+        const map: Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }> = {};
+        for (const r of (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; pdf_url: string | null; pagamento_id: string }>) {
+          map[r.pagamento_id] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.pdf_url };
+        }
+        setNfsePorLancamento(map);
+      });
+    return () => { cancel = true; };
+  }, [mens, clinicaAtual?.clinica_id]);
+
   // Sincroniza a faixa "admin" com a faixa vigente (baseada no valor_mensal atual)
   useEffect(() => {
     if (!faixas.length) {
