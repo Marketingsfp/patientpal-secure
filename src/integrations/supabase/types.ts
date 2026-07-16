@@ -2567,6 +2567,7 @@ export type Database = {
           status: string
           tabela_legada: boolean
           taxa_adesao: number
+          titular_apenas_financeiro: boolean
           token_publico: string | null
           updated_at: string
           valor_mensal: number
@@ -2596,6 +2597,7 @@ export type Database = {
           status?: string
           tabela_legada?: boolean
           taxa_adesao?: number
+          titular_apenas_financeiro?: boolean
           token_publico?: string | null
           updated_at?: string
           valor_mensal?: number
@@ -2625,6 +2627,7 @@ export type Database = {
           status?: string
           tabela_legada?: boolean
           taxa_adesao?: number
+          titular_apenas_financeiro?: boolean
           token_publico?: string | null
           updated_at?: string
           valor_mensal?: number
@@ -8363,6 +8366,10 @@ export type Database = {
         Args: { _canal_id: string; _user_id: string }
         Returns: boolean
       }
+      is_financeiro_clinica: {
+        Args: { _clinica_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_medico: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
@@ -8552,6 +8559,19 @@ export type Database = {
         }
         Returns: string
       }
+      painel_senhas_publicas: {
+        Args: { _clinica_id: string }
+        Returns: {
+          chamada_em: string
+          codigo: string
+          guiche: string
+          id: string
+          paciente_id: string
+          paciente_nome: string
+          status: string
+          tipo: string
+        }[]
+      }
       pendencias_paciente: { Args: { _paciente_id: string }; Returns: Json }
       procedimentos_popularidade: {
         Args: { p_clinica_id: string }
@@ -8592,6 +8612,17 @@ export type Database = {
       }
       resolver_clinica_por_token: {
         Args: { _token: string }
+        Returns: {
+          base_importada: boolean
+          branding: Json
+          cidade: string
+          estado: string
+          id: string
+          nome: string
+        }[]
+      }
+      resolver_clinica_publica: {
+        Args: { _clinica_id: string }
         Returns: {
           base_importada: boolean
           branding: Json
@@ -8676,6 +8707,24 @@ export type Database = {
           ultimo_uso: string
         }[]
       }
+      totem_match_biometria: {
+        Args: { _clinica_id: string; _descriptor: Json; _threshold?: number }
+        Returns: {
+          distancia: number
+          nome: string
+          paciente_id: string
+        }[]
+      }
+      totem_upsert_paciente: {
+        Args: {
+          _clinica_id: string
+          _cpf?: string
+          _descriptor?: Json
+          _nome: string
+          _telefone?: string
+        }
+        Returns: string
+      }
       unaccent: { Args: { "": string }; Returns: string }
       user_is_any_manager: { Args: { _user_id: string }; Returns: boolean }
       verificar_certificado: { Args: { _codigo: string }; Returns: Json }
@@ -8713,6 +8762,8 @@ export type Database = {
         | "recebimento"
         | "despesa"
         | "fechamento"
+        | "estorno"
+        | "reabertura"
       caixa_sessao_status: "aberto" | "fechado"
       chat_canal_tipo: "direto" | "grupo" | "setor"
       crm_status: "aberta" | "ganha" | "perdida"
@@ -8946,6 +8997,8 @@ export const Constants = {
         "recebimento",
         "despesa",
         "fechamento",
+        "estorno",
+        "reabertura",
       ],
       caixa_sessao_status: ["aberto", "fechado"],
       chat_canal_tipo: ["direto", "grupo", "setor"],

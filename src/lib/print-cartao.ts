@@ -26,7 +26,8 @@ function addMeses(iso: string, n: number): string {
 type CardItem = {
   nome: string;
   cpf: string;
-  tipo: "TITULAR" | "DEPENDENTE" | "AGREGADO";
+  tipo: "TITULAR" | "TITULAR FINANCEIRO" | "DEPENDENTE" | "AGREGADO";
+  aviso?: string;
   numero: string;
   plano: string;
   validade: string;
@@ -55,6 +56,7 @@ function renderCard(item: CardItem, planoTipo: string): string {
       </div>
       <div class="plano">${esc(item.plano)}</div>
       <div class="nome">${esc(item.nome.toUpperCase())}</div>
+      ${item.aviso ? `<div class="aviso">${esc(item.aviso)}</div>` : ""}
       <div class="meta">
         <div><span>CPF</span>${esc(fmtCPF(item.cpf))}</div>
         <div><span>Nº</span>${esc(item.numero)}</div>
@@ -120,7 +122,8 @@ export async function printCartoes(contratoId: string) {
     {
       nome: c.paciente_nome,
       cpf: _pa.cpf ?? "",
-      tipo: "TITULAR",
+      tipo: (c as any).titular_apenas_financeiro ? "TITULAR FINANCEIRO" : "TITULAR",
+      aviso: (c as any).titular_apenas_financeiro ? "Não utiliza os benefícios" : undefined,
       numero, plano: planoNome, validade, clinica: clinicaNome, cidadeUf, telefone, pac: pacStr,
     },
     ...((deps ?? []) as any[]).map((d) => ({
@@ -152,6 +155,7 @@ export async function printCartoes(contratoId: string) {
   .tipo { font-weight: 800; font-size: 7pt; letter-spacing: 1pt; }
   .plano { font-size: 11pt; font-weight: 700; opacity: .95; margin-top: -1mm; }
   .nome { font-size: 12pt; font-weight: 800; letter-spacing: .5pt; }
+  .aviso { font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: .5pt; background: rgba(255,255,255,.18); padding: 0.6mm 1.6mm; border-radius: 1mm; align-self: flex-start; margin-top: -1mm; }
   .meta { display: grid; grid-template-columns: 1.4fr 1fr 1fr 0.6fr; gap: 2mm; font-size: 7.5pt; }
   .meta div { display: flex; flex-direction: column; }
   .meta span { font-size: 5.5pt; opacity: .8; text-transform: uppercase; letter-spacing: .5pt; }

@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, LayoutList, GanttChartSquare, CalendarDays,
   Search, Rows3, Rows2, Focus, Sparkles, Plus, Keyboard, PanelLeft, UserCheck,
 } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -303,6 +303,9 @@ export function AgendaV2Shell() {
     queryKey: ["agenda-v2", "ags", clinicaId, diaKey],
     enabled: !!clinicaId,
     staleTime: 60 * 1000,
+    // Mantém a lista anterior visível durante refetch / troca de dia,
+    // evitando "flash" de tela em branco.
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       startedAtRef.current = performance.now();
       const start = new Date(diaKey);
@@ -312,7 +315,8 @@ export function AgendaV2Shell() {
         .eq("clinica_id", clinicaId!)
         .gte("inicio", start.toISOString())
         .lte("inicio", end.toISOString())
-        .order("inicio", { ascending: true });
+        .order("inicio", { ascending: true })
+        .order("id", { ascending: true });
       return (data ?? []) as RawAg[];
     },
   });
@@ -345,7 +349,8 @@ export function AgendaV2Shell() {
             .eq("clinica_id", clinicaId)
             .gte("inicio", start.toISOString())
             .lte("inicio", end.toISOString())
-            .order("inicio", { ascending: true });
+            .order("inicio", { ascending: true })
+            .order("id", { ascending: true });
           return (data ?? []) as RawAg[];
         },
       });

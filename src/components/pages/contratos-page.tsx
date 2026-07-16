@@ -18,6 +18,7 @@ import {
   Mail,
   AlertTriangle,
   Loader2,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -801,6 +802,7 @@ function NovoContratoForm({
   const [titular, setTitular] = useState<Paciente | null>(null);
   const [clientes, setClientes] = useState<Paciente[]>([]);
   const [titularOpen, setTitularOpen] = useState(false);
+  const [titularApenasFinanceiro, setTitularApenasFinanceiro] = useState(false);
   const [depOpen, setDepOpen] = useState(false);
   const [valor, setValor] = useState(0);
   const [taxa, setTaxa] = useState(0);
@@ -924,13 +926,13 @@ function NovoContratoForm({
       setValor(Number(convenio.valor_mensal));
       return;
     }
-    const vidasAtuais = (titular ? 1 : 0) + deps.length;
+    const vidasAtuais = (titular && !titularApenasFinanceiro ? 1 : 0) + deps.length;
     const inicial =
       faixas.find((f) => vidasAtuais >= f.vidas_de && (f.vidas_ate == null || vidasAtuais <= f.vidas_ate)) ?? faixas[0];
     setFaixaId(inicial.id);
     setValor(Number(inicial.valor_mensal));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [faixas]);
+  }, [faixas, titularApenasFinanceiro]);
 
   // Quando o usuário muda a faixa manualmente, atualiza o valor mensal
   useEffect(() => {
@@ -970,10 +972,18 @@ function NovoContratoForm({
         `Este titular já possui um contrato ativo (#${titularContratoAtivo}). Cancele o contrato anterior antes de criar um novo.`,
       );
     }
-    const maxDep = Number(convenio.max_dependentes ?? 0) || 0;
+    const convenioMaxDep = Number(convenio.max_dependentes ?? 0) || 0;
+    const faixaSel = faixaId ? faixas.find((f) => f.id === faixaId) : null;
+    const titularOcupa = titularApenasFinanceiro ? 0 : 1;
+    const maxDep =
+      faixaSel && faixaSel.vidas_ate != null
+        ? Math.max(0, Number(faixaSel.vidas_ate) - titularOcupa)
+        : convenioMaxDep;
     if (deps.length > maxDep) {
       return toast.error(
-        maxDep === 0 ? "Este convênio não permite dependentes." : `Limite de ${maxDep} dependentes excedido.`,
+        maxDep === 0
+          ? "Este convênio não permite dependentes."
+          : `Faixa selecionada permite no máximo ${maxDep} dependente(s).`,
       );
     }
     // Sanitiza observações (remove HTML/scripts) e aplica limite
@@ -1055,6 +1065,13 @@ function NovoContratoForm({
     if (!contrato?.id) {
       setSaving(false);
       return toast.error("Falha ao criar contrato: retorno inesperado da função de banco.");
+    }
+
+    if (titularApenasFinanceiro) {
+      await supabase
+        .from("contratos_assinatura")
+        .update({ titular_apenas_financeiro: true } as any)
+        .eq("id", contrato.id);
     }
 
     setSaving(false);
@@ -1144,8 +1161,9 @@ function NovoContratoForm({
             <div className="col-span-2">
               <Label>Paciente titular</Label>
               {titular ? (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] items-start">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
                     <span className="font-medium flex items-center gap-2">
                       {titular.nome} {titular.cpf ? `— ${titular.cpf}` : ""}
                       {titular.face_descriptor && titular.face_descriptor.length > 0 ? (
@@ -1221,6 +1239,26 @@ function NovoContratoForm({
                       </Button>
                     </div>
                   ) : null}
+                  </div>
+                  <div className="flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2 md:self-stretch md:min-w-[260px] md:max-w-[340px]">
+                    <input
+                      id="tit-apenas-fin-novo"
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={titularApenasFinanceiro}
+                      onChange={(e) => setTitularApenasFinanceiro(e.target.checked)}
+                    />
+                    <label htmlFor="tit-apenas-fin-novo" className="text-sm cursor-pointer">
+                      <span className="font-medium">Apenas titular financeiro</span>
+                      <span className="text-muted-foreground"> — paga o plano, mas não usufrui dos benefícios.</span>
+                      <span
+                        className="ml-1 inline-flex items-center text-muted-foreground"
+                        title="Marque quando o titular apenas paga o contrato e não usufrui dos benefícios. Ele NÃO conta na quantidade de vidas do plano e aparecerá na carteirinha com o selo 'Titular financeiro — Não utiliza os benefícios'."
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </span>
+                    </label>
+                  </div>
                 </div>
               ) : (
                 <PatientSearchInput
@@ -1369,14 +1407,25 @@ function NovoContratoForm({
               </p>
             </div>
             <div className="col-span-2 border-t pt-3">
-              <Label>Dependentes {convenio ? `(${deps.length}/${convenio.max_dependentes ?? 0})` : ""}</Label>
-              {convenio && deps.length >= (Number(convenio?.max_dependentes ?? 0) || 0) ? (
-                <div className="w-full mt-1 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                  {(convenio.max_dependentes ?? 0) === 0
-                    ? "Convênio sem dependentes"
-                    : `Limite atingido (${deps.length}/${convenio.max_dependentes})`}
-                </div>
-              ) : (
+              {(() => {
+                const convenioMaxDep = Number(convenio?.max_dependentes ?? 0) || 0;
+                const faixaSel = faixaId ? faixas.find((f) => f.id === faixaId) : null;
+                const titularOcupa = titularApenasFinanceiro ? 0 : 1;
+                const maxDepWiz =
+                  faixaSel && faixaSel.vidas_ate != null
+                    ? Math.max(0, Number(faixaSel.vidas_ate) - titularOcupa)
+                    : convenioMaxDep;
+                const cheio = convenio && deps.length >= maxDepWiz;
+                return (
+                  <>
+                    <Label>{convenio ? `Dependentes (${deps.length}/${maxDepWiz})` : "Dependentes"}</Label>
+                    {cheio ? (
+                      <div className="w-full mt-1 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                        {maxDepWiz === 0
+                          ? "Faixa/convênio não permite dependentes. Aumente a faixa ou marque o titular como apenas financeiro."
+                          : `Limite da faixa atingido (${deps.length}/${maxDepWiz}). Aumente a faixa ou marque o titular como apenas financeiro.`}
+                      </div>
+                    ) : (
                 <div className="mt-1">
                   <PatientSearchInput
                     clinicaIdsOverride={[clinicaId]}
@@ -1397,7 +1446,10 @@ function NovoContratoForm({
                     onRequestCreate={(q) => setQuickCreate({ alvo: "dependente", nome: q })}
                   />
                 </div>
-              )}
+                    )}
+                  </>
+                );
+              })()}
               {deps.length > 0 ? (
                 <div className="mt-2 space-y-1">
                   {deps.map((d, i) => (
@@ -1608,6 +1660,41 @@ function DetalheContrato({
       <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">{value || "—"}</div>
     </div>
   );
+  const ApenasFinanceiroToggle = ({
+    contratoId: _cid,
+    checked,
+    saving,
+    disabled,
+    onChange,
+  }: {
+    contratoId: string;
+    checked: boolean;
+    saving: boolean;
+    disabled?: boolean;
+    onChange: (v: boolean) => Promise<void> | void;
+  }) => (
+    <div className="flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2 mt-1">
+      <input
+        id={`tit-apenas-fin-${_cid}`}
+        type="checkbox"
+        className="mt-0.5"
+        checked={checked}
+        disabled={saving || disabled}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <label htmlFor={`tit-apenas-fin-${_cid}`} className="text-sm cursor-pointer">
+        <span className="font-medium">Apenas titular financeiro</span>
+        <span className="text-muted-foreground"> — paga o plano, mas não usufrui dos benefícios.</span>
+        <span
+          className="ml-1 inline-flex items-center text-muted-foreground"
+          title="Marque quando o titular apenas paga o contrato e não usufrui dos benefícios. Ele NÃO conta na quantidade de vidas do plano e aparecerá na carteirinha com o selo 'Titular financeiro — Não utiliza os benefícios'."
+        >
+          <Info className="h-3.5 w-3.5" />
+        </span>
+        {saving ? <span className="ml-2 text-xs text-muted-foreground">salvando…</span> : null}
+      </label>
+    </div>
+  );
   const [mens, setMens] = useState<Mens[]>([]);
   const [extraRecebido, setExtraRecebido] = useState<{ total: number; count: number }>({ total: 0, count: 0 });
   const [drill, setDrill] = useState<null | "pagas" | "recebido" | "areceber">(null);
@@ -1665,6 +1752,10 @@ function DetalheContrato({
   const [admObs, setAdmObs] = useState<string>(contrato.observacoes ?? "");
   const [admFaixaId, setAdmFaixaId] = useState<string>("");
   const [savingAdm, setSavingAdm] = useState(false);
+  const [apenasFinanceiro, setApenasFinanceiro] = useState<boolean>(
+    !!(contrato as any).titular_apenas_financeiro,
+  );
+  const [savingApenasFin, setSavingApenasFin] = useState(false);
   const [retroDialog, setRetroDialog] = useState<{ open: boolean; parcelasPagas: string; dataInicio: string } | null>(null);
   const [regerandoRetro, setRegerandoRetro] = useState(false);
   useEffect(() => {
@@ -1673,6 +1764,7 @@ function DetalheContrato({
     setAdmTaxaAdesao(String(Number(contrato.taxa_adesao ?? 0).toFixed(2)));
     setAdmForma(contrato.forma_pagamento ?? "");
     setAdmObs(contrato.observacoes ?? "");
+    setApenasFinanceiro(!!(contrato as any).titular_apenas_financeiro);
   }, [contrato.id]);
 
   // Carrega lista de convênios ativos (ADM)
@@ -2250,7 +2342,8 @@ function DetalheContrato({
   const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
 
   // ---- Dados da venda (aba "Dados") ----
-  const totalVidasAtual = 1 + deps.filter((d) => d.ativo).length;
+  const titularConta = apenasFinanceiro ? 0 : 1;
+  const totalVidasAtual = titularConta + deps.filter((d) => d.ativo).length;
   const faixasElegiveis = faixas.filter(
     (f) => totalVidasAtual >= f.vidas_de && (f.vidas_ate == null || totalVidasAtual <= f.vidas_ate),
   );
@@ -2274,7 +2367,13 @@ function DetalheContrato({
     manual: "Manual",
   };
   const formaLabel = formaLabelMap[contrato.forma_pagamento ?? ""] ?? contrato.forma_pagamento ?? "—";
-  const maxDep = Number(convenio?.max_dependentes ?? 0) || 0;
+  const convenioMaxDep = Number(convenio?.max_dependentes ?? 0) || 0;
+  const faixaSelecionadaEdicao = admFaixaId ? faixas.find((f) => f.id === admFaixaId) : faixaAtual;
+  const titularOcupaVaga = apenasFinanceiro ? 0 : 1;
+  const maxDep =
+    faixaSelecionadaEdicao && faixaSelecionadaEdicao.vidas_ate != null
+      ? Math.max(0, Number(faixaSelecionadaEdicao.vidas_ate) - titularOcupaVaga)
+      : convenioMaxDep;
   const depsAtivos = deps.filter((d) => d.ativo);
 
   const renderTermo = (dep: Dep, movimento: "Inclusão" | "Exclusão"): string => {
@@ -2434,7 +2533,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
     setIncTipo("dependente");
     // Recalcula valor das parcelas em aberto conforme a nova quantidade de vidas
     // (titular + dependentes ativos, incluindo o recém-incluído)
-    await recalcularParcelasAbertas(depsAtivos.length + 2);
+    await recalcularParcelasAbertas(titularConta + depsAtivos.length + 1);
     await load();
     abrirTermoSeAssinado(novoDep, "Inclusão");
   };
@@ -2456,7 +2555,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
     setExcAlvo(null);
     // Recalcula valor das parcelas em aberto conforme nova qtd de vidas
     // (titular = 1 + dependentes ativos restantes = depsAtivos.length - 1)
-    await recalcularParcelasAbertas(1 + Math.max(0, depsAtivos.length - 1));
+    await recalcularParcelasAbertas(titularConta + Math.max(0, depsAtivos.length - 1));
     await load();
     abrirTermoSeAssinado(alvo, "Exclusão");
   };
@@ -2550,6 +2649,14 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     ) : null}
                     <div className="text-muted-foreground mt-0.5">O plano e todos os benefícios foram cancelados.</div>
                   </div>
+                </div>
+              ) : null}
+              {apenasFinanceiro ? (
+                <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
+                  <Info className="h-4 w-4 shrink-0" />
+                  <span>
+                    <strong>Titular financeiro</strong> — {contrato.paciente_nome} paga o plano, mas <strong>não utiliza</strong> os benefícios. Não conta na quantidade de vidas do contrato.
+                  </span>
                 </div>
               ) : null}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
@@ -2826,14 +2933,47 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     onSelect={(p) => setAdmPaciente(p)}
                     placeholder="Buscar paciente por nome ou CPF…"
                   />
+                  <ApenasFinanceiroToggle
+                    contratoId={contrato.id}
+                    checked={apenasFinanceiro}
+                    saving={savingApenasFin}
+                    disabled={cancelado && !isAdmin}
+                    onChange={async (v) => {
+                      setSavingApenasFin(true);
+                      const { error } = await supabase
+                        .from("contratos_assinatura")
+                        .update({ titular_apenas_financeiro: v } as any)
+                        .eq("id", contrato.id);
+                      if (error) {
+                        setSavingApenasFin(false);
+                        mostrarErro(error);
+                        return;
+                      }
+                      (contrato as any).titular_apenas_financeiro = v;
+                      setApenasFinanceiro(v);
+                      const novoTotal = (v ? 0 : 1) + depsAtivos.length;
+                      await recalcularParcelasAbertas(novoTotal);
+                      setSavingApenasFin(false);
+                      toast.success(v
+                        ? "Marcado como Titular financeiro (não utiliza os benefícios)."
+                        : "Titular passa a usufruir dos benefícios normalmente.");
+                    }}
+                  />
                 </div>
               ) : (
-                <DadosField
-                  label="Paciente titular"
-                  value={`${contrato.paciente_nome}${pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}`}
-                />
+                <>
+                  <DadosField
+                    label="Paciente titular"
+                    value={`${contrato.paciente_nome}${pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}`}
+                  />
+                  {apenasFinanceiro ? (
+                    <div className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                      <Info className="h-3.5 w-3.5" /> Titular financeiro — não utiliza os benefícios.
+                    </div>
+                  ) : null}
+                </>
               )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {isAdmin && podeEscrever ? (
                   <div className="space-y-1">
                     <div className="text-xs text-muted-foreground">Data início</div>
@@ -2846,6 +2986,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <DadosField label="Data início" value={fmtD(contrato.data_inicio)} />
                 )}
                 <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">Data término</div>
+                  <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold text-sm">
+                    {fmtD(contrato.data_fim ?? addUmAno(admDataInicio || contrato.data_inicio))}
+                  </div>
+                </div>
+                <div className="space-y-1">
                   <div className="text-xs text-muted-foreground">Dia de vencimento</div>
                   <Input
                     type="number"
@@ -2856,6 +3002,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <div className="text-xs text-muted-foreground">Valor mensal (R$)</div>
                   <Input
@@ -2925,6 +3073,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-medium">
                     Dependentes ({depsAtivos.length}/{maxDep})
+                    {depsAtivos.length >= maxDep && (
+                      <span className="ml-2 text-xs font-normal text-amber-600">
+                        Limite da faixa atingido. Aumente a faixa ou marque o titular como apenas financeiro.
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {podeEscrever && (

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TotemRouteImport } from './routes/totem'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PainelRouteImport } from './routes/painel'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
@@ -157,6 +158,11 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PainelRoute = PainelRouteImport.update({
@@ -909,6 +915,7 @@ export interface FileRoutesByFullPath {
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
   '/painel': typeof PainelRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRouteWithChildren
@@ -1044,6 +1051,7 @@ export interface FileRoutesByTo {
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
   '/painel': typeof PainelRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRouteWithChildren
@@ -1177,6 +1185,7 @@ export interface FileRoutesById {
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
   '/painel': typeof PainelRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRouteWithChildren
@@ -1314,6 +1323,7 @@ export interface FileRouteTypes {
     | '/diagnostico'
     | '/login'
     | '/painel'
+    | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
     | '/totem'
@@ -1449,6 +1459,7 @@ export interface FileRouteTypes {
     | '/diagnostico'
     | '/login'
     | '/painel'
+    | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
     | '/totem'
@@ -1581,6 +1592,7 @@ export interface FileRouteTypes {
     | '/diagnostico'
     | '/login'
     | '/painel'
+    | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
     | '/totem'
@@ -1718,6 +1730,7 @@ export interface RootRouteChildren {
   DiagnosticoRoute: typeof DiagnosticoRoute
   LoginRoute: typeof LoginRoute
   PainelRoute: typeof PainelRouteWithChildren
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TotemRoute: typeof TotemRouteWithChildren
@@ -1757,6 +1770,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/painel': {
@@ -3046,6 +3066,7 @@ const rootRouteChildren: RootRouteChildren = {
   DiagnosticoRoute: DiagnosticoRoute,
   LoginRoute: LoginRoute,
   PainelRoute: PainelRouteWithChildren,
+  ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TotemRoute: TotemRouteWithChildren,

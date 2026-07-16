@@ -253,7 +253,13 @@ function NfsePage() {
                   ) : <span className="text-muted-foreground text-xs">—</span>}
                 </TableCell>
                 <TableCell>{r.numero ?? "—"}</TableCell>
-                <TableCell>{new Date(r.data_emissao).toLocaleDateString("pt-BR")}</TableCell>
+                <TableCell>{
+                  // `data_emissao` vem como "YYYY-MM-DD"; sem hora, o parse assume
+                  // UTC 00:00 e em BRT (UTC-3) o dia aparece 1 dia antes.
+                  /^\d{4}-\d{2}-\d{2}$/.test(r.data_emissao)
+                    ? new Date(`${r.data_emissao}T12:00:00`).toLocaleDateString("pt-BR")
+                    : new Date(r.data_emissao).toLocaleDateString("pt-BR")
+                }</TableCell>
                 <TableCell>{r.tomador_nome ?? "—"}</TableCell>
                 <TableCell className="text-right">{Number(r.valor_servicos).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
                 <TableCell>

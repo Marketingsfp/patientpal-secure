@@ -67,6 +67,21 @@ function normalizarForma(f: string | null | undefined): FormaBucket {
 }
 
 /**
+ * Bucket efetivo do movimento para agrupamento por forma de pagamento.
+ * Sangria, suprimento e despesa mexem no dinheiro físico do caixa: quando
+ * chegam sem `forma_pagamento`, contam como "dinheiro" (em vez de cair em
+ * "outros"). Se, no futuro, algum desses lançamentos vier com forma
+ * explícita, a forma informada é respeitada.
+ */
+function bucketDeMov(m: { tipo: string; forma_pagamento: string | null }): FormaBucket {
+  const bruto = normalizarForma(m.forma_pagamento);
+  if (bruto === "outros" && (m.tipo === "sangria" || m.tipo === "suprimento" || m.tipo === "despesa")) {
+    return "dinheiro";
+  }
+  return bruto;
+}
+
+/**
  * Extrai as parcelas de um pagamento misto a partir do trecho
  * `Pagamento misto: Dinheiro R$ 60,00; PIX R$ 50,00 | ...` gravado em
  * `fin_lancamentos.observacoes`. Retorna somas por bucket já normalizado.
@@ -146,7 +161,7 @@ function CaixaRouteDispatcher() {
   return <Page />;
 }
 
-type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento";
+type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento" | "estorno" | "reabertura";
 interface Sessao {
   id: string; clinica_id: string; user_id: string; user_nome: string | null;
   aberto_em: string; valor_abertura: number;
@@ -180,10 +195,11 @@ const fmtDT = (s: string | null) =>
 const TIPO_LABEL: Record<MovTipo, string> = {
   abertura: "Abertura", sangria: "Sangria", suprimento: "Suprimento",
   recebimento: "Recebimento", despesa: "Despesa", fechamento: "Fechamento",
+  estorno: "Estorno", reabertura: "Reabertura",
 };
 const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
   abertura: 1, suprimento: 1, recebimento: 1,
-  sangria: -1, despesa: -1, fechamento: 0,
+  sangria: -1, despesa: -1, fechamento: 0, estorno: -1, reabertura: 0,
 };
 const TIPO_CLASS: Record<MovTipo, string> = {
   abertura: "bg-sky-100 text-sky-700 border-sky-300 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800",
@@ -192,6 +208,8 @@ const TIPO_CLASS: Record<MovTipo, string> = {
   sangria: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
   despesa: "bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800",
   fechamento: "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700",
+  estorno: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300 dark:bg-fuchsia-950 dark:text-fuchsia-300 dark:border-fuchsia-800",
+  reabertura: "bg-violet-100 text-violet-700 border-violet-300 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800",
 };
 
 const SESSAO_FIELDS = "id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, valor_fechamento_informado, valor_fechamento_calculado, diferenca, status, observacoes";
@@ -227,7 +245,7 @@ function pacienteFromDescricao(desc: string | null): string | null {
   const mens = desc.match(/CONTRATO\s+#\S+\s+-\s+(.+?)\s*$/i);
   if (mens) return mens[1].trim() || null;
   // Descarta descrições sem paciente (sangria/suprimento/fechamento/etc.)
-  if (/^\s*(abertura|fechamento|sangria|suprimento)\b/i.test(desc)) return null;
+  if (/^\s*(abertura|fechamento|reabertura|sangria|suprimento|estorno|fechamento\s+desfeito)\b/i.test(desc)) return null;
   if (/^\s*\[caixa\]/i.test(desc)) return null;
   const clean = desc.replace(/^Recebimento\s+—\s+/i, "");
   // Nome vem antes do PRIMEIRO separador " — " ou " · "
@@ -326,6 +344,12 @@ function Page() {
   const [loading, setLoading] = useState(true);
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
+  // Movimentos do próprio usuário ao longo das ~20 sessões mais recentes
+  // (aberta + fechadas). Usado APENAS na aba "Meu caixa → Movimentos" para
+  // permitir visualizar/estornar lançamentos retroativos. NÃO é usado nos
+  // cálculos de Saldo/Totais — esses continuam presos à sessão aberta atual
+  // via `minhasMovs`.
+  const [minhasMovsHist, setMinhasMovsHist] = useState<Mov[]>([]);
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
   // Solicitações de estorno vinculadas às movimentações visíveis
   // (chave = lancamento_id, valor = status). Usado para trocar o botão
@@ -347,7 +371,7 @@ function Page() {
   const [openCal, setOpenCal] = useState(false);
   const minhasMovsFiltrados = useMemo<Mov[]>(() => {
     // 1) filtro de período (data)
-    let base: Mov[] = minhasMovs;
+    let base: Mov[] = minhasMovsHist;
     if (meuPeriodo !== "todos") {
       const now = new Date();
       const fim = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
@@ -405,18 +429,18 @@ function Page() {
       });
     }
     return base;
-  }, [minhasMovs, meuPeriodo, meuDataIni, meuDataFim, meuMedico, meuPaciente, enrichPorLanc]);
+  }, [minhasMovsHist, meuPeriodo, meuDataIni, meuDataFim, meuMedico, meuPaciente, enrichPorLanc]);
 
   // Lista de médicos distintos presentes nos movimentos carregados.
   const medicosDisponiveis = useMemo<string[]>(() => {
     const set = new Set<string>();
-    for (const m of minhasMovs) {
+    for (const m of minhasMovsHist) {
       const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
       const nome = (enr?.medico ?? "").trim();
       if (nome) set.add(nome);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [minhasMovs, enrichPorLanc]);
+  }, [minhasMovsHist, enrichPorLanc]);
 
   const filtrosAtivos =
     meuPeriodo !== "hoje" || meuMedico !== "__all__" || meuPaciente.trim() !== "";
@@ -490,6 +514,9 @@ function Page() {
   const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
   // Fechamento em lote (por dia) — gestor
   const [openLote, setOpenLote] = useState(false);
+  // Desfazer fechamento (admin/gestor/financeiro)
+  const [openReabrir, setOpenReabrir] = useState<Sessao | null>(null);
+  const [motivoReabrir, setMotivoReabrir] = useState("");
   const [loteSelecionados, setLoteSelecionados] = useState<Record<string, boolean>>({});
   const [obsLote, setObsLote] = useState("");
 
@@ -655,38 +682,43 @@ function Page() {
       return { enrich, cancelados };
     };
 
-    if (aberta) {
+    // Sessões recentes do usuário (aberta + últimas fechadas).
+    // Carregamos os movimentos de TODAS elas em uma única consulta e
+    // dividimos em duas listas:
+    //   - minhasMovs      → só a sessão aberta atual (base para Saldo/Totais)
+    //   - minhasMovsHist  → todas as sessões recentes (base para a aba
+    //                       "Meu caixa → Movimentos", permitindo ver e
+    //                       solicitar estorno de lançamentos retroativos)
+    const histSessoes = (histRes.data ?? []) as Sessao[];
+    const sessaoIds = new Set<string>(histSessoes.map((s) => s.id));
+    if (aberta) sessaoIds.add((aberta as Sessao).id);
+    const idsArr = Array.from(sessaoIds);
+    let movsHist: Mov[] = [];
+    if (idsArr.length > 0) {
       const { data: movs } = await supabase
         .from("caixa_movimentos")
         .select(MOV_FIELDS)
-        .eq("sessao_id", (aberta as Sessao).id)
-        .order("created_at", { ascending: true });
-      const movsList = (movs ?? []) as Mov[];
-      setMinhasMovs(movsList);
-      const { enrich, cancelados } = await enrichMovsList(movsList);
-      setEnrichPorLanc(enrich);
-      setLancsCancelados(cancelados);
-    } else {
-      // Sem sessão aberta: mostra movimentos das sessões recentes do
-      // próprio usuário e AINDA ASSIM roda o enriquecimento — sem isso,
-      // as colunas Paciente/Serviço/Médico ficavam vazias e o filtro
-      // por médico não listava opções, mesmo com movimentos visíveis.
-      const histSessoes = (histRes.data ?? []) as Sessao[];
-      const histIds = histSessoes.map((s) => s.id);
-      let movsList: Mov[] = [];
-      if (histIds.length > 0) {
-        const { data: movs } = await supabase
-          .from("caixa_movimentos")
-          .select(MOV_FIELDS)
-          .in("sessao_id", histIds)
-          .order("created_at", { ascending: false });
-        movsList = (movs ?? []) as Mov[];
-      }
-      setMinhasMovs(movsList);
-      const { enrich, cancelados } = await enrichMovsList(movsList);
-      setEnrichPorLanc(enrich);
-      setLancsCancelados(cancelados);
+        .in("sessao_id", idsArr)
+        .order("created_at", { ascending: false });
+      movsHist = (movs ?? []) as Mov[];
     }
+    setMinhasMovsHist(movsHist);
+    if (aberta) {
+      // Sessão aberta: `minhasMovs` recebe apenas os movimentos da sessão
+      // atual (ordem crescente, como antes) para manter Saldo/Totais
+      // idênticos ao comportamento anterior.
+      const sid = (aberta as Sessao).id;
+      const abertaMovs = movsHist
+        .filter((m) => m.sessao_id === sid)
+        .slice()
+        .sort((a, b) => a.created_at.localeCompare(b.created_at));
+      setMinhasMovs(abertaMovs);
+    } else {
+      setMinhasMovs([]);
+    }
+    const { enrich, cancelados } = await enrichMovsList(movsHist);
+    setEnrichPorLanc(enrich);
+    setLancsCancelados(cancelados);
 
     setMinhasSessoes((histRes.data ?? []) as Sessao[]);
     setLoading(false);
@@ -1023,6 +1055,7 @@ function Page() {
       // (dados antigos) o saldo já fica correto.
       if (m.lancamento_id && lancsCancelados.has(m.lancamento_id)) {
         if (m.tipo === "recebimento") return acc;
+        if (m.tipo === "estorno") return acc;
         if (
           m.tipo === "sangria" &&
           (m.descricao ?? "").toLowerCase().startsWith("estorno")
@@ -1037,7 +1070,7 @@ function Page() {
   const resumoTipos = useMemo(() => {
     const r: Record<MovTipo, number> = {
       abertura: 0, sangria: 0, suprimento: 0,
-      recebimento: 0, despesa: 0, fechamento: 0,
+      recebimento: 0, despesa: 0, fechamento: 0, estorno: 0, reabertura: 0,
     };
     minhasMovs.forEach((m) => { r[m.tipo] += Number(m.valor || 0); });
     return r;
@@ -1089,7 +1122,7 @@ function Page() {
       if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
       const v = Number(m.valor || 0);
       r.total += v;
-      const bucket = normalizarForma(m.forma_pagamento);
+      const bucket = bucketDeMov(m);
       if (bucket === "misto") {
         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
         const partes = decomporMistoObs(obs);
@@ -1101,7 +1134,7 @@ function Page() {
         // Diferença (ex.: obs ainda não carregada, ou parcela sem label
         // reconhecido) vai para "outros" para preservar o total.
         const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r.outros += resto;
+        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
       } else {
         r[bucket] += v;
       }
@@ -1139,7 +1172,7 @@ function Page() {
       r.saldo += sinal * v;
       if (m.tipo === "recebimento" || m.tipo === "suprimento") {
         r.entradas += v;
-        const bucket = normalizarForma(m.forma_pagamento);
+        const bucket = bucketDeMov(m);
         if (bucket === "misto") {
           const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
           const partes = decomporMistoObs(obs);
@@ -1149,11 +1182,11 @@ function Page() {
             somado += val ?? 0;
           }
           const resto = v - somado;
-          if (Math.abs(resto) > 0.005) r.porForma.outros += resto;
+          if (Math.abs(resto) > 0.005) r.porForma.dinheiro += resto;
         } else {
           r.porForma[bucket] = (r.porForma[bucket] ?? 0) + v;
         }
-      } else if (m.tipo === "sangria" || m.tipo === "despesa") {
+      } else if (m.tipo === "sangria" || m.tipo === "despesa" || m.tipo === "estorno") {
         r.saidas += v;
       }
     }
@@ -1184,19 +1217,34 @@ function Page() {
       boleto: 0, transferencia: 0, convenio: 0, outros: 0,
     };
     movsDoDiaFechamento.forEach((m) => {
-      if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
-      const v = Number(m.valor || 0);
-      const bucket = normalizarForma(m.forma_pagamento);
+      // "Esperado por forma" deve refletir o SALDO LÍQUIDO por forma no dia,
+      // batendo com o saldo do caixa (entradas − saídas). Por isso incluímos
+      // também sangria e despesa com sinal negativo. Abertura/fechamento não
+      // entram (abertura é saldo inicial, fechamento é registro contábil).
+      if (
+        m.tipo !== "recebimento" &&
+        m.tipo !== "suprimento" &&
+        m.tipo !== "estorno" &&
+        m.tipo !== "sangria" &&
+        m.tipo !== "despesa"
+      ) return;
+      const sinal =
+        m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
+      const v = Number(m.valor || 0) * sinal;
+      const bucket = bucketDeMov(m);
       if (bucket === "misto") {
         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
         const partes = decomporMistoObs(obs);
         let somado = 0;
         for (const [k, val] of Object.entries(partes)) {
-          r[k] = (r[k] ?? 0) + (val ?? 0);
-          somado += val ?? 0;
+          r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
+          somado += (val ?? 0) * sinal;
         }
         const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r.outros += resto;
+        // Sem decomposição (pagamento agrupado, obs sem "Pagamento misto:"),
+        // o resto cai em Dinheiro — a UI não deve exibir "Outros" para
+        // recebimentos reais. O operador pode ajustar no modal de fechamento.
+        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
       } else {
         r[bucket] = (r[bucket] ?? 0) + v;
       }
@@ -1325,19 +1373,29 @@ function Page() {
     };
     todosMovs.forEach((m) => {
       if (m.sessao_id !== sid) return;
-      if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
-      const v = Number(m.valor || 0);
-      const bucket = normalizarForma(m.forma_pagamento);
+      // Saldo líquido por forma na sessão (usado nos modais de fechamento):
+      // entradas − saídas por forma, para bater com o saldo do caixa.
+      if (
+        m.tipo !== "recebimento" &&
+        m.tipo !== "suprimento" &&
+        m.tipo !== "estorno" &&
+        m.tipo !== "sangria" &&
+        m.tipo !== "despesa"
+      ) return;
+      const sinal =
+        m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
+      const v = Number(m.valor || 0) * sinal;
+      const bucket = bucketDeMov(m);
       if (bucket === "misto") {
         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
         const partes = decomporMistoObs(obs);
         let somado = 0;
         for (const [k, val] of Object.entries(partes)) {
-          r[k] = (r[k] ?? 0) + (val ?? 0);
-          somado += val ?? 0;
+          r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
+          somado += (val ?? 0) * sinal;
         }
         const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r.outros += resto;
+        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
       } else {
         r[bucket] = (r[bucket] ?? 0) + v;
       }
@@ -1417,6 +1475,13 @@ function Page() {
         : "Selecione de quem o dinheiro está sendo recebido");
       return;
     }
+    // Estorno avulso não tem seletor de destino (não é transferência entre
+    // membros da equipe) — a descrição é o único registro de quem/o que
+    // está sendo estornado, então é obrigatória aqui.
+    if (openMov.tipo === "estorno" && !movDesc.trim()) {
+      toast.error("Descreva o motivo/paciente do estorno");
+      return;
+    }
     const destinoNome = ehTransfer
       ? (membrosClinica.find((m) => m.user_id === movDestinoUserId)?.nome ?? null)
       : null;
@@ -1464,7 +1529,7 @@ function Page() {
     setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
     setMovBandeira(""); setMovParcelas("1"); setMovDestinoUserId("");
     toast.success(`${TIPO_LABEL[tipoLancado]} registrada`);
-    if (tipoLancado === "sangria" || tipoLancado === "suprimento") {
+    if (tipoLancado === "sangria" || tipoLancado === "suprimento" || tipoLancado === "estorno") {
       printComprovanteCaixa({
         tipo: tipoLancado,
         clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
@@ -1608,6 +1673,50 @@ function Page() {
     void load();
   };
 
+  // Desfazer fechamento de um caixa (admin/gestor/financeiro).
+  // Registra auditoria via caixa_movimentos.tipo='reabertura' e limpa
+  // os campos de fechamento da sessão, deixando-a novamente 'aberto'.
+  const desfazerFechamento = async () => {
+    const alvo = openReabrir;
+    if (!alvo || !clinicaAtual || !user) return;
+    const motivo = motivoReabrir.trim();
+    if (!motivo) { toast.error("Informe o motivo da reabertura."); return; }
+    const executorNome = user.user_metadata?.nome || user.email || "gestor";
+    const agora = new Date();
+    const marcador = `[Reaberto por ${executorNome} em ${agora.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })} — ${motivo}]`;
+    const novaObs = alvo.observacoes ? `${alvo.observacoes} | ${marcador}` : marcador;
+    setSaving(true);
+    const { error } = await supabase
+      .from("caixa_sessoes")
+      .update({
+        status: "aberto",
+        fechado_em: null,
+        valor_fechamento_informado: null,
+        valor_fechamento_calculado: null,
+        diferenca: null,
+        observacoes: novaObs,
+      })
+      .eq("id", alvo.id);
+    if (!error) {
+      // Remove o(s) movimento(s) de fechamento desta sessão para que o caixa
+      // do operador volte exatamente ao estado anterior (saldo, lista de
+      // movimentos e totais). A auditoria da reabertura fica registrada no
+      // campo `observacoes` da sessão (marcador com executor, data e motivo).
+      await supabase
+        .from("caixa_movimentos")
+        .delete()
+        .eq("sessao_id", alvo.id)
+        .eq("tipo", "fechamento");
+    }
+    setSaving(false);
+    if (error) { mostrarErro(error); return; }
+    setOpenReabrir(null);
+    setMotivoReabrir("");
+    toast.success("Fechamento desfeito. O caixa foi reaberto.");
+    void loadTodos();
+    void load();
+  };
+
   // Fecha em lote todas as sessões marcadas — usa o saldo calculado como
   // valor informado (diferença = 0). Uma observação global identifica o
   // fechamento como feito pelo gestor.
@@ -1676,7 +1785,7 @@ function Page() {
     const cats = new Map<string, Cat>();
     let totPag = 0, totReceb = 0;
     for (const m of movs) {
-      if (m.tipo === "abertura" || m.tipo === "fechamento") continue;
+      if (m.tipo === "abertura" || m.tipo === "fechamento" || m.tipo === "reabertura") continue;
       const key = TIPO_LABEL[m.tipo];
       const cat = cats.get(key) ?? { label: key, pagamento: 0, recebimento: 0 };
       const v = Number(m.valor || 0);
@@ -1692,7 +1801,7 @@ function Page() {
     type Forma = { label: string; pagamento: number; recebimento: number };
     const formas = new Map<string, Forma>();
     for (const m of movs) {
-      if (m.tipo === "abertura" || m.tipo === "fechamento") continue;
+      if (m.tipo === "abertura" || m.tipo === "fechamento" || m.tipo === "reabertura") continue;
       const bucket = normalizarForma(m.forma_pagamento) || "—";
       const label = bucket.toUpperCase();
       const f = formas.get(label) ?? { label, pagamento: 0, recebimento: 0 };
@@ -1706,7 +1815,12 @@ function Page() {
       accF += f.recebimento - f.pagamento;
       return '<tr><td>' + esc(f.label) + '</td><td style="text-align:right;">' + fmt(f.pagamento) + '</td><td style="text-align:right;">' + fmt(f.recebimento) + '</td><td style="text-align:right;">' + fmt(accF) + '</td></tr>';
     }).join("");
-    const qtd = movs.filter((m) => m.tipo !== "abertura" && m.tipo !== "fechamento").length;
+    const qtd = movs.filter((m) => m.tipo !== "abertura" && m.tipo !== "fechamento" && m.tipo !== "reabertura").length;
+    const reaberturas = movs.filter((m) => m.tipo === "reabertura");
+    const linhasReabertura = reaberturas.length === 0 ? "" :
+      '<div style="margin-top:10px;font-size:11px;color:#7c3aed;"><strong>Reaberturas de fechamento:</strong><ul style="margin:4px 0 0 16px;padding:0;">' +
+      reaberturas.map((m) => '<li>' + esc(new Date(m.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })) + ' — ' + esc(m.descricao || "sem detalhes") + '</li>').join("") +
+      '</ul></div>';
     const emissao = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
     const style = 'body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;} h1{font-size:16px;margin:0 0 6px;text-align:center;letter-spacing:.5px;} .meta{font-size:11px;color:#475569;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;} table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;} th,td{padding:5px 6px;border-bottom:1px solid #cbd5e1;} thead th{border-bottom:2px solid #0f172a;text-align:left;} thead th.n{text-align:right;} tfoot td{border-top:2px solid #0f172a;font-weight:700;} .right{text-align:right;}';
     const empty = '<tr><td colspan="4" style="text-align:center;color:#64748b;">Sem movimentos</td></tr>';
@@ -1720,6 +1834,7 @@ function Page() {
       '<table><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + (linhasForma || empty) + '</tbody>' +
       '<tfoot><tr><td>TOTAL</td><td class="right">' + fmt(totPag) + '</td><td class="right">' + fmt(totReceb) + '</td><td class="right">' + fmt(totReceb - totPag) + '</td></tr></tfoot></table>' +
       '<div class="meta"><span>' + qtd + ' registro' + (qtd === 1 ? '' : 's') + '</span></div>' +
+      linhasReabertura +
       '<script>window.onload=function(){window.print();}</script></body></html>';
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
@@ -1926,6 +2041,9 @@ function Page() {
                 <Button variant="outline" onClick={() => setOpenMov({ tipo: "sangria" })}>
                   <ArrowUpFromLine className="h-4 w-4 mr-2 text-rose-600" /> Sangria
                 </Button>
+                <Button variant="outline" onClick={() => setOpenMov({ tipo: "estorno" })}>
+                  <Undo2 className="h-4 w-4 mr-2 text-fuchsia-600" /> Estorno
+                </Button>
                 {podeLancarRecebDespesa && (
                   <>
                     <Button variant="outline" onClick={() => setOpenMov({ tipo: "recebimento" })}>
@@ -2018,36 +2136,24 @@ function Page() {
 
               {/* ---------- Movimentos ---------- */}
               <TabsContent value="movimentos" className="space-y-4 pt-4">
-                {!minhaSessao ? (
-                  <Card>
-                    <CardContent className="py-10 text-center text-muted-foreground">
-                      Abra um caixa para visualizar os movimentos.
-                    </CardContent>
-                  </Card>
-                ) : (
               <Card>
                 <CardHeader className="gap-3">
                   <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
                     <CardTitle className="text-base">
-                      {isManager ? "Movimentos da sessão" : "Movimentos de hoje"}
+                      Meus movimentos
                       {filtrosAtivos && (
                         <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          ({minhasMovsFiltrados.length} de {minhasMovs.length})
+                          ({minhasMovsFiltrados.length} de {minhasMovsHist.length})
                         </span>
                       )}
                     </CardTitle>
                     <div className="flex items-center gap-2">
-                      {!isManager && (
-                        <span className="text-xs text-muted-foreground">
-                          {new Date().toLocaleDateString("pt-BR")}
-                        </span>
-                      )}
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => imprimirRelatorioMovs(
                           minhasMovsFiltrados,
-                          isManager ? periodoLabel : new Date().toLocaleDateString("pt-BR"),
+                          periodoLabel,
                         )}
                         disabled={minhasMovsFiltrados.length === 0}
                       >
@@ -2056,8 +2162,7 @@ function Page() {
                     </div>
                   </div>
                   <div className="flex items-end gap-2 flex-wrap">
-                    {isManager && (
-                      <div>
+                    <div>
                         <Label className="text-xs">Período</Label>
                         <Popover open={openCal} onOpenChange={setOpenCal}>
                           <PopoverTrigger asChild>
@@ -2114,7 +2219,6 @@ function Page() {
                           </PopoverContent>
                         </Popover>
                       </div>
-                    )}
                     <div>
                       <Label className="text-xs">Médico</Label>
                       <Select value={meuMedico} onValueChange={setMeuMedico}>
@@ -2176,9 +2280,7 @@ function Page() {
                           <TableCell colSpan={10} className="text-center text-muted-foreground">
                             {filtrosAtivos
                               ? "Nenhum movimento corresponde aos filtros"
-                              : isManager
-                                ? "Sem movimentos no período"
-                                : "Sem movimentos hoje"}
+                              : "Sem movimentos no período"}
                           </TableCell>
                         </TableRow>
                       ) : minhasMovsFiltrados.map((m) => {
@@ -2263,7 +2365,6 @@ function Page() {
                   </Table>
                 </CardContent>
               </Card>
-                )}
               </TabsContent>
 
               {/* ---------- Histórico ---------- */}
@@ -2460,6 +2561,22 @@ function Page() {
                                 <Lock className="h-4 w-4" />
                               </Button>
                             )}
+                            {!sAberta && l.statusDia === "fechado" && podeLancarRecebDespesa && (() => {
+                              const sFechada = [...l.sessoes]
+                                .filter((x) => x.status === "fechado" && x.fechado_em)
+                                .sort((a, b) => (b.fechado_em || "").localeCompare(a.fechado_em || ""))[0];
+                              if (!sFechada) return null;
+                              return (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Desfazer fechamento (reabrir caixa)"
+                                  onClick={() => { setOpenReabrir(sFechada); setMotivoReabrir(""); }}
+                                >
+                                  <Undo2 className="h-4 w-4 text-amber-700" />
+                                </Button>
+                              );
+                            })()}
                           </TableCell>
                         </TableRow>
                       );
@@ -2592,6 +2709,7 @@ function Page() {
               {openMov?.tipo === "suprimento" && "Adição de dinheiro ao caixa."}
               {openMov?.tipo === "recebimento" && "Entrada de pagamento avulsa."}
               {openMov?.tipo === "despesa" && "Pagamento avulso de despesa pelo caixa."}
+              {openMov?.tipo === "estorno" && "Devolução de dinheiro ao paciente fora do fluxo de solicitação de estorno (ex.: troco, valor cobrado a mais). Descreva o motivo/paciente abaixo."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={lancarMov} className="space-y-3">
@@ -2696,18 +2814,19 @@ function Page() {
                     : minhasMovs;
                   const pf: Record<string, number> = {};
                   filtrados.forEach((m) => {
-                    if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
-                    const v = Number(m.valor || 0);
-                    const bucket = normalizarForma(m.forma_pagamento);
+                    if (m.tipo !== "recebimento" && m.tipo !== "suprimento" && m.tipo !== "estorno") return;
+                    const sinal = m.tipo === "estorno" ? -1 : 1;
+                    const v = Number(m.valor || 0) * sinal;
+                    const bucket = bucketDeMov(m);
                     if (bucket === "misto") {
                       const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
                       const partes = decomporMistoObs(obs);
                       let somado = 0;
                       for (const [k, val] of Object.entries(partes)) {
-                        pf[k] = (pf[k] ?? 0) + (val ?? 0); somado += val ?? 0;
+                        pf[k] = (pf[k] ?? 0) + (val ?? 0) * sinal; somado += (val ?? 0) * sinal;
                       }
                       const resto = v - somado;
-                      if (Math.abs(resto) > 0.005) pf.outros = (pf.outros ?? 0) + resto;
+                      if (Math.abs(resto) > 0.005) pf.dinheiro = (pf.dinheiro ?? 0) + resto;
                     } else {
                       pf[bucket] = (pf[bucket] ?? 0) + v;
                     }
@@ -2729,7 +2848,10 @@ function Page() {
             {minhaSessao && (() => {
               const porForma = porFormaDoDiaFechamento;
               const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
-              const chaves = ordem;
+              // "Outros" só aparece se realmente houver saldo residual (ex.: parcela
+              // de pagamento misto ainda não decomposta). Sangria/suprimento/despesa
+              // agora contam em "Dinheiro" via bucketDeMov.
+              const chaves = ordem.filter((k) => k !== "outros" || Math.abs(porForma[k] ?? 0) > 0.005);
               const totalConferido = Object.values(conferidoOwn)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
@@ -2782,6 +2904,46 @@ function Page() {
         </DialogContent>
       </Dialog>
 
+      {/* === Modal Desfazer fechamento (admin/gestor/financeiro) === */}
+      <Dialog open={!!openReabrir} onOpenChange={(o) => { if (!o) { setOpenReabrir(null); setMotivoReabrir(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Desfazer fechamento do caixa</DialogTitle>
+            {openReabrir && (
+              <DialogDescription>
+                Operador: <strong className="uppercase">{openReabrir.user_nome || openReabrir.user_id.slice(0, 8)}</strong>
+                <br />
+                Calculado: <strong>{fmt(Number(openReabrir.valor_fechamento_calculado || 0))}</strong>
+                {" · "}Informado: <strong>{fmt(Number(openReabrir.valor_fechamento_informado || 0))}</strong>
+                {" · "}Diferença: <strong>{fmt(Number(openReabrir.diferenca || 0))}</strong>
+                <br />
+                <span className="text-xs text-muted-foreground">
+                  O caixa voltará ao status "aberto". O histórico de fechamento
+                  fica registrado e uma linha de reabertura será adicionada aos
+                  movimentos do operador.
+                </span>
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="motivo-reabrir">Motivo (obrigatório)</Label>
+            <Textarea
+              id="motivo-reabrir"
+              value={motivoReabrir}
+              onChange={(e) => setMotivoReabrir(e.target.value)}
+              placeholder="Ex.: valor informado incorreto, sangria pendente..."
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setOpenReabrir(null); setMotivoReabrir(""); }}>Cancelar</Button>
+            <Button variant="destructive" disabled={saving || !motivoReabrir.trim()} onClick={() => void desfazerFechamento()}>
+              <Undo2 className="h-4 w-4 mr-2" /> Reabrir caixa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* === Modal Fechar caixa de OUTRO usuário (gestor/admin) === */}
       <Dialog open={!!openFecharTerceiro} onOpenChange={(o) => { if (!o) setOpenFecharTerceiro(null); }}>
         <DialogContent>
@@ -2799,7 +2961,7 @@ function Page() {
             {openFecharTerceiro && (() => {
               const porForma = entradasPorFormaSessao(openFecharTerceiro.id);
               const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
-              const chaves = ordem;
+              const chaves = ordem.filter((k) => k !== "outros" || Math.abs(porForma[k] ?? 0) > 0.005);
               const totalConferido = Object.values(conferidoTerceiro)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
@@ -3102,14 +3264,25 @@ function Page() {
               {(() => {
                 const tot = { recebimento: 0, sangria: 0, estorno: 0 };
                 let qtdReceb = 0;
+                let qtdEstornoReceb = 0;
                 detalheMovs.forEach((m) => {
                   const v = Number(m.valor || 0);
                   if (m.tipo === "recebimento") { tot.recebimento += v; qtdReceb++; }
                   else if (m.tipo === "sangria") tot.sangria += v;
-                  if ((m.descricao ?? "").toLowerCase().includes("estorno")) tot.estorno += v;
+                  else if (m.tipo === "estorno") { tot.estorno += v; qtdEstornoReceb++; }
+                  if (m.tipo !== "estorno" && (m.descricao ?? "").toLowerCase().includes("estorno")) {
+                    tot.estorno += v;
+                    qtdEstornoReceb++;
+                  }
                 });
+                // Recebimentos líquidos: o estorno desconta do recebimento do
+                // mesmo movimento, então nem o valor nem a contagem entram no
+                // total exibido — a linha original continua na tabela como
+                // rastro de auditoria.
+                const recebLiquido = tot.recebimento - tot.estorno;
+                const qtdRecebLiquido = Math.max(0, qtdReceb - qtdEstornoReceb);
                 const diff = Number(openDetalhe.diferenca || 0);
-                const media = qtdReceb > 0 ? tot.recebimento / qtdReceb : 0;
+                const media = qtdRecebLiquido > 0 ? recebLiquido / qtdRecebLiquido : 0;
                 return (
                   <>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
@@ -3119,8 +3292,11 @@ function Page() {
                       </div>
                       <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Recebimentos</p>
-                        <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{fmt(tot.recebimento)}</p>
-                        <p className="text-[11px] text-muted-foreground">{qtdReceb} lançamento{qtdReceb === 1 ? "" : "s"}</p>
+                        <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{fmt(recebLiquido)}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {qtdRecebLiquido} lançamento{qtdRecebLiquido === 1 ? "" : "s"}
+                          {qtdEstornoReceb > 0 ? ` · ${qtdEstornoReceb} estornado${qtdEstornoReceb === 1 ? "" : "s"}` : ""}
+                        </p>
                       </div>
                       <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Sangrias</p>
@@ -3129,7 +3305,7 @@ function Page() {
                       <div className="rounded-lg border bg-sky-50 dark:bg-sky-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Média / atendimento</p>
                         <p className="text-base font-bold text-sky-700 dark:text-sky-400">{fmt(media)}</p>
-                        <p className="text-[11px] text-muted-foreground">{qtdReceb} atendimento{qtdReceb === 1 ? "" : "s"}</p>
+                        <p className="text-[11px] text-muted-foreground">{qtdRecebLiquido} atendimento{qtdRecebLiquido === 1 ? "" : "s"}</p>
                       </div>
                       <div className="rounded-lg border bg-fuchsia-50 dark:bg-fuchsia-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Estornos</p>
@@ -3233,7 +3409,7 @@ function Page() {
                   {minhasMovs
                     .filter((m) => {
                       if (caixaDrill === "entradas") return m.tipo === "suprimento" || m.tipo === "recebimento";
-                      if (caixaDrill === "saidas") return m.tipo === "sangria" || m.tipo === "despesa";
+                      if (caixaDrill === "saidas") return m.tipo === "sangria" || m.tipo === "despesa" || m.tipo === "estorno";
                       return true;
                     })
                     .map((m) => (

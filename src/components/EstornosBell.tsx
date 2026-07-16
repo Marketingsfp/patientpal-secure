@@ -149,7 +149,7 @@ export function EstornosBell() {
                 </div>
                 <div className="flex gap-1.5 pt-1">
                   {podeAprovar && (
-                    <Link to="/app/financeiro/atendimentos" onClick={() => setOpen(false)}>
+                    <Link to="/app/financeiro/estorno" onClick={() => setOpen(false)}>
                       <Button size="sm" variant="default" className="h-7 text-xs">
                         <ExternalLink className="h-3 w-3 mr-1" /> Abrir financeiro
                       </Button>
