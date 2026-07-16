@@ -189,6 +189,10 @@ const BASE_CSS = `
   @page { size: 80mm auto; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+  /* Zera espaço extra que o Chrome/driver da térmica reserva no fim da
+     página. Sem isso a bobina saía com ~8–10 cm em branco após a linha
+     "DATA IMPRESSÃO", só desperdiçando papel antes do corte. */
+  html, body { height: auto; }
   body {
     font-family: "Courier New", "Consolas", monospace;
     font-size: 11pt;
@@ -197,7 +201,8 @@ const BASE_CSS = `
     word-break: break-word;
     overflow-wrap: anywhere;
   }
-  .ticket { width: 76mm; max-width: 100%; padding: 3mm 2mm 6mm; }
+  .ticket { width: 76mm; max-width: 100%; padding: 3mm 2mm 2mm; }
+  .ticket:last-child { padding-bottom: 1mm; }
   .center { text-align: center; }
   .right  { text-align: right; }
   .bold   { font-weight: 700; }
