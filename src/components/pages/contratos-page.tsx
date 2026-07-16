@@ -2250,6 +2250,35 @@ function DetalheContrato({
     load();
   };
 
+  // Marca uma parcela pendente como "paga historicamente":
+  // atualiza status/pago_em/valor_pago SEM criar lançamento no caixa.
+  // Uso: regularizar contratos cuja 1ª (ou primeiras) mensalidades já
+  // foram pagas fora do sistema, sem precisar cancelar e refazer o contrato.
+  const marcarPagaHistorica = async (m: Mens) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (m.status === "pago") return;
+    const ok = confirm(
+      `Marcar a parcela ${isAdesao(m) ? "de adesão" : m.numero_parcela} como paga historicamente?\n\n` +
+      `Ela ficará como PAGA no contrato, mas NÃO gerará movimento no caixa nem lançamento financeiro. ` +
+      `Use apenas para regularizar pagamentos feitos fora do sistema.`
+    );
+    if (!ok) return;
+    const valor = Number(m.valor) || 0;
+    const { error } = await supabase
+      .from("contrato_mensalidades")
+      .update({
+        status: "pago",
+        pago_em: m.vencimento,
+        valor_pago: valor,
+        forma_pagamento: null,
+        lancamento_id: null,
+      })
+      .eq("id", m.id);
+    if (error) return mostrarErro(error);
+    toast.success("Parcela marcada como paga (histórica). Não foi lançada no caixa.");
+    load();
+  };
+
   const abrirFormaPag = (m: Mens) => {
     setPagMens(m);
     setFormaPagOpen(true);
