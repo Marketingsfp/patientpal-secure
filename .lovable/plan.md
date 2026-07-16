@@ -1,41 +1,35 @@
+## Problema
 
-## O que muda na Agenda
+Na lista da agenda (`/app/agenda`), o ícone que indicava que o paciente tem cartão de convênio da clínica sumiu do lado do nome.
 
-Hoje, quando você escolhe uma data no filtro (ex.: 01/07/26), o sistema traz **apenas** os agendamentos daquele dia. Por isso os agendamentos do Nélio para 16/07 não aparecem quando você escolhe 01/07.
+O código responsável ainda carrega os dados: existe um estado `convenioMap` (linha ~891 de `src/routes/_authenticated/app.agenda.tsx`) populado a partir de `contratos_assinatura` (titular) e `contrato_dependentes` (dependentes) — mapa `paciente_id → nome do convênio`. Porém, esse `convenioMap` **não é lido em lugar nenhum do JSX**, então o indicador visual não aparece.
 
-Depois desta alteração:
+O ícone `IdCard` (lucide) continua importado (linha 63), mas também não é usado na renderização.
 
-- **Padrão**: a data selecionada passa a significar "**a partir de**". Escolhendo 01/07/26, você vê todos os agendamentos do dia 01/07 em diante, inclusive datas futuras (16/07, agosto, etc.).
-- **Novo checkbox** "Exibir apenas a data selecionada": quando marcado, o filtro volta a se comportar como hoje, trazendo só o dia escolhido.
-- O seletor de **intervalo de datas** (calendário com data inicial + data final) continua funcionando igual: se você definir uma data final, o sistema respeita o intervalo.
+## Correção
 
-## Onde vai aparecer
+No `<TableCell>` do cliente (arquivo `src/routes/_authenticated/app.agenda.tsx`, por volta da linha 6753-6769), acrescentar — dentro do botão do nome do paciente, entre o `IdadeIcon` e o `<span>` do nome — um ícone `IdCard` que aparece somente quando o paciente tem cartão:
 
-O checkbox "Exibir apenas a data selecionada" fica logo abaixo do campo **Data**, na mesma barra de filtros da tela `/app/agenda` (Lista e Por médico), sem ocupar espaço extra na tabela.
+```tsx
+{a.paciente_id && convenioMap.has(a.paciente_id) && (
+  <IdCard
+    className="h-3.5 w-3.5 text-emerald-600 shrink-0"
+    aria-label={`Cartão ${convenioMap.get(a.paciente_id)}`}
+  >
+    <title>{`Cartão ${convenioMap.get(a.paciente_id)}`}</title>
+  </IdCard>
+)}
+```
 
-## Impacto (4 eixos)
+(A `<title>` interna funciona como tooltip nativo no SVG; se o Lucide não repassar filhos, uso um `<span title=...>` envolvendo o ícone.)
 
-- 💰 **Financeiro**: neutro.
-- ⏱️ **Operacional**: recepção deixa de precisar ampliar manualmente a janela de datas ou trocar filtros para encontrar o próximo agendamento de um paciente. Elimina cliques em quase todo atendimento em que a recepcionista precisa consultar "o próximo do paciente".
-- 😊 **Experiência**: paciente é informado imediatamente sobre próximos agendamentos, sem espera.
-- 🛡️ **Segurança/auditoria**: nenhuma alteração — só leitura, RLS existente permanece.
+Regra visual:
+- Só aparece quando `convenioMap` tem o `paciente_id` (paciente titular ou dependente com contrato ativo na clínica).
+- Cor discreta (esmeralda) para diferenciar dos outros badges existentes (estrela de confirmado, ORÇ).
+- Tooltip com o nome do convênio ao passar o mouse.
 
-## Detalhes técnicos
+## Fora do escopo
 
-Arquivo único: `src/routes/_authenticated/app.agenda.tsx`.
-
-1. **Estado**: mudar valor inicial de `apenasData` de `true` para `false` (linha 860).
-2. **Consulta** (bloco `load`, linhas 1524–1543): reescrever para:
-   - `apenasData = true` → mantém `gte(dataRef 00:00) && lte(dataFim ?? dataRef 23:59)` (comportamento atual).
-   - `apenasData = false`:
-     - `gte(dataRef 00:00)` sempre;
-     - se `dataFim` estiver definido (usuário abriu o calendário e escolheu intervalo) → `lte(dataFim 23:59)`;
-     - caso contrário, **sem** limite superior — remove a janela fixa de 7/365 dias que existe hoje. O `.range(0, 9999)` do PostgREST continua limitando a 10 mil linhas, o que combinado aos filtros existentes (profissional, cliente, situação) é seguro.
-3. **UI** (barra de filtros, ~linha 6503): adicionar um `<label>` compacto com `Checkbox` controlando `apenasData` / `setApenasData`, logo abaixo do `DataRefField`.
-4. **Reset**: se `limparFiltros` restaurar `apenasData`, garantir que volta ao novo padrão (`false`).
-
-## Fora de escopo
-
-- Não altera Agenda V2 nem Agenda Express.
-- Não altera regras de negócio, permissões, dados financeiros, agendamentos existentes ou consultas de outros módulos.
-- Não muda o formato do calendário/range picker existente.
+- Não altera lógica de preço, `tipo_atendimento`, filtros ou busca.
+- Não mexe na GR nem no caixa.
+- Só a lista principal da agenda clássica — outras telas (agenda-v2, drawer) não estão no pedido.
