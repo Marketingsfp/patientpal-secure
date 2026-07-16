@@ -784,7 +784,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
     <div class="sep"></div>
     <div class="row sm">
-      <div>DATA IMPRESSAO</div>
+      <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
   </div>`;
@@ -1189,7 +1189,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         ` : ""}
         <div class="sep"></div>
         <div class="row sm">
-          <div>DATA IMPRESSAO</div>
+          <div>DATA</div>
           <div>${dataImpressao}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
         </div>
       </div>
@@ -1399,7 +1399,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
 
     <div class="sep"></div>
     <div class="row sm">
-      <div>DATA IMPRESSÃO</div>
+      <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
   </div>`;
@@ -1593,7 +1593,7 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
 
     <div class="sep"></div>
     <div class="row sm">
-      <div>DATA IMPRESSÃO</div>
+      <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
   </div>`;
@@ -1789,7 +1789,7 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
 
     <div class="sep"></div>
     <div class="row sm">
-      <div>DATA IMPRESSÃO</div>
+      <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumeroMens >= 2 ? ` — ${viaTextoMens}` : ""}</div>
     </div>
   </div>`;
@@ -1856,7 +1856,7 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
 
     <div class="sep"></div>
     <div class="row sm">
-      <div>DATA IMPRESSÃO</div>
+      <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumeroTaxa >= 2 ? ` — ${viaTextoTaxa}` : ""}</div>
     </div>
   </div>`;

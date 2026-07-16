@@ -1,35 +1,31 @@
-## Problema
+## Objetivo
 
-Na lista da agenda (`/app/agenda`), o ícone que indicava que o paciente tem cartão de convênio da clínica sumiu do lado do nome.
+Na GR (guia de atendimento impressa), a linha final está mostrando duas vezes a palavra "IMPRESSÃO":
 
-O código responsável ainda carrega os dados: existe um estado `convenioMap` (linha ~891 de `src/routes/_authenticated/app.agenda.tsx`) populado a partir de `contratos_assinatura` (titular) e `contrato_dependentes` (dependentes) — mapa `paciente_id → nome do convênio`. Porém, esse `convenioMap` **não é lido em lugar nenhum do JSX**, então o indicador visual não aparece.
+- rótulo à esquerda: `DATA IMPRESSÃO`
+- valor à direita: `16/07/2026 19:25 — IMPRESSÃO Nº 4`
 
-O ícone `IdCard` (lucide) continua importado (linha 63), mas também não é usado na renderização.
+Quando o papel é estreito, o rótulo `DATA IMPRESSÃO` quebra a linha e exibe "IMPRESSAO" solto embaixo (o trecho circulado nas fotos). O valor à direita já traz "IMPRESSÃO Nº X", então a palavra no rótulo é redundante.
 
-## Correção
+## Alteração
 
-No `<TableCell>` do cliente (arquivo `src/routes/_authenticated/app.agenda.tsx`, por volta da linha 6753-6769), acrescentar — dentro do botão do nome do paciente, entre o `IdadeIcon` e o `<span>` do nome — um ícone `IdCard` que aparece somente quando o paciente tem cartão:
+Apenas texto do rótulo em `src/lib/print-gr.ts`. Trocar `DATA IMPRESSAO` / `DATA IMPRESSÃO` por `DATA` nas 6 ocorrências dos layouts de GR:
 
-```tsx
-{a.paciente_id && convenioMap.has(a.paciente_id) && (
-  <IdCard
-    className="h-3.5 w-3.5 text-emerald-600 shrink-0"
-    aria-label={`Cartão ${convenioMap.get(a.paciente_id)}`}
-  >
-    <title>{`Cartão ${convenioMap.get(a.paciente_id)}`}</title>
-  </IdCard>
-)}
-```
+- linha 787 (`DATA IMPRESSAO` → `DATA`)
+- linha 1192 (`DATA IMPRESSAO` → `DATA`)
+- linha 1402 (`DATA IMPRESSÃO` → `DATA`)
+- linha 1596 (`DATA IMPRESSÃO` → `DATA`)
+- linha 1792 (`DATA IMPRESSÃO` → `DATA`)
+- linha 1859 (`DATA IMPRESSÃO` → `DATA`)
 
-(A `<title>` interna funciona como tooltip nativo no SVG; se o Lucide não repassar filhos, uso um `<span title=...>` envolvendo o ícone.)
-
-Regra visual:
-- Só aparece quando `convenioMap` tem o `paciente_id` (paciente titular ou dependente com contrato ativo na clínica).
-- Cor discreta (esmeralda) para diferenciar dos outros badges existentes (estrela de confirmado, ORÇ).
-- Tooltip com o nome do convênio ao passar o mouse.
+O valor à direita (`${fmtData(...)}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}`) fica intacto, então continua aparecendo "16/07/2026 19:25 — IMPRESSÃO Nº 4" quando é 2ª via ou mais.
 
 ## Fora do escopo
 
-- Não altera lógica de preço, `tipo_atendimento`, filtros ou busca.
-- Não mexe na GR nem no caixa.
-- Só a lista principal da agenda clássica — outras telas (agenda-v2, drawer) não estão no pedido.
+- Nenhuma alteração em regra de negócio, numeração de vias, cálculo de valores, plano/convênio, cabeçalho ou qualquer outro trecho da GR.
+- Sem alterações em outros arquivos.
+
+## Antes / Depois
+
+- Antes: `DATA IMPRESSÃO      16/07/2026 19:25 — IMPRESSÃO Nº 4` (com quebra: "IMPRESSAO" sobrando na linha de baixo)
+- Depois: `DATA      16/07/2026 19:25 — IMPRESSÃO Nº 4` (sem repetição, sem sobra)
