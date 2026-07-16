@@ -857,7 +857,12 @@ function AgendaPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
   const [dataFim, setDataFim] = useState<string | null>(null);
-  const [apenasData, setApenasData] = useState(true);
+  // Padrão: filtro de data é "a partir de" — traz o dia selecionado em
+  // diante, para que a recepção veja os próximos agendamentos do paciente
+  // sem precisar ampliar a janela manualmente. Marcando o checkbox
+  // "Exibir apenas a data selecionada" o filtro passa a trazer só o dia
+  // escolhido (comportamento antigo).
+  const [apenasData, setApenasData] = useState(false);
   const [mostrarLivres, setMostrarLivres] = useState(true);
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
@@ -1522,24 +1527,23 @@ function AgendaPage() {
       q = q.ilike("paciente_nome", `%${termo}%`);
     }
     if (apenasData) {
+      // "Exibir apenas a data selecionada" — restringe ao dia escolhido
+      // (ou ao intervalo, se o usuário definiu uma data final no picker).
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
       const fimDia = dataFim ?? dataRef;
       const fim = new Date(`${fimDia}T23:59:59`).toISOString();
       q = q.gte("inicio", inicio).lte("inicio", fim);
     } else if (!statusEspecifico) {
+      // Padrão "a partir de": mostra tudo do dia selecionado em diante.
+      // Se o usuário definiu uma data final no picker de intervalo,
+      // respeita o intervalo; caso contrário, não aplica limite superior.
+      // O `.range(0, 9999)` do PostgREST já protege contra volume excessivo.
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
-      const f = new Date(`${dataFim ?? dataRef}T00:00:00`);
-      if (!dataFim) {
-        // Quando há busca por cliente, ampliamos a janela (o ILIKE no
-        // servidor já reduz o volume). Sem filtro, mantemos 30 dias.
-        // Janela padrão reduzida para 7 dias para abrir a agenda
-        // muito mais rápido. Quem precisa de janela maior pode
-        // selecionar uma data final no filtro.
-        f.setDate(f.getDate() + (termoCli.length >= 2 ? 365 : 7));
-      } else {
-        f.setHours(23, 59, 59);
+      q = q.gte("inicio", inicio);
+      if (dataFim) {
+        const f = new Date(`${dataFim}T23:59:59`).toISOString();
+        q = q.lte("inicio", f);
       }
-      q = q.gte("inicio", inicio).lte("inicio", f.toISOString());
     }
     if (!statusEspecifico) {
       q = q.range(0, 9999);
@@ -6510,6 +6514,14 @@ function AgendaPage() {
               shiftData={shiftData}
               compact
             />
+            <label className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500 cursor-pointer select-none">
+              <Checkbox
+                checked={apenasData}
+                onCheckedChange={(v) => setApenasData(v === true)}
+                className="h-3 w-3"
+              />
+              Exibir apenas a data selecionada
+            </label>
           </div>
 
           {/* Cliente */}
