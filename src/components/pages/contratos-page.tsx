@@ -2232,15 +2232,15 @@ function DetalheContrato({
     let cancel = false;
     void supabase
       .from("nfse")
-      .select("id, numero, status, pdf_url, pagamento_id")
+      .select("id, numero, status, url_pdf, pagamento_id")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .in("pagamento_id", ids)
-      .neq("status", "cancelado")
+      .neq("status", "cancelada")
       .then(({ data }) => {
         if (cancel) return;
         const map: Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }> = {};
-        for (const r of (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; pdf_url: string | null; pagamento_id: string }>) {
-          map[r.pagamento_id] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.pdf_url };
+        for (const r of (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string }>) {
+          map[r.pagamento_id] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
         }
         setNfsePorLancamento(map);
       });
