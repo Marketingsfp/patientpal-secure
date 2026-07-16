@@ -4561,7 +4561,10 @@ function AgendaPage() {
             className="h-7 text-[11px] px-2"
             title="Agendamento rápido em 4 passos"
           >
-            <Link to="/app/agenda/express">
+            <Link
+              to="/app/agenda/express"
+              activeProps={{ className: "bg-primary text-primary-foreground border-primary hover:bg-primary/90 hover:text-primary-foreground" }}
+            >
               <Clock className="h-3 w-3 mr-1.5" /> Agenda Express
             </Link>
           </Button>
