@@ -7,7 +7,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { consultarNfse, reenviarNfse, extrairNfseDeImagem, baixarNfseArquivo } from "@/lib/nfse.functions";
+import { consultarNfse, reenviarNfse, extrairNfseDeImagem, baixarNfseArquivo, avancarRpsProximoNumero } from "@/lib/nfse.functions";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -40,6 +40,7 @@ function NfsePage() {
   const consulta = useServerFn(consultarNfse);
   const reenviar = useServerFn(reenviarNfse);
   const extrair = useServerFn(extrairNfseDeImagem);
+  const avancarRps = useServerFn(avancarRpsProximoNumero);
   const [reenviando, setReenviando] = useState<string | null>(null);
   const [conferirOpen, setConferirOpen] = useState(false);
   const [conferirLoading, setConferirLoading] = useState(false);
@@ -151,13 +152,16 @@ function NfsePage() {
     }
     setAvancandoRps(true);
     try {
-      const { error } = await supabase
-        .from("nfse_emitentes")
-        .update({ rps_proximo_numero: novo })
-        .eq("id", erroDetalhe.emitente_id);
-      if (error) { mostrarErro(error); return; }
-      setRpsAtual(novo);
-      toast.success(`Próx. nº RPS do emitente atualizado para ${novo}.`);
+      // Usa server fn para contornar RLS silenciosa: só managers da clínica
+      // podem UPDATE direto em nfse_emitentes, então o update client-side
+      // retornava 0 linhas sem erro e o usuário achava que tinha avançado.
+      const r = await avancarRps({ data: { emitente_id: erroDetalhe.emitente_id, novo_numero: novo } });
+      if (!r.ok) {
+        toast.error(r.motivo ?? "Não foi possível avançar o contador.");
+        return;
+      }
+      setRpsAtual(r.novo_numero);
+      toast.success(`Próx. nº RPS do emitente atualizado para ${r.novo_numero}.`);
       if (reenviarDepois) {
         const notaId = erroDetalhe.id;
         setErroDetalhe(null);

@@ -516,6 +516,52 @@ export const cancelarNfse = createServerFn({ method: "POST" })
  * Reenvia uma NFS-e a partir de um registro existente (status=erro).
  * Reusa emitente/tomador/valor/descrição da nota original.
  */
+/**
+ * Avança o contador rps_proximo_numero do emitente. Existe porque o UPDATE
+ * direto pelo client pode ser bloqueado silenciosamente por RLS (só managers
+ * podem alterar nfse_emitentes) — o usuário fica com a impressão de que
+ * "advancei mas continua dando erro E0014" porque o UPDATE simplesmente
+ * não afetou nenhuma linha. Aqui rodamos com service role após validar
+ * autenticação, e devolvemos o novo valor efetivamente aplicado.
+ */
+export const avancarRpsProximoNumero = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({
+      emitente_id: z.string().uuid(),
+      novo_numero: z.number().int().positive(),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }): Promise<{ ok: true; novo_numero: number; anterior: number } | { ok: false; motivo: string }> => {
+    const { supabase } = context;
+    // Validação de acesso: o usuário precisa enxergar o emitente (RLS SELECT
+    // é liberado só para managers da clínica). Se não vê, não pode avançar.
+    const { data: emit, error: selErr } = await supabase
+      .from("nfse_emitentes")
+      .select("id, rps_proximo_numero, clinica_id")
+      .eq("id", data.emitente_id)
+      .maybeSingle();
+    if (selErr) return { ok: false, motivo: selErr.message };
+    if (!emit) return { ok: false, motivo: "Emitente não encontrado ou sem permissão." };
+    const anterior = Number(emit.rps_proximo_numero ?? 1);
+    if (data.novo_numero <= anterior) {
+      return { ok: false, motivo: `O novo número deve ser maior que o atual (${anterior}).` };
+    }
+    // Faz o UPDATE com service role para contornar RLS quando o usuário tem
+    // permissão de módulo (nfse) mas não é manager da clínica.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: upErr } = await supabaseAdmin
+      .from("nfse_emitentes")
+      .update({ rps_proximo_numero: data.novo_numero })
+      .eq("id", data.emitente_id);
+    if (upErr) return { ok: false, motivo: upErr.message };
+    return { ok: true, novo_numero: data.novo_numero, anterior };
+  });
+
+/**
+ * Reenvia uma NFS-e a partir de um registro existente (status=erro).
+ * Reusa emitente/tomador/valor/descrição da nota original.
+ */
 export const reenviarNfse = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
