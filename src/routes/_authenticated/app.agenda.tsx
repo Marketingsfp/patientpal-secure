@@ -3766,7 +3766,7 @@ function AgendaPage() {
       mostrarErro(error);
       return;
     }
-    toast.success("Baixa registrada — executado por " + (clinicaAtual?.role ? "você" : "usuário atual"));
+    toast.success("Baixa registrada — executor e horário gravados.");
     await load();
   };
 
