@@ -8707,6 +8707,10 @@ export type Database = {
           ultimo_uso: string
         }[]
       }
+      totem_checkin_cpf: {
+        Args: { _clinica_id: string; _cpf: string }
+        Returns: Json
+      }
       totem_match_biometria: {
         Args: { _clinica_id: string; _descriptor: Json; _threshold?: number }
         Returns: {
