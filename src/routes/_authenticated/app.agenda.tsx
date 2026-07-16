@@ -3451,9 +3451,14 @@ function AgendaPage() {
           .filter(Boolean),
       ),
     );
-    // Serviço é opcional — quando não informado, o agendamento é salvo sem
-    // procedimento e a cobrança pode ser feita via "Valor manual".
+    // Regra (2026-07-16): procedimento passou a ser OBRIGATÓRIO em todo
+    // agendamento de paciente. Elimina o rótulo de fallback ("CONSULTA" /
+    // "EXAMES LABORATORIAIS") aparecer em cima de campo vazio.
     const procedimentoTexto = procedimentosParaSalvar.join(" + ");
+    if (!procedimentoTexto.trim()) {
+      toast.error("Selecione o procedimento antes de salvar.");
+      return;
+    }
     const multiExamesModo =
       procedimentosParaSalvar.length > 1
         ? medicoEhLaboratorioFormulario(form.medico_id)
