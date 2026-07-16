@@ -22,6 +22,7 @@ import {
   euclidean,
   FACE_MATCH_THRESHOLD,
 } from "@/lib/face-recognition";
+import { TecladoNumerico, formatarCpfParcial } from "@/components/totem/teclado-numerico";
 
 export const Route = createFileRoute("/autoatendimento")({
   component: AutoatendimentoRoute,
@@ -517,7 +518,7 @@ function AutoatendimentoPage() {
               <h2 className="text-5xl font-bold tracking-tight">Como podemos ajudar?</h2>
               <p className="text-xl text-muted-foreground">Toque em uma das opções</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <TileGrande
                 onClick={() => navigate({ to: "/totem" })}
                 cor="from-primary/90 to-primary"
@@ -528,23 +529,15 @@ function AutoatendimentoPage() {
               <TileGrande
                 onClick={() => {
                   setStep("checkin");
-                  setIdentMode(null);
+                  // Identificação no totem é só por CPF (teclado na tela) —
+                  // o reconhecimento facial foi removido a pedido da gestão.
+                  setIdentMode("cpf");
+                  setCpf("");
                 }}
                 cor="from-emerald-600 to-emerald-700"
                 Icon={BadgeCheck}
                 titulo="Fazer check-in"
                 sub="Confirme presença na sua consulta de hoje"
-              />
-              <TileGrande
-                onClick={() => {
-                  setStep("agendar");
-                  setIdentMode(null);
-                  void carregarEspecialidades();
-                }}
-                cor="from-indigo-600 to-indigo-700"
-                Icon={CalendarPlus}
-                titulo="Solicitar atendimento"
-                sub="Escolha a especialidade e seja chamado"
               />
             </div>
             <p className="text-center text-xs text-muted-foreground pt-4">
@@ -564,14 +557,16 @@ function AutoatendimentoPage() {
 
             <div className="text-center space-y-2 mb-8">
               <h2 className="text-3xl font-bold">
-                {step === "checkin" ? "Identifique-se para check-in" : "Identifique-se"}
+                {step === "checkin" ? "Check-in" : "Identifique-se"}
               </h2>
-              <p className="text-muted-foreground">Escolha como deseja se identificar</p>
+              <p className="text-muted-foreground">Digite seu CPF no teclado abaixo</p>
             </div>
 
-            {/* Escolha do modo */}
+            {/* Escolha do modo — mantido apenas como fallback (o check-in já
+                entra direto no CPF; o botão de reconhecimento facial foi
+                removido a pedido da gestão). */}
             {identMode === null && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <button
                   onClick={() => setIdentMode("cpf")}
                   className="h-32 rounded-2xl border-2 hover:border-primary hover:bg-primary/5 transition flex flex-col items-center justify-center gap-2"
@@ -579,34 +574,28 @@ function AutoatendimentoPage() {
                   <ShieldCheck className="h-8 w-8 text-primary" />
                   <div className="text-lg font-semibold">Digitar CPF</div>
                 </button>
-                <button
-                  onClick={() => {
-                    setIdentMode("facial");
-                    void iniciarFacial((p) => {
-                      if (step === "checkin") void fazerCheckin(p);
-                    });
-                  }}
-                  className="h-32 rounded-2xl border-2 hover:border-primary hover:bg-primary/5 transition flex flex-col items-center justify-center gap-2"
-                >
-                  <Camera className="h-8 w-8 text-primary" />
-                  <div className="text-lg font-semibold">Reconhecimento facial</div>
-                </button>
               </div>
             )}
 
-            {/* CPF */}
+            {/* CPF — input somente leitura + teclado na tela (totem touch,
+                sem teclado físico; inputMode none evita o teclado do SO). */}
             {identMode === "cpf" && (
               <div className="space-y-5">
                 <input
-                  autoFocus
-                  inputMode="numeric"
-                  placeholder="Digite seu CPF (apenas números)"
-                  value={cpf}
-                  onChange={(e) => setCpf(e.target.value.replace(/\D/g, "").slice(0, 11))}
-                  className="w-full h-20 px-6 text-3xl tracking-widest rounded-xl border bg-background text-center"
+                  readOnly
+                  inputMode="none"
+                  placeholder="000.000.000-00"
+                  value={formatarCpfParcial(cpf)}
+                  className="w-full h-20 px-6 text-3xl tracking-widest rounded-xl border bg-background text-center tabular-nums"
+                />
+                <TecladoNumerico
+                  disabled={busy}
+                  onDigit={(d) => setCpf((v) => (v + d).slice(0, 11))}
+                  onBackspace={() => setCpf((v) => v.slice(0, -1))}
+                  onClear={() => setCpf("")}
                 />
                 <div className="grid grid-cols-2 gap-3">
-                  <Button variant="outline" size="lg" className="h-14" onClick={() => setIdentMode(null)}>
+                  <Button variant="outline" size="lg" className="h-14" onClick={reset}>
                     Voltar
                   </Button>
                   <Button

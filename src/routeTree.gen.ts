@@ -21,7 +21,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PacienteIndexRouteImport } from './routes/paciente.index'
 import { Route as VerificarCodigoRouteImport } from './routes/verificar.$codigo'
-import { Route as TotemClinicaIdRouteImport } from './routes/totem.$clinicaId'
+import { Route as TotemClinicaIdRouteImport } from './routes/totem_.$clinicaId'
 import { Route as PainelClinicaIdRouteImport } from './routes/painel.$clinicaId'
 import { Route as PacientePerfilRouteImport } from './routes/paciente.perfil'
 import { Route as PacienteFinanceiroRouteImport } from './routes/paciente.financeiro'
@@ -205,9 +205,9 @@ const VerificarCodigoRoute = VerificarCodigoRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const TotemClinicaIdRoute = TotemClinicaIdRouteImport.update({
-  id: '/$clinicaId',
-  path: '/$clinicaId',
-  getParentRoute: () => TotemRoute,
+  id: '/totem_/$clinicaId',
+  path: '/totem/$clinicaId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PainelClinicaIdRoute = PainelClinicaIdRouteImport.update({
   id: '/$clinicaId',
@@ -1198,7 +1198,7 @@ export interface FileRoutesById {
   '/paciente/financeiro': typeof PacienteFinanceiroRoute
   '/paciente/perfil': typeof PacientePerfilRoute
   '/painel/$clinicaId': typeof PainelClinicaIdRoute
-  '/totem/$clinicaId': typeof TotemClinicaIdRoute
+  '/totem_/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
   '/painel/t/': typeof PainelTRoute
@@ -1605,7 +1605,7 @@ export interface FileRouteTypes {
     | '/paciente/financeiro'
     | '/paciente/perfil'
     | '/painel/$clinicaId'
-    | '/totem/$clinicaId'
+    | '/totem_/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente/'
     | '/painel/t/'
@@ -1741,6 +1741,7 @@ export interface RootRouteChildren {
   PacienteConsultasRoute: typeof PacienteConsultasRoute
   PacienteFinanceiroRoute: typeof PacienteFinanceiroRoute
   PacientePerfilRoute: typeof PacientePerfilRoute
+  TotemClinicaIdRoute: typeof TotemClinicaIdRoute
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
@@ -1835,12 +1836,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerificarCodigoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/totem/$clinicaId': {
-      id: '/totem/$clinicaId'
-      path: '/$clinicaId'
+    '/totem_/$clinicaId': {
+      id: '/totem_/$clinicaId'
+      path: '/totem/$clinicaId'
       fullPath: '/totem/$clinicaId'
       preLoaderRoute: typeof TotemClinicaIdRouteImport
-      parentRoute: typeof TotemRoute
+      parentRoute: typeof rootRouteImport
     }
     '/painel/$clinicaId': {
       id: '/painel/$clinicaId'
@@ -3048,12 +3049,10 @@ const PainelRouteWithChildren =
   PainelRoute._addFileChildren(PainelRouteChildren)
 
 interface TotemRouteChildren {
-  TotemClinicaIdRoute: typeof TotemClinicaIdRoute
   TotemTRoute: typeof TotemTRoute
 }
 
 const TotemRouteChildren: TotemRouteChildren = {
-  TotemClinicaIdRoute: TotemClinicaIdRoute,
   TotemTRoute: TotemTRoute,
 }
 
@@ -3077,6 +3076,7 @@ const rootRouteChildren: RootRouteChildren = {
   PacienteConsultasRoute: PacienteConsultasRoute,
   PacienteFinanceiroRoute: PacienteFinanceiroRoute,
   PacientePerfilRoute: PacientePerfilRoute,
+  TotemClinicaIdRoute: TotemClinicaIdRoute,
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
   PContratoTokenRoute: PContratoTokenRoute,

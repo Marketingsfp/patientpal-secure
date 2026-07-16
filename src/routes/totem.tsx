@@ -1,14 +1,24 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ClinicaProvider, useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { Accessibility, Stethoscope, Hash, RotateCcw, Camera, ShieldCheck, X, ArrowLeft, Loader2 } from "lucide-react";
-import { detectDescriptor, ensureFaceModels, FACE_MATCH_THRESHOLD } from "@/lib/face-recognition";
+import {
+  Accessibility,
+  Stethoscope,
+  Hash,
+  RotateCcw,
+  ArrowLeft,
+  Loader2,
+  Ticket,
+  BadgeCheck,
+  CheckCircle2,
+} from "lucide-react";
 import { imprimirSenhaTotem, gerarSenhaPdfBase64 } from "@/lib/print-senha";
 import { imprimirDocumentoSilencioso } from "@/utils/printService";
+import { TecladoNumerico, formatarCpfParcial } from "@/components/totem/teclado-numerico";
 
 export const Route = createFileRoute("/totem")({
   component: TotemRoute,
@@ -31,45 +41,43 @@ const TIPOS: { tipo: TipoSenha; titulo: string; sub: string; Icon: typeof Hash; 
   { tipo: "R", titulo: "Retorno", sub: "Pacientes em retorno", Icon: RotateCcw, classe: "from-emerald-600 to-emerald-700" },
 ];
 
-type Step = "home" | "consent" | "scan" | "manual" | "ticket";
+// "menu" é a tela inicial (check-in OU retirar senha); "senha" mostra os
+// tipos; "ticket"/"checkin-ok" são telas de conclusão com auto-retorno.
+type Step = "menu" | "senha" | "checkin" | "checkin-ok" | "ticket";
+
+type CheckinInfo = {
+  paciente_nome: string;
+  inicio: string | null;
+  medico: string | null;
+  procedimento: string | null;
+};
 
 export function TotemPage() {
   const navigate = useNavigate();
   const { clinicaAtual, loading } = useClinica();
-  const [step, setStep] = useState<Step>("home");
-  const [tipo, setTipo] = useState<TipoSenha | null>(null);
+  const [step, setStep] = useState<Step>("menu");
   const [busy, setBusy] = useState(false);
-  const [ticket, setTicket] = useState<{ codigo: string; tipo: TipoSenha; identificado: boolean; nome?: string | null } | null>(null);
-  const [scanMsg, setScanMsg] = useState("Posicione seu rosto na câmera");
-  const [manual, setManual] = useState({ nome: "", cpf: "", telefone: "" });
+  const [ticket, setTicket] = useState<{ codigo: string; tipo: TipoSenha } | null>(null);
+  const [cpf, setCpf] = useState("");
+  const [checkinInfo, setCheckinInfo] = useState<CheckinInfo | null>(null);
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  // Auto-volta para home depois de 12s mostrando o ticket
+  // Telas de conclusão voltam sozinhas para o menu inicial — a senha já saiu
+  // impressa, então o ticket fica só alguns segundos na tela (sem botão
+  // "Concluir"); o check-in fica um pouco mais para o paciente ler os dados.
   useEffect(() => {
-    if (step !== "ticket") return;
-    const t = setTimeout(() => reset(), 12000);
+    if (step !== "ticket" && step !== "checkin-ok") return;
+    const t = setTimeout(() => reset(), step === "ticket" ? 4000 : 8000);
     return () => clearTimeout(t);
   }, [step]);
 
-  // Pre-carrega modelos em segundo plano
-  useEffect(() => { void ensureFaceModels().catch(() => {}); }, []);
-
   function reset() {
-    stopCamera();
-    setTipo(null);
     setTicket(null);
-    setStep("home");
-    setManual({ nome: "", cpf: "", telefone: "" });
+    setCpf("");
+    setCheckinInfo(null);
+    setStep("menu");
   }
 
-  function stopCamera() {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-  }
-
-  async function emitir(_tipo: TipoSenha, pacienteId?: string, identificado = false): Promise<void> {
+  async function emitir(_tipo: TipoSenha): Promise<void> {
     if (!clinicaAtual) {
       toast.error("Nenhuma clínica selecionada");
       return;
@@ -78,8 +86,6 @@ export function TotemPage() {
     const { data, error } = await supabase.rpc("emitir_senha", {
       _clinica_id: clinicaAtual.clinica_id,
       _tipo,
-      _paciente_id: pacienteId,
-      _identificado_facial: identificado,
     });
     setBusy(false);
     if (error || !data) {
@@ -87,9 +93,8 @@ export function TotemPage() {
       return;
     }
     const row = Array.isArray(data) ? data[0] : data;
-    setTicket({ codigo: row.codigo, tipo: _tipo, identificado });
+    setTicket({ codigo: row.codigo, tipo: _tipo });
     setStep("ticket");
-    stopCamera();
     // Impressão automática da senha.
     // 1º) tenta impressão silenciosa via QZ Tray (não abre diálogo do navegador).
     // 2º) em qualquer falha (QZ Tray não instalado / websocket recusado /
@@ -113,101 +118,40 @@ export function TotemPage() {
     })();
   }
 
-  function escolherTipo(t: TipoSenha) {
-    setTipo(t);
-    void emitir(t);
-  }
-
-  async function iniciarCamera() {
-    setStep("scan");
-    setScanMsg("Carregando câmera…");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 }, audio: false });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setScanMsg("Posicione seu rosto e mantenha-se imóvel…");
-      await reconhecerLoop();
-    } catch {
-      toast.error("Não foi possível acessar a câmera");
-      setStep("consent");
-    }
-  }
-
-  async function reconhecerLoop() {
-    if (!clinicaAtual || !tipo || !videoRef.current) return;
-    await ensureFaceModels();
-    setScanMsg("Detectando rosto…");
-
-    // Tenta detectar até 10 vezes (~5s)
-    let descritor: Float32Array | null = null;
-    for (let i = 0; i < 10; i++) {
-      if (!videoRef.current || !streamRef.current) return;
-      descritor = await detectDescriptor(videoRef.current);
-      if (descritor) break;
-      await new Promise((r) => setTimeout(r, 500));
-    }
-
-    if (!descritor) {
-      setScanMsg("Rosto não detectado");
-      // Cadastra sem foto: pede manual
-      stopCamera();
-      setStep("manual");
-      return;
-    }
-
-    // Busca match no servidor (não expõe descritores dos outros pacientes).
-    const descriptorArr = Array.from(descritor);
-    const { data: matchData } = await supabase.rpc("totem_match_biometria", {
-      _clinica_id: clinicaAtual.clinica_id,
-      _descriptor: descriptorArr,
-      _threshold: FACE_MATCH_THRESHOLD,
-    });
-    const match = Array.isArray(matchData) ? matchData[0] : matchData;
-    if (match?.paciente_id) {
-      setScanMsg(`Olá, ${match.nome}!`);
-      await emitir(tipo, match.paciente_id, true);
-      setTicket((prev) => prev ? { ...prev, nome: match.nome } : prev);
-      return;
-    }
-
-    // Não achou: cadastra novo paciente e biometria
-    stopCamera();
-    setManual({ nome: "", cpf: "", telefone: "" });
-    setStep("manual");
-    // Guarda descritor temporariamente
-    (window as any).__totem_descriptor = descriptorArr;
-  }
-
-  async function concluirManual(e: React.FormEvent) {
-    e.preventDefault();
-    if (!clinicaAtual || !tipo) return;
-    const nome = manual.nome.trim();
-    if (nome.length < 2) {
-      toast.error("Informe o nome completo");
+  async function fazerCheckin() {
+    if (!clinicaAtual) return;
+    if (cpf.length !== 11) {
+      toast.error("Digite os 11 números do CPF");
       return;
     }
     setBusy(true);
-
-    const desc = (window as any).__totem_descriptor as number[] | undefined;
-    const { data: pacienteId, error } = await supabase.rpc("totem_upsert_paciente", {
+    // RPC SECURITY DEFINER com grant para anon — o totem roda também nas
+    // rotas públicas (/totem/$clinicaId e /totem/t/$token), onde não há
+    // sessão e o RLS bloquearia consultas diretas a pacientes/agendamentos.
+    const { data, error } = await (supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: unknown }>)("totem_checkin_cpf", {
       _clinica_id: clinicaAtual.clinica_id,
-      _nome: nome,
-      _cpf: manual.cpf.trim() || undefined,
-      _telefone: manual.telefone.trim() || undefined,
-      _descriptor: desc ?? null,
+      _cpf: cpf,
     });
-    if (error || !pacienteId) {
-      setBusy(false);
+    setBusy(false);
+    if (error) {
       mostrarErro(error);
       return;
     }
-    if (desc) delete (window as any).__totem_descriptor;
-
-    setBusy(false);
-    await emitir(tipo, pacienteId as string, !!desc);
+    const r = (data ?? {}) as { ok?: boolean; erro?: string } & CheckinInfo;
+    if (!r.ok) {
+      toast.error(r.erro ?? "Não foi possível fazer o check-in. Procure a recepção.");
+      return;
+    }
+    setCheckinInfo({
+      paciente_nome: r.paciente_nome,
+      inicio: r.inicio ?? null,
+      medico: r.medico ?? null,
+      procedimento: r.procedimento ?? null,
+    });
+    setStep("checkin-ok");
   }
 
   if (loading) {
@@ -242,13 +186,49 @@ export function TotemPage() {
           <h1 className="text-2xl font-bold">{clinicaAtual.clinica.nome}</h1>
         </div>
         <div className="text-right text-sm text-muted-foreground">
-          <div>{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}</div>
+          <div className="capitalize">{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}</div>
           <div className="text-2xl font-mono tabular-nums text-foreground"><Clock /></div>
         </div>
       </header>
 
       <main className="flex-1 flex items-center justify-center px-8 pb-12">
-        {step === "home" && (
+        {step === "menu" && (
+          <div className="w-full max-w-4xl space-y-10">
+            <div className="text-center space-y-2">
+              <h2 className="text-5xl font-bold tracking-tight">Como podemos ajudar?</h2>
+              <p className="text-xl text-muted-foreground">Toque em uma das opções</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <button
+                onClick={() => setStep("senha")}
+                className="group relative overflow-hidden rounded-3xl p-8 text-left text-white bg-gradient-to-br from-primary/90 to-primary shadow-lg hover:shadow-2xl transition-all active:scale-[0.98] min-h-[240px] flex flex-col justify-between"
+              >
+                <Ticket className="h-14 w-14" />
+                <div>
+                  <div className="text-3xl font-bold">Retirar senha</div>
+                  <div className="text-white/85 text-sm mt-1">Comum, preferencial, cartão ou retorno</div>
+                </div>
+                <Ticket className="absolute -right-6 -bottom-6 h-40 w-40 opacity-10" />
+              </button>
+              <button
+                onClick={() => { setCpf(""); setStep("checkin"); }}
+                className="group relative overflow-hidden rounded-3xl p-8 text-left text-white bg-gradient-to-br from-emerald-600 to-emerald-700 shadow-lg hover:shadow-2xl transition-all active:scale-[0.98] min-h-[240px] flex flex-col justify-between"
+              >
+                <BadgeCheck className="h-14 w-14" />
+                <div>
+                  <div className="text-3xl font-bold">Fazer check-in</div>
+                  <div className="text-white/85 text-sm mt-1">Confirme presença na sua consulta de hoje</div>
+                </div>
+                <BadgeCheck className="absolute -right-6 -bottom-6 h-40 w-40 opacity-10" />
+              </button>
+            </div>
+            <p className="text-center text-xs text-muted-foreground pt-2">
+              Em caso de emergência, dirija-se imediatamente à recepção.
+            </p>
+          </div>
+        )}
+
+        {step === "senha" && (
           <div className="w-full max-w-5xl space-y-8">
             <div className="text-center space-y-2">
               <h2 className="text-4xl font-bold tracking-tight">Retire sua senha</h2>
@@ -258,8 +238,9 @@ export function TotemPage() {
               {TIPOS.map(({ tipo: t, titulo, sub, Icon, classe }) => (
                 <button
                   key={t}
-                  onClick={() => escolherTipo(t)}
-                  className={`group relative overflow-hidden rounded-2xl p-8 text-left text-white bg-gradient-to-br ${classe} shadow-lg hover:shadow-2xl transition-all active:scale-[0.98]`}
+                  disabled={busy}
+                  onClick={() => void emitir(t)}
+                  className={`group relative overflow-hidden rounded-2xl p-8 text-left text-white bg-gradient-to-br ${classe} shadow-lg hover:shadow-2xl transition-all active:scale-[0.98] disabled:opacity-60`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
@@ -272,107 +253,87 @@ export function TotemPage() {
                 </button>
               ))}
             </div>
-          </div>
-        )}
-
-        {step === "consent" && tipo && (
-          <div className="max-w-2xl w-full bg-card border rounded-2xl p-10 space-y-6 shadow-xl">
-            <div className="flex items-center gap-3">
-              <ShieldCheck className="h-8 w-8 text-primary" />
-              <h2 className="text-2xl font-bold">Identificação opcional</h2>
-            </div>
-            <div className="space-y-3 text-muted-foreground">
-              <p>
-                Podemos usar o reconhecimento facial para identificar você mais rápido nas
-                próximas visitas. A imagem <strong>não é armazenada</strong> — apenas um código
-                matemático do rosto (vetor) fica salvo, criptografado, e pode ser removido a qualquer momento.
-              </p>
-              <p className="text-sm">
-                Base legal: <strong>consentimento</strong> do titular (LGPD art. 11, II, "a").
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-4 pt-2">
-              <Button size="lg" variant="outline" className="h-16 text-base" onClick={() => { setStep("manual"); }}>
-                Sem identificação
-              </Button>
-              <Button size="lg" className="h-16 text-base" onClick={iniciarCamera}>
-                <Camera className="h-5 w-5 mr-2" /> Aceitar e usar a câmera
+            <div className="text-center">
+              <Button variant="outline" size="lg" className="h-14 px-8 text-base" onClick={reset}>
+                <ArrowLeft className="h-5 w-5 mr-2" /> Voltar ao início
               </Button>
             </div>
-            <button onClick={() => emitir(tipo)} className="mx-auto block text-sm text-muted-foreground underline">
-              Pular tudo e só emitir a senha
-            </button>
-            <button onClick={reset} className="absolute top-6 left-6 text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-5 w-5 inline mr-1" /> Voltar
-            </button>
           </div>
         )}
 
-        {step === "scan" && (
-          <div className="max-w-xl w-full text-center space-y-6">
-            <div className="relative mx-auto w-[480px] h-[360px] rounded-2xl overflow-hidden border-4 border-primary/40 bg-black">
-              <video ref={videoRef} className="w-full h-full object-cover scale-x-[-1]" playsInline muted />
-              <div className="absolute inset-8 border-2 border-white/60 rounded-full pointer-events-none" />
+        {step === "checkin" && (
+          <div className="w-full max-w-xl bg-card border rounded-3xl p-10 shadow-xl space-y-6">
+            <div className="text-center space-y-2">
+              <h2 className="text-3xl font-bold">Check-in</h2>
+              <p className="text-muted-foreground">Digite seu CPF no teclado abaixo</p>
             </div>
-            <p className="text-lg">{scanMsg}</p>
-            <Button variant="outline" onClick={() => { stopCamera(); setStep("consent"); }}>
-              <X className="h-4 w-4 mr-2" /> Cancelar
-            </Button>
-          </div>
-        )}
-
-        {step === "manual" && tipo && (
-          <form onSubmit={concluirManual} className="max-w-md w-full bg-card border rounded-2xl p-8 space-y-5 shadow-xl">
-            <h2 className="text-2xl font-bold">Seus dados</h2>
-            <p className="text-sm text-muted-foreground">Preencha para personalizar seu atendimento (opcional, exceto o nome).</p>
-            <div className="space-y-3">
-              <input
-                autoFocus
-                placeholder="Nome completo"
-                value={manual.nome}
-                onChange={(e) => setManual({ ...manual, nome: e.target.value })}
-                maxLength={200}
-                className="w-full h-14 px-4 text-lg rounded-lg border bg-background"
-              />
-              <input
-                placeholder="CPF (opcional)"
-                value={manual.cpf}
-                onChange={(e) => setManual({ ...manual, cpf: e.target.value.replace(/\D/g, "").slice(0, 11) })}
-                inputMode="numeric"
-                className="w-full h-14 px-4 text-lg rounded-lg border bg-background"
-              />
-              <input
-                placeholder="Telefone (opcional)"
-                value={manual.telefone}
-                onChange={(e) => setManual({ ...manual, telefone: e.target.value })}
-                maxLength={30}
-                className="w-full h-14 px-4 text-lg rounded-lg border bg-background"
-              />
-            </div>
+            <input
+              readOnly
+              inputMode="none"
+              value={formatarCpfParcial(cpf)}
+              placeholder="000.000.000-00"
+              className="w-full h-20 px-6 text-3xl tracking-widest rounded-xl border bg-background text-center tabular-nums"
+            />
+            <TecladoNumerico
+              disabled={busy}
+              onDigit={(d) => setCpf((v) => (v + d).slice(0, 11))}
+              onBackspace={() => setCpf((v) => v.slice(0, -1))}
+              onClear={() => setCpf("")}
+            />
             <div className="grid grid-cols-2 gap-3">
-              <Button type="button" variant="outline" size="lg" onClick={reset}>Cancelar</Button>
-              <Button type="submit" size="lg" disabled={busy}>
-                {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Emitir senha
+              <Button variant="outline" size="lg" className="h-14" onClick={reset}>
+                <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
+              </Button>
+              <Button size="lg" className="h-14" disabled={busy || cpf.length !== 11} onClick={() => void fazerCheckin()}>
+                {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Confirmar
               </Button>
             </div>
-          </form>
+          </div>
+        )}
+
+        {step === "checkin-ok" && checkinInfo && (
+          <div className="text-center space-y-6 max-w-2xl animate-in fade-in zoom-in duration-300">
+            <CheckCircle2 className="h-24 w-24 text-emerald-500 mx-auto" />
+            <h2 className="text-4xl font-bold">Check-in confirmado!</h2>
+            <p className="text-2xl">Olá, {checkinInfo.paciente_nome}</p>
+            <div className="bg-card border rounded-2xl p-6 text-left space-y-2">
+              {checkinInfo.inicio && (
+                <div>
+                  <span className="text-muted-foreground text-sm">Horário: </span>
+                  <span className="text-lg font-semibold">
+                    {new Date(checkinInfo.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+              )}
+              {checkinInfo.medico && (
+                <div>
+                  <span className="text-muted-foreground text-sm">Profissional: </span>
+                  <span className="text-lg">{checkinInfo.medico}</span>
+                </div>
+              )}
+              {checkinInfo.procedimento && (
+                <div>
+                  <span className="text-muted-foreground text-sm">Procedimento: </span>
+                  <span className="text-lg">{checkinInfo.procedimento}</span>
+                </div>
+              )}
+            </div>
+            <p className="text-muted-foreground">Aguarde sua chamada no painel.</p>
+          </div>
         )}
 
         {step === "ticket" && ticket && (
           <div className="text-center space-y-6 animate-in fade-in zoom-in duration-300">
             <div className="text-muted-foreground uppercase tracking-widest text-sm">Sua senha</div>
             <div className="text-[12rem] leading-none font-black text-primary tabular-nums">{ticket.codigo}</div>
-            <div className="text-2xl">
-              {ticket.identificado && ticket.nome ? `Bem-vindo de volta, ${ticket.nome}!` : "Aguarde sua chamada"}
-            </div>
+            <div className="text-2xl">Retire sua senha impressa</div>
             <p className="text-muted-foreground">Acompanhe o painel de chamada na sala de espera.</p>
-            <Button size="lg" onClick={reset}>Concluir</Button>
           </div>
         )}
       </main>
 
       <footer className="px-8 py-4 text-center text-xs text-muted-foreground">
-        ClinicaOS · Totem v1 · {step !== "home" && (
+        ClinicaOS · Totem · {step !== "menu" && (
           <button onClick={reset} className="underline ml-2">Voltar ao início</button>
         )}
       </footer>
@@ -381,10 +342,12 @@ export function TotemPage() {
 }
 
 function Clock() {
-  const [now, setNow] = useState(new Date());
+  const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
+    setNow(new Date());
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+  if (!now) return <span>--:--</span>;
   return <span>{now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>;
 }
