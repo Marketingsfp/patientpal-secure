@@ -7,11 +7,12 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { consultarNfse, reenviarNfse, extrairNfseDeImagem, baixarNfseArquivo } from "@/lib/nfse.functions";
+import { consultarNfse, reenviarNfse, extrairNfseDeImagem, baixarNfseArquivo, avancarRpsProximoNumero } from "@/lib/nfse.functions";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/_authenticated/app/nfse/")({
   component: NfsePage,
@@ -39,6 +40,7 @@ function NfsePage() {
   const consulta = useServerFn(consultarNfse);
   const reenviar = useServerFn(reenviarNfse);
   const extrair = useServerFn(extrairNfseDeImagem);
+  const avancarRps = useServerFn(avancarRpsProximoNumero);
   const [reenviando, setReenviando] = useState<string | null>(null);
   const [conferirOpen, setConferirOpen] = useState(false);
   const [conferirLoading, setConferirLoading] = useState(false);
@@ -51,6 +53,9 @@ function NfsePage() {
   const [loading, setLoading] = useState(false);
   const [erroDetalhe, setErroDetalhe] = useState<Row | null>(null);
   const [pdfVisualizando, setPdfVisualizando] = useState<Row | null>(null);
+  const [rpsAtual, setRpsAtual] = useState<number | null>(null);
+  const [rpsNovoInput, setRpsNovoInput] = useState<string>("");
+  const [avancandoRps, setAvancandoRps] = useState(false);
   const baixarArquivo = useServerFn(baixarNfseArquivo);
 
   useEffect(() => {
@@ -99,6 +104,22 @@ function NfsePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows.map((r) => `${r.id}:${r.status}`).join("|")]);
 
+  // Ao abrir o diálogo de erro, carrega o "Próx. nº RPS" atual do emitente
+  // para permitir avançar o contador rapidamente (útil no erro E0014).
+  useEffect(() => {
+    if (!erroDetalhe?.emitente_id) { setRpsAtual(null); setRpsNovoInput(""); return; }
+    void (async () => {
+      const { data } = await supabase
+        .from("nfse_emitentes")
+        .select("rps_proximo_numero")
+        .eq("id", erroDetalhe.emitente_id!)
+        .maybeSingle();
+      const atual = Number(data?.rps_proximo_numero ?? 1);
+      setRpsAtual(atual);
+      setRpsNovoInput(String(atual + 30));
+    })();
+  }, [erroDetalhe?.id, erroDetalhe?.emitente_id]);
+
   const filtrados = useMemo(() => rows.filter((r) => {
     if (filtroEmitente !== "todos" && r.emitente_id !== filtroEmitente) return false;
     if (filtroStatus !== "todos" && r.status !== filtroStatus) return false;
@@ -117,6 +138,37 @@ function NfsePage() {
       toast.error((e as Error).message);
     } finally {
       setReenviando(null);
+    }
+  };
+
+  const onAvancarRps = async (reenviarDepois: boolean) => {
+    if (!erroDetalhe?.emitente_id) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    const novo = Number(rpsNovoInput);
+    if (!Number.isFinite(novo) || novo < 1) { toast.error("Informe um número válido."); return; }
+    if (rpsAtual != null && novo <= rpsAtual) {
+      toast.error(`O novo número deve ser maior que o atual (${rpsAtual}).`);
+      return;
+    }
+    setAvancandoRps(true);
+    try {
+      // Usa server fn para contornar RLS silenciosa: só managers da clínica
+      // podem UPDATE direto em nfse_emitentes, então o update client-side
+      // retornava 0 linhas sem erro e o usuário achava que tinha avançado.
+      const r = await avancarRps({ data: { emitente_id: erroDetalhe.emitente_id, novo_numero: novo } });
+      if (!r.ok) {
+        toast.error(r.motivo ?? "Não foi possível avançar o contador.");
+        return;
+      }
+      setRpsAtual(r.novo_numero);
+      toast.success(`Próx. nº RPS do emitente atualizado para ${r.novo_numero}.`);
+      if (reenviarDepois) {
+        const notaId = erroDetalhe.id;
+        setErroDetalhe(null);
+        await onReenviar(notaId);
+      }
+    } finally {
+      setAvancandoRps(false);
     }
   };
 
@@ -407,12 +459,61 @@ function NfsePage() {
               | null
               | undefined;
             const erros = Array.isArray(body?.erros) ? body!.erros! : [];
+            const isE0014 =
+              erros.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014") ||
+              /j[áa]\s+existe/i.test(erroDetalhe.erro_mensagem ?? "");
             return (
               <div className="space-y-3 text-sm max-h-[60vh] overflow-auto">
                 {erroDetalhe.erro_mensagem && (
                   <div className="rounded-md border border-red-200 bg-red-50 p-3 text-red-900">
                     <div className="text-xs font-medium uppercase tracking-wide text-red-700">Mensagem</div>
                     <div className="mt-1 whitespace-pre-wrap break-words">{erroDetalhe.erro_mensagem}</div>
+                  </div>
+                )}
+                {isE0014 && erroDetalhe.emitente_id && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2 text-amber-900">
+                    <div className="text-xs font-semibold uppercase tracking-wide">Ação recomendada</div>
+                    <p className="text-sm">
+                      A prefeitura recusou porque o nº do RPS já foi usado. Avance o
+                      <strong> Próx. nº RPS</strong> do emitente para pular a faixa
+                      já consumida e tente reenviar.
+                    </p>
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Atual</label>
+                        <div className="h-9 px-2 rounded-md border bg-white text-sm flex items-center min-w-[80px]">
+                          {rpsAtual ?? "…"}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Novo</label>
+                        <Input
+                          className="h-9 w-28 bg-white"
+                          value={rpsNovoInput}
+                          onChange={(e) => setRpsNovoInput(e.target.value.replace(/\D/g, ""))}
+                          inputMode="numeric"
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={avancandoRps || !podeEscrever}
+                        onClick={() => void onAvancarRps(false)}
+                      >
+                        Só atualizar
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={avancandoRps || !podeEscrever}
+                        onClick={() => void onAvancarRps(true)}
+                      >
+                        {avancandoRps ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                        Avançar e reenviar
+                      </Button>
+                    </div>
+                    <p className="text-xs text-amber-800">
+                      Sugestão: pular ~30 números. Se cair novamente em E0014, aumente o salto.
+                    </p>
                   </div>
                 )}
                 {(body?.status || body?.codigo) && (

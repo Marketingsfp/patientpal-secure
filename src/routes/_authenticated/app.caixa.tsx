@@ -344,6 +344,12 @@ function Page() {
   const [loading, setLoading] = useState(true);
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
+  // Movimentos do próprio usuário ao longo das ~20 sessões mais recentes
+  // (aberta + fechadas). Usado APENAS na aba "Meu caixa → Movimentos" para
+  // permitir visualizar/estornar lançamentos retroativos. NÃO é usado nos
+  // cálculos de Saldo/Totais — esses continuam presos à sessão aberta atual
+  // via `minhasMovs`.
+  const [minhasMovsHist, setMinhasMovsHist] = useState<Mov[]>([]);
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
   // Solicitações de estorno vinculadas às movimentações visíveis
   // (chave = lancamento_id, valor = status). Usado para trocar o botão
@@ -365,7 +371,7 @@ function Page() {
   const [openCal, setOpenCal] = useState(false);
   const minhasMovsFiltrados = useMemo<Mov[]>(() => {
     // 1) filtro de período (data)
-    let base: Mov[] = minhasMovs;
+    let base: Mov[] = minhasMovsHist;
     if (meuPeriodo !== "todos") {
       const now = new Date();
       const fim = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
@@ -423,18 +429,18 @@ function Page() {
       });
     }
     return base;
-  }, [minhasMovs, meuPeriodo, meuDataIni, meuDataFim, meuMedico, meuPaciente, enrichPorLanc]);
+  }, [minhasMovsHist, meuPeriodo, meuDataIni, meuDataFim, meuMedico, meuPaciente, enrichPorLanc]);
 
   // Lista de médicos distintos presentes nos movimentos carregados.
   const medicosDisponiveis = useMemo<string[]>(() => {
     const set = new Set<string>();
-    for (const m of minhasMovs) {
+    for (const m of minhasMovsHist) {
       const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
       const nome = (enr?.medico ?? "").trim();
       if (nome) set.add(nome);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [minhasMovs, enrichPorLanc]);
+  }, [minhasMovsHist, enrichPorLanc]);
 
   const filtrosAtivos =
     meuPeriodo !== "hoje" || meuMedico !== "__all__" || meuPaciente.trim() !== "";
@@ -676,38 +682,43 @@ function Page() {
       return { enrich, cancelados };
     };
 
-    if (aberta) {
+    // Sessões recentes do usuário (aberta + últimas fechadas).
+    // Carregamos os movimentos de TODAS elas em uma única consulta e
+    // dividimos em duas listas:
+    //   - minhasMovs      → só a sessão aberta atual (base para Saldo/Totais)
+    //   - minhasMovsHist  → todas as sessões recentes (base para a aba
+    //                       "Meu caixa → Movimentos", permitindo ver e
+    //                       solicitar estorno de lançamentos retroativos)
+    const histSessoes = (histRes.data ?? []) as Sessao[];
+    const sessaoIds = new Set<string>(histSessoes.map((s) => s.id));
+    if (aberta) sessaoIds.add((aberta as Sessao).id);
+    const idsArr = Array.from(sessaoIds);
+    let movsHist: Mov[] = [];
+    if (idsArr.length > 0) {
       const { data: movs } = await supabase
         .from("caixa_movimentos")
         .select(MOV_FIELDS)
-        .eq("sessao_id", (aberta as Sessao).id)
-        .order("created_at", { ascending: true });
-      const movsList = (movs ?? []) as Mov[];
-      setMinhasMovs(movsList);
-      const { enrich, cancelados } = await enrichMovsList(movsList);
-      setEnrichPorLanc(enrich);
-      setLancsCancelados(cancelados);
-    } else {
-      // Sem sessão aberta: mostra movimentos das sessões recentes do
-      // próprio usuário e AINDA ASSIM roda o enriquecimento — sem isso,
-      // as colunas Paciente/Serviço/Médico ficavam vazias e o filtro
-      // por médico não listava opções, mesmo com movimentos visíveis.
-      const histSessoes = (histRes.data ?? []) as Sessao[];
-      const histIds = histSessoes.map((s) => s.id);
-      let movsList: Mov[] = [];
-      if (histIds.length > 0) {
-        const { data: movs } = await supabase
-          .from("caixa_movimentos")
-          .select(MOV_FIELDS)
-          .in("sessao_id", histIds)
-          .order("created_at", { ascending: false });
-        movsList = (movs ?? []) as Mov[];
-      }
-      setMinhasMovs(movsList);
-      const { enrich, cancelados } = await enrichMovsList(movsList);
-      setEnrichPorLanc(enrich);
-      setLancsCancelados(cancelados);
+        .in("sessao_id", idsArr)
+        .order("created_at", { ascending: false });
+      movsHist = (movs ?? []) as Mov[];
     }
+    setMinhasMovsHist(movsHist);
+    if (aberta) {
+      // Sessão aberta: `minhasMovs` recebe apenas os movimentos da sessão
+      // atual (ordem crescente, como antes) para manter Saldo/Totais
+      // idênticos ao comportamento anterior.
+      const sid = (aberta as Sessao).id;
+      const abertaMovs = movsHist
+        .filter((m) => m.sessao_id === sid)
+        .slice()
+        .sort((a, b) => a.created_at.localeCompare(b.created_at));
+      setMinhasMovs(abertaMovs);
+    } else {
+      setMinhasMovs([]);
+    }
+    const { enrich, cancelados } = await enrichMovsList(movsHist);
+    setEnrichPorLanc(enrich);
+    setLancsCancelados(cancelados);
 
     setMinhasSessoes((histRes.data ?? []) as Sessao[]);
     setLoading(false);
@@ -2125,36 +2136,24 @@ function Page() {
 
               {/* ---------- Movimentos ---------- */}
               <TabsContent value="movimentos" className="space-y-4 pt-4">
-                {!minhaSessao ? (
-                  <Card>
-                    <CardContent className="py-10 text-center text-muted-foreground">
-                      Abra um caixa para visualizar os movimentos.
-                    </CardContent>
-                  </Card>
-                ) : (
               <Card>
                 <CardHeader className="gap-3">
                   <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
                     <CardTitle className="text-base">
-                      {isManager ? "Movimentos da sessão" : "Movimentos de hoje"}
+                      Meus movimentos
                       {filtrosAtivos && (
                         <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          ({minhasMovsFiltrados.length} de {minhasMovs.length})
+                          ({minhasMovsFiltrados.length} de {minhasMovsHist.length})
                         </span>
                       )}
                     </CardTitle>
                     <div className="flex items-center gap-2">
-                      {!isManager && (
-                        <span className="text-xs text-muted-foreground">
-                          {new Date().toLocaleDateString("pt-BR")}
-                        </span>
-                      )}
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => imprimirRelatorioMovs(
                           minhasMovsFiltrados,
-                          isManager ? periodoLabel : new Date().toLocaleDateString("pt-BR"),
+                          periodoLabel,
                         )}
                         disabled={minhasMovsFiltrados.length === 0}
                       >
@@ -2163,8 +2162,7 @@ function Page() {
                     </div>
                   </div>
                   <div className="flex items-end gap-2 flex-wrap">
-                    {isManager && (
-                      <div>
+                    <div>
                         <Label className="text-xs">Período</Label>
                         <Popover open={openCal} onOpenChange={setOpenCal}>
                           <PopoverTrigger asChild>
@@ -2221,7 +2219,6 @@ function Page() {
                           </PopoverContent>
                         </Popover>
                       </div>
-                    )}
                     <div>
                       <Label className="text-xs">Médico</Label>
                       <Select value={meuMedico} onValueChange={setMeuMedico}>
@@ -2283,9 +2280,7 @@ function Page() {
                           <TableCell colSpan={10} className="text-center text-muted-foreground">
                             {filtrosAtivos
                               ? "Nenhum movimento corresponde aos filtros"
-                              : isManager
-                                ? "Sem movimentos no período"
-                                : "Sem movimentos hoje"}
+                              : "Sem movimentos no período"}
                           </TableCell>
                         </TableRow>
                       ) : minhasMovsFiltrados.map((m) => {
@@ -2370,7 +2365,6 @@ function Page() {
                   </Table>
                 </CardContent>
               </Card>
-                )}
               </TabsContent>
 
               {/* ---------- Histórico ---------- */}

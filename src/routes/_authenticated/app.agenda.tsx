@@ -3107,10 +3107,10 @@ function AgendaPage() {
       );
       const editingItemIdsLiberar = editing?.id
         ? new Set<string>(
-            ((consumidosRows ?? []) as Array<{ orcamento_item_id: string; agendamento_id: string }>)
-              .filter((r) => r.agendamento_id === editing.id)
-              .map((r) => r.orcamento_item_id),
-          )
+          ((consumidosRows ?? []) as Array<{ orcamento_item_id: string; agendamento_id: string }>)
+            .filter((r) => r.agendamento_id === editing.id)
+            .map((r) => r.orcamento_item_id),
+        )
         : new Set<string>();
       const its = itsAll.filter((i) => !consumidos.has(i.id) || editingItemIdsLiberar.has(i.id));
       if (its.length === 0) {
@@ -3541,13 +3541,13 @@ function AgendaPage() {
         payload.tipo_atendimento === "particular"
           ? Promise.resolve(null)
           : obterInfoConvenioPaciente({
-              clinicaId: clinicaAtual.clinica_id,
-              pacienteId: payload.paciente_id,
-              medicoId: payload.medico_id,
-              procedimentoNome: payload.procedimento ?? "",
-              agendamentoId: novoId,
-              dataRef: payload.inicio ?? null,
-            }),
+            clinicaId: clinicaAtual.clinica_id,
+            pacienteId: payload.paciente_id,
+            medicoId: payload.medico_id,
+            procedimentoNome: payload.procedimento ?? "",
+            agendamentoId: novoId,
+            dataRef: payload.inicio ?? null,
+          }),
       ]);
       // Multi-exame: quando há mais de um procedimento (imagem ou laboratório),
       // o payload.procedimento vem concatenado ("A + B + C") e não encontra match
@@ -6438,7 +6438,7 @@ function AgendaPage() {
 
           {/* Agenda */}
           <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Agenda</Label>
+            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Tipo</Label>
             {(() => {
               let ags: { id: string; nome: string }[];
               if (filtroMedico !== "todos") {
@@ -6596,11 +6596,11 @@ function AgendaPage() {
                     onCheckedChange={toggleAll}
                   />
                 </TableHead>
-                <TableHead className="w-20 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
-                <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
                 <TableHead className="w-14 text-center font-semibold text-xs uppercase text-muted-foreground">
                   Ficha
                 </TableHead>
+                <TableHead className="w-20 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
+                <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
                 <TableHead className="min-w-[130px] font-semibold text-xs uppercase text-muted-foreground">
                   Profissional
                 </TableHead>
@@ -6674,17 +6674,17 @@ function AgendaPage() {
                         />
                       </TableCell>
 
+                      {/* Ficha */}
+                      <TableCell className="text-center font-mono text-sm font-medium py-1.5">
+                        {fichaNum || "—"}
+                      </TableCell>
+
                       {/* Data */}
                       <TableCell className="py-1.5 text-sm">{fmtData(a.inicio)}</TableCell>
 
                       {/* Horário */}
                       <TableCell className="py-1.5 text-sm font-medium text-emerald-600">
                         {fmtHora(a.inicio)} - {fmtHora(a.fim)}
-                      </TableCell>
-
-                      {/* Ficha */}
-                      <TableCell className="text-center font-mono text-sm font-medium py-1.5">
-                        {fichaNum || "—"}
                       </TableCell>
 
                       {/* Profissional */}
@@ -6724,7 +6724,7 @@ function AgendaPage() {
                             {a.status === "confirmado" && (
                               <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
                             )}
-                            {a.paciente_id && <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={16} />}
+                            {a.paciente_id && <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={25} />}
                             <span className="truncate max-w-[300px]">{a.paciente_nome}</span>
                             {a.orcamento_numero && (
                               <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
