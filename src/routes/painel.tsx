@@ -341,14 +341,6 @@ export function PainelPage() {
           <h1 className={`truncate font-black uppercase tracking-tight ${t.heading} text-[clamp(1.25rem,3vw,2.5rem)]`}>{clinicaAtual.clinica.nome}</h1>
         </div>
         <div className="flex items-center gap-[clamp(0.75rem,1.5vw,1.5rem)] shrink-0">
-          <button
-            type="button"
-            onClick={() => setTheme(isLight ? "dark" : "light")}
-            aria-label={isLight ? "Mudar para modo escuro" : "Mudar para modo claro"}
-            className={`h-10 w-10 sm:h-11 sm:w-11 lg:h-12 lg:w-12 rounded-full flex items-center justify-center transition ${t.toggle}`}
-          >
-            {isLight ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-          </button>
           <div className={`font-medium tabular-nums ${t.clock} text-[clamp(1.25rem,2.5vw,2.5rem)]`}><PainelClock /></div>
         </div>
       </header>
