@@ -2973,7 +2973,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   ) : null}
                 </>
               )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {isAdmin && podeEscrever ? (
                   <div className="space-y-1">
                     <div className="text-xs text-muted-foreground">Data início</div>
@@ -2986,6 +2986,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <DadosField label="Data início" value={fmtD(contrato.data_inicio)} />
                 )}
                 <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">Data término</div>
+                  <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold text-sm">
+                    {fmtD(contrato.data_fim ?? addUmAno(admDataInicio || contrato.data_inicio))}
+                  </div>
+                </div>
+                <div className="space-y-1">
                   <div className="text-xs text-muted-foreground">Dia de vencimento</div>
                   <Input
                     type="number"
@@ -2996,6 +3002,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <div className="text-xs text-muted-foreground">Valor mensal (R$)</div>
                   <Input
