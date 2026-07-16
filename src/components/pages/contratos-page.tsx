@@ -1064,7 +1064,7 @@ function NovoContratoForm({
     }
 
     setSaving(false);
-    toast.success(`Contrato #${contrato.numero} criado com ${convenio.num_parcelas} mensalidades${taxaAdesao > 0 && mensalidadesJaPagas === 0 ? " e taxa de adesao separada" : ""}`);
+    toast.success(`Contrato #${contrato.numero} criado com ${convenio.num_parcelas} mensalidades${taxaAdesao > 0 ? " + taxa de adesão" : ""}`);
 
     // Pós-criação: gerar carnê ou boletos com timeout de 15s (não trava UI)
     const withTimeout = <T,>(p: Promise<T>, ms: number) =>
