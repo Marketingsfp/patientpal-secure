@@ -1015,18 +1015,9 @@ function NovoContratoForm({
       };
     });
     const taxaAdesao = Number(taxa) || 0;
-    const cobrancas = taxaAdesao > 0 && mensalidadesJaPagas === 0
-      ? [
-          {
-            numero_parcela: 0,
-            vencimento: primeiraVencimento,
-            valor: taxaAdesao,
-            status: "pendente",
-            observacoes: "Taxa de adesao cobrada somente na primeira mensalidade.",
-          },
-          ...parcelas,
-        ]
-      : parcelas;
+    // Taxa de adesão é registrada em contratos_assinatura.taxa_adesao e NÃO
+    // gera uma linha em contrato_mensalidades — não é uma mensalidade.
+    const cobrancas = parcelas;
 
     // Contrato + dependentes + mensalidades numa única transação (RPC):
     // se qualquer etapa falhar, o Postgres desfaz tudo — antes eram 3
