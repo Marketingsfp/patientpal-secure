@@ -1880,27 +1880,21 @@ function DetalheContrato({
     const valor = Number((contrato as any).valor_mensal ?? 0);
     const pagas = Math.max(0, Math.min(12, Math.floor(n)));
     setRegerandoRetro(true);
-    // 1) Apaga pendentes existentes
+    // 1) Apaga TODAS as mensalidades (≠0) — pendentes e pagas —
+    // para regenerar exatamente 12 parcelas numeradas de 1 a 12.
+    // Sem isso, uma parcela órfã anterior fazia o prox virar 2 e o
+    // contrato terminar com 13 linhas (bug do contrato #20261888).
     const { error: delErr } = await supabase
       .from("contrato_mensalidades")
       .delete()
       .eq("contrato_id", contrato.id)
-      .eq("status", "pendente")
       .neq("numero_parcela", 0);
     if (delErr) {
       setRegerandoRetro(false);
       return mostrarErro(delErr);
     }
-    // 2) Próximo número de parcela
-    const { data: maxRow } = await supabase
-      .from("contrato_mensalidades")
-      .select("numero_parcela")
-      .eq("contrato_id", contrato.id)
-      .neq("numero_parcela", 0)
-      .order("numero_parcela", { ascending: false })
-      .limit(1);
-    let prox = ((maxRow?.[0]?.numero_parcela ?? 0) as number) + 1;
-    // 3) Gera 12 parcelas a partir do mês da nova data de início
+    // 2) Gera exatamente 12 parcelas (1..12) a partir do mês da nova data de início
+    let prox = 1;
     const ini = new Date(iniStr + "T00:00:00");
     const baseAno = ini.getFullYear();
     const baseMes = ini.getMonth();
