@@ -2363,6 +2363,94 @@ function DetalheContrato({
     setPagMens(m);
     setFormaPagOpen(true);
   };
+
+  // Emite NFS-e a partir de uma parcela paga (mensalidade ou taxa de adesão).
+  // Reutiliza o mesmo picker/prompt do módulo Financeiro › Atendimentos,
+  // com bloqueio de endereço e escolha de percentual do valor.
+  const emitirNfseParcela = async (m: Mens) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!clinicaAtual) return;
+    if (!m.lancamento_id) {
+      toast.error("Esta parcela não tem lançamento financeiro vinculado — não é possível emitir NFS-e.");
+      return;
+    }
+    if (!emitentes.length || !emitenteId) {
+      toast.error("Cadastre um emitente ativo em Configurações › NFS-e antes de emitir.");
+      return;
+    }
+    const pac = pacienteFull ?? {};
+    const nomePac = contrato.paciente_nome ?? "";
+    if (!nomePac) { toast.error("Contrato sem paciente vinculado."); return; }
+    const valorBase = Number(m.valor_pago ?? m.valor) || 0;
+    if (valorBase <= 0) { toast.error("Valor pago da parcela é zero."); return; }
+    setNfseEmitindoId(m.id);
+    try {
+      const tomador = await pickTomadorNfse({
+        paciente: {
+          nome: nomePac,
+          cpfCnpj: pac.cpf ?? undefined,
+          email: pac.email ?? undefined,
+          cep: pac.cep ?? undefined,
+          logradouro: pac.logradouro ?? undefined,
+          numero: pac.numero ?? undefined,
+          bairro: pac.bairro ?? undefined,
+          municipio: pac.cidade ?? undefined,
+          uf: pac.estado ?? undefined,
+        },
+        valorBase,
+      });
+      if (!tomador) { toast.error("Emissão cancelada."); return; }
+      const parcial = aplicarValorParcial(valorBase, tomador);
+      const convNome = convenio?.nome ? ` — Cartão Benefício ${convenio.nome}` : " — Cartão Benefício";
+      const rotulo = isAdesao(m)
+        ? `Taxa de adesão${convNome} — Contrato #${contrato.numero} — ${nomePac}`
+        : `Mensalidade ${m.numero_parcela}/${mensalidades.length}${convNome} — Contrato #${contrato.numero} — ${nomePac}`;
+      const descComDep = tomador.dependenteAtendido
+        ? `${rotulo} — Atendido: ${tomador.dependenteAtendido}`
+        : rotulo;
+      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
+      const descFinal = await pedirDescricaoNfse(descSugerida);
+      if (!descFinal) { toast.error("Emissão cancelada."); return; }
+      const paciente_id = (contrato as { paciente_id?: string | null }).paciente_id ?? undefined;
+      const res = await emitirNfseFn({
+        data: {
+          emitenteId,
+          pacienteId: paciente_id,
+          pagamentoId: m.lancamento_id,
+          valorServicos: parcial.valor,
+          descricaoServicos: descFinal,
+          tomador,
+        },
+      });
+      const nfseId = (res as { id?: string })?.id;
+      toast.success("NFS-e enviada. Consultando status...");
+      if (nfseId) {
+        await new Promise((r) => setTimeout(r, 4000));
+        await consultarNfseFn({ data: { id: nfseId } });
+      }
+      // Recarrega o mapa de NFS-e emitidas para trocar o botão pelo link.
+      const { data } = await supabase
+        .from("nfse")
+        .select("id, numero, status, url_pdf, pagamento_id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .in("pagamento_id", [m.lancamento_id])
+        .neq("status", "cancelada");
+      const row = (data ?? [])[0] as
+        | { id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string }
+        | undefined;
+      if (row) {
+        setNfsePorLancamento((prev) => ({
+          ...prev,
+          [row.pagamento_id]: { id: row.id, numero: row.numero, status: row.status, pdf_url: row.url_pdf },
+        }));
+      }
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setNfseEmitindoId(null);
+    }
+  };
+
   // Multa de 10% + juros de 0,33% ao dia para parcelas vencidas
   const calcValorComJuros = (m: Mens | null): number => {
     if (!m) return 0;
