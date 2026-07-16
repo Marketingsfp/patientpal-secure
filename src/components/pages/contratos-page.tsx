@@ -972,10 +972,18 @@ function NovoContratoForm({
         `Este titular já possui um contrato ativo (#${titularContratoAtivo}). Cancele o contrato anterior antes de criar um novo.`,
       );
     }
-    const maxDep = Number(convenio.max_dependentes ?? 0) || 0;
+    const convenioMaxDep = Number(convenio.max_dependentes ?? 0) || 0;
+    const faixaSel = faixaId ? faixas.find((f) => f.id === faixaId) : null;
+    const titularOcupa = titularApenasFinanceiro ? 0 : 1;
+    const maxDep =
+      faixaSel && faixaSel.vidas_ate != null
+        ? Math.max(0, Number(faixaSel.vidas_ate) - titularOcupa)
+        : convenioMaxDep;
     if (deps.length > maxDep) {
       return toast.error(
-        maxDep === 0 ? "Este convênio não permite dependentes." : `Limite de ${maxDep} dependentes excedido.`,
+        maxDep === 0
+          ? "Este convênio não permite dependentes."
+          : `Faixa selecionada permite no máximo ${maxDep} dependente(s).`,
       );
     }
     // Sanitiza observações (remove HTML/scripts) e aplica limite
@@ -1397,14 +1405,25 @@ function NovoContratoForm({
               </p>
             </div>
             <div className="col-span-2 border-t pt-3">
-              <Label>Dependentes {convenio ? `(${deps.length}/${convenio.max_dependentes ?? 0})` : ""}</Label>
-              {convenio && deps.length >= (Number(convenio?.max_dependentes ?? 0) || 0) ? (
-                <div className="w-full mt-1 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                  {(convenio.max_dependentes ?? 0) === 0
-                    ? "Convênio sem dependentes"
-                    : `Limite atingido (${deps.length}/${convenio.max_dependentes})`}
-                </div>
-              ) : (
+              {(() => {
+                const convenioMaxDep = Number(convenio?.max_dependentes ?? 0) || 0;
+                const faixaSel = faixaId ? faixas.find((f) => f.id === faixaId) : null;
+                const titularOcupa = titularApenasFinanceiro ? 0 : 1;
+                const maxDepWiz =
+                  faixaSel && faixaSel.vidas_ate != null
+                    ? Math.max(0, Number(faixaSel.vidas_ate) - titularOcupa)
+                    : convenioMaxDep;
+                const cheio = convenio && deps.length >= maxDepWiz;
+                return (
+                  <>
+                    <Label>{convenio ? `Dependentes (${deps.length}/${maxDepWiz})` : "Dependentes"}</Label>
+                    {cheio ? (
+                      <div className="w-full mt-1 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                        {maxDepWiz === 0
+                          ? "Faixa/convênio não permite dependentes. Aumente a faixa ou marque o titular como apenas financeiro."
+                          : `Limite da faixa atingido (${deps.length}/${maxDepWiz}). Aumente a faixa ou marque o titular como apenas financeiro.`}
+                      </div>
+                    ) : (
                 <div className="mt-1">
                   <PatientSearchInput
                     clinicaIdsOverride={[clinicaId]}
@@ -1425,7 +1444,10 @@ function NovoContratoForm({
                     onRequestCreate={(q) => setQuickCreate({ alvo: "dependente", nome: q })}
                   />
                 </div>
-              )}
+                    )}
+                  </>
+                );
+              })()}
               {deps.length > 0 ? (
                 <div className="mt-2 space-y-1">
                   {deps.map((d, i) => (
@@ -2343,7 +2365,13 @@ function DetalheContrato({
     manual: "Manual",
   };
   const formaLabel = formaLabelMap[contrato.forma_pagamento ?? ""] ?? contrato.forma_pagamento ?? "—";
-  const maxDep = Number(convenio?.max_dependentes ?? 0) || 0;
+  const convenioMaxDep = Number(convenio?.max_dependentes ?? 0) || 0;
+  const faixaSelecionadaEdicao = admFaixaId ? faixas.find((f) => f.id === admFaixaId) : faixaAtual;
+  const titularOcupaVaga = apenasFinanceiro ? 0 : 1;
+  const maxDep =
+    faixaSelecionadaEdicao && faixaSelecionadaEdicao.vidas_ate != null
+      ? Math.max(0, Number(faixaSelecionadaEdicao.vidas_ate) - titularOcupaVaga)
+      : convenioMaxDep;
   const depsAtivos = deps.filter((d) => d.ativo);
 
   const renderTermo = (dep: Dep, movimento: "Inclusão" | "Exclusão"): string => {
@@ -3035,6 +3063,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-medium">
                     Dependentes ({depsAtivos.length}/{maxDep})
+                    {depsAtivos.length >= maxDep && (
+                      <span className="ml-2 text-xs font-normal text-amber-600">
+                        Limite da faixa atingido. Aumente a faixa ou marque o titular como apenas financeiro.
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {podeEscrever && (
