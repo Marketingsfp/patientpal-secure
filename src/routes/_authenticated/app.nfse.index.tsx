@@ -7,7 +7,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { consultarNfse, reenviarNfse, extrairNfseDeImagem, baixarNfseArquivo } from "@/lib/nfse.functions";
+import { consultarNfse, reenviarNfse, extrairNfseDeImagem, baixarNfseArquivo, avancarRpsProximoNumero } from "@/lib/nfse.functions";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -40,6 +40,7 @@ function NfsePage() {
   const consulta = useServerFn(consultarNfse);
   const reenviar = useServerFn(reenviarNfse);
   const extrair = useServerFn(extrairNfseDeImagem);
+  const avancarRps = useServerFn(avancarRpsProximoNumero);
   const [reenviando, setReenviando] = useState<string | null>(null);
   const [conferirOpen, setConferirOpen] = useState(false);
   const [conferirLoading, setConferirLoading] = useState(false);
