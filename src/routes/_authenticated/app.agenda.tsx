@@ -115,6 +115,7 @@ type Agendamento = {
   atendimento_grupo_id?: string | null;
   ficha_numero?: number | null;
   forma_pagamento_prevista?: string | null;
+  enfermagem_recurso_id?: string | null;
 };
 type Medico = {
   id: string;
