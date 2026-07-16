@@ -1405,14 +1405,25 @@ function NovoContratoForm({
               </p>
             </div>
             <div className="col-span-2 border-t pt-3">
-              <Label>Dependentes {convenio ? `(${deps.length}/${convenio.max_dependentes ?? 0})` : ""}</Label>
-              {convenio && deps.length >= (Number(convenio?.max_dependentes ?? 0) || 0) ? (
-                <div className="w-full mt-1 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                  {(convenio.max_dependentes ?? 0) === 0
-                    ? "Convênio sem dependentes"
-                    : `Limite atingido (${deps.length}/${convenio.max_dependentes})`}
-                </div>
-              ) : (
+              {(() => {
+                const convenioMaxDep = Number(convenio?.max_dependentes ?? 0) || 0;
+                const faixaSel = faixaId ? faixas.find((f) => f.id === faixaId) : null;
+                const titularOcupa = titularApenasFinanceiro ? 0 : 1;
+                const maxDepWiz =
+                  faixaSel && faixaSel.vidas_ate != null
+                    ? Math.max(0, Number(faixaSel.vidas_ate) - titularOcupa)
+                    : convenioMaxDep;
+                const cheio = convenio && deps.length >= maxDepWiz;
+                return (
+                  <>
+                    <Label>{convenio ? `Dependentes (${deps.length}/${maxDepWiz})` : "Dependentes"}</Label>
+                    {cheio ? (
+                      <div className="w-full mt-1 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                        {maxDepWiz === 0
+                          ? "Faixa/convênio não permite dependentes. Aumente a faixa ou marque o titular como apenas financeiro."
+                          : `Limite da faixa atingido (${deps.length}/${maxDepWiz}). Aumente a faixa ou marque o titular como apenas financeiro.`}
+                      </div>
+                    ) : (
                 <div className="mt-1">
                   <PatientSearchInput
                     clinicaIdsOverride={[clinicaId]}
@@ -1433,7 +1444,10 @@ function NovoContratoForm({
                     onRequestCreate={(q) => setQuickCreate({ alvo: "dependente", nome: q })}
                   />
                 </div>
-              )}
+                    )}
+                  </>
+                );
+              })()}
               {deps.length > 0 ? (
                 <div className="mt-2 space-y-1">
                   {deps.map((d, i) => (
