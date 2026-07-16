@@ -10,6 +10,7 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useServerFn } from "@tanstack/react-start";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { usePickTomador } from "@/components/nfse/use-pick-tomador";
+import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -63,6 +64,7 @@ function Page() {
   const emitirFn = useServerFn(emitirNfse);
   const consultarFn = useServerFn(consultarNfse);
   const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
+  const { prompt: pedirDescricaoNfse, dialog: descricaoNfseDialog } = usePromptDescricaoNfse();
 
   const load = async () => {
     if (!clinicaAtual) { setItems([]); setLoading(false); return; }
@@ -173,9 +175,11 @@ function Page() {
             pacienteNome: p.nome,
             dataReferencia: n.data_emissao,
           });
-      const descFinal = tomador.dependenteAtendido
+      const descSugerida = tomador.dependenteAtendido
         ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
         : descBase;
+      const descFinal = await pedirDescricaoNfse(descSugerida);
+      if (!descFinal) { setEmitting(false); toast.error("Emissão cancelada."); return; }
       const res = await emitirFn({ data: {
         emitenteId,
         pacienteId: p.id,
@@ -336,6 +340,7 @@ function Page() {
         </DialogContent>
       </Dialog>
       {tomadorNfseDialog}
+      {descricaoNfseDialog}
     </div>
   );
 }

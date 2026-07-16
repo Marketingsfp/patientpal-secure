@@ -34,6 +34,7 @@ import { useMedicoContext } from "@/hooks/use-medico-context";
 import { useServerFn } from "@tanstack/react-start";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { usePickTomador } from "@/components/nfse/use-pick-tomador";
+import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -589,6 +590,7 @@ function AtendimentosPage() {
   const emitirNfseFn = useServerFn(emitirNfse);
   const consultarNfseFn = useServerFn(consultarNfse);
   const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
+  const { prompt: pedirDescricaoNfse, dialog: descricaoNfseDialog } = usePromptDescricaoNfse();
 
   useEffect(() => {
     if (!clinicaAtual) {
@@ -661,9 +663,11 @@ function AtendimentosPage() {
             pacienteNome: p.nome,
             dataReferencia: dataRef,
           });
-      const descFinal = tomador.dependenteAtendido
+      const descSugerida = tomador.dependenteAtendido
         ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
         : descBase;
+      const descFinal = await pedirDescricaoNfse(descSugerida);
+      if (!descFinal) { setNfseEmitting(false); toast.error("Emissão cancelada."); return; }
       const res = await emitirNfseFn({
         data: {
           emitenteId,
@@ -3329,6 +3333,7 @@ function AtendimentosPage() {
         </DialogContent>
       </Dialog>
       {tomadorNfseDialog}
+      {descricaoNfseDialog}
 
       {/* Edição pontual do repasse médico de um atendimento */}
       <Dialog
