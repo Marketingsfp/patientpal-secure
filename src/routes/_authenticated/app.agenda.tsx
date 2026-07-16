@@ -4470,6 +4470,7 @@ function AgendaPage() {
     <div className="space-y-3">
       {emitenteNfseDialog}
       {tomadorNfseDialog}
+      {descricaoNfseDialog}
       {reagendandoAg && (
         <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
           <div className="flex flex-wrap items-center gap-3 text-sm">
