@@ -10,6 +10,7 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useServerFn } from "@tanstack/react-start";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { usePickTomador } from "@/components/nfse/use-pick-tomador";
+import { aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
