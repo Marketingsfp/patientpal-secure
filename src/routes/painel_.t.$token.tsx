@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PainelPage } from "./painel";
 import { PublicClinicaProvider } from "@/components/public-clinica-provider";
 
-export const Route = createFileRoute("/painel/t/")({
+// Sufixo "_" no segmento pai des-aninha esta rota de /painel (que não
+// renderiza <Outlet/>). O path público continua /painel/t/$token.
+export const Route = createFileRoute("/painel_/t/$token")({
   component: PainelPublicoTokenRoute,
   head: () => ({
     meta: [

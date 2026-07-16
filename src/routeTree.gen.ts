@@ -32,6 +32,8 @@ import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
+import { Route as TotemTTokenRouteImport } from './routes/totem_.t.$token'
+import { Route as PainelTTokenRouteImport } from './routes/painel_.t.$token'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
 import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
@@ -100,8 +102,6 @@ import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authent
 import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/_authenticated/app.alertas-enfermagem'
 import { Route as AuthenticatedAppAgendaV2RouteImport } from './routes/_authenticated/app.agenda-v2'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
-import { Route as TotemTRouteImport } from './routes/totem.t.'
-import { Route as PainelTRouteImport } from './routes/painel.t.'
 import { Route as AuthenticatedAppNfseIndexRouteImport } from './routes/_authenticated/app.nfse.index'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
 import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authenticated/app.equipe.index'
@@ -258,6 +258,16 @@ const AuthenticatedAppIndexRoute = AuthenticatedAppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const TotemTTokenRoute = TotemTTokenRouteImport.update({
+  id: '/totem_/t/$token',
+  path: '/totem/t/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PainelTTokenRoute = PainelTTokenRouteImport.update({
+  id: '/painel_/t/$token',
+  path: '/painel/t/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PContratoTokenRoute = PContratoTokenRouteImport.update({
   id: '/p/contrato/$token',
@@ -646,16 +656,6 @@ const AuthenticatedAppAgendaRoute = AuthenticatedAppAgendaRouteImport.update({
   path: '/agenda',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
-const TotemTRoute = TotemTRouteImport.update({
-  id: '/t/',
-  path: '/t/',
-  getParentRoute: () => TotemRoute,
-} as any)
-const PainelTRoute = PainelTRouteImport.update({
-  id: '/t/',
-  path: '/t/',
-  getParentRoute: () => PainelRoute,
-} as any)
 const AuthenticatedAppNfseIndexRoute =
   AuthenticatedAppNfseIndexRouteImport.update({
     id: '/nfse/',
@@ -918,7 +918,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/totem': typeof TotemRouteWithChildren
+  '/totem': typeof TotemRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
@@ -931,8 +931,6 @@ export interface FileRoutesByFullPath {
   '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
-  '/painel/t/': typeof PainelTRoute
-  '/totem/t/': typeof TotemTRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
   '/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
@@ -1001,6 +999,8 @@ export interface FileRoutesByFullPath {
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
+  '/painel/t/$token': typeof PainelTTokenRoute
+  '/totem/t/$token': typeof TotemTTokenRoute
   '/app/': typeof AuthenticatedAppIndexRoute
   '/app/agenda/express': typeof AuthenticatedAppAgendaExpressRoute
   '/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
@@ -1054,7 +1054,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/totem': typeof TotemRouteWithChildren
+  '/totem': typeof TotemRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -1066,8 +1066,6 @@ export interface FileRoutesByTo {
   '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente': typeof PacienteIndexRoute
-  '/painel/t': typeof PainelTRoute
-  '/totem/t': typeof TotemTRoute
   '/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
   '/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
@@ -1133,6 +1131,8 @@ export interface FileRoutesByTo {
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
+  '/painel/t/$token': typeof PainelTTokenRoute
+  '/totem/t/$token': typeof TotemTTokenRoute
   '/app': typeof AuthenticatedAppIndexRoute
   '/app/agenda/express': typeof AuthenticatedAppAgendaExpressRoute
   '/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
@@ -1188,7 +1188,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/totem': typeof TotemRouteWithChildren
+  '/totem': typeof TotemRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
@@ -1201,8 +1201,6 @@ export interface FileRoutesById {
   '/totem_/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
-  '/painel/t/': typeof PainelTRoute
-  '/totem/t/': typeof TotemTRoute
   '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
   '/_authenticated/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
   '/_authenticated/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
@@ -1271,6 +1269,8 @@ export interface FileRoutesById {
   '/_authenticated/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
+  '/painel_/t/$token': typeof PainelTTokenRoute
+  '/totem_/t/$token': typeof TotemTTokenRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
   '/_authenticated/app/agenda/express': typeof AuthenticatedAppAgendaExpressRoute
   '/_authenticated/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
@@ -1339,8 +1339,6 @@ export interface FileRouteTypes {
     | '/totem/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente/'
-    | '/painel/t/'
-    | '/totem/t/'
     | '/app/agenda'
     | '/app/agenda-v2'
     | '/app/alertas-enfermagem'
@@ -1409,6 +1407,8 @@ export interface FileRouteTypes {
     | '/app/triagem-enfermagem'
     | '/app/unidades'
     | '/p/contrato/$token'
+    | '/painel/t/$token'
+    | '/totem/t/$token'
     | '/app/'
     | '/app/agenda/express'
     | '/app/atendimento-ia/$agendamentoId'
@@ -1474,8 +1474,6 @@ export interface FileRouteTypes {
     | '/totem/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente'
-    | '/painel/t'
-    | '/totem/t'
     | '/app/agenda'
     | '/app/agenda-v2'
     | '/app/alertas-enfermagem'
@@ -1541,6 +1539,8 @@ export interface FileRouteTypes {
     | '/app/triagem-enfermagem'
     | '/app/unidades'
     | '/p/contrato/$token'
+    | '/painel/t/$token'
+    | '/totem/t/$token'
     | '/app'
     | '/app/agenda/express'
     | '/app/atendimento-ia/$agendamentoId'
@@ -1608,8 +1608,6 @@ export interface FileRouteTypes {
     | '/totem_/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente/'
-    | '/painel/t/'
-    | '/totem/t/'
     | '/_authenticated/app/agenda'
     | '/_authenticated/app/agenda-v2'
     | '/_authenticated/app/alertas-enfermagem'
@@ -1678,6 +1676,8 @@ export interface FileRouteTypes {
     | '/_authenticated/app/triagem-enfermagem'
     | '/_authenticated/app/unidades'
     | '/p/contrato/$token'
+    | '/painel_/t/$token'
+    | '/totem_/t/$token'
     | '/_authenticated/app/'
     | '/_authenticated/app/agenda/express'
     | '/_authenticated/app/atendimento-ia/$agendamentoId'
@@ -1733,7 +1733,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
-  TotemRoute: typeof TotemRouteWithChildren
+  TotemRoute: typeof TotemRoute
   CheckinTokenRoute: typeof CheckinTokenRoute
   LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
@@ -1745,6 +1745,8 @@ export interface RootRouteChildren {
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
+  PainelTTokenRoute: typeof PainelTTokenRoute
+  TotemTTokenRoute: typeof TotemTTokenRoute
   ApiPublicFocusnfeWebhookRoute: typeof ApiPublicFocusnfeWebhookRoute
   ApiPublicHooksBackupDiarioRoute: typeof ApiPublicHooksBackupDiarioRoute
   ApiPublicWhatsappClinicaIdRoute: typeof ApiPublicWhatsappClinicaIdRoute
@@ -1912,6 +1914,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/'
       preLoaderRoute: typeof AuthenticatedAppIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/totem_/t/$token': {
+      id: '/totem_/t/$token'
+      path: '/totem/t/$token'
+      fullPath: '/totem/t/$token'
+      preLoaderRoute: typeof TotemTTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/painel_/t/$token': {
+      id: '/painel_/t/$token'
+      path: '/painel/t/$token'
+      fullPath: '/painel/t/$token'
+      preLoaderRoute: typeof PainelTTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/p/contrato/$token': {
       id: '/p/contrato/$token'
@@ -2388,20 +2404,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/agenda'
       preLoaderRoute: typeof AuthenticatedAppAgendaRouteImport
       parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/totem/t/': {
-      id: '/totem/t/'
-      path: '/t'
-      fullPath: '/totem/t/'
-      preLoaderRoute: typeof TotemTRouteImport
-      parentRoute: typeof TotemRoute
-    }
-    '/painel/t/': {
-      id: '/painel/t/'
-      path: '/t'
-      fullPath: '/painel/t/'
-      preLoaderRoute: typeof PainelTRouteImport
-      parentRoute: typeof PainelRoute
     }
     '/_authenticated/app/nfse/': {
       id: '/_authenticated/app/nfse/'
@@ -3037,26 +3039,14 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 
 interface PainelRouteChildren {
   PainelClinicaIdRoute: typeof PainelClinicaIdRoute
-  PainelTRoute: typeof PainelTRoute
 }
 
 const PainelRouteChildren: PainelRouteChildren = {
   PainelClinicaIdRoute: PainelClinicaIdRoute,
-  PainelTRoute: PainelTRoute,
 }
 
 const PainelRouteWithChildren =
   PainelRoute._addFileChildren(PainelRouteChildren)
-
-interface TotemRouteChildren {
-  TotemTRoute: typeof TotemTRoute
-}
-
-const TotemRouteChildren: TotemRouteChildren = {
-  TotemTRoute: TotemTRoute,
-}
-
-const TotemRouteWithChildren = TotemRoute._addFileChildren(TotemRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -3068,7 +3058,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
-  TotemRoute: TotemRouteWithChildren,
+  TotemRoute: TotemRoute,
   CheckinTokenRoute: CheckinTokenRoute,
   LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
@@ -3080,6 +3070,8 @@ const rootRouteChildren: RootRouteChildren = {
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
   PContratoTokenRoute: PContratoTokenRoute,
+  PainelTTokenRoute: PainelTTokenRoute,
+  TotemTTokenRoute: TotemTTokenRoute,
   ApiPublicFocusnfeWebhookRoute: ApiPublicFocusnfeWebhookRoute,
   ApiPublicHooksBackupDiarioRoute: ApiPublicHooksBackupDiarioRoute,
   ApiPublicWhatsappClinicaIdRoute: ApiPublicWhatsappClinicaIdRoute,

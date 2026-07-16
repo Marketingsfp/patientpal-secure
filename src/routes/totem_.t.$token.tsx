@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { TotemPage } from "./totem";
 import { PublicClinicaProvider } from "@/components/public-clinica-provider";
 
-export const Route = createFileRoute("/totem/t/")({
+// Sufixo "_" no segmento pai des-aninha esta rota de /totem. O path público
+// continua /totem/t/$token.
+export const Route = createFileRoute("/totem_/t/$token")({
   component: TotemPublicoTokenRoute,
   head: () => ({
     meta: [
