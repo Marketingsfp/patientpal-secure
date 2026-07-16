@@ -163,12 +163,14 @@ function Page() {
           municipio: p.cidade ?? undefined,
           uf: p.estado ?? undefined,
         },
+        valorBase: Number(n.valor) || 0,
       });
       if (!tomador) { setEmitting(false); toast.error("Emissão cancelada."); return; }
       const cpfLimpo = (tomador.cpfCnpj ?? "").replace(/\D/g, "");
       if (cpfLimpo.length !== 11 && cpfLimpo.length !== 14) {
         throw new Error("CPF/CNPJ do tomador é obrigatório (11 ou 14 dígitos).");
       }
+      const parcial = aplicarValorParcial(Number(n.valor) || 0, tomador);
       const descBase = (descricao && descricao.trim())
         ? descricao.trim()
         : montarDiscriminacaoNfse({
@@ -176,16 +178,17 @@ function Page() {
             pacienteNome: p.nome,
             dataReferencia: n.data_emissao,
           });
-      const descSugerida = tomador.dependenteAtendido
+      const descComDep = tomador.dependenteAtendido
         ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
         : descBase;
+      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
       const descFinal = await pedirDescricaoNfse(descSugerida);
       if (!descFinal) { setEmitting(false); toast.error("Emissão cancelada."); return; }
       const res = await emitirFn({ data: {
         emitenteId,
         pacienteId: p.id,
         pagamentoId: n.id ?? undefined,
-        valorServicos: Number(n.valor),
+        valorServicos: parcial.valor,
         descricaoServicos: descFinal,
         tomador: { ...tomador, cpfCnpj: cpfLimpo },
       } });
