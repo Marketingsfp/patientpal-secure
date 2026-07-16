@@ -2671,6 +2671,24 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
                 </button>
               </div>
+              {Number(contrato.taxa_adesao ?? 0) > 0 ? (() => {
+                const linhaAdesao = mens.find((m) => isAdesao(m));
+                const adesaoPaga = linhaAdesao?.status === "pago";
+                return (
+                  <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">Taxa de adesão</Badge>
+                      <span className="text-muted-foreground">Cobrança única, não conta como mensalidade.</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold tabular-nums">{BRL(Number(contrato.taxa_adesao ?? 0))}</span>
+                      <Badge variant={adesaoPaga ? "default" : "outline"}>
+                        {adesaoPaga ? "Paga" : "Pendente"}
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })() : null}
               <div className="flex gap-2 flex-wrap">
                 <Button size="sm" onClick={() => printContrato(contrato.id)}>
                   <Printer className="h-4 w-4 mr-1" />
