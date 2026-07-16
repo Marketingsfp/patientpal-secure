@@ -246,30 +246,53 @@ const BASE_CSS = `
      "DATA IMPRESSÃO", só desperdiçando papel antes do corte. */
   html, body { height: auto; }
   body {
-    font-family: "Courier New", "Consolas", monospace;
-    font-size: 11pt;
-    line-height: 1.3;
-    font-weight: 700;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.35;
+    font-weight: 500;
     word-break: break-word;
     overflow-wrap: anywhere;
+    -webkit-font-smoothing: antialiased;
   }
-  .ticket { width: 76mm; max-width: 100%; padding: 3mm 2mm 2mm; }
+  .ticket { width: 76mm; max-width: 100%; padding: 4mm 3mm 3mm; }
   .ticket:last-child { padding-bottom: 1mm; }
   .center { text-align: center; }
   .right  { text-align: right; }
   .bold   { font-weight: 700; }
-  .sm     { font-size: 9pt; font-weight: 700; }
-  .lg     { font-size: 14pt; font-weight: 700; }
-  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
+  .sm     { font-size: 8.5pt; font-weight: 500; letter-spacing: 0.02em; }
+  .lg     {
+    font-size: 13pt;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 2px 0;
+  }
+  .sep    { border-top: 1px solid #000; margin: 7px 0; }
+  .sep.thin { border-top-width: 1px; opacity: 0.35; margin: 5px 0; }
   .row    { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: baseline; }
   .row > * { min-width: 0; }
   .row .right { justify-self: end; }
   table   { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  td      { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: anywhere; }
-  .label  { color: #000; font-weight: 700; }
+  td      { padding: 2px 0; vertical-align: top; word-break: break-word; overflow-wrap: anywhere; }
+  .label  {
+    color: #000;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 8.5pt;
+  }
   .v      { font-weight: 700; }
   .qtd    { width: 10mm; }
   h1, h2, h3 { margin: 0; }
+  /* Cabeçalho da clínica — nome grande, endereço/contatos discretos. */
+  .clinica-nome {
+    font-size: 13pt;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 2px 0 4px;
+  }
   ${VIA_CSS}
 `;
 
@@ -717,7 +740,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
   const ticketHtml = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1108,7 +1131,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
 
   // Cabeçalho da clínica (reutilizado em cada GR)
   const headerClinica = `
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1343,7 +1366,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
 
   const ticketHtml = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1538,7 +1561,7 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
 
   const ticketHtml = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1733,7 +1756,7 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
   const viaTextoMens = `IMPRESSÃO Nº ${viaNumeroMens}`;
   const ticketMens = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1801,7 +1824,7 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
   const viaTextoTaxa = `IMPRESSÃO Nº ${viaNumeroTaxa}`;
   const ticketTaxa = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
