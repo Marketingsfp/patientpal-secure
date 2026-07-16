@@ -2197,6 +2197,24 @@ function DetalheContrato({
     setAdmFaixaId(match?.id ?? "");
   }, [faixas, valorMensalAtual]);
 
+  // Ao trocar o convênio na aba Dados (modo admin), recarrega as faixas de
+  // pessoas do novo convênio para que o select "Faixa de pessoas" mostre
+  // as opções corretas. Sem isso, ficavam as faixas do convênio original.
+  useEffect(() => {
+    if (!admConvenioId) { setFaixas([]); return; }
+    if (admConvenioId === contrato.convenio_id) return; // já carregado pelo load()
+    let cancelado = false;
+    (async () => {
+      const { data } = await supabase
+        .from("cb_convenio_faixas")
+        .select("*")
+        .eq("convenio_id", admConvenioId)
+        .order("vidas_de");
+      if (!cancelado) setFaixas(((data ?? []) as Faixa[]));
+    })();
+    return () => { cancelado = true; };
+  }, [admConvenioId, contrato.convenio_id]);
+
   // Busca de pacientes agora é feita sob demanda pelo PatientSearchInput.
 
   const marcarPago = async (
