@@ -3731,6 +3731,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
         }}
       />
 
+      {/* Diálogos usados pela emissão de NFS-e a partir das parcelas */}
+      {tomadorNfseDialog}
+      {descricaoNfseDialog}
+
       <Dialog open={incOpen} onOpenChange={setIncOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
