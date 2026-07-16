@@ -6517,14 +6517,6 @@ function AgendaPage() {
               shiftData={shiftData}
               compact
             />
-            <label className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500 cursor-pointer select-none">
-              <Checkbox
-                checked={apenasData}
-                onCheckedChange={(v) => setApenasData(v === true)}
-                className="h-3 w-3"
-              />
-              Exibir apenas a data selecionada
-            </label>
           </div>
 
           {/* Cliente */}
@@ -6616,6 +6608,15 @@ function AgendaPage() {
             </Button>
           </div>
         </div>
+        {/* Toggle "apenas a data selecionada" — alinhado à esquerda do cabeçalho da tabela abaixo */}
+        <label className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500 cursor-pointer select-none w-fit">
+          <Checkbox
+            checked={apenasData}
+            onCheckedChange={(v) => setApenasData(v === true)}
+            className="h-3 w-3"
+          />
+          Exibir apenas a data selecionada
+        </label>
         {/* KPIs REMOVIDOS */}
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
         <div className="h-8"></div> {/* ← ADICIONE ESTA LINHA */}
