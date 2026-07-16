@@ -559,7 +559,7 @@ export const avancarRpsProximoNumero = createServerFn({ method: "POST" })
     return { ok: true, novo_numero: data.novo_numero, anterior };
   });
 
-export const reenviarNfseCompat = createServerFn({ method: "POST" })
+export const reenviarNfse = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
