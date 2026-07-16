@@ -6603,8 +6603,8 @@ function AgendaPage() {
             o contexto de scroll do sticky, e como este div nunca rola
             internamente (quem rola é o <main> do app-shell), o cabeçalho
             "sticky top-0" parava de acompanhar o scroll da página. */}
-        <div className="rounded-lg border border-border bg-card">
-          <Table className="max-lg:table max-lg:overflow-visible">
+        <div className="rounded-lg border border-border bg-card overflow-x-auto">
+          <Table className="min-w-[900px] max-lg:table max-lg:overflow-visible">
             <TableHeader className="sticky top-0 z-20">
               <TableRow className="bg-muted">
                 <TableHead className="w-8 rounded-tl-lg" title="Selecione para ações em lote">
