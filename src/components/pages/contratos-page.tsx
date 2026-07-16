@@ -972,10 +972,18 @@ function NovoContratoForm({
         `Este titular já possui um contrato ativo (#${titularContratoAtivo}). Cancele o contrato anterior antes de criar um novo.`,
       );
     }
-    const maxDep = Number(convenio.max_dependentes ?? 0) || 0;
+    const convenioMaxDep = Number(convenio.max_dependentes ?? 0) || 0;
+    const faixaSel = faixaId ? faixas.find((f) => f.id === faixaId) : null;
+    const titularOcupa = titularApenasFinanceiro ? 0 : 1;
+    const maxDep =
+      faixaSel && faixaSel.vidas_ate != null
+        ? Math.max(0, Number(faixaSel.vidas_ate) - titularOcupa)
+        : convenioMaxDep;
     if (deps.length > maxDep) {
       return toast.error(
-        maxDep === 0 ? "Este convênio não permite dependentes." : `Limite de ${maxDep} dependentes excedido.`,
+        maxDep === 0
+          ? "Este convênio não permite dependentes."
+          : `Faixa selecionada permite no máximo ${maxDep} dependente(s).`,
       );
     }
     // Sanitiza observações (remove HTML/scripts) e aplica limite
