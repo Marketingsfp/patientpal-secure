@@ -152,13 +152,16 @@ function NfsePage() {
     }
     setAvancandoRps(true);
     try {
-      const { error } = await supabase
-        .from("nfse_emitentes")
-        .update({ rps_proximo_numero: novo })
-        .eq("id", erroDetalhe.emitente_id);
-      if (error) { mostrarErro(error); return; }
-      setRpsAtual(novo);
-      toast.success(`Próx. nº RPS do emitente atualizado para ${novo}.`);
+      // Usa server fn para contornar RLS silenciosa: só managers da clínica
+      // podem UPDATE direto em nfse_emitentes, então o update client-side
+      // retornava 0 linhas sem erro e o usuário achava que tinha avançado.
+      const r = await avancarRps({ data: { emitente_id: erroDetalhe.emitente_id, novo_numero: novo } });
+      if (!r.ok) {
+        toast.error(r.motivo ?? "Não foi possível avançar o contador.");
+        return;
+      }
+      setRpsAtual(r.novo_numero);
+      toast.success(`Próx. nº RPS do emitente atualizado para ${r.novo_numero}.`);
       if (reenviarDepois) {
         const notaId = erroDetalhe.id;
         setErroDetalhe(null);
