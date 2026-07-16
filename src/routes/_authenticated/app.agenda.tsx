@@ -6930,6 +6930,14 @@ function AgendaPage() {
                               {podeEscrever && !ehLivre && (
                                 <>
                                   <DropdownMenuSeparator />
+                                  {a.enfermagem_recurso_id && a.status !== "realizado" && (
+                                    <DropdownMenuItem
+                                      onClick={() => iniciarAtendimentoEnf(a)}
+                                      className="text-green-700 font-medium"
+                                    >
+                                      <CheckCircle2 className="h-4 w-4 mr-2" /> Dar baixa (Enfermagem)
+                                    </DropdownMenuItem>
+                                  )}
                                   {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
                                     <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
                                       <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}
