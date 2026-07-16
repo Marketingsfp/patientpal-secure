@@ -996,8 +996,6 @@ function NovoContratoForm({
     // Gerar cobrancas: taxa de adesao separada da mensalidade.
     const base = new Date(dataInicio + "T00:00:00");
     const valorParcela = valor + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
-    const primeiraData = new Date(base.getFullYear(), base.getMonth(), diaVenc);
-    const primeiraVencimento = primeiraData.toISOString().slice(0, 10);
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
       const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
       const jaPago = i < mensalidadesJaPagas;
@@ -1015,18 +1013,9 @@ function NovoContratoForm({
       };
     });
     const taxaAdesao = Number(taxa) || 0;
-    const cobrancas = taxaAdesao > 0 && mensalidadesJaPagas === 0
-      ? [
-          {
-            numero_parcela: 0,
-            vencimento: primeiraVencimento,
-            valor: taxaAdesao,
-            status: "pendente",
-            observacoes: "Taxa de adesao cobrada somente na primeira mensalidade.",
-          },
-          ...parcelas,
-        ]
-      : parcelas;
+    // Taxa de adesão é registrada em contratos_assinatura.taxa_adesao e NÃO
+    // gera uma linha em contrato_mensalidades — não é uma mensalidade.
+    const cobrancas = parcelas;
 
     // Contrato + dependentes + mensalidades numa única transação (RPC):
     // se qualquer etapa falhar, o Postgres desfaz tudo — antes eram 3
@@ -1075,7 +1064,7 @@ function NovoContratoForm({
     }
 
     setSaving(false);
-    toast.success(`Contrato #${contrato.numero} criado com ${convenio.num_parcelas} mensalidades${taxaAdesao > 0 && mensalidadesJaPagas === 0 ? " e taxa de adesao separada" : ""}`);
+    toast.success(`Contrato #${contrato.numero} criado com ${convenio.num_parcelas} mensalidades${taxaAdesao > 0 ? " + taxa de adesão" : ""}`);
 
     // Pós-criação: gerar carnê ou boletos com timeout de 15s (não trava UI)
     const withTimeout = <T,>(p: Promise<T>, ms: number) =>
@@ -1891,27 +1880,21 @@ function DetalheContrato({
     const valor = Number((contrato as any).valor_mensal ?? 0);
     const pagas = Math.max(0, Math.min(12, Math.floor(n)));
     setRegerandoRetro(true);
-    // 1) Apaga pendentes existentes
+    // 1) Apaga TODAS as mensalidades (≠0) — pendentes e pagas —
+    // para regenerar exatamente 12 parcelas numeradas de 1 a 12.
+    // Sem isso, uma parcela órfã anterior fazia o prox virar 2 e o
+    // contrato terminar com 13 linhas (bug do contrato #20261888).
     const { error: delErr } = await supabase
       .from("contrato_mensalidades")
       .delete()
       .eq("contrato_id", contrato.id)
-      .eq("status", "pendente")
       .neq("numero_parcela", 0);
     if (delErr) {
       setRegerandoRetro(false);
       return mostrarErro(delErr);
     }
-    // 2) Próximo número de parcela
-    const { data: maxRow } = await supabase
-      .from("contrato_mensalidades")
-      .select("numero_parcela")
-      .eq("contrato_id", contrato.id)
-      .neq("numero_parcela", 0)
-      .order("numero_parcela", { ascending: false })
-      .limit(1);
-    let prox = ((maxRow?.[0]?.numero_parcela ?? 0) as number) + 1;
-    // 3) Gera 12 parcelas a partir do mês da nova data de início
+    // 2) Gera exatamente 12 parcelas (1..12) a partir do mês da nova data de início
+    let prox = 1;
     const ini = new Date(iniStr + "T00:00:00");
     const baseAno = ini.getFullYear();
     const baseMes = ini.getMonth();
@@ -2023,19 +2006,25 @@ function DetalheContrato({
         .eq("status", "pendente")
         .neq("numero_parcela", 0)
         .gt("vencimento", hoje);
-      // próximo número
-      const { data: maxRow } = await supabase
+      // Conta parcelas restantes (≠0) — geralmente pagas/atrasadas anteriores a hoje.
+      // Todo contrato deve ter no máximo 12 mensalidades: gera só o que falta.
+      const { data: restantes } = await supabase
         .from("contrato_mensalidades")
         .select("numero_parcela")
         .eq("contrato_id", contrato.id)
         .neq("numero_parcela", 0)
-        .order("numero_parcela", { ascending: false })
-        .limit(1);
-      let prox = ((maxRow?.[0]?.numero_parcela ?? 0) as number) + 1;
+        .order("numero_parcela", { ascending: false });
+      const existentes = restantes ?? [];
+      const maxExistente = existentes.reduce(
+        (mx, r) => Math.max(mx, Number((r as { numero_parcela: number }).numero_parcela) || 0),
+        0,
+      );
+      const restantesParaGerar = Math.max(0, 12 - existentes.length);
+      let prox = maxExistente + 1;
       const inicio = new Date();
       inicio.setDate(1);
       const rows: any[] = [];
-      for (let i = 1; i <= 12; i++) {
+      for (let i = 1; i <= restantesParaGerar; i++) {
         const ref = new Date(inicio.getFullYear(), inicio.getMonth() + i, 1);
         const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
         const d = Math.min(dia, lastDay);
@@ -2049,12 +2038,14 @@ function DetalheContrato({
           status: "pendente",
         });
       }
-      const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows);
-      if (insErr) {
-        setSavingDados(false);
-        mostrarErro(insErr, "dados salvos, mas falha ao gerar parcelas");
-        await load();
-        return;
+      if (rows.length > 0) {
+        const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows);
+        if (insErr) {
+          setSavingDados(false);
+          mostrarErro(insErr, "dados salvos, mas falha ao gerar parcelas");
+          await load();
+          return;
+        }
       }
     }
     setSavingDados(false);
@@ -2682,6 +2673,24 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
                 </button>
               </div>
+              {Number(contrato.taxa_adesao ?? 0) > 0 ? (() => {
+                const linhaAdesao = mens.find((m) => isAdesao(m));
+                const adesaoPaga = linhaAdesao?.status === "pago";
+                return (
+                  <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">Taxa de adesão</Badge>
+                      <span className="text-muted-foreground">Cobrança única, não conta como mensalidade.</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold tabular-nums">{BRL(Number(contrato.taxa_adesao ?? 0))}</span>
+                      <Badge variant={adesaoPaga ? "default" : "outline"}>
+                        {adesaoPaga ? "Paga" : "Pendente"}
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })() : null}
               <div className="flex gap-2 flex-wrap">
                 <Button size="sm" onClick={() => printContrato(contrato.id)}>
                   <Printer className="h-4 w-4 mr-1" />
@@ -2772,7 +2781,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           </TableCell>
                         </TableRow>
                       ) : null}
-                      {mens.map((m) => (
+                      {mensalidades.map((m) => (
                         <TableRow key={m.id}>
                           <TableCell>
                             {isAdesao(m) ? (
