@@ -1406,107 +1406,110 @@ function NovoContratoForm({
                 parcela.
               </p>
             </div>
-            <div className="col-span-2 border-t pt-3">
-              {(() => {
-                const convenioMaxDep = Number(convenio?.max_dependentes ?? 0) || 0;
-                const faixaSel = faixaId ? faixas.find((f) => f.id === faixaId) : null;
-                const titularOcupa = titularApenasFinanceiro ? 0 : 1;
-                const maxDepWiz =
-                  faixaSel && faixaSel.vidas_ate != null
-                    ? Math.max(0, Number(faixaSel.vidas_ate) - titularOcupa)
-                    : convenioMaxDep;
-                const cheio = convenio && deps.length >= maxDepWiz;
-                return (
-                  <>
-                    <Label>{convenio ? `Dependentes (${deps.length}/${maxDepWiz})` : "Dependentes"}</Label>
-                    {cheio ? (
-                      <div className="w-full mt-1 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                        {maxDepWiz === 0
-                          ? "Faixa/convênio não permite dependentes. Aumente a faixa ou marque o titular como apenas financeiro."
-                          : `Limite da faixa atingido (${deps.length}/${maxDepWiz}). Aumente a faixa ou marque o titular como apenas financeiro.`}
-                      </div>
-                    ) : (
-                <div className="mt-1">
-                  <PatientSearchInput
-                    clinicaIdsOverride={[clinicaId]}
-                    placeholder="Adicionar dependente — busque por nome, CPF, prontuário…"
-                    onSelect={async (p) => {
-                      if (!p) return;
-                      if (p.id === titular?.id) {
-                        toast.error("Esse paciente já é o titular.");
-                        return;
-                      }
-                      if (deps.find((d) => d.id === p.id)) {
-                        toast.error("Dependente já adicionado.");
-                        return;
-                      }
-                      const full = await carregarPacienteCompleto(p);
-                      addDep(full);
-                    }}
-                    onRequestCreate={(q) => setQuickCreate({ alvo: "dependente", nome: q })}
-                  />
-                </div>
-                    )}
-                  </>
-                );
-              })()}
-              {deps.length > 0 ? (
-                <div className="mt-2 space-y-1">
-                  {deps.map((d, i) => (
-                    <div key={d.id} className="grid grid-cols-12 gap-2 items-center">
-                      <span className="col-span-12 sm:col-span-3 text-sm truncate flex items-center gap-1">
-                        {d.nome}
-                        {d.face_descriptor && d.face_descriptor.length > 0 ? (
-                          <Check className="h-3 w-3 text-green-600" />
-                        ) : null}
-                      </span>
-                      <Select
-                        value={d.parentesco}
-                        onValueChange={(v) => setDeps(deps.map((x, j) => (j === i ? { ...x, parentesco: v } : x)))}
-                      >
-                        <SelectTrigger className="col-span-6 sm:col-span-3 h-8">
-                          <SelectValue placeholder="Parentesco" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Filho(a)">Filho(a)</SelectItem>
-                          <SelectItem value="Cônjuge">Cônjuge</SelectItem>
-                          <SelectItem value="Pai">Pai</SelectItem>
-                          <SelectItem value="Mãe">Mãe</SelectItem>
-                          <SelectItem value="Irmão(ã)">Irmão(ã)</SelectItem>
-                          <SelectItem value="Outro">Outro</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <div className="col-span-6 sm:col-span-2 text-xs text-muted-foreground self-center">Dependente</div>
-                      {podeEscrever && (
-                        <Button size="sm" variant="outline" className="col-span-6 sm:col-span-2 h-8" onClick={() => setFaceOpen(i)}>
-                          <Camera className="h-3 w-3 mr-1" />
-                          {d.face_descriptor?.length ? "Refazer" : "Foto"}
-                        </Button>
-                      )}
-                      {podeEscrever && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="col-span-3 sm:col-span-1 h-8 px-0"
-                          onClick={() => setEditarPaciente({ alvo: i })}
-                          title="Editar e-mail e telefone"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="col-span-3 sm:col-span-1"
-                        onClick={() => setDeps(deps.filter((_, j) => j !== i))}
-                      >
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+
+            {/* ====== SEÇÃO DE DEPENDENTES ====== */}
+<div className="col-span-2 border-t pt-3">
+  {(() => {
+    const faixaSel = faixaId ? faixas.find((f) => f.id === faixaId) : null;
+    const titularOcupa = titularApenasFinanceiro ? 0 : 1;
+    
+    // 🔥 O número de dependentes É O vidas_de
+    const maxDepWiz = Math.max(0, Number(faixaSel?.vidas_de ?? 0) - (titularApenasFinanceiro ? 1 : 0));
+    
+    const qtdAtual = deps.length;
+    const podeAdicionar = qtdAtual < maxDepWiz;
+
+    return (
+      <>
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-semibold">
+            Dependentes {maxDepWiz > 0 ? `(${qtdAtual}/${maxDepWiz})` : '(nenhum permitido)'}
+          </Label>
+          {podeAdicionar && maxDepWiz > 0 && (
+            <Button size="sm" variant="outline" onClick={() => setDepOpen(true)}>
+              <Plus className="h-3 w-3 mr-1" /> Adicionar
+            </Button>
+          )}
+        </div>
+
+        {podeAdicionar && maxDepWiz > 0 && (
+          <div className="mt-1">
+            <PatientSearchInput
+              clinicaIdsOverride={[clinicaId]}
+              placeholder="Adicionar dependente — busque por nome, CPF, prontuário…"
+              onSelect={async (p) => {
+                if (!p) return;
+                if (p.id === titular?.id) {
+                  toast.error("Esse paciente já é o titular.");
+                  return;
+                }
+                if (deps.find((d) => d.id === p.id)) {
+                  toast.error("Dependente já adicionado.");
+                  return;
+                }
+                const full = await carregarPacienteCompleto(p);
+                addDep(full);
+              }}
+              onRequestCreate={(q) => setQuickCreate({ alvo: "dependente", nome: q })}
+            />
+          </div>
+        )}
+
+        {deps.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {deps.map((d, i) => (
+              <div key={d.id || i} className="grid grid-cols-12 gap-2 items-center rounded-md border p-2 bg-muted/20">
+                <span className="col-span-12 sm:col-span-4 text-sm truncate">
+                  {d.nome}
+                </span>
+                <Select
+                  value={d.parentesco}
+                  onValueChange={(v) => setDeps(deps.map((x, j) => (j === i ? { ...x, parentesco: v } : x)))}
+                >
+                  <SelectTrigger className="col-span-6 sm:col-span-3 h-8">
+                    <SelectValue placeholder="Parentesco" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Filho(a)">Filho(a)</SelectItem>
+                    <SelectItem value="Cônjuge">Cônjuge</SelectItem>
+                    <SelectItem value="Pai">Pai</SelectItem>
+                    <SelectItem value="Mãe">Mãe</SelectItem>
+                    <SelectItem value="Irmão(ã)">Irmão(ã)</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="col-span-3 sm:col-span-1"
+                  onClick={() => setDeps(deps.filter((_, j) => j !== i))}
+                >
+                  <Trash2 className="h-3 w-3 text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {qtdAtual === 0 && maxDepWiz > 0 && (
+          <div className="mt-2 rounded-md border border-dashed border-primary/30 bg-primary/5 p-4 text-center">
+            <p className="text-sm text-muted-foreground">
+              Este convênio permite até <strong>{maxDepWiz} dependente{maxDepWiz > 1 ? 's' : ''}</strong>.
+            </p>
+          </div>
+        )}
+
+        {qtdAtual >= maxDepWiz && maxDepWiz > 0 && (
+          <div className="w-full mt-1 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            ✅ Limite de {maxDepWiz} dependente{maxDepWiz > 1 ? 's' : ''} atingido.
+          </div>
+        )}
+      </>
+    );
+  })()}
+</div>
+
+            {/* ====== OBSERVAÇÕES ====== */}
             <div className="col-span-2">
               <Label>Observações</Label>
               <Textarea
@@ -1515,30 +1518,18 @@ function NovoContratoForm({
                 maxLength={OBS_MAX}
                 onChange={(e) => setObs(e.target.value)}
               />
-              <p
-                className={`text-xs mt-1 text-right ${
-                  obsSanitizedLen > OBS_MAX ? "text-red-600" : "text-muted-foreground"
-                }`}
-              >
+              <p className={`text-xs mt-1 text-right ${obsSanitizedLen > OBS_MAX ? "text-red-600" : "text-muted-foreground"}`}>
                 {obsSanitizedLen} / {OBS_MAX} caracteres
               </p>
             </div>
           </div>
+
+          {/* ====== BOTÕES ====== */}
           <div className="flex justify-end gap-2 border-t pt-4">
             <Button variant="ghost" onClick={onBack}>
               Cancelar
             </Button>
-            <Button
-              onClick={salvar}
-              disabled={!podeSalvar || !podeEscrever}
-              title={
-                titularContratoAtivo !== null
-                  ? `Titular já possui contrato ativo #${titularContratoAtivo}`
-                  : obsSanitizedLen > OBS_MAX
-                    ? `Observações excedem ${OBS_MAX} caracteres`
-                    : undefined
-              }
-            >
+            <Button onClick={salvar} disabled={!podeSalvar || !podeEscrever}>
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1552,6 +1543,7 @@ function NovoContratoForm({
               )}
             </Button>
           </div>
+
           {faceOpen !== null ? (
             <FaceCaptureDialog
               open={faceOpen !== null}
