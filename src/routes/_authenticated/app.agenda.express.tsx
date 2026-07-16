@@ -258,7 +258,21 @@ function AgendaExpressPage() {
           <h1 className="text-2xl font-bold">Agendamento Express</h1>
           <p className="text-sm text-muted-foreground">4 passos, poucos cliques.</p>
         </div>
-        <Button variant="ghost" asChild><Link to="/app/agenda">Agenda completa</Link></Button>
+        <div className="inline-flex rounded-full border bg-card p-0.5">
+          <Link
+            to="/app/agenda"
+            className="px-2 py-1 text-[11px] font-medium rounded-full transition-colors text-muted-foreground hover:text-foreground"
+          >
+            Agenda completa
+          </Link>
+          <Link
+            to="/app/agenda/express"
+            activeProps={{ className: "px-2 py-1 text-[11px] font-medium rounded-full transition-colors bg-primary text-primary-foreground" }}
+            inactiveProps={{ className: "px-2 py-1 text-[11px] font-medium rounded-full transition-colors text-muted-foreground hover:text-foreground" }}
+          >
+            Agenda Express
+          </Link>
+        </div>
         <TurboModeToggle />
       </header>
 
