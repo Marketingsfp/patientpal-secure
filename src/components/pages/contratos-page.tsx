@@ -3063,6 +3063,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-medium">
                     Dependentes ({depsAtivos.length}/{maxDep})
+                    {depsAtivos.length >= maxDep && (
+                      <span className="ml-2 text-xs font-normal text-amber-600">
+                        Limite da faixa atingido. Aumente a faixa ou marque o titular como apenas financeiro.
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {podeEscrever && (
