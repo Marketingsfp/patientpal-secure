@@ -996,8 +996,6 @@ function NovoContratoForm({
     // Gerar cobrancas: taxa de adesao separada da mensalidade.
     const base = new Date(dataInicio + "T00:00:00");
     const valorParcela = valor + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
-    const primeiraData = new Date(base.getFullYear(), base.getMonth(), diaVenc);
-    const primeiraVencimento = primeiraData.toISOString().slice(0, 10);
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
       const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
       const jaPago = i < mensalidadesJaPagas;
