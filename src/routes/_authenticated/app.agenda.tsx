@@ -5630,15 +5630,9 @@ function AgendaPage() {
                       {ocultarPaciente ? (
                         <span className="text-xs italic text-rose-600">— aguardando estorno —</span>
                       ) : ehLivre ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openSlot(a)}
-                          className="h-6 px-2 text-primary hover:text-primary/80 font-medium text-xs"
-                        >
-                          <UserPlus className="h-3 w-3 mr-1" />
-                          Agendar
-                        </Button>
+                        <span className="text-sm font-medium text-primary/60">
+                          Nenhum paciente agendado
+                        </span>
                       ) : (
                         <button
                           type="button"
@@ -5652,7 +5646,7 @@ function AgendaPage() {
                           {a.paciente_id && (
                             <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={16} />
                           )}
-                          <span className="truncate max-w-[110px]">{a.paciente_nome}</span>
+                          <span className="truncate max-w-[300px]">{a.paciente_nome}</span>
                           {a.orcamento_numero && (
                             <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
                               ORÇ
@@ -5687,22 +5681,28 @@ function AgendaPage() {
                       {fmtHora(a.inicio)} - {fmtHora(a.fim)}
                     </TableCell>
 
-                    {/* Situação */}
-                    <TableCell className="py-1.5">
-                      {ehLivre ? (
-                        <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 text-xs">
-                          Livre
-                        </Badge>
-                      ) : estornoPend ? (
-                        <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-xs">
-                          Estorno solicitado
-                        </Badge>
-                      ) : (
-                        <Badge className={`${STATUS_COR[a.status]} text-xs`}>
-                          {STATUS_LABEL[a.status]}
-                        </Badge>
-                      )}
-                    </TableCell>
+                   {/* Situação */}
+<TableCell className="py-2.5">
+  {ehLivre ? (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => openSlot(a)}
+      className="h-7 px-3 text-emerald-600 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 font-medium text-xs w-full"
+    >
+      <UserPlus className="h-3 w-3 mr-1.5" />
+      Agendar
+    </Button>
+  ) : estornoPend ? (
+    <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-xs">
+      Estorno solicitado
+    </Badge>
+  ) : (
+    <Badge className={`${STATUS_COR[a.status]} text-xs`}>
+      {STATUS_LABEL[a.status]}
+    </Badge>
+  )}
+</TableCell>
 
                     {/* Ações - Botões na linha + Menu */}
                     <TableCell className="py-1.5 text-right">
