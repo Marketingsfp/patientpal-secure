@@ -1689,6 +1689,16 @@ function DetalheContrato({
   const [faixas, setFaixas] = useState<Faixa[]>([]);
   const [loading, setLoading] = useState(true);
   const gerarBoletosFn = useServerFn(gerarBoletosContrato);
+  // NFS-e a partir da parcela paga (mensalidade/taxa adesão).
+  // Reaproveita o mesmo picker/prompt usados no Financeiro › Atendimentos.
+  const emitirNfseFn = useServerFn(emitirNfse);
+  const consultarNfseFn = useServerFn(consultarNfse);
+  const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
+  const { prompt: pedirDescricaoNfse, dialog: descricaoNfseDialog } = usePromptDescricaoNfse();
+  const [emitentes, setEmitentes] = useState<Array<{ id: string; nome: string }>>([]);
+  const [emitenteId, setEmitenteId] = useState<string>("");
+  const [nfsePorLancamento, setNfsePorLancamento] = useState<Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }>>({});
+  const [nfseEmitindoId, setNfseEmitindoId] = useState<string | null>(null);
 
   // Inclusão/exclusão de dependentes pós-venda
   const [incOpen, setIncOpen] = useState(false);
