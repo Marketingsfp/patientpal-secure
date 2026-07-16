@@ -238,6 +238,20 @@ export const emitirNfse = createServerFn({ method: "POST" })
     // cnpj_prestador ou cpf_prestador não informado" (requisicao_invalida).
     const cpfCnpjTomador = only(data.tomador.cpfCnpj);
     const tomadorCodMun = tomadorCodigoMunicipio ?? emitente.codigo_municipio;
+    // Endereço do tomador para o Ambiente Nacional (DPS). Sem estes campos a
+    // NFS-e sai com o endereço que a Receita tem cadastrado para o CPF/CNPJ,
+    // ignorando o cadastro do cliente na clínica. Só envia quando há
+    // logradouro cadastrado — do contrário o schema rejeita campos vazios.
+    const enderecoTomadorNacional = data.tomador.logradouro
+      ? {
+          logradouro_tomador: data.tomador.logradouro,
+          numero_tomador: data.tomador.numero ?? "S/N",
+          bairro_tomador: data.tomador.bairro ?? "Centro",
+          cep_tomador: only(data.tomador.cep) || undefined,
+          codigo_municipio_tomador: Number(tomadorCodMun),
+          uf_tomador: data.tomador.uf ?? emitente.uf,
+        }
+      : {};
     const payloadNacional = {
       data_emissao: dataEmissaoBR,
       serie_dps: Number(emitente.rps_serie ?? 1) || 1,
@@ -257,6 +271,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
       // do tomador) o schema rejeita: "Element 'toma': Missing child element(s).
       // Expected is one of (CAEPF, IM, xNome)".
       razao_social_tomador: data.tomador.nome,
+      ...enderecoTomadorNacional,
       codigo_municipio_prestacao: Number(tomadorCodMun),
       codigo_tributacao_nacional_iss: itemListaServico,
       ...(codigoTributarioMunicipio ? { codigo_tributacao_municipio: codigoTributarioMunicipio } : {}),
