@@ -455,12 +455,61 @@ function NfsePage() {
               | null
               | undefined;
             const erros = Array.isArray(body?.erros) ? body!.erros! : [];
+            const isE0014 =
+              erros.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014") ||
+              /j[áa]\s+existe/i.test(erroDetalhe.erro_mensagem ?? "");
             return (
               <div className="space-y-3 text-sm max-h-[60vh] overflow-auto">
                 {erroDetalhe.erro_mensagem && (
                   <div className="rounded-md border border-red-200 bg-red-50 p-3 text-red-900">
                     <div className="text-xs font-medium uppercase tracking-wide text-red-700">Mensagem</div>
                     <div className="mt-1 whitespace-pre-wrap break-words">{erroDetalhe.erro_mensagem}</div>
+                  </div>
+                )}
+                {isE0014 && erroDetalhe.emitente_id && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2 text-amber-900">
+                    <div className="text-xs font-semibold uppercase tracking-wide">Ação recomendada</div>
+                    <p className="text-sm">
+                      A prefeitura recusou porque o nº do RPS já foi usado. Avance o
+                      <strong> Próx. nº RPS</strong> do emitente para pular a faixa
+                      já consumida e tente reenviar.
+                    </p>
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Atual</label>
+                        <div className="h-9 px-2 rounded-md border bg-white text-sm flex items-center min-w-[80px]">
+                          {rpsAtual ?? "…"}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Novo</label>
+                        <Input
+                          className="h-9 w-28 bg-white"
+                          value={rpsNovoInput}
+                          onChange={(e) => setRpsNovoInput(e.target.value.replace(/\D/g, ""))}
+                          inputMode="numeric"
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={avancandoRps || !podeEscrever}
+                        onClick={() => void onAvancarRps(false)}
+                      >
+                        Só atualizar
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={avancandoRps || !podeEscrever}
+                        onClick={() => void onAvancarRps(true)}
+                      >
+                        {avancandoRps ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                        Avançar e reenviar
+                      </Button>
+                    </div>
+                    <p className="text-xs text-amber-800">
+                      Sugestão: pular ~30 números. Se cair novamente em E0014, aumente o salto.
+                    </p>
                   </div>
                 )}
                 {(body?.status || body?.codigo) && (
