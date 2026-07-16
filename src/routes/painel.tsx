@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ClinicaProvider, useClinica } from "@/hooks/use-clinica";
-import { Loader2, Sun, Moon } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/painel")({
   component: PainelRoute,
@@ -44,14 +44,22 @@ export function PainelPage() {
   const filaFalaRef = useRef<Array<{ key: string; senha: Senha }>>([]);
   const falandoRef = useRef<boolean>(false);
   const vozFemininaRef = useRef<SpeechSynthesisVoice | null>(null);
-  const [theme, setTheme] = useState<"dark" | "light">(() => {
-    if (typeof window === "undefined") return "dark";
-    return (localStorage.getItem("painel-theme") as "dark" | "light") ?? "dark";
+  // Modo automático: claro das 06h às 17h; escuro das 17h às 06h.
+  // Sem botão manual — a troca acontece sozinha ao longo do dia.
+  const [isLight, setIsLight] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const h = new Date().getHours();
+    return h >= 6 && h < 17;
   });
-  const isLight = theme === "light";
   useEffect(() => {
-    if (typeof window !== "undefined") localStorage.setItem("painel-theme", theme);
-  }, [theme]);
+    const tick = () => {
+      const h = new Date().getHours();
+      setIsLight(h >= 6 && h < 17);
+    };
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   // Destrava o áudio automaticamente no primeiro gesto do usuário em
   // QUALQUER lugar da página (política de autoplay dos navegadores).
@@ -333,14 +341,6 @@ export function PainelPage() {
           <h1 className={`truncate font-black uppercase tracking-tight ${t.heading} text-[clamp(1.25rem,3vw,2.5rem)]`}>{clinicaAtual.clinica.nome}</h1>
         </div>
         <div className="flex items-center gap-[clamp(0.75rem,1.5vw,1.5rem)] shrink-0">
-          <button
-            type="button"
-            onClick={() => setTheme(isLight ? "dark" : "light")}
-            aria-label={isLight ? "Mudar para modo escuro" : "Mudar para modo claro"}
-            className={`h-10 w-10 sm:h-11 sm:w-11 lg:h-12 lg:w-12 rounded-full flex items-center justify-center transition ${t.toggle}`}
-          >
-            {isLight ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-          </button>
           <div className={`font-medium tabular-nums ${t.clock} text-[clamp(1.25rem,2.5vw,2.5rem)]`}><PainelClock /></div>
         </div>
       </header>
