@@ -1,41 +1,27 @@
-## Objetivo
+## Problema
 
-Marcar a parcela 1 do contrato de BARBARA ELAINE BERNARDINO RAMOS como paga **apenas visualmente**, sem gerar lançamento financeiro, sem movimento de caixa e sem repasse — porque o pagamento aconteceu antes do sistema entrar em uso.
+Na página **Cartão Benefícios → Contratos**, a tabela mostra apenas ~10-12 contratos e a barra de paginação (Anterior / Próxima) fica cortada no rodapé.
 
-## Parcela identificada
+## Causa
 
-- Contrato: `a481ceae-4049-4c40-97e5-43627abc68cc` (BARBARA ELAINE BERNARDINO RAMOS)
-- Parcela 1 · Venc. 05/07/2026 · R$ 210,00
-- `id`: `e6a5e5c7-592d-4809-adf7-a5214965bceb`
-- Status atual: `pendente` · `lancamento_id`: null
+O componente `Table` está com `containerClassName="max-h-[70vh]"` (linha 516 de `src/components/pages/contratos-page.tsx`). Isso limita a altura do container da tabela a 70% da viewport (~447px em telas de ~640px de altura), forçando um scroll **interno** que:
 
-## O que vou fazer (via tool de insert/update)
+1. Corta as linhas além das ~12 primeiras (as outras 38 da página só aparecem rolando dentro da tabela — pouco intuitivo).
+2. Deixa a barra de paginação (que está fora do scroll interno, logo abaixo da tabela) empurrada para fora da viewport.
 
-Um único `UPDATE` em `contrato_mensalidades` na parcela acima:
+Como já existe paginação de 50 em 50, esse scroll interno é redundante.
 
-- `status` = `pago`
-- `pago_em` = `2026-07-06`
-- `valor_pago` = `210`
-- `forma_pagamento` = `dinheiro` (histórico externo ao sistema)
-- `observacoes` = "Pago em 06/07/2026, antes da entrada em uso do ClinicaOS. Baixa apenas visual — sem lançamento financeiro nem movimento de caixa."
-- `lancamento_id` fica **null** de propósito
+## Correção
 
-## O que **não** será alterado
+Remover o `max-h-[70vh]` do `Table`, deixando o scroll da página cuidar da rolagem. O cabeçalho continua `sticky top-0` e a barra de paginação fica logo abaixo dos 50 registros, visível junto do restante do conteúdo.
 
-- Nada em `fin_lancamentos` (não cria receita).
-- Nada em `caixa_movimentos` / `caixa_sessoes` (não altera fechamento de caixa).
-- Nada em `pagamento_splits` (não gera repasse para o profissional).
-- Nada nas outras 11 parcelas nem na taxa de adesão.
+### Arquivo afetado
+- `src/components/pages/contratos-page.tsx` — linha 516: trocar `<Table containerClassName="max-h-[70vh]" ...>` por `<Table className="max-lg:table max-lg:overflow-visible">` (sem `containerClassName`).
 
-## Efeito visual esperado
+## Antes x Depois
+- **Antes:** só ~12 linhas visíveis, scroll interno confuso, paginação cortada.
+- **Depois:** todas as 50 linhas da página renderizadas na sequência; paginação "Anterior / Página X de Y / Próxima" visível logo abaixo.
 
-- Card "Pagas" passa de `0/12` para `1/12`.
-- "Recebido" continua **R$ 0,00** (correto — o dinheiro não entrou pelo sistema).
-- "A receber" cai de R$ 2.520,00 para R$ 2.310,00.
-- Linha da parcela 1 mostra status **Pago** e a data 06/07/2026 em "Pago em".
-
-## Reversível?
-
-Sim. Basta um `UPDATE` voltando `status='pendente'`, `pago_em=null`, `valor_pago=null`, `forma_pagamento=null`, `observacoes=null` na mesma linha.
-
-Confirma que posso aplicar esse update?
+## Fora do escopo
+- Não altero a lógica de busca (`.limit(500)`), filtros, nem o tamanho de página (50).
+- Não mexo em outras telas que usam o mesmo componente `Table`.
