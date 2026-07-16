@@ -6760,6 +6760,14 @@ function AgendaPage() {
                               <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
                             )}
                             {a.paciente_id && <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={25} />}
+                            {a.paciente_id && convenioMap.has(a.paciente_id) && (
+                              <span
+                                title={`Cartão ${convenioMap.get(a.paciente_id)}`}
+                                className="shrink-0 inline-flex"
+                              >
+                                <IdCard className="h-3.5 w-3.5 text-emerald-600" />
+                              </span>
+                            )}
                             <span className="truncate max-w-[300px]">{a.paciente_nome}</span>
                             {a.orcamento_numero && (
                               <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
