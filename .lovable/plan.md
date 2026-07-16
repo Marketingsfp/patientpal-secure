@@ -1,35 +1,55 @@
-## Diagnóstico
 
-O agendamento das 08:40 do Dr. Milton apareceu como "EXAMES LABORATORIAIS", mas no banco o campo `procedimento` está **vazio** — a atendente salvou sem escolher procedimento. O texto vermelho circulado é apenas um rótulo de fallback da tela.
+## Objetivo
 
-O rótulo vem de `medicoEhLaboratorioFormulario` (`src/routes/_authenticated/app.agenda.tsx`, linhas 2232-2254): a regra atual marca o médico como "de laboratório" se **qualquer** procedimento do cadastro dele tiver `tipo_procedimento = 'laboratorio'`. O Dr. Milton tem cadastrado "PROCEDIMENTOS, ANALISE DE LABORATORIO A PARTIR" (tipo=laboratorio) como cobrança avulsa, então toda a agenda dele foi rotulada como lab.
+Quando um pagamento é lançado com **data retroativa** (ex.: hoje é 16/07 e a data do pagamento é 13/07), o movimento de caixa deve pertencer ao **dia do pagamento**, e não à sessão aberta de hoje. O lançamento no Financeiro (`fin_lancamentos.data`) continua correto — o problema está apenas em `caixa_movimentos`.
 
-## Correções
+## Diagnóstico (o que acontece hoje)
 
-### 1. Médico só é "de laboratório" pela especialidade
+- O diálogo de pagamento chama a função de banco `fn_registrar_lancamento_e_caixa`.
+- Ela grava `fin_lancamentos.data = 13/07` corretamente.
+- Mas para `caixa_movimentos` ela pega **sempre a sessão de caixa aberta do usuário no momento** (a de hoje) e usa `created_at = now()`. Por isso o recebimento aparece em "Meus movimentos" de hoje.
+- A tela "Meu caixa → Movimentos" lista por `sessao_id`, então o movimento fica atrelado ao caixa errado.
 
-Em `src/routes/_authenticated/app.agenda.tsx`, `medicoEhLaboratorioFormulario`: remover o bloco que varre `opcoesProcedimentoMedico` procurando `tipo_procedimento='laboratorio'`. Manter apenas a checagem pela `especialidade_nome` do médico e pelas `medico_especialidades` contendo "laborat". Resultado: Dr. Milton (Dermato + Clínico Geral) deixa de ser tratado como laboratório, o rótulo cai para "CONSULTA" e o comportamento operacional de lab (agrupamento multi-exames, contagem, texto no serviço) não se aplica mais a ele.
+## O que vai mudar
 
-Efeito colateral revisado: a mesma função é usada em outros pontos do arquivo (rótulo de fallback, texto na coluna Serviço, filtros multi-exame, agrupamento de orçamento). Todos passam a exigir que o médico tenha especialidade "Laboratório" — coerente com a regra pedida.
+Alterar a função `fn_registrar_lancamento_e_caixa` para decidir a sessão de destino com base na **data do lançamento** (`p_lancamento.data`):
 
-### 2. Procedimento obrigatório ao salvar agendamento
+1. Se `data = hoje` → comportamento atual (sessão aberta do usuário, cria uma se não houver).
+2. Se `data < hoje` (retroativo):
+   - Procurar a **sessão do próprio usuário** que cubra aquele dia (aberta naquele dia ou fechada no dia — comparando `aberto_em::date` ou `fechado_em::date` com `p_lancamento.data`).
+   - Se existir sessão **aberta** desse dia: anexar o movimento nela (`created_at = data 12:00`).
+   - Se existir sessão **fechada** desse dia: anexar o movimento com `created_at` no dia; **atualizar** `valor_fechamento_calculado` (somando o valor) e `diferenca = valor_fechamento_informado − novo valor_fechamento_calculado`. **Não** mexer em `valor_fechamento_informado` (foi conferido em espécie no dia) e **não** reabrir a sessão. Acrescentar em `observacoes` uma nota tipo `[Retroativo lançado em 16/07/26 por <usuário>: +R$ 110,00]`.
+   - Se **não existir** nenhuma sessão do usuário naquele dia: criar uma sessão **já fechada** rotulada como "Sessão retroativa" com `aberto_em`/`fechado_em` = 13/07 12:00, `valor_abertura = 0`, `valor_fechamento_informado = valor`, `valor_fechamento_calculado = valor`, `diferenca = 0`, observação explicando a origem — e inserir o movimento nela.
+   - Nunca criar uma sessão aberta em data passada (evita duas sessões abertas ao mesmo tempo).
 
-Duas camadas:
+3. `caixa_movimentos.created_at` para movimentos retroativos passa a ser preenchido explicitamente com a data do lançamento (12:00 local em UTC), para que a coluna "Data/Hora" da grade reflita 13/07 corretamente e o `ORDER BY created_at` já ordene certo.
 
-- **UI (`app.agenda.tsx`, `submit`)**: antes de chamar `criarAgendamento`, validar `form.procedimento?.trim()`. Se vazio, `toast.error("Selecione o procedimento antes de salvar")` e abortar. Marcar o campo como obrigatório visualmente.
-- **Server (`src/lib/agenda/criar-agendamento.functions.ts`)**: adicionar validação no início do handler — se `data.procedimento` estiver vazio/nulo, `throw new Error("Procedimento é obrigatório")`. Isso protege também a Agenda V2 e qualquer outra tela que use a mesma função (regra do `docs/agenda/criar-agendamento-shared.md`).
+## Efeitos na UI
 
-Fica fora do escopo desta correção: alterar agendamentos já existentes sem procedimento (como o 622d3d6a da Adriny). Eles continuam válidos; se quiserem, faço um relatório separado listando os registros com `procedimento` vazio para revisão manual.
+- A grade "Meu caixa → Movimentos" já busca todas as sessões recentes do usuário; o lançamento passará a aparecer sob a sessão de 13/07, junto com os outros movimentos daquele dia, com data 13/07.
+- O saldo/fechamento de hoje não será mais inflado por retroativos.
+- Aba "Todos (Financeiro)" e relatórios continuam corretos (usam `fin_lancamentos.data`).
+- Nenhuma tela precisa ser reescrita — só ajustes pontuais se algum filtro depender do dia atual.
 
-### 3. Verificação
+## Áreas críticas / riscos (AGENTS.md §1.9)
 
-- Recarregar a agenda do dia 14/07 do Dr. Milton — a linha 08:40 deve aparecer sem procedimento (ainda vazio no banco) e o rótulo de fallback deve ser "CONSULTA", não "EXAMES LABORATORIAIS".
-- Tentar salvar um novo agendamento sem selecionar procedimento — deve ser bloqueado com toast de erro.
-- Abrir a agenda de um médico realmente de laboratório — comportamento lab (multi-exame, rótulo) deve continuar igual.
-- `tsgo` sem erros.
+- Alteração de sessão **já fechada**: apenas soma no campo calculado e recalcula diferença, preservando o valor informado. Existe risco de o relatório de fechamento do dia mostrar diferença nova; por isso a observação de auditoria é obrigatória.
+- Estorno de um retroativo: já usa `lancamento_id` para localizar o movimento — continua funcionando.
+- Permissões: mantém-se como está — qualquer usuário com acesso ao Financeiro pode lançar retroativo, motivo obrigatório (comportamento atual preservado).
 
-## Fora do escopo
+## Passos técnicos
 
-- Reclassificar o procedimento "PROCEDIMENTOS, ANALISE DE LABORATORIO A PARTIR" no cadastro (pode ser feito depois pela equipe se quiserem tirar o `tipo_procedimento='laboratorio'` dele).
-- Backfill dos agendamentos antigos com procedimento vazio.
-- Mudanças na regra de contagem de atendimentos (`src/lib/agenda/contagem.ts`) — ela já usa `procedimentos.tipo_procedimento` como fonte primária e não depende dessa heurística.
+1. **Migration** — substituir `fn_registrar_lancamento_e_caixa` pela versão com o roteamento por data descrito acima.
+2. **Front-end** (`src/components/financeiro/lancamento-dialog.tsx`) — nenhuma alteração de contrato; a função continua recebendo `p_lancamento.data`. Apenas confirmar que a data selecionada é enviada (já é).
+3. **Validação pós-alteração**:
+   - Lançar um pagamento com data = hoje → deve ir para a sessão aberta (comportamento antigo).
+   - Lançar retroativo com o dia 13/07 (sessão fechada existente) → deve aparecer na grade sob 13/07; saldo de hoje inalterado; `valor_fechamento_calculado` da sessão de 13/07 aumentado; `diferenca` recalculada; observação de auditoria adicionada.
+   - Lançar retroativo em um dia sem sessão do usuário → cria sessão retroativa fechada; movimento aparece nela.
+   - Solicitar estorno do retroativo → continua funcionando.
+4. Relatar **antes/depois** ao usuário com o resumo do que foi ajustado e o que foi validado.
+
+## Fora de escopo
+
+- Não altero perfil/permissão de quem lança retroativo.
+- Não mexo em outros fluxos (repasse médico, sangria, suprimento, estorno avulso, abertura/fechamento manual).
+- Não altero relatórios financeiros — eles já usam `fin_lancamentos.data`.
