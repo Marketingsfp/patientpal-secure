@@ -713,6 +713,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     a.paciente_id ?? null,
     clinicaId,
   );
+  const vinculoConv = await resolveVinculoConvenio(a.paciente_id ?? null, clinicaId);
 
   const ticketHtml = `
   <div class="ticket">
@@ -731,6 +732,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
     ${convLabel ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabel)}</span></div>` : ""}
+    ${renderLinhaVinculo(vinculoConv)}
 
     <div class="sep"></div>
 
