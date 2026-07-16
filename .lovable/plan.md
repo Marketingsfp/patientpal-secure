@@ -1,43 +1,35 @@
-## Ajuste dos pagamentos retroativos lançados hoje
+## Objetivo
+Permitir marcar mensalidades como "já pagas anteriormente" **em contratos já criados**, sem precisar cancelar e refazer a venda, e sem gerar lançamento no caixa (é histórico, o dinheiro não entrou agora).
 
-### O que foi encontrado
+Hoje esse campo só existe na tela de criação. Já existe um `retroDialog` interno, mas ele só dispara quando o usuário move a data de início para o passado — não há entrada manual.
 
-Consultando `caixa_movimentos` de hoje (16/07/26) cujo `fin_lancamentos.data` é anterior, encontrei **15 movimentos** de 4 operadoras que caíram na sessão aberta de hoje quando deveriam ter ido para o caixa do dia do pagamento:
+## Onde mexer
+Arquivo único: `src/components/pages/contratos-page.tsx`.
 
-| Operadora | Data do pagamento | Qtd | Total | Sessão destino |
-|---|---|---:|---:|---|
-| EDNALDA PAULINA DE OLIVEIRA | 13/07 | 1 | R$ 110,00 | `b0e4bcba` (13/07, fechada) |
-| MAYARA APARECIDA VIANA LUCENA | 13/07 | 4 | R$ 324,00 | `e9c3c272` (13/07, fechada) |
-| SUELLEN ALEXANDRE BATISTA | 13/07 | 6 | R$ 710,00 | `f950176a` (13/07, fechada) |
-| SUELLEN ALEXANDRE BATISTA | 14/07 | 4 | R$ 239,98 | `c6b455ae` (14/07, fechada) |
+### 1. Botão global no cabeçalho de "Mensalidades"
+Ao lado de "Adicionar parcela", incluir botão **"Ajustar mensalidades já pagas"** (só visível se `podeEscrever` e contrato ativo).
 
-Não incluí a QUÉDIMA SUELEN (2 movs de 15/07, R$ 440): já estão na sessão dela do dia 15/07 (que só foi fechada hoje de manhã) — nada a mover.
+- Abre o `retroDialog` existente, pré-preenchido com `dataInicio = contrato.data_inicio` e uma sugestão baseada em meses decorridos.
+- Reaproveita `regerarComPagas(n)` que já apaga as 12 parcelas e regera com as N primeiras como `status=pago`, `pago_em`, `valor_pago` — **sem criar lançamento financeiro** (mesmo comportamento atual do fluxo de data retroativa).
+- Ajustar o texto do diálogo para deixar claro: "Marca as N primeiras parcelas como pagas historicamente. Não gera movimento no caixa."
 
-### Ajuste proposto
+### 2. Ação por linha (opcional, mais cirúrgico)
+Na tabela de mensalidades, em cada parcela `pendente`, adicionar item no menu de ações: **"Marcar como paga (histórica)"**.
 
-Para cada bloco acima, uma única migração (`INSERT/UPDATE`):
+- Atualiza a linha: `status='pago'`, `pago_em = vencimento`, `valor_pago = valor`, sem tocar em `contrato_mensalidades.lancamento_id` nem em `fin_lancamentos` / `caixa_movimentos`.
+- Confirmação: "Esta parcela será marcada como paga historicamente e **não** aparecerá no caixa. Use apenas para regularizar pagamentos feitos fora do sistema."
+- Espelhar botão **"Reverter para pendente"** só quando `pago_em` existe **e** não há `lancamento_id` (para não conflitar com o fluxo de estorno existente, que já cuida de pagamentos com lançamento no caixa).
 
-1. `UPDATE caixa_movimentos` dos 15 IDs afetados:
-   - `sessao_id` = sessão fechada do usuário no dia do pagamento;
-   - `created_at` = data do pagamento às 12:00 UTC (para que o histórico "Meu caixa" exiba na data certa).
-2. `UPDATE caixa_sessoes` das 4 sessões de destino:
-   - recalcular `valor_fechamento_calculado` somando os movimentos após anexar;
-   - recalcular `diferenca = valor_fechamento_calculado - valor_fechamento_informado`;
-   - **preservar `valor_fechamento_informado`** (foi conferido em espécie na época);
-   - acrescentar linha em `observacoes` do tipo "Ajuste 16/07: anexados N mov(s), total R$ X.XX (lançados retroativamente hoje)."
+### 3. Nada de mudança no schema, nada de RLS
+As colunas `status`, `pago_em`, `valor_pago` já existem em `contrato_mensalidades`. Regras de escrita já passam pelo `podeEscrever` do módulo.
 
-Nada é feito nas sessões abertas de hoje (16/07) — os valores simplesmente saem do saldo diário, que é o comportamento esperado.
+## Validação
+- Typecheck.
+- Testar em contrato ativo: abrir "Ajustar mensalidades já pagas" → informar 2 → confirmar que parcelas 1–2 ficam `pago` sem aparecer no caixa e 3–12 seguem pendentes.
+- Testar ação por linha: marcar parcela 5 como paga histórica; conferir que não gerou movimento em `/app/caixa`.
+- Confirmar que o botão de estorno existente **não aparece** em parcelas históricas (não têm `lancamento_id`), e que o botão "Reverter para pendente" limpa `status/pago_em/valor_pago`.
 
-### Efeitos
-
-- **Antes:** R$ 1.383,98 aparecendo no caixa de hoje das 3 operadoras (Ednalda, Mayara, Suellen).
-- **Depois:** cada valor volta ao caixa do dia de origem; a diferença de cada sessão fechada fica registrada (valor informado permanece intacto).
-- Relatórios financeiros baseados em `fin_lancamentos.data` não mudam (já estavam corretos).
-
-### Segurança
-
-- Só toca 15 movimentos + 4 sessões, todos identificados por ID.
-- Nenhuma alteração em outras operadoras, dias ou fluxos.
-- Reversível: as observações registram os IDs anexados, então dá para desfazer manualmente se necessário.
-
-Se aprovado, executo a migração única com todos os 4 blocos de UPDATE.
+## Fora do escopo
+- Não altero o fluxo de pagamento normal (GR, lançamento, caixa).
+- Não mexo em contratos cancelados nem no cancelamento em si.
+- Não altero cálculo de `Pagas`, `Recebido`, `A receber` — eles já leem `status`/`valor_pago`, então passam a refletir sozinho.
