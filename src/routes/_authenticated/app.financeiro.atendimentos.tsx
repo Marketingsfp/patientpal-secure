@@ -651,8 +651,10 @@ function AtendimentosPage() {
           municipio: p.cidade ?? undefined,
           uf: p.estado ?? undefined,
         },
+        valorBase: valor,
       });
       if (!tomador) { setNfseEmitting(false); toast.error("Emissão cancelada."); return; }
+      const parcial = aplicarValorParcial(valor, tomador);
       // Sempre compõe a discriminação com procedimento + paciente + data de
       // referência, mesmo se o usuário deixou o campo do diálogo em branco.
       const dataRef = a.agendamento_inicio ?? a.data;
@@ -663,9 +665,10 @@ function AtendimentosPage() {
             pacienteNome: p.nome,
             dataReferencia: dataRef,
           });
-      const descSugerida = tomador.dependenteAtendido
+      const descComDep = tomador.dependenteAtendido
         ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
         : descBase;
+      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
       const descFinal = await pedirDescricaoNfse(descSugerida);
       if (!descFinal) { setNfseEmitting(false); toast.error("Emissão cancelada."); return; }
       const res = await emitirNfseFn({
@@ -674,7 +677,7 @@ function AtendimentosPage() {
           pacienteId: p.id,
           agendamentoId: a.agendamento_id ?? undefined,
           pagamentoId: a.id ?? undefined,
-          valorServicos: valor,
+          valorServicos: parcial.valor,
           descricaoServicos: descFinal,
           tomador,
         },
