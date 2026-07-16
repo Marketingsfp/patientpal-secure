@@ -6,6 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+const SERVICOS_PRESET = [
+  "Serviços laboratoriais",
+  "Serviços de clínica médica",
+  "Serviços de diagnóstico de imagem",
+];
+
 /**
  * Hook que abre um modal para o usuário revisar/editar a descrição
  * da NFS-e antes de emitir. Retorna o texto final ou `null` se cancelado.
@@ -47,6 +53,19 @@ export function usePromptDescricaoNfse() {
         </DialogHeader>
         <div className="space-y-2">
           <Label>Descrição</Label>
+          <div className="flex flex-wrap gap-2">
+            {SERVICOS_PRESET.map((s) => (
+              <Button
+                key={s}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setTexto(s)}
+              >
+                {s}
+              </Button>
+            ))}
+          </div>
           <Textarea
             rows={6}
             value={texto}
