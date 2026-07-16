@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/_authenticated/app/nfse/")({
   component: NfsePage,
@@ -51,6 +52,9 @@ function NfsePage() {
   const [loading, setLoading] = useState(false);
   const [erroDetalhe, setErroDetalhe] = useState<Row | null>(null);
   const [pdfVisualizando, setPdfVisualizando] = useState<Row | null>(null);
+  const [rpsAtual, setRpsAtual] = useState<number | null>(null);
+  const [rpsNovoInput, setRpsNovoInput] = useState<string>("");
+  const [avancandoRps, setAvancandoRps] = useState(false);
   const baixarArquivo = useServerFn(baixarNfseArquivo);
 
   useEffect(() => {
@@ -98,6 +102,22 @@ function NfsePage() {
     return () => { cancelled = true; clearInterval(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows.map((r) => `${r.id}:${r.status}`).join("|")]);
+
+  // Ao abrir o diálogo de erro, carrega o "Próx. nº RPS" atual do emitente
+  // para permitir avançar o contador rapidamente (útil no erro E0014).
+  useEffect(() => {
+    if (!erroDetalhe?.emitente_id) { setRpsAtual(null); setRpsNovoInput(""); return; }
+    void (async () => {
+      const { data } = await supabase
+        .from("nfse_emitentes")
+        .select("rps_proximo_numero")
+        .eq("id", erroDetalhe.emitente_id!)
+        .maybeSingle();
+      const atual = Number(data?.rps_proximo_numero ?? 1);
+      setRpsAtual(atual);
+      setRpsNovoInput(String(atual + 30));
+    })();
+  }, [erroDetalhe?.id, erroDetalhe?.emitente_id]);
 
   const filtrados = useMemo(() => rows.filter((r) => {
     if (filtroEmitente !== "todos" && r.emitente_id !== filtroEmitente) return false;
