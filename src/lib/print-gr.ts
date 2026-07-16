@@ -155,6 +155,58 @@ async function resolveConvLabel(
   return "CONVÊNIO";
 }
 
+/**
+ * Verifica se o paciente tem contrato ativo do cartão de benefícios/convênio
+ * na clínica atual — como titular ou dependente — independente do
+ * `tipo_atendimento` do agendamento. Usado para imprimir na GR o plano/
+ * vínculo mesmo quando o pagamento foi feito no particular.
+ */
+async function resolveVinculoConvenio(
+  pacienteId: string | null | undefined,
+  clinicaId: string,
+): Promise<{ convenioNome: string; vinculo: "titular" | "dependente"; titularNome?: string } | null> {
+  if (!pacienteId) return null;
+  try {
+    const { data: titular } = await supabase
+      .from("contratos_assinatura")
+      .select("id, cb_convenios(nome)")
+      .eq("clinica_id", clinicaId)
+      .eq("status", "ativo")
+      .eq("paciente_id", pacienteId)
+      .limit(1);
+    const t0 = ((titular ?? []) as any[])[0];
+    const nomeT = t0?.cb_convenios?.nome;
+    if (nomeT) return { convenioNome: String(nomeT).toUpperCase(), vinculo: "titular" };
+
+    const { data: deps } = await supabase
+      .from("contrato_dependentes")
+      .select("contratos_assinatura!inner(id,clinica_id,status,paciente_nome,cb_convenios(nome))")
+      .eq("paciente_id", pacienteId)
+      .eq("ativo", true)
+      .limit(5);
+    const cand = ((deps ?? []) as any[])
+      .map((d) => d.contratos_assinatura)
+      .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
+    const nomeD = cand?.cb_convenios?.nome;
+    if (nomeD) {
+      return {
+        convenioNome: String(nomeD).toUpperCase(),
+        vinculo: "dependente",
+        titularNome: cand?.paciente_nome ? String(cand.paciente_nome).toUpperCase() : undefined,
+      };
+    }
+  } catch { /* ignora e retorna null */ }
+  return null;
+}
+
+function renderLinhaVinculo(v: { convenioNome: string; vinculo: "titular" | "dependente"; titularNome?: string } | null): string {
+  if (!v) return "";
+  const suf = v.vinculo === "titular"
+    ? "(TITULAR)"
+    : v.titularNome ? `(DEPENDENTE DE ${esc(v.titularNome)})` : "(DEPENDENTE)";
+  return `<div class="center sm">PLANO: <span class="v">${esc(v.convenioNome)}</span> ${suf}</div>`;
+}
+
 // Duplica o HTML de um ou mais tickets para emitir N vias com quebra de
 // página entre elas e um rótulo identificando a via.
 function multiplicarVias(ticketsHtml: string, nVias: number): string {
@@ -661,6 +713,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     a.paciente_id ?? null,
     clinicaId,
   );
+  const vinculoConv = await resolveVinculoConvenio(a.paciente_id ?? null, clinicaId);
 
   const ticketHtml = `
   <div class="ticket">
@@ -679,6 +732,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
     ${convLabel ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabel)}</span></div>` : ""}
+    ${renderLinhaVinculo(vinculoConv)}
 
     <div class="sep"></div>
 
@@ -1050,6 +1104,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     pacIdRef ?? null,
     clinicaId,
   );
+  const vinculoConvAgrupada = await resolveVinculoConvenio(pacIdRef ?? null, clinicaId);
 
   // Cabeçalho da clínica (reutilizado em cada GR)
   const headerClinica = `
@@ -1065,6 +1120,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
     ${convLabelAgrupada ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabelAgrupada)}</span></div>` : ""}
+    ${renderLinhaVinculo(vinculoConvAgrupada)}
   `;
 
   const gruposArr = Array.from(grupos.values());
