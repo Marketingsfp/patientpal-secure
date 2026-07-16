@@ -33,7 +33,7 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { useServerFn } from "@tanstack/react-start";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
-import { usePickTomador } from "@/components/nfse/use-pick-tomador";
+import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
