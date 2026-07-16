@@ -140,6 +140,34 @@ function NfsePage() {
     }
   };
 
+  const onAvancarRps = async (reenviarDepois: boolean) => {
+    if (!erroDetalhe?.emitente_id) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    const novo = Number(rpsNovoInput);
+    if (!Number.isFinite(novo) || novo < 1) { toast.error("Informe um número válido."); return; }
+    if (rpsAtual != null && novo <= rpsAtual) {
+      toast.error(`O novo número deve ser maior que o atual (${rpsAtual}).`);
+      return;
+    }
+    setAvancandoRps(true);
+    try {
+      const { error } = await supabase
+        .from("nfse_emitentes")
+        .update({ rps_proximo_numero: novo })
+        .eq("id", erroDetalhe.emitente_id);
+      if (error) { mostrarErro(error); return; }
+      setRpsAtual(novo);
+      toast.success(`Próx. nº RPS do emitente atualizado para ${novo}.`);
+      if (reenviarDepois) {
+        const notaId = erroDetalhe.id;
+        setErroDetalhe(null);
+        await onReenviar(notaId);
+      }
+    } finally {
+      setAvancandoRps(false);
+    }
+  };
+
   const onConsultar = async (id: string) => {
     try {
       await consulta({ data: { id } });
