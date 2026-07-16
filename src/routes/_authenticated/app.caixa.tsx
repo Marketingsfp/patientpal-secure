@@ -3666,7 +3666,7 @@ function Page() {
               <Label>Valor total líquido (R$)</Label>
               <CurrencyInput
                 value={cartaoEdit.valorLiquido}
-                onValueChange={(v) => setCartaoEdit((s) => ({ ...s, valorLiquido: v }))}
+                onChange={(v) => setCartaoEdit((s) => ({ ...s, valorLiquido: v }))}
               />
             </div>
           </div>
