@@ -61,6 +61,21 @@ export function TotemPage() {
   const [cpf, setCpf] = useState("");
   const [checkinInfo, setCheckinInfo] = useState<CheckinInfo | null>(null);
 
+  // Modo automático (claro das 06h–17h, escuro caso contrário). Aplica a
+  // classe `dark` no <html> enquanto o totem estiver aberto e limpa ao sair.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const html = document.documentElement;
+    const apply = () => {
+      const h = new Date().getHours();
+      const isDark = h < 6 || h >= 17;
+      html.classList.toggle("dark", isDark);
+    };
+    apply();
+    const id = setInterval(apply, 60_000);
+    return () => { clearInterval(id); html.classList.remove("dark"); };
+  }, []);
+
   // Telas de conclusão voltam sozinhas para o menu inicial — a senha já saiu
   // impressa, então o ticket fica só alguns segundos na tela (sem botão
   // "Concluir"); o check-in fica um pouco mais para o paciente ler os dados.
