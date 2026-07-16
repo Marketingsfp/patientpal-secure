@@ -1104,6 +1104,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     pacIdRef ?? null,
     clinicaId,
   );
+  const vinculoConvAgrupada = await resolveVinculoConvenio(pacIdRef ?? null, clinicaId);
 
   // Cabeçalho da clínica (reutilizado em cada GR)
   const headerClinica = `
@@ -1119,6 +1120,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
     ${convLabelAgrupada ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabelAgrupada)}</span></div>` : ""}
+    ${renderLinhaVinculo(vinculoConvAgrupada)}
   `;
 
   const gruposArr = Array.from(grupos.values());
