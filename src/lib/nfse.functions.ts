@@ -705,14 +705,15 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       })
       .eq("id", nota.id);
 
-    // E0014 (DPS já existente) — incrementa numero_dps e tenta de novo.
+    // E0014 (DPS já existente) — probing com salto geométrico até encontrar
+    // um numero_dps livre. Cada tentativa aqui envolve polling assíncrono
+    // no /v2/nfsen, então incrementar de 1 em 1 é lento demais e o time do
+    // server function pode estourar. Cresce o salto (1,2,4,8,...) até um
+    // teto para varrer faixas grandes com poucas tentativas.
     const baseUrl = focusNfseBase(emitente);
     const isNacional = !!emitente.usar_ambiente_nacional;
-    // Reenvio manual: caminha até 100 números por clique para descobrir
-    // automaticamente o próximo RPS livre quando a faixa local está atrás
-    // do que a prefeitura já consumiu (E0014). Cada tentativa é polling
-    // assíncrono no endpoint Nacional, então pode levar alguns minutos.
-    const MAX_RPS_RETRIES = 100;
+    const MAX_RPS_RETRIES = 25;
+    const MAX_STEP = 64;
     let currentRef = ref;
     let currentNumero = (payloadNacional as { numero_dps?: number }).numero_dps ?? (emitente.rps_proximo_numero ?? 1);
     let resp: Response;
@@ -728,8 +729,6 @@ export const reenviarNfse = createServerFn({ method: "POST" })
         body: JSON.stringify(payload),
       });
       body = (await resp.json().catch(() => ({}))) as typeof body;
-      // /v2/nfsen é assíncrono: precisamos consultar o ref para descobrir
-      // se a prefeitura recusou com E0014.
       if (
         isNacional &&
         (body?.status === "processando_autorizacao" || body?.status === "processando")
@@ -739,7 +738,8 @@ export const reenviarNfse = createServerFn({ method: "POST" })
       const erros = Array.isArray(body?.erros) ? body!.erros! : [];
       const e0014 = erros.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014");
       if (!isNacional || !e0014 || attempts >= MAX_RPS_RETRIES) break;
-      currentNumero += 1;
+      const step = Math.min(2 ** (attempts - 1), MAX_STEP);
+      currentNumero += step;
       bumpedTo = currentNumero;
       (payloadNacional as { numero_dps: number }).numero_dps = currentNumero;
       currentRef = `${ref}-r${currentNumero}`;
