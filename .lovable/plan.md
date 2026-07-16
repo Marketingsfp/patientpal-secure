@@ -1,33 +1,35 @@
-## Diagnóstico
+## O que vai acontecer
 
-**O que está acontecendo:** O pagamento do repasse do Dr. Marcelo Barreto foi feito e existe no banco — o lançamento de despesa "REPASSE MEDICO — MARCELO BARRETO FRANCO DA SILVEIRA (9 ATEND.)" foi criado em 16/07/2026 (R$ 475,00) e os 9 atendimentos (datas 10/07, 14/07 e 15/07) estão corretamente marcados como `repasse_pago = true`, apontando para o mesmo `repasse_lancamento_id`.
+Dar baixa nas 12 mensalidades pendentes do contrato **20260369 — DEBORA CATARINA TENORIO L** marcando-as como **pagas na data de hoje (16/07/2026)**, **sem gerar receita** no módulo financeiro (nenhum lançamento em `fin_lancamentos`).
 
-**Por que não aparece na tela:** A aba **Comprovantes de repasse** (`src/components/financeiro/comprovantes-tab.tsx`, função `load()`) lê **apenas** da tabela `fin_atendimentos`. Só que os atendimentos do Dr. Marcelo Barreto (assim como praticamente todos os pagamentos vindos da agenda) ficam gravados em `fin_lancamentos` — não em `fin_atendimentos`. Resultado: o repasse existe, mas a lista o ignora.
+## Escopo — o que muda no banco
 
-Isso classifica como **erro de código** (fonte de dados incompleta na consulta), não regra de negócio nem dados inconsistentes. Os comprovantes dos dias 09/07 e 10/07 que aparecem hoje são justamente os que por acaso tinham origem em `fin_atendimentos`.
+**Tabela `contrato_mensalidades`** (12 linhas, contrato_id `f25e1deb-1733-4421-9f1c-3e98edc19ffc`):
+- `status` → `pago`
+- `pago_em` → `2026-07-16`
+- `valor_pago` → mesmo valor da parcela (R$ 155,00)
+- `forma_pagamento` → `manual`
+- `observacoes` → `"Baixa manual — contrato renovado no 20260370 (16/07/2026)"`
+- `lancamento_id` fica `NULL` (é isso que garante que nenhuma receita é criada)
 
-## O que vai mudar
+Nenhuma outra tabela é tocada. O status do contrato 20260369 permanece `ativo` (posso cancelar depois se você pedir).
 
-Ampliar a consulta da aba Comprovantes de repasse para unificar as duas fontes que já são unificadas na tela de Atendimentos (`app.financeiro.atendimentos.tsx`): `fin_atendimentos` **e** `fin_lancamentos` com `repasse_pago = true`. Depois disso o agrupamento existente (por médico + `repasse_lancamento_id`) consolida naturalmente os N atendimentos em 1 comprovante — inclusive o do Dr. Marcelo com os 9 atendimentos e total de R$ 475,00.
+## Fora do escopo
 
-## Escopo
-
-**Dentro:**
-- `src/components/financeiro/comprovantes-tab.tsx` → função `load()`: buscar em paralelo `fin_atendimentos` e `fin_lancamentos` (repasse_pago = true, filtrado por `repasse_pago_em` no período) e mapear ambos para o mesmo tipo `Row` que o resto do componente já usa. Nenhuma mudança no agrupamento, no filtro por médico, no modal ou na impressão.
-
-**Fora:**
-- Nenhuma migração de banco. Os dados já estão certos.
-- Nenhuma alteração na RPC `pagar_repasse_medico`, no fluxo de pagamento, na tela de Atendimentos ou no caixa.
-- Nenhuma refatoração ampla do componente.
+- Não altero o contrato 20260370 (renovado).
+- Não crio nada em `fin_lancamentos` (é justamente o "sem gerar receita").
+- Não mexo em `caixa_movimentos`, `boletos`, `pagamentos`, `nfse` ou qualquer integração.
+- Não altero código.
 
 ## Validação
 
-- Consulta manual no banco confirmando que o repasse de 16/07 do Dr. Marcelo aparece (`repasse_lancamento_id = fd9bb77f-…`, R$ 475,00, 9 itens).
-- Reabrir a aba **Comprovantes de repasse** com o período que inclui 16/07 e confirmar visualmente que o comprovante aparece com médico, quantidade de pacientes, valor total, forma e conta corretos, e que o botão "Visualizar" lista os 9 atendimentos.
-- Verificar que os comprovantes antigos (09/07 e 10/07) continuam aparecendo normalmente.
-- Typecheck (`tsgo`).
+- Consulta antes: 12 mensalidades pendentes, `pago_em NULL`, `lancamento_id NULL`.
+- Executar o UPDATE.
+- Consulta depois: as 12 devem estar `status = 'pago'`, `pago_em = 2026-07-16`, `valor_pago = 155.00`, `lancamento_id` ainda `NULL`.
+- Conferir no financeiro que **não** apareceu receita nova de R$ 1.860,00 no dia 16/07.
 
-## Riscos
+## Riscos e pontos de atenção
 
-- Como a fonte `fin_lancamentos` traz muitos registros, mantemos o filtro por `repasse_pago = true` + intervalo de `repasse_pago_em` + `clinica_id` e o mesmo `limit(5000)` já usado. A carga fica equivalente à da tela de Atendimentos, que já faz esse mesmo join com sucesso.
-- Nenhum risco em módulos sensíveis (agenda, prontuário, permissões, LGPD). Alteração puramente de leitura, restrita a uma aba de relatório.
+- Operação em produção, mas totalmente reversível: se precisar, dá para voltar as 12 linhas ao estado anterior (status = `pendente`, `pago_em` = NULL, `valor_pago` = NULL) — desde que você me avise antes que alguma outra ação seja tomada em cima delas.
+- O contrato 20260369 continuará `ativo` na listagem, agora com 12/12 parcelas pagas. Se preferir que ele também apareça como "encerrado", me peça um segundo passo para cancelar o contrato.
+- Nenhum impacto em agenda, prontuário, LGPD, permissões ou repasses.
