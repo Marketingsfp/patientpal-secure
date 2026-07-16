@@ -63,6 +63,9 @@ import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { EditarPacienteRapidoDialog } from "@/components/contratos/editar-paciente-rapido-dialog";
 import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
+import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
+import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
+import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
