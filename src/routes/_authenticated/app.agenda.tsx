@@ -3736,6 +3736,18 @@ function AgendaPage() {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
+    const inicio = new Date(a.inicio);
+    const hojeFim = new Date();
+    hojeFim.setHours(23, 59, 59, 999);
+    if (inicio.getTime() > hojeFim.getTime()) {
+      toast.error("Não é possível dar baixa em um atendimento de data futura.");
+      return;
+    }
+    if (a.status === "realizado") {
+      toast.info("Este atendimento já foi baixado.");
+      return;
+    }
+    if (!confirm(`Dar baixa como Realizado no atendimento de ${a.paciente_nome}?`)) return;
     const uid = (await supabase.auth.getUser()).data.user?.id;
     if (!uid) {
       toast.error("Sessão expirada");
@@ -3753,7 +3765,7 @@ function AgendaPage() {
       mostrarErro(error);
       return;
     }
-    toast.success("Atendimento iniciado e registrado");
+    toast.success("Baixa registrada — executado por " + (clinicaAtual?.role ? "você" : "usuário atual"));
     await load();
   };
 
