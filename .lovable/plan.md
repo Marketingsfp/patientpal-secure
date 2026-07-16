@@ -1,73 +1,46 @@
+
 ## Objetivo
 
-Permitir marcar o **paciente titular** de um contrato do Cartão Benefícios como **"Titular financeiro"** (paga o plano, mas não usufrui dos benefícios). A marcação fica visível na ficha do contrato, na carteirinha impressa/digital, no portal do paciente, e afeta a contagem de vidas usadas na faixa de preço.
+Fazer o sistema bloquear automaticamente a inclusão de dependentes quando o total de vidas (titular + dependentes) atingir o limite definido pela **faixa de pessoas** escolhida no contrato, respeitando a marcação **"Apenas titular financeiro"**.
 
-## 1) Banco — nova coluna
+## Regra de negócio
 
-Nova coluna em `contratos_assinatura`:
+Seja `V` o número máximo de vidas da faixa selecionada (`faixa.vidas_ate`, ou `faixa.vidas_de` quando a faixa é aberta "N+"):
 
-- `titular_apenas_financeiro boolean NOT NULL DEFAULT false`
+- **Titular conta como vida** (checkbox desmarcado): `maxDependentes = V - 1`.
+- **Titular apenas financeiro** (checkbox marcado): `maxDependentes = V` (titular não ocupa vaga).
 
-Sem trigger, sem regeração automática de faixa. A recontagem passa a considerar essa flag no cálculo de vidas.
+Exemplo do contrato da tela:
+- Faixa "3 pessoas" + titular normal → máximo 2 dependentes.
+- Faixa "3 pessoas" + titular apenas financeiro → máximo 3 dependentes.
 
-## 2) UI — página do contrato (`src/components/pages/contratos-page.tsx`)
+Quando a faixa for aberta ("3+ pessoas", `vidas_ate = null`), o limite superior continua sendo o `max_dependentes` do convênio (comportamento atual), apenas descontando 1 quando o titular usufrui. Faixas fechadas passam a ser respeitadas.
 
-Ao lado do nome do **Paciente titular** (bloco onde hoje ficam os badges de e-mail/foto/duplicidade):
+## Alterações (somente `src/components/pages/contratos-page.tsx`)
 
-- Adicionar um **checkbox / toggle**: "**Apenas titular financeiro** (não utiliza os benefícios)".
-- Ícone de informação (`Info` do lucide) com tooltip:
-  > "Marque quando o titular apenas paga o contrato e não usufrui dos benefícios. Ele **não conta** na quantidade de vidas do plano, mas aparecerá na carteirinha com o selo 'Titular financeiro — não utiliza'."
-- Ao marcar/desmarcar: se o contrato já existe, salva imediatamente (`update` em `contratos_assinatura`) e recalcula a faixa sugerida.
-- Se ainda é um contrato novo (draft), guarda no estado local e envia no create.
+1. **Aba Dados do contrato existente (por volta da linha 2346):**
+   - Substituir `const maxDep = Number(convenio?.max_dependentes ?? 0) || 0;` por um cálculo derivado da `faixaAtual` (ou `admFaixaId` selecionada) e da flag `titular_apenas_financeiro`:
+     - `cap = faixaAtual.vidas_ate` (fechada) ou `convenio.max_dependentes + (titularFin ? 0 : 1)` (aberta).
+     - `maxDep = cap - (titularFin ? 0 : 1)`, com `Math.max(0, …)`.
+   - `maxDep` é usado no contador "Dependentes (x/maxDep)" (linha 3037) e no `disabled` do botão "Incluir dependente" (linha 3059) — ambos passam a refletir a nova regra automaticamente.
+   - Recalcular quando o admin trocar a faixa (`admFaixaId`) ou alternar o checkbox de titular financeiro (já reativos).
 
-**Contagem de vidas (faixa de preço):**
-- Substituir `vidasAtuais = (titular ? 1 : 0) + deps.length` por `vidasAtuais = (titular && !titularApenasFinanceiro ? 1 : 0) + deps.length`.
-- Aplicar na pré-seleção de faixa e na exibição do "Nº de pessoas no contrato".
+2. **Wizard de novo contrato (por volta da linha 975):**
+   - Na validação do submit, trocar `convenio.max_dependentes` pelo mesmo cálculo baseado na faixa selecionada (`faixaId`) + `titularApenasFinanceiro`.
+   - Mensagem de erro atualizada: "Faixa selecionada permite no máximo X dependente(s)."
 
-**Aba "Resumo" do contrato existente:** exibir uma linha destacada `"Titular apenas financeiro — não utiliza os benefícios"` quando marcado, com o mesmo tooltip explicativo.
+3. **Mensagem de UI:**
+   - Abaixo do contador "Dependentes (x/max)" exibir dica curta quando o limite for atingido: "Limite da faixa atingido. Aumente a faixa ou marque o titular como apenas financeiro."
 
-## 3) Cartão impresso/digital (`src/lib/print-cartao.ts`)
+## Fora do escopo
 
-- Ler `titular_apenas_financeiro` do contrato.
-- Quando `true`, no cartão do titular:
-  - Rótulo `TITULAR` → `TITULAR FINANCEIRO`.
-  - Adicionar faixa/selo discreto no rodapé do cartão: `"Não utiliza os benefícios"`.
-- Dependentes não mudam.
-
-## 4) Portal do paciente (`src/routes/paciente.cartoes.tsx` e RPC `meus_cartoes`)
-
-- Incluir `titular_apenas_financeiro` no retorno da RPC `meus_cartoes` (edição da function; parte do mesmo migration).
-- Quando `papel = "titular"` e a flag for `true`:
-  - Na carteirinha, mudar o subtítulo `capitalize(papel)` de "Titular" para "Titular financeiro".
-  - Abaixo do nome, badge branca semitransparente: `"Não utiliza benefícios"`.
-  - Mantém tudo o resto (mensalidades, dependentes).
-
-## 5) Não faz parte do escopo
-
-- Não altera regras de repasse, faturamento, ou vínculo de consultas.
-- Não bloqueia agendamento/atendimento do titular financeiro no sistema — a marcação é informativa/comercial (o convênio dele simplesmente não deve ser usado; a clínica continua controlando isso operacionalmente).
-- Não altera o cálculo já persistido do `valor_mensal` de contratos antigos; só afeta a **sugestão de faixa** ao editar e o campo `titular_apenas_financeiro`.
-
-## Antes / Depois
-
-**Antes:** todo titular consta como beneficiário; a faixa sempre soma titular + dependentes; não há como registrar que o titular só paga.
-
-**Depois:** um checkbox ao lado do titular marca "apenas financeiro"; a faixa passa a contar só quem usufrui; a carteirinha, o resumo do contrato e o portal do paciente exibem o selo "Titular financeiro — não utiliza".
+- Não altera cálculo de valor/faixa sugerida (já existe e considera a flag).
+- Não altera RLS, banco, portal do paciente, impressão do cartão.
+- Não mexe em contratos já salvos que estejam acima do novo limite — apenas bloqueia novas inclusões; os dependentes existentes continuam listados e podem ser removidos manualmente.
 
 ## Validação
 
-1. Abrir um contrato existente, marcar "Apenas titular financeiro", salvar → a contagem de vidas cai em 1 e a faixa sugerida é recalculada.
-2. Imprimir o cartão → titular sai com rótulo `TITULAR FINANCEIRO` + "Não utiliza os benefícios"; dependentes inalterados.
-3. Logar no portal como o titular → carteirinha mostra "Titular financeiro" e badge "Não utiliza benefícios"; mensalidades continuam listadas.
-4. Desmarcar a flag → tudo volta ao comportamento anterior.
-
-## Detalhes técnicos
-
-- Migração:
-  ```sql
-  ALTER TABLE public.contratos_assinatura
-    ADD COLUMN titular_apenas_financeiro boolean NOT NULL DEFAULT false;
-  ```
-  E `CREATE OR REPLACE FUNCTION public.meus_cartoes(...)` para incluir a nova coluna no JSON retornado (mantendo a assinatura atual).
-- Não altera RLS nem GRANTs (coluna nova em tabela existente).
-- Arquivos tocados: `contratos-page.tsx`, `print-cartao.ts`, `paciente.cartoes.tsx`, função `meus_cartoes` (migration).
+- Contrato da tela (faixa "3+", 1 titular + 3 deps): como faixa é aberta, comportamento atual permanece; a regra já aparece em faixas fechadas.
+- Criar contrato faixa "3 pessoas" sem titular financeiro → botão "Incluir dependente" desabilita após 2 dependentes.
+- Marcar "Apenas titular financeiro" → botão volta a habilitar até 3 dependentes.
+- Trocar faixa para "2 pessoas" com 3 deps já cadastrados → botão fica desabilitado; contador exibe 3/1 (ou 3/2 com titular financeiro) sinalizando excesso.
