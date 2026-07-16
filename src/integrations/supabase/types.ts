@@ -8227,6 +8227,35 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      emitir_senha_publica: {
+        Args: {
+          _clinica_id: string
+          _tipo: Database["public"]["Enums"]["tipo_senha"]
+        }
+        Returns: {
+          atendida_em: string | null
+          cancelada_em: string | null
+          chamada_em: string | null
+          chamada_por: string | null
+          clinica_id: string
+          codigo: string
+          data_dia: string
+          emitida_em: string
+          guiche: string | null
+          id: string
+          identificado_por_facial: boolean
+          numero: number
+          paciente_id: string | null
+          status: Database["public"]["Enums"]["status_senha"]
+          tipo: Database["public"]["Enums"]["tipo_senha"]
+        }
+        SetofOptions: {
+          from: "*"
+          to: "senhas"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       estornar_lancamento_receita: {
         Args: { _clinica_id: string; _lancamento_id: string }
         Returns: Json
