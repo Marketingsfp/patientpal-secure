@@ -3603,6 +3603,83 @@ function Page() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Diálogo para dados do cartão (crédito/débito) ao editar a Forma inline. */}
+      <Dialog open={!!cartaoEditFor} onOpenChange={(v) => { if (!v) setCartaoEditFor(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {cartaoEditFor?.forma === "cartao_credito" ? "Dados do cartão de crédito" : "Dados do cartão de débito"}
+            </DialogTitle>
+            <DialogDescription>
+              Informe os dados da transação no cartão. Eles ficam vinculados ao lançamento financeiro.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="grid gap-1.5">
+              <Label>Bandeira</Label>
+              <Select
+                value={cartaoEdit.bandeira}
+                onValueChange={(v) => setCartaoEdit((s) => ({ ...s, bandeira: v }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione a bandeira" /></SelectTrigger>
+                <SelectContent>
+                  {BANDEIRAS_CARTAO.map((b) => (
+                    <SelectItem key={b} value={b}>{b}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {cartaoEditFor?.forma === "cartao_credito" && (
+              <div className="grid gap-1.5">
+                <Label>Parcelamento</Label>
+                <Select
+                  value={cartaoEdit.parcelas}
+                  onValueChange={(v) => setCartaoEdit((s) => ({ ...s, parcelas: v }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                      <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="grid gap-1.5">
+              <Label>Data da transação</Label>
+              <Input
+                type="date"
+                value={cartaoEdit.data}
+                onChange={(e) => setCartaoEdit((s) => ({ ...s, data: e.target.value }))}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Número de autorização</Label>
+              <Input
+                value={cartaoEdit.autorizacao}
+                onChange={(e) => setCartaoEdit((s) => ({ ...s, autorizacao: e.target.value }))}
+                placeholder="Ex.: 123456"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Valor total líquido (R$)</Label>
+              <CurrencyInput
+                value={cartaoEdit.valorLiquido}
+                onValueChange={(v) => setCartaoEdit((s) => ({ ...s, valorLiquido: v }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCartaoEditFor(null)} disabled={salvandoCartao}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void confirmarCartaoEdit()} disabled={salvandoCartao}>
+              {salvandoCartao ? "Salvando…" : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
