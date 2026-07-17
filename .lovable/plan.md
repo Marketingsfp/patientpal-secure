@@ -1,38 +1,39 @@
-## Objetivo
+## Que erro é esse?
 
-Fazer o diálogo **Renovar contrato** se comportar igual ao **Novo contrato**:
+A tela mostrou:
 
-1. No campo **Convênio da renovação**, mostrar apenas o nome do convênio (sem valor ao lado).
-2. Substituir o input numérico **Nº de pessoas no contrato** por um `Select` que lista as **faixas de preço** cadastradas no convênio escolhido, no mesmo formato da venda: "1 pessoa — R$ 110,00", "2 pessoas — R$ 130,00", "3+ pessoas — R$ 150,00" etc.
-3. Ao incluir ou remover dependentes (aumentando/diminuindo o total de pessoas), a faixa deve ser reselecionada automaticamente e o valor mensal atualizado — como na venda.
+> `Erro ao renovar: column "descricao" of relation "contrato_mensalidades" does not exist`
 
-## Escopo
+Traduzindo em linguagem simples: as funções do banco que fazem a renovação (`renovar_contrato_extensao` e `renovar_contrato_troca_plano`) tentam gravar a taxa de inclusão de dependente em uma coluna chamada **descricao** na tabela de mensalidades — só que essa coluna nunca existiu nessa tabela. A tabela `contrato_mensalidades` só tem o campo **observacoes** para texto livre. Por isso o Postgres recusa o insert e a renovação inteira é abortada.
 
-- `src/components/contratos/renovar-contrato-dialog.tsx` (UI + estado do diálogo).
-- Migração SQL para as RPCs `renovar_contrato_extensao` e `renovar_contrato_troca_plano`, adicionando parâmetro opcional `_valor_mensal numeric` que, quando informado, sobrescreve `v_convenio.valor_mensal` no cálculo das parcelas e no `contrato_renovacoes.valor_novo` / `contratos_assinatura.valor_mensal` (quando `NULL`, mantém o comportamento atual). Nada mais das RPCs muda.
+Isso é **erro de código no banco**, não regra de negócio nem problema de dados. Foi um resquício das mudanças anteriores da "Taxa de inclusão de dependente" — ficou uma referência a uma coluna que foi imaginada, mas não criada.
 
-## Detalhamento técnico
+Efeito prático: **nenhuma renovação está passando** hoje, mesmo sem incluir dependente novo, porque as duas versões da função continuam com esse INSERT quebrado no caminho de dependentes.
 
-1. **Carga inicial**: junto com `cb_convenios` e `contrato_dependentes`, carregar `cb_convenio_faixas` (filtrado por `convenio_id IN (...ids...)`) — mesma tabela usada em `contratos-page.tsx` (linhas 971-978).
-2. **Estado**: adicionar `faixaId: string`. Derivar `faixasDoConvenio = faixas.filter(f => f.convenio_id === novoConvenioId).sort(vidas_de asc)`.
-3. **Auto-seleção da faixa**: sempre que `totalPessoas` (titular + dependentes ativos) ou `novoConvenioId` mudar, escolher a faixa onde `totalPessoas >= vidas_de && (vidas_ate == null || totalPessoas <= vidas_ate)`; fallback para a última faixa quando exceder. Mesma lógica dos linhas 985-993 de `contratos-page.tsx`.
-4. **Valor exibido**: `valorRenovacao` passa a vir da faixa selecionada (não mais de `novoConvenio.valor_mensal`). Reaproveitar o helper `labelFaixa` (linha 1008) para renderizar as opções do `Select`.
-5. **Convênio dropdown**: exibir só `c.nome` (sem `— R$ ...`), mantendo o sufixo "(atual)" para o convênio atual do contrato.
-6. **Remover o input numérico** de nº de pessoas. O `Select` de faixa passa a ser o campo à direita. O total real de pessoas continua sendo derivado de `1 + depsAtivos.length` e usado para pré-selecionar a faixa; se o usuário mudar a faixa manualmente para uma que exija menos/mais pessoas, apenas alerta via `toast` (sem alterar a lista de dependentes automaticamente, para não sobrescrever escolhas do usuário).
-7. **Botão "Adicionar dependente"** continua igual. Ao adicionar/remover, o `useEffect` recalcula a faixa e o valor mensal automaticamente. O limite `maxDep` continua vindo de `cb_convenios.max_dependentes`.
-8. **Chamada às RPCs**: enviar `_valor_mensal: faixaSelecionada.valor_mensal` nas duas RPCs.
-9. **Migração SQL** (dois `CREATE OR REPLACE FUNCTION`): novo parâmetro `_valor_mensal numeric DEFAULT NULL` no fim da assinatura de cada função e uso de `COALESCE(_valor_mensal, v_convenio.valor_mensal)` nas linhas que hoje usam `v_convenio.valor_mensal` / `v_convenio_novo.valor_mensal` para valor de parcela e para `valor_novo`/`valor_mensal` do novo contrato.
+Também vi que a função `renovar_contrato_extensao` existe em **duas assinaturas sobrepostas** (uma antiga sem `_valor_mensal` e a nova com `_valor_mensal`). Convém remover a antiga para não haver ambiguidade nas chamadas futuras.
 
-## Fora do escopo
+## Como resolver
 
-- Não alterar as taxas de adesão / inclusão de dependente (continuam vindo do convênio).
-- Não mudar o fluxo de venda (`Novo contrato`) nem o de edição do contrato.
-- Não alterar a tabela `cb_convenio_faixas` nem os relatórios.
+Uma migração única que:
 
-## Validação
+1. **Corrige `renovar_contrato_extensao`** (versão com `_valor_mensal`): remove a coluna inexistente `descricao` do `INSERT` da taxa de inclusão. O texto "Taxa de inclusão de dependente — <nome>" continua sendo gravado em `observacoes`, exatamente como já acontece hoje nas taxas antigas visíveis no financeiro da paciente.
+2. **Corrige `renovar_contrato_troca_plano`** da mesma forma (mesmo bug no ramo de dependentes novos).
+3. **Remove a assinatura antiga** `renovar_contrato_extensao(_contrato_id, _observacao, _dependentes)` sem `_valor_mensal`, para deixar apenas a versão nova em uso.
 
-- Renovar contrato no mesmo convênio (extensão) com faixa diferente → 12 novas parcelas com o valor da faixa.
-- Trocar de convênio → novo contrato com parcelas no valor da faixa escolhida + taxa de adesão.
-- Incluir dependente novo → faixa e valor mensal atualizam sozinhos no resumo.
-- Remover dependente existente (× ao lado do nome) → faixa recua e valor atualiza.
-- Escolher manualmente uma faixa diferente da automática → valor atualiza e aviso é exibido.
+Nenhuma alteração no front-end é necessária — o diálogo de renovação já envia os parâmetros certos.
+
+## Antes × Depois
+
+- **Antes:** clicar em "Renovar Contrato" dispara toast vermelho `column "descricao" ... does not exist`; nenhuma parcela é gerada, nenhum dependente é atualizado.
+- **Depois:** renovação (extensão e troca de plano) processa normalmente; taxa de inclusão de dependente é lançada com o texto correto em `observacoes` (como já é feito hoje para as taxas existentes da paciente).
+
+## Validação após aplicar
+
+- Re-testar a renovação da paciente Quédima (extensão do CARTÃO CONSULTA, mesmo com a Tuane como dependente ativa).
+- Conferir se as parcelas 13–24 aparecem em "Mensalidades" com o valor da faixa selecionada.
+- Confirmar que nenhuma taxa nova é lançada quando não há inclusão de dependente novo nesta renovação.
+
+## Riscos
+
+- Baixo. É correção pontual de duas funções `SECURITY DEFINER` já existentes; não altera tabela, RLS, permissão nem dados.
+- Áreas sensíveis tocadas: **financeiro** (mensalidades) e **contratos**. Como o INSERT quebrado hoje aborta a transação inteira, ninguém conseguiu renovar até agora — não há risco de "consertar em cima" de renovação parcial.
