@@ -3232,10 +3232,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <div className="text-xs text-muted-foreground">Paciente titular</div>
+                      <div className="text-sm font-medium">Paciente titular</div>
                       <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
                     </div>
-                    <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold text-sm">
+                    <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
                       {contrato.paciente_nome}{pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}
                     </div>
                   </div>
