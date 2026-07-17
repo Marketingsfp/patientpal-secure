@@ -1787,6 +1787,13 @@ function DetalheContrato({
   const [incParentesco, setIncParentesco] = useState<string>("");
   const [incTipo, setIncTipo] = useState<string>("dependente");
   const [incSaving, setIncSaving] = useState(false);
+  // Taxa de inclusão de dependente (cobrança avulsa gerada junto com a
+  // inclusão pós-venda). Padrão: cobrar sempre, exceto quando a inclusão é
+  // feita no mesmo dia da venda (data_inicio do contrato). Valor sugerido
+  // vem de cb_convenios.taxa_inclusao_dependente e permanece editável.
+  const [incCobrarTaxa, setIncCobrarTaxa] = useState<boolean>(true);
+  const [incTaxaValor, setIncTaxaValor] = useState<string>("0.00");
+  const [incTaxaVenc, setIncTaxaVenc] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [excAlvo, setExcAlvo] = useState<Dep | null>(null);
   const [termoOpen, setTermoOpen] = useState(false);
   const [termoMovimento, setTermoMovimento] = useState<"Inclusão" | "Exclusão">("Inclusão");
