@@ -308,6 +308,7 @@ function ConveniosPage() {
     setDescricao(c.descricao ?? "");
     setAtivo(c.ativo);
     setTaxaAdesao(Number(c.taxa_adesao ?? 0));
+    setTaxaInclusaoDep(Number((c as unknown as { taxa_inclusao_dependente?: number }).taxa_inclusao_dependente ?? 0));
     setNumParcelas(c.num_parcelas ?? 12);
     setMaxDependentes(c.max_dependentes ?? 0);
     setFidelidadeMeses(c.fidelidade_meses ?? 0);
