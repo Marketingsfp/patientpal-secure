@@ -2145,7 +2145,7 @@ function DetalheContrato({
         .maybeSingle(),
       supabase
         .from("pacientes")
-        .select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep")
+        .select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep, codigo_prontuario")
         .eq("id", (contrato as any).paciente_id ?? "")
         .maybeSingle(),
       contrato.convenio_id
@@ -2179,9 +2179,14 @@ function DetalheContrato({
     const rows = (d.data ?? []) as any[];
     const pids = Array.from(new Set(rows.map((r) => r.paciente_id).filter(Boolean)));
     let cpfMap: Record<string, string | null> = {};
+    let prontMap: Record<string, string | null> = {};
     if (pids.length) {
-      const { data: pacs } = await supabase.from("pacientes").select("id, cpf").in("id", pids);
+      const { data: pacs } = await supabase
+        .from("pacientes")
+        .select("id, cpf, codigo_prontuario")
+        .in("id", pids);
       cpfMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.cpf]));
+      prontMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.codigo_prontuario]));
     }
     const depsRows = rows.map((r) => ({
       id: r.id,
@@ -2190,6 +2195,7 @@ function DetalheContrato({
       parentesco: r.parentesco,
       tipo: r.tipo,
       cpf: cpfMap[r.paciente_id] ?? null,
+      codigo_prontuario: prontMap[r.paciente_id] ?? null,
       incluido_em: r.incluido_em ?? null,
       excluido_em: r.excluido_em ?? null,
       ativo: !!r.ativo,
