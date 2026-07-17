@@ -8489,7 +8489,6 @@ export type Database = {
           _clinica_id: string
           _data_pagamento: string
           _editing_id: string
-          _enfermagem_recurso_id: string
           _especialidade_id: string
           _fim: string
           _forma_pagamento_prevista: string
@@ -8512,7 +8511,6 @@ export type Database = {
           _clinica_id: string
           _data_pagamento: string
           _editing_id: string
-          _enfermagem_recurso_id: string
           _especialidade_id: string
           _fim: string
           _forma_pagamento_prevista: string
