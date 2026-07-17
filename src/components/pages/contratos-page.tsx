@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   FileSignature,
   Plus,
@@ -1722,7 +1722,7 @@ function DetalheContrato({
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const podeEscrever = usePodeEscrever(modulo);
-  const DadosField = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  const DadosField = ({ label, value }: { label: string; value: ReactNode }) => (
     <div className="space-y-1">
       <div className="text-sm font-medium">{label}</div>
       <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">{value || "—"}</div>
@@ -3448,7 +3448,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         // Cabeçalho de ciclo antes da 1ª parcela de cada ciclo
                         // subsequente ao original. Só aparece quando há
                         // renovação por extensão (temCiclosMultiplos).
-                        let cicloHeader: React.ReactNode = null;
+                        let cicloHeader: ReactNode = null;
                         if (temCiclosMultiplos && (m.numero_parcela ?? 0) > 0) {
                           const ciclo = ciclos.find((c) =>
                             c.parcelas.some((p) => p.id === m.id),
@@ -3472,7 +3472,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           }
                         }
                         return (
-                        <React.Fragment key={m.id}>
+                        <Fragment key={m.id}>
                         {cicloHeader}
                         <TableRow>
                           <TableCell>
@@ -3621,7 +3621,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                             </div>
                           </TableCell>
                         </TableRow>
-                        </React.Fragment>
+                        </Fragment>
                         );
                       })}
                     </TableBody>
