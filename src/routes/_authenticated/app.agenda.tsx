@@ -867,6 +867,16 @@ function AgendaPage() {
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
   const [agendasPorMedico, setAgendasPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
+  // Lookup id-da-agenda → nome, usado pelo filtro "Tipo de agenda" quando
+  // agrupa por NOME (evita duplicidades quando vários médicos têm agendas
+  // homônimas, ex.: "AGENDA", "CONSULTAS").
+  const agendaNomePorId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const arr of agendasPorMedico.values()) {
+      for (const a of arr) m.set(a.id, a.nome);
+    }
+    return m;
+  }, [agendasPorMedico]);
   const [procIdsPorAgenda, setProcIdsPorAgenda] = useState<Map<string, Set<string>>>(new Map());
   // Solicitações de estorno pendentes por agendamento — a linha correspondente
   // fica em vermelho e, para o médico, o paciente é ocultado até o financeiro
