@@ -6354,12 +6354,27 @@ function AgendaPage() {
                 // Notas manuais
                 for (const n of notasHist) {
                   const quem = n.user_nome || quemPorEmail(n.user_email);
+                  const origemAuto =
+                    !n.user_email &&
+                    (n.user_nome === "Totem" || n.user_nome === "Autoatendimento");
                   items.push({
                     id: `nota-${n.id}`,
                     when: n.created_at,
                     quem,
-                    kind: "nota",
-                    body: <span className="whitespace-pre-wrap">{n.texto}</span>,
+                    kind: origemAuto ? "checkin" : "nota",
+                    body: (
+                      <div className="flex items-start gap-2 flex-wrap">
+                        {origemAuto ? (
+                          <Badge
+                            variant="outline"
+                            className="bg-indigo-100 text-indigo-700 border-indigo-200 shrink-0"
+                          >
+                            {n.user_nome === "Totem" ? "Totem" : "Autoatendimento"}
+                          </Badge>
+                        ) : null}
+                        <span className="whitespace-pre-wrap">{n.texto}</span>
+                      </div>
+                    ),
                   });
                 }
                 items.sort((x, y) => (x.when < y.when ? 1 : -1));
