@@ -2718,8 +2718,11 @@ function DetalheContrato({
   const pagas = mensalidades.filter((m) => m.status === "pago").length;
   const totalPagoMens = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
   const totalPago = totalPagoMens + extraRecebido.total;
-  const pagasTotal = pagas + extraRecebido.count;
-  const totalParcelas = mensalidades.length + extraRecebido.count;
+  // "Pagas X/Y" reflete apenas as parcelas deste contrato — recebimentos
+  // avulsos (fin_lancamentos) continuam no card "Recebido" mas fora da
+  // contagem de parcelas, para não inflar o denominador com histórico.
+  const pagasTotal = pagas;
+  const totalParcelas = mensalidades.length;
   const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
 
   // ---- Dados da venda (aba "Dados") ----
