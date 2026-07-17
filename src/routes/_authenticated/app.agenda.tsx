@@ -6547,13 +6547,202 @@ function AgendaPage() {
         {/* KPIs REMOVIDOS */}
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
         <div className="h-4 xl:h-8"></div>
-        {/* Tabela - Com botões de ação na linha */}
+        {/* ============ LISTA MOBILE / TABLET (cards empilhados) ============ */}
+        <div className="lg:hidden space-y-2">
+          {loading ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">Carregando…</div>
+          ) : !clinicaAtual ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">Selecione uma clínica.</div>
+          ) : paginados.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">Nenhum agendamento encontrado.</div>
+          ) : (
+            paginados.map((a) => {
+              const fichaNum = fichaPorId.get(a.id) ?? "";
+              const realizado = a.status === "realizado";
+              const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
+              const hojeIsoLocal = new Date().toISOString().slice(0, 10);
+              const ehHoje = (a.inicio ?? "").slice(0, 10) === hojeIsoLocal;
+              const pagoHoje = pagosSet.has(a.id) && ehHoje;
+              const presente =
+                !realizado && (pagoHoje || !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow));
+              const estornoPend = estornoPendAgs.has(a.id);
+              const ocultarPaciente = estornoPend && isMedicoOnly;
+              const ehLivre = isSlotLivre(a.paciente_nome);
+              const profLabel = medicoNomeAgendamento(a);
+
+              let bgClass = "bg-card";
+              let borderLeft = "border-l-4 border-transparent";
+              if (estornoPend) { bgClass = "bg-rose-50"; borderLeft = "border-l-4 border-rose-500"; }
+              else if (realizado) { bgClass = "bg-emerald-50"; borderLeft = "border-l-4 border-emerald-500"; }
+              else if (presente) { bgClass = "bg-blue-50"; borderLeft = "border-l-4 border-blue-400"; }
+
+              const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
+              const pendenteCheckin = ["aguardando_recepcao", "recepcao"].includes(etapa);
+              const podeCheckin = !ehLivre && !realizado && pagosSet.has(a.id) && pendenteCheckin && podeEscrever;
+
+              return (
+                <div
+                  key={a.id}
+                  className={`rounded-lg border ${bgClass} ${borderLeft} p-3 shadow-sm`}
+                >
+                  {/* Linha 1: horário + ficha + situação */}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-sm font-semibold text-emerald-700 whitespace-nowrap">
+                        {fmtHora(a.inicio)}–{fmtHora(a.fim)}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                        {fmtData(a.inicio)}
+                      </span>
+                      {fichaNum && (
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-foreground/70">
+                          #{fichaNum}
+                        </span>
+                      )}
+                    </div>
+                    {ehLivre ? (
+                      <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-300 shrink-0">Livre</Badge>
+                    ) : estornoPend ? (
+                      <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-[10px] shrink-0">Estorno</Badge>
+                    ) : (
+                      <Badge className={`${STATUS_COR[a.status]} text-[10px] shrink-0`}>{STATUS_LABEL[a.status]}</Badge>
+                    )}
+                  </div>
+
+                  {/* Linha 2: paciente */}
+                  <div className="mb-1.5">
+                    {ocultarPaciente ? (
+                      <span className="text-xs italic text-rose-600">— aguardando estorno —</span>
+                    ) : ehLivre ? (
+                      <span className="text-sm text-muted-foreground italic">Horário livre</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
+                        className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary text-left w-full min-w-0"
+                      >
+                        {a.status === "confirmado" && (
+                          <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
+                        )}
+                        {a.paciente_id && convenioMap.has(a.paciente_id) && (
+                          <IdCard className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        )}
+                        <span className="truncate">{a.paciente_nome}</span>
+                        {a.orcamento_numero && (
+                          <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1 py-0.5 rounded border border-amber-200">
+                            ORÇ
+                          </span>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Linha 3: profissional + serviço */}
+                  <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground mb-2 min-w-0">
+                    <span className="truncate" title={profLabel}>
+                      👤 {profLabel}
+                    </span>
+                    <span className="truncate max-w-[45%] text-right" title={procedimentoEfetivo(a.medico_id, a.procedimento) || ""}>
+                      {procedimentoEfetivo(a.medico_id, a.procedimento) || "—"}
+                    </span>
+                  </div>
+
+                  {/* Linha 4: ações rápidas */}
+                  <div className="flex items-center gap-1.5 pt-2 border-t">
+                    {ehLivre ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openSlot(a)}
+                        className="h-8 flex-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs"
+                      >
+                        <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                        Agendar
+                      </Button>
+                    ) : (
+                      <>
+                        {podeCheckin && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => confirmarPresenca(a)}
+                            className="h-8 flex-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs"
+                            title="Check-in"
+                          >
+                            <BadgeCheck className="h-3.5 w-3.5 mr-1" /> Check-in
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => cobrarAgendamento(a)}
+                          className={`h-8 flex-1 text-xs ${pagosSet.has(a.id)
+                            ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                            : "border-rose-200 text-rose-600 hover:bg-rose-50"}`}
+                          title={pagosSet.has(a.id) ? "Pago" : "Cobrar"}
+                        >
+                          <DollarSign className="h-3.5 w-3.5 mr-1" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
+                          {pagosSet.has(a.id) ? "Pago" : "Cobrar"}
+                        </Button>
+                        {podeEscrever && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEdit(a)}
+                            className="h-8 px-2 text-xs"
+                            title="Editar"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-8 px-2">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            {podeEscrever && (
+                              <DropdownMenuItem onClick={() => iniciarReagendamento(a)} disabled={a.status === "realizado"}>
+                                <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={() => imprimirGR(a)} disabled={!pagosSet.has(a.id)}>
+                              <Printer className="h-4 w-4 mr-2" /> Imprimir GR
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
+                              <Printer className="h-4 w-4 mr-2" /> Comprovante
+                            </DropdownMenuItem>
+                            {podeEscrever && !ehLivre && a.status !== "realizado" && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => remove(a)} className="text-amber-600">
+                                  <UserMinus className="h-4 w-4 mr-2" /> Desmarcar paciente
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
+                              <ShieldCheck className="h-4 w-4 mr-2" /> Histórico
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* ============ TABELA DESKTOP (lg+) ============ */}
         {/* Sem overflow-hidden aqui: um ancestral com overflow != visible vira
             o contexto de scroll do sticky, e como este div nunca rola
             internamente (quem rola é o <main> do app-shell), o cabeçalho
             "sticky top-0" parava de acompanhar o scroll da página. */}
-        <div className="rounded-lg border border-border bg-card overflow-x-auto">
-          <Table className="min-w-[820px] xl:min-w-[900px] max-lg:table max-lg:overflow-visible">
+        <div className="hidden lg:block rounded-lg border border-border bg-card overflow-x-auto">
+          <Table className="min-w-[820px] xl:min-w-[900px]">
             <TableHeader className="sticky top-0 z-20">
               <TableRow className="bg-muted">
                 <TableHead className="w-8 rounded-tl-lg" title="Selecione para ações em lote">
