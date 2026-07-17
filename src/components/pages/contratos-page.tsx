@@ -4190,12 +4190,6 @@ h1, h2, h3 { margin: 0 0 6mm; }
               Esta ação cancela o plano e todos os benefícios deste contrato. Informe o motivo do cancelamento.
             </DialogDescription>
           </DialogHeader>
-        </DialogContent>
-      </Dialog>
-            <DialogDescription>
-              Esta ação cancela o plano e todos os benefícios deste contrato. Informe o motivo do cancelamento.
-            </DialogDescription>
-          </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="cancel-motivo">Motivo</Label>
             <Textarea
@@ -4221,6 +4215,22 @@ h1, h2, h3 { margin: 0 0 6mm; }
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <RenovarContratoDialog
+        open={renovarOpen}
+        onOpenChange={setRenovarOpen}
+        contratoId={contrato.id}
+        clinicaId={(contrato as any).clinica_id}
+        convenioAtualId={contrato.convenio_id ?? null}
+        convenioAtualNome={convenio?.nome ?? null}
+        valorAtual={Number(contrato.valor_mensal ?? 0)}
+        onRenovado={(r) => {
+          if (r.tipo === "troca_plano" && r.contratoNovoId) {
+            onBack();
+          } else {
+            load();
+          }
+        }}
+      />
       <Dialog
         open={!!retroDialog?.open}
         onOpenChange={(o) => { if (!o && !regerandoRetro) setRetroDialog(null); }}
