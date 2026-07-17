@@ -2177,7 +2177,7 @@ function AgendaPage() {
       // mantém o valor para não perder o serviço no submit.
       const opts = opcoesProcedimentoMedico(
         medicoId ?? null,
-        editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
+        editing?.agenda_id ?? (filtroAgenda !== "todos" && !filtroAgenda.startsWith("nome:") ? filtroAgenda : null),
       );
       const alvo = normalizar(atual);
       const ehProcedimentoReal =
@@ -2245,7 +2245,7 @@ function AgendaPage() {
     if (!form.medico_id) return base;
     const opts = opcoesProcedimentoMedico(
       form.medico_id,
-      editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
+      editing?.agenda_id ?? (filtroAgenda !== "todos" && !filtroAgenda.startsWith("nome:") ? filtroAgenda : null),
     ).map((p) => ({ value: p.nome, label: p.nome }));
     const padrao = procedimentoPadraoDoMedico(form.medico_id);
     if (padrao && !opts.some((o) => normalizar(o.value) === normalizar(padrao))) {
