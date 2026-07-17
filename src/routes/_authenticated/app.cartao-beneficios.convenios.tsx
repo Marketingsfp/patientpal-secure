@@ -153,6 +153,7 @@ function ConveniosPage() {
   const [descricao, setDescricao] = useState("");
   const [ativo, setAtivo] = useState(true);
   const [taxaAdesao, setTaxaAdesao] = useState<number>(0);
+  const [taxaInclusaoDep, setTaxaInclusaoDep] = useState<number>(0);
   const [numParcelas, setNumParcelas] = useState<number>(12);
   const [maxDependentes, setMaxDependentes] = useState<number>(0);
   const [fidelidadeMeses, setFidelidadeMeses] = useState<number>(0);
