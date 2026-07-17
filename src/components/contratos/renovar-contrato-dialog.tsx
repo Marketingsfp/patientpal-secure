@@ -159,7 +159,6 @@ export function RenovarContratoDialog({
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   const [novoConvenioId, setNovoConvenioId] = useState<string>("");
   const [deps, setDeps] = useState<DepRow[]>([]);
-  const [cobrarTaxa, setCobrarTaxa] = useState(true);
   const [saving, setSaving] = useState(false);
   const [faixas, setFaixas] = useState<Faixa[]>([]);
   const [faixaId, setFaixaId] = useState<string>("");
@@ -170,7 +169,6 @@ export function RenovarContratoDialog({
     if (!open) return;
     setObservacao("");
     setNovoConvenioId(convenioAtualId ?? "");
-    setCobrarTaxa(true);
     setConfirmacaoAberta(false);
     setErroRenovacao(null);
 
@@ -216,7 +214,8 @@ export function RenovarContratoDialog({
   const parcelasRenovacao = novoConvenio ? Number(novoConvenio.num_parcelas ?? 12) : 12;
   const taxaAdesaoConvenio = novoConvenio ? Number(novoConvenio.taxa_adesao ?? 0) : 0;
   const taxaInclusaoConvenio = novoConvenio ? Number(novoConvenio.taxa_inclusao_dependente ?? 0) : 0;
-  const taxaAdesaoCobrada = mode === "troca_plano" && cobrarTaxa ? taxaAdesaoConvenio : 0;
+  // Regra fixa: renovação (extensão OU troca de plano) nunca cobra taxa de adesão.
+  const taxaAdesaoCobrada = 0;
   const maxDep = novoConvenio ? Number(novoConvenio.max_dependentes ?? 0) : 0;
 
   const depsAtivos = deps.filter((d) => d.manter && (d.id !== null || d.paciente_id));
@@ -362,7 +361,7 @@ export function RenovarContratoDialog({
           _contrato_id: contratoId,
           _convenio_novo_id: novoConvenioId,
           _observacao: observacao || null,
-          _cobrar_taxa_adesao: cobrarTaxa,
+          _cobrar_taxa_adesao: false,
           _dependentes: payloadDeps,
           _valor_mensal: faixaSelecionada ? Number(faixaSelecionada.valor_mensal) : null,
         });
@@ -496,19 +495,7 @@ export function RenovarContratoDialog({
             )}
           </div>
 
-          {/* 3. Taxa de adesão (só troca) */}
-          {mode === "troca_plano" && taxaAdesaoConvenio > 0 ? (
-            <label className="flex items-start gap-2 rounded-md border p-2 text-sm cursor-pointer hover:bg-muted/40">
-              <Checkbox
-                checked={cobrarTaxa}
-                onCheckedChange={(v) => setCobrarTaxa(v === true)}
-                className="mt-0.5"
-              />
-              <span className="flex-1">
-                Cobrar taxa de adesão do novo convênio ({BRL(taxaAdesaoConvenio)})
-              </span>
-            </label>
-          ) : null}
+          {/* Renovação nunca cobra taxa de adesão — regra fixa. */}
 
           <div className="rounded-md bg-muted/40 p-3 text-sm space-y-1">
             <div className="flex justify-between">
@@ -531,10 +518,12 @@ export function RenovarContratoDialog({
               <span className="text-muted-foreground">Parcelas a gerar</span>
               <span className="font-mono">{parcelasRenovacao}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Taxa de adesão</span>
-              <span className="font-mono">{BRL(taxaAdesaoCobrada)}</span>
-            </div>
+            {taxaAdesaoCobrada > 0 ? (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Taxa de adesão</span>
+                <span className="font-mono">{BRL(taxaAdesaoCobrada)}</span>
+              </div>
+            ) : null}
             {novosComTaxa.length > 0 ? (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Taxa de inclusão ({novosComTaxa.length}× {BRL(taxaInclusaoConvenio)})</span>

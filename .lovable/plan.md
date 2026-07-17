@@ -1,38 +1,68 @@
-## Diagnóstico
+## Objetivo
 
-Existem **dois** diálogos "Cadastro rápido de paciente" no projeto:
+1. Garantir que **contratos de renovação nunca cobrem taxa de adesão e nunca tenham carência** — em qualquer cenário (extensão do mesmo convênio ou troca de plano).
+2. No fluxo de **Novo contrato** (botão "Novo contrato" da tela de Contratos), abrir **primeiro um pop-up** perguntando "Este contrato é uma renovação?" antes de qualquer coisa. Fluxo depende da resposta.
 
-1. `src/components/pacientes/quick-patient-dialog.tsx` — componente reutilizável (botão "Cadastrar e selecionar"). Já recebeu o botão de foto na alteração anterior.
-2. `src/routes/_authenticated/app.agenda.tsx` (linhas 5734‑5821) — **diálogo inline** da tela de Agenda (botão "Cadastrar", verde). Este é o que aparece no print enviado, e **não** foi alterado antes.
+---
 
-O botão "Tirar foto (reconhecimento facial)" só existe no diálogo 1, por isso não aparece no fluxo mostrado no print.
+## Verificação da situação atual
 
-## O que vou alterar
+- **Carência (Agenda):** Confirmei em `src/routes/_authenticated/app.agenda.tsx` (linhas 348–505) que a lógica já detecta renovação via `numero_renovacoes > 0` ou `contrato_origem_id` e pula a carência (`carenciaCumprida`).
+- **Caixa/PDV:** `carenciaCumprida` só é usada em `app.agenda.tsx` e `cb-regras.ts`. Não há outra tela reaplicando carência — o Caixa consome os valores já calculados pela Agenda. Não precisa de outro ajuste.
+- **Taxa de adesão na renovação:** Em `src/components/contratos/renovar-contrato-dialog.tsx` (linha 219), a taxa é cobrada quando `mode === "troca_plano" && cobrarTaxa`. Existe um checkbox opcional. **Precisa ser removida** por regra fixa: renovação nunca cobra adesão.
+- **Fluxo de nova venda:** `src/components/pages/contratos-page.tsx` linha 528 dispara `setView("new")` que renderiza `NovoContratoForm`. Hoje não há nenhuma pergunta prévia sobre renovação.
 
-Arquivo único: `src/routes/_authenticated/app.agenda.tsx`.
+---
 
-- Importar `FaceCaptureDialog` e o ícone `Camera` (se ainda não estiver importado).
-- Adicionar estado local: `faceOpen` e `descritorFace` (Float32Array | null).
-- Inserir, logo acima do `DialogFooter` do "Cadastro rápido" (após o campo E-mail, linha ~5810), o mesmo bloco do botão usado em `quick-patient-dialog.tsx`:
-  - Quando não há descritor: "📷 Tirar foto (reconhecimento facial)".
-  - Quando já capturado: "✓ Foto capturada — refazer" + link "remover".
-- Renderizar `<FaceCaptureDialog>` dentro do mesmo Dialog, controlado por `faceOpen`, gravando o descritor em `descritorFace` no `onCaptured`.
-- Após o `insert` em `pacientes` dentro de `cadastrarPacienteRapido`, se `descritorFace` estiver preenchido, gravar em `paciente_biometria` (mesmo shape usado em `quick-patient-dialog.tsx`: `paciente_id`, `descritor` como `Array.from(descritorFace)`, `clinica_id`). Em caso de falha, exibir `toast.warning("Paciente salvo, mas a foto não foi registrada.")` — não bloquear o cadastro.
-- Resetar `descritorFace` e `faceOpen` quando o diálogo fechar (junto com o reset já existente de `novoPac`).
+## Mudanças propostas
 
-Nenhuma alteração em banco, RPC ou em outros arquivos.
+### A. Renovação sempre sem taxa de adesão
 
-## Antes / Depois
+Em `src/components/contratos/renovar-contrato-dialog.tsx`:
 
-- **Antes:** No cadastro rápido a partir da Agenda, não havia como capturar a foto — o paciente ficava sem biometria e o totem não reconhecia.
-- **Depois:** O mesmo botão que existe no `QuickPatientDialog` também aparece na Agenda, e a foto é vinculada em `paciente_biometria` no mesmo passo do cadastro.
+- Remover o estado `cobrarTaxa` e o checkbox "Cobrar taxa de adesão do novo convênio".
+- Fixar `taxaAdesaoCobrada = 0` em toda renovação (extensão e troca de plano).
+- Passar `_cobrar_taxa_adesao: false` para o RPC.
+- No resumo (bloco de totais), remover a linha da taxa de adesão quando ela ficar zero.
 
-## Validação
+Carência já está tratada — sem alteração adicional.
 
-- Typecheck (`tsgo --noEmit`).
-- Abrir o modal via Agenda e confirmar visualmente que o botão aparece entre "E-mail" e o rodapé, com o mesmo comportamento (captura + toast + refazer/remover).
+### B. Pop-up "É renovação?" antes de abrir a nova venda
+
+Em `src/components/pages/contratos-page.tsx`:
+
+1. Novo estado local `perguntaRenovacaoAberta` na `ContratosPage`.
+2. Alterar o `onClick` do botão "Novo contrato" (linha 528): em vez de `setView("new")`, abrir o dialog de pergunta.
+3. Criar um `AlertDialog` simples com o texto **"Este contrato é uma renovação de um contrato anterior?"** e dois botões:
+   - **Sim, é renovação:** abre um segundo passo pedindo para **buscar o paciente titular** e escolher qual dos contratos anteriores dele será renovado (lista de contratos do paciente, ordenados por mais recente). Ao confirmar, abre o `RenovarContratoDialog` já existente com aquele contrato — que agora nunca cobra adesão e cuja carência já é ignorada.
+   - **Não, é uma venda nova:** segue o comportamento atual (`setView("new")`, `NovoContratoForm`, com taxa de adesão normal e carência normal).
+4. Se o titular selecionado não tiver contrato anterior elegível, mostrar aviso ("Este paciente não tem contrato anterior — a venda seguirá como contrato novo") e prosseguir para o fluxo de nova venda.
+
+### C. Registro/observabilidade
+
+- Renovações continuam gravadas em `contrato_renovacoes` como hoje (o RPC atual já registra).
+- Não há mudança de schema.
+
+---
 
 ## Fora do escopo
 
-- Não vou unificar os dois diálogos em um único componente agora (é uma refatoração maior e o pedido é só fazer o botão aparecer).
-- Não vou mexer no diálogo do Wizard de novo agendamento (`novo-agendamento-wizard.tsx`) — se você quiser o botão lá também, me avise que incluo no mesmo passo.
+- Nenhuma alteração em RPCs SQL (`renovar_contrato_extensao`, `renovar_contrato_troca_plano`) — o parâmetro `_cobrar_taxa_adesao` continua existindo, apenas será sempre enviado como `false` pelo cliente. Se você quiser reforçar isso no backend também, posso propor uma migração depois.
+- Não mexer no `NovoContratoForm` — a venda "não renovação" mantém carência e taxa de adesão como estão.
+- Não mexer em contratos já criados.
+
+---
+
+## Validação prevista
+
+- Abrir "Novo contrato" → pop-up aparece.
+- Escolher "Não" → fluxo antigo, com taxa e carência.
+- Escolher "Sim" → seleciona paciente e contrato origem → abre dialog de renovação sem checkbox de taxa e com valor final sem adesão.
+- Simular agendamento em contrato renovado → benefício sai imediato (sem carência).
+
+---
+
+## Pendências / suposições
+
+- **Suposição:** por "aparecer um pop-up antes de qualquer coisa" você quer dizer *antes de abrir o formulário de nova venda* (ao clicar no botão "Novo contrato"), e não em toda a tela de listagem. Se for outro momento (ex.: ao abrir o menu "Contratos"), me avise para ajustar.
+- **Possível regra de negócio — validar com a equipe:** se um contrato marcado como renovação **também não deve ter fidelidade** (além de não ter taxa e carência), me confirme — hoje o campo `fidelidade_meses` não é alterado.
