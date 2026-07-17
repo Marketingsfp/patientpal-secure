@@ -4013,12 +4013,13 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <div className="space-y-1">
                   <Label className="text-xs">Valor (R$)</Label>
                   <Input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    value={incTaxaValor}
+                    type="text"
+                    value={brl(Number(String(incTaxaValor).replace(",", ".")) || 0)}
+                    readOnly
                     disabled={!incCobrarTaxa}
-                    onChange={(e) => setIncTaxaValor(e.target.value)}
+                    tabIndex={-1}
+                    className="bg-muted/50 cursor-not-allowed"
+                    title="Valor definido no cadastro do convênio"
                   />
                 </div>
                 <div className="space-y-1">
