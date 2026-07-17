@@ -1,41 +1,74 @@
-## Reorganizar filtros da agenda em 2 linhas
 
-Hoje os 8 filtros ficam numa linha só (`lg:grid-cols-8`), o que aperta demais os campos de texto — principalmente **Profissional** e **Cliente**.
+## Objetivo
 
-### O que muda
+Retirar do sistema tudo relacionado a "Serviços de Enfermagem" que não é usado, **preservando** os módulos **Triagem - Enfermagem** e **Alertas Enfermagem** (que continuam funcionando normalmente).
 
-Dividir o grid em duas linhas de 4 colunas cada, mantendo o mesmo card e o mesmo checkbox "Exibir apenas a data selecionada" logo abaixo.
+## O que será removido
 
-**Linha 1 (4 colunas):**
-1. Profissional
-2. Tipo
-3. Data
-4. Cliente
+### 1. Tela Horários médicos (`/app/disponibilidades`)
+- Aba **"Enfermagem"** (ao lado de Agendas / Médicos).
+- Bloco **"Gerar agenda - Enfermagem"** (gerador de slots para recursos de enfermagem).
+- Arquivo `src/components/enfermagem-horarios-parts.tsx` (deixará de ser usado).
 
-**Linha 2 (4 colunas):**
-1. Nº Ficha
-2. Situação
-3. Especialidade
-4. Ações (botão **Exibir** + botão **X** para limpar) — na mesma célula, como já estão hoje
+### 2. Módulo Recursos de Enfermagem
+- Rota `/app/enfermagem-recursos` (arquivo `src/routes/_authenticated/app.enfermagem-recursos.tsx`).
+- Item de menu correspondente, se houver.
+- Todo o CRUD de recursos de enfermagem, atendentes vinculados e disponibilidades.
 
-**Abaixo do grid (inalterado):** checkbox "Exibir apenas a data selecionada" alinhado à esquerda com o cabeçalho da tabela.
+### 3. Cadastro de profissional de Enfermagem (Equipe)
+- Aba **"Enfermagem"** em `/app/equipe` (`app.equipe.index.tsx`).
+- Rota de edição `app.equipe.enfermeiro.$userId.editar.tsx`.
+- Componente `src/components/funcionarios/EnfermeiroFormDialog.tsx`.
+- Server functions em `src/lib/enfermagem-equipe.functions.ts`.
 
-### Antes / Depois
+### 4. Referências pontuais a "enfermagem" em Serviços/Agenda
+- Opção **"Procedimento de enfermagem"** no seletor de categoria em `/app/procedimentos` (linha 1395).
+- Rótulo "enfermagem" em mapeamentos de exibição na agenda (`app.agenda.tsx` linha 5921) — apenas o rótulo, sem mudar regra de negócio.
 
-**Antes:** 1 linha × 8 colunas → cada campo com ~140 px, Cliente e Profissional truncando texto.
+### 5. Banco de dados (migração)
+Serão removidas, em uma única migração, as tabelas e colunas abaixo. Antes de rodar, a migração verifica que não há dados vinculados vivos (`agendamentos.enfermagem_recurso_id` está zerado hoje).
 
-**Depois:** 2 linhas × 4 colunas → cada campo com ~280 px, respiro para digitar nome/CPF do paciente e ver o nome completo do profissional.
+Tabelas a apagar (DROP):
+- `enfermagem_recurso_atendentes`
+- `enfermagem_recurso_disponibilidades`
+- `enfermagem_recurso_procedimentos`
+- `enfermagem_recursos`
 
-### Detalhes técnicos
+Coluna a apagar:
+- `agendamentos.enfermagem_recurso_id`
 
-- Arquivo: `src/routes/_authenticated/app.agenda.tsx` (~linha 6450).
-- Trocar `grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8` por `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4` (2 colunas em tablet, 4 em desktop; empilha em mobile).
-- Reordenar os blocos de filtro dentro do mesmo `<div className="grid …">` para: Profissional → Tipo → Data → Cliente → Nº Ficha → Situação → Especialidade → Ações. Como cada bloco é uma célula do grid, o resultado natural são 2 linhas de 4.
-- Nenhuma lógica de negócio muda. Nenhum filtro é adicionado, removido ou renomeado.
+**Não serão tocadas** (dependem de Triagem-Enfermagem e Alertas, que ficam):
+- `triagens_enfermagem` e suas colunas (`enfermeira_id`, `enfermeira_nome`).
+- `alertas_enfermagem`.
 
-### Validação
+## O que NÃO será alterado
 
-- Verificar visualmente em desktop (1440 px): 4+4, campos largos.
-- Verificar em tablet: 2+2+2+2 (2 colunas).
-- Verificar em mobile: empilha um por linha.
-- Confirmar que o checkbox "Exibir apenas a data selecionada" continua alinhado com a coluna FICHA da tabela.
+- `/app/triagem-enfermagem` — permanece igual.
+- `/app/alertas-enfermagem` — permanece igual.
+- Nenhuma regra de agendamento, financeiro, prontuário ou permissão além das citadas.
+
+## Ordem de execução
+
+1. **Backend primeiro (schema)**: migração que dropa as 4 tabelas de recursos de enfermagem e a coluna `agendamentos.enfermagem_recurso_id`. Como `_authenticated/` bloqueia tudo o que consome esses objetos, esconder da UI antes do drop deixaria server functions quebradas — por isso o schema sai primeiro. Aguarda aprovação humana.
+2. **Frontend + server functions** (mesmo commit, após a migração aprovada):
+   - Remover aba e bloco de Enfermagem em `app.disponibilidades.tsx`.
+   - Remover rota `app.enfermagem-recursos.tsx` e itens de menu.
+   - Remover aba Enfermagem em `app.equipe.index.tsx` + rota `app.equipe.enfermeiro.$userId.editar.tsx` + `EnfermeiroFormDialog.tsx`.
+   - Apagar `src/lib/enfermagem-equipe.functions.ts` e `src/components/enfermagem-horarios-parts.tsx`.
+   - Limpar imports órfãos e o SelectItem "Procedimento de enfermagem" em `app.procedimentos.tsx`.
+3. **Validação**: build sem erros de import; abrir `/app/disponibilidades`, `/app/equipe` e `/app/procedimentos` para conferir que as abas/blocos sumiram e que Triagem-Enfermagem e Alertas Enfermagem continuam abrindo.
+
+## Antes × Depois
+
+- **Antes:** aba Enfermagem em Horários médicos, gerador de agenda de enfermagem, módulo Recursos de Enfermagem, aba Enfermagem em Equipe com cadastro de enfermeiro e opção "Procedimento de enfermagem" em Serviços.
+- **Depois:** todas essas superfícies somem da interface e do banco. Triagem - Enfermagem e Alertas Enfermagem seguem operando.
+
+## Riscos e pontos de atenção
+
+- **Irreversível no banco:** o DROP das 4 tabelas apaga os 10 recursos e 30 vínculos de atendentes existentes hoje. Confirmar que ninguém precisa desse histórico antes de aprovar a migração.
+- Existem 0 agendamentos com `enfermagem_recurso_id` preenchido, então o DROP da coluna é seguro.
+- Se no futuro voltar a existir "serviços de enfermagem", será preciso recriar o módulo do zero.
+
+## Classificação do pedido
+
+Remoção de funcionalidade (regra de negócio + limpeza de dados). Não é bug nem correção visual.

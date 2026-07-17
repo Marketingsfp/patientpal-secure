@@ -354,7 +354,6 @@ export type Database = {
           created_at: string
           criado_por: string | null
           data_pagamento: string | null
-          enfermagem_recurso_id: string | null
           especialidade_id: string | null
           executado_em: string | null
           executado_por: string | null
@@ -388,7 +387,6 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           data_pagamento?: string | null
-          enfermagem_recurso_id?: string | null
           especialidade_id?: string | null
           executado_em?: string | null
           executado_por?: string | null
@@ -422,7 +420,6 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           data_pagamento?: string | null
-          enfermagem_recurso_id?: string | null
           especialidade_id?: string | null
           executado_em?: string | null
           executado_por?: string | null
@@ -455,13 +452,6 @@ export type Database = {
             columns: ["agenda_id"]
             isOneToOne: false
             referencedRelation: "medico_agendas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "agendamentos_enfermagem_recurso_id_fkey"
-            columns: ["enfermagem_recurso_id"]
-            isOneToOne: false
-            referencedRelation: "enfermagem_recursos"
             referencedColumns: ["id"]
           },
           {
@@ -2774,182 +2764,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      enfermagem_recurso_atendentes: {
-        Row: {
-          clinica_id: string
-          created_at: string
-          id: string
-          recurso_id: string
-          user_id: string
-        }
-        Insert: {
-          clinica_id: string
-          created_at?: string
-          id?: string
-          recurso_id: string
-          user_id: string
-        }
-        Update: {
-          clinica_id?: string
-          created_at?: string
-          id?: string
-          recurso_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "enfermagem_recurso_atendentes_clinica_id_fkey"
-            columns: ["clinica_id"]
-            isOneToOne: false
-            referencedRelation: "clinicas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "enfermagem_recurso_atendentes_recurso_id_fkey"
-            columns: ["recurso_id"]
-            isOneToOne: false
-            referencedRelation: "enfermagem_recursos"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      enfermagem_recurso_disponibilidades: {
-        Row: {
-          ativo: boolean
-          clinica_id: string
-          created_at: string
-          dia_semana: number
-          hora_fim: string
-          hora_inicio: string
-          id: string
-          intervalo_min: number | null
-          limite_pacientes: number | null
-          observacoes: string | null
-          recurso_id: string
-          updated_at: string
-        }
-        Insert: {
-          ativo?: boolean
-          clinica_id: string
-          created_at?: string
-          dia_semana: number
-          hora_fim: string
-          hora_inicio: string
-          id?: string
-          intervalo_min?: number | null
-          limite_pacientes?: number | null
-          observacoes?: string | null
-          recurso_id: string
-          updated_at?: string
-        }
-        Update: {
-          ativo?: boolean
-          clinica_id?: string
-          created_at?: string
-          dia_semana?: number
-          hora_fim?: string
-          hora_inicio?: string
-          id?: string
-          intervalo_min?: number | null
-          limite_pacientes?: number | null
-          observacoes?: string | null
-          recurso_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "enfermagem_recurso_disponibilidades_clinica_id_fkey"
-            columns: ["clinica_id"]
-            isOneToOne: false
-            referencedRelation: "clinicas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "enfermagem_recurso_disponibilidades_recurso_id_fkey"
-            columns: ["recurso_id"]
-            isOneToOne: false
-            referencedRelation: "enfermagem_recursos"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      enfermagem_recurso_procedimentos: {
-        Row: {
-          created_at: string
-          procedimento_id: string
-          recurso_id: string
-        }
-        Insert: {
-          created_at?: string
-          procedimento_id: string
-          recurso_id: string
-        }
-        Update: {
-          created_at?: string
-          procedimento_id?: string
-          recurso_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "enfermagem_recurso_procedimentos_procedimento_id_fkey"
-            columns: ["procedimento_id"]
-            isOneToOne: false
-            referencedRelation: "procedimentos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "enfermagem_recurso_procedimentos_recurso_id_fkey"
-            columns: ["recurso_id"]
-            isOneToOne: false
-            referencedRelation: "enfermagem_recursos"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      enfermagem_recursos: {
-        Row: {
-          ativo: boolean
-          clinica_id: string
-          cor: string | null
-          created_at: string
-          descricao: string | null
-          duracao_padrao_min: number
-          id: string
-          nome: string
-          updated_at: string
-        }
-        Insert: {
-          ativo?: boolean
-          clinica_id: string
-          cor?: string | null
-          created_at?: string
-          descricao?: string | null
-          duracao_padrao_min?: number
-          id?: string
-          nome: string
-          updated_at?: string
-        }
-        Update: {
-          ativo?: boolean
-          clinica_id?: string
-          cor?: string | null
-          created_at?: string
-          descricao?: string | null
-          duracao_padrao_min?: number
-          id?: string
-          nome?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "enfermagem_recursos_clinica_id_fkey"
-            columns: ["clinica_id"]
-            isOneToOne: false
-            referencedRelation: "clinicas"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       especialidades: {
         Row: {
