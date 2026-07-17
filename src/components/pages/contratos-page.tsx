@@ -3909,7 +3909,25 @@ h1, h2, h3 { margin: 0 0 6mm; }
       {tomadorNfseDialog}
       {descricaoNfseDialog}
 
-      <Dialog open={incOpen} onOpenChange={setIncOpen}>
+      <Dialog
+        open={incOpen}
+        onOpenChange={(v) => {
+          setIncOpen(v);
+          if (v) {
+            // Regra: só NÃO cobrar quando a inclusão é feita no mesmo dia
+            // da venda (data_inicio do contrato). Nos demais casos, taxa vem
+            // marcada. Valor sugerido: cb_convenios.taxa_inclusao_dependente
+            // (0 quando ainda não configurado no convênio) — sempre editável.
+            const hoje = new Date().toISOString().slice(0, 10);
+            const dataInicioIso = (contrato.data_inicio ?? "").slice(0, 10);
+            const mesmoDiaVenda = !!dataInicioIso && dataInicioIso === hoje;
+            const valorPadrao = Number(convenio?.taxa_inclusao_dependente ?? 0) || 0;
+            setIncCobrarTaxa(!mesmoDiaVenda);
+            setIncTaxaValor(valorPadrao.toFixed(2));
+            setIncTaxaVenc(hoje);
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Incluir dependente</DialogTitle>
