@@ -3163,6 +3163,56 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
                 </button>
               </div>
+              {contratosAnteriores.length > 0 ? (
+                <div className="rounded-md border">
+                  <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
+                    <div className="text-sm font-medium">
+                      Contratos anteriores deste paciente
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {contratosAnteriores.length}{" "}
+                      {contratosAnteriores.length === 1 ? "contrato" : "contratos"}
+                    </div>
+                  </div>
+                  <div className="overflow-auto max-h-64">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nº contrato</TableHead>
+                          <TableHead>Convênio</TableHead>
+                          <TableHead>Início</TableHead>
+                          <TableHead>Término</TableHead>
+                          <TableHead>Parcelas pagas</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {contratosAnteriores.map((c) => (
+                          <TableRow key={c.id}>
+                            <TableCell className="font-mono text-xs">
+                              {c.numero ?? "—"}
+                            </TableCell>
+                            <TableCell>{c.convenio ?? "—"}</TableCell>
+                            <TableCell>{c.data_inicio ? fmtD(c.data_inicio) : "—"}</TableCell>
+                            <TableCell>{c.data_termino ? fmtD(c.data_termino) : "—"}</TableCell>
+                            <TableCell>
+                              {c.parcelas > 0 ? `${c.pagas}/${c.parcelas}` : "—"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="capitalize">
+                                {c.status ?? "—"}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="px-3 py-2 text-[11px] text-muted-foreground border-t">
+                    Cada contrato mantém sua própria contagem de parcelas. Recebimentos avulsos históricos ficam no card "Recebido".
+                  </div>
+                </div>
+              ) : null}
               {/* A antiga faixa "Taxa de adesão" foi movida para dentro da
                   tabela de Mensalidades como uma linha regular, com botão
                   próprio de pagamento (gera lançamento financeiro e caixa). */}
