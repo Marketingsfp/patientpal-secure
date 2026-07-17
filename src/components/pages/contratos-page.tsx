@@ -858,6 +858,145 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           </div>
         ) : null}
       </div>
+
+      {/* Passo 1: pergunta "É renovação?" antes de abrir a nova venda */}
+      <AlertDialog open={perguntaRenovOpen} onOpenChange={setPerguntaRenovOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Este contrato é uma renovação?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se for renovação de um contrato anterior do mesmo paciente, não haverá
+              cobrança de taxa de adesão e a carência não se aplicará.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setPerguntaRenovOpen(false);
+                setView("new");
+              }}
+            >
+              Não, é venda nova
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setPerguntaRenovOpen(false);
+                setPacRenov(null);
+                setContratosPac([]);
+                setEscolhaContratoOpen(true);
+              }}
+            >
+              Sim, é renovação
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Passo 2: escolher o titular e o contrato anterior a renovar */}
+      <Dialog open={escolhaContratoOpen} onOpenChange={setEscolhaContratoOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Selecionar contrato para renovação</DialogTitle>
+            <DialogDescription>
+              Busque o paciente titular e escolha qual contrato será renovado.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Paciente titular</Label>
+              <PatientSearchInput
+                value={pacRenov}
+                onChange={async (p) => {
+                  setPacRenov(p);
+                  setContratosPac([]);
+                  if (!p || !clinicaAtual) return;
+                  setLoadingContratosPac(true);
+                  const { data } = await supabase
+                    .from("contratos_assinatura")
+                    .select("*")
+                    .eq("clinica_id", clinicaAtual.clinica_id)
+                    .eq("paciente_id", p.id)
+                    .order("data_inicio", { ascending: false });
+                  setContratosPac((data ?? []) as Contrato[]);
+                  setLoadingContratosPac(false);
+                }}
+                clinicaId={clinicaAtual?.clinica_id ?? null}
+              />
+            </div>
+            {pacRenov ? (
+              loadingContratosPac ? (
+                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Carregando contratos…
+                </div>
+              ) : contratosPac.length === 0 ? (
+                <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                  Este paciente não possui contrato anterior. A venda seguirá como
+                  contrato novo (com taxa de adesão e carência normais).
+                </div>
+              ) : (
+                <div className="rounded-md border divide-y max-h-72 overflow-y-auto">
+                  {contratosPac.map((c) => {
+                    const conv = convenios.find((cv) => cv.id === c.convenio_id);
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 hover:bg-muted/60 flex items-center justify-between gap-3"
+                        onClick={() => {
+                          setRenovInfo({
+                            contratoId: c.id,
+                            clinicaId: c.clinica_id ?? clinicaAtual!.clinica_id,
+                            convenioId: c.convenio_id ?? null,
+                            convenioNome: conv?.nome ?? null,
+                            valorMensal: Number(c.valor_mensal ?? 0),
+                          });
+                          setEscolhaContratoOpen(false);
+                        }}
+                      >
+                        <div className="text-sm">
+                          <div className="font-medium">#{c.numero} — {conv?.nome ?? "Convênio"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            Início {fmtD(c.data_inicio)} · {BRL(Number(c.valor_mensal ?? 0))} · {c.status}
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setEscolhaContratoOpen(false);
+                setView("new");
+              }}
+            >
+              Cancelar e fazer venda nova
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Passo 3: dialog de renovação (nunca cobra adesão) */}
+      {renovInfo ? (
+        <RenovarContratoDialog
+          open={!!renovInfo}
+          onOpenChange={(o) => { if (!o) setRenovInfo(null); }}
+          contratoId={renovInfo.contratoId}
+          clinicaId={renovInfo.clinicaId}
+          convenioAtualId={renovInfo.convenioId}
+          convenioAtualNome={renovInfo.convenioNome}
+          valorAtual={renovInfo.valorMensal}
+          onRenovado={() => {
+            setRenovInfo(null);
+            load();
+          }}
+        />
+      ) : null}
     </div>
   );
 }
