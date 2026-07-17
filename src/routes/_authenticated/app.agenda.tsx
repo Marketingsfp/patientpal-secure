@@ -33,6 +33,7 @@ import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import { PatientSearchInput } from "@/components/patient-search-input";
 import { PacienteQuickActions } from "@/components/agenda/paciente-quick-actions";
+import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { FichaEmUsoAlert } from "@/components/agenda/ficha-em-uso-alert";
 import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
 import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
@@ -67,6 +68,7 @@ import {
   Undo2,
   CheckCircle2,
   User,
+  Camera,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
@@ -1261,6 +1263,8 @@ function AgendaPage() {
     new Promise((resolve) => setGratuidadePrompt({ convenioNome, resolve }));
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
+  const [faceOpen, setFaceOpen] = useState(false);
+  const [descritorFace, setDescritorFace] = useState<number[] | null>(null);
   const [savingPac, setSavingPac] = useState(false);
   const [equipeList, setEquipeList] = useState<
     Array<{ nome: string | null; email: string | null; user_id: string | null; role: string | null }>
@@ -1472,7 +1476,18 @@ function AgendaPage() {
     }
     setPacientes((prev) => [...prev, { id: data.id, nome: data.nome }].sort((a, b) => a.nome.localeCompare(b.nome)));
     setForm((f) => ({ ...f, paciente_nome: data.nome, paciente_id: data.id }));
+    if (descritorFace) {
+      const { error: bioErr } = await supabase.from("paciente_biometria").insert({
+        paciente_id: data.id,
+        clinica_id: clinicaAtual.clinica_id,
+        descritor: descritorFace as unknown as number[],
+      } as never);
+      if (bioErr) {
+        toast.warning("Paciente salvo, mas a foto não foi registrada.");
+      }
+    }
     setNovoPac({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
+    setDescritorFace(null);
     setNovoPacOpen(false);
     toast.success("Paciente cadastrado");
   };
@@ -5808,6 +5823,33 @@ function AgendaPage() {
                 onChange={(e) => setNovoPac((p) => ({ ...p, email: e.target.value }))}
               />
             </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                type="button"
+                variant={descritorFace ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setFaceOpen(true)}
+              >
+                {descritorFace ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-1 text-green-600" /> Foto capturada — refazer
+                  </>
+                ) : (
+                  <>
+                    <Camera className="h-4 w-4 mr-1" /> Tirar foto (reconhecimento facial)
+                  </>
+                )}
+              </Button>
+              {descritorFace && (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground underline"
+                  onClick={() => setDescritorFace(null)}
+                >
+                  remover
+                </button>
+              )}
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setNovoPacOpen(false)}>
                 Cancelar
@@ -5817,6 +5859,15 @@ function AgendaPage() {
               </Button>
             </DialogFooter>
           </form>
+          <FaceCaptureDialog
+            open={faceOpen}
+            onClose={() => setFaceOpen(false)}
+            onCaptured={(desc) => {
+              setDescritorFace(desc);
+              toast.success("Foto capturada. Será vinculada ao cadastrar.");
+            }}
+            titulo="Cadastrar rosto do paciente"
+          />
         </DialogContent>
       </Dialog>
 

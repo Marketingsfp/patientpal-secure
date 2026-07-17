@@ -1,59 +1,38 @@
-## Problema observado
+## Diagnóstico
 
-Contrato #20261894 (Quédima) mostra **Pagas 12/24** porque, ao renovar por
-extensão (mesmo convênio), a RPC `renovar_contrato_extensao` acrescenta as 12
-novas mensalidades (nº 13 a 24) **no mesmo contrato**. Não há um contrato
-"filho" — é o mesmo `contrato_id` com dois ciclos de 12 parcelas.
+Existem **dois** diálogos "Cadastro rápido de paciente" no projeto:
 
-Consulta confirmou:
-- 24 linhas em `contrato_mensalidades` para o contrato atual (1‑12 pagas,
-  13‑24 pendentes).
-- 1 linha em `contrato_renovacoes` com `tipo='extensao'` e
-  `parcelas_geradas=12`.
+1. `src/components/pacientes/quick-patient-dialog.tsx` — componente reutilizável (botão "Cadastrar e selecionar"). Já recebeu o botão de foto na alteração anterior.
+2. `src/routes/_authenticated/app.agenda.tsx` (linhas 5734‑5821) — **diálogo inline** da tela de Agenda (botão "Cadastrar", verde). Este é o que aparece no print enviado, e **não** foi alterado antes.
 
-Não é regra de negócio nova: é a mesma correção que já foi feita para
-"contratos anteriores do mesmo paciente", agora aplicada aos **ciclos de
-renovação por extensão dentro do mesmo contrato**.
+O botão "Tirar foto (reconhecimento facial)" só existe no diálogo 1, por isso não aparece no fluxo mostrado no print.
 
-## O que muda (apenas visual, sem tocar em banco)
+## O que vou alterar
 
-Alteração restrita a `src/components/pages/contratos-page.tsx`.
+Arquivo único: `src/routes/_authenticated/app.agenda.tsx`.
 
-1. Carregar `contrato_renovacoes` do contrato atual (ordenadas por
-   `created_at`) para conhecer os tamanhos de cada ciclo (`parcelas_geradas`).
-2. Calcular ciclos a partir de `numero_parcela` (ignorando adesão/taxa com
-   `numero_parcela <= 0`):
-   - Ciclo 1 = parcelas 1 até `num_parcelas` do contrato original (12).
-   - Ciclo 2 = próximas `parcelas_geradas` (13–24).
-   - E assim por diante para futuras renovações.
-3. **Card "Pagas X/Y"** passa a refletir apenas o **ciclo atual** (o último),
-   ficando 0/12 logo após a renovação e evoluindo conforme os pagamentos.
-4. Nova seção **"Ciclos anteriores deste contrato"** (padrão visual idêntico
-   ao "Contratos anteriores deste paciente"), listando cada ciclo antigo com:
-   Ciclo, Período (venc. da 1ª → última parcela), Parcelas pagas (ex.: 12/12),
-   Tipo (Original / Renovação por extensão).
-5. Na tabela **Mensalidades**, inserir uma linha de cabeçalho separadora
-   entre ciclos (ex.: "Renovação — 15/06/2026 a 15/05/2027") para deixar
-   claro onde começa cada ciclo. Adesão e Taxa de inclusão continuam no topo,
-   fora de qualquer ciclo.
-6. Drill‑down do card "Pagas" continua mostrando pagamentos, mas restrito ao
-   ciclo atual, para bater com o denominador.
+- Importar `FaceCaptureDialog` e o ícone `Camera` (se ainda não estiver importado).
+- Adicionar estado local: `faceOpen` e `descritorFace` (Float32Array | null).
+- Inserir, logo acima do `DialogFooter` do "Cadastro rápido" (após o campo E-mail, linha ~5810), o mesmo bloco do botão usado em `quick-patient-dialog.tsx`:
+  - Quando não há descritor: "📷 Tirar foto (reconhecimento facial)".
+  - Quando já capturado: "✓ Foto capturada — refazer" + link "remover".
+- Renderizar `<FaceCaptureDialog>` dentro do mesmo Dialog, controlado por `faceOpen`, gravando o descritor em `descritorFace` no `onCaptured`.
+- Após o `insert` em `pacientes` dentro de `cadastrarPacienteRapido`, se `descritorFace` estiver preenchido, gravar em `paciente_biometria` (mesmo shape usado em `quick-patient-dialog.tsx`: `paciente_id`, `descritor` como `Array.from(descritorFace)`, `clinica_id`). Em caso de falha, exibir `toast.warning("Paciente salvo, mas a foto não foi registrada.")` — não bloquear o cadastro.
+- Resetar `descritorFace` e `faceOpen` quando o diálogo fechar (junto com o reset já existente de `novoPac`).
 
-## Fora do escopo
+Nenhuma alteração em banco, RPC ou em outros arquivos.
 
-- Não altero RPCs (`renovar_contrato_extensao`, `troca_plano`) nem o banco.
-- Não altero a lógica de pagamento/reversão das parcelas.
-- Não mexo em cards "Recebido" e "A receber" — continuam somando o contrato
-  todo (dinheiro real recebido/a receber não muda por causa da visão em
-  ciclos).
+## Antes / Depois
+
+- **Antes:** No cadastro rápido a partir da Agenda, não havia como capturar a foto — o paciente ficava sem biometria e o totem não reconhecia.
+- **Depois:** O mesmo botão que existe no `QuickPatientDialog` também aparece na Agenda, e a foto é vinculada em `paciente_biometria` no mesmo passo do cadastro.
 
 ## Validação
 
-- Abrir contrato #20261894: card deve mostrar **Pagas 0/12** (ciclo atual);
-  seção "Ciclos anteriores deste contrato" com 1 linha (Original 12/12);
-  tabela Mensalidades com um separador antes da parcela 13.
-- Abrir um contrato sem renovação: nada muda (sem seção de ciclos, contagem
-  igual à atual).
-- Abrir contrato renovado com troca de plano: continua funcionando como hoje
-  (esse fluxo já gera contrato novo e cai na seção "Contratos anteriores do
-  mesmo paciente").
+- Typecheck (`tsgo --noEmit`).
+- Abrir o modal via Agenda e confirmar visualmente que o botão aparece entre "E-mail" e o rodapé, com o mesmo comportamento (captura + toast + refazer/remover).
+
+## Fora do escopo
+
+- Não vou unificar os dois diálogos em um único componente agora (é uma refatoração maior e o pedido é só fazer o botão aparecer).
+- Não vou mexer no diálogo do Wizard de novo agendamento (`novo-agendamento-wizard.tsx`) — se você quiser o botão lá também, me avise que incluo no mesmo passo.
