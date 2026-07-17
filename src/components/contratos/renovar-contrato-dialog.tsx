@@ -33,6 +33,14 @@ interface Convenio {
   max_dependentes: number;
 }
 
+interface Faixa {
+  id: string;
+  convenio_id: string;
+  vidas_de: number;
+  vidas_ate: number | null;
+  valor_mensal: number;
+}
+
 interface DepExistente {
   id: string;
   paciente_id: string;
@@ -85,7 +93,9 @@ export function RenovarContratoDialog({
   const [deps, setDeps] = useState<DepRow[]>([]);
   const [cobrarTaxa, setCobrarTaxa] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [numPessoasInput, setNumPessoasInput] = useState<string>("1");
+  const [faixas, setFaixas] = useState<Faixa[]>([]);
+  const [faixaId, setFaixaId] = useState<string>("");
+  const [faixaTocada, setFaixaTocada] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -94,7 +104,7 @@ export function RenovarContratoDialog({
     setCobrarTaxa(true);
 
     (async () => {
-      const [{ data: conv }, { data: depsData }] = await Promise.all([
+      const [{ data: conv }, { data: depsData }, { data: faixasData }] = await Promise.all([
         supabase
           .from("cb_convenios")
           .select("id, nome, valor_mensal, num_parcelas, taxa_adesao, taxa_inclusao_dependente, max_dependentes")
@@ -107,8 +117,13 @@ export function RenovarContratoDialog({
           .eq("contrato_id", contratoId)
           .eq("ativo", true)
           .order("paciente_nome"),
+        supabase
+          .from("cb_convenio_faixas")
+          .select("id, convenio_id, vidas_de, vidas_ate, valor_mensal")
+          .order("vidas_de"),
       ]);
       setConvenios((conv ?? []) as Convenio[]);
+      setFaixas((faixasData ?? []) as Faixa[]);
       const lista = (depsData ?? []) as DepExistente[];
       const rows: DepRow[] = lista.map((d, i) => ({
         key: `exist-${d.id}-${i}`,
@@ -121,14 +136,13 @@ export function RenovarContratoDialog({
         cobrar_taxa_inclusao: false,
       }));
       setDeps(rows);
-      setNumPessoasInput(String(1 + rows.length));
+      setFaixaTocada(false);
     })();
   }, [open, clinicaId, convenioAtualId, contratoId]);
 
   const novoConvenio = convenios.find((c) => c.id === novoConvenioId);
   const mode: Mode =
     novoConvenioId && convenioAtualId && novoConvenioId === convenioAtualId ? "extensao" : "troca_plano";
-  const valorRenovacao = novoConvenio ? Number(novoConvenio.valor_mensal) : 0;
   const parcelasRenovacao = novoConvenio ? Number(novoConvenio.num_parcelas ?? 12) : 12;
   const taxaAdesaoConvenio = novoConvenio ? Number(novoConvenio.taxa_adesao ?? 0) : 0;
   const taxaInclusaoConvenio = novoConvenio ? Number(novoConvenio.taxa_inclusao_dependente ?? 0) : 0;
@@ -142,17 +156,63 @@ export function RenovarContratoDialog({
   );
   const totalPessoas = 1 + depsPreenchidosCount;
 
+  const faixasDoConvenio = useMemo(
+    () =>
+      faixas
+        .filter((f) => f.convenio_id === novoConvenioId)
+        .sort((a, b) => a.vidas_de - b.vidas_de),
+    [faixas, novoConvenioId],
+  );
+
+  const faixaSelecionada = faixasDoConvenio.find((f) => f.id === faixaId) ?? null;
+  const valorRenovacao = faixaSelecionada
+    ? Number(faixaSelecionada.valor_mensal)
+    : novoConvenio
+      ? Number(novoConvenio.valor_mensal)
+      : 0;
+
+  const labelFaixa = (f: Faixa) => {
+    const range =
+      f.vidas_ate == null
+        ? `${f.vidas_de}+ pessoas`
+        : f.vidas_de === f.vidas_ate
+          ? `${f.vidas_de} pessoa${f.vidas_de === 1 ? "" : "s"}`
+          : `${f.vidas_de}–${f.vidas_ate} pessoas`;
+    return `${range} — ${BRL(Number(f.valor_mensal))}`;
+  };
+
+  // Ao trocar de convênio, reseta o "toque" para permitir auto-seleção pela quantidade.
+  useEffect(() => {
+    setFaixaTocada(false);
+  }, [novoConvenioId]);
+
+  // Auto-seleciona a faixa correspondente ao total de pessoas, a menos que
+  // o usuário tenha escolhido manualmente uma faixa nesta sessão.
+  useEffect(() => {
+    if (faixasDoConvenio.length === 0) {
+      setFaixaId("");
+      return;
+    }
+    if (faixaTocada) return;
+    const alvo =
+      faixasDoConvenio.find(
+        (f) =>
+          totalPessoas >= f.vidas_de &&
+          (f.vidas_ate == null || totalPessoas <= f.vidas_ate),
+      ) ?? faixasDoConvenio[faixasDoConvenio.length - 1];
+    setFaixaId(alvo.id);
+  }, [faixasDoConvenio, totalPessoas, faixaTocada]);
+
   const novosComTaxa = deps.filter(
     (d) => d.id === null && d.paciente_id && d.cobrar_taxa_inclusao,
   );
   const taxaInclusaoTotal = novosComTaxa.length * taxaInclusaoConvenio;
 
-  const podeConfirmar = !saving && !!novoConvenioId && !depsIncompletos;
-
-  // Sincroniza campo "Nº de pessoas" com o total derivado quando ele muda.
-  useEffect(() => {
-    setNumPessoasInput(String(totalPessoas));
-  }, [totalPessoas]);
+  const podeConfirmar =
+    !saving &&
+    !!novoConvenioId &&
+    !depsIncompletos &&
+    (faixasDoConvenio.length === 0 || !!faixaId);
 
   const updateDep = (key: string, patch: Partial<DepRow>) => {
     setDeps((prev) => prev.map((d) => (d.key === key ? { ...d, ...patch } : d)));
@@ -194,61 +254,6 @@ export function RenovarContratoDialog({
     updateDep(key, { manter: true });
   };
 
-  const onNumPessoasChange = (val: string) => {
-    setNumPessoasInput(val);
-    const n = Math.max(1, Number(val) || 1);
-    const desejadosDeps = n - 1;
-    if (desejadosDeps > depsPreenchidosCount) {
-      const faltam = desejadosDeps - depsPreenchidosCount;
-      const teto = maxDep > 0 ? maxDep - depsPreenchidosCount : faltam;
-      const aCriar = Math.min(faltam, teto);
-      if (aCriar > 0) {
-        setDeps((prev) => [
-          ...prev,
-          ...Array.from({ length: aCriar }).map((_, i) => ({
-            key: `novo-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`,
-            id: null,
-            paciente_id: null,
-            paciente_nome: "",
-            parentesco: "",
-            tipo: "dependente",
-            manter: true,
-            cobrar_taxa_inclusao: true,
-          })),
-        ]);
-      }
-      if (aCriar < faltam && maxDep > 0) {
-        toast.error(`Limite de ${maxDep} dependentes atingido para este convênio.`);
-      }
-    } else if (desejadosDeps < depsPreenchidosCount) {
-      // Reduz remove primeiro linhas NOVAS vazias, depois novas preenchidas.
-      let toRemove = depsPreenchidosCount - desejadosDeps;
-      setDeps((prev) => {
-        const clone = [...prev];
-        // remove novas vazias
-        for (let i = clone.length - 1; i >= 0 && toRemove > 0; i--) {
-          if (clone[i].id === null && !clone[i].paciente_id) {
-            clone.splice(i, 1);
-            toRemove -= 1;
-          }
-        }
-        // remove novas preenchidas
-        for (let i = clone.length - 1; i >= 0 && toRemove > 0; i--) {
-          if (clone[i].id === null && clone[i].paciente_id) {
-            clone.splice(i, 1);
-            toRemove -= 1;
-          }
-        }
-        return clone;
-      });
-      if (toRemove > 0) {
-        toast.info(
-          "Para remover dependentes já ativos, use o botão × ao lado do nome.",
-        );
-      }
-    }
-  };
-
   const buildPayloadDeps = () =>
     deps
       .filter((d) => d.id !== null || (d.paciente_id && d.manter))
@@ -277,6 +282,7 @@ export function RenovarContratoDialog({
           _contrato_id: contratoId,
           _observacao: observacao || null,
           _dependentes: payloadDeps,
+          _valor_mensal: faixaSelecionada ? Number(faixaSelecionada.valor_mensal) : null,
         });
         if (error) throw error;
         toast.success(
@@ -290,6 +296,7 @@ export function RenovarContratoDialog({
           _observacao: observacao || null,
           _cobrar_taxa_adesao: cobrarTaxa,
           _dependentes: payloadDeps,
+          _valor_mensal: faixaSelecionada ? Number(faixaSelecionada.valor_mensal) : null,
         });
         if (error) throw error;
         toast.success("Novo contrato criado a partir da renovação");
@@ -333,7 +340,7 @@ export function RenovarContratoDialog({
                 <SelectContent>
                   {convenios.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.nome} — {BRL(Number(c.valor_mensal))}
+                      {c.nome}
                       {c.id === convenioAtualId ? " (atual)" : ""}
                     </SelectItem>
                   ))}
@@ -347,17 +354,39 @@ export function RenovarContratoDialog({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Nº de pessoas no contrato</Label>
-              <Input
-                type="number"
-                min={1}
-                max={maxDep > 0 ? maxDep + 1 : undefined}
-                value={numPessoasInput}
-                onChange={(e) => onNumPessoasChange(e.target.value)}
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Titular + dependentes ativos. Aumentar adiciona linhas para novos dependentes.
-                {maxDep > 0 ? ` Limite do convênio: ${maxDep} dependente${maxDep === 1 ? "" : "s"}.` : ""}
-              </p>
+              {faixasDoConvenio.length > 0 ? (
+                <>
+                  <Select
+                    value={faixaId}
+                    onValueChange={(v) => {
+                      setFaixaId(v);
+                      setFaixaTocada(true);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a faixa…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {faixasDoConvenio.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {labelFaixa(f)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Atualiza automaticamente conforme dependentes são incluídos ou removidos.
+                    {" "}Contrato atual: <strong>{totalPessoas}</strong> pessoa{totalPessoas === 1 ? "" : "s"}.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Input value={`${totalPessoas} pessoa${totalPessoas === 1 ? "" : "s"} — ${BRL(valorRenovacao)}`} readOnly />
+                  <p className="text-[11px] text-muted-foreground">
+                    Este convênio não possui faixas de preço cadastradas — o valor base é aplicado.
+                  </p>
+                </>
+              )}
             </div>
           </div>
 

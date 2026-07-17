@@ -8588,24 +8588,46 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      renovar_contrato_extensao: {
-        Args: {
-          _contrato_id: string
-          _dependentes?: Json
-          _observacao?: string
-        }
-        Returns: Json
-      }
-      renovar_contrato_troca_plano: {
-        Args: {
-          _cobrar_taxa_adesao?: boolean
-          _contrato_id: string
-          _convenio_novo_id: string
-          _dependentes?: Json
-          _observacao?: string
-        }
-        Returns: Json
-      }
+      renovar_contrato_extensao:
+        | {
+            Args: {
+              _contrato_id: string
+              _dependentes?: Json
+              _observacao?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _contrato_id: string
+              _dependentes?: Json
+              _observacao?: string
+              _valor_mensal?: number
+            }
+            Returns: Json
+          }
+      renovar_contrato_troca_plano:
+        | {
+            Args: {
+              _cobrar_taxa_adesao?: boolean
+              _contrato_id: string
+              _convenio_novo_id: string
+              _dependentes?: Json
+              _observacao?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _cobrar_taxa_adesao?: boolean
+              _contrato_id: string
+              _convenio_novo_id: string
+              _dependentes?: Json
+              _observacao?: string
+              _valor_mensal?: number
+            }
+            Returns: Json
+          }
       resolver_clinica_por_token: {
         Args: { _token: string }
         Returns: {
