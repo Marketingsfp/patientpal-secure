@@ -1,49 +1,51 @@
-## Ajustes na renovação de contrato
+## Reorganizar o diálogo "Renovar contrato" no padrão da venda
 
-Hoje o diálogo de "Renovar contrato" separa duas opções fixas (mesmo plano vs. trocar plano) e a troca não cobra taxa de adesão. Vou transformar o fluxo em uma revisão única, com escolha explícita do convênio, confirmação dos dependentes e cobrança da taxa de adesão sempre que houver troca de plano.
+Vou reordenar as seções para bater com o wizard de venda de contrato e habilitar edição/inclusão de dependentes no mesmo diálogo.
 
-### Comportamento novo
+### Nova ordem das seções
 
-1. **Passo 1 — Novo convênio** (obrigatório): dropdown com todos os convênios ativos da clínica, pré-selecionado com o convênio atual do contrato. Cada item mostra nome, valor mensal e nº de parcelas. Ao lado, resumo do plano escolhido: valor mensal, parcelas, taxa de adesão vigente.
-2. **Passo 2 — Dependentes e nº de pessoas**: lista os dependentes ativos do contrato atual com checkbox para manter/remover cada um. O "nº de pessoas no contrato" (titular + dependentes ativos) é recalculado automaticamente conforme os checkboxes; campo apenas leitura, exibido no topo. Botão para adicionar novos dependentes fica fora do escopo desta alteração (continuam podendo ser incluídos depois pela aba de dependentes do contrato).
-3. **Passo 3 — Resumo e confirmação**: mostra
-   - Convênio anterior → novo
-   - Valor anterior → valor da renovação
-   - Nº de pessoas no contrato (após ajuste)
-   - Parcelas a gerar (do convênio escolhido, default 12)
-   - Taxa de adesão que será cobrada: **R$ 0,00** quando o convênio é o mesmo (extensão), ou o valor da taxa de adesão do novo convênio quando houver troca.
-   - Campo de observação opcional.
+1. **Convênio da renovação** (Select, como já está).
+2. **Nº de pessoas no contrato** (campo numérico logo abaixo do convênio, mesmo padrão da venda). Ao alterar o número:
+   - Aumentar: abre linhas vazias na lista de dependentes para preencher.
+   - Diminuir: pede confirmação antes de remover o último dependente da lista.
+3. **Dependentes** (titular + dependentes):
+   - Titular fixo no topo (só leitura), com prontuário ao lado.
+   - Lista dos dependentes atuais do contrato, agora **editáveis**:
+     - Trocar o paciente vinculado (busca com `PatientSearchInput` + prontuário).
+     - Trocar o parentesco (Select).
+     - Marcar/desmarcar "manter no contrato renovado".
+   - Botão **"+ Adicionar dependente"** para novas linhas (paciente + parentesco + checkbox "Cobrar taxa de inclusão R$ X,XX", marcado por padrão).
+4. **Cobrar taxa de adesão do novo convênio** (mantém o checkbox atual, aparece só em troca de plano).
+5. **Resumo** (mantém, com linhas extras "Novos dependentes" e "Taxa de inclusão total" quando houver).
+6. **Observação** (mantém).
 
-### Regra de taxa de adesão
+### Regras
 
-- Convênio novo = atual → **extensão** do contrato atual (parcelas 13–24 com o valor atual do convênio), sem taxa. Comportamento igual ao atual.
-- Convênio novo ≠ atual → **novo contrato** vinculado ao anterior via `contrato_origem_id`, replicando apenas os dependentes que foram mantidos no passo 2, e gerando **taxa de adesão normal** do novo convênio como encargo (`numero_parcela = 0`) — mesmo padrão da venda de contrato novo. Exemplo: Cartão Consulta → Cartão Consulta + Seguros gera novo contrato com taxa de adesão do "+ Seguros".
-
-O texto "A renovação não cobra taxa de adesão" sai; entra uma linha explicando que a taxa só é cobrada quando há troca de plano.
+- **Extensão (mesmo convênio)**: alterações em dependentes existentes são aplicadas no próprio contrato; dependentes novos entram no contrato atual e a taxa de inclusão (se marcada) vai como `numero_parcela < 0` com o valor do convênio atual.
+- **Troca de plano**: o contrato antigo é encerrado como renovado; o contrato novo recebe os dependentes na configuração final desta tela (com edições e novos), e as taxas de inclusão marcadas viram parcelas do contrato novo com o valor do convênio escolhido.
+- **Nº de pessoas** é derivado: `1 (titular) + dependentes marcados como manter + novos preenchidos`. O campo é editável e serve como meta — se o operador digita 4 e só há 2 linhas, o diálogo abre 2 linhas em branco para completar. Botão "Confirmar" fica desabilitado enquanto houver linha incompleta ou mismatch com o número informado.
 
 ### Alterações técnicas
 
-1. **Migration — RPC `renovar_contrato_troca_plano`**
-   - Aceita novos parâmetros: `_dependentes_manter uuid[]` (IDs de `contrato_dependentes` a replicar) e `_cobrar_taxa_adesao boolean default true`.
-   - Insere no novo contrato somente os dependentes cujo ID veio em `_dependentes_manter` (mantém `paciente_id`, `paciente_nome`, `parentesco`, `tipo`).
-   - Se `_cobrar_taxa_adesao` e o convênio novo tiver `taxa_adesao > 0`, insere uma linha em `contrato_mensalidades` com `numero_parcela = 0`, descrição "Taxa de adesão", valor da taxa, vencimento = hoje, seguindo o mesmo padrão usado hoje na venda de contrato.
-   - Registra em `contrato_renovacoes` os campos já existentes (`valor_anterior`, `valor_novo`, `parcelas_geradas`, período) — sem mudança de schema.
+1. **Migration — RPCs de renovação** (`renovar_contrato_extensao` e `renovar_contrato_troca_plano`):
+   - Novo parâmetro `_dependentes jsonb` com o estado final da lista:
+     `[{ "id": uuid | null, "paciente_id": uuid, "parentesco": text, "manter": bool, "cobrar_taxa_inclusao": bool }]`.
+     - `id` presente → dependente existente: aplicar edições (paciente/parentesco) ou desativar se `manter=false`.
+     - `id` nulo → dependente novo: inserir e, se `cobrar_taxa_inclusao`, lançar parcela de taxa de inclusão.
+   - Aposentar `_dependentes_manter uuid[]` (substituído por `_dependentes`).
+   - Snapshot dos novos vai para `contrato_renovacoes.dependentes_incluidos jsonb` (nova coluna) para histórico.
 
-2. **Migration — RPC `renovar_contrato_extensao`**: sem mudança de assinatura; continua sem taxa.
+2. **Frontend — `src/components/contratos/renovar-contrato-dialog.tsx`**:
+   - Reordenar o JSX (convênio → nº pessoas → dependentes → taxa adesão → resumo → observação).
+   - Substituir a lista atual de checkboxes por linhas editáveis com `PatientSearchInput` + Select de parentesco + toggle "manter".
+   - Adicionar botão "+ Adicionar dependente" e a lógica de sincronia com o campo "Nº de pessoas".
+   - Enviar o novo payload `_dependentes` para as RPCs.
 
-3. **Frontend — `src/components/contratos/renovar-contrato-dialog.tsx`**
-   - Substituir os dois botões de modo por: Select de convênio (default = atual) + lista de dependentes com checkboxes carregada de `contrato_dependentes` (ativos) + resumo recalculado.
-   - Modo (`extensao` vs `troca_plano`) passa a ser derivado: `novoConvenioId === convenioAtualId`. O diálogo já decide qual RPC chamar.
-   - No RPC de troca, enviar `_dependentes_manter` (IDs marcados) e `_cobrar_taxa_adesao: true`.
-   - Buscar `taxa_adesao` do convênio escolhido para exibir no resumo.
-   - Mensagens de toast e confirmação atualizadas.
-
-4. **Frontend — `src/components/pages/contratos-page.tsx`**: nenhuma mudança além da já existente `onRenovado` (que já recarrega ou navega quando é troca).
+3. **`contratos-page.tsx`**: sem alterações (o `onRenovado` continua o mesmo).
 
 ### Fora de escopo
 
-- Adicionar novos dependentes durante a renovação (continua pela aba de dependentes após a renovação).
-- Renovação parcial de parcelas.
-- Notificação automática ao paciente.
+- Cadastrar paciente novo direto do diálogo (continua sendo feito antes, na tela de pacientes).
+- Alterar o valor da mensalidade em função do nº de pessoas (segue o cadastro do convênio, como hoje).
 
 Confirme para eu executar.
