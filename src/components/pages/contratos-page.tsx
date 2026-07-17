@@ -4190,6 +4190,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
               Esta ação cancela o plano e todos os benefícios deste contrato. Informe o motivo do cancelamento.
             </DialogDescription>
           </DialogHeader>
+        </DialogContent>
+      </Dialog>
+            <DialogDescription>
+              Esta ação cancela o plano e todos os benefícios deste contrato. Informe o motivo do cancelamento.
+            </DialogDescription>
+          </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="cancel-motivo">Motivo</Label>
             <Textarea
