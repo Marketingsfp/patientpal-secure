@@ -14,13 +14,15 @@ function isoToBr(iso: string): string {
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
-// Converte "dd/mm/yyyy" -> "yyyy-mm-dd". Retorna "" quando incompleto/inválido.
+// Converte "dd/mm/yyyy" ou "dd/mm/yy" -> "yyyy-mm-dd".
+// Ano curto é tratado como 20yy para cadastros/renovações operacionais.
 function brToIso(br: string): string {
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(br);
+  const m = /^(\d{2})\/(\d{2})\/(\d{2}|\d{4})$/.exec(br);
   if (!m) return "";
-  const day = Number(m[1]), month = Number(m[2]), year = Number(m[3]);
+  const yearText = m[3].length === 2 ? `20${m[3]}` : m[3];
+  const day = Number(m[1]), month = Number(m[2]), year = Number(yearText);
   if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900) return "";
-  return `${m[3]}-${m[2]}-${m[1]}`;
+  return `${yearText}-${m[2]}-${m[1]}`;
 }
 
 // Aplica máscara dd/mm/yyyy incrementalmente enquanto o usuário digita.
