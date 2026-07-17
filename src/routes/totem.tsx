@@ -320,9 +320,12 @@ export function TotemPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/40 flex flex-col cursor-none [&_*]:cursor-none">
+    // h-screen + overflow-hidden (em vez de min-h-screen): a página do totem
+    // não pode rolar de jeito nenhum — trava exatamente na altura da
+    // viewport e cada tela (header/main/footer) precisa caber dentro disso.
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-background via-background to-muted/40 flex flex-col cursor-none [&_*]:cursor-none">
       {/* Header */}
-      <header className="px-8 py-6 flex items-center justify-between">
+      <header className="px-8 py-4 flex items-center justify-between shrink-0">
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Bem-vindo a</div>
           <h1 className="text-2xl font-bold">{clinicaAtual.clinica.nome}</h1>
@@ -333,7 +336,7 @@ export function TotemPage() {
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center px-8 pb-12">
+      <main className="flex-1 min-h-0 flex items-center justify-center px-8 py-2 overflow-hidden">
         {step === "menu" && (
           <div className="w-full max-w-4xl space-y-10">
             <div className="text-center space-y-2">
@@ -404,21 +407,23 @@ export function TotemPage() {
         )}
 
         {step === "checkin" && (
-          // self-start: o bloco cresceu (CPF + teclado + botão facial + ações)
-          // e a centralização vertical do <main> deixava muito vazio em cima
-          // e empurrava "Voltar/Confirmar" pra baixo. Sobe o bloco mantendo a
-          // centralização horizontal (justify-center do <main> continua valendo).
-          <div className="w-full max-w-xl bg-card border rounded-3xl p-10 shadow-xl space-y-6 self-start mt-4">
-            <div className="text-center space-y-2">
-              <h2 className="text-3xl font-bold">Check-in</h2>
-              <p className="text-muted-foreground">Digite seu CPF no teclado abaixo</p>
+          // Card compacto de propósito: com CPF + teclado + botão facial +
+          // ações, a versão "confortável" (p-10, botões h-14, gap-3) passava
+          // da altura da viewport em telas de totem comuns e forçava scroll.
+          // A página não pode rolar — então tudo aqui é dimensionado para
+          // caber inteiro e ficar centralizado de verdade (sem hack de
+          // alinhamento), com "max-h-full" como cinto de segurança.
+          <div className="w-full max-w-md max-h-full overflow-hidden bg-card border rounded-3xl p-6 shadow-xl space-y-3">
+            <div className="text-center space-y-0.5">
+              <h2 className="text-2xl font-bold">Check-in</h2>
+              <p className="text-sm text-muted-foreground">Digite seu CPF no teclado abaixo</p>
             </div>
             <input
               readOnly
               inputMode="none"
               value={formatarCpfParcial(cpf)}
               placeholder="000.000.000-00"
-              className="w-full h-20 px-6 text-3xl tracking-widest rounded-xl border bg-background text-center tabular-nums"
+              className="w-full h-14 px-4 text-2xl tracking-widest rounded-xl border bg-background text-center tabular-nums"
             />
             <TecladoNumerico
               disabled={busy}
@@ -428,18 +433,17 @@ export function TotemPage() {
             />
             <Button
               variant="outline"
-              size="lg"
-              className="w-full h-14 text-base"
+              className="w-full h-11 text-sm"
               disabled={busy}
               onClick={() => void iniciarCheckinFacial()}
             >
-              <Camera className="h-5 w-5 mr-2" /> Usar reconhecimento facial
+              <Camera className="h-4 w-4 mr-2" /> Usar reconhecimento facial
             </Button>
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" size="lg" className="h-14" onClick={reset}>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" className="h-11" onClick={reset}>
                 <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
               </Button>
-              <Button size="lg" className="h-14" disabled={busy || cpf.length !== 11} onClick={() => void fazerCheckin()}>
+              <Button className="h-11" disabled={busy || cpf.length !== 11} onClick={() => void fazerCheckin()}>
                 {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Confirmar
               </Button>
             </div>
@@ -505,7 +509,7 @@ export function TotemPage() {
         )}
       </main>
 
-      <footer className="px-8 py-4 text-center text-xs text-muted-foreground">
+      <footer className="px-8 py-2 text-center text-xs text-muted-foreground shrink-0">
         ClinicaOS · Totem · {step !== "menu" && (
           <button onClick={reset} className="underline ml-2">Voltar ao início</button>
         )}

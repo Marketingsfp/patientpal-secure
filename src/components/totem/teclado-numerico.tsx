@@ -17,9 +17,9 @@ export function TecladoNumerico({
   disabled?: boolean;
 }) {
   const base =
-    "h-16 rounded-xl border-2 text-2xl font-semibold bg-background transition active:scale-95 disabled:opacity-40 hover:border-primary hover:bg-primary/5";
+    "h-12 rounded-xl border-2 text-xl font-semibold bg-background transition active:scale-95 disabled:opacity-40 hover:border-primary hover:bg-primary/5";
   return (
-    <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto select-none">
+    <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto select-none">
       {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
         <button key={d} type="button" className={base} disabled={disabled} onClick={() => onDigit(d)}>
           {d}
