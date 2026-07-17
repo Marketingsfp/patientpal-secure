@@ -1476,7 +1476,18 @@ function AgendaPage() {
     }
     setPacientes((prev) => [...prev, { id: data.id, nome: data.nome }].sort((a, b) => a.nome.localeCompare(b.nome)));
     setForm((f) => ({ ...f, paciente_nome: data.nome, paciente_id: data.id }));
+    if (descritorFace) {
+      const { error: bioErr } = await supabase.from("paciente_biometria").insert({
+        paciente_id: data.id,
+        clinica_id: clinicaAtual.clinica_id,
+        descritor: Array.from(descritorFace) as unknown as number[],
+      } as never);
+      if (bioErr) {
+        toast.warning("Paciente salvo, mas a foto não foi registrada.");
+      }
+    }
     setNovoPac({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
+    setDescritorFace(null);
     setNovoPacOpen(false);
     toast.success("Paciente cadastrado");
   };
