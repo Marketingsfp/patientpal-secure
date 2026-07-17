@@ -3190,7 +3190,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
               )}
               {isAdmin && podeEscrever ? (
                 <div className="space-y-1">
-                  <Label>Paciente titular</Label>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Label>Paciente titular</Label>
+                    <ProntuarioBadge
+                      codigo={admPaciente?.codigo_prontuario ?? pacienteFull?.codigo_prontuario}
+                    />
+                  </div>
                   <PatientSearchInput
                     value={admPaciente}
                     onSelect={(p) => setAdmPaciente(p)}
@@ -3225,10 +3230,15 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </div>
               ) : (
                 <>
-                  <DadosField
-                    label="Paciente titular"
-                    value={`${contrato.paciente_nome}${pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}`}
-                  />
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="text-xs text-muted-foreground">Paciente titular</div>
+                      <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
+                    </div>
+                    <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold text-sm">
+                      {contrato.paciente_nome}{pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}
+                    </div>
+                  </div>
                   {apenasFinanceiro ? (
                     <div className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
                       <Info className="h-3.5 w-3.5" /> Titular financeiro — não utiliza os benefícios.
