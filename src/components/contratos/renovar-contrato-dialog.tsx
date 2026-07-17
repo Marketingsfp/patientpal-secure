@@ -282,6 +282,7 @@ export function RenovarContratoDialog({
           _contrato_id: contratoId,
           _observacao: observacao || null,
           _dependentes: payloadDeps,
+          _valor_mensal: faixaSelecionada ? Number(faixaSelecionada.valor_mensal) : null,
         });
         if (error) throw error;
         toast.success(
@@ -295,6 +296,7 @@ export function RenovarContratoDialog({
           _observacao: observacao || null,
           _cobrar_taxa_adesao: cobrarTaxa,
           _dependentes: payloadDeps,
+          _valor_mensal: faixaSelecionada ? Number(faixaSelecionada.valor_mensal) : null,
         });
         if (error) throw error;
         toast.success("Novo contrato criado a partir da renovação");
