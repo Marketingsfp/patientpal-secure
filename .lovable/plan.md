@@ -1,28 +1,23 @@
-## Objetivo
+## Problema
 
-No diálogo "Incluir dependente", quando o operador marcar "Cobrar taxa de inclusão de dependente", o campo **Valor (R$)** deve vir preenchido automaticamente com o valor configurado no convênio e **ficar somente leitura** (não editável).
+Ao clicar em "Incluir dependente" no contrato, o campo **Valor (R$)** aparece em R$ 0,00 mesmo com o convênio tendo `taxa_inclusao_dependente` configurado (ex.: CARTÃO CONSULTA = R$ 30,00).
 
-## O que muda
+## Causa
 
-Arquivo: `src/components/pages/contratos-page.tsx` (diálogo de inclusão de dependente).
+A inicialização dos campos do diálogo (`incCobrarTaxa`, `incTaxaValor`, `incTaxaVenc`) está dentro do callback `onOpenChange` do `<Dialog>` (contratos-page.tsx linhas 3914–3928). Como o diálogo é aberto programaticamente pelo botão (`setIncOpen(true)` na linha 3512), o Radix **não dispara** `onOpenChange` nesse caso — ele só dispara para interações iniciadas pelo próprio Dialog (ESC, overlay, botão close). Resultado: o bloco de inicialização nunca roda e o campo Valor fica em 0.
 
-1. O valor do campo continua sendo carregado de `cb_convenios.taxa_inclusao_dependente` (já implementado).
-2. O `<Input>` de Valor passa a ser `readOnly` + estilo desabilitado (cinza), mantendo o número visível para conferência.
-3. Remover o spinner numérico (setas) já que não é mais editável — pode virar um campo formatado em BRL apenas para leitura.
-4. A data de vencimento continua editável (o operador precisa poder ajustar).
+## Correção
 
-## O que NÃO muda
+Extrair a inicialização para uma função `inicializarIncluirDependente()` e chamá-la no `onClick` do botão "Incluir dependente" (linha 3512), antes de `setIncOpen(true)`. Manter também a chamada dentro de `onOpenChange` como redundância inofensiva (caso o diálogo passe a ser reaberto por outro caminho).
 
-- Checkbox continua funcionando (marcar/desmarcar cobra ou não a taxa).
-- Regra do "mesmo dia da venda" (default desmarcado) permanece.
-- Se o convênio tiver `taxa_inclusao_dependente = 0`, o valor exibido será R$ 0,00 e ao salvar nenhuma cobrança é lançada (código atual já ignora `valor <= 0`).
-- Cadastro do convênio continua sendo o único lugar para editar esse valor.
+Nenhuma outra alteração de escopo — apenas garantir que o valor padrão da taxa (vindo de `cb_convenios.taxa_inclusao_dependente`) seja aplicado toda vez que o diálogo abre.
 
-## Ponto a confirmar
+## Validação
 
-Se o convênio estiver com `taxa_inclusao_dependente = 0` (ou nulo) e o operador marcar o checkbox, o que fazer?
+- Abrir contrato de convênio com taxa configurada → clicar Incluir dependente → campo Valor deve exibir o valor do convênio (ex.: R$ 30,00) já preenchido e travado.
+- Abrir em contrato com data_início = hoje → checkbox "Cobrar taxa" deve vir desmarcado (regra mesmo-dia preservada).
+- Convênios sem taxa (0) → mantém R$ 0,00 (comportamento atual correto).
 
-- **A) Manter como está:** exibe R$ 0,00 travado e nada é lançado ao salvar (comportamento atual).
-- **B) Bloquear o checkbox:** se o convênio não tem taxa configurada, o checkbox aparece desabilitado com aviso "Configure a taxa no cadastro do convênio".
+## Fora de escopo
 
-Sigo com **A** se não houver objeção.
+Nenhuma mudança em regra de cobrança, banco, ou no fluxo de salvar.
