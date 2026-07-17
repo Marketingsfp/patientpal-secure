@@ -1,36 +1,42 @@
-## Objetivo
+## O que vai mudar
 
-Diferenciar visualmente qual paciente é o titular / dependente do contrato quando existem pacientes homônimos, exibindo o **código de prontuário** ao lado do nome (titular e dependentes) na tela de detalhes do contrato (`/app/cartao-beneficios/contratos` e `/app/contratos`).
+Todas as alterações são de **layout/UI** em `src/components/pages/contratos-page.tsx`. Nenhuma regra de negócio, cálculo, permissão, migração ou banco é tocado.
 
-## Onde vai aparecer
+### 1. Badge "Prontuário" ao lado do nome do titular (foto 1)
 
-Em `src/components/pages/contratos-page.tsx`, na tela de detalhes do contrato:
+Hoje o badge `Prontuário xxxx` aparece apenas ao lado do rótulo "Paciente titular". A foto pede que ele também apareça **inline junto ao nome do paciente selecionado**, dentro da caixa de exibição do titular.
 
-1. **Título do contrato** (topo da página):
-   `Contrato #20260978 — MARIA DA GLORIA DE SOUZA` + badge `Prontuário 12345` ao lado.
-2. **Aba Dados → Paciente titular**:
-   - Modo leitura: badge `Prontuário 12345` ao lado do nome.
-   - Modo admin (com `PatientSearchInput`): badge abaixo do campo mostrando o prontuário do titular atualmente selecionado (o dropdown de busca já mostra o prontuário; a novidade é persistir a informação visível após a seleção).
-3. **Aba Dados → Dependentes**: cada linha da lista passa a mostrar `• NOME — Prontuário 12345 — parentesco (tipo) — CPF … — Incluído: …`.
-4. **Aba Resumo → aviso de "Titular financeiro"**: mesma badge de prontuário junto ao nome do titular.
+Aplicar em 3 pontos:
 
-Escopo mantido dentro desta tela — não altero o wizard de novo contrato (o dropdown já mostra o prontuário durante a busca) nem outras telas.
+- **Aba Dados — modo admin (contrato existente):** logo após o `PatientSearchInput`, renderizar o `ProntuarioBadge` inline ao lado do nome selecionado (quando houver `admPaciente?.codigo_prontuario`). O badge continua fixo/não editável — só aparece após seleção.
+- **Aba Dados — modo leitura:** dentro da caixa cinza que mostra `{contrato.paciente_nome}`, exibir o `ProntuarioBadge` ao lado do nome (mesmo comportamento).
+- **Novo contrato (wizard):** dentro do bloco de exibição do titular selecionado (linha `{titular.nome} {titular.cpf ...}`), acrescentar o `ProntuarioBadge` com `titular.codigo_prontuario`. Confirmar que `carregarPacienteCompleto` já traz `codigo_prontuario`; se não trouxer, incluir apenas a leitura desse campo (nada de escrita — respeita a constraint de identificadores legados imutáveis).
 
-## Mudanças técnicas
+Sem alteração no rótulo/label — mantém a badge que já existe junto do rótulo.
 
-- Estender o `select` do `pacienteFull` (dentro de `load()`) para incluir `codigo_prontuario` (hoje traz apenas `cpf, data_nascimento, telefone, email, endereço`).
-- Estender o tipo `Dep` com `codigo_prontuario?: string | null`.
-- No mesmo bloco que já busca `cpf` dos dependentes (`from('pacientes').select('id, cpf').in('id', pids)`), incluir `codigo_prontuario` e propagar no `map` que monta `depsRows`.
-- Criar pequeno componente inline `ProntuarioBadge` (mesma aparência já usada em `PatientSearchInput` e em `app.clientes.$pacienteId.editar`: `text-xs font-mono px-1.5 py-0.5 rounded bg-muted`) e reutilizar nos 4 pontos acima.
-- Nenhuma alteração de banco, RLS, regra de negócio, cálculo financeiro, impressão de contrato/carnê ou fluxo de inclusão/exclusão de dependentes. Puramente apresentação.
+### 2. Convênio + Nº de pessoas na mesma linha (foto 2)
+
+Na aba **Dados — modo admin**, hoje "Convênio" e "Nº de pessoas no contrato" estão em blocos separados um abaixo do outro (linhas 3142–3190). Envolver os dois em um único `grid grid-cols-1 md:grid-cols-2 gap-4` para que fiquem lado a lado no desktop. Em telas estreitas, empilham normalmente.
+
+O modo leitura (dois `DadosField` correspondentes) recebe o mesmo agrupamento em 2 colunas para manter consistência.
+
+### 3. Inverter ordem no wizard "Novo contrato"
+
+Em `NovoContratoWizard` (a partir da linha 1128), reordenar os campos no `Card` para:
+
+1. **Paciente titular** (busca + bloco de titular selecionado, com toggle "Apenas titular financeiro")
+2. **Convênio** + **Nº de pessoas no contrato** (mesma linha, grid 2 colunas — só aparece Nº de pessoas quando há faixas)
+3. **Data início**, **Dia de vencimento** e demais campos que já existem depois
+
+Nada além da ordem visual muda: mesmos estados (`convenioId`, `faixaId`, `titular`, etc.), mesmas validações, mesmo submit.
 
 ## Fora de escopo
 
-- Wizard de criação de novo contrato (o autocomplete já mostra o prontuário durante a busca).
-- Impressão do contrato / cartão / carnê — os textos impressos continuam iguais.
-- Demais telas que exibem nome de paciente.
+- Wizard de novo contrato: sem novos campos, sem alteração em validações ou submit.
+- Impressão de contrato/cartão/carnê, aba Resumo, aba Contrato: intocados.
+- Não haverá gravação em `codigo_prontuario` (identificador legado imutável) — apenas leitura.
 
 ## Validação
 
-- Build + typecheck.
-- Conferir visualmente na tela do contrato mostrado na imagem (com titular real que tem `codigo_prontuario`) que a badge aparece nos 4 locais e que pacientes sem prontuário cadastrado não quebram o layout (badge é omitida quando o valor é `null`).
+- `tsgo` (typecheck) após as edições.
+- Verificação visual via preview nas duas telas (aba Dados de contrato existente em modo admin/leitura, e wizard de novo contrato).
