@@ -113,6 +113,7 @@ type Paciente = {
   telefone: string | null;
   email: string | null;
   face_descriptor?: number[] | null;
+  codigo_prontuario?: string | null;
 };
 type Contrato = {
   id: string;
@@ -903,7 +904,7 @@ function NovoContratoForm({
   async function carregarPacienteCompleto(p: PatientOption): Promise<Paciente> {
     const { data } = await supabase
       .from("pacientes")
-      .select("id, nome, cpf, telefone, email, face_descriptor")
+      .select("id, nome, cpf, telefone, email, face_descriptor, codigo_prontuario")
       .eq("id", p.id)
       .maybeSingle();
     return (
@@ -914,6 +915,7 @@ function NovoContratoForm({
         telefone: p.telefone,
         email: null,
         face_descriptor: null,
+        codigo_prontuario: null,
       }
     );
   }
@@ -1128,41 +1130,6 @@ function NovoContratoForm({
       <Card>
         <CardContent className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div className={faixas.length > 0 ? undefined : "col-span-2"}>
-              <Label>Convênio</Label>
-              <Select value={convenioId} onValueChange={setConvenioId}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {convenios.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {faixas.length > 0 ? (
-              <div>
-                <Label>Nº de pessoas no contrato</Label>
-                <Select value={faixaId} onValueChange={setFaixaId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a faixa…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {faixas.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {labelFaixa(f)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  O valor mensal é definido pela faixa selecionada (cadastrada no convênio).
-                </p>
-              </div>
-            ) : null}
             <div className="col-span-2">
               <Label>Paciente titular</Label>
               {titular ? (
@@ -1171,6 +1138,7 @@ function NovoContratoForm({
                     <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
                     <span className="font-medium flex items-center gap-2">
                       {titular.nome} {titular.cpf ? `— ${titular.cpf}` : ""}
+                      <ProntuarioBadge codigo={titular.codigo_prontuario} />
                       {titular.face_descriptor && titular.face_descriptor.length > 0 ? (
                         <Badge variant="default" className="gap-1">
                           <Check className="h-3 w-3" />
@@ -1282,6 +1250,41 @@ function NovoContratoForm({
                 />
               )}
             </div>
+            <div className={faixas.length > 0 ? undefined : "col-span-2"}>
+              <Label>Convênio</Label>
+              <Select value={convenioId} onValueChange={setConvenioId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {convenios.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {faixas.length > 0 ? (
+              <div>
+                <Label>Nº de pessoas no contrato</Label>
+                <Select value={faixaId} onValueChange={setFaixaId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a faixa…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {faixas.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {labelFaixa(f)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  O valor mensal é definido pela faixa selecionada (cadastrada no convênio).
+                </p>
+              </div>
+            ) : null}
             <div>
               <Label>Data início</Label>
               <DateInputBR value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
@@ -3141,6 +3144,66 @@ h1, h2, h3 { margin: 0 0 6mm; }
               ) : null}
               {isAdmin && podeEscrever ? (
                 <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Label>Paciente titular</Label>
+                    <ProntuarioBadge
+                      codigo={admPaciente?.codigo_prontuario ?? pacienteFull?.codigo_prontuario}
+                    />
+                  </div>
+                  <PatientSearchInput
+                    value={admPaciente}
+                    onSelect={(p) => setAdmPaciente(p)}
+                    placeholder="Buscar paciente por nome ou CPF…"
+                  />
+                  <ApenasFinanceiroToggle
+                    contratoId={contrato.id}
+                    checked={apenasFinanceiro}
+                    saving={savingApenasFin}
+                    disabled={cancelado && !isAdmin}
+                    onChange={async (v) => {
+                      setSavingApenasFin(true);
+                      const { error } = await supabase
+                        .from("contratos_assinatura")
+                        .update({ titular_apenas_financeiro: v } as any)
+                        .eq("id", contrato.id);
+                      if (error) {
+                        setSavingApenasFin(false);
+                        mostrarErro(error);
+                        return;
+                      }
+                      (contrato as any).titular_apenas_financeiro = v;
+                      setApenasFinanceiro(v);
+                      const novoTotal = (v ? 0 : 1) + depsAtivos.length;
+                      await recalcularParcelasAbertas(novoTotal);
+                      setSavingApenasFin(false);
+                      toast.success(v
+                        ? "Marcado como Titular financeiro (não utiliza os benefícios)."
+                        : "Titular passa a usufruir dos benefícios normalmente.");
+                    }}
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="text-sm font-medium">Paciente titular</div>
+                      <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
+                    </div>
+                    <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm flex items-center gap-2 flex-wrap">
+                      <span>{contrato.paciente_nome}{pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}</span>
+                      <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
+                    </div>
+                  </div>
+                  {apenasFinanceiro ? (
+                    <div className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                      <Info className="h-3.5 w-3.5" /> Titular financeiro — não utiliza os benefícios.
+                    </div>
+                  ) : null}
+                </>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {isAdmin && podeEscrever ? (
+                <div className="space-y-1">
                   <Label>Convênio</Label>
                   <Select value={admConvenioId} onValueChange={setAdmConvenioId}>
                     <SelectTrigger>
@@ -3188,64 +3251,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
               ) : (
                 <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
               )}
-              {isAdmin && podeEscrever ? (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Label>Paciente titular</Label>
-                    <ProntuarioBadge
-                      codigo={admPaciente?.codigo_prontuario ?? pacienteFull?.codigo_prontuario}
-                    />
-                  </div>
-                  <PatientSearchInput
-                    value={admPaciente}
-                    onSelect={(p) => setAdmPaciente(p)}
-                    placeholder="Buscar paciente por nome ou CPF…"
-                  />
-                  <ApenasFinanceiroToggle
-                    contratoId={contrato.id}
-                    checked={apenasFinanceiro}
-                    saving={savingApenasFin}
-                    disabled={cancelado && !isAdmin}
-                    onChange={async (v) => {
-                      setSavingApenasFin(true);
-                      const { error } = await supabase
-                        .from("contratos_assinatura")
-                        .update({ titular_apenas_financeiro: v } as any)
-                        .eq("id", contrato.id);
-                      if (error) {
-                        setSavingApenasFin(false);
-                        mostrarErro(error);
-                        return;
-                      }
-                      (contrato as any).titular_apenas_financeiro = v;
-                      setApenasFinanceiro(v);
-                      const novoTotal = (v ? 0 : 1) + depsAtivos.length;
-                      await recalcularParcelasAbertas(novoTotal);
-                      setSavingApenasFin(false);
-                      toast.success(v
-                        ? "Marcado como Titular financeiro (não utiliza os benefícios)."
-                        : "Titular passa a usufruir dos benefícios normalmente.");
-                    }}
-                  />
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <div className="text-sm font-medium">Paciente titular</div>
-                      <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
-                    </div>
-                    <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                      {contrato.paciente_nome}{pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}
-                    </div>
-                  </div>
-                  {apenasFinanceiro ? (
-                    <div className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
-                      <Info className="h-3.5 w-3.5" /> Titular financeiro — não utiliza os benefícios.
-                    </div>
-                  ) : null}
-                </>
-              )}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {isAdmin && podeEscrever ? (
                   <div className="space-y-1">
