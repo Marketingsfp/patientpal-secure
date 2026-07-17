@@ -2382,6 +2382,24 @@ function DetalheContrato({
     } else {
       setContratosAnteriores([]);
     }
+    // Carrega ciclos de renovação por extensão deste contrato (mesmo id).
+    // Usamos os tamanhos (parcelas_geradas) e a ordem cronológica para
+    // segmentar as mensalidades em ciclos (Original, Renovação 1, ...).
+    {
+      const { data: renRows } = await supabase
+        .from("contrato_renovacoes")
+        .select("id, tipo, parcelas_geradas, periodo_inicio, periodo_fim, created_at")
+        .eq("contrato_id", contrato.id)
+        .order("created_at", { ascending: true });
+      setRenovacoes(((renRows ?? []) as any[]).map((r) => ({
+        id: r.id,
+        tipo: r.tipo ?? null,
+        parcelas_geradas: r.parcelas_geradas ?? null,
+        periodo_inicio: r.periodo_inicio ?? null,
+        periodo_fim: r.periodo_fim ?? null,
+        created_at: r.created_at ?? null,
+      })));
+    }
     setLoading(false);
   };
   useEffect(() => {
