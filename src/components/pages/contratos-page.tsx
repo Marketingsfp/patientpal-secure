@@ -1982,7 +1982,7 @@ function DetalheContrato({
       .from("contrato_mensalidades")
       .delete()
       .eq("contrato_id", contrato.id)
-      .neq("numero_parcela", 0);
+      .gt("numero_parcela", 0);
     if (delErr) {
       setRegerandoRetro(false);
       return mostrarErro(delErr);
