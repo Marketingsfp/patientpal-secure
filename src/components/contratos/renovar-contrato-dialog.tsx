@@ -338,7 +338,7 @@ export function RenovarContratoDialog({
                 <SelectContent>
                   {convenios.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
-                      {c.nome} — {BRL(Number(c.valor_mensal))}
+                      {c.nome}
                       {c.id === convenioAtualId ? " (atual)" : ""}
                     </SelectItem>
                   ))}
@@ -352,17 +352,39 @@ export function RenovarContratoDialog({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Nº de pessoas no contrato</Label>
-              <Input
-                type="number"
-                min={1}
-                max={maxDep > 0 ? maxDep + 1 : undefined}
-                value={numPessoasInput}
-                onChange={(e) => onNumPessoasChange(e.target.value)}
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Titular + dependentes ativos. Aumentar adiciona linhas para novos dependentes.
-                {maxDep > 0 ? ` Limite do convênio: ${maxDep} dependente${maxDep === 1 ? "" : "s"}.` : ""}
-              </p>
+              {faixasDoConvenio.length > 0 ? (
+                <>
+                  <Select
+                    value={faixaId}
+                    onValueChange={(v) => {
+                      setFaixaId(v);
+                      setFaixaTocada(true);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a faixa…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {faixasDoConvenio.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {labelFaixa(f)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">
+                    Atualiza automaticamente conforme dependentes são incluídos ou removidos.
+                    {" "}Contrato atual: <strong>{totalPessoas}</strong> pessoa{totalPessoas === 1 ? "" : "s"}.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Input value={`${totalPessoas} pessoa${totalPessoas === 1 ? "" : "s"} — ${BRL(valorRenovacao)}`} readOnly />
+                  <p className="text-[11px] text-muted-foreground">
+                    Este convênio não possui faixas de preço cadastradas — o valor base é aplicado.
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
