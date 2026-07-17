@@ -68,6 +68,7 @@ import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { Checkbox } from "@/components/ui/checkbox";
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) =>
   s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—";
