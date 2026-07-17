@@ -16,7 +16,6 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { EnfermagemGerarAgendaCard, EnfermagemRecursosHorariosEditor } from "@/components/enfermagem-horarios-parts";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/disponibilidades")({
@@ -587,7 +586,6 @@ function Page() {
         <TabsList>
           <TabsTrigger value="agendas">Agendas</TabsTrigger>
           <TabsTrigger value="medicos">Médicos</TabsTrigger>
-          <TabsTrigger value="enfermagem">Enfermagem</TabsTrigger>
         </TabsList>
 
         <TabsContent value="agendas" className="space-y-6">
@@ -698,8 +696,6 @@ function Page() {
               )}
             </CardContent>
           </Card>
-
-          <EnfermagemGerarAgendaCard />
         </TabsContent>
 
         <TabsContent value="medicos" className="space-y-6">
@@ -1045,10 +1041,6 @@ function Page() {
               </div>
             );
           })()}
-        </TabsContent>
-
-        <TabsContent value="enfermagem" className="space-y-6">
-          <EnfermagemRecursosHorariosEditor />
         </TabsContent>
       </Tabs>
 

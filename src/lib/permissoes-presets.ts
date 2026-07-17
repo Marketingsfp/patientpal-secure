@@ -25,7 +25,7 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   // Cadastros
   "equipe", "especialidades", "disponibilidades", "prontuario-modelos",
   "perfis", "unidades", "medicos", "procedimentos", "planos", "estoque",
-  "modelos-documentos", "clinicas", "tipos-servico", "enfermagem-recursos",
+  "modelos-documentos", "clinicas", "tipos-servico",
   // RH
   "hr-ponto", "hr-contratos", "hr-ferias", "hr-holerites", "treinamentos",
   "lms-admin",
@@ -51,7 +51,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     "consulta-rapida": "read", "alertas-enfermagem": "read",
     "cartao-beneficios": "read",
     "painel-executivo": "write", "atendimento-multiplo": "read",
-    "tipos-servico": "read", "enfermagem-recursos": "read",
+    "tipos-servico": "read",
   },
   medico: {
     agenda: "write", "atendimento-ia": "write", "exames-resultados": "read",
@@ -90,7 +90,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     "atendimento-ia": "read",
     anamneses: "write", prontuarios: "read", estoque: "read",
     documentos: "read", chat: "write", orcamentos: "write",
-    "atendimento-multiplo": "write", "enfermagem-recursos": "write",
+    "atendimento-multiplo": "write",
     caixa: "read",
   },
 };

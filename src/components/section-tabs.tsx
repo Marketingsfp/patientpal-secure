@@ -77,7 +77,6 @@ export const SERVICOS_TABS: ReadonlyArray<SectionTab> = [
   { to: "/app/especialidades", label: "Especialidades", icon: HeartPulse, modulo: "especialidades" },
   { to: "/app/tipos-servico", label: "Categorias", icon: LayoutGrid, modulo: "tipos-servico" },
   { to: "/app/procedimentos", label: "Serviços", icon: ClipboardList, modulo: "procedimentos" },
-  { to: "/app/enfermagem-recursos", label: "Enfermagem", icon: HeartPulse, modulo: "enfermagem-recursos" },
 ];
 
 export const SEGURANCA_TABS: ReadonlyArray<SectionTab> = [

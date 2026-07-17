@@ -140,15 +140,7 @@ async function computarSlots(
   const dow = dia.getDay(); // 0..6
 
   let dispos: DispoRow[] = [];
-  if (ehRecurso) {
-    const { data } = await supabase
-      .from("enfermagem_recurso_disponibilidades")
-      .select("dia_semana, hora_inicio, hora_fim, intervalo_min")
-      .eq("recurso_id", profId)
-      .eq("dia_semana", dow)
-      .eq("ativo", true);
-    dispos = (data ?? []) as DispoRow[];
-  } else {
+  if (!ehRecurso) {
     const { data } = await supabase
       .from("medico_disponibilidades")
       .select("dia_semana, hora_inicio, hora_fim, intervalo_min, vigencia_inicio, vigencia_fim")
@@ -166,12 +158,7 @@ async function computarSlots(
   const inicioDia = new Date(`${dataStr}T00:00:00`).toISOString();
   const fimDia = new Date(`${dataStr}T23:59:59`).toISOString();
   const ags = ehRecurso
-    ? await supabase
-        .from("agendamentos")
-        .select("id, inicio, fim, status, paciente_id, paciente_nome")
-        .eq("enfermagem_recurso_id", profId)
-        .gte("inicio", inicioDia)
-        .lte("inicio", fimDia)
+    ? { data: [] as unknown[] }
     : await supabase
         .from("agendamentos")
         .select("id, inicio, fim, status, paciente_id, paciente_nome")
@@ -267,16 +254,11 @@ export function DividirOrcamentoDialog({
     (async () => {
       setLoadingVinc(true);
       try {
-        const [{ data: mp }, { data: rp }] = await Promise.all([
-          supabase
-            .from("medico_procedimentos")
-            .select("medico_id, procedimento_id")
-            .in("procedimento_id", procIds),
-          supabase
-            .from("enfermagem_recurso_procedimentos")
-            .select("recurso_id, procedimento_id")
-            .in("procedimento_id", procIds),
-        ]);
+        const { data: mp } = await supabase
+          .from("medico_procedimentos")
+          .select("medico_id, procedimento_id")
+          .in("procedimento_id", procIds);
+        const rp: Array<{ recurso_id: string | null; procedimento_id: string | null }> = [];
         if (cancel) return;
         const m = new Map<string, Set<string>>();
         for (const r of mp ?? []) {
@@ -285,7 +267,7 @@ export function DividirOrcamentoDialog({
           m.get(r.procedimento_id)!.add(r.medico_id);
         }
         const re = new Map<string, Set<string>>();
-        for (const r of rp ?? []) {
+        for (const r of rp) {
           if (!r.procedimento_id || !r.recurso_id) continue;
           if (!re.has(r.procedimento_id)) re.set(r.procedimento_id, new Set());
           re.get(r.procedimento_id)!.add(r.recurso_id);
@@ -431,7 +413,6 @@ export function DividirOrcamentoDialog({
           paciente_nome: orcamento.paciente_nome ?? "",
           paciente_id: orcamento.paciente_id ?? null,
           medico_id: ehRecurso ? null : g.medico_id,
-          enfermagem_recurso_id: ehRecurso ? g.medico_id : null,
           inicio: inicioIso,
           fim: fimIso,
           procedimento: montarDescricao(g),

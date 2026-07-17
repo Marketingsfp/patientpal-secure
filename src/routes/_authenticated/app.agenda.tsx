@@ -115,7 +115,6 @@ type Agendamento = {
   atendimento_grupo_id?: string | null;
   ficha_numero?: number | null;
   forma_pagamento_prevista?: string | null;
-  enfermagem_recurso_id?: string | null;
 };
 type Medico = {
   id: string;
@@ -128,7 +127,6 @@ type Medico = {
   procedimento_padrao_nome?: string | null;
   especialidade_nome?: string | null;
 };
-type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
 type ProcedimentoRef = {
@@ -1477,7 +1475,7 @@ function AgendaPage() {
     let q = supabase
       .from("agendamentos")
       .select(
-        "id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never,
+        "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never,
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: apenasData ? false : true });
@@ -1493,7 +1491,7 @@ function AgendaPage() {
     // linhas do PostgREST e descartar os agendamentos do profissional/dia
     // selecionado.
     if (filtroMedico !== "todos") {
-      q = q.or(`medico_id.eq.${filtroMedico},enfermagem_recurso_id.eq.${filtroMedico}`);
+      q = q.eq("medico_id", filtroMedico);
     }
     // Empurra a busca por nome de cliente para o servidor — sem isso a
     // janela de 30 dias pode trazer mais que o limite do PostgREST e
@@ -1556,12 +1554,9 @@ function AgendaPage() {
       mostrarErro(error);
       return;
     }
-    // Recursos de enfermagem aparecem como "médicos virtuais": mapeamos o
-    // enfermagem_recurso_id no campo medico_id para reuso de toda a UI.
     const mapped = (
       (data ?? []) as unknown as Array<
         Agendamento & {
-          enfermagem_recurso_id?: string | null;
           medico?: { nome: string | null; sexo: string | null } | null;
           orcamento?: { numero: number | null } | null;
         }
@@ -1569,7 +1564,7 @@ function AgendaPage() {
     ).map((a) => ({
       ...a,
       paciente_nome: isSlotLivre(a.paciente_nome) ? "DISPONÍVEL" : a.paciente_nome,
-      medico_id: a.medico_id ?? a.enfermagem_recurso_id ?? null,
+      medico_id: a.medico_id ?? null,
       medico_nome: a.medico_nome ?? a.medico?.nome ?? null,
       medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
       orcamento_numero: a.orcamento_numero ?? a.orcamento?.numero ?? null,
@@ -1708,7 +1703,7 @@ function AgendaPage() {
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
-    const [m, e, me, pr, sr, mcRows, mp, er, erp, agendasRes] = await Promise.all([
+    const [m, e, me, pr, sr, mcRows, mp, agendasRes] = await Promise.all([
       supabase
         .from("medicos")
         .select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco")
@@ -1728,16 +1723,6 @@ function AgendaPage() {
         .not("medico_id", "is", null),
       getMedicoConveniosAgenda(clinicaAtual.clinica_id),
       fetchMedicoProcedimentosAgenda(clinicaAtual.clinica_id),
-      supabase
-        .from("enfermagem_recursos")
-        .select("id,nome")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true)
-        .order("nome"),
-      supabase
-        .from("enfermagem_recurso_procedimentos")
-        .select("recurso_id,procedimento_id,enfermagem_recursos!inner(clinica_id)")
-        .eq("enfermagem_recursos.clinica_id", clinicaAtual.clinica_id),
       supabase
         .from("medico_agendas")
         .select("id,nome,medico_id,ativo,ordem")
@@ -1781,24 +1766,8 @@ function AgendaPage() {
       especialidade_nome: x.especialidade_id ? (especialidadesPorId.get(x.especialidade_id) ?? null) : null,
       __recurso: false,
     }));
-    let recursosArr = (er.data ?? []) as RecursoEnf[];
-    // Se o usuário logado é enfermeiro, restringe agendas àquelas em que foi liberado
-    if (clinicaAtual.role === "enfermeiro" && user?.id) {
-      const { data: vinc } = await supabase
-        .from("enfermagem_recurso_atendentes")
-        .select("recurso_id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("user_id", user.id);
-      const allowed = new Set(((vinc ?? []) as Array<{ recurso_id: string }>).map((r) => r.recurso_id));
-      recursosArr = recursosArr.filter((r) => allowed.has(r.id));
-    }
-    const recursosComoMedicos: Medico[] = recursosArr.map((r) => ({
-      id: r.id,
-      nome: `🩺 ${r.nome}`,
-      sexo: null,
-    }));
-    setRecursoIds(new Set(recursosArr.map((r) => r.id)));
-    setMedicos([...medicosBase, ...recursosComoMedicos] as Medico[]);
+    setRecursoIds(new Set());
+    setMedicos(medicosBase as Medico[]);
     // Pacientes não são mais carregados em massa aqui: a seleção usa busca
     // server-side em PatientSearchInput. Isso evita travar a agenda em bases grandes.
     setPacientes([]);
@@ -1873,23 +1842,6 @@ function AgendaPage() {
       procOpcoesMap.get(r.medico_id)!.push({ id: proc.id, nome: decorado });
     }
     setProcPorMedico(pm);
-    // Vínculos de procedimentos por recurso de enfermagem
-    const recursoProcsValidos = ((erp.data ?? []) as Array<{ recurso_id: string; procedimento_id: string }>).filter(
-      (r) => new Set(recursosArr.map((x) => x.id)).has(r.recurso_id),
-    );
-    for (const r of recursoProcsValidos) {
-      if (!pm.has(r.recurso_id)) pm.set(r.recurso_id, new Set());
-      pm.get(r.recurso_id)!.add(r.procedimento_id);
-      const proc = procedimentosPorId.get(r.procedimento_id);
-      if (!proc) continue;
-      if (!procOpcoesMap.has(r.recurso_id)) procOpcoesMap.set(r.recurso_id, []);
-      if (!procOpcoesVistos.has(r.recurso_id)) procOpcoesVistos.set(r.recurso_id, new Set());
-      const vistos = procOpcoesVistos.get(r.recurso_id)!;
-      const chave = normalizar(proc.nome);
-      if (vistos.has(chave)) continue;
-      vistos.add(chave);
-      procOpcoesMap.get(r.recurso_id)!.push(proc);
-    }
     setProcOpcoesPorMedico(procOpcoesMap);
     const medicosIds = new Set(((m.data ?? []) as unknown as Medico[]).map((x) => x.id));
     const nm = new Map<string, Set<string>>();
@@ -3480,13 +3432,11 @@ function AgendaPage() {
       return;
     }
     setSaving(true);
-    const ehRecurso = !!form.medico_id && recursoIds.has(form.medico_id);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       paciente_nome: form.paciente_nome.trim(),
       paciente_id: form.paciente_id || null,
-      medico_id: ehRecurso ? null : form.medico_id || null,
-      enfermagem_recurso_id: ehRecurso ? form.medico_id : null,
+      medico_id: form.medico_id || null,
       inicio: new Date(form.inicio).toISOString(),
       fim: new Date(form.fim).toISOString(),
       procedimento: procedimentoTexto || null,
@@ -6013,7 +5963,6 @@ function AgendaPage() {
                   paciente_nome: "Paciente",
                   paciente_id: "Paciente (id)",
                   medico_id: "Profissional",
-                  enfermagem_recurso_id: "Recurso de enfermagem",
                   inicio: "Início",
                   fim: "Fim",
                   status: "Status",
@@ -6961,14 +6910,6 @@ function AgendaPage() {
                               {podeEscrever && !ehLivre && (
                                 <>
                                   <DropdownMenuSeparator />
-                                  {a.enfermagem_recurso_id && a.status !== "realizado" && (
-                                    <DropdownMenuItem
-                                      onClick={() => iniciarAtendimentoEnf(a)}
-                                      className="text-green-700 font-medium"
-                                    >
-                                      <CheckCircle2 className="h-4 w-4 mr-2" /> Dar baixa (Enfermagem)
-                                    </DropdownMenuItem>
-                                  )}
                                   {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
                                     <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
                                       <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}

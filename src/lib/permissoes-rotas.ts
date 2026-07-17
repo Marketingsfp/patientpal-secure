@@ -69,7 +69,6 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/especialidades": "especialidades",
   "/app/procedimentos": "procedimentos",
   "/app/tipos-servico": "tipos-servico",
-  "/app/enfermagem-recursos": "enfermagem-recursos",
   "/app/disponibilidades": "disponibilidades",
   "/app/prontuario-modelos": "prontuario-modelos",
   "/app/modelos-documentos": "modelos-documentos",

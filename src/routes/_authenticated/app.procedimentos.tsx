@@ -1392,7 +1392,6 @@ function ProcedimentosPage() {
                       <SelectItem value="consulta_medica">Consulta padrão (com médico)</SelectItem>
                       <SelectItem value="exame_agendado">Exame com laudo</SelectItem>
                       <SelectItem value="equipamento">Exame sem laudo</SelectItem>
-                      <SelectItem value="procedimento_ambulatorial">Procedimento de enfermagem</SelectItem>
                       <SelectItem value="lab_agendado">Coleta laboratorial</SelectItem>
                       <SelectItem value="domiciliar">Entrega/retirada domiciliar (MAPA/Holter)</SelectItem>
                       <SelectItem value="venda_balcao">Venda de balcão</SelectItem>

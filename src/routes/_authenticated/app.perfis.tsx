@@ -136,7 +136,6 @@ const GRUPOS: Grupo[] = [
       { key: "estoque", nome: "Estoque", descricao: "Produtos e movimentos" },
       { key: "procedimentos", nome: "Procedimentos", descricao: "Tabela de procedimentos" },
       { key: "tipos-servico", nome: "Tipos de serviço", descricao: "Classificação de serviços" },
-      { key: "enfermagem-recursos", nome: "Recursos de enfermagem", descricao: "Recursos operacionais de enfermagem" },
     ],
   },
   {
