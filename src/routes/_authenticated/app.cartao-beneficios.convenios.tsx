@@ -42,6 +42,10 @@ const convenioSchema = z
     descricao: z.string().trim().max(DESCRICAO_MAX, `Descrição pode ter no máximo ${DESCRICAO_MAX} caracteres`).optional(),
     beneficios: z.string().trim().max(BENEFICIOS_MAX, `Benefícios pode ter no máximo ${BENEFICIOS_MAX} caracteres`).optional(),
     taxa_adesao: z.number().min(0, "Taxa não pode ser negativa").max(100000, "Taxa acima do permitido"),
+    taxa_inclusao_dependente: z
+      .number()
+      .min(0, "Taxa não pode ser negativa")
+      .max(100000, "Taxa acima do permitido"),
     num_parcelas: z.number().int().min(1, "Nº de parcelas deve ser ≥ 1").max(60, "Máximo de 60 parcelas"),
     max_dependentes: z.number().int().min(0).max(50, "Máximo de 50 dependentes"),
     fidelidade_meses: z.number().int().min(0).max(120),
@@ -100,6 +104,7 @@ type Convenio = {
   ativo: boolean;
   valor_mensal: number;
   taxa_adesao: number;
+  taxa_inclusao_dependente: number;
   num_parcelas: number;
   max_dependentes: number;
   fidelidade_meses: number;
@@ -148,6 +153,7 @@ function ConveniosPage() {
   const [descricao, setDescricao] = useState("");
   const [ativo, setAtivo] = useState(true);
   const [taxaAdesao, setTaxaAdesao] = useState<number>(0);
+  const [taxaInclusaoDep, setTaxaInclusaoDep] = useState<number>(0);
   const [numParcelas, setNumParcelas] = useState<number>(12);
   const [maxDependentes, setMaxDependentes] = useState<number>(0);
   const [fidelidadeMeses, setFidelidadeMeses] = useState<number>(0);
@@ -283,7 +289,7 @@ function ConveniosPage() {
     setEditing(null);
     setEditingBenIdx(null);
     setNome(""); setDescricao(""); setAtivo(true);
-    setTaxaAdesao(0); setNumParcelas(12);
+    setTaxaAdesao(0); setTaxaInclusaoDep(0); setNumParcelas(12);
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
     setBeneficiosTxt(""); setModeloContrato("");
     setInformativoHtml("");
@@ -302,6 +308,7 @@ function ConveniosPage() {
     setDescricao(c.descricao ?? "");
     setAtivo(c.ativo);
     setTaxaAdesao(Number(c.taxa_adesao ?? 0));
+    setTaxaInclusaoDep(Number((c as unknown as { taxa_inclusao_dependente?: number }).taxa_inclusao_dependente ?? 0));
     setNumParcelas(c.num_parcelas ?? 12);
     setMaxDependentes(c.max_dependentes ?? 0);
     setFidelidadeMeses(c.fidelidade_meses ?? 0);
@@ -346,6 +353,7 @@ function ConveniosPage() {
       descricao: descClean || undefined,
       beneficios: benefClean || undefined,
       taxa_adesao: taxaAdesao,
+      taxa_inclusao_dependente: taxaInclusaoDep,
       num_parcelas: numParcelas,
       max_dependentes: maxDependentes,
       fidelidade_meses: fidelidadeMeses,
@@ -381,6 +389,7 @@ function ConveniosPage() {
       ativo,
       valor_mensal: valorMin,
       taxa_adesao: taxaAdesao,
+      taxa_inclusao_dependente: taxaInclusaoDep,
       num_parcelas: numParcelas,
       max_dependentes: maxDependentes,
       fidelidade_meses: fidelidadeMeses,
@@ -559,12 +568,19 @@ function ConveniosPage() {
                   {nome.trim().length} / {NOME_MAX}
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
                   <Label>Taxa de adesão (R$)</Label>
                   <CurrencyInput
                     value={taxaAdesao ? taxaAdesao.toFixed(2) : ""}
                     onChange={(v) => setTaxaAdesao(v ? parseFloat(v) : 0)}
+                  />
+                </div>
+                <div>
+                  <Label>Taxa de inclusão de dependente (R$)</Label>
+                  <CurrencyInput
+                    value={taxaInclusaoDep ? taxaInclusaoDep.toFixed(2) : ""}
+                    onChange={(v) => setTaxaInclusaoDep(v ? parseFloat(v) : 0)}
                   />
                 </div>
                 <div>

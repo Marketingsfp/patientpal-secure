@@ -68,6 +68,7 @@ import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { Checkbox } from "@/components/ui/checkbox";
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) =>
   s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—";
@@ -156,8 +157,22 @@ type Mens = {
 
 const isAdesao = (m: Pick<Mens, "numero_parcela">) => Number(m.numero_parcela) === 0;
 
+/** Taxa de inclusão de dependente: linha com numero_parcela negativo. */
+const isTaxaInclusao = (m: Pick<Mens, "numero_parcela">) => Number(m.numero_parcela) < 0;
+/** Encargo avulso: qualquer cobrança que NÃO seja uma mensalidade mensal.
+ *  Cobre a linha de adesão inicial (numero_parcela = 0) e as taxas de
+ *  inclusão de dependente (numero_parcela < 0). Todos os filtros que se
+ *  referem a "parcelas mensais" (contador N/M, recálculo por vidas,
+ *  renumeração) usam este predicado. */
+const isEncargoAvulso = (m: Pick<Mens, "numero_parcela">) =>
+  Number(m.numero_parcela) <= 0;
+
 const cobrancaLabel = (m: Pick<Mens, "numero_parcela">) =>
-  isAdesao(m) ? "Adesão" : `Mensalidade ${m.numero_parcela}`;
+  isAdesao(m)
+    ? "Adesão"
+    : isTaxaInclusao(m)
+      ? "Taxa inclusão"
+      : `Mensalidade ${m.numero_parcela}`;
 type Dep = {
   id: string;
   paciente_id: string;
@@ -1773,6 +1788,13 @@ function DetalheContrato({
   const [incParentesco, setIncParentesco] = useState<string>("");
   const [incTipo, setIncTipo] = useState<string>("dependente");
   const [incSaving, setIncSaving] = useState(false);
+  // Taxa de inclusão de dependente (cobrança avulsa gerada junto com a
+  // inclusão pós-venda). Padrão: cobrar sempre, exceto quando a inclusão é
+  // feita no mesmo dia da venda (data_inicio do contrato). Valor sugerido
+  // vem de cb_convenios.taxa_inclusao_dependente e permanece editável.
+  const [incCobrarTaxa, setIncCobrarTaxa] = useState<boolean>(true);
+  const [incTaxaValor, setIncTaxaValor] = useState<string>("0.00");
+  const [incTaxaVenc, setIncTaxaVenc] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [excAlvo, setExcAlvo] = useState<Dep | null>(null);
   const [termoOpen, setTermoOpen] = useState(false);
   const [termoMovimento, setTermoMovimento] = useState<"Inclusão" | "Exclusão">("Inclusão");
@@ -1923,7 +1945,7 @@ function DetalheContrato({
       (contrato as any).valor_mensal = novoValorMensal;
       setValorMensalAtual(novoValorMensal);
       // Recalcula parcelas em aberto para o novo valor
-      const abertas = mens.filter((m) => !isAdesao(m) && m.status !== "pago");
+      const abertas = mens.filter((m) => !isEncargoAvulso(m) && m.status !== "pago");
       if (abertas.length > 0) {
         await Promise.all(
           abertas.map((m) => {
@@ -1968,7 +1990,7 @@ function DetalheContrato({
       .from("contrato_mensalidades")
       .delete()
       .eq("contrato_id", contrato.id)
-      .neq("numero_parcela", 0);
+      .gt("numero_parcela", 0);
     if (delErr) {
       setRegerandoRetro(false);
       return mostrarErro(delErr);
@@ -2084,7 +2106,7 @@ function DetalheContrato({
         .delete()
         .eq("contrato_id", contrato.id)
         .eq("status", "pendente")
-        .neq("numero_parcela", 0)
+        .gt("numero_parcela", 0)
         .gt("vencimento", hoje);
       // Conta parcelas restantes (≠0) — geralmente pagas/atrasadas anteriores a hoje.
       // Todo contrato deve ter no máximo 12 mensalidades: gera só o que falta.
@@ -2092,7 +2114,7 @@ function DetalheContrato({
         .from("contrato_mensalidades")
         .select("numero_parcela")
         .eq("contrato_id", contrato.id)
-        .neq("numero_parcela", 0)
+        .gt("numero_parcela", 0)
         .order("numero_parcela", { ascending: false });
       const existentes = restantes ?? [];
       const maxExistente = existentes.reduce(
@@ -2188,7 +2210,7 @@ function DetalheContrato({
       contrato.convenio_id
         ? supabase
             .from("cb_convenios")
-            .select("nome, modelo_contrato, termo_inclusao_html, vigencia_meses, fidelidade_meses, max_dependentes")
+            .select("nome, modelo_contrato, termo_inclusao_html, vigencia_meses, fidelidade_meses, max_dependentes, taxa_adesao, taxa_inclusao_dependente")
             .eq("id", contrato.convenio_id)
             .maybeSingle()
         : Promise.resolve({ data: null }),
@@ -2586,7 +2608,7 @@ function DetalheContrato({
     toast.success("Link de assinatura copiado");
   };
 
-  const mensalidades = mens.filter((m) => !isAdesao(m));
+  const mensalidades = mens.filter((m) => !isEncargoAvulso(m));
   const pagas = mensalidades.filter((m) => m.status === "pago").length;
   const totalPagoMens = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
   const totalPago = totalPagoMens + extraRecebido.total;
@@ -2736,7 +2758,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
       // Reflete imediatamente no objeto recebido por prop, para textos derivados
       (contrato as any).valor_mensal = novoValor;
     }
-    const abertas = mens.filter((m) => !isAdesao(m) && m.status !== "pago");
+    const abertas = mens.filter((m) => !isEncargoAvulso(m) && m.status !== "pago");
     if (abertas.length === 0) return;
     await Promise.all(
       abertas.map((m) => {
@@ -2754,6 +2776,19 @@ h1, h2, h3 { margin: 0 0 6mm; }
       toast.error("Selecione um paciente");
       return;
     }
+    // Valida os campos da taxa quando marcada (não bloqueia a inclusão do
+    // dependente por engano do valor — mensagem clara ao operador).
+    const taxaValor = Number(String(incTaxaValor).replace(",", "."));
+    if (incCobrarTaxa) {
+      if (!Number.isFinite(taxaValor) || taxaValor <= 0) {
+        toast.error("Informe um valor válido para a taxa de inclusão.");
+        return;
+      }
+      if (!incTaxaVenc) {
+        toast.error("Informe o vencimento da taxa de inclusão.");
+        return;
+      }
+    }
     setIncSaving(true);
     const resultado = await incluirDependenteContrato({
       contratoId: contrato.id,
@@ -2761,6 +2796,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
       pacienteNome: incPaciente.nome,
       parentesco: incParentesco || null,
       tipo: incTipo,
+      taxa: incCobrarTaxa ? { valor: taxaValor, vencimento: incTaxaVenc } : null,
     });
     setIncSaving(false);
     if (!resultado.ok) {
@@ -2768,7 +2804,13 @@ h1, h2, h3 { margin: 0 0 6mm; }
       return;
     }
     const data = resultado.dependente;
-    toast.success("Dependente incluído");
+    if (resultado.taxaAviso) {
+      toast.error(resultado.taxaAviso);
+    } else if (resultado.taxa) {
+      toast.success(`Dependente incluído. Taxa de inclusão de ${BRL(Number(resultado.taxa.valor))} lançada em Mensalidades.`);
+    } else {
+      toast.success("Dependente incluído");
+    }
     setIncOpen(false);
     const novoDep: Dep = {
       id: data.id,
@@ -2802,6 +2844,31 @@ h1, h2, h3 { margin: 0 0 6mm; }
     if (error) {
       mostrarErro(error);
       return;
+    }
+    // Remove automaticamente eventual Taxa de inclusão ainda PENDENTE
+    // vinculada a este dependente. Taxas já pagas permanecem para não
+    // sumir com histórico financeiro. Vínculo pelo texto de `observacoes`
+    // ("Taxa de inclusão de dependente — <NOME>"), gravado no lançamento.
+    const alvoNome = excAlvo.paciente_nome;
+    const { data: taxasPend } = await supabase
+      .from("contrato_mensalidades")
+      .select("id, observacoes")
+      .eq("contrato_id", contrato.id)
+      .eq("status", "pendente")
+      .lt("numero_parcela", 0);
+    const idsRemover = ((taxasPend ?? []) as Array<{ id: string; observacoes: string | null }>)
+      .filter((r) => (r.observacoes ?? "").includes(alvoNome))
+      .map((r) => r.id);
+    if (idsRemover.length > 0) {
+      const { error: eDel } = await supabase
+        .from("contrato_mensalidades")
+        .delete()
+        .in("id", idsRemover);
+      if (eDel) {
+        toast.error("Dependente excluído, mas houve falha ao remover a taxa de inclusão pendente.");
+      } else {
+        toast.info(`Taxa de inclusão pendente removida (${idsRemover.length}).`);
+      }
     }
     toast.success("Dependente excluído");
     const alvo = { ...excAlvo, ativo: false, excluido_em: hoje };
@@ -3058,6 +3125,16 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           <TableCell>
                             {isAdesao(m) ? (
                               <Badge variant="secondary">Adesão</Badge>
+                            ) : isTaxaInclusao(m) ? (
+                              <Badge
+                                variant="secondary"
+                                title={
+                                  (m as unknown as { observacoes?: string | null }).observacoes ??
+                                  "Taxa de inclusão de dependente"
+                                }
+                              >
+                                Taxa inclusão
+                              </Badge>
                             ) : (
                               m.numero_parcela
                             )}
@@ -3832,7 +3909,25 @@ h1, h2, h3 { margin: 0 0 6mm; }
       {tomadorNfseDialog}
       {descricaoNfseDialog}
 
-      <Dialog open={incOpen} onOpenChange={setIncOpen}>
+      <Dialog
+        open={incOpen}
+        onOpenChange={(v) => {
+          setIncOpen(v);
+          if (v) {
+            // Regra: só NÃO cobrar quando a inclusão é feita no mesmo dia
+            // da venda (data_inicio do contrato). Nos demais casos, taxa vem
+            // marcada. Valor sugerido: cb_convenios.taxa_inclusao_dependente
+            // (0 quando ainda não configurado no convênio) — sempre editável.
+            const hoje = new Date().toISOString().slice(0, 10);
+            const dataInicioIso = (contrato.data_inicio ?? "").slice(0, 10);
+            const mesmoDiaVenda = !!dataInicioIso && dataInicioIso === hoje;
+            const valorPadrao = Number(convenio?.taxa_inclusao_dependente ?? 0) || 0;
+            setIncCobrarTaxa(!mesmoDiaVenda);
+            setIncTaxaValor(valorPadrao.toFixed(2));
+            setIncTaxaVenc(hoje);
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Incluir dependente</DialogTitle>
@@ -3898,6 +3993,42 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     <SelectItem value="agregado">Agregado</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+            <div className="rounded-md border p-3 space-y-2 bg-muted/20">
+              <label className="flex items-start gap-2 text-sm cursor-pointer">
+                <Checkbox
+                  checked={incCobrarTaxa}
+                  onCheckedChange={(v) => setIncCobrarTaxa(v === true)}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium">Cobrar taxa de inclusão de dependente</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Cobrança única — aparece em <strong>Mensalidades</strong> mas não conta como parcela.
+                  </span>
+                </span>
+              </label>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-xs">Valor (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={incTaxaValor}
+                    disabled={!incCobrarTaxa}
+                    onChange={(e) => setIncTaxaValor(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Vencimento</Label>
+                  <DateInputBR
+                    value={incTaxaVenc}
+                    onChange={(e) => setIncTaxaVenc(e.target.value)}
+                    disabled={!incCobrarTaxa}
+                  />
+                </div>
               </div>
             </div>
             {contrato.assinado_em && convenio?.termo_inclusao_html ? (
