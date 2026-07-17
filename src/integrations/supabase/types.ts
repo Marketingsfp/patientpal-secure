@@ -5882,6 +5882,7 @@ export type Database = {
           cancelado_em: string | null
           concluido_em: string | null
           created_at: string
+          dentes: number[] | null
           descricao: string
           fin_atendimento_id: string | null
           id: string
@@ -5908,6 +5909,7 @@ export type Database = {
           cancelado_em?: string | null
           concluido_em?: string | null
           created_at?: string
+          dentes?: number[] | null
           descricao: string
           fin_atendimento_id?: string | null
           id?: string
@@ -5934,6 +5936,7 @@ export type Database = {
           cancelado_em?: string | null
           concluido_em?: string | null
           created_at?: string
+          dentes?: number[] | null
           descricao?: string
           fin_atendimento_id?: string | null
           id?: string
@@ -5987,6 +5990,7 @@ export type Database = {
           created_at: string
           criado_por: string | null
           desconto: number
+          especialidade_id: string | null
           forma_pagamento: string | null
           id: string
           medico_externo: boolean
@@ -6011,6 +6015,7 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           desconto?: number
+          especialidade_id?: string | null
           forma_pagamento?: string | null
           id?: string
           medico_externo?: boolean
@@ -6035,6 +6040,7 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           desconto?: number
+          especialidade_id?: string | null
           forma_pagamento?: string | null
           id?: string
           medico_externo?: boolean
@@ -6051,7 +6057,15 @@ export type Database = {
           valor_total?: number
           valores_pagamento?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "orcamentos_especialidade_id_fkey"
+            columns: ["especialidade_id"]
+            isOneToOne: false
+            referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       paciente_biometria: {
         Row: {
