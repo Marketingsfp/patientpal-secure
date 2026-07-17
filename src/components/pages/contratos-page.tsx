@@ -2118,8 +2118,14 @@ function DetalheContrato({
     }
     const dataInicioAntiga = (contrato as any).data_inicio as string | null;
     setSavingAdm(true);
-    // Se admin escolheu outra faixa, aplica novo valor_mensal
-    const faixaEscolhida = admFaixaId ? faixas.find((f) => f.id === admFaixaId) : null;
+    // Só aplica novo valor_mensal se o usuário trocou explicitamente a faixa
+    // em relação à sincronização inicial. Sem isso, um fallback silencioso
+    // do dropdown rebaixaria o valor do contrato (ver bug #20260945).
+    const faixaFoiTrocada =
+      !!admFaixaId && admFaixaId !== admFaixaIdInicialRef.current;
+    const faixaEscolhida = faixaFoiTrocada
+      ? faixas.find((f) => f.id === admFaixaId)
+      : null;
     const novoValorMensal = faixaEscolhida ? Number(faixaEscolhida.valor_mensal) : null;
     const updatePayload: any = {
       convenio_id: admConvenioId,
