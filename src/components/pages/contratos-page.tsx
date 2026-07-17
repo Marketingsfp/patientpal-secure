@@ -1814,6 +1814,7 @@ function DetalheContrato({
   const [renovadoEm, setRenovadoEm] = useState<string | null>(null);
   useEffect(() => {
     let cancelado = false;
+    setRenovadoEm((contrato as any).renovado_em ?? null);
     (async () => {
       const { data } = await supabase
         .from("contrato_renovacoes")
@@ -1822,7 +1823,7 @@ function DetalheContrato({
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (!cancelado) setRenovadoEm((data as any)?.created_at ?? null);
+      if (!cancelado) setRenovadoEm((data as any)?.created_at ?? (contrato as any).renovado_em ?? null);
     })();
     return () => { cancelado = true; };
   }, [contrato.id]);
@@ -2989,6 +2990,30 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   parcelasMensais.length > 0 &&
                   parcelasMensais.every((m) => m.status === "pago");
                 if (!podeRenovar) return null;
+                const contratoJaRenovado = !!renovadoEm || (contrato as any).status === "renovado";
+                if (contratoJaRenovado) {
+                  const textoRenovacao = renovadoEm
+                    ? `Renovado em ${fmtD(renovadoEm)}`
+                    : "Contrato já renovado";
+                  return (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex" tabIndex={0}>
+                            <Button
+                              size="sm"
+                              disabled
+                              className="bg-red-600 text-white opacity-60 cursor-not-allowed"
+                            >
+                              <RefreshCw className="h-4 w-4 mr-1" /> RENOVAÇÃO
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>{textoRenovacao}</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  );
+                }
                 return (
                   <Button
                     size="sm"
@@ -4240,6 +4265,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
         convenioAtualNome={convenio?.nome ?? null}
         valorAtual={Number(contrato.valor_mensal ?? 0)}
         onRenovado={(r) => {
+          setRenovadoEm(new Date().toISOString());
           if (r.tipo === "troca_plano" && r.contratoNovoId) {
             onBack();
           } else {
