@@ -2443,7 +2443,15 @@ function AgendaPage() {
         // Agendamentos criados via "Atendimento Múltiplo" não são vinculados a
         // uma agenda específica (podem envolver médicos/recursos diferentes),
         // então não os escondemos quando o usuário filtra por agenda.
-        if (a.agenda_id !== filtroAgenda && !a.atendimento_grupo_id) return false;
+        if (filtroAgenda.startsWith("nome:")) {
+          // Filtro por NOME da agenda (dedupe entre múltiplos médicos):
+          // aplicado quando o usuário está com "TODOS" os profissionais.
+          const alvo = filtroAgenda.slice(5);
+          const nomeAg = (a.agenda_id ? agendaNomePorId.get(a.agenda_id) : "") ?? "";
+          if (nomeAg.trim().toUpperCase() !== alvo && !a.atendimento_grupo_id) return false;
+        } else {
+          if (a.agenda_id !== filtroAgenda && !a.atendimento_grupo_id) return false;
+        }
       }
       if (filtroApenasMultiplo && !a.atendimento_grupo_id) return false;
       return true;
