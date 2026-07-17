@@ -3444,8 +3444,37 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           </TableCell>
                         </TableRow>
                       ) : null}
-                      {linhasCobranca.map((m) => (
-                        <TableRow key={m.id}>
+                      {linhasCobranca.map((m) => {
+                        // Cabeçalho de ciclo antes da 1ª parcela de cada ciclo
+                        // subsequente ao original. Só aparece quando há
+                        // renovação por extensão (temCiclosMultiplos).
+                        let cicloHeader: React.ReactNode = null;
+                        if (temCiclosMultiplos && (m.numero_parcela ?? 0) > 0) {
+                          const ciclo = ciclos.find((c) =>
+                            c.parcelas.some((p) => p.id === m.id),
+                          );
+                          if (ciclo && ciclo.index > 0 && ciclo.parcelas[0]?.id === m.id) {
+                            cicloHeader = (
+                              <TableRow key={`hdr-${ciclo.index}`} className="bg-muted/40">
+                                <TableCell colSpan={6} className="text-xs font-semibold py-2">
+                                  {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a {ciclo.fim ? fmtD(ciclo.fim) : "—"}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          } else if (ciclo && ciclo.index === 0 && ciclo.parcelas[0]?.id === m.id) {
+                            cicloHeader = (
+                              <TableRow key={`hdr-${ciclo.index}`} className="bg-muted/40">
+                                <TableCell colSpan={6} className="text-xs font-semibold py-2">
+                                  {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a {ciclo.fim ? fmtD(ciclo.fim) : "—"}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          }
+                        }
+                        return (
+                        <React.Fragment key={m.id}>
+                        {cicloHeader}
+                        <TableRow>
                           <TableCell>
                             {isAdesao(m) ? (
                               <Badge variant="secondary">Adesão</Badge>
