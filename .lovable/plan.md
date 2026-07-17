@@ -1,67 +1,59 @@
-## Diagnóstico (confirmado no banco)
+## Problema observado
 
-O contrato **#20260619 (IARA BARBOSA VALENTE)** tem, na tabela `contrato_mensalidades`, exatamente **12 parcelas** (1 paga + 11 pendentes). Está correto.
+Contrato #20261894 (Quédima) mostra **Pagas 12/24** porque, ao renovar por
+extensão (mesmo convênio), a RPC `renovar_contrato_extensao` acrescenta as 12
+novas mensalidades (nº 13 a 24) **no mesmo contrato**. Não há um contrato
+"filho" — é o mesmo `contrato_id` com dois ciclos de 12 parcelas.
 
-O card **"Pagas 185/196"** infla porque o cálculo hoje faz:
+Consulta confirmou:
+- 24 linhas em `contrato_mensalidades` para o contrato atual (1‑12 pagas,
+  13‑24 pendentes).
+- 1 linha em `contrato_renovacoes` com `tipo='extensao'` e
+  `parcelas_geradas=12`.
 
-```
-totalParcelas = mensalidades do contrato (12) + TODO lançamento de receita do paciente (fin_lancamentos)
-```
+Não é regra de negócio nova: é a mesma correção que já foi feita para
+"contratos anteriores do mesmo paciente", agora aplicada aos **ciclos de
+renovação por extensão dentro do mesmo contrato**.
 
-Consultando o banco: a paciente tem **184 lançamentos** em `fin_lancamentos` (consultas, exames, contratos antigos importados, cartão-consulta avulso etc.). Nenhum deles é "parcela" deste contrato — o contador está somando o histórico financeiro inteiro do paciente ao denominador.
+## O que muda (apenas visual, sem tocar em banco)
 
-Além disso, a paciente tem **2 contratos formais** na tabela `contratos_assinatura` (o atual + 1 anterior de 12/12 quitado no mesmo lote de importação), não 16.
+Alteração restrita a `src/components/pages/contratos-page.tsx`.
 
-Ou seja: **não são "parcelas de contratos antigos"** — são recebimentos avulsos históricos. E os contratos antigos formais existem, mas hoje não aparecem em lugar nenhum na tela do contrato atual.
-
-## O que vou alterar
-
-### 1. Corrigir o card "Pagas X/Y" no resumo do contrato
-Arquivo: `src/components/pages/contratos-page.tsx`
-
-- Remover `extraRecebido.count` do denominador e do numerador. O contador passa a mostrar **apenas as parcelas deste contrato** (ex.: `1/12`), como o negócio exige.
-- O card **"Recebido"** continua somando os recebimentos avulsos (útil para BI), mas com um rótulo mais claro: `R$ X do contrato + R$ Y avulso` no drill.
-- O drill "Parcelas pagas" também deixa de listar avulsos.
-
-### 2. Nova seção "Contratos anteriores deste paciente"
-No mesmo arquivo, dentro da aba **Resumo**, logo abaixo dos 3 cards.
-
-Consulta: `contratos_assinatura` do mesmo `paciente_id`, exceto o contrato atual, com `count` e `count filter (status='pago')` de `contrato_mensalidades` por contrato.
-
-Renderização em tabela compacta:
-
-```text
-Nº contrato   Convênio            Início      Parcelas   Pagas   Status
-20260618      Cartão consulta     01/06/2025  12         12/12   Quitado
-```
-
-Cada linha clicável abre o contrato correspondente (reaproveita `setContratoAberto`). Se não houver contratos anteriores, a seção não aparece.
-
-### 3. Nova seção "Recebimentos avulsos do paciente" (opcional, dentro do drill)
-Já existe `extraRecebido`. Vou apenas:
-- Manter a lista no drill "Recebido" (renomeada para "Recebimentos avulsos históricos", com aviso "não são parcelas deste contrato").
-- Removê-la totalmente do drill "Pagas".
-
-## Detalhes técnicos
-
-- Consulta adicional no `load()`:
-  ```sql
-  SELECT c.id, c.numero, c.status, c.data_inicio,
-         cv.nome AS convenio,
-         count(m.id) AS parcelas,
-         count(m.id) FILTER (WHERE m.status='pago') AS pagas
-  FROM contratos_assinatura c
-  LEFT JOIN contrato_mensalidades m ON m.contrato_id = c.id AND m.numero_parcela > 0
-  LEFT JOIN cb_convenios cv ON cv.id = c.convenio_id
-  WHERE c.paciente_id = :pid AND c.id <> :contrato_atual
-  GROUP BY c.id, cv.nome
-  ORDER BY c.created_at DESC;
-  ```
-- Filtro `numero_parcela > 0` exclui adesão (0) e taxa de inclusão (< 0), que não são parcelas mensais.
-- Novo estado local `contratosAnteriores: Array<{id, numero, convenio, data_inicio, parcelas, pagas, status}>`.
-- `pagasTotal` e `totalParcelas` passam a considerar apenas `mensalidades` (filtrando `numero_parcela > 0` para bater com "12/12").
+1. Carregar `contrato_renovacoes` do contrato atual (ordenadas por
+   `created_at`) para conhecer os tamanhos de cada ciclo (`parcelas_geradas`).
+2. Calcular ciclos a partir de `numero_parcela` (ignorando adesão/taxa com
+   `numero_parcela <= 0`):
+   - Ciclo 1 = parcelas 1 até `num_parcelas` do contrato original (12).
+   - Ciclo 2 = próximas `parcelas_geradas` (13–24).
+   - E assim por diante para futuras renovações.
+3. **Card "Pagas X/Y"** passa a refletir apenas o **ciclo atual** (o último),
+   ficando 0/12 logo após a renovação e evoluindo conforme os pagamentos.
+4. Nova seção **"Ciclos anteriores deste contrato"** (padrão visual idêntico
+   ao "Contratos anteriores deste paciente"), listando cada ciclo antigo com:
+   Ciclo, Período (venc. da 1ª → última parcela), Parcelas pagas (ex.: 12/12),
+   Tipo (Original / Renovação por extensão).
+5. Na tabela **Mensalidades**, inserir uma linha de cabeçalho separadora
+   entre ciclos (ex.: "Renovação — 15/06/2026 a 15/05/2027") para deixar
+   claro onde começa cada ciclo. Adesão e Taxa de inclusão continuam no topo,
+   fora de qualquer ciclo.
+6. Drill‑down do card "Pagas" continua mostrando pagamentos, mas restrito ao
+   ciclo atual, para bater com o denominador.
 
 ## Fora do escopo
-- Não vou mexer nos lançamentos financeiros históricos existentes.
-- Não vou tentar "casar" retroativamente os 184 lançamentos avulsos a contratos antigos importados — não há como saber a qual contrato cada um pertencia sem regra do time.
-- Não vou alterar a listagem principal `/app/cartao-beneficios/contratos`, apenas o detalhe do contrato aberto.
+
+- Não altero RPCs (`renovar_contrato_extensao`, `troca_plano`) nem o banco.
+- Não altero a lógica de pagamento/reversão das parcelas.
+- Não mexo em cards "Recebido" e "A receber" — continuam somando o contrato
+  todo (dinheiro real recebido/a receber não muda por causa da visão em
+  ciclos).
+
+## Validação
+
+- Abrir contrato #20261894: card deve mostrar **Pagas 0/12** (ciclo atual);
+  seção "Ciclos anteriores deste contrato" com 1 linha (Original 12/12);
+  tabela Mensalidades com um separador antes da parcela 13.
+- Abrir um contrato sem renovação: nada muda (sem seção de ciclos, contagem
+  igual à atual).
+- Abrir contrato renovado com troca de plano: continua funcionando como hoje
+  (esse fluxo já gera contrato novo e cai na seção "Contratos anteriores do
+  mesmo paciente").
