@@ -1,42 +1,36 @@
-## O que vai mudar
+## Objetivo
 
-Todas as alterações são de **layout/UI** em `src/components/pages/contratos-page.tsx`. Nenhuma regra de negócio, cálculo, permissão, migração ou banco é tocado.
+Na tela **Novo contrato** (Cartão Benefícios → Vendas), deixar o campo **"Apenas titular financeiro"** sempre visível na área do Paciente titular, porém **desabilitado** enquanto o titular não for selecionado. Após escolher o paciente titular, o checkbox fica habilitado para marcar/desmarcar.
 
-### 1. Badge "Prontuário" ao lado do nome do titular (foto 1)
+## Comportamento
 
-Hoje o badge `Prontuário xxxx` aparece apenas ao lado do rótulo "Paciente titular". A foto pede que ele também apareça **inline junto ao nome do paciente selecionado**, dentro da caixa de exibição do titular.
+**Antes:** o checkbox "Apenas titular financeiro" só aparece depois que o paciente titular é selecionado (fica escondido no estado inicial da tela).
 
-Aplicar em 3 pontos:
+**Depois:**
+- O bloco do checkbox aparece fixo, ao lado da área do titular, desde a abertura da tela.
+- Enquanto `titular` for `null`:
+  - `input[type=checkbox]` fica com `disabled` e `checked={false}`.
+  - Rótulo em cor mais suave (`text-muted-foreground`, `opacity-60`, `cursor-not-allowed`).
+  - Texto auxiliar curto: "Selecione o paciente titular para habilitar."
+- Assim que o titular é selecionado, o checkbox é habilitado e permite marcar/desmarcar normalmente (mesmo estado `titularApenasFinanceiro` já existente).
+- Ao trocar o titular (botão "Trocar"), o checkbox volta a ficar desabilitado e é resetado para desmarcado.
 
-- **Aba Dados — modo admin (contrato existente):** logo após o `PatientSearchInput`, renderizar o `ProntuarioBadge` inline ao lado do nome selecionado (quando houver `admPaciente?.codigo_prontuario`). O badge continua fixo/não editável — só aparece após seleção.
-- **Aba Dados — modo leitura:** dentro da caixa cinza que mostra `{contrato.paciente_nome}`, exibir o `ProntuarioBadge` ao lado do nome (mesmo comportamento).
-- **Novo contrato (wizard):** dentro do bloco de exibição do titular selecionado (linha `{titular.nome} {titular.cpf ...}`), acrescentar o `ProntuarioBadge` com `titular.codigo_prontuario`. Confirmar que `carregarPacienteCompleto` já traz `codigo_prontuario`; se não trouxer, incluir apenas a leitura desse campo (nada de escrita — respeita a constraint de identificadores legados imutáveis).
+## Onde muda
 
-Sem alteração no rótulo/label — mantém a badge que já existe junto do rótulo.
+Apenas em `src/components/pages/contratos-page.tsx`, no wizard **Novo contrato** (bloco atual entre as linhas ~1140–1252, onde hoje há `{titular ? (...) : (PatientSearchInput)}`):
 
-### 2. Convênio + Nº de pessoas na mesma linha (foto 2)
-
-Na aba **Dados — modo admin**, hoje "Convênio" e "Nº de pessoas no contrato" estão em blocos separados um abaixo do outro (linhas 3142–3190). Envolver os dois em um único `grid grid-cols-1 md:grid-cols-2 gap-4` para que fiquem lado a lado no desktop. Em telas estreitas, empilham normalmente.
-
-O modo leitura (dois `DadosField` correspondentes) recebe o mesmo agrupamento em 2 colunas para manter consistência.
-
-### 3. Inverter ordem no wizard "Novo contrato"
-
-Em `NovoContratoWizard` (a partir da linha 1128), reordenar os campos no `Card` para:
-
-1. **Paciente titular** (busca + bloco de titular selecionado, com toggle "Apenas titular financeiro")
-2. **Convênio** + **Nº de pessoas no contrato** (mesma linha, grid 2 colunas — só aparece Nº de pessoas quando há faixas)
-3. **Data início**, **Dia de vencimento** e demais campos que já existem depois
-
-Nada além da ordem visual muda: mesmos estados (`convenioId`, `faixaId`, `titular`, etc.), mesmas validações, mesmo submit.
+1. Reestruturar o bloco do "Paciente titular" para que o checkbox "Apenas titular financeiro" fique **fora** do ramo `titular ? …`, permanecendo sempre renderizado ao lado (mantendo o layout md:flex já usado — coluna do titular à esquerda, caixa do checkbox à direita, `md:min-w-[260px] md:max-w-[340px]`).
+2. Adicionar `disabled={!titular}` no `<input type="checkbox">` e ajustar as classes do label para refletir o estado desabilitado.
+3. No handler do botão **Trocar** (`onClick={() => setTitular(null)}`), também chamar `setTitularApenasFinanceiro(false)` para não deixar um valor "fantasma" marcado sem titular.
+4. Adicionar uma linha de ajuda curta abaixo do rótulo, exibida apenas quando `!titular`.
 
 ## Fora de escopo
 
-- Wizard de novo contrato: sem novos campos, sem alteração em validações ou submit.
-- Impressão de contrato/cartão/carnê, aba Resumo, aba Contrato: intocados.
-- Não haverá gravação em `codigo_prontuario` (identificador legado imutável) — apenas leitura.
+- Aba **Dados** de contratos já existentes (comportamento continua idêntico ao atual — o toggle já aparece lá com titular sempre presente).
+- Regras de negócio de `titular_apenas_financeiro` (cálculo de vidas, carteirinha, cobrança) — nada muda.
+- Migrações, RLS, tipos gerados, layout de "Convênio + Nº de pessoas" e ordem dos campos (já ajustados anteriormente).
 
 ## Validação
 
-- `tsgo` (typecheck) após as edições.
-- Verificação visual via preview nas duas telas (aba Dados de contrato existente em modo admin/leitura, e wizard de novo contrato).
+- `tsgo --noEmit` sem erros.
+- Abrir `Cartão Benefícios → Vendas → Novo contrato`: checkbox visível e desabilitado antes de escolher titular; habilita ao selecionar; reseta ao clicar em "Trocar".
