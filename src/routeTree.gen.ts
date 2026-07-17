@@ -73,7 +73,6 @@ import { Route as AuthenticatedAppExamesResultadosRouteImport } from './routes/_
 import { Route as AuthenticatedAppEstoqueRouteImport } from './routes/_authenticated/app.estoque'
 import { Route as AuthenticatedAppEspecialidadesRouteImport } from './routes/_authenticated/app.especialidades'
 import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
-import { Route as AuthenticatedAppEnfermagemRecursosRouteImport } from './routes/_authenticated/app.enfermagem-recursos'
 import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
 import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
 import { Route as AuthenticatedAppDevOrcamentosShellRouteImport } from './routes/_authenticated/app.dev-orcamentos-shell'
@@ -143,7 +142,6 @@ import { Route as AuthenticatedAppClientesPacienteIdVisualizarRouteImport } from
 import { Route as AuthenticatedAppClientesPacienteIdEditarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.editar'
 import { Route as AuthenticatedAppEquipeMedicoMedicoIdEditarRouteImport } from './routes/_authenticated/app.equipe.medico.$medicoId.editar'
 import { Route as AuthenticatedAppEquipeFuncionarioUserIdEditarRouteImport } from './routes/_authenticated/app.equipe.funcionario.$userId.editar'
-import { Route as AuthenticatedAppEquipeEnfermeiroUserIdEditarRouteImport } from './routes/_authenticated/app.equipe.enfermeiro.$userId.editar'
 
 const TotemRoute = TotemRouteImport.update({
   id: '/totem',
@@ -491,12 +489,6 @@ const AuthenticatedAppEquipeRoute = AuthenticatedAppEquipeRouteImport.update({
   path: '/equipe',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
-const AuthenticatedAppEnfermagemRecursosRoute =
-  AuthenticatedAppEnfermagemRecursosRouteImport.update({
-    id: '/enfermagem-recursos',
-    path: '/enfermagem-recursos',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
 const AuthenticatedAppDocumentosRoute =
   AuthenticatedAppDocumentosRouteImport.update({
     id: '/documentos',
@@ -902,12 +894,6 @@ const AuthenticatedAppEquipeFuncionarioUserIdEditarRoute =
     path: '/funcionario/$userId/editar',
     getParentRoute: () => AuthenticatedAppEquipeRoute,
   } as any)
-const AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute =
-  AuthenticatedAppEquipeEnfermeiroUserIdEditarRouteImport.update({
-    id: '/enfermeiro/$userId/editar',
-    path: '/enfermeiro/$userId/editar',
-    getParentRoute: () => AuthenticatedAppEquipeRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -959,7 +945,6 @@ export interface FileRoutesByFullPath {
   '/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
-  '/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRouteWithChildren
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
@@ -1041,7 +1026,6 @@ export interface FileRoutesByFullPath {
   '/app/nfse/': typeof AuthenticatedAppNfseIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
-  '/app/equipe/enfermeiro/$userId/editar': typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute
   '/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
   '/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
@@ -1093,7 +1077,6 @@ export interface FileRoutesByTo {
   '/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
-  '/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
@@ -1173,7 +1156,6 @@ export interface FileRoutesByTo {
   '/app/nfse': typeof AuthenticatedAppNfseIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
-  '/app/equipe/enfermeiro/$userId/editar': typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute
   '/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
   '/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
@@ -1229,7 +1211,6 @@ export interface FileRoutesById {
   '/_authenticated/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
   '/_authenticated/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/_authenticated/app/documentos': typeof AuthenticatedAppDocumentosRoute
-  '/_authenticated/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
   '/_authenticated/app/equipe': typeof AuthenticatedAppEquipeRouteWithChildren
   '/_authenticated/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/_authenticated/app/estoque': typeof AuthenticatedAppEstoqueRoute
@@ -1311,7 +1292,6 @@ export interface FileRoutesById {
   '/_authenticated/app/nfse/': typeof AuthenticatedAppNfseIndexRoute
   '/_authenticated/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
   '/_authenticated/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
-  '/_authenticated/app/equipe/enfermeiro/$userId/editar': typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute
   '/_authenticated/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
   '/_authenticated/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
@@ -1367,7 +1347,6 @@ export interface FileRouteTypes {
     | '/app/dev-orcamentos-shell'
     | '/app/disponibilidades'
     | '/app/documentos'
-    | '/app/enfermagem-recursos'
     | '/app/equipe'
     | '/app/especialidades'
     | '/app/estoque'
@@ -1449,7 +1428,6 @@ export interface FileRouteTypes {
     | '/app/nfse/'
     | '/app/clientes/$pacienteId/editar'
     | '/app/clientes/$pacienteId/visualizar'
-    | '/app/equipe/enfermeiro/$userId/editar'
     | '/app/equipe/funcionario/$userId/editar'
     | '/app/equipe/medico/$medicoId/editar'
   fileRoutesByTo: FileRoutesByTo
@@ -1501,7 +1479,6 @@ export interface FileRouteTypes {
     | '/app/dev-orcamentos-shell'
     | '/app/disponibilidades'
     | '/app/documentos'
-    | '/app/enfermagem-recursos'
     | '/app/especialidades'
     | '/app/estoque'
     | '/app/exames-resultados'
@@ -1581,7 +1558,6 @@ export interface FileRouteTypes {
     | '/app/nfse'
     | '/app/clientes/$pacienteId/editar'
     | '/app/clientes/$pacienteId/visualizar'
-    | '/app/equipe/enfermeiro/$userId/editar'
     | '/app/equipe/funcionario/$userId/editar'
     | '/app/equipe/medico/$medicoId/editar'
   id:
@@ -1636,7 +1612,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/dev-orcamentos-shell'
     | '/_authenticated/app/disponibilidades'
     | '/_authenticated/app/documentos'
-    | '/_authenticated/app/enfermagem-recursos'
     | '/_authenticated/app/equipe'
     | '/_authenticated/app/especialidades'
     | '/_authenticated/app/estoque'
@@ -1718,7 +1693,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/nfse/'
     | '/_authenticated/app/clientes/$pacienteId/editar'
     | '/_authenticated/app/clientes/$pacienteId/visualizar'
-    | '/_authenticated/app/equipe/enfermeiro/$userId/editar'
     | '/_authenticated/app/equipe/funcionario/$userId/editar'
     | '/_authenticated/app/equipe/medico/$medicoId/editar'
   fileRoutesById: FileRoutesById
@@ -2200,13 +2174,6 @@ declare module '@tanstack/react-router' {
       path: '/equipe'
       fullPath: '/app/equipe'
       preLoaderRoute: typeof AuthenticatedAppEquipeRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/enfermagem-recursos': {
-      id: '/_authenticated/app/enfermagem-recursos'
-      path: '/enfermagem-recursos'
-      fullPath: '/app/enfermagem-recursos'
-      preLoaderRoute: typeof AuthenticatedAppEnfermagemRecursosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/documentos': {
@@ -2692,13 +2659,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRouteImport
       parentRoute: typeof AuthenticatedAppEquipeRoute
     }
-    '/_authenticated/app/equipe/enfermeiro/$userId/editar': {
-      id: '/_authenticated/app/equipe/enfermeiro/$userId/editar'
-      path: '/enfermeiro/$userId/editar'
-      fullPath: '/app/equipe/enfermeiro/$userId/editar'
-      preLoaderRoute: typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRouteImport
-      parentRoute: typeof AuthenticatedAppEquipeRoute
-    }
   }
 }
 
@@ -2766,7 +2726,6 @@ const AuthenticatedAppCartaoBeneficiosRouteWithChildren =
 
 interface AuthenticatedAppEquipeRouteChildren {
   AuthenticatedAppEquipeIndexRoute: typeof AuthenticatedAppEquipeIndexRoute
-  AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute: typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute
   AuthenticatedAppEquipeFuncionarioUserIdEditarRoute: typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
   AuthenticatedAppEquipeMedicoMedicoIdEditarRoute: typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
@@ -2774,8 +2733,6 @@ interface AuthenticatedAppEquipeRouteChildren {
 const AuthenticatedAppEquipeRouteChildren: AuthenticatedAppEquipeRouteChildren =
   {
     AuthenticatedAppEquipeIndexRoute: AuthenticatedAppEquipeIndexRoute,
-    AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute:
-      AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute,
     AuthenticatedAppEquipeFuncionarioUserIdEditarRoute:
       AuthenticatedAppEquipeFuncionarioUserIdEditarRoute,
     AuthenticatedAppEquipeMedicoMedicoIdEditarRoute:
@@ -2870,7 +2827,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppDevOrcamentosShellRoute: typeof AuthenticatedAppDevOrcamentosShellRoute
   AuthenticatedAppDisponibilidadesRoute: typeof AuthenticatedAppDisponibilidadesRoute
   AuthenticatedAppDocumentosRoute: typeof AuthenticatedAppDocumentosRoute
-  AuthenticatedAppEnfermagemRecursosRoute: typeof AuthenticatedAppEnfermagemRecursosRoute
   AuthenticatedAppEquipeRoute: typeof AuthenticatedAppEquipeRouteWithChildren
   AuthenticatedAppEspecialidadesRoute: typeof AuthenticatedAppEspecialidadesRoute
   AuthenticatedAppEstoqueRoute: typeof AuthenticatedAppEstoqueRoute
@@ -2957,8 +2913,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppDevOrcamentosShellRoute,
   AuthenticatedAppDisponibilidadesRoute: AuthenticatedAppDisponibilidadesRoute,
   AuthenticatedAppDocumentosRoute: AuthenticatedAppDocumentosRoute,
-  AuthenticatedAppEnfermagemRecursosRoute:
-    AuthenticatedAppEnfermagemRecursosRoute,
   AuthenticatedAppEquipeRoute: AuthenticatedAppEquipeRouteWithChildren,
   AuthenticatedAppEspecialidadesRoute: AuthenticatedAppEspecialidadesRoute,
   AuthenticatedAppEstoqueRoute: AuthenticatedAppEstoqueRoute,
