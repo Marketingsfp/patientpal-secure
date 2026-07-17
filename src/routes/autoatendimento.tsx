@@ -495,8 +495,10 @@ function AutoatendimentoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/40 flex flex-col">
-      <header className="px-8 py-6 flex items-center justify-between">
+    // h-[100dvh] + overflow-hidden: modo quiosque, sem scroll — cada tela
+    // precisa caber inteira na viewport do totem.
+    <div className="h-[100dvh] overflow-hidden bg-gradient-to-br from-background via-background to-muted/40 flex flex-col">
+      <header className="px-6 py-3 flex items-center justify-between shrink-0">
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Bem-vindo a</div>
           <h1 className="text-2xl font-bold">{clinicaAtual.clinica.nome}</h1>
@@ -511,7 +513,7 @@ function AutoatendimentoPage() {
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center px-6 pb-12">
+      <main className="flex-1 min-h-0 flex items-center justify-center px-6 py-2 overflow-hidden">
         {step === "home" && (
           <div className="w-full max-w-6xl space-y-10">
             <div className="text-center space-y-2">
@@ -529,8 +531,8 @@ function AutoatendimentoPage() {
               <TileGrande
                 onClick={() => {
                   setStep("checkin");
-                  // Identificação no totem é só por CPF (teclado na tela) —
-                  // o reconhecimento facial foi removido a pedido da gestão.
+                // Entra direto no CPF; o paciente pode alternar para
+                // reconhecimento facial pelo botão dentro da tela.
                   setIdentMode("cpf");
                   setCpf("");
                 }}
@@ -547,19 +549,23 @@ function AutoatendimentoPage() {
         )}
 
         {(step === "checkin" || step === "agendar") && (
-          <div className="w-full max-w-3xl bg-card border rounded-3xl p-10 shadow-xl relative">
+          <div className="w-full max-w-xl bg-card border rounded-3xl p-6 shadow-xl relative my-auto max-h-full flex flex-col">
             <button
               onClick={reset}
-              className="absolute top-6 left-6 text-muted-foreground hover:text-foreground flex items-center gap-1"
+              className="absolute top-4 left-4 text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm"
             >
-              <ArrowLeft className="h-5 w-5" /> Início
+              <ArrowLeft className="h-4 w-4" /> Início
             </button>
 
-            <div className="text-center space-y-2 mb-8">
-              <h2 className="text-3xl font-bold">
+            <div className="text-center space-y-1 mb-4 mt-2">
+              <h2 className="text-2xl font-bold">
                 {step === "checkin" ? "Check-in" : "Identifique-se"}
               </h2>
-              <p className="text-muted-foreground">Digite seu CPF no teclado abaixo</p>
+              <p className="text-sm text-muted-foreground">
+                {identMode === "facial"
+                  ? "Posicione seu rosto na câmera"
+                  : "Digite seu CPF no teclado abaixo"}
+              </p>
             </div>
 
             {/* Escolha do modo — mantido apenas como fallback (o check-in já
@@ -580,13 +586,13 @@ function AutoatendimentoPage() {
             {/* CPF — input somente leitura + teclado na tela (totem touch,
                 sem teclado físico; inputMode none evita o teclado do SO). */}
             {identMode === "cpf" && (
-              <div className="space-y-5">
+              <div className="space-y-3">
                 <input
                   readOnly
                   inputMode="none"
                   placeholder="000.000.000-00"
                   value={formatarCpfParcial(cpf)}
-                  className="w-full h-20 px-6 text-3xl tracking-widest rounded-xl border bg-background text-center tabular-nums"
+                  className="w-full h-14 px-4 text-2xl tracking-widest rounded-xl border bg-background text-center tabular-nums"
                 />
                 <TecladoNumerico
                   disabled={busy}
@@ -594,13 +600,25 @@ function AutoatendimentoPage() {
                   onBackspace={() => setCpf((v) => v.slice(0, -1))}
                   onClear={() => setCpf("")}
                 />
-                <div className="grid grid-cols-2 gap-3">
-                  <Button variant="outline" size="lg" className="h-14" onClick={reset}>
+                <Button
+                  variant="outline"
+                  className="w-full h-11"
+                  disabled={busy}
+                  onClick={() => {
+                    setIdentMode("facial");
+                    void iniciarFacial(async (p) => {
+                      if (step === "checkin") await fazerCheckin(p);
+                    });
+                  }}
+                >
+                  <Camera className="h-4 w-4 mr-2" /> Usar reconhecimento facial
+                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" className="h-11" onClick={reset}>
                     Voltar
                   </Button>
                   <Button
-                    size="lg"
-                    className="h-14"
+                    className="h-11"
                     disabled={busy || cpf.length !== 11}
                     onClick={async () => {
                       const p = await identificarPorCpf();
@@ -617,26 +635,39 @@ function AutoatendimentoPage() {
 
             {/* Facial */}
             {identMode === "facial" && (
-              <div className="text-center space-y-4">
-                <div className="relative mx-auto w-[420px] h-[320px] rounded-2xl overflow-hidden border-4 border-primary/40 bg-black">
+              <div className="text-center space-y-3">
+                <div className="relative mx-auto w-full max-w-[360px] aspect-[4/3] rounded-2xl overflow-hidden border-4 border-primary/40 bg-black">
                   <video
                     ref={videoRef}
                     className="w-full h-full object-cover scale-x-[-1]"
                     playsInline
                     muted
                   />
-                  <div className="absolute inset-8 border-2 border-white/60 rounded-full pointer-events-none" />
+                  <div className="absolute inset-6 border-2 border-white/60 rounded-full pointer-events-none" />
                 </div>
-                <p className="text-lg">{scanMsg}</p>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    stopCamera();
-                    setIdentMode(null);
-                  }}
-                >
-                  <X className="h-4 w-4 mr-2" /> Cancelar
-                </Button>
+                <p className="text-base">{scanMsg}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    className="h-11"
+                    onClick={() => {
+                      stopCamera();
+                      setIdentMode("cpf");
+                    }}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Digitar CPF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-11"
+                    onClick={() => {
+                      stopCamera();
+                      reset();
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-2" /> Cancelar
+                  </Button>
+                </div>
               </div>
             )}
 
