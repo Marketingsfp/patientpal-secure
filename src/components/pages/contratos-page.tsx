@@ -139,6 +139,7 @@ type Contrato = {
   tabela_legada?: boolean | null;
   migrar_apos?: string | null;
   criado_por?: string | null;
+  codigo_prontuario?: string | null;
 };
 type Mens = {
   id: string;
