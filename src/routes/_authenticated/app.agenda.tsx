@@ -127,7 +127,6 @@ type Medico = {
   procedimento_padrao_nome?: string | null;
   especialidade_nome?: string | null;
 };
-type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
 type ProcedimentoRef = {
