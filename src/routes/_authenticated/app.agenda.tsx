@@ -6546,14 +6546,14 @@ function AgendaPage() {
         </label>
         {/* KPIs REMOVIDOS */}
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
-        <div className="h-8"></div> {/* ← ADICIONE ESTA LINHA */}
+        <div className="h-4 xl:h-8"></div>
         {/* Tabela - Com botões de ação na linha */}
         {/* Sem overflow-hidden aqui: um ancestral com overflow != visible vira
             o contexto de scroll do sticky, e como este div nunca rola
             internamente (quem rola é o <main> do app-shell), o cabeçalho
             "sticky top-0" parava de acompanhar o scroll da página. */}
         <div className="rounded-lg border border-border bg-card overflow-x-auto">
-          <Table className="min-w-[900px] max-lg:table max-lg:overflow-visible">
+          <Table className="min-w-[820px] xl:min-w-[900px] max-lg:table max-lg:overflow-visible">
             <TableHeader className="sticky top-0 z-20">
               <TableRow className="bg-muted">
                 <TableHead className="w-8 rounded-tl-lg" title="Selecione para ações em lote">
@@ -6567,13 +6567,13 @@ function AgendaPage() {
                 </TableHead>
                 <TableHead className="w-20 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
                 <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
-                <TableHead className="min-w-[130px] font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="min-w-[110px] xl:min-w-[130px] font-semibold text-xs uppercase text-muted-foreground">
                   Profissional
                 </TableHead>
-                <TableHead className="min-w-[150px] font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="min-w-[130px] xl:min-w-[150px] font-semibold text-xs uppercase text-muted-foreground">
                   Cliente
                 </TableHead>
-                <TableHead className="min-w-[110px] font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="min-w-[100px] xl:min-w-[110px] font-semibold text-xs uppercase text-muted-foreground">
                   Serviço
                 </TableHead>
                 <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
