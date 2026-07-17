@@ -2845,6 +2845,31 @@ h1, h2, h3 { margin: 0 0 6mm; }
       mostrarErro(error);
       return;
     }
+    // Remove automaticamente eventual Taxa de inclusão ainda PENDENTE
+    // vinculada a este dependente. Taxas já pagas permanecem para não
+    // sumir com histórico financeiro. Vínculo pelo texto de `observacoes`
+    // ("Taxa de inclusão de dependente — <NOME>"), gravado no lançamento.
+    const alvoNome = excAlvo.paciente_nome;
+    const { data: taxasPend } = await supabase
+      .from("contrato_mensalidades")
+      .select("id, observacoes")
+      .eq("contrato_id", contrato.id)
+      .eq("status", "pendente")
+      .lt("numero_parcela", 0);
+    const idsRemover = ((taxasPend ?? []) as Array<{ id: string; observacoes: string | null }>)
+      .filter((r) => (r.observacoes ?? "").includes(alvoNome))
+      .map((r) => r.id);
+    if (idsRemover.length > 0) {
+      const { error: eDel } = await supabase
+        .from("contrato_mensalidades")
+        .delete()
+        .in("id", idsRemover);
+      if (eDel) {
+        toast.error("Dependente excluído, mas houve falha ao remover a taxa de inclusão pendente.");
+      } else {
+        toast.info(`Taxa de inclusão pendente removida (${idsRemover.length}).`);
+      }
+    }
     toast.success("Dependente excluído");
     const alvo = { ...excAlvo, ativo: false, excluido_em: hoje };
     setExcAlvo(null);
