@@ -1847,23 +1847,6 @@ function AgendaPage() {
       procOpcoesMap.get(r.medico_id)!.push({ id: proc.id, nome: decorado });
     }
     setProcPorMedico(pm);
-    // Vínculos de procedimentos por recurso de enfermagem
-    const recursoProcsValidos = ((erp.data ?? []) as Array<{ recurso_id: string; procedimento_id: string }>).filter(
-      (r) => new Set(recursosArr.map((x) => x.id)).has(r.recurso_id),
-    );
-    for (const r of recursoProcsValidos) {
-      if (!pm.has(r.recurso_id)) pm.set(r.recurso_id, new Set());
-      pm.get(r.recurso_id)!.add(r.procedimento_id);
-      const proc = procedimentosPorId.get(r.procedimento_id);
-      if (!proc) continue;
-      if (!procOpcoesMap.has(r.recurso_id)) procOpcoesMap.set(r.recurso_id, []);
-      if (!procOpcoesVistos.has(r.recurso_id)) procOpcoesVistos.set(r.recurso_id, new Set());
-      const vistos = procOpcoesVistos.get(r.recurso_id)!;
-      const chave = normalizar(proc.nome);
-      if (vistos.has(chave)) continue;
-      vistos.add(chave);
-      procOpcoesMap.get(r.recurso_id)!.push(proc);
-    }
     setProcOpcoesPorMedico(procOpcoesMap);
     const medicosIds = new Set(((m.data ?? []) as unknown as Medico[]).map((x) => x.id));
     const nm = new Map<string, Set<string>>();
