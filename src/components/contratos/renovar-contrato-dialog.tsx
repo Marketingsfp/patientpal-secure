@@ -207,7 +207,6 @@ export function RenovarContratoDialog({
         cobrar_taxa_inclusao: false,
       }));
       setDeps(rows);
-      setFaixaTocada(false);
     })();
   }, [open, clinicaId, convenioAtualId, contratoId]);
 
@@ -251,11 +250,6 @@ export function RenovarContratoDialog({
           : `${f.vidas_de}–${f.vidas_ate} pessoas`;
     return `${range} — ${BRL(Number(f.valor_mensal))}`;
   };
-
-  // Ao trocar de convênio, reseta o "toque" para permitir auto-seleção pela quantidade.
-  useEffect(() => {
-    setFaixaTocada(false);
-  }, [novoConvenioId]);
 
   // Auto-seleciona a faixa correspondente ao total de pessoas.
   // Sempre re-sincroniza quando dependentes são incluídos ou removidos.
