@@ -906,7 +906,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
               <Label className="text-xs">Paciente titular</Label>
               <PatientSearchInput
                 value={pacRenov}
-                onChange={async (p) => {
+                onSelect={async (p: PatientOption | null) => {
                   setPacRenov(p);
                   setContratosPac([]);
                   if (!p || !clinicaAtual) return;
@@ -920,7 +920,6 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                   setContratosPac((data ?? []) as Contrato[]);
                   setLoadingContratosPac(false);
                 }}
-                clinicaId={clinicaAtual?.clinica_id ?? null}
               />
             </div>
             {pacRenov ? (
