@@ -240,7 +240,10 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       telefone: editing.telefone ?? "", telefone2: editing.telefone2 ?? "",
       email: editing.email ?? "",
       data_nascimento: editing.data_nascimento ?? "",
-      sexo: editing.sexo ?? "nao_informar", ativo: editing.ativo,
+      sexo: (["masculino","feminino","outro","nao_informar"].includes((editing.sexo ?? "") as string)
+        ? (editing.sexo as string)
+        : "nao_informar"),
+      ativo: editing.ativo,
       cep: editing.cep ?? "", logradouro: editing.logradouro ?? "",
       numero: editing.numero ?? "", complemento: editing.complemento ?? "",
       bairro: editing.bairro ?? "", cidade: editing.cidade ?? "",
@@ -757,7 +760,9 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       telefone2: form.telefone2.trim() || null,
       email: form.email.trim() || null,
       data_nascimento: form.data_nascimento || null,
-      sexo: form.sexo,
+      sexo: (["masculino","feminino","outro","nao_informar"].includes(form.sexo)
+        ? form.sexo
+        : "nao_informar"),
       ativo: form.ativo,
       cep: form.cep.trim() || null,
       logradouro: form.logradouro.trim() || null,
