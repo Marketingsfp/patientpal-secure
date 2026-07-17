@@ -353,6 +353,7 @@ function ConveniosPage() {
       descricao: descClean || undefined,
       beneficios: benefClean || undefined,
       taxa_adesao: taxaAdesao,
+      taxa_inclusao_dependente: taxaInclusaoDep,
       num_parcelas: numParcelas,
       max_dependentes: maxDependentes,
       fidelidade_meses: fidelidadeMeses,
