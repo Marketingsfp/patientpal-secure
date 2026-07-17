@@ -1480,10 +1480,11 @@ function AgendaPage() {
       const { error: bioErr } = await supabase.from("paciente_biometria").insert({
         paciente_id: data.id,
         clinica_id: clinicaAtual.clinica_id,
-        descritor: descritorFace as unknown as number[],
+        descriptor: descritorFace as unknown as number[],
       } as never);
       if (bioErr) {
-        toast.warning("Paciente salvo, mas a foto não foi registrada.");
+        console.error("Erro ao salvar biometria:", bioErr);
+        toast.warning(`Paciente salvo, mas a foto não foi registrada: ${bioErr.message}`);
       }
     }
     setNovoPac({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
