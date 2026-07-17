@@ -285,8 +285,6 @@ const TABELAS_COM_CLINICA_ARR = [
   "chat_canais", "chat_mensagens", "contrato_dependentes",
   "contrato_mensalidades", "contratos_assinatura", "crm_etapas",
   "crm_oportunidades", "documentos_emitidos",
-  "enfermagem_recurso_atendentes", "enfermagem_recurso_disponibilidades",
-  "enfermagem_recurso_procedimentos", "enfermagem_recursos",
   "especialidades", "estoque_movimentos", "estoque_produtos",
   "estorno_solicitacoes", "exame_resultados", "fin_alertas",
   "fin_atendimentos", "fin_categorias", "fin_contas", "fin_empresas",
