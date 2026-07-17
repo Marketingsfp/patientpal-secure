@@ -163,10 +163,23 @@ type Dep = {
   parentesco: string | null;
   tipo: string;
   cpf?: string | null;
+  codigo_prontuario?: string | null;
   incluido_em: string | null;
   excluido_em: string | null;
   ativo: boolean;
 };
+
+/** Badge compacta com o código de prontuário do paciente, para diferenciar
+ *  homônimos ao lado do nome (titular/dependente). Omitida quando o paciente
+ *  não tem código cadastrado. */
+function ProntuarioBadge({ codigo }: { codigo?: string | null }) {
+  if (!codigo) return null;
+  return (
+    <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted whitespace-nowrap">
+      Prontuário {codigo}
+    </span>
+  );
+}
 
 export function ContratosPage({ initialContratoId, modulo = "contratos" }: { initialContratoId?: string; modulo?: string } = {}) {
   const { clinicaAtual } = useClinica();
