@@ -352,56 +352,6 @@ function EquipePage() {
           )}
         </TabsContent>
 
-        <TabsContent value="enfermagem" className="mt-4">
-          {loading ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent></Card>
-          ) : enfermeirosFiltrados.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">
-              <HeartPulse className="h-8 w-8 mx-auto mb-2 opacity-50" /> Nenhum enfermeiro cadastrado.
-            </CardContent></Card>
-          ) : (
-            <Card>
-              <Table>
-                <TableHeader><TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Agendas</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-16 text-right">Ações</TableHead>
-                </TableRow></TableHeader>
-                <TableBody>
-                  {enfermeirosFiltrados.map((e) => (
-                    <TableRow key={e.id}>
-                      <TableCell>{e.nome}</TableCell>
-                      <TableCell className="text-sm">
-                        {e.agendas.length === 0 ? (
-                          <span className="text-muted-foreground">—</span>
-                        ) : (
-                          <div className="flex flex-wrap gap-1">
-                            {e.agendas.map((a, idx) => (
-                              <Badge key={idx} variant="outline">{a}</Badge>
-                            ))}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={e.ativo ? "default" : "outline"}>{e.ativo ? "Ativo" : "Inativo"}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {podeEscrever && (
-                          <Button size="icon" variant="ghost" asChild>
-                            <Link to="/app/equipe/enfermeiro/$userId/editar" params={{ userId: e.user_id }}>
-                              <Pencil className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-          )}
-        </TabsContent>
       </Tabs>
 
       <Dialog open={openChooser} onOpenChange={setOpenChooser}>
@@ -412,7 +362,7 @@ function EquipePage() {
               Escolha o tipo de cadastro. Em ambos é possível liberar acesso ao sistema.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               type="button"
               onClick={escolherFuncionario}
@@ -430,15 +380,6 @@ function EquipePage() {
               <Stethoscope className="h-8 w-8 text-primary" />
               <span className="font-medium">Médico</span>
               <span className="text-xs text-muted-foreground">CRM, especialidades e repasse</span>
-            </button>
-            <button
-              type="button"
-              onClick={escolherEnfermagem}
-              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-border bg-background p-4 text-center transition hover:border-primary hover:bg-accent"
-            >
-              <HeartPulse className="h-8 w-8 text-primary" />
-              <span className="font-medium">Enfermagem</span>
-              <span className="text-xs text-muted-foreground">Vinculado às agendas de enfermagem</span>
             </button>
           </div>
         </DialogContent>
@@ -461,15 +402,6 @@ function EquipePage() {
           editingMedicoId={medicoDialog.id}
           prefillNome={medicoPrefillNome}
           prefillUserId={medicoPrefillUserId}
-          onSaved={() => setReloadKey((k) => k + 1)}
-        />
-      )}
-      {clinicaAtual && (
-        <EnfermeiroFormDialog
-          open={enfDialog.open}
-          onOpenChange={(o) => setEnfDialog((s) => ({ ...s, open: o }))}
-          clinicaId={clinicaAtual.clinica_id}
-          editingUserId={enfDialog.userId ?? null}
           onSaved={() => setReloadKey((k) => k + 1)}
         />
       )}
