@@ -114,14 +114,23 @@ export function NovoOrcamentoOdontoDialog({
       const norm = procQuery.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       const ids = Array.from(procIdsOdonto);
       // PostgREST aceita listas grandes por vírgula; 180 IDs é seguro.
-      const { data } = await supabase
+      const { sanitizePostgrestSearch } = await import("@/lib/sanitize-search");
+      const safeQ = sanitizePostgrestSearch(procQuery);
+      const safeNorm = sanitizePostgrestSearch(norm);
+      let q = supabase
         .from("procedimentos")
         .select("id, nome, valor_padrao, valor_dinheiro, valor_pix, valor_dinheiro_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, preparo, valor_variavel")
         .eq("clinica_id", clinicaId)
         .eq("ativo", true)
-        .in("id", ids)
-        .or(`nome.ilike.%${procQuery}%,nome.ilike.%${norm}%`)
-        .limit(20);
+        .in("id", ids);
+      if (safeQ.length > 0 || safeNorm.length > 0) {
+        const parts: string[] = [];
+        if (safeQ.length > 0) parts.push(`nome.ilike.%${safeQ}%`);
+        if (safeNorm.length > 0 && safeNorm !== safeQ)
+          parts.push(`nome.ilike.%${safeNorm}%`);
+        q = q.or(parts.join(","));
+      }
+      const { data } = await q.limit(20);
       if (!cancel) { setProcResults((data ?? []) as Procedimento[]); setSearchingProc(false); }
     }, 250);
     return () => { cancel = true; clearTimeout(t); };

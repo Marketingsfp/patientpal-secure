@@ -695,12 +695,21 @@ function NovoOrcamentoDialog({
     setSearchingProc(true);
     const t = setTimeout(async () => {
       const norm = procQuery.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const { sanitizePostgrestSearch } = await import("@/lib/sanitize-search");
+      const safeQ = sanitizePostgrestSearch(procQuery);
+      const safeNorm = sanitizePostgrestSearch(norm);
       let q = supabase
         .from("procedimentos")
         .select("id, nome, valor_dinheiro_pix, valor_cartao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, valor_padrao, preparo, valor_variavel")
         .eq("clinica_id", clinicaId)
-        .eq("ativo", true)
-        .or(`nome.ilike.%${procQuery}%,nome.ilike.%${norm}%`);
+        .eq("ativo", true);
+      if (safeQ.length > 0 || safeNorm.length > 0) {
+        const parts: string[] = [];
+        if (safeQ.length > 0) parts.push(`nome.ilike.%${safeQ}%`);
+        if (safeNorm.length > 0 && safeNorm !== safeQ)
+          parts.push(`nome.ilike.%${safeNorm}%`);
+        q = q.or(parts.join(","));
+      }
       if (categoria === "laboratorio") {
         q = q.or("tipo_procedimento.eq.laboratorio,grupo.ilike.%labor%");
       } else if (categoria === "demais") {

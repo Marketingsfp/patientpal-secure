@@ -391,16 +391,19 @@ function AutoatendimentoPage() {
     const esp = especialidades.find((e) => e.id === especialidadeId);
     const nomeEsp = esp?.nome ?? "";
     // Procura procedimento por nome da especialidade ou "consulta"
-    const { data } = await supabase
+    const { sanitizePostgrestSearch } = await import("@/lib/sanitize-search");
+    const safeEsp = sanitizePostgrestSearch(nomeEsp);
+    let q = supabase
       .from("procedimentos")
       .select(
         "id, nome, valor_padrao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, duracao_minutos",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("ativo", true)
-      .or(`nome.ilike.%${nomeEsp}%,nome.ilike.%consulta%`)
-      .order("nome")
-      .limit(20);
+      .eq("ativo", true);
+    const parts: string[] = ["nome.ilike.%consulta%"];
+    if (safeEsp.length > 0) parts.unshift(`nome.ilike.%${safeEsp}%`);
+    q = q.or(parts.join(","));
+    const { data } = await q.order("nome").limit(20);
     const list = data ?? [];
     // Prioriza match por nome exato da especialidade
     const exato = list.find((p: any) =>
