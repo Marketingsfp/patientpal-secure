@@ -3901,7 +3901,16 @@ h1, h2, h3 { margin: 0 0 6mm; }
               {isAdmin && podeEscrever && faixas.length > 0 ? (
                 <div className="space-y-1">
                   <Label>Nº de pessoas no contrato</Label>
-                  <Select value={admFaixaId} onValueChange={setAdmFaixaId}>
+                  <Select
+                    value={admFaixaId}
+                    onValueChange={(id) => {
+                      setAdmFaixaId(id);
+                      // Ao trocar a faixa, reflete o valor no input "Valor mensal"
+                      // para que "Salvar valor e vencimento" persista corretamente.
+                      const f = faixas.find((x) => x.id === id);
+                      if (f) setEditValor(Number(f.valor_mensal).toFixed(2));
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a faixa…" />
                     </SelectTrigger>
@@ -3921,9 +3930,15 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       })}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Ao salvar, o valor mensal do contrato e das parcelas em aberto serão atualizados para a faixa selecionada.
-                  </p>
+                  {admFaixaId === "" && Number(valorMensalAtual) > 0 ? (
+                    <p className="text-xs text-amber-600">
+                      O valor atual ({BRL(Number(valorMensalAtual))}) não corresponde a nenhuma faixa deste convênio (possível tabela antiga). Selecione uma faixa para alinhar o valor ou edite manualmente o campo "Valor mensal" ao lado.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Ao salvar, o valor mensal do contrato e das parcelas em aberto serão atualizados para a faixa selecionada.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
