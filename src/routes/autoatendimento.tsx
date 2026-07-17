@@ -495,8 +495,10 @@ function AutoatendimentoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/40 flex flex-col">
-      <header className="px-8 py-6 flex items-center justify-between">
+    // h-[100dvh] + overflow-hidden: modo quiosque, sem scroll — cada tela
+    // precisa caber inteira na viewport do totem.
+    <div className="h-[100dvh] overflow-hidden bg-gradient-to-br from-background via-background to-muted/40 flex flex-col">
+      <header className="px-6 py-3 flex items-center justify-between shrink-0">
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Bem-vindo a</div>
           <h1 className="text-2xl font-bold">{clinicaAtual.clinica.nome}</h1>
@@ -511,7 +513,7 @@ function AutoatendimentoPage() {
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center px-6 pb-12">
+      <main className="flex-1 min-h-0 flex items-center justify-center px-6 py-2 overflow-hidden">
         {step === "home" && (
           <div className="w-full max-w-6xl space-y-10">
             <div className="text-center space-y-2">
@@ -529,8 +531,8 @@ function AutoatendimentoPage() {
               <TileGrande
                 onClick={() => {
                   setStep("checkin");
-                  // Identificação no totem é só por CPF (teclado na tela) —
-                  // o reconhecimento facial foi removido a pedido da gestão.
+                // Entra direto no CPF; o paciente pode alternar para
+                // reconhecimento facial pelo botão dentro da tela.
                   setIdentMode("cpf");
                   setCpf("");
                 }}
