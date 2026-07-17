@@ -4014,7 +4014,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <Label className="text-xs">Valor (R$)</Label>
                   <Input
                     type="text"
-                    value={brl(Number(String(incTaxaValor).replace(",", ".")) || 0)}
+                    value={BRL(Number(String(incTaxaValor).replace(",", ".")) || 0)}
                     readOnly
                     disabled={!incCobrarTaxa}
                     tabIndex={-1}
