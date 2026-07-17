@@ -2202,7 +2202,7 @@ function DetalheContrato({
       contrato.convenio_id
         ? supabase
             .from("cb_convenios")
-            .select("nome, modelo_contrato, termo_inclusao_html, vigencia_meses, fidelidade_meses, max_dependentes")
+            .select("nome, modelo_contrato, termo_inclusao_html, vigencia_meses, fidelidade_meses, max_dependentes, taxa_adesao, taxa_inclusao_dependente")
             .eq("id", contrato.convenio_id)
             .maybeSingle()
         : Promise.resolve({ data: null }),
