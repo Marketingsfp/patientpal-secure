@@ -289,7 +289,7 @@ function ConveniosPage() {
     setEditing(null);
     setEditingBenIdx(null);
     setNome(""); setDescricao(""); setAtivo(true);
-    setTaxaAdesao(0); setNumParcelas(12);
+    setTaxaAdesao(0); setTaxaInclusaoDep(0); setNumParcelas(12);
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
     setBeneficiosTxt(""); setModeloContrato("");
     setInformativoHtml("");
