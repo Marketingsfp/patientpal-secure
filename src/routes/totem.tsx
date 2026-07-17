@@ -323,20 +323,20 @@ export function TotemPage() {
     // h-screen + overflow-hidden (em vez de min-h-screen): a página do totem
     // não pode rolar de jeito nenhum — trava exatamente na altura da
     // viewport e cada tela (header/main/footer) precisa caber dentro disso.
-    <div className="h-screen overflow-hidden bg-gradient-to-br from-background via-background to-muted/40 flex flex-col cursor-none [&_*]:cursor-none">
+    <div className="h-[100dvh] overflow-hidden bg-gradient-to-br from-background via-background to-muted/40 flex flex-col cursor-none [&_*]:cursor-none">
       {/* Header */}
-      <header className="px-8 py-4 flex items-center justify-between shrink-0">
+      <header className="px-6 py-3 flex items-center justify-between shrink-0">
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Bem-vindo a</div>
-          <h1 className="text-2xl font-bold">{clinicaAtual.clinica.nome}</h1>
+          <h1 className="text-xl md:text-2xl font-bold">{clinicaAtual.clinica.nome}</h1>
         </div>
         <div className="text-right text-sm text-muted-foreground">
           <div className="capitalize">{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}</div>
-          <div className="text-2xl font-mono tabular-nums text-foreground"><Clock /></div>
+          <div className="text-xl md:text-2xl font-mono tabular-nums text-foreground"><Clock /></div>
         </div>
       </header>
 
-      <main className="flex-1 min-h-0 flex items-center justify-center px-8 py-2 overflow-hidden">
+      <main className="flex-1 min-h-0 flex items-center justify-center px-6 py-2 overflow-hidden">
         {step === "menu" && (
           <div className="w-full max-w-4xl space-y-10">
             <div className="text-center space-y-2">
@@ -407,23 +407,21 @@ export function TotemPage() {
         )}
 
         {step === "checkin" && (
-          // Card compacto de propósito: com CPF + teclado + botão facial +
-          // ações, a versão "confortável" (p-10, botões h-14, gap-3) passava
-          // da altura da viewport em telas de totem comuns e forçava scroll.
-          // A página não pode rolar — então tudo aqui é dimensionado para
-          // caber inteiro e ficar centralizado de verdade (sem hack de
-          // alinhamento), com "max-h-full" como cinto de segurança.
-          <div className="w-full max-w-md max-h-full overflow-hidden bg-card border rounded-3xl p-6 shadow-xl space-y-3">
+          // Card do check-in dimensionado para caber inteiro na viewport do
+          // totem (a página é h-[100dvh] + overflow-hidden). Sem "max-h-full
+          // overflow-hidden" no card — se algum item passar, preferimos
+          // reduzir tamanhos aqui a esconder conteúdo por corte.
+          <div className="w-full max-w-sm bg-card border rounded-3xl p-5 shadow-xl space-y-3 my-auto">
             <div className="text-center space-y-0.5">
-              <h2 className="text-2xl font-bold">Check-in</h2>
-              <p className="text-sm text-muted-foreground">Digite seu CPF no teclado abaixo</p>
+              <h2 className="text-xl font-bold">Check-in</h2>
+              <p className="text-xs text-muted-foreground">Digite seu CPF no teclado abaixo</p>
             </div>
             <input
               readOnly
               inputMode="none"
               value={formatarCpfParcial(cpf)}
               placeholder="000.000.000-00"
-              className="w-full h-14 px-4 text-2xl tracking-widest rounded-xl border bg-background text-center tabular-nums"
+              className="w-full h-12 px-4 text-xl tracking-widest rounded-xl border bg-background text-center tabular-nums"
             />
             <TecladoNumerico
               disabled={busy}
@@ -433,17 +431,17 @@ export function TotemPage() {
             />
             <Button
               variant="outline"
-              className="w-full h-11 text-sm"
+              className="w-full h-10 text-sm"
               disabled={busy}
               onClick={() => void iniciarCheckinFacial()}
             >
               <Camera className="h-4 w-4 mr-2" /> Usar reconhecimento facial
             </Button>
             <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" className="h-11" onClick={reset}>
+              <Button variant="outline" className="h-10" onClick={reset}>
                 <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
               </Button>
-              <Button className="h-11" disabled={busy || cpf.length !== 11} onClick={() => void fazerCheckin()}>
+              <Button className="h-10" disabled={busy || cpf.length !== 11} onClick={() => void fazerCheckin()}>
                 {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Confirmar
               </Button>
             </div>
@@ -451,16 +449,16 @@ export function TotemPage() {
         )}
 
         {step === "checkin-facial" && (
-          <div className="max-w-xl w-full text-center space-y-6">
-            <div className="relative mx-auto w-[480px] h-[360px] rounded-2xl overflow-hidden border-4 border-primary/40 bg-black">
+          <div className="max-w-xl w-full text-center space-y-4 my-auto">
+            <div className="relative mx-auto w-full max-w-[420px] aspect-[4/3] rounded-2xl overflow-hidden border-4 border-primary/40 bg-black">
               <video ref={videoRef} className="w-full h-full object-cover scale-x-[-1]" playsInline muted />
               <div className="absolute inset-8 border-2 border-white/60 rounded-full pointer-events-none" />
             </div>
-            <p className="text-lg">{scanMsg}</p>
+            <p className="text-base">{scanMsg}</p>
             <Button
               variant="outline"
               size="lg"
-              className="h-14 px-8"
+              className="h-12 px-6"
               onClick={() => { stopCamera(); setStep("checkin"); }}
             >
               <X className="h-5 w-5 mr-2" /> Cancelar
@@ -509,7 +507,7 @@ export function TotemPage() {
         )}
       </main>
 
-      <footer className="px-8 py-2 text-center text-xs text-muted-foreground shrink-0">
+      <footer className="px-6 py-2 text-center text-xs text-muted-foreground shrink-0">
         ClinicaOS · Totem · {step !== "menu" && (
           <button onClick={reset} className="underline ml-2">Voltar ao início</button>
         )}
