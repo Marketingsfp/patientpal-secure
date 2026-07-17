@@ -2039,6 +2039,10 @@ function DetalheContrato({
   const [admObs, setAdmObs] = useState<string>(contrato.observacoes ?? "");
   const [admFaixaId, setAdmFaixaId] = useState<string>("");
   const [savingAdm, setSavingAdm] = useState(false);
+  // Guarda a faixa que foi auto-sincronizada com o valor_mensal atual.
+  // Só sobrescrevemos valor_mensal no salvarContratoAdmin se o usuário
+  // trocou explicitamente para uma faixa diferente desta inicial.
+  const admFaixaIdInicialRef = useRef<string>("");
   const [apenasFinanceiro, setApenasFinanceiro] = useState<boolean>(
     !!(contrato as any).titular_apenas_financeiro,
   );
