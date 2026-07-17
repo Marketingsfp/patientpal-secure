@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Users, Stethoscope, HeartPulse } from "lucide-react";
+import { Plus, Pencil, Users, Stethoscope } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,13 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { FuncionarioFormDialog } from "@/components/funcionarios/FuncionarioFormDialog";
 import { MedicoFormDialog } from "@/components/medicos/MedicoFormDialog";
-import { EnfermeiroFormDialog } from "@/components/funcionarios/EnfermeiroFormDialog";
 
 export const Route = createFileRoute("/_authenticated/app/equipe/")({
   component: EquipePage,
   head: () => ({ meta: [{ title: "Equipe — ClinicaOS" }] }),
   validateSearch: z.object({
-    tab: z.enum(["funcionarios", "medicos", "enfermagem"]).optional(),
+    tab: z.enum(["funcionarios", "medicos"]).optional(),
   }),
 });
 
@@ -56,11 +55,10 @@ function EquipePage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("equipe");
   const { tab: tabFromUrl } = Route.useSearch();
-  const [tab, setTab] = useState<"funcionarios" | "medicos" | "enfermagem">(tabFromUrl ?? "funcionarios");
+  const [tab, setTab] = useState<"funcionarios" | "medicos">(tabFromUrl ?? "funcionarios");
   useEffect(() => { if (tabFromUrl) setTab(tabFromUrl); }, [tabFromUrl]);
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
-  const [enfermeiros, setEnfermeiros] = useState<Array<Funcionario & { agendas: string[] }>>([]);
   const [loading, setLoading] = useState(false);
   const [openChooser, setOpenChooser] = useState(false);
   const [busca, setBusca] = useState("");
@@ -69,7 +67,6 @@ function EquipePage() {
   const [medicoDialog, setMedicoDialog] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
   const [medicoPrefillNome, setMedicoPrefillNome] = useState<string | undefined>(undefined);
   const [medicoPrefillUserId, setMedicoPrefillUserId] = useState<string | undefined>(undefined);
-  const [enfDialog, setEnfDialog] = useState<{ open: boolean; userId?: string | null }>({ open: false, userId: null });
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -108,10 +105,9 @@ function EquipePage() {
         ativo: r.ativo,
       }));
       allRows.sort((a, b) => a.nome.localeCompare(b.nome));
-      const enfRows = allRows.filter((r) => r.role === "enfermeiro");
       // Quem é médico nunca aparece em Funcionários (nem "pendente" — esses
       // vão para a aba Médicos, mesclados via medicosPendentes abaixo).
-      setFuncionarios(allRows.filter((r) => r.role !== "enfermeiro" && r.role !== "medico"));
+      setFuncionarios(allRows.filter((r) => r.role !== "medico"));
       // Perfil "Médico" sem cadastro completo em `medicos` (falta CRM): mantém
       // visível na aba Médicos como pendente — nunca deve desaparecer do
       // sistema. Usa o próprio membership como linha sintética (id prefixado).
@@ -130,24 +126,6 @@ function EquipePage() {
           user_id: r.user_id,
         }));
 
-      // Carrega vínculos de agendas para enfermeiros
-      let agendasMap = new Map<string, string[]>();
-      if (enfRows.length) {
-        const userIds = enfRows.map((e) => e.user_id);
-        const { data: vinc } = await supabase
-          .from("enfermagem_recurso_atendentes")
-          .select("user_id, recurso:enfermagem_recursos(nome)")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .in("user_id", userIds);
-        for (const r of (vinc ?? []) as Array<{ user_id: string; recurso: { nome: string } | null }>) {
-          const nome = r.recurso?.nome;
-          if (!nome) continue;
-          const arr = agendasMap.get(r.user_id) ?? [];
-          arr.push(nome);
-          agendasMap.set(r.user_id, arr);
-        }
-      }
-      setEnfermeiros(enfRows.map((e) => ({ ...e, agendas: agendasMap.get(e.user_id) ?? [] })));
       const medicosBase = ((m.data ?? []) as Medico[]).map((medico) => ({
         ...medico,
         nome: limparPrefixoMedico(medico.nome),
