@@ -2118,6 +2118,7 @@ function DetalheContrato({
     }
     const dataInicioAntiga = (contrato as any).data_inicio as string | null;
     setSavingAdm(true);
+    const novaDataFim = addUmAno(admDataInicio);
     // Só aplica novo valor_mensal se o usuário trocou explicitamente a faixa
     // em relação à sincronização inicial. Sem isso, um fallback silencioso
     // do dropdown rebaixaria o valor do contrato (ver bug #20260945).
@@ -2132,6 +2133,7 @@ function DetalheContrato({
       paciente_id: admPaciente.id,
       paciente_nome: admPaciente.nome,
       data_inicio: admDataInicio,
+      data_fim: novaDataFim,
       taxa_adesao: taxa,
       forma_pagamento: admForma || null,
       observacoes: admObs || null,
@@ -2152,6 +2154,7 @@ function DetalheContrato({
     (contrato as any).paciente_id = admPaciente.id;
     (contrato as any).paciente_nome = admPaciente.nome;
     (contrato as any).data_inicio = admDataInicio;
+    (contrato as any).data_fim = novaDataFim;
     (contrato as any).taxa_adesao = taxa;
     (contrato as any).forma_pagamento = admForma || null;
     (contrato as any).observacoes = admObs || null;
