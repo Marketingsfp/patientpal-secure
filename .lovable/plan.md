@@ -1,51 +1,38 @@
-## Reorganizar o diálogo "Renovar contrato" no padrão da venda
+## Objetivo
 
-Vou reordenar as seções para bater com o wizard de venda de contrato e habilitar edição/inclusão de dependentes no mesmo diálogo.
+Fazer o diálogo **Renovar contrato** se comportar igual ao **Novo contrato**:
 
-### Nova ordem das seções
+1. No campo **Convênio da renovação**, mostrar apenas o nome do convênio (sem valor ao lado).
+2. Substituir o input numérico **Nº de pessoas no contrato** por um `Select` que lista as **faixas de preço** cadastradas no convênio escolhido, no mesmo formato da venda: "1 pessoa — R$ 110,00", "2 pessoas — R$ 130,00", "3+ pessoas — R$ 150,00" etc.
+3. Ao incluir ou remover dependentes (aumentando/diminuindo o total de pessoas), a faixa deve ser reselecionada automaticamente e o valor mensal atualizado — como na venda.
 
-1. **Convênio da renovação** (Select, como já está).
-2. **Nº de pessoas no contrato** (campo numérico logo abaixo do convênio, mesmo padrão da venda). Ao alterar o número:
-   - Aumentar: abre linhas vazias na lista de dependentes para preencher.
-   - Diminuir: pede confirmação antes de remover o último dependente da lista.
-3. **Dependentes** (titular + dependentes):
-   - Titular fixo no topo (só leitura), com prontuário ao lado.
-   - Lista dos dependentes atuais do contrato, agora **editáveis**:
-     - Trocar o paciente vinculado (busca com `PatientSearchInput` + prontuário).
-     - Trocar o parentesco (Select).
-     - Marcar/desmarcar "manter no contrato renovado".
-   - Botão **"+ Adicionar dependente"** para novas linhas (paciente + parentesco + checkbox "Cobrar taxa de inclusão R$ X,XX", marcado por padrão).
-4. **Cobrar taxa de adesão do novo convênio** (mantém o checkbox atual, aparece só em troca de plano).
-5. **Resumo** (mantém, com linhas extras "Novos dependentes" e "Taxa de inclusão total" quando houver).
-6. **Observação** (mantém).
+## Escopo
 
-### Regras
+- `src/components/contratos/renovar-contrato-dialog.tsx` (UI + estado do diálogo).
+- Migração SQL para as RPCs `renovar_contrato_extensao` e `renovar_contrato_troca_plano`, adicionando parâmetro opcional `_valor_mensal numeric` que, quando informado, sobrescreve `v_convenio.valor_mensal` no cálculo das parcelas e no `contrato_renovacoes.valor_novo` / `contratos_assinatura.valor_mensal` (quando `NULL`, mantém o comportamento atual). Nada mais das RPCs muda.
 
-- **Extensão (mesmo convênio)**: alterações em dependentes existentes são aplicadas no próprio contrato; dependentes novos entram no contrato atual e a taxa de inclusão (se marcada) vai como `numero_parcela < 0` com o valor do convênio atual.
-- **Troca de plano**: o contrato antigo é encerrado como renovado; o contrato novo recebe os dependentes na configuração final desta tela (com edições e novos), e as taxas de inclusão marcadas viram parcelas do contrato novo com o valor do convênio escolhido.
-- **Nº de pessoas** é derivado: `1 (titular) + dependentes marcados como manter + novos preenchidos`. O campo é editável e serve como meta — se o operador digita 4 e só há 2 linhas, o diálogo abre 2 linhas em branco para completar. Botão "Confirmar" fica desabilitado enquanto houver linha incompleta ou mismatch com o número informado.
+## Detalhamento técnico
 
-### Alterações técnicas
+1. **Carga inicial**: junto com `cb_convenios` e `contrato_dependentes`, carregar `cb_convenio_faixas` (filtrado por `convenio_id IN (...ids...)`) — mesma tabela usada em `contratos-page.tsx` (linhas 971-978).
+2. **Estado**: adicionar `faixaId: string`. Derivar `faixasDoConvenio = faixas.filter(f => f.convenio_id === novoConvenioId).sort(vidas_de asc)`.
+3. **Auto-seleção da faixa**: sempre que `totalPessoas` (titular + dependentes ativos) ou `novoConvenioId` mudar, escolher a faixa onde `totalPessoas >= vidas_de && (vidas_ate == null || totalPessoas <= vidas_ate)`; fallback para a última faixa quando exceder. Mesma lógica dos linhas 985-993 de `contratos-page.tsx`.
+4. **Valor exibido**: `valorRenovacao` passa a vir da faixa selecionada (não mais de `novoConvenio.valor_mensal`). Reaproveitar o helper `labelFaixa` (linha 1008) para renderizar as opções do `Select`.
+5. **Convênio dropdown**: exibir só `c.nome` (sem `— R$ ...`), mantendo o sufixo "(atual)" para o convênio atual do contrato.
+6. **Remover o input numérico** de nº de pessoas. O `Select` de faixa passa a ser o campo à direita. O total real de pessoas continua sendo derivado de `1 + depsAtivos.length` e usado para pré-selecionar a faixa; se o usuário mudar a faixa manualmente para uma que exija menos/mais pessoas, apenas alerta via `toast` (sem alterar a lista de dependentes automaticamente, para não sobrescrever escolhas do usuário).
+7. **Botão "Adicionar dependente"** continua igual. Ao adicionar/remover, o `useEffect` recalcula a faixa e o valor mensal automaticamente. O limite `maxDep` continua vindo de `cb_convenios.max_dependentes`.
+8. **Chamada às RPCs**: enviar `_valor_mensal: faixaSelecionada.valor_mensal` nas duas RPCs.
+9. **Migração SQL** (dois `CREATE OR REPLACE FUNCTION`): novo parâmetro `_valor_mensal numeric DEFAULT NULL` no fim da assinatura de cada função e uso de `COALESCE(_valor_mensal, v_convenio.valor_mensal)` nas linhas que hoje usam `v_convenio.valor_mensal` / `v_convenio_novo.valor_mensal` para valor de parcela e para `valor_novo`/`valor_mensal` do novo contrato.
 
-1. **Migration — RPCs de renovação** (`renovar_contrato_extensao` e `renovar_contrato_troca_plano`):
-   - Novo parâmetro `_dependentes jsonb` com o estado final da lista:
-     `[{ "id": uuid | null, "paciente_id": uuid, "parentesco": text, "manter": bool, "cobrar_taxa_inclusao": bool }]`.
-     - `id` presente → dependente existente: aplicar edições (paciente/parentesco) ou desativar se `manter=false`.
-     - `id` nulo → dependente novo: inserir e, se `cobrar_taxa_inclusao`, lançar parcela de taxa de inclusão.
-   - Aposentar `_dependentes_manter uuid[]` (substituído por `_dependentes`).
-   - Snapshot dos novos vai para `contrato_renovacoes.dependentes_incluidos jsonb` (nova coluna) para histórico.
+## Fora do escopo
 
-2. **Frontend — `src/components/contratos/renovar-contrato-dialog.tsx`**:
-   - Reordenar o JSX (convênio → nº pessoas → dependentes → taxa adesão → resumo → observação).
-   - Substituir a lista atual de checkboxes por linhas editáveis com `PatientSearchInput` + Select de parentesco + toggle "manter".
-   - Adicionar botão "+ Adicionar dependente" e a lógica de sincronia com o campo "Nº de pessoas".
-   - Enviar o novo payload `_dependentes` para as RPCs.
+- Não alterar as taxas de adesão / inclusão de dependente (continuam vindo do convênio).
+- Não mudar o fluxo de venda (`Novo contrato`) nem o de edição do contrato.
+- Não alterar a tabela `cb_convenio_faixas` nem os relatórios.
 
-3. **`contratos-page.tsx`**: sem alterações (o `onRenovado` continua o mesmo).
+## Validação
 
-### Fora de escopo
-
-- Cadastrar paciente novo direto do diálogo (continua sendo feito antes, na tela de pacientes).
-- Alterar o valor da mensalidade em função do nº de pessoas (segue o cadastro do convênio, como hoje).
-
-Confirme para eu executar.
+- Renovar contrato no mesmo convênio (extensão) com faixa diferente → 12 novas parcelas com o valor da faixa.
+- Trocar de convênio → novo contrato com parcelas no valor da faixa escolhida + taxa de adesão.
+- Incluir dependente novo → faixa e valor mensal atualizam sozinhos no resumo.
+- Remover dependente existente (× ao lado do nome) → faixa recua e valor atualiza.
+- Escolher manualmente uma faixa diferente da automática → valor atualiza e aviso é exibido.
