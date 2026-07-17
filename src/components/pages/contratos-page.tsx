@@ -729,6 +729,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <span>{c.paciente_nome}</span>
+                    <ProntuarioBadge codigo={c.codigo_prontuario} />
                     {c.tabela_legada ? (
                       <Badge
                         variant="outline"
