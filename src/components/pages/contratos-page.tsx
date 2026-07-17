@@ -3258,7 +3258,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   ) : null}
                 </>
               )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {isAdmin && podeEscrever ? (
                 <div className="space-y-1">
                   <Label>Convênio</Label>
@@ -3308,6 +3308,31 @@ h1, h2, h3 { margin: 0 0 6mm; }
               ) : (
                 <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
               )}
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">Valor mensal (R$)</div>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={editValor}
+                  onChange={(e) => setEditValor(e.target.value)}
+                  disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
+                />
+              </div>
+              {isAdmin && podeEscrever ? (
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">Taxa de adesão (R$)</div>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={admTaxaAdesao}
+                    onChange={(e) => setAdmTaxaAdesao(e.target.value)}
+                  />
+                </div>
+              ) : (
+                <DadosField label="Taxa de adesão" value={BRL(Number(contrato.taxa_adesao ?? 0))} />
+              )}
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {isAdmin && podeEscrever ? (
@@ -3338,33 +3363,6 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
                   />
                 </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground">Valor mensal (R$)</div>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    value={editValor}
-                    onChange={(e) => setEditValor(e.target.value)}
-                    disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
-                  />
-                </div>
-                {isAdmin && podeEscrever ? (
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">Taxa de adesão (R$)</div>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min={0}
-                      value={admTaxaAdesao}
-                      onChange={(e) => setAdmTaxaAdesao(e.target.value)}
-                    />
-                  </div>
-                ) : (
-                  <DadosField label="Taxa de adesão" value={BRL(Number(contrato.taxa_adesao ?? 0))} />
-                )}
               </div>
               <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
                 <label className="flex items-center gap-2 text-sm">
