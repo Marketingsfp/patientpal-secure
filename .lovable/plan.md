@@ -1,74 +1,69 @@
-
 ## Objetivo
 
-Retirar do sistema tudo relacionado a "Serviços de Enfermagem" que não é usado, **preservando** os módulos **Triagem - Enfermagem** e **Alertas Enfermagem** (que continuam funcionando normalmente).
+Em `/app/odontologia`, criar duas abas — **Prontuário** (a tela atual) e **Orçamento** — para gerar orçamentos exclusivamente de procedimentos da especialidade **Odontologia** e vincular cada item do orçamento a um ou mais dentes do odontograma daquele paciente. O odontograma passa a exibir visualmente os dentes com item orçado (aberto) e os que já viraram atendimento.
 
-## O que será removido
+Sem alterar: menu Orçamentos, tabela `orcamentos`, regras de conversão/impressão/histórico/RLS, permissões, agenda, financeiro.
 
-### 1. Tela Horários médicos (`/app/disponibilidades`)
-- Aba **"Enfermagem"** (ao lado de Agendas / Médicos).
-- Bloco **"Gerar agenda - Enfermagem"** (gerador de slots para recursos de enfermagem).
-- Arquivo `src/components/enfermagem-horarios-parts.tsx` (deixará de ser usado).
+## Escopo
 
-### 2. Módulo Recursos de Enfermagem
-- Rota `/app/enfermagem-recursos` (arquivo `src/routes/_authenticated/app.enfermagem-recursos.tsx`).
-- Item de menu correspondente, se houver.
-- Todo o CRUD de recursos de enfermagem, atendentes vinculados e disponibilidades.
+**Dentro:**
+1. Duas abas na página `/app/odontologia`: `Prontuário` (conteúdo atual) e `Orçamento`.
+2. Na aba Orçamento: lista apenas os orçamentos **odontológicos do paciente selecionado** + botão “Novo orçamento odontológico”.
+3. Novo diálogo de criação com busca de procedimento restrita à especialidade **ODONTOLOGIA** (via `procedimento_especialidades`), sem o passo “Laboratório vs Demais Serviços” (categoria fixa = `demais`, com marca `odontologia` — ver Técnico).
+4. Cada item do orçamento passa a ter uma lista de dentes vinculados (0..N). O selecionador de dentes reutiliza o componente `Odontograma`.
+5. Odontograma na aba Prontuário: além do estado clínico atual, mostra badge/cor discreta nos dentes com item de orçamento **aberto**. Ao clicar no dente, aparece no card lateral a lista dos itens orçados naquele dente (com nº do orçamento, procedimento, valor, status) além do formulário já existente.
+6. Ações do item já herdadas: imprimir, converter em atendimento, histórico, cancelar — via o mesmo `OrcamentoDrawer` / `ConversaoOrcamentoDialog`.
 
-### 3. Cadastro de profissional de Enfermagem (Equipe)
-- Aba **"Enfermagem"** em `/app/equipe` (`app.equipe.index.tsx`).
-- Rota de edição `app.equipe.enfermeiro.$userId.editar.tsx`.
-- Componente `src/components/funcionarios/EnfermeiroFormDialog.tsx`.
-- Server functions em `src/lib/enfermagem-equipe.functions.ts`.
+**Fora (não mexe):**
+- Menu global `/app/orcamentos` e seu diálogo de criação.
+- Regras de conversão, splits, impressão, auditoria e RLS existentes.
+- Módulo Triagem — Enfermagem, alertas, permissões.
 
-### 4. Referências pontuais a "enfermagem" em Serviços/Agenda
-- Opção **"Procedimento de enfermagem"** no seletor de categoria em `/app/procedimentos` (linha 1395).
-- Rótulo "enfermagem" em mapeamentos de exibição na agenda (`app.agenda.tsx` linha 5921) — apenas o rótulo, sem mudar regra de negócio.
+## Passos
 
-### 5. Banco de dados (migração)
-Serão removidas, em uma única migração, as tabelas e colunas abaixo. Antes de rodar, a migração verifica que não há dados vinculados vivos (`agendamentos.enfermagem_recurso_id` está zerado hoje).
+1. **Migration** (uma só, revisada pelo usuário):
+   - `ALTER TABLE public.orcamento_itens ADD COLUMN dentes smallint[] NULL;` — array com números FDI (11–48, 51–85). Nullable e default null: itens não-odonto ficam inalterados.
+   - Constraint leve: `CHECK (dentes IS NULL OR array_length(dentes,1) BETWEEN 1 AND 32)`.
+   - `ALTER TABLE public.orcamentos ADD COLUMN especialidade_id uuid NULL REFERENCES public.especialidades(id);` — marca o orçamento como “de Odontologia” (permite filtrar sem depender de heurística textual). Índice parcial: `CREATE INDEX ON orcamentos (clinica_id, paciente_id) WHERE especialidade_id IS NOT NULL;`.
+   - Sem novas policies (as existentes de `orcamentos` / `orcamento_itens` já cobrem por clínica).
 
-Tabelas a apagar (DROP):
-- `enfermagem_recurso_atendentes`
-- `enfermagem_recurso_disponibilidades`
-- `enfermagem_recurso_procedimentos`
-- `enfermagem_recursos`
+2. **Componentes novos** em `src/components/odontologia/`:
+   - `odonto-tabs.tsx` — envoltório com `Tabs` (Prontuário | Orçamento). Recebe `pacienteId`.
+   - `orcamento-tab.tsx` — busca `orcamentos` do paciente com `especialidade_id = <ODONTO>`, lista compacta reutilizando `OrcamentoCard` (v2) + botão Novo.
+   - `novo-orcamento-odonto-dialog.tsx` — versão enxuta de `NovoOrcamentoDialog` extraída de `app.orcamentos.tsx`:
+     - paciente já vem fixo (o da aba); campos paciente/telefone somente leitura.
+     - sem escolha de categoria (laboratorio/demais); grava `categoria='demais'` e `especialidade_id = <ODONTO>`.
+     - a busca de `procedimentos` faz `INNER JOIN procedimento_especialidades pe ON pe.procedimento_id = procedimentos.id AND pe.especialidade_id = <ODONTO>` (via `select` com filtro correspondente do PostgREST) — hoje há 180 procedimentos vinculados.
+     - novo campo por item: **Dentes** (input que abre um mini-odontograma; clicar em dentes adiciona/remove). Persiste em `orcamento_itens.dentes`.
+   - `odontograma-badges.tsx` — mesmo `Odontograma` atual acrescido de um mapa `Record<number, "orcado" | undefined>` para desenhar um pontinho/anel diferente nos dentes com item orçado aberto.
 
-Coluna a apagar:
-- `agendamentos.enfermagem_recurso_id`
+3. **Refactor mínimo** em `src/routes/_authenticated/app.odontologia.tsx`:
+   - Envolve o conteúdo atual em `<Tabs>` com abas Prontuário/Orçamento.
+   - Continua carregando dentes/prontuário na aba Prontuário; a aba Orçamento monta o componente novo.
+   - No card do dente selecionado (aba Prontuário): abaixo do form de status, lista dos itens de orçamento aberto vinculados àquele dente.
 
-**Não serão tocadas** (dependem de Triagem-Enfermagem e Alertas, que ficam):
-- `triagens_enfermagem` e suas colunas (`enfermeira_id`, `enfermeira_nome`).
-- `alertas_enfermagem`.
+4. **Sem tocar** em `app.orcamentos.tsx` ou nos componentes v2 — apenas reutilizamos `OrcamentoCard`, `OrcamentoDrawer`, `ConversaoOrcamentoDialog` importando-os.
 
-## O que NÃO será alterado
+5. **Permissões**: aba Orçamento usa a mesma checagem `podeEscrever("odontologia")` já em uso; leitura livre para quem enxerga a página. Como o dado grava em `orcamentos`/`orcamento_itens`, as políticas por clínica dessas tabelas continuam valendo.
 
-- `/app/triagem-enfermagem` — permanece igual.
-- `/app/alertas-enfermagem` — permanece igual.
-- Nenhuma regra de agendamento, financeiro, prontuário ou permissão além das citadas.
+## Detalhes técnicos (para revisão do dev)
 
-## Ordem de execução
+- ID da especialidade: `f0cfaa0a-2a67-4176-97de-a7072c37077c` (nome `ODONTOLOGIA`). Sem hardcode: buscar por `nome ilike 'odontologia'` no carregamento inicial e guardar em estado; cai para “sem procedimentos” se não existir na clínica.
+- Filtro de procedimentos: reproduzir a estrutura do `NovoOrcamentoDialog` atual, trocando a cláusula de categoria por um `.in("id", ids)` onde `ids` vem de `procedimento_especialidades.select('procedimento_id').eq('especialidade_id', ODONTO_ID)` da mesma clínica. Cache local no dialog.
+- Vínculo dente↔item: gravado em `orcamento_itens.dentes` (smallint[]) — evita nova tabela de junção e simplifica leitura. Ao consultar “o que está orçado no dente X”, um único `select` com `.contains('dentes', [X])` resolve.
+- Marcação visual “orçado” no odontograma: consulta `orcamento_itens` do paciente cujo `orcamento.status = 'aberto'` (via join implícito ou 2 queries com `.in`). Item convertido/executado/cancelado sai da marcação automaticamente (deriva de `status_operacional`/`status`).
+- Odontograma clicável no dialog: mesmo componente da página, mas com `multi` para permitir selecionar N dentes por item (reutilizando a UX visual atual).
+- SSR: página fica sob `_authenticated`, sem loader adicional; leituras ficam client-side como já são hoje.
+- Não altera `NovoOrcamentoDialog` original — extraímos apenas o subformulário reutilizável para o novo componente (copy-controlado).
 
-1. **Backend primeiro (schema)**: migração que dropa as 4 tabelas de recursos de enfermagem e a coluna `agendamentos.enfermagem_recurso_id`. Como `_authenticated/` bloqueia tudo o que consome esses objetos, esconder da UI antes do drop deixaria server functions quebradas — por isso o schema sai primeiro. Aguarda aprovação humana.
-2. **Frontend + server functions** (mesmo commit, após a migração aprovada):
-   - Remover aba e bloco de Enfermagem em `app.disponibilidades.tsx`.
-   - Remover rota `app.enfermagem-recursos.tsx` e itens de menu.
-   - Remover aba Enfermagem em `app.equipe.index.tsx` + rota `app.equipe.enfermeiro.$userId.editar.tsx` + `EnfermeiroFormDialog.tsx`.
-   - Apagar `src/lib/enfermagem-equipe.functions.ts` e `src/components/enfermagem-horarios-parts.tsx`.
-   - Limpar imports órfãos e o SelectItem "Procedimento de enfermagem" em `app.procedimentos.tsx`.
-3. **Validação**: build sem erros de import; abrir `/app/disponibilidades`, `/app/equipe` e `/app/procedimentos` para conferir que as abas/blocos sumiram e que Triagem-Enfermagem e Alertas Enfermagem continuam abrindo.
+## Antes / Depois (para o time)
 
-## Antes × Depois
+- **Antes:** Odontologia é uma tela única com odontograma + prontuário; para orçar precisa ir no menu Orçamentos e escolher `Demais Serviços`, sem filtro por especialidade e sem ligação com dentes.
+- **Depois:** dentro do prontuário odontológico o usuário abre a aba Orçamento, cria um orçamento com procedimentos só de Odontologia, marca em quais dentes cada item se aplica, e os dentes orçados ficam sinalizados no odontograma até o item ser executado ou cancelado.
 
-- **Antes:** aba Enfermagem em Horários médicos, gerador de agenda de enfermagem, módulo Recursos de Enfermagem, aba Enfermagem em Equipe com cadastro de enfermeiro e opção "Procedimento de enfermagem" em Serviços.
-- **Depois:** todas essas superfícies somem da interface e do banco. Triagem - Enfermagem e Alertas Enfermagem seguem operando.
+## Pendências / riscos
 
-## Riscos e pontos de atenção
-
-- **Irreversível no banco:** o DROP das 4 tabelas apaga os 10 recursos e 30 vínculos de atendentes existentes hoje. Confirmar que ninguém precisa desse histórico antes de aprovar a migração.
-- Existem 0 agendamentos com `enfermagem_recurso_id` preenchido, então o DROP da coluna é seguro.
-- Se no futuro voltar a existir "serviços de enfermagem", será preciso recriar o módulo do zero.
-
-## Classificação do pedido
-
-Remoção de funcionalidade (regra de negócio + limpeza de dados). Não é bug nem correção visual.
+- Precisa de aprovação da migration (nova coluna `orcamento_itens.dentes` e `orcamentos.especialidade_id`).
+- Não vamos preencher retroativamente orçamentos antigos. Só orçamentos criados pela nova aba receberão `especialidade_id`. Se quiser marcar históricos como “de odontologia”, é decisão à parte.
+- Impressão / conversão em atendimento continuam ignorando o campo `dentes` (é meta-info clínica, não afeta valor). Se quiser incluir os dentes no cupom impresso, sinalizar depois.
+- Testes em produção: criação do orçamento chama `orcamentos.numero=0` (auto pela trigger existente). Se o time preferir, faço um teste com paciente rastreável e removo depois — pergunto antes.

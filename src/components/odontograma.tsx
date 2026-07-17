@@ -17,9 +17,11 @@ interface Props {
   estados: Record<number, OdontoStatus>;
   onClickDente: (dente: number) => void;
   selecionado?: number | null;
+  /** Conjunto de dentes com item de orçamento em aberto (recebe anel destacado). */
+  orcadoSet?: Set<number>;
 }
 
-export function Odontograma({ estados, onClickDente, selecionado }: Props) {
+export function Odontograma({ estados, onClickDente, selecionado, orcadoSet }: Props) {
   const linhas = useMemo(() => [[...SUP_DIR, ...SUP_ESQ], [...INF_DIR, ...INF_ESQ]], []);
   return (
     <div className="flex flex-col gap-3 select-none">
@@ -29,16 +31,20 @@ export function Odontograma({ estados, onClickDente, selecionado }: Props) {
             const status = estados[d] ?? "higido";
             const cor = STATUS_COR[status];
             const ativo = selecionado === d;
+            const orcado = orcadoSet?.has(d) ?? false;
             return (
               <button
                 key={d}
                 type="button"
                 onClick={() => onClickDente(d)}
-                className={`relative flex flex-col items-center justify-end h-14 w-9 rounded-md border-2 transition ${ativo ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/50"}`}
+                className={`relative flex flex-col items-center justify-end h-14 w-9 rounded-md border-2 transition ${ativo ? "border-primary ring-2 ring-primary/30" : orcado ? "border-amber-500 ring-2 ring-amber-400/40" : "border-border hover:border-primary/50"}`}
                 style={{ background: `linear-gradient(to top, ${cor} 60%, transparent 60%)` }}
-                title={`Dente ${d} — ${status}`}
+                title={`Dente ${d} — ${status}${orcado ? " · orçado" : ""}`}
               >
                 <span className="absolute top-0.5 text-[10px] font-mono text-foreground/70">{d}</span>
+                {orcado && (
+                  <span className="absolute bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />
+                )}
               </button>
             );
           })}
