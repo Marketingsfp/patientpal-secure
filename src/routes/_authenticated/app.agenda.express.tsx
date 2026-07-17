@@ -267,8 +267,14 @@ function AgendaExpressPage() {
           </Link>
           <Link
             to="/app/agenda/express"
+            preload={false}
             activeProps={{ className: "px-2 py-1 text-[11px] font-medium rounded-full transition-colors bg-primary text-primary-foreground" }}
             inactiveProps={{ className: "px-2 py-1 text-[11px] font-medium rounded-full transition-colors text-muted-foreground hover:text-foreground" }}
+            onClick={(e) => {
+              // Toggle: se já estiver na Express, clicar novamente volta para a Agenda completa.
+              e.preventDefault();
+              navigate({ to: "/app/agenda" });
+            }}
           >
             Agenda Express
           </Link>
