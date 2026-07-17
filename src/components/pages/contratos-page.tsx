@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   FileSignature,
   Plus,
@@ -1722,7 +1722,7 @@ function DetalheContrato({
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const podeEscrever = usePodeEscrever(modulo);
-  const DadosField = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  const DadosField = ({ label, value }: { label: string; value: ReactNode }) => (
     <div className="space-y-1">
       <div className="text-sm font-medium">{label}</div>
       <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">{value || "—"}</div>
@@ -1776,6 +1776,18 @@ function DetalheContrato({
     status: string | null;
     parcelas: number;
     pagas: number;
+  }>>([]);
+  // Ciclos de renovação por extensão dentro do MESMO contrato. A RPC
+  // renovar_contrato_extensao acrescenta N novas mensalidades (numero_parcela
+  // continua sequencial: 13..24, 25..36, etc.) no mesmo contrato. Para não
+  // inflar o contador N/M, separamos em ciclos.
+  const [renovacoes, setRenovacoes] = useState<Array<{
+    id: string;
+    tipo: string | null;
+    parcelas_geradas: number | null;
+    periodo_inicio: string | null;
+    periodo_fim: string | null;
+    created_at: string | null;
   }>>([]);
   const [convenio, setConvenio] = useState<any>(null);
   const [clinica, setClinica] = useState<any>(null);
@@ -2370,6 +2382,24 @@ function DetalheContrato({
     } else {
       setContratosAnteriores([]);
     }
+    // Carrega ciclos de renovação por extensão deste contrato (mesmo id).
+    // Usamos os tamanhos (parcelas_geradas) e a ordem cronológica para
+    // segmentar as mensalidades em ciclos (Original, Renovação 1, ...).
+    {
+      const { data: renRows } = await supabase
+        .from("contrato_renovacoes")
+        .select("id, tipo, parcelas_geradas, periodo_inicio, periodo_fim, created_at")
+        .eq("contrato_id", contrato.id)
+        .order("created_at", { ascending: true });
+      setRenovacoes(((renRows ?? []) as any[]).map((r) => ({
+        id: r.id,
+        tipo: r.tipo ?? null,
+        parcelas_geradas: r.parcelas_geradas ?? null,
+        periodo_inicio: r.periodo_inicio ?? null,
+        periodo_fim: r.periodo_fim ?? null,
+        created_at: r.created_at ?? null,
+      })));
+    }
     setLoading(false);
   };
   useEffect(() => {
@@ -2718,11 +2748,68 @@ function DetalheContrato({
   const pagas = mensalidades.filter((m) => m.status === "pago").length;
   const totalPagoMens = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
   const totalPago = totalPagoMens + extraRecebido.total;
-  // "Pagas X/Y" reflete apenas as parcelas deste contrato — recebimentos
-  // avulsos (fin_lancamentos) continuam no card "Recebido" mas fora da
-  // contagem de parcelas, para não inflar o denominador com histórico.
-  const pagasTotal = pagas;
-  const totalParcelas = mensalidades.length;
+  // Segmenta mensalidades em CICLOS: ciclo 1 = parcelas 1..N0 (contrato
+  // original, N0 = contrato.num_parcelas); ciclos seguintes usam
+  // parcelas_geradas de cada renovação por extensão, em ordem cronológica.
+  // Renovações do tipo troca_plano geram contrato NOVO (não caem aqui) e
+  // aparecem em "Contratos anteriores deste paciente".
+  const parcelasMensais = mensalidades
+    .filter((m) => (m.numero_parcela ?? 0) > 0)
+    .sort((a, b) => (a.numero_parcela ?? 0) - (b.numero_parcela ?? 0));
+  const tamanhoOriginal = Math.max(
+    1,
+    Number((contrato as any).num_parcelas) || 12,
+  );
+  const tamanhosCiclos: number[] = [tamanhoOriginal];
+  for (const r of renovacoes) {
+    if (r.tipo === "extensao" && Number(r.parcelas_geradas ?? 0) > 0) {
+      tamanhosCiclos.push(Number(r.parcelas_geradas));
+    }
+  }
+  // Constrói ciclos como fatias sobre parcelasMensais (ordenadas). Se o total
+  // real de parcelas não bater com a soma dos tamanhos, o último ciclo
+  // absorve o excedente para não perder linhas.
+  type Ciclo = {
+    index: number; // 0 = original, 1 = 1ª renovação, ...
+    label: string;
+    tipo: "original" | "extensao";
+    parcelas: Mens[];
+    inicio: string | null;
+    fim: string | null;
+  };
+  const ciclos: Ciclo[] = [];
+  {
+    let cursor = 0;
+    for (let i = 0; i < tamanhosCiclos.length; i++) {
+      const isLast = i === tamanhosCiclos.length - 1;
+      const take = isLast
+        ? parcelasMensais.length - cursor
+        : Math.min(tamanhosCiclos[i], parcelasMensais.length - cursor);
+      const slice = parcelasMensais.slice(cursor, cursor + Math.max(0, take));
+      cursor += Math.max(0, take);
+      const tipoCiclo: Ciclo["tipo"] = i === 0 ? "original" : "extensao";
+      ciclos.push({
+        index: i,
+        tipo: tipoCiclo,
+        label: i === 0 ? "Ciclo original" : `Renovação ${i}`,
+        parcelas: slice,
+        inicio: slice[0]?.vencimento ?? null,
+        fim: slice[slice.length - 1]?.vencimento ?? null,
+      });
+      if (cursor >= parcelasMensais.length) break;
+    }
+  }
+  const cicloAtual = ciclos[ciclos.length - 1] ?? null;
+  const ciclosAnteriores = ciclos.slice(0, -1);
+  const temCiclosMultiplos = ciclos.length > 1;
+  // "Pagas X/Y" reflete o CICLO ATUAL quando o contrato tem renovações por
+  // extensão; caso contrário, é igual ao total de mensalidades do contrato.
+  const pagasTotal = temCiclosMultiplos
+    ? (cicloAtual?.parcelas.filter((m) => m.status === "pago").length ?? 0)
+    : pagas;
+  const totalParcelas = temCiclosMultiplos
+    ? (cicloAtual?.parcelas.length ?? 0)
+    : mensalidades.length;
   const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
 
   // ---- Dados da venda (aba "Dados") ----
@@ -3163,6 +3250,57 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
                 </button>
               </div>
+              {temCiclosMultiplos ? (
+                <div className="rounded-md border">
+                  <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
+                    <div className="text-sm font-medium">
+                      Ciclos anteriores deste contrato
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {ciclosAnteriores.length}{" "}
+                      {ciclosAnteriores.length === 1 ? "ciclo" : "ciclos"}
+                    </div>
+                  </div>
+                  <div className="overflow-auto max-h-64">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Ciclo</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Período</TableHead>
+                          <TableHead>Parcelas pagas</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {ciclosAnteriores.map((c) => {
+                          const pagasCiclo = c.parcelas.filter((m) => m.status === "pago").length;
+                          return (
+                            <TableRow key={c.index}>
+                              <TableCell className="font-medium">{c.label}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">
+                                  {c.tipo === "original" ? "Original" : "Renovação por extensão"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {c.inicio ? fmtD(c.inicio) : "—"} — {c.fim ? fmtD(c.fim) : "—"}
+                              </TableCell>
+                              <TableCell>
+                                {c.parcelas.length > 0
+                                  ? `${pagasCiclo}/${c.parcelas.length}`
+                                  : "—"}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="px-3 py-2 text-[11px] text-muted-foreground border-t">
+                    Cada ciclo mantém sua própria contagem de 12 parcelas. O card "Pagas" acima reflete apenas o ciclo atual.
+                  </div>
+                </div>
+              ) : null}
               {contratosAnteriores.length > 0 ? (
                 <div className="rounded-md border">
                   <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
@@ -3306,8 +3444,37 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           </TableCell>
                         </TableRow>
                       ) : null}
-                      {linhasCobranca.map((m) => (
-                        <TableRow key={m.id}>
+                      {linhasCobranca.map((m) => {
+                        // Cabeçalho de ciclo antes da 1ª parcela de cada ciclo
+                        // subsequente ao original. Só aparece quando há
+                        // renovação por extensão (temCiclosMultiplos).
+                        let cicloHeader: ReactNode = null;
+                        if (temCiclosMultiplos && (m.numero_parcela ?? 0) > 0) {
+                          const ciclo = ciclos.find((c) =>
+                            c.parcelas.some((p) => p.id === m.id),
+                          );
+                          if (ciclo && ciclo.index > 0 && ciclo.parcelas[0]?.id === m.id) {
+                            cicloHeader = (
+                              <TableRow key={`hdr-${ciclo.index}`} className="bg-muted/40">
+                                <TableCell colSpan={6} className="text-xs font-semibold py-2">
+                                  {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a {ciclo.fim ? fmtD(ciclo.fim) : "—"}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          } else if (ciclo && ciclo.index === 0 && ciclo.parcelas[0]?.id === m.id) {
+                            cicloHeader = (
+                              <TableRow key={`hdr-${ciclo.index}`} className="bg-muted/40">
+                                <TableCell colSpan={6} className="text-xs font-semibold py-2">
+                                  {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a {ciclo.fim ? fmtD(ciclo.fim) : "—"}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          }
+                        }
+                        return (
+                        <Fragment key={m.id}>
+                        {cicloHeader}
+                        <TableRow>
                           <TableCell>
                             {isAdesao(m) ? (
                               <Badge variant="secondary">Adesão</Badge>
@@ -3454,7 +3621,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        </Fragment>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -3844,12 +4013,19 @@ h1, h2, h3 { margin: 0 0 6mm; }
               </TableHeader>
               <TableBody>
                 {(() => {
+                  const idsCicloAtual = new Set(
+                    (cicloAtual?.parcelas ?? []).map((p) => p.id),
+                  );
                   const list =
                     drill === "areceber"
                       ? mens.filter((m) => m.status !== "pago")
-                      : drill === "pagas" || drill === "recebido"
-                        ? mens.filter((m) => m.status === "pago")
-                        : mens;
+                      : drill === "pagas"
+                        ? (temCiclosMultiplos
+                            ? mens.filter((m) => m.status === "pago" && idsCicloAtual.has(m.id))
+                            : mens.filter((m) => m.status === "pago"))
+                        : drill === "recebido"
+                          ? mens.filter((m) => m.status === "pago")
+                          : mens;
                   if (list.length === 0) {
                     return (
                       <TableRow>
