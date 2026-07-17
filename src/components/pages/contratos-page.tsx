@@ -3250,6 +3250,57 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
                 </button>
               </div>
+              {temCiclosMultiplos ? (
+                <div className="rounded-md border">
+                  <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
+                    <div className="text-sm font-medium">
+                      Ciclos anteriores deste contrato
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {ciclosAnteriores.length}{" "}
+                      {ciclosAnteriores.length === 1 ? "ciclo" : "ciclos"}
+                    </div>
+                  </div>
+                  <div className="overflow-auto max-h-64">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Ciclo</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Período</TableHead>
+                          <TableHead>Parcelas pagas</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {ciclosAnteriores.map((c) => {
+                          const pagasCiclo = c.parcelas.filter((m) => m.status === "pago").length;
+                          return (
+                            <TableRow key={c.index}>
+                              <TableCell className="font-medium">{c.label}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">
+                                  {c.tipo === "original" ? "Original" : "Renovação por extensão"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                {c.inicio ? fmtD(c.inicio) : "—"} — {c.fim ? fmtD(c.fim) : "—"}
+                              </TableCell>
+                              <TableCell>
+                                {c.parcelas.length > 0
+                                  ? `${pagasCiclo}/${c.parcelas.length}`
+                                  : "—"}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="px-3 py-2 text-[11px] text-muted-foreground border-t">
+                    Cada ciclo mantém sua própria contagem de 12 parcelas. O card "Pagas" acima reflete apenas o ciclo atual.
+                  </div>
+                </div>
+              ) : null}
               {contratosAnteriores.length > 0 ? (
                 <div className="rounded-md border">
                   <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
