@@ -27,6 +27,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { DateInputBR } from "@/components/ui/date-input-br";
+import { hojeBR, formatDatePura } from "@/lib/date-utils";
 
 const BRL = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -164,6 +166,7 @@ export function RenovarContratoDialog({
   const [faixaId, setFaixaId] = useState<string>("");
   const [confirmacaoAberta, setConfirmacaoAberta] = useState(false);
   const [erroRenovacao, setErroRenovacao] = useState<RenovacaoError | null>(null);
+  const [dataRenovacao, setDataRenovacao] = useState<string>(hojeBR());
 
   useEffect(() => {
     if (!open) return;
@@ -171,6 +174,7 @@ export function RenovarContratoDialog({
     setNovoConvenioId(convenioAtualId ?? "");
     setConfirmacaoAberta(false);
     setErroRenovacao(null);
+    setDataRenovacao(hojeBR());
 
     (async () => {
       const [{ data: conv }, { data: depsData }, { data: faixasData }] = await Promise.all([
@@ -274,6 +278,9 @@ export function RenovarContratoDialog({
   const dependentesRemovidos = deps.filter((d) => d.id !== null && !d.manter);
   const dependentesMantidos = deps.filter((d) => d.id !== null && d.manter);
 
+  const hoje = hojeBR();
+  const retroativa = !!dataRenovacao && dataRenovacao < hoje;
+
   const podeConfirmar =
     !saving &&
     !!novoConvenioId &&
@@ -350,6 +357,7 @@ export function RenovarContratoDialog({
           _observacao: observacao || null,
           _dependentes: payloadDeps,
           _valor_mensal: faixaSelecionada ? Number(faixaSelecionada.valor_mensal) : null,
+          _data_renovacao: dataRenovacao || null,
         });
         if (error) throw error;
         toast.success(
@@ -364,6 +372,7 @@ export function RenovarContratoDialog({
           _cobrar_taxa_adesao: false,
           _dependentes: payloadDeps,
           _valor_mensal: faixaSelecionada ? Number(faixaSelecionada.valor_mensal) : null,
+          _data_renovacao: dataRenovacao || null,
         });
         if (error) throw error;
         toast.success("Novo contrato criado a partir da renovação");
