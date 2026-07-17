@@ -2776,6 +2776,19 @@ h1, h2, h3 { margin: 0 0 6mm; }
       toast.error("Selecione um paciente");
       return;
     }
+    // Valida os campos da taxa quando marcada (não bloqueia a inclusão do
+    // dependente por engano do valor — mensagem clara ao operador).
+    const taxaValor = Number(String(incTaxaValor).replace(",", "."));
+    if (incCobrarTaxa) {
+      if (!Number.isFinite(taxaValor) || taxaValor <= 0) {
+        toast.error("Informe um valor válido para a taxa de inclusão.");
+        return;
+      }
+      if (!incTaxaVenc) {
+        toast.error("Informe o vencimento da taxa de inclusão.");
+        return;
+      }
+    }
     setIncSaving(true);
     const resultado = await incluirDependenteContrato({
       contratoId: contrato.id,
@@ -2783,6 +2796,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
       pacienteNome: incPaciente.nome,
       parentesco: incParentesco || null,
       tipo: incTipo,
+      taxa: incCobrarTaxa ? { valor: taxaValor, vencimento: incTaxaVenc } : null,
     });
     setIncSaving(false);
     if (!resultado.ok) {
@@ -2790,7 +2804,13 @@ h1, h2, h3 { margin: 0 0 6mm; }
       return;
     }
     const data = resultado.dependente;
-    toast.success("Dependente incluído");
+    if (resultado.taxaAviso) {
+      toast.error(resultado.taxaAviso);
+    } else if (resultado.taxa) {
+      toast.success(`Dependente incluído. Taxa de inclusão de ${BRL(Number(resultado.taxa.valor))} lançada em Mensalidades.`);
+    } else {
+      toast.success("Dependente incluído");
+    }
     setIncOpen(false);
     const novoDep: Dep = {
       id: data.id,
