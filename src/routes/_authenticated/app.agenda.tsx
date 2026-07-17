@@ -170,6 +170,12 @@ const normalizar = (s: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 
+const chaveNomeAgenda = (s: string) =>
+  normalizar(s)
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
 const isSlotLivre = (pacienteNome: string | null | undefined) => {
   const nome = normalizar(pacienteNome ?? "").trim();
   return nome === "disponivel" || nome === "bloqueio";
@@ -2458,7 +2464,7 @@ function AgendaPage() {
           // aplicado quando o usuário está com "TODOS" os profissionais.
           const alvo = filtroAgenda.slice(5);
           const nomeAg = (a.agenda_id ? agendaNomePorId.get(a.agenda_id) : "") ?? "";
-          if (nomeAg.trim().toUpperCase() !== alvo && !a.atendimento_grupo_id) return false;
+          if (chaveNomeAgenda(nomeAg) !== alvo && !a.atendimento_grupo_id) return false;
         } else {
           if (a.agenda_id !== filtroAgenda && !a.atendimento_grupo_id) return false;
         }
@@ -2477,6 +2483,7 @@ function AgendaPage() {
     filtroEspecialidade,
     filtroAgenda,
     filtroApenasMultiplo,
+    agendaNomePorId,
     medicoEspec,
     fichaPorId,
   ]);
@@ -6445,19 +6452,17 @@ function AgendaPage() {
                   // Quando é "TODOS", agrupamos por NOME (ex.: "AGENDA",
                   // "CONSULTAS") para não repetir a mesma opção uma vez
                   // por médico.
-                  if (filtroMedico !== "todos") {
-                    const arr = agendasPorMedico.get(filtroMedico) ?? [];
-                    return arr.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
-                    ));
-                  }
+                  const agendasFiltro =
+                    filtroMedico !== "todos"
+                      ? (agendasPorMedico.get(filtroMedico) ?? [])
+                      : Array.from(agendasPorMedico.values()).flat();
                   const seen = new Set<string>();
                   const out: { key: string; nome: string }[] = [];
-                  for (const a of Array.from(agendasPorMedico.values()).flat()) {
-                    const k = (a.nome ?? "").trim().toUpperCase();
+                  for (const a of agendasFiltro) {
+                    const k = chaveNomeAgenda(a.nome ?? "");
                     if (!k || seen.has(k)) continue;
                     seen.add(k);
-                    out.push({ key: k, nome: a.nome });
+                    out.push({ key: k, nome: (a.nome ?? "").trim() });
                   }
                   return out.map((o) => (
                     <SelectItem key={`nome:${o.key}`} value={`nome:${o.key}`}>{o.nome}</SelectItem>
