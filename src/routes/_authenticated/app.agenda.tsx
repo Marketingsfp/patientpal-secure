@@ -67,6 +67,7 @@ import {
   Undo2,
   CheckCircle2,
   User,
+  Camera,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
