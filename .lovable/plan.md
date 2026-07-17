@@ -1,39 +1,42 @@
-## Objetivo
-Quando o check-in for feito na tela do **Totem** (autoatendimento), registrar isso no histórico do agendamento, para que o time consiga distinguir de um check-in feito manualmente pela recepção.
+## Renovação de Contrato de Convênio
 
-## Situação atual (verificado)
-- O totem chama duas RPCs anônimas: `totem_checkin_cpf` e `totem_checkin_paciente`. Ambas só fazem `UPDATE agendamentos SET fluxo_etapa='recepcao', fluxo_atualizado_em=now()` — sem nenhum marcador de origem.
-- A RPC `checkin_agendamento(_token)` (link/QR do comprovante) faz o mesmo update, também sem marcar origem.
-- A aba **Histórico** do agendamento (`src/routes/_authenticated/app.agenda.tsx`, por volta da linha 1367) já lê a tabela `agendamento_historico_notas` e mostra as entradas em ordem cronológica junto com o audit_log. Ou seja, basta gravar uma nota do sistema para aparecer automaticamente no histórico.
-- Hoje, no audit_log, o UPDATE feito pela RPC do totem aparece como uma alteração genérica de `fluxo_etapa` sem autor — indistinguível de outras alterações.
+### Comportamento
 
-## Mudanças propostas
+- Botão vermelho **"RENOVAR CONTRATO"** aparece no cabeçalho do contrato **somente quando todas as 12 parcelas de mensalidade estão pagas** (taxa de adesão e taxas de inclusão não contam).
+- Ao clicar, abre diálogo de confirmação com dois caminhos:
+  1. **Renovar mesmo plano** → estende o contrato atual, gerando parcelas 13–24 com o **valor atual do convênio** (buscado do cadastro `cb_convenios`), mantendo dependentes e configuração.
+  2. **Alterar convênio** → abre wizard reduzido para escolher novo convênio; encerra o atual (marca `renovado_em`) e cria **novo contrato** vinculado por `contrato_origem_id`.
+- Confirmação final antes de gravar, mostrando: novo período, novo valor mensal, nº de parcelas geradas e se haverá taxa (renovação não cobra taxa de adesão por padrão).
 
-### 1. Migração (banco)
-Atualizar as três RPCs de check-in via SECURITY DEFINER para inserirem uma linha em `agendamento_historico_notas` marcando a origem:
+### Histórico
 
-- `totem_checkin_cpf` → nota: **"Check-in realizado pelo Totem (CPF)"**, `user_nome='Totem'`, `user_email=null`.
-- `totem_checkin_paciente` → nota: **"Check-in realizado pelo Totem (reconhecimento facial)"**, `user_nome='Totem'`.
-- `checkin_agendamento` (link/QR do comprovante) → nota: **"Check-in realizado pelo link do comprovante"**, `user_nome='Autoatendimento'`.
+Nova tabela `contrato_renovacoes` registrando cada renovação:
+- `contrato_id` (origem), `contrato_novo_id` (quando trocou de plano, senão null)
+- `tipo`: `extensao` | `troca_plano`
+- `convenio_anterior_id`, `convenio_novo_id`
+- `valor_anterior`, `valor_novo`
+- `parcelas_geradas` (int), `periodo_inicio`, `periodo_fim`
+- `usuario_id`, `created_at`, `observacao`
 
-A inserção só ocorre quando o check-in efetivamente move o fluxo para `recepcao` (não repetir se o paciente já estava em triagem/atendimento).
+Exibido em nova aba/seção **"Histórico de renovações"** dentro do contrato.
 
-Nenhuma alteração de schema é necessária — a tabela `agendamento_historico_notas` já existe e comporta esse tipo de registro.
+### Técnico
 
-### 2. Frontend
-Na aba Histórico do agendamento (`app.agenda.tsx`) o bloco de notas já renderiza `user_nome` + `texto` + `created_at`, então o registro aparecerá automaticamente. Ajuste mínimo: destacar visualmente (badge cinza "Totem" / "Autoatendimento") quando `user_email IS NULL` e `user_nome IN ('Totem','Autoatendimento')`, para o time bater o olho e reconhecer.
+1. **Migration**
+   - `contrato_renovacoes` (com GRANTs + RLS por `clinica_id`).
+   - `contratos_assinatura`: adicionar `contrato_origem_id uuid`, `renovado_em timestamptz`, `numero_renovacoes int default 0`.
+2. **RPC `renovar_contrato`** (`extensao`): valida 12/12 pagas, busca valor atual do convênio, insere 12 novas `contrato_mensalidades` com `numero_parcela = 13..24`, atualiza `data_termino` do contrato, grava `contrato_renovacoes`, registra `audit_log`.
+3. **RPC `renovar_contrato_trocando_plano`** (`troca_plano`): cria novo contrato (reaproveitando dependentes conforme escolha), encerra atual, grava histórico.
+4. **Frontend** em `contratos-page.tsx`:
+   - Helper `podeRenovar(contrato, mensalidades)` — 12 parcelas de mensalidade com status pago.
+   - Botão vermelho no header do contrato quando `podeRenovar`.
+   - `RenovarContratoDialog` com as duas opções.
+   - Aba "Histórico de renovações" listando registros de `contrato_renovacoes`.
 
-## Fora do escopo
-- Não vou alterar a lógica do totem em si, nem o layout da tela do totem.
-- Não vou renomear ou adicionar colunas em `agendamentos`.
-- Não vou mexer em outras telas de histórico (financeiro, prontuário) — o pedido é sobre o histórico do agendamento na Agenda.
+### Fora de escopo
 
-## Riscos
-- Baixo. As RPCs continuam com o mesmo retorno; só acrescentam um INSERT em `agendamento_historico_notas`. Se o INSERT falhar por RLS/policy, a RPC precisa continuar concluindo o check-in — vou envolver o INSERT em `BEGIN ... EXCEPTION WHEN OTHERS THEN NULL; END;` para não quebrar o fluxo do paciente no totem.
+- Notificação/lembrete automático ao paciente.
+- Recalcular taxa de adesão na renovação (não cobra por padrão; pode ser adicionado depois se necessário).
+- Renovação parcial (só alguns dependentes).
 
-## Validação
-- Teste manual: abrir `/totem`, fazer check-in por CPF de um agendamento de teste, abrir a tela do agendamento na Agenda → aba Histórico e conferir a nota "Check-in realizado pelo Totem (CPF)".
-- Repetir para o fluxo por link (`/checkin/<token>`).
-- Conferir que um check-in feito pela recepção (fluxo manual) continua não gerando essa nota.
-
-Pendência para confirmar antes de implementar: você quer que eu inclua também o check-in via link do comprovante (`/checkin/<token>`), ou apenas o que sai do Totem físico?
+Confirme para eu executar.

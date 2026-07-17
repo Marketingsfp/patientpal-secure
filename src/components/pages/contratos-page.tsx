@@ -63,6 +63,7 @@ import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { EditarPacienteRapidoDialog } from "@/components/contratos/editar-paciente-rapido-dialog";
 import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
+import { RenovarContratoDialog } from "@/components/contratos/renovar-contrato-dialog";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
@@ -1807,6 +1808,8 @@ function DetalheContrato({
   const [canceladoEm, setCanceladoEm] = useState<string | null>(contrato.cancelado_em ?? null);
   const [cancelMotivoAtual, setCancelMotivoAtual] = useState<string | null>(contrato.cancelamento_motivo ?? null);
   const cancelado = !!canceladoEm;
+  // Renovação do contrato
+  const [renovarOpen, setRenovarOpen] = useState(false);
   // Valor mensal vigente (atualizado quando recalculamos as parcelas em aberto)
   const [valorMensalAtual, setValorMensalAtual] = useState<number>(Number(contrato.valor_mensal));
   useEffect(() => {
@@ -2963,9 +2966,27 @@ h1, h2, h3 { margin: 0 0 6mm; }
         </h1>
         <div>
           {!cancelado && podeEscrever ? (
-            <Button size="sm" variant="destructive" onClick={() => setCancelOpen(true)}>
-              <Ban className="h-4 w-4 mr-1" /> Cancelar contrato
-            </Button>
+            <div className="flex items-center gap-2">
+              {(() => {
+                const parcelasMensais = mens.filter((m) => !isEncargoAvulso(m));
+                const podeRenovar =
+                  parcelasMensais.length > 0 &&
+                  parcelasMensais.every((m) => m.status === "pago");
+                if (!podeRenovar) return null;
+                return (
+                  <Button
+                    size="sm"
+                    onClick={() => setRenovarOpen(true)}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-1" /> RENOVAÇÃO
+                  </Button>
+                );
+              })()}
+              <Button size="sm" variant="destructive" onClick={() => setCancelOpen(true)}>
+                <Ban className="h-4 w-4 mr-1" /> Cancelar contrato
+              </Button>
+            </div>
           ) : (
             <div className="w-[160px]" />
           )}
@@ -4194,6 +4215,22 @@ h1, h2, h3 { margin: 0 0 6mm; }
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <RenovarContratoDialog
+        open={renovarOpen}
+        onOpenChange={setRenovarOpen}
+        contratoId={contrato.id}
+        clinicaId={(contrato as any).clinica_id}
+        convenioAtualId={contrato.convenio_id ?? null}
+        convenioAtualNome={convenio?.nome ?? null}
+        valorAtual={Number(contrato.valor_mensal ?? 0)}
+        onRenovado={(r) => {
+          if (r.tipo === "troca_plano" && r.contratoNovoId) {
+            onBack();
+          } else {
+            load();
+          }
+        }}
+      />
       <Dialog
         open={!!retroDialog?.open}
         onOpenChange={(o) => { if (!o && !regerandoRetro) setRetroDialog(null); }}
