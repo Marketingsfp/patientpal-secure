@@ -156,8 +156,22 @@ type Mens = {
 
 const isAdesao = (m: Pick<Mens, "numero_parcela">) => Number(m.numero_parcela) === 0;
 
+/** Taxa de inclusão de dependente: linha com numero_parcela negativo. */
+const isTaxaInclusao = (m: Pick<Mens, "numero_parcela">) => Number(m.numero_parcela) < 0;
+/** Encargo avulso: qualquer cobrança que NÃO seja uma mensalidade mensal.
+ *  Cobre a linha de adesão inicial (numero_parcela = 0) e as taxas de
+ *  inclusão de dependente (numero_parcela < 0). Todos os filtros que se
+ *  referem a "parcelas mensais" (contador N/M, recálculo por vidas,
+ *  renumeração) usam este predicado. */
+const isEncargoAvulso = (m: Pick<Mens, "numero_parcela">) =>
+  Number(m.numero_parcela) <= 0;
+
 const cobrancaLabel = (m: Pick<Mens, "numero_parcela">) =>
-  isAdesao(m) ? "Adesão" : `Mensalidade ${m.numero_parcela}`;
+  isAdesao(m)
+    ? "Adesão"
+    : isTaxaInclusao(m)
+      ? "Taxa inclusão"
+      : `Mensalidade ${m.numero_parcela}`;
 type Dep = {
   id: string;
   paciente_id: string;
