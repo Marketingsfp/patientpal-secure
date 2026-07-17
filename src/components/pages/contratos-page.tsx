@@ -242,6 +242,20 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
   const [pagina, setPagina] = useState(1);
   const POR_PAGINA = 50;
 
+  // Fluxo "É renovação?" acionado antes de abrir a nova venda.
+  const [perguntaRenovOpen, setPerguntaRenovOpen] = useState(false);
+  const [escolhaContratoOpen, setEscolhaContratoOpen] = useState(false);
+  const [pacRenov, setPacRenov] = useState<PatientOption | null>(null);
+  const [contratosPac, setContratosPac] = useState<Contrato[]>([]);
+  const [loadingContratosPac, setLoadingContratosPac] = useState(false);
+  const [renovInfo, setRenovInfo] = useState<{
+    contratoId: string;
+    clinicaId: string;
+    convenioId: string | null;
+    convenioNome: string | null;
+    valorMensal: number;
+  } | null>(null);
+
   // Termo com debounce para acionar busca server-side sem bater a cada tecla.
   const [qDebounced, setQDebounced] = useState("");
   useEffect(() => {
