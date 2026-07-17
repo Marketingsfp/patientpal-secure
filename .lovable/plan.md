@@ -1,44 +1,29 @@
-## Objetivo
+## Ajustes de layout do formulário de contrato
 
-No **Comprovante de Agendamento** (impressão térmica 80mm):
+Reorganizar os campos do formulário de contrato (usado tanto na venda de novo contrato quanto na edição de contratos existentes) em duas linhas agrupadas.
 
-1. Mostrar o **nº de prontuário** do paciente, no mesmo padrão da GR.
-2. Corrigir o disparo duplicado de `window.print()`, que abre dois pop-ups de impressão.
+### Linha 1 (4 colunas)
+- Convênio
+- Nº de pessoas no contrato
+- Valor mensal
+- Taxa de adesão
 
-## Onde muda
+### Linha 2 (3 colunas)
+- Data início
+- Data término
+- Dia de vencimento
 
-Apenas `src/lib/print-comprovante-agendamento.ts`.
+### Onde aplicar
+- `src/components/pages/contratos-page.tsx` — tanto no bloco "Novo contrato" quanto no bloco de edição de contrato existente (aba Dados).
 
-### 1. Nº de prontuário
+### Detalhes técnicos
+- Substituir os grids atuais (`grid-cols-1 md:grid-cols-2`) por:
+  - Linha 1: `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4`
+  - Linha 2: `grid grid-cols-1 md:grid-cols-3 gap-4`
+- Manter o campo "Paciente titular" + checkbox "Apenas titular financeiro" como está (linha própria já ajustada anteriormente).
+- Preservar labels, helpers (`O valor mensal é definido...`, `Calculada automaticamente...`, `Definido pela faixa...`, `Cobrança única...`), validações e handlers.
+- Sem mudança de lógica/estado; apenas reorganização visual (frontend/apresentação).
 
-- Incluir `codigo_prontuario` no `select` da tabela `pacientes` (linha ~69).
-- Adicionar o campo no tipo local do `paciente`.
-- Renderizar logo abaixo do nome / CPF, como uma linha centralizada:
-  `PRONTUÁRIO: 00001` (usando classe `sm` já existente). Só exibe quando `codigo_prontuario` estiver preenchido — mantém o comportamento de identificadores legados (leitura, nunca escrita).
-
-### 2. Pop-up duplicado
-
-Hoje `imprimirViaIframe` chama `dispararPrint` duas vezes (linhas 228–229): via `iframe.onload` **e** via `setTimeout(600)`. Em navegadores rápidos, os dois disparam e aparecem dois diálogos de impressão.
-
-Ajuste: adicionar uma flag `jaImprimiu` para garantir que `cw.print()` execute uma única vez. O `setTimeout(600)` fica só como fallback para o caso do `onload` não disparar.
-
-```
-let jaImprimiu = false;
-const dispararPrint = () => {
-  if (jaImprimiu) return;
-  jaImprimiu = true;
-  try { cw.focus(); cw.print(); } catch {}
-  setTimeout(cleanup, 4000);
-};
-```
-
-## Fora de escopo
-
-- Layout geral do comprovante (fontes, separadores, orientações) permanece igual.
-- GR e demais impressões (carnê, cartão, orçamento) — nenhuma alteração.
-- Regras de negócio, banco e RLS — nada muda.
-
-## Validação
-
+### Validação
 - `tsgo --noEmit` sem erros.
-- Reagendar/agendar um paciente com `codigo_prontuario` cadastrado e imprimir o comprovante: só abre 1 diálogo e o campo `PRONTUÁRIO: xxxxx` aparece abaixo do CPF.
+- Verificar responsividade: em telas menores as colunas colapsam para 1 coluna; em `md` intermediário Linha 1 fica em 2 colunas.
