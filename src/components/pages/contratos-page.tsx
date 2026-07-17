@@ -4013,12 +4013,19 @@ h1, h2, h3 { margin: 0 0 6mm; }
               </TableHeader>
               <TableBody>
                 {(() => {
+                  const idsCicloAtual = new Set(
+                    (cicloAtual?.parcelas ?? []).map((p) => p.id),
+                  );
                   const list =
                     drill === "areceber"
                       ? mens.filter((m) => m.status !== "pago")
-                      : drill === "pagas" || drill === "recebido"
-                        ? mens.filter((m) => m.status === "pago")
-                        : mens;
+                      : drill === "pagas"
+                        ? (temCiclosMultiplos
+                            ? mens.filter((m) => m.status === "pago" && idsCicloAtual.has(m.id))
+                            : mens.filter((m) => m.status === "pago"))
+                        : drill === "recebido"
+                          ? mens.filter((m) => m.status === "pago")
+                          : mens;
                   if (list.length === 0) {
                     return (
                       <TableRow>
