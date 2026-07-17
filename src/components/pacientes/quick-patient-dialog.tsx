@@ -17,6 +17,8 @@ import {
 import type { PatientOption } from "@/components/patient-search-input";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
+import { Camera, CheckCircle2 } from "lucide-react";
 interface QuickPatientDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -43,6 +45,8 @@ export function QuickPatientDialog({
   const [telefone, setTelefone] = useState("");
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
+  const [faceOpen, setFaceOpen] = useState(false);
+  const [descritor, setDescritor] = useState<number[] | null>(null);
 
   // Reset ao abrir e pré-preenche com o texto digitado na busca.
   useEffect(() => {
@@ -52,6 +56,7 @@ export function QuickPatientDialog({
       setDataNasc("");
       setTelefone("");
       setEmail("");
+      setDescritor(null);
     }
   }, [open, nomeInicial]);
 
@@ -92,6 +97,19 @@ export function QuickPatientDialog({
         .select("id, nome, cpf, telefone, data_nascimento, clinica_id, email")
         .single();
       if (error) throw error;
+
+      if (descritor) {
+        const { error: bioErr } = await supabase.from("paciente_biometria").insert({
+          paciente_id: data.id,
+          clinica_id: clinicaId,
+          descriptor: descritor as unknown as never,
+          consentimento_em: new Date().toISOString(),
+        });
+        if (bioErr) {
+          console.error(bioErr);
+          toast.warning("Paciente salvo, mas a foto não foi registrada.");
+        }
+      }
 
       const p: PatientOption = {
         id: data.id,
@@ -164,6 +182,33 @@ export function QuickPatientDialog({
               />
             </div>
           </div>
+          <div className="flex items-center gap-2 pt-1">
+            <Button
+              type="button"
+              variant={descritor ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setFaceOpen(true)}
+            >
+              {descritor ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-1 text-green-600" /> Foto capturada — refazer
+                </>
+              ) : (
+                <>
+                  <Camera className="h-4 w-4 mr-1" /> Tirar foto (reconhecimento facial)
+                </>
+              )}
+            </Button>
+            {descritor && (
+              <button
+                type="button"
+                className="text-xs text-muted-foreground underline"
+                onClick={() => setDescritor(null)}
+              >
+                remover
+              </button>
+            )}
+          </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancelar
@@ -173,6 +218,15 @@ export function QuickPatientDialog({
             </Button>
           </DialogFooter>
         </form>
+        <FaceCaptureDialog
+          open={faceOpen}
+          onClose={() => setFaceOpen(false)}
+          onCaptured={(desc) => {
+            setDescritor(desc);
+            toast.success("Foto capturada. Será vinculada ao cadastrar.");
+          }}
+          titulo="Cadastrar rosto do paciente"
+        />
       </DialogContent>
     </Dialog>
   );
