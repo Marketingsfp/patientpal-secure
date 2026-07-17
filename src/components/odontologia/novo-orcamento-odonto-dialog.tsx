@@ -340,8 +340,8 @@ export function NovoOrcamentoOdontoDialog({
                         onChange={(e) => atualizarItem(idx, "quantidade", Number(e.target.value))}
                       />
                       <CurrencyInput
-                        value={it.valor_unitario}
-                        onValueChange={(v) => atualizarItem(idx, "valor_unitario", v)}
+                        value={it.valor_unitario ? it.valor_unitario.toFixed(2) : ""}
+                        onChange={(v) => atualizarItem(idx, "valor_unitario", v === "" ? 0 : Number(v))}
                       />
                     </div>
                     <Button type="button" variant="ghost" size="icon" onClick={() => remover(idx)}>
@@ -362,7 +362,10 @@ export function NovoOrcamentoOdontoDialog({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label>Desconto</Label>
-              <CurrencyInput value={desconto} onValueChange={setDesconto} />
+              <CurrencyInput
+                value={desconto ? desconto.toFixed(2) : ""}
+                onChange={(v) => setDesconto(v === "" ? 0 : Number(v))}
+              />
             </div>
             <div className="space-y-1">
               <Label>Validade (dias)</Label>
