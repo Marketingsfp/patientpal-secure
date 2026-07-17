@@ -8589,14 +8589,25 @@ export type Database = {
         Args: { _contrato_id: string; _observacao?: string }
         Returns: Json
       }
-      renovar_contrato_troca_plano: {
-        Args: {
-          _contrato_id: string
-          _convenio_novo_id: string
-          _observacao?: string
-        }
-        Returns: Json
-      }
+      renovar_contrato_troca_plano:
+        | {
+            Args: {
+              _contrato_id: string
+              _convenio_novo_id: string
+              _observacao?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _cobrar_taxa_adesao?: boolean
+              _contrato_id: string
+              _convenio_novo_id: string
+              _dependentes_manter?: string[]
+              _observacao?: string
+            }
+            Returns: Json
+          }
       resolver_clinica_por_token: {
         Args: { _token: string }
         Returns: {
