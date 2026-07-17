@@ -6,6 +6,7 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { EncerrarExpedienteButton } from "@/components/medicos/EncerrarExpedienteButton";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1466,7 +1467,7 @@ function AgendaPage() {
   const loadReqId = useRef(0);
   // Aponta sempre para o `load` mais recente — usado pelo handler realtime
   // para não cair em stale closure (ver comentário na assinatura realtime).
-  const loadFnRef = useRef<() => void>(() => {});
+  const loadFnRef = useRef<() => void>(() => { });
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -2900,7 +2901,7 @@ function AgendaPage() {
     if (livres.length < fontes.length) {
       toast.error(
         `Não há horários livres suficientes a partir da ficha ${String(fichaInicial).padStart(3, "0")} ` +
-          `(precisa de ${fontes.length}, encontrou ${livres.length}).`,
+        `(precisa de ${fontes.length}, encontrou ${livres.length}).`,
       );
       return;
     }
@@ -3825,13 +3826,13 @@ function AgendaPage() {
         a.tipo_atendimento === "particular"
           ? Promise.resolve(null)
           : obterInfoConvenioPaciente({
-              clinicaId: clinicaAtual.clinica_id,
-              pacienteId: a.paciente_id,
-              medicoId: a.medico_id,
-              procedimentoNome: a.procedimento ?? "",
-              agendamentoId: a.id,
-              dataRef: a.inicio ?? null,
-            }),
+            clinicaId: clinicaAtual.clinica_id,
+            pacienteId: a.paciente_id,
+            medicoId: a.medico_id,
+            procedimentoNome: a.procedimento ?? "",
+            agendamentoId: a.id,
+            dataRef: a.inicio ?? null,
+          }),
       ]);
       if ((jaPagos ?? []).length > 0) {
         toast.info("Este agendamento já foi pago.");
@@ -3965,13 +3966,13 @@ function AgendaPage() {
           },
           p_movimento: user?.id
             ? {
-                user_id: user.id,
-                user_nome: nomeUsuario,
-                tipo: "recebimento",
-                valor: 0,
-                descricao: desc,
-                forma_pagamento: isGrat ? "convenio_gratuidade" : "sem_cobranca",
-              }
+              user_id: user.id,
+              user_nome: nomeUsuario,
+              tipo: "recebimento",
+              valor: 0,
+              descricao: desc,
+              forma_pagamento: isGrat ? "convenio_gratuidade" : "sem_cobranca",
+            }
             : null,
         });
         if (errRpc) {
@@ -4314,11 +4315,11 @@ function AgendaPage() {
       // quando o lançamento não tem forma preenchida).
       let pagamentoInfo:
         | {
-            valor: number;
-            forma_pagamento: string | null;
-            parcelas: number | null;
-            bandeira_cartao: string | null;
-          }
+          valor: number;
+          forma_pagamento: string | null;
+          parcelas: number | null;
+          bandeira_cartao: string | null;
+        }
         | undefined;
       try {
         const { data: lancs } = await supabase
@@ -4705,22 +4706,22 @@ function AgendaPage() {
                           value={
                             form.paciente_id
                               ? {
-                                  id: form.paciente_id,
+                                id: form.paciente_id,
+                                nome: form.paciente_nome,
+                                cpf: null,
+                                telefone: null,
+                                data_nascimento: null,
+                                clinica_id: clinicaAtual?.clinica_id ?? "",
+                              }
+                              : form.paciente_nome
+                                ? {
+                                  id: "__pendente__",
                                   nome: form.paciente_nome,
                                   cpf: null,
                                   telefone: null,
                                   data_nascimento: null,
                                   clinica_id: clinicaAtual?.clinica_id ?? "",
                                 }
-                              : form.paciente_nome
-                                ? {
-                                    id: "__pendente__",
-                                    nome: form.paciente_nome,
-                                    cpf: null,
-                                    telefone: null,
-                                    data_nascimento: null,
-                                    clinica_id: clinicaAtual?.clinica_id ?? "",
-                                  }
                                 : null
                           }
                           onSelect={(p) => {
@@ -4924,8 +4925,8 @@ function AgendaPage() {
                     <Label className="text-xs font-semibold text-slate-700">Serviço</Label>
                     {form.medico_id ? (
                       procOpcoesPorMedico.get(form.medico_id)?.length ||
-                      procPorMedico.get(form.medico_id)?.size ||
-                      procNomesPorMedico.get(form.medico_id)?.size ? (
+                        procPorMedico.get(form.medico_id)?.size ||
+                        procNomesPorMedico.get(form.medico_id)?.size ? (
                         <p className="text-[11px] text-slate-500">
                           Mostrando apenas serviços configurados para este médico.
                         </p>
@@ -6395,64 +6396,54 @@ function AgendaPage() {
         className="rounded-2xl border bg-card p-3 shadow-sm mb-10 [&_input]:h-8 [&_input]:text-xs [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:text-xs"
         style={{ ["--clinic" as never]: corClinica }}
       >
-        {/* Filtros em 2 linhas de 4 colunas */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+        {/* Linha 1: Filtros principais */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5">
+
           {/* Profissional */}
           <div className="space-y-0">
             <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
               value={filtroMedico}
-              onChange={(v) => {
-                if (!isMedicoOnly) {
-                  setFiltroMedico(v);
-                  setFiltroAgenda("todos");
-                }
-              }}
+              onChange={(v) => { if (!isMedicoOnly) { setFiltroMedico(v); setFiltroAgenda("todos"); } }}
               disabled={isMedicoOnly}
               onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
               compact
             />
           </div>
 
-          {/* Agenda */}
+          {/* Tipo de Agenda */}
           <div className="space-y-0">
             <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Tipo de agenda</Label>
-            {(() => {
-              let ags: { id: string; nome: string }[];
-              if (filtroMedico !== "todos") {
-                ags = agendasPorMedico.get(filtroMedico) ?? [];
-              } else {
-                const seen = new Set<string>();
-                ags = [];
-                for (const lista of agendasPorMedico.values()) {
-                  for (const a of lista) {
-                    if (!seen.has(a.id)) {
-                      seen.add(a.id);
-                      ags.push(a);
-                    }
-                  }
-                }
-                ags.sort((a, b) => a.nome.localeCompare(b.nome));
-              }
-              const unica = ags.length <= 1;
-              const semProfissional = filtroMedico === "todos";
-              return (
-                <Select value={filtroAgenda} onValueChange={setFiltroAgenda} disabled={unica || semProfissional}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder={semProfissional ? "Selecione" : (ags[0]?.nome ?? "—")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">TODAS</SelectItem>
-                    {ags.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              );
-            })()}
+            <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
+              <SelectTrigger className="h-8 text-xs w-full">
+                <SelectValue placeholder="TODAS" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">TODAS</SelectItem>
+                {Array.from(agendasPorMedico.values()).flat().map((a) => (
+                  <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Situação */}
+          <div className="space-y-0">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Situação</Label>
+            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+              <SelectTrigger className="h-8 text-xs w-full">
+                <SelectValue placeholder="TODOS" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">TODOS</SelectItem>
+                <SelectItem value="livres">Livres</SelectItem>
+                <SelectItem value="pago">Pago</SelectItem>
+                {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
+                  <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Data */}
@@ -6463,106 +6454,49 @@ function AgendaPage() {
               dataFim={dataFim}
               setDataRef={setDataRef}
               setDataFim={setDataFim}
-              shiftData={shiftData}
               compact
             />
-          </div>
-
-          {/* Cliente */}
-          <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Cliente</Label>
-            <div className="flex gap-1">
-              <Input
-                data-quick-search
-                value={filtroCliente}
-                onChange={(e) => setFiltroCliente(e.target.value)}
-                placeholder="Nome ou CPF…"
-                className="h-8 text-xs flex-1"
-              />
-              {podeEscrever && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  title="Cadastrar paciente rápido"
-                  onClick={() => {
-                    setNovoPac({ nome: filtroCliente.trim(), cpf: "", telefone: "", data_nascimento: "", email: "" });
-                    setNovoPacOpen(true);
-                  }}
-                  className="h-8 w-8 shrink-0"
-                >
-                  <UserPlus className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Nº Ficha */}
-          <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Nº Ficha</Label>
-            <Input
-              value={filtroFicha}
-              onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))}
-              placeholder="001"
-              inputMode="numeric"
-              className="h-8 text-xs"
-            />
-          </div>
-
-          {/* Situação */}
-          <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Situação</Label>
-            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">TODOS</SelectItem>
-                <SelectItem value="livres">Livres</SelectItem>
-                <SelectItem value="pago">Pago</SelectItem>
-                {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {STATUS_LABEL[s]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Especialidade */}
           <div className="space-y-0">
             <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
+              <SelectTrigger className="h-8 text-xs w-full">
+                <SelectValue placeholder="TODOS" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">TODOS</SelectItem>
-                {especialidades.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.nome}
-                  </SelectItem>
-                ))}
+                {especialidades.map(e => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Ações rápidas */}
-          <div className="space-y-0 flex items-end gap-1">
-            <Button size="sm" onClick={load} className="h-8 text-xs flex-1 bg-primary hover:bg-primary/90">
-              <Search className="h-3 w-3 mr-1" /> Exibir
-            </Button>
-            <Button variant="outline" size="sm" onClick={limparFiltros} className="h-8 text-xs">
-              <X className="h-3 w-3" />
-            </Button>
+          {/* Cliente + Ações rápidas juntos */}
+          <div className="space-y-0">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Cliente</Label>
+            <div className="flex items-center gap-1">
+              <Input
+                value={filtroCliente}
+                onChange={(e) => setFiltroCliente(e.target.value)}
+                placeholder="Nome ou CPF..."
+                className="h-8 text-xs flex-1 min-w-0"
+              />
+              <Button size="sm" onClick={load} className="h-8 px-2.5 bg-primary hover:bg-primary/90 shrink-0">
+                <Search className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={limparFiltros} className="h-8 w-8 p-0 shrink-0">
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
         {/* Toggle "apenas a data selecionada" — alinhado à esquerda do cabeçalho da tabela abaixo */}
-        <label className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500 cursor-pointer select-none w-fit">
+        <label className="mt-2 flex items-center gap-2 text-[12px] text-slate-600 cursor-pointer select-none w-fit hover:text-slate-900 transition-colors">
           <Checkbox
             checked={apenasData}
             onCheckedChange={(v) => setApenasData(v === true)}
-            className="h-3 w-3"
+            className="h-4 w-4 rounded border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
           />
           Exibir apenas a data selecionada
         </label>
@@ -6818,11 +6752,10 @@ function AgendaPage() {
                                 return `Pago • ${v}`;
                               })()}
                               onClick={() => cobrarAgendamento(a)}
-                              className={`h-7 w-7 rounded-md border-2 ${
-                                pagosSet.has(a.id)
-                                  ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                                  : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
-                              }`}
+                              className={`h-7 w-7 rounded-md border-2 ${pagosSet.has(a.id)
+                                ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
+                                }`}
                             >
                               <DollarSign className="h-3.5 w-3.5" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
                             </Button>
@@ -6841,11 +6774,10 @@ function AgendaPage() {
                                   size="icon"
                                   title={emitida ? `NFS-e ${nf?.numero ?? ""}` : "Emitir NFS-e"}
                                   onClick={() => verOuEmitirNota(a)}
-                                  className={`h-7 w-7 rounded-md border-2 ${
-                                    emitida
-                                      ? "border-sky-400 bg-sky-50 text-sky-600 hover:bg-sky-100"
-                                      : "border-sky-200 text-sky-400 hover:border-sky-400 hover:bg-sky-50"
-                                  }`}
+                                  className={`h-7 w-7 rounded-md border-2 ${emitida
+                                    ? "border-sky-400 bg-sky-50 text-sky-600 hover:bg-sky-100"
+                                    : "border-sky-200 text-sky-400 hover:border-sky-400 hover:bg-sky-50"
+                                    }`}
                                 >
                                   <FileText className="h-3.5 w-3.5" strokeWidth={emitida ? 3 : 2.5} />
                                 </Button>
@@ -7469,9 +7401,8 @@ function FragmentDayCell({
             type="button"
             onClick={() => (ehLivre ? onSlotClick(ag) : ocultarPaciente ? undefined : onAgClick(ag))}
             disabled={ocultarPaciente}
-            className={`w-full text-left rounded-md px-2 py-1.5 text-xs leading-tight truncate hover:brightness-95 transition ${
-              estornoPend ? "bg-rose-100 text-rose-800 border border-rose-300" : corStatus(ag.status)
-            } ${ocultarPaciente ? "cursor-not-allowed opacity-90" : ""}`}
+            className={`w-full text-left rounded-md px-2 py-1.5 text-xs leading-tight truncate hover:brightness-95 transition ${estornoPend ? "bg-rose-100 text-rose-800 border border-rose-300" : corStatus(ag.status)
+              } ${ocultarPaciente ? "cursor-not-allowed opacity-90" : ""}`}
             title={
               estornoPend
                 ? "Estorno solicitado — aguardando decisão do financeiro"
@@ -7491,14 +7422,12 @@ function DataRefField({
   dataFim,
   setDataRef,
   setDataFim,
-  shiftData,
   compact,
 }: {
   dataRef: string;
   dataFim: string | null;
   setDataRef: (v: string) => void;
   setDataFim: (v: string | null) => void;
-  shiftData: (delta: number) => void;
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -7511,6 +7440,8 @@ function DataRefField({
     while (d.getDay() === 0) d.setDate(d.getDate() + 1);
     return d;
   };
+
+  // 🔥 AGORA SEMPRE MOSTRA O ANO
   const fmt = (s: string) => {
     const d = new Date(`${s}T12:00:00`);
     return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
@@ -7520,25 +7451,44 @@ function DataRefField({
 
   return (
     <div className="flex gap-1">
-      {/* SETAS REMOVIDAS */}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="flex-1 justify-start font-normal h-8 text-xs">
-            <CalendarDays className="h-3.5 w-3.5 mr-1.5" /> {label}
+          <Button
+            variant="outline"
+            className={cn(
+              "font-normal transition-all",
+              compact
+                ? "h-7 text-[13px] px-2 min-w-[130px] w-full justify-center border border-slate-300/60 hover:border-slate-400 hover:bg-slate-50/50"
+                : "h-8 text-xs flex-1 justify-start border-slate-200 hover:border-slate-300 hover:bg-slate-50/50"
+            )}
+          >
+            <CalendarDays className={cn("h-3.5 w-3.5", compact ? "mr-1" : "mr-1.5")} />
+            {label}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <div className="flex items-center gap-1 p-2 border-b">
-            <Button size="sm" variant={mode === "single" ? "default" : "outline"} onClick={() => setMode("single")}>
+            <Button
+              size="sm"
+              variant={mode === "single" ? "default" : "outline"}
+              onClick={() => setMode("single")}
+              className={compact ? "h-7 text-xs" : ""}
+            >
               Dia
             </Button>
-            <Button size="sm" variant={mode === "range" ? "default" : "outline"} onClick={() => setMode("range")}>
+            <Button
+              size="sm"
+              variant={mode === "range" ? "default" : "outline"}
+              onClick={() => setMode("range")}
+              className={compact ? "h-7 text-xs" : ""}
+            >
               Período
             </Button>
             <span className="flex-1" />
             <Button
               size="sm"
               variant="ghost"
+              className={compact ? "h-7 text-xs" : ""}
               onClick={() => {
                 setDataRef(toIso(proxDiaUtil()));
                 setDataFim(null);
@@ -7551,6 +7501,7 @@ function DataRefField({
             <Button
               size="sm"
               variant="ghost"
+              className={compact ? "h-7 text-xs" : ""}
               onClick={() => {
                 setDataRef(toIso(proxDiaUtil()));
                 setDataFim(null);
@@ -7570,7 +7521,7 @@ function DataRefField({
                 setDataFim(null);
                 setOpen(false);
               }}
-              className="p-3 pointer-events-auto"
+              className={cn("pointer-events-auto", compact ? "p-2" : "p-3")}
             />
           ) : (
             <Calendar
@@ -7584,8 +7535,8 @@ function DataRefField({
                 setDataRef(toIso(r.from));
                 setDataFim(r.to ? toIso(r.to) : null);
               }}
-              numberOfMonths={2}
-              className="p-3 pointer-events-auto"
+              numberOfMonths={compact ? 1 : 2}
+              className={cn("pointer-events-auto", compact ? "p-2" : "p-3")}
             />
           )}
         </PopoverContent>
