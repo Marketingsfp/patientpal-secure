@@ -2966,9 +2966,27 @@ h1, h2, h3 { margin: 0 0 6mm; }
         </h1>
         <div>
           {!cancelado && podeEscrever ? (
-            <Button size="sm" variant="destructive" onClick={() => setCancelOpen(true)}>
-              <Ban className="h-4 w-4 mr-1" /> Cancelar contrato
-            </Button>
+            <div className="flex items-center gap-2">
+              {(() => {
+                const parcelasMensais = mens.filter((m) => !isEncargoAvulso(m));
+                const podeRenovar =
+                  parcelasMensais.length > 0 &&
+                  parcelasMensais.every((m) => m.status === "pago");
+                if (!podeRenovar) return null;
+                return (
+                  <Button
+                    size="sm"
+                    onClick={() => setRenovarOpen(true)}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-1" /> RENOVAÇÃO
+                  </Button>
+                );
+              })()}
+              <Button size="sm" variant="destructive" onClick={() => setCancelOpen(true)}>
+                <Ban className="h-4 w-4 mr-1" /> Cancelar contrato
+              </Button>
+            </div>
           ) : (
             <div className="w-[160px]" />
           )}
