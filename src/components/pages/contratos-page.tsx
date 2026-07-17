@@ -2600,7 +2600,7 @@ function DetalheContrato({
     toast.success("Link de assinatura copiado");
   };
 
-  const mensalidades = mens.filter((m) => !isAdesao(m));
+  const mensalidades = mens.filter((m) => !isEncargoAvulso(m));
   const pagas = mensalidades.filter((m) => m.status === "pago").length;
   const totalPagoMens = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
   const totalPago = totalPagoMens + extraRecebido.total;
