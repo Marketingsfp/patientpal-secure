@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { RefreshCw, Loader2, Plus, X, UserRound } from "lucide-react";
+import { AlertTriangle, CheckCircle2, RefreshCw, Loader2, Plus, X, UserRound } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +11,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -77,6 +87,60 @@ interface Props {
   onRenovado: (result: { tipo: Mode; contratoNovoId?: string | null }) => void;
 }
 
+type RenovacaoError = {
+  codigo: string;
+  titulo: string;
+  orientacao: string;
+  detalheTecnico: string;
+  identificador: string;
+};
+
+const normalizarErro = (erro: unknown): RenovacaoError => {
+  const mensagem =
+    typeof erro === "object" && erro !== null && "message" in erro
+      ? String((erro as { message?: unknown }).message ?? "")
+      : String(erro ?? "");
+  const lower = mensagem.toLowerCase();
+
+  let codigo = "RENOVACAO_ERRO_GERAL";
+  let titulo = "Não foi possível concluir a renovação";
+  let orientacao = "Revise os dados do convênio, dependentes e valores. Se persistir, informe a identificação abaixo para localizar o erro.";
+
+  if (lower.includes('column "clinica_id"') && lower.includes("contrato_dependentes")) {
+    codigo = "RENOVACAO_DEPENDENTE_COLUNA";
+    titulo = "Erro ao gravar dependente";
+    orientacao = "O sistema tentou salvar um campo que não faz parte do cadastro de dependentes. A renovação não foi concluída para evitar dados parciais.";
+  } else if (lower.includes('column "descricao"') && lower.includes("contrato_mensalidades")) {
+    codigo = "RENOVACAO_TAXA_DESCRICAO";
+    titulo = "Erro ao lançar taxa da renovação";
+    orientacao = "A taxa não conseguiu ser registrada na aba de mensalidades. A renovação foi interrompida antes de gerar dados incompletos.";
+  } else if (lower.includes("mensalidades") && lower.includes("pagas")) {
+    codigo = "RENOVACAO_MENSALIDADES_ABERTAS";
+    titulo = "Ainda existem mensalidades em aberto";
+    orientacao = "A renovação só é permitida quando todas as parcelas anteriores do contrato estiverem pagas.";
+  } else if (lower.includes("sem permissao") || lower.includes("permission") || lower.includes("rls")) {
+    codigo = "RENOVACAO_PERMISSAO";
+    titulo = "Usuário sem permissão para renovar";
+    orientacao = "O usuário atual não tem autorização para renovar contratos desta clínica.";
+  } else if (lower.includes("convenio") && lower.includes("invalido")) {
+    codigo = "RENOVACAO_CONVENIO_INVALIDO";
+    titulo = "Convênio da renovação inválido";
+    orientacao = "Selecione novamente o convênio da renovação e confirme se ele está ativo para esta clínica.";
+  } else if (lower.includes("contrato nao encontrado")) {
+    codigo = "RENOVACAO_CONTRATO_NAO_ENCONTRADO";
+    titulo = "Contrato não encontrado";
+    orientacao = "Atualize a tela e tente novamente. O contrato pode ter sido alterado por outro usuário.";
+  }
+
+  return {
+    codigo,
+    titulo,
+    orientacao,
+    detalheTecnico: mensagem || "Sem detalhe técnico retornado pelo backend.",
+    identificador: `${codigo}-${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`,
+  };
+};
+
 export function RenovarContratoDialog({
   open,
   onOpenChange,
@@ -96,12 +160,16 @@ export function RenovarContratoDialog({
   const [faixas, setFaixas] = useState<Faixa[]>([]);
   const [faixaId, setFaixaId] = useState<string>("");
   const [faixaTocada, setFaixaTocada] = useState(false);
+  const [confirmacaoAberta, setConfirmacaoAberta] = useState(false);
+  const [erroRenovacao, setErroRenovacao] = useState<RenovacaoError | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setObservacao("");
     setNovoConvenioId(convenioAtualId ?? "");
     setCobrarTaxa(true);
+    setConfirmacaoAberta(false);
+    setErroRenovacao(null);
 
     (async () => {
       const [{ data: conv }, { data: depsData }, { data: faixasData }] = await Promise.all([
@@ -207,6 +275,9 @@ export function RenovarContratoDialog({
     (d) => d.id === null && d.paciente_id && d.cobrar_taxa_inclusao,
   );
   const taxaInclusaoTotal = novosComTaxa.length * taxaInclusaoConvenio;
+  const dependentesNovos = deps.filter((d) => d.id === null && d.manter && d.paciente_id);
+  const dependentesRemovidos = deps.filter((d) => d.id !== null && !d.manter);
+  const dependentesMantidos = deps.filter((d) => d.id !== null && d.manter);
 
   const podeConfirmar =
     !saving &&
@@ -267,13 +338,14 @@ export function RenovarContratoDialog({
         cobrar_taxa_inclusao: d.id === null ? !!d.cobrar_taxa_inclusao : false,
       }));
 
+  const abrirConfirmacao = () => {
+    if (!podeConfirmar) return;
+    setErroRenovacao(null);
+    setConfirmacaoAberta(true);
+  };
+
   const confirmar = async () => {
     if (!podeConfirmar) return;
-    const msg =
-      mode === "extensao"
-        ? `Renovar o contrato gerando ${parcelasRenovacao} novas mensalidades de ${BRL(valorRenovacao)}${taxaInclusaoTotal > 0 ? ` + taxas de inclusão (${BRL(taxaInclusaoTotal)})` : ""}?`
-        : `Encerrar este contrato como renovado e criar um novo contrato no convênio "${novoConvenio?.nome}" com ${parcelasRenovacao} parcelas de ${BRL(valorRenovacao)}${taxaAdesaoCobrada > 0 ? ` + taxa de adesão (${BRL(taxaAdesaoCobrada)})` : ""}${taxaInclusaoTotal > 0 ? ` + taxas de inclusão (${BRL(taxaInclusaoTotal)})` : ""}?`;
-    if (!window.confirm(msg)) return;
     setSaving(true);
     try {
       const payloadDeps = buildPayloadDeps();
@@ -302,9 +374,12 @@ export function RenovarContratoDialog({
         toast.success("Novo contrato criado a partir da renovação");
         onRenovado({ tipo: "troca_plano", contratoNovoId: (data as any)?.contrato_novo_id ?? null });
       }
+      setConfirmacaoAberta(false);
       onOpenChange(false);
     } catch (e) {
-      toast.error(`Erro ao renovar: ${(e as Error).message}`);
+      const erroTratado = normalizarErro(e);
+      setErroRenovacao(erroTratado);
+      toast.error(erroTratado.titulo);
     } finally {
       setSaving(false);
     }
@@ -494,13 +569,129 @@ export function RenovarContratoDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={confirmar} disabled={!podeConfirmar} className="bg-red-600 hover:bg-red-700 text-white">
-            {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+          <Button onClick={abrirConfirmacao} disabled={!podeConfirmar} className="bg-red-600 hover:bg-red-700 text-white">
+            <RefreshCw className="h-4 w-4 mr-1" />
             Confirmar renovação
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <AlertDialog open={confirmacaoAberta} onOpenChange={(v) => !saving && setConfirmacaoAberta(v)}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+              Revisar e confirmar renovação
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Confira a identificação do contrato, dependentes e movimentos financeiros antes de concluir.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-3 text-sm">
+            <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+              <div className="flex items-center gap-2 font-medium">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                Identificação da renovação
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <span className="text-muted-foreground">Tipo</span>
+                <span className="font-medium">{mode === "extensao" ? "Renovar contrato atual" : "Criar novo contrato"}</span>
+                <span className="text-muted-foreground">Convênio anterior</span>
+                <span className="font-medium">{convenioAtualNome ?? "—"}</span>
+                <span className="text-muted-foreground">Convênio da renovação</span>
+                <span className="font-medium">{novoConvenio?.nome ?? "—"}</span>
+                <span className="text-muted-foreground">Pessoas no contrato</span>
+                <span className="font-medium">{totalPessoas}</span>
+                <span className="text-muted-foreground">Mensalidades</span>
+                <span className="font-medium">{parcelasRenovacao} × {BRL(valorRenovacao)}</span>
+              </div>
+            </div>
+
+            <div className="rounded-md border p-3 space-y-2">
+              <div className="font-medium">Dependentes</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                <ResumoDependentes titulo="Mantidos" nomes={dependentesMantidos.map((d) => d.paciente_nome)} />
+                <ResumoDependentes titulo="Incluídos" nomes={dependentesNovos.map((d) => d.paciente_nome)} destaque="text-emerald-700" />
+                <ResumoDependentes titulo="Removidos" nomes={dependentesRemovidos.map((d) => d.paciente_nome)} destaque="text-red-700" />
+              </div>
+            </div>
+
+            <div className="rounded-md border p-3 space-y-1 text-xs">
+              <div className="font-medium text-sm">Movimentos financeiros que serão gerados</div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Mensalidades</span>
+                <span className="font-mono">{parcelasRenovacao} × {BRL(valorRenovacao)}</span>
+              </div>
+              {taxaAdesaoCobrada > 0 ? (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Taxa de adesão</span>
+                  <span className="font-mono">{BRL(taxaAdesaoCobrada)}</span>
+                </div>
+              ) : null}
+              {taxaInclusaoTotal > 0 ? (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Taxa de inclusão de dependente</span>
+                  <span className="font-mono">{novosComTaxa.length} × {BRL(taxaInclusaoConvenio)} = {BRL(taxaInclusaoTotal)}</span>
+                </div>
+              ) : null}
+            </div>
+
+            {erroRenovacao ? (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-red-900 space-y-1">
+                <div className="font-semibold">{erroRenovacao.titulo}</div>
+                <p className="text-xs">{erroRenovacao.orientacao}</p>
+                <div className="text-[11px] font-mono bg-white/70 rounded px-2 py-1 break-all">
+                  Identificação: {erroRenovacao.identificador}
+                  <br />
+                  Detalhe: {erroRenovacao.detalheTecnico}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Voltar e revisar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void confirmar();
+              }}
+              disabled={saving}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+              Confirmar renovação
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
+  );
+}
+
+function ResumoDependentes({
+  titulo,
+  nomes,
+  destaque = "text-foreground",
+}: {
+  titulo: string;
+  nomes: string[];
+  destaque?: string;
+}) {
+  return (
+    <div className="rounded-md bg-muted/30 p-2 min-h-16">
+      <div className="font-medium text-muted-foreground">{titulo} ({nomes.length})</div>
+      {nomes.length > 0 ? (
+        <ul className={`mt-1 space-y-0.5 ${destaque}`}>
+          {nomes.map((nome) => (
+            <li key={`${titulo}-${nome}`} className="truncate">• {nome}</li>
+          ))}
+        </ul>
+      ) : (
+        <div className="mt-1 text-muted-foreground">Nenhum</div>
+      )}
+    </div>
   );
 }
 
