@@ -1777,6 +1777,18 @@ function DetalheContrato({
     parcelas: number;
     pagas: number;
   }>>([]);
+  // Ciclos de renovação por extensão dentro do MESMO contrato. A RPC
+  // renovar_contrato_extensao acrescenta N novas mensalidades (numero_parcela
+  // continua sequencial: 13..24, 25..36, etc.) no mesmo contrato. Para não
+  // inflar o contador N/M, separamos em ciclos.
+  const [renovacoes, setRenovacoes] = useState<Array<{
+    id: string;
+    tipo: string | null;
+    parcelas_geradas: number | null;
+    periodo_inicio: string | null;
+    periodo_fim: string | null;
+    created_at: string | null;
+  }>>([]);
   const [convenio, setConvenio] = useState<any>(null);
   const [clinica, setClinica] = useState<any>(null);
   const [pacienteFull, setPacienteFull] = useState<any>(null);
