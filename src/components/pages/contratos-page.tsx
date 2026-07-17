@@ -2621,12 +2621,17 @@ function DetalheContrato({
   useEffect(() => {
     if (!faixas.length) {
       setAdmFaixaId("");
+      admFaixaIdInicialRef.current = "";
       return;
     }
     const v = Number(valorMensalAtual);
-    const match =
-      faixas.find((f) => Number(f.valor_mensal) === v) ?? faixas[0];
-    setAdmFaixaId(match?.id ?? "");
+    // Só auto-seleciona a faixa quando há match exato com o valor_mensal.
+    // Sem match (ex.: contrato em tabela antiga cujo valor não existe mais
+    // nas faixas atuais), deixa vazio para não sugerir uma faixa incorreta.
+    const match = faixas.find((f) => Number(f.valor_mensal) === v) ?? null;
+    const id = match?.id ?? "";
+    setAdmFaixaId(id);
+    admFaixaIdInicialRef.current = id;
   }, [faixas, valorMensalAtual]);
 
   // Ao trocar o convênio na aba Dados (modo admin), recarrega as faixas de
