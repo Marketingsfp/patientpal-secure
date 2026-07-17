@@ -3884,9 +3884,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
               </TableBody>
             </Table>
           </div>
-          {(drill === "recebido" || drill === "pagas") && extraRecebido.count > 0 ? (
+          {drill === "recebido" && extraRecebido.count > 0 ? (
             <div className="text-xs text-muted-foreground">
-              + {extraRecebido.count} recebimento(s) avulso(s) totalizando {BRL(extraRecebido.total)}.
+              + {extraRecebido.count} recebimento(s) avulso(s) históricos totalizando {BRL(extraRecebido.total)}.
+              Não são parcelas deste contrato.
             </div>
           ) : null}
           <DialogFooter>
