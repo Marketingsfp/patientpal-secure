@@ -3621,7 +3621,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        </React.Fragment>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
