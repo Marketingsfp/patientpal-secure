@@ -3809,17 +3809,39 @@ h1, h2, h3 { margin: 0 0 6mm; }
         tipo="receita"
         initialDescricao={
           pagMens
-            ? `${isAdesao(pagMens) ? "Taxa de adesao" : `Mensalidade ${pagMens.numero_parcela}/${mensalidades.length}`} - Contrato #${contrato.numero} - ${contrato.paciente_nome}`
+            ? isAdesao(pagMens)
+              ? `Taxa de adesão — Contrato #${contrato.numero} — ${contrato.paciente_nome}`
+              : isTaxaInclusao(pagMens)
+                ? `Taxa de inclusão de dependente — Contrato #${contrato.numero} — ${contrato.paciente_nome}`
+                : `Mensalidade ${pagMens.numero_parcela}/${mensalidades.length} - Contrato #${contrato.numero} - ${contrato.paciente_nome}`
             : ""
         }
         initialValor={pagMens ? pagValorFinal.toFixed(2) : ""}
         initialFormaPagamento={pagInitialForma}
-        categoriaFixaNome={pagMens && isAdesao(pagMens) ? "ADESAO CARTAO CONSULTA" : "MENSALIDADE CARTAO CONSULTA"}
+        categoriaFixaNome={
+          pagMens && isAdesao(pagMens)
+            ? "TAXA DE ADESAO CARTAO"
+            : pagMens && isTaxaInclusao(pagMens)
+              ? "DEPENDENTE / ADESAO CARTAO"
+              : "MENSALIDADE CARTAO CONSULTA"
+        }
         onSavedWithData={async (dados) => {
           if (!pagMens || !clinicaAtual) return;
           const mensId = pagMens.id;
           const taxaAdesao = Number(pagMens.taxa_adesao ?? 0) || 0;
+          const ehAdesaoAvulsa = isAdesao(pagMens);
+          const ehTaxaInclusao = isTaxaInclusao(pagMens);
           await marcarPago(mensId, true, dados.forma_pagamento ?? "misto", dados.lancamento_id, dados.valor);
+          // Pagamentos avulsos da linha de adesão ou da taxa de inclusão de
+          // dependente: o próprio LancamentoDialog já gravou lançamento +
+          // movimento de caixa via RPC atômica com a categoria correta. Não
+          // há segunda cobrança nem GR de mensalidade a imprimir.
+          if (ehAdesaoAvulsa || ehTaxaInclusao) {
+            toast.success("Pagamento registrado.");
+            setPagMens(null);
+            setPagInitialForma("");
+            return;
+          }
           try {
             // Se a parcela carrega a taxa de adesão (apenas a 1ª parcela),
             // gera um lançamento financeiro separado e imprime UMA GR única
