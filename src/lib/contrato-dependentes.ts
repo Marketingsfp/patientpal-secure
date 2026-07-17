@@ -11,8 +11,15 @@ export interface DependenteIncluido {
   ativo: boolean;
 }
 
+export interface TaxaInclusaoLancada {
+  id: string;
+  numero_parcela: number;
+  valor: number;
+  vencimento: string;
+}
+
 export type IncluirDependenteResultado =
-  | { ok: true; dependente: DependenteIncluido }
+  | { ok: true; dependente: DependenteIncluido; taxa?: TaxaInclusaoLancada; taxaAviso?: string }
   | { ok: false; mensagem: string; error?: unknown };
 
 /**
@@ -29,12 +36,22 @@ export async function incluirDependenteContrato(params: {
   pacienteNome: string;
   parentesco?: string | null;
   tipo?: string;
+  /**
+   * Quando presente, cria uma cobrança avulsa de "Taxa de inclusão de
+   * dependente" em `contrato_mensalidades` (numero_parcela negativo — não
+   * conta como mensalidade). Se a taxa falhar, a inclusão do dependente
+   * já feita permanece e retornamos `taxaAviso` para o operador reagir.
+   */
+  taxa?: {
+    valor: number;
+    vencimento: string; // ISO YYYY-MM-DD
+  } | null;
 }): Promise<IncluirDependenteResultado> {
-  const { contratoId, pacienteId, pacienteNome, parentesco, tipo } = params;
+  const { contratoId, pacienteId, pacienteNome, parentesco, tipo, taxa } = params;
 
   const { data: contrato, error: eContrato } = await supabase
     .from("contratos_assinatura")
-    .select("id, paciente_id, status, convenio_id, plano_id")
+    .select("id, paciente_id, status, convenio_id, plano_id, clinica_id")
     .eq("id", contratoId)
     .maybeSingle();
   if (eContrato) return { ok: false, mensagem: "Falha ao buscar o contrato.", error: eContrato };
@@ -102,5 +119,48 @@ export async function incluirDependenteContrato(params: {
       : "Falha ao incluir dependente.";
     return { ok: false, mensagem, error };
   }
-  return { ok: true, dependente: data as unknown as DependenteIncluido };
+  const dependente = data as unknown as DependenteIncluido;
+
+  // Lançamento opcional da Taxa de inclusão de dependente. Usa
+  // numero_parcela negativo para diferenciar de mensalidades e da adesão
+  // inicial (0). O menor negativo existente decrementa em 1.
+  if (taxa && Number(taxa.valor) > 0) {
+    const { data: negs } = await supabase
+      .from("contrato_mensalidades")
+      .select("numero_parcela")
+      .eq("contrato_id", contratoId)
+      .lt("numero_parcela", 0)
+      .order("numero_parcela", { ascending: true })
+      .limit(1);
+    const menorNeg = ((negs ?? []) as Array<{ numero_parcela: number }>)[0]?.numero_parcela ?? 0;
+    const proxNeg = Math.min(menorNeg, 0) - 1;
+    const observacoes = `Taxa de inclusão de dependente — ${pacienteNome}`;
+    const { data: taxaRow, error: eTaxa } = await supabase
+      .from("contrato_mensalidades")
+      .insert({
+        contrato_id: contratoId,
+        clinica_id: (contrato as { clinica_id: string }).clinica_id,
+        numero_parcela: proxNeg,
+        vencimento: taxa.vencimento,
+        valor: Number(taxa.valor),
+        status: "pendente",
+        observacoes,
+      } as never)
+      .select("id, numero_parcela, valor, vencimento")
+      .single();
+    if (eTaxa) {
+      return {
+        ok: true,
+        dependente,
+        taxaAviso: `Dependente incluído, mas a Taxa de inclusão não foi lançada. Detalhe: ${eTaxa.message ?? String(eTaxa)}`,
+      };
+    }
+    return {
+      ok: true,
+      dependente,
+      taxa: taxaRow as unknown as TaxaInclusaoLancada,
+    };
+  }
+
+  return { ok: true, dependente };
 }
