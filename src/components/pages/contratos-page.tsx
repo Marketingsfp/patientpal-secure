@@ -2989,8 +2989,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 const podeRenovar =
                   parcelasMensais.length > 0 &&
                   parcelasMensais.every((m) => m.status === "pago");
-                if (!podeRenovar) return null;
                 const contratoJaRenovado = !!renovadoEm || (contrato as any).status === "renovado";
+                if (!podeRenovar && !contratoJaRenovado) return null;
                 if (contratoJaRenovado) {
                   const textoRenovacao = renovadoEm
                     ? `Renovado em ${fmtD(renovadoEm)}`
