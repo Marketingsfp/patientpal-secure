@@ -215,10 +215,6 @@ function EquipePage() {
               <Stethoscope className="h-4 w-4 mr-2" /> Médicos
               <Badge variant="secondary" className="ml-2">{medicosAtivosCount}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="enfermagem">
-              <HeartPulse className="h-4 w-4 mr-2" /> Enfermagem
-              <Badge variant="secondary" className="ml-2">{enfermeiros.length}</Badge>
-            </TabsTrigger>
           </TabsList>
           <Input
             placeholder="Buscar por nome, CPF ou CRM…"
