@@ -549,7 +549,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           Contratos
         </h1>
         {podeEscrever && (
-          <Button onClick={() => setView("new")} disabled={convenios.length === 0}>
+          <Button onClick={() => setPerguntaRenovOpen(true)} disabled={convenios.length === 0}>
             <Plus className="h-4 w-4 mr-2" />
             Vendas
           </Button>
