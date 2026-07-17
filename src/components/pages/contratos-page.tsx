@@ -2609,6 +2609,29 @@ function DetalheContrato({
   };
 
   const mensalidades = mens.filter((m) => !isEncargoAvulso(m));
+  // Linhas exibidas na tabela de "Mensalidades": inclui adesão (numero_parcela = 0)
+  // e taxas de inclusão (numero_parcela < 0). Ordenação: adesão primeiro, depois
+  // taxas de inclusão pela data de vencimento, e por último as parcelas mensais
+  // em ordem crescente. Os contadores N/M continuam usando apenas `mensalidades`.
+  const linhasCobranca = [...mens].sort((a, b) => {
+    const rank = (m: Mens) => (isAdesao(m) ? 0 : isTaxaInclusao(m) ? 1 : 2);
+    const ra = rank(a);
+    const rb = rank(b);
+    if (ra !== rb) return ra - rb;
+    if (ra === 2) return a.numero_parcela - b.numero_parcela;
+    return (a.vencimento || "").localeCompare(b.vencimento || "");
+  });
+  // Adesão embutida na 1ª parcela (numero_parcela = 1 com taxa_adesao > 0):
+  // enquanto essa parcela estiver pendente, a linha da adesão é cobrada junto
+  // com ela e o botão "Pagar" da linha da adesão fica oculto para evitar dupla
+  // cobrança. Se a 1ª parcela já foi paga (histórica, por exemplo) sem quitar a
+  // adesão, a linha da adesão volta a permitir pagamento avulso.
+  const primeiraParcela = mensalidades.find((m) => m.numero_parcela === 1);
+  const adesaoEmbutida = Boolean(
+    primeiraParcela &&
+      primeiraParcela.status !== "pago" &&
+      Number(primeiraParcela.taxa_adesao ?? 0) > 0,
+  );
   const pagas = mensalidades.filter((m) => m.status === "pago").length;
   const totalPagoMens = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
   const totalPago = totalPagoMens + extraRecebido.total;
@@ -3012,24 +3035,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <div className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</div>
                 </button>
               </div>
-              {Number(contrato.taxa_adesao ?? 0) > 0 ? (() => {
-                const linhaAdesao = mens.find((m) => isAdesao(m));
-                const adesaoPaga = linhaAdesao?.status === "pago";
-                return (
-                  <div className="rounded-md border bg-muted/30 px-3 py-2 flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">Taxa de adesão</Badge>
-                      <span className="text-muted-foreground">Cobrança única, não conta como mensalidade.</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold tabular-nums">{BRL(Number(contrato.taxa_adesao ?? 0))}</span>
-                      <Badge variant={adesaoPaga ? "default" : "outline"}>
-                        {adesaoPaga ? "Paga" : "Pendente"}
-                      </Badge>
-                    </div>
-                  </div>
-                );
-              })() : null}
+              {/* A antiga faixa "Taxa de adesão" foi movida para dentro da
+                  tabela de Mensalidades como uma linha regular, com botão
+                  próprio de pagamento (gera lançamento financeiro e caixa). */}
               <div className="flex gap-2 flex-wrap">
                 <Button size="sm" onClick={() => printContrato(contrato.id)}>
                   <Printer className="h-4 w-4 mr-1" />
@@ -3120,7 +3128,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           </TableCell>
                         </TableRow>
                       ) : null}
-                      {mensalidades.map((m) => (
+                      {linhasCobranca.map((m) => (
                         <TableRow key={m.id}>
                           <TableCell>
                             {isAdesao(m) ? (
@@ -3229,19 +3237,30 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                 </>
                               ) : (
                                 <>
-                                  <Button size="sm" disabled={cancelado && !isAdmin} onClick={() => abrirFormaPag(m)}>
-                                    <Check className="h-3 w-3 mr-1" />
-                                    Pagar
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    title="Marcar como paga historicamente (sem lançar no caixa)"
-                                    disabled={cancelado && !isAdmin}
-                                    onClick={() => marcarPagaHistorica(m)}
-                                  >
-                                    Paga (histórica)
-                                  </Button>
+                                  {isAdesao(m) && adesaoEmbutida ? (
+                                    <span
+                                      className="text-xs text-muted-foreground italic"
+                                      title="A adesão é cobrada junto com a 1ª mensalidade enquanto ela estiver pendente."
+                                    >
+                                      Cobrada com a 1ª parcela
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <Button size="sm" disabled={cancelado && !isAdmin} onClick={() => abrirFormaPag(m)}>
+                                        <Check className="h-3 w-3 mr-1" />
+                                        Pagar
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        title="Marcar como paga historicamente (sem lançar no caixa)"
+                                        disabled={cancelado && !isAdmin}
+                                        onClick={() => marcarPagaHistorica(m)}
+                                      >
+                                        Paga (histórica)
+                                      </Button>
+                                    </>
+                                  )}
                                 </>
                               ))}
                               {isAdmin && podeEscrever ? (
@@ -3790,17 +3809,39 @@ h1, h2, h3 { margin: 0 0 6mm; }
         tipo="receita"
         initialDescricao={
           pagMens
-            ? `${isAdesao(pagMens) ? "Taxa de adesao" : `Mensalidade ${pagMens.numero_parcela}/${mensalidades.length}`} - Contrato #${contrato.numero} - ${contrato.paciente_nome}`
+            ? isAdesao(pagMens)
+              ? `Taxa de adesão — Contrato #${contrato.numero} — ${contrato.paciente_nome}`
+              : isTaxaInclusao(pagMens)
+                ? `Taxa de inclusão de dependente — Contrato #${contrato.numero} — ${contrato.paciente_nome}`
+                : `Mensalidade ${pagMens.numero_parcela}/${mensalidades.length} - Contrato #${contrato.numero} - ${contrato.paciente_nome}`
             : ""
         }
         initialValor={pagMens ? pagValorFinal.toFixed(2) : ""}
         initialFormaPagamento={pagInitialForma}
-        categoriaFixaNome={pagMens && isAdesao(pagMens) ? "ADESAO CARTAO CONSULTA" : "MENSALIDADE CARTAO CONSULTA"}
+        categoriaFixaNome={
+          pagMens && isAdesao(pagMens)
+            ? "TAXA DE ADESAO CARTAO"
+            : pagMens && isTaxaInclusao(pagMens)
+              ? "DEPENDENTE / ADESAO CARTAO"
+              : "MENSALIDADE CARTAO CONSULTA"
+        }
         onSavedWithData={async (dados) => {
           if (!pagMens || !clinicaAtual) return;
           const mensId = pagMens.id;
           const taxaAdesao = Number(pagMens.taxa_adesao ?? 0) || 0;
+          const ehAdesaoAvulsa = isAdesao(pagMens);
+          const ehTaxaInclusao = isTaxaInclusao(pagMens);
           await marcarPago(mensId, true, dados.forma_pagamento ?? "misto", dados.lancamento_id, dados.valor);
+          // Pagamentos avulsos da linha de adesão ou da taxa de inclusão de
+          // dependente: o próprio LancamentoDialog já gravou lançamento +
+          // movimento de caixa via RPC atômica com a categoria correta. Não
+          // há segunda cobrança nem GR de mensalidade a imprimir.
+          if (ehAdesaoAvulsa || ehTaxaInclusao) {
+            toast.success("Pagamento registrado.");
+            setPagMens(null);
+            setPagInitialForma("");
+            return;
+          }
           try {
             // Se a parcela carrega a taxa de adesão (apenas a 1ª parcela),
             // gera um lançamento financeiro separado e imprime UMA GR única
