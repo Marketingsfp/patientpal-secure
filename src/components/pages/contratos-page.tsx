@@ -38,6 +38,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -1810,6 +1811,21 @@ function DetalheContrato({
   const cancelado = !!canceladoEm;
   // Renovação do contrato
   const [renovarOpen, setRenovarOpen] = useState(false);
+  const [renovadoEm, setRenovadoEm] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      const { data } = await supabase
+        .from("contrato_renovacoes")
+        .select("created_at")
+        .eq("contrato_id", contrato.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancelado) setRenovadoEm((data as any)?.created_at ?? null);
+    })();
+    return () => { cancelado = true; };
+  }, [contrato.id]);
   // Valor mensal vigente (atualizado quando recalculamos as parcelas em aberto)
   const [valorMensalAtual, setValorMensalAtual] = useState<number>(Number(contrato.valor_mensal));
   useEffect(() => {

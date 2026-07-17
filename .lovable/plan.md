@@ -1,16 +1,34 @@
-**Classificação:** erro de banco/regra de contrato, com impacto em **contratos, dependentes e financeiro**.
+## Objetivo
+Ao renovar um contrato, o botão "RENOVAÇÃO" deve ficar desabilitado, e ao passar o mouse deve exibir a data em que a renovação foi feita.
 
-**Problema confirmado:** a função de renovação ainda tenta gravar `clinica_id` na tabela `contrato_dependentes`, mas essa tabela não possui essa coluna. Por isso aparece: `column "clinica_id" of relation "contrato_dependentes" does not exist`.
+## Escopo
+Somente frontend. Arquivo: `src/components/pages/contratos-page.tsx` (bloco do botão RENOVAÇÃO, linhas ~2968-2985).
 
-**Plano de correção:**
-1. Recriar as funções de renovação do contrato para inserir dependentes apenas com as colunas reais da tabela `contrato_dependentes`.
-2. Revisar as duas rotas do fluxo:
-   - renovação mantendo/extensando o contrato atual;
-   - renovação com troca de convênio e geração de novo contrato.
-3. Manter a lógica já ajustada de faixa de preço: o valor mensal continua vindo da faixa selecionada conforme quantidade de pessoas.
-4. Garantir que inclusão/exclusão de dependentes continue atualizando mensalidade, taxa de inclusão e taxa de adesão quando aplicável.
-5. Validar com leitura do banco que as funções foram recriadas sem referência a `contrato_dependentes.clinica_id`.
+## Como detectar que já foi renovado
+A tabela `contrato_renovacoes` já registra cada renovação com `contrato_id` (contrato de origem) e `created_at`. Buscar a renovação mais recente onde `contrato_id = contrato.id`:
+- Se existir → botão desabilitado, com tooltip "Renovado em DD/MM/AAAA".
+- Se não existir → mantém comportamento atual (habilitado quando as 12 parcelas estão pagas).
 
-**Fora do escopo:** não vou alterar o layout da tela nem mexer em outros módulos financeiros que não sejam chamados pela renovação.
+## Alterações
+1. Adicionar `useQuery` na view do contrato para buscar a renovação existente:
+   ```
+   supabase.from('contrato_renovacoes')
+     .select('created_at, tipo, contrato_novo_id')
+     .eq('contrato_id', contrato.id)
+     .order('created_at', { desc: true })
+     .limit(1).maybeSingle()
+   ```
+2. No bloco do botão RENOVAÇÃO:
+   - Continuar exigindo `podeRenovar` (12/12 pagas) para exibir.
+   - Se houver renovação registrada: renderizar o botão com `disabled`, estilo esmaecido, envolto em `Tooltip` do shadcn mostrando `Renovado em {dd/MM/yyyy}` (usar `format` do date-fns já disponível no arquivo).
+   - Sem renovação: botão vermelho ativo como hoje.
+3. Invalidar essa query no `onSuccess` do fluxo de renovação (mesmo padrão de invalidação já usado após renovar) para o botão desabilitar imediatamente após a ação.
 
-**Risco:** baixo a moderado, porque mexe em função de contrato/financeiro. A correção será localizada no ponto que está quebrando.
+## Fora de escopo
+- Nenhuma mudança em RPCs, banco, permissões ou no fluxo do diálogo de renovação.
+- Não altera o botão "Cancelar contrato".
+
+## Validação
+- Contrato já renovado (ex.: da Quédima após renovar): botão aparece desabilitado com tooltip da data.
+- Contrato quitado ainda não renovado: botão continua clicável e vermelho.
+- Após concluir uma nova renovação, o botão passa a desabilitado sem precisar recarregar a página.
