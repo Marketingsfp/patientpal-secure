@@ -554,6 +554,25 @@ export function RenovarContratoDialog({
               placeholder="Motivo, condições combinadas, etc."
             />
           </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Data da renovação</Label>
+            <DateInputBR
+              value={dataRenovacao}
+              onChange={(e) => setDataRenovacao(e.target.value)}
+              max={hoje}
+            />
+            {retroativa ? (
+              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                Renovação retroativa — as novas parcelas serão geradas a partir de {formatDatePura(dataRenovacao)}.
+                Use este campo quando a renovação foi feita fora do sistema.
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                Se a renovação já aconteceu em uma data anterior, informe aqui para registrar corretamente.
+              </p>
+            )}
+          </div>
         </div>
 
         <DialogFooter>
