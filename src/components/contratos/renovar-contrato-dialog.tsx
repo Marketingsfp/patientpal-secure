@@ -518,10 +518,12 @@ export function RenovarContratoDialog({
               <span className="text-muted-foreground">Parcelas a gerar</span>
               <span className="font-mono">{parcelasRenovacao}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Taxa de adesão</span>
-              <span className="font-mono">{BRL(taxaAdesaoCobrada)}</span>
-            </div>
+            {taxaAdesaoCobrada > 0 ? (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Taxa de adesão</span>
+                <span className="font-mono">{BRL(taxaAdesaoCobrada)}</span>
+              </div>
+            ) : null}
             {novosComTaxa.length > 0 ? (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Taxa de inclusão ({novosComTaxa.length}× {BRL(taxaInclusaoConvenio)})</span>
