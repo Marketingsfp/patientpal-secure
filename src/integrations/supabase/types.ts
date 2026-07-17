@@ -2534,6 +2534,96 @@ export type Database = {
           },
         ]
       }
+      contrato_renovacoes: {
+        Row: {
+          clinica_id: string
+          contrato_id: string
+          contrato_novo_id: string | null
+          convenio_anterior_id: string | null
+          convenio_novo_id: string | null
+          created_at: string
+          id: string
+          observacao: string | null
+          parcelas_geradas: number
+          periodo_fim: string | null
+          periodo_inicio: string | null
+          tipo: string
+          usuario_id: string | null
+          valor_anterior: number
+          valor_novo: number
+        }
+        Insert: {
+          clinica_id: string
+          contrato_id: string
+          contrato_novo_id?: string | null
+          convenio_anterior_id?: string | null
+          convenio_novo_id?: string | null
+          created_at?: string
+          id?: string
+          observacao?: string | null
+          parcelas_geradas?: number
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          tipo: string
+          usuario_id?: string | null
+          valor_anterior?: number
+          valor_novo?: number
+        }
+        Update: {
+          clinica_id?: string
+          contrato_id?: string
+          contrato_novo_id?: string | null
+          convenio_anterior_id?: string | null
+          convenio_novo_id?: string | null
+          created_at?: string
+          id?: string
+          observacao?: string | null
+          parcelas_geradas?: number
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          tipo?: string
+          usuario_id?: string | null
+          valor_anterior?: number
+          valor_novo?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contrato_renovacoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_renovacoes_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_assinatura"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_renovacoes_contrato_novo_id_fkey"
+            columns: ["contrato_novo_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_assinatura"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_renovacoes_convenio_anterior_id_fkey"
+            columns: ["convenio_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "cb_convenios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_renovacoes_convenio_novo_id_fkey"
+            columns: ["convenio_novo_id"]
+            isOneToOne: false
+            referencedRelation: "cb_convenios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contratos_assinatura: {
         Row: {
           assinado_em: string | null
@@ -2542,6 +2632,7 @@ export type Database = {
           cancelado_em: string | null
           cancelamento_motivo: string | null
           clinica_id: string
+          contrato_origem_id: string | null
           convenio_id: string | null
           created_at: string
           criado_por: string | null
@@ -2553,10 +2644,12 @@ export type Database = {
           migrar_apos: string | null
           num_parcelas: number
           numero: number
+          numero_renovacoes: number
           observacoes: string | null
           paciente_id: string
           paciente_nome: string
           plano_id: string | null
+          renovado_em: string | null
           status: string
           tabela_legada: boolean
           taxa_adesao: number
@@ -2572,6 +2665,7 @@ export type Database = {
           cancelado_em?: string | null
           cancelamento_motivo?: string | null
           clinica_id: string
+          contrato_origem_id?: string | null
           convenio_id?: string | null
           created_at?: string
           criado_por?: string | null
@@ -2583,10 +2677,12 @@ export type Database = {
           migrar_apos?: string | null
           num_parcelas?: number
           numero?: number
+          numero_renovacoes?: number
           observacoes?: string | null
           paciente_id: string
           paciente_nome: string
           plano_id?: string | null
+          renovado_em?: string | null
           status?: string
           tabela_legada?: boolean
           taxa_adesao?: number
@@ -2602,6 +2698,7 @@ export type Database = {
           cancelado_em?: string | null
           cancelamento_motivo?: string | null
           clinica_id?: string
+          contrato_origem_id?: string | null
           convenio_id?: string | null
           created_at?: string
           criado_por?: string | null
@@ -2613,10 +2710,12 @@ export type Database = {
           migrar_apos?: string | null
           num_parcelas?: number
           numero?: number
+          numero_renovacoes?: number
           observacoes?: string | null
           paciente_id?: string
           paciente_nome?: string
           plano_id?: string | null
+          renovado_em?: string | null
           status?: string
           tabela_legada?: boolean
           taxa_adesao?: number
@@ -2626,6 +2725,13 @@ export type Database = {
           valor_mensal?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "contratos_assinatura_contrato_origem_id_fkey"
+            columns: ["contrato_origem_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_assinatura"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contratos_assinatura_convenio_id_fkey"
             columns: ["convenio_id"]
@@ -8478,6 +8584,18 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      renovar_contrato_extensao: {
+        Args: { _contrato_id: string; _observacao?: string }
+        Returns: Json
+      }
+      renovar_contrato_troca_plano: {
+        Args: {
+          _contrato_id: string
+          _convenio_novo_id: string
+          _observacao?: string
+        }
+        Returns: Json
       }
       resolver_clinica_por_token: {
         Args: { _token: string }
