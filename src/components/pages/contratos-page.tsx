@@ -1767,6 +1767,16 @@ function DetalheContrato({
   const [extraRecebido, setExtraRecebido] = useState<{ total: number; count: number }>({ total: 0, count: 0 });
   const [drill, setDrill] = useState<null | "pagas" | "recebido" | "areceber">(null);
   const [deps, setDeps] = useState<Dep[]>([]);
+  const [contratosAnteriores, setContratosAnteriores] = useState<Array<{
+    id: string;
+    numero: string | number | null;
+    convenio: string | null;
+    data_inicio: string | null;
+    data_termino: string | null;
+    status: string | null;
+    parcelas: number;
+    pagas: number;
+  }>>([]);
   const [convenio, setConvenio] = useState<any>(null);
   const [clinica, setClinica] = useState<any>(null);
   const [pacienteFull, setPacienteFull] = useState<any>(null);
