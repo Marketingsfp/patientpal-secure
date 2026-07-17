@@ -2317,6 +2317,59 @@ function DetalheContrato({
     setClinica(cl.data ?? null);
     setPacienteFull(pa.data ?? null);
     setFaixas(((fx as any).data ?? []) as Faixa[]);
+    // Contratos anteriores do mesmo paciente (histórico) — não junta parcelas
+    // com o contrato atual; apenas lista lado a lado para conferência.
+    if (pacienteId) {
+      const { data: antRows } = await supabase
+        .from("contratos_assinatura")
+        .select("id, numero, status, data_inicio, data_termino, convenio_id, created_at")
+        .eq("paciente_id", pacienteId)
+        .neq("id", contrato.id)
+        .order("created_at", { ascending: false });
+      const anteriores = (antRows ?? []) as any[];
+      if (anteriores.length) {
+        const ids = anteriores.map((c) => c.id);
+        const convIds = Array.from(
+          new Set(anteriores.map((c) => c.convenio_id).filter(Boolean)),
+        );
+        const [{ data: mensAll }, { data: convs }] = await Promise.all([
+          supabase
+            .from("contrato_mensalidades")
+            .select("contrato_id, status, numero_parcela")
+            .in("contrato_id", ids),
+          convIds.length
+            ? supabase.from("cb_convenios").select("id, nome").in("id", convIds)
+            : Promise.resolve({ data: [] as any[] }),
+        ]);
+        const convMap: Record<string, string> = Object.fromEntries(
+          ((convs as any)?.data ?? convs ?? []).map((c: any) => [c.id, c.nome]),
+        );
+        const counts: Record<string, { parcelas: number; pagas: number }> = {};
+        ((mensAll ?? []) as any[]).forEach((m) => {
+          if ((m.numero_parcela ?? 0) <= 0) return; // ignora adesão/taxa
+          const c = counts[m.contrato_id] ?? { parcelas: 0, pagas: 0 };
+          c.parcelas += 1;
+          if (m.status === "pago") c.pagas += 1;
+          counts[m.contrato_id] = c;
+        });
+        setContratosAnteriores(
+          anteriores.map((c) => ({
+            id: c.id,
+            numero: c.numero ?? null,
+            convenio: c.convenio_id ? convMap[c.convenio_id] ?? null : null,
+            data_inicio: c.data_inicio ?? null,
+            data_termino: c.data_termino ?? null,
+            status: c.status ?? null,
+            parcelas: counts[c.id]?.parcelas ?? 0,
+            pagas: counts[c.id]?.pagas ?? 0,
+          })),
+        );
+      } else {
+        setContratosAnteriores([]);
+      }
+    } else {
+      setContratosAnteriores([]);
+    }
     setLoading(false);
   };
   useEffect(() => {
