@@ -1,4 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { timingSafeEqual } from "crypto";
+
+function safeEq(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  try {
+    return timingSafeEqual(ba, bb);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Backup diário do schema public.
@@ -22,9 +34,17 @@ export const Route = createFileRoute("/api/public/hooks/backup-diario")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // Auth: header apikey deve bater com a publishable key
-        const apikey = request.headers.get("apikey");
-        if (!apikey || apikey !== process.env.SUPABASE_PUBLISHABLE_KEY) {
+        // Auth: header `x-backup-token` deve bater com BACKUP_WEBHOOK_TOKEN
+        // (segredo server-only, comparado com timingSafeEqual).
+        const token = process.env.BACKUP_WEBHOOK_TOKEN;
+        if (!token) {
+          return new Response(
+            JSON.stringify({ error: "backup token not configured" }),
+            { status: 503, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        const provided = request.headers.get("x-backup-token") ?? "";
+        if (!safeEq(provided, token)) {
           return new Response(JSON.stringify({ error: "unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },
