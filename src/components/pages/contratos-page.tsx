@@ -1173,6 +1173,7 @@ function NovoContratoForm({
                     <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
                     <span className="font-medium flex items-center gap-2">
                       {titular.nome} {titular.cpf ? `— ${titular.cpf}` : ""}
+                      <ProntuarioBadge codigo={titular.codigo_prontuario} />
                       {titular.face_descriptor && titular.face_descriptor.length > 0 ? (
                         <Badge variant="default" className="gap-1">
                           <Check className="h-3 w-3" />
