@@ -5,7 +5,7 @@
 //   1. Bloqueio de agendamento quando paciente não tem telefone/data_nascimento.
 //   2. Bloqueio quando médico/recurso de enfermagem não tem agenda aberta no dia (nenhum slot).
 //   3. Bloqueio quando não há slot `DISPONÍVEL` cobrindo o intervalo escolhido.
-//   4. [revertido — ver nota "recursos de enfermagem" abaixo] Bypass de checagem de slot para recursos de enfermagem.
+//   4. (removido) Bypass de checagem de slot para recursos de enfermagem.
 //   5. Bloqueio por mensalidade vencida (cartão benefícios) quando
 //      tipo_atendimento = "convenio".
 //   6. INSERT em `agendamentos` (novo) OU UPDATE (edição).
@@ -27,12 +27,8 @@
 // o que já está gravado no banco. Um caller que "esqueça" de pedir a
 // checagem não consegue mais burlar a validação.
 //
-// Recursos de enfermagem (salas/equipamentos): antes eram bypassados por
-// completo dessa checagem (regra 4 acima) — dois pacientes podiam cair no
-// mesmo recurso/horário sem erro nenhum, e sem a trava otimista contra
-// corrida (que depende da checagem ter rodado). Agora o recurso de
-// enfermagem passa pela MESMA checagem que o médico, só trocando a coluna
-// filtrada (`enfermagem_recurso_id` em vez de `medico_id`).
+// Recursos de enfermagem foram removidos do sistema — hoje só existe o
+// caminho `medico_id`.
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -47,7 +43,6 @@ export type CriarAgendamentoInput = {
     paciente_nome: string;
     paciente_id: string | null;
     medico_id: string | null;
-    enfermagem_recurso_id: string | null;
     inicio: string;
     fim: string;
     procedimento: string | null;
@@ -194,12 +189,8 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     // sempre que há médico OU recurso de enfermagem, e o recurso/horário
     // está de fato mudando — comparado ao que já está GRAVADO no banco,
     // nunca ao que o caller alega em `checagens`.
-    const recursoField: "medico_id" | "enfermagem_recurso_id" | null = payload.medico_id
-      ? "medico_id"
-      : payload.enfermagem_recurso_id
-        ? "enfermagem_recurso_id"
-        : null;
-    const recursoId = recursoField === "medico_id" ? payload.medico_id : payload.enfermagem_recurso_id;
+    const recursoField: "medico_id" | null = payload.medico_id ? "medico_id" : null;
+    const recursoId = payload.medico_id;
 
     // Uma única leitura do registro atual (edição) — usada para decidir se
     // agenda/paciente/horário estão de fato mudando, servindo às duas
@@ -207,7 +198,7 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     const atual = editing_id
       ? (await supabase
           .from("agendamentos")
-          .select("medico_id, enfermagem_recurso_id, paciente_id, inicio, fim")
+          .select("medico_id, paciente_id, inicio, fim")
           .eq("id", editing_id)
           .maybeSingle()).data
       : null;
@@ -222,7 +213,7 @@ export const criarAgendamento = createServerFn({ method: "POST" })
         // validar — falha fechado, não aberto.
         precisaValidarAgenda = true;
       } else {
-        const atualRecursoId = recursoField === "medico_id" ? atual.medico_id : atual.enfermagem_recurso_id;
+        const atualRecursoId = atual.medico_id;
         precisaValidarAgenda = atualRecursoId !== recursoId || horarioMudou;
       }
     }
@@ -266,7 +257,7 @@ export const criarAgendamento = createServerFn({ method: "POST" })
 
     // ---------- 2/3/4. Agenda aberta + slot livre cobrindo o intervalo (2440-2478) ----------
     if (precisaValidarAgenda && recursoField && recursoId) {
-      const rotuloRecurso = recursoField === "medico_id" ? "médico" : "recurso de enfermagem";
+      const rotuloRecurso = "médico";
       const di = new Date(payload.inicio);
       const df = new Date(payload.fim);
       const inicioDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 0, 0, 0).toISOString();
@@ -361,7 +352,6 @@ export const criarAgendamento = createServerFn({ method: "POST" })
         _paciente_id: payload.paciente_id,
         _paciente_nome: payload.paciente_nome,
         _medico_id: payload.medico_id,
-        _enfermagem_recurso_id: payload.enfermagem_recurso_id,
         _inicio: payload.inicio,
         _fim: payload.fim,
         _procedimentos: procedimentos,
@@ -402,7 +392,6 @@ export const criarAgendamento = createServerFn({ method: "POST" })
         _paciente_id: payload.paciente_id,
         _paciente_nome: payload.paciente_nome,
         _medico_id: payload.medico_id,
-        _enfermagem_recurso_id: payload.enfermagem_recurso_id,
         _inicio: payload.inicio,
         _fim: payload.fim,
         _procedimento: procedimentoFinal,
