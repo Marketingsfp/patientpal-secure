@@ -1130,41 +1130,6 @@ function NovoContratoForm({
       <Card>
         <CardContent className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div className={faixas.length > 0 ? undefined : "col-span-2"}>
-              <Label>Convênio</Label>
-              <Select value={convenioId} onValueChange={setConvenioId}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {convenios.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {faixas.length > 0 ? (
-              <div>
-                <Label>Nº de pessoas no contrato</Label>
-                <Select value={faixaId} onValueChange={setFaixaId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a faixa…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {faixas.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {labelFaixa(f)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  O valor mensal é definido pela faixa selecionada (cadastrada no convênio).
-                </p>
-              </div>
-            ) : null}
             <div className="col-span-2">
               <Label>Paciente titular</Label>
               {titular ? (
@@ -1285,6 +1250,41 @@ function NovoContratoForm({
                 />
               )}
             </div>
+            <div className={faixas.length > 0 ? undefined : "col-span-2"}>
+              <Label>Convênio</Label>
+              <Select value={convenioId} onValueChange={setConvenioId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {convenios.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {faixas.length > 0 ? (
+              <div>
+                <Label>Nº de pessoas no contrato</Label>
+                <Select value={faixaId} onValueChange={setFaixaId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a faixa…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {faixas.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {labelFaixa(f)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  O valor mensal é definido pela faixa selecionada (cadastrada no convênio).
+                </p>
+              </div>
+            ) : null}
             <div>
               <Label>Data início</Label>
               <DateInputBR value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
