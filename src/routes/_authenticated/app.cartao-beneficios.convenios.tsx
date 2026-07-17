@@ -104,6 +104,7 @@ type Convenio = {
   ativo: boolean;
   valor_mensal: number;
   taxa_adesao: number;
+  taxa_inclusao_dependente: number;
   num_parcelas: number;
   max_dependentes: number;
   fidelidade_meses: number;
