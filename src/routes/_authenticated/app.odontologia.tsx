@@ -179,11 +179,31 @@ function OdontologiaPage() {
       </Card>
 
       {pacienteId && (
-        <>
+        <Tabs defaultValue="prontuario" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="prontuario">Prontuário</TabsTrigger>
+            <TabsTrigger value="orcamento">Orçamento</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="prontuario" className="space-y-6">
           <Card>
             <CardHeader><CardTitle>Odontograma</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <Odontograma estados={estados} onClickDente={setSelecionado} selecionado={selecionado} />
+              <Odontograma estados={estados} onClickDente={setSelecionado} selecionado={selecionado} orcadoSet={orcadoSet} />
+              {selecionado && itensDoDenteSelecionado.length > 0 && (
+                <div className="border rounded-md p-3 bg-amber-50/60 border-amber-200 space-y-1">
+                  <p className="text-sm font-medium text-amber-900">
+                    Itens de orçamento aberto neste dente ({itensDoDenteSelecionado.length})
+                  </p>
+                  <ul className="text-xs text-amber-900/90 space-y-0.5">
+                    {itensDoDenteSelecionado.map((it) => (
+                      <li key={it.id}>
+                        Orç. {it.orcamento_numero ?? "—"} · {it.descricao} · R$ {Number(it.valor_total).toFixed(2)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {selecionado && podeEscrever && (
                 <div className="border rounded-md p-4 space-y-3">
                   <p className="font-medium">Dente {selecionado}</p>
@@ -280,7 +300,21 @@ function OdontologiaPage() {
               )}
             </CardContent>
           </Card>
-        </>
+          </TabsContent>
+
+          <TabsContent value="orcamento">
+            <Card>
+              <CardContent className="pt-6">
+                <OrcamentoTab
+                  pacienteId={pacienteId}
+                  pacienteNome={pacienteSel?.nome ?? ""}
+                  pacienteTelefone={pacienteSel?.telefone ?? null}
+                  especialidadeOdontoId={especialidadeOdontoId}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );
