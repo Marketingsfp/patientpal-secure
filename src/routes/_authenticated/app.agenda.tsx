@@ -867,6 +867,16 @@ function AgendaPage() {
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
   const [agendasPorMedico, setAgendasPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
+  // Lookup id-da-agenda → nome, usado pelo filtro "Tipo de agenda" quando
+  // agrupa por NOME (evita duplicidades quando vários médicos têm agendas
+  // homônimas, ex.: "AGENDA", "CONSULTAS").
+  const agendaNomePorId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const arr of agendasPorMedico.values()) {
+      for (const a of arr) m.set(a.id, a.nome);
+    }
+    return m;
+  }, [agendasPorMedico]);
   const [procIdsPorAgenda, setProcIdsPorAgenda] = useState<Map<string, Set<string>>>(new Map());
   // Solicitações de estorno pendentes por agendamento — a linha correspondente
   // fica em vermelho e, para o médico, o paciente é ocultado até o financeiro
@@ -2167,7 +2177,7 @@ function AgendaPage() {
       // mantém o valor para não perder o serviço no submit.
       const opts = opcoesProcedimentoMedico(
         medicoId ?? null,
-        editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
+        editing?.agenda_id ?? (filtroAgenda !== "todos" && !filtroAgenda.startsWith("nome:") ? filtroAgenda : null),
       );
       const alvo = normalizar(atual);
       const ehProcedimentoReal =
@@ -2235,7 +2245,7 @@ function AgendaPage() {
     if (!form.medico_id) return base;
     const opts = opcoesProcedimentoMedico(
       form.medico_id,
-      editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
+      editing?.agenda_id ?? (filtroAgenda !== "todos" && !filtroAgenda.startsWith("nome:") ? filtroAgenda : null),
     ).map((p) => ({ value: p.nome, label: p.nome }));
     const padrao = procedimentoPadraoDoMedico(form.medico_id);
     if (padrao && !opts.some((o) => normalizar(o.value) === normalizar(padrao))) {
@@ -2443,7 +2453,15 @@ function AgendaPage() {
         // Agendamentos criados via "Atendimento Múltiplo" não são vinculados a
         // uma agenda específica (podem envolver médicos/recursos diferentes),
         // então não os escondemos quando o usuário filtra por agenda.
-        if (a.agenda_id !== filtroAgenda && !a.atendimento_grupo_id) return false;
+        if (filtroAgenda.startsWith("nome:")) {
+          // Filtro por NOME da agenda (dedupe entre múltiplos médicos):
+          // aplicado quando o usuário está com "TODOS" os profissionais.
+          const alvo = filtroAgenda.slice(5);
+          const nomeAg = (a.agenda_id ? agendaNomePorId.get(a.agenda_id) : "") ?? "";
+          if (nomeAg.trim().toUpperCase() !== alvo && !a.atendimento_grupo_id) return false;
+        } else {
+          if (a.agenda_id !== filtroAgenda && !a.atendimento_grupo_id) return false;
+        }
       }
       if (filtroApenasMultiplo && !a.atendimento_grupo_id) return false;
       return true;
@@ -6421,9 +6439,30 @@ function AgendaPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">TODAS</SelectItem>
-                {Array.from(agendasPorMedico.values()).flat().map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
-                ))}
+                {(() => {
+                  // Quando um médico específico está selecionado, listamos
+                  // as agendas dele por id (permite distinguir turnos/salas).
+                  // Quando é "TODOS", agrupamos por NOME (ex.: "AGENDA",
+                  // "CONSULTAS") para não repetir a mesma opção uma vez
+                  // por médico.
+                  if (filtroMedico !== "todos") {
+                    const arr = agendasPorMedico.get(filtroMedico) ?? [];
+                    return arr.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
+                    ));
+                  }
+                  const seen = new Set<string>();
+                  const out: { key: string; nome: string }[] = [];
+                  for (const a of Array.from(agendasPorMedico.values()).flat()) {
+                    const k = (a.nome ?? "").trim().toUpperCase();
+                    if (!k || seen.has(k)) continue;
+                    seen.add(k);
+                    out.push({ key: k, nome: a.nome });
+                  }
+                  return out.map((o) => (
+                    <SelectItem key={`nome:${o.key}`} value={`nome:${o.key}`}>{o.nome}</SelectItem>
+                  ));
+                })()}
               </SelectContent>
             </Select>
           </div>
