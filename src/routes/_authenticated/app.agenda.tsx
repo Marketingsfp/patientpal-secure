@@ -7126,7 +7126,7 @@ function AgendaPage() {
         </div>
         <div className="rounded-lg border bg-muted/30 p-4">
           <h3 className="text-center font-semibold mb-3">Legenda</h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { cor: "#cfe3fb", borda: "#9fc3f3", label: "Confirmado pelo cliente" },
               { cor: "#a8c8ed", borda: "#7aa9d8", label: "Presente na clínica" },
