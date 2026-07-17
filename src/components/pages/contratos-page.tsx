@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   FileSignature,
   Plus,
@@ -2039,6 +2039,10 @@ function DetalheContrato({
   const [admObs, setAdmObs] = useState<string>(contrato.observacoes ?? "");
   const [admFaixaId, setAdmFaixaId] = useState<string>("");
   const [savingAdm, setSavingAdm] = useState(false);
+  // Guarda a faixa que foi auto-sincronizada com o valor_mensal atual.
+  // Só sobrescrevemos valor_mensal no salvarContratoAdmin se o usuário
+  // trocou explicitamente para uma faixa diferente desta inicial.
+  const admFaixaIdInicialRef = useRef<string>("");
   const [apenasFinanceiro, setApenasFinanceiro] = useState<boolean>(
     !!(contrato as any).titular_apenas_financeiro,
   );
@@ -2114,8 +2118,14 @@ function DetalheContrato({
     }
     const dataInicioAntiga = (contrato as any).data_inicio as string | null;
     setSavingAdm(true);
-    // Se admin escolheu outra faixa, aplica novo valor_mensal
-    const faixaEscolhida = admFaixaId ? faixas.find((f) => f.id === admFaixaId) : null;
+    // Só aplica novo valor_mensal se o usuário trocou explicitamente a faixa
+    // em relação à sincronização inicial. Sem isso, um fallback silencioso
+    // do dropdown rebaixaria o valor do contrato (ver bug #20260945).
+    const faixaFoiTrocada =
+      !!admFaixaId && admFaixaId !== admFaixaIdInicialRef.current;
+    const faixaEscolhida = faixaFoiTrocada
+      ? faixas.find((f) => f.id === admFaixaId)
+      : null;
     const novoValorMensal = faixaEscolhida ? Number(faixaEscolhida.valor_mensal) : null;
     const updatePayload: any = {
       convenio_id: admConvenioId,
@@ -2621,12 +2631,17 @@ function DetalheContrato({
   useEffect(() => {
     if (!faixas.length) {
       setAdmFaixaId("");
+      admFaixaIdInicialRef.current = "";
       return;
     }
     const v = Number(valorMensalAtual);
-    const match =
-      faixas.find((f) => Number(f.valor_mensal) === v) ?? faixas[0];
-    setAdmFaixaId(match?.id ?? "");
+    // Só auto-seleciona a faixa quando há match exato com o valor_mensal.
+    // Sem match (ex.: contrato em tabela antiga cujo valor não existe mais
+    // nas faixas atuais), deixa vazio para não sugerir uma faixa incorreta.
+    const match = faixas.find((f) => Number(f.valor_mensal) === v) ?? null;
+    const id = match?.id ?? "";
+    setAdmFaixaId(id);
+    admFaixaIdInicialRef.current = id;
   }, [faixas, valorMensalAtual]);
 
   // Ao trocar o convênio na aba Dados (modo admin), recarrega as faixas de
@@ -3886,7 +3901,16 @@ h1, h2, h3 { margin: 0 0 6mm; }
               {isAdmin && podeEscrever && faixas.length > 0 ? (
                 <div className="space-y-1">
                   <Label>Nº de pessoas no contrato</Label>
-                  <Select value={admFaixaId} onValueChange={setAdmFaixaId}>
+                  <Select
+                    value={admFaixaId}
+                    onValueChange={(id) => {
+                      setAdmFaixaId(id);
+                      // Ao trocar a faixa, reflete o valor no input "Valor mensal"
+                      // para que "Salvar valor e vencimento" persista corretamente.
+                      const f = faixas.find((x) => x.id === id);
+                      if (f) setEditValor(Number(f.valor_mensal).toFixed(2));
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a faixa…" />
                     </SelectTrigger>
@@ -3906,9 +3930,15 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       })}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Ao salvar, o valor mensal do contrato e das parcelas em aberto serão atualizados para a faixa selecionada.
-                  </p>
+                  {admFaixaId === "" && Number(valorMensalAtual) > 0 ? (
+                    <p className="text-xs text-amber-600">
+                      O valor atual ({BRL(Number(valorMensalAtual))}) não corresponde a nenhuma faixa deste convênio (possível tabela antiga). Selecione uma faixa para alinhar o valor ou edite manualmente o campo "Valor mensal" ao lado.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Ao salvar, o valor mensal do contrato e das parcelas em aberto serão atualizados para a faixa selecionada.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
