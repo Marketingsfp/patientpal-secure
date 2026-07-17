@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ClinicaProvider, useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -15,10 +15,13 @@ import {
   Ticket,
   BadgeCheck,
   CheckCircle2,
+  Camera,
+  X,
 } from "lucide-react";
 import { imprimirSenhaTotem, gerarSenhaPdfBase64 } from "@/lib/print-senha";
 import { imprimirDocumentoSilencioso } from "@/utils/printService";
 import { TecladoNumerico, formatarCpfParcial } from "@/components/totem/teclado-numerico";
+import { detectDescriptor, ensureFaceModels, FACE_MATCH_THRESHOLD } from "@/lib/face-recognition";
 
 export const Route = createFileRoute("/totem")({
   component: TotemRoute,
@@ -42,8 +45,9 @@ const TIPOS: { tipo: TipoSenha; titulo: string; sub: string; Icon: typeof Hash; 
 ];
 
 // "menu" é a tela inicial (check-in OU retirar senha); "senha" mostra os
-// tipos; "ticket"/"checkin-ok" são telas de conclusão com auto-retorno.
-type Step = "menu" | "senha" | "checkin" | "checkin-ok" | "ticket";
+// tipos; "checkin-facial" é a câmera de reconhecimento; "ticket"/"checkin-ok"
+// são telas de conclusão com auto-retorno.
+type Step = "menu" | "senha" | "checkin" | "checkin-facial" | "checkin-ok" | "ticket";
 
 type CheckinInfo = {
   paciente_nome: string;
@@ -60,6 +64,16 @@ export function TotemPage() {
   const [ticket, setTicket] = useState<{ codigo: string; tipo: TipoSenha } | null>(null);
   const [cpf, setCpf] = useState("");
   const [checkinInfo, setCheckinInfo] = useState<CheckinInfo | null>(null);
+  const [scanMsg, setScanMsg] = useState("Posicione seu rosto na câmera");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Pré-carrega os modelos de reconhecimento facial em segundo plano para a
+  // câmera abrir rápida quando o paciente escolher essa opção.
+  useEffect(() => {
+    void ensureFaceModels().catch(() => {});
+    return () => stopCamera();
+  }, []);
 
   // Modo automático (claro das 06h–17h, escuro caso contrário). Aplica a
   // classe `dark` no <html> enquanto o totem estiver aberto e limpa ao sair.
@@ -85,7 +99,13 @@ export function TotemPage() {
     return () => clearTimeout(t);
   }, [step]);
 
+  function stopCamera() {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+  }
+
   function reset() {
+    stopCamera();
     setTicket(null);
     setCpf("");
     setCheckinInfo(null);
@@ -174,6 +194,106 @@ export function TotemPage() {
       procedimento: r.procedimento ?? null,
     });
     setStep("checkin-ok");
+  }
+
+  // Conclui o check-in a partir do paciente identificado pela biometria —
+  // mesma regra do check-in por CPF, via RPC pública totem_checkin_paciente.
+  async function fazerCheckinPaciente(pacienteId: string) {
+    if (!clinicaAtual) return;
+    setBusy(true);
+    const { data, error } = await (supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: unknown }>)("totem_checkin_paciente", {
+      _clinica_id: clinicaAtual.clinica_id,
+      _paciente_id: pacienteId,
+    });
+    setBusy(false);
+    if (error) {
+      mostrarErro(error);
+      setStep("checkin");
+      return;
+    }
+    const r = (data ?? {}) as { ok?: boolean; erro?: string } & CheckinInfo;
+    if (!r.ok) {
+      toast.error(r.erro ?? "Não foi possível fazer o check-in. Procure a recepção.");
+      setStep("checkin");
+      return;
+    }
+    setCheckinInfo({
+      paciente_nome: r.paciente_nome,
+      inicio: r.inicio ?? null,
+      medico: r.medico ?? null,
+      procedimento: r.procedimento ?? null,
+    });
+    setStep("checkin-ok");
+  }
+
+  // Check-in por reconhecimento facial: liga a câmera, detecta o rosto e
+  // procura o match no servidor (totem_match_biometria — os descritores dos
+  // pacientes nunca chegam ao navegador). Qualquer falha volta para o CPF.
+  async function iniciarCheckinFacial() {
+    if (!clinicaAtual) return;
+    setStep("checkin-facial");
+    setScanMsg("Carregando câmera…");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: 640, height: 480 },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setScanMsg("Posicione seu rosto e fique parado…");
+      await ensureFaceModels();
+
+      let descritor: Float32Array | null = null;
+      for (let i = 0; i < 12; i++) {
+        if (!streamRef.current || !videoRef.current) return; // cancelado pelo paciente
+        descritor = await detectDescriptor(videoRef.current);
+        if (descritor) break;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      if (!streamRef.current) return; // cancelado durante a detecção
+      if (!descritor) {
+        stopCamera();
+        toast.error("Rosto não detectado. Digite o CPF.");
+        setStep("checkin");
+        return;
+      }
+
+      setScanMsg("Verificando…");
+      const { data: matchData, error } = await (supabase.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: unknown; error: unknown }>)("totem_match_biometria", {
+        _clinica_id: clinicaAtual.clinica_id,
+        _descriptor: Array.from(descritor),
+        _threshold: FACE_MATCH_THRESHOLD,
+      });
+      stopCamera();
+      if (error) {
+        mostrarErro(error);
+        setStep("checkin");
+        return;
+      }
+      const match = (Array.isArray(matchData) ? matchData[0] : matchData) as
+        | { paciente_id: string; nome: string }
+        | undefined;
+      if (!match?.paciente_id) {
+        toast.error("Não reconhecemos seu rosto. Digite o CPF.");
+        setStep("checkin");
+        return;
+      }
+      setScanMsg(`Olá, ${match.nome}!`);
+      await fazerCheckinPaciente(match.paciente_id);
+    } catch {
+      stopCamera();
+      toast.error("Não foi possível acessar a câmera. Digite o CPF.");
+      setStep("checkin");
+    }
   }
 
   if (loading) {
@@ -302,6 +422,15 @@ export function TotemPage() {
               onBackspace={() => setCpf((v) => v.slice(0, -1))}
               onClear={() => setCpf("")}
             />
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full h-14 text-base"
+              disabled={busy}
+              onClick={() => void iniciarCheckinFacial()}
+            >
+              <Camera className="h-5 w-5 mr-2" /> Usar reconhecimento facial
+            </Button>
             <div className="grid grid-cols-2 gap-3">
               <Button variant="outline" size="lg" className="h-14" onClick={reset}>
                 <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
@@ -310,6 +439,24 @@ export function TotemPage() {
                 {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Confirmar
               </Button>
             </div>
+          </div>
+        )}
+
+        {step === "checkin-facial" && (
+          <div className="max-w-xl w-full text-center space-y-6">
+            <div className="relative mx-auto w-[480px] h-[360px] rounded-2xl overflow-hidden border-4 border-primary/40 bg-black">
+              <video ref={videoRef} className="w-full h-full object-cover scale-x-[-1]" playsInline muted />
+              <div className="absolute inset-8 border-2 border-white/60 rounded-full pointer-events-none" />
+            </div>
+            <p className="text-lg">{scanMsg}</p>
+            <Button
+              variant="outline"
+              size="lg"
+              className="h-14 px-8"
+              onClick={() => { stopCamera(); setStep("checkin"); }}
+            >
+              <X className="h-5 w-5 mr-2" /> Cancelar
+            </Button>
           </div>
         )}
 
