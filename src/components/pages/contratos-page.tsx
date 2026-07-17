@@ -2098,7 +2098,7 @@ function DetalheContrato({
         .delete()
         .eq("contrato_id", contrato.id)
         .eq("status", "pendente")
-        .neq("numero_parcela", 0)
+        .gt("numero_parcela", 0)
         .gt("vencimento", hoje);
       // Conta parcelas restantes (≠0) — geralmente pagas/atrasadas anteriores a hoje.
       // Todo contrato deve ter no máximo 12 mensalidades: gera só o que falta.
@@ -2106,7 +2106,7 @@ function DetalheContrato({
         .from("contrato_mensalidades")
         .select("numero_parcela")
         .eq("contrato_id", contrato.id)
-        .neq("numero_parcela", 0)
+        .gt("numero_parcela", 0)
         .order("numero_parcela", { ascending: false });
       const existentes = restantes ?? [];
       const maxExistente = existentes.reduce(
