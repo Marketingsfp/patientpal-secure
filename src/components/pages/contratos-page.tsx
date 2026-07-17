@@ -1294,74 +1294,100 @@ function NovoContratoForm({
                   </div>
               </div>
             </div>
-            <div className={faixas.length > 0 ? undefined : "col-span-2"}>
-              <Label>Convênio</Label>
-              <Select value={convenioId} onValueChange={setConvenioId}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {convenios.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {faixas.length > 0 ? (
+            {/* Linha 1: Convênio | Nº pessoas | Valor mensal | Taxa de adesão */}
+            <div className="col-span-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
-                <Label>Nº de pessoas no contrato</Label>
-                <Select value={faixaId} onValueChange={setFaixaId}>
+                <Label>Convênio</Label>
+                <Select value={convenioId} onValueChange={setConvenioId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione a faixa…" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {faixas.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {labelFaixa(f)}
+                    {convenios.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.nome}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  O valor mensal é definido pela faixa selecionada (cadastrada no convênio).
-                </p>
               </div>
-            ) : null}
-            <div>
-              <Label>Data início</Label>
-              <DateInputBR value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
-              {dataAvisoExtrema ? (
-                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  {dataAvisoExtrema}
-                </p>
+              {faixas.length > 0 ? (
+                <div>
+                  <Label>Nº de pessoas no contrato</Label>
+                  <Select value={faixaId} onValueChange={setFaixaId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a faixa…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {faixas.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {labelFaixa(f)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    O valor mensal é definido pela faixa selecionada (cadastrada no convênio).
+                  </p>
+                </div>
               ) : null}
-            </div>
-            <div>
-              <Label>Data término</Label>
-              <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">
-                {fmtD(addUmAno(dataInicio))}
+              <div>
+                <Label>Valor mensal</Label>
+                <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">
+                  {BRL(valor)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {faixas.length > 0 ? "Definido pela faixa de pessoas selecionada acima." : "Definido pelo convênio."}
+                  {tipoCobranca === "boleto" ? (
+                    <span className="block text-amber-600 font-medium">
+                      + {BRL(TAXA_BOLETO)} de taxa de boleto por parcela — total da parcela: {BRL(valor + TAXA_BOLETO)}
+                    </span>
+                  ) : null}
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Calculada automaticamente: 1 ano após a data de início.
-              </p>
+              <div>
+                <Label>Taxa de adesão</Label>
+                <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">{BRL(taxa)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Cobrança única, definida pelo convênio.</p>
+              </div>
             </div>
-            <div>
-              <Label>Dia de vencimento</Label>
-              <Select value={String(diaVenc)} onValueChange={(v) => setDiaVenc(Number(v))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[5, 10, 15, 20, 25, 30].map((d) => (
-                    <SelectItem key={d} value={String(d)}>
-                      {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+            {/* Linha 2: Data início | Data término | Dia de vencimento */}
+            <div className="col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <Label>Data início</Label>
+                <DateInputBR value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+                {dataAvisoExtrema ? (
+                  <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {dataAvisoExtrema}
+                  </p>
+                ) : null}
+              </div>
+              <div>
+                <Label>Data término</Label>
+                <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">
+                  {fmtD(addUmAno(dataInicio))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Calculada automaticamente: 1 ano após a data de início.
+                </p>
+              </div>
+              <div>
+                <Label>Dia de vencimento</Label>
+                <Select value={String(diaVenc)} onValueChange={(v) => setDiaVenc(Number(v))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[5, 10, 15, 20, 25, 30].map((d) => (
+                      <SelectItem key={d} value={String(d)}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             {(() => {
               // Mostra campo "já pagas" quando data de início é anterior ao mês atual
@@ -1392,25 +1418,6 @@ function NovoContratoForm({
                 </div>
               );
             })()}
-            <div>
-              <Label>Valor mensal</Label>
-              <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">
-                {BRL(valor)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {faixas.length > 0 ? "Definido pela faixa de pessoas selecionada acima." : "Definido pelo convênio."}
-                {tipoCobranca === "boleto" ? (
-                  <span className="block text-amber-600 font-medium">
-                    + {BRL(TAXA_BOLETO)} de taxa de boleto por parcela — total da parcela: {BRL(valor + TAXA_BOLETO)}
-                  </span>
-                ) : null}
-              </p>
-            </div>
-            <div>
-              <Label>Taxa de adesão</Label>
-              <div className="h-10 rounded-md border bg-muted/30 px-3 flex items-center font-semibold">{BRL(taxa)}</div>
-              <p className="text-xs text-muted-foreground mt-1">Cobrança única, definida pelo convênio.</p>
-            </div>
             <div className="col-span-2">
               <Label>
                 Tipo de cobrança <span className="text-muted-foreground font-normal">(opcional)</span>
