@@ -1132,9 +1132,9 @@ function NovoContratoForm({
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <Label>Paciente titular</Label>
-              {titular ? (
-                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] items-start">
-                  <div className="space-y-1 min-w-0">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] items-start">
+                <div className="space-y-1 min-w-0">
+                  {titular ? (
                     <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
                     <span className="font-medium flex items-center gap-2">
                       {titular.nome} {titular.cpf ? `— ${titular.cpf}` : ""}
@@ -1190,7 +1190,14 @@ function NovoContratoForm({
                           {titular.face_descriptor?.length ? "Refazer foto" : "Tirar foto"}
                         </Button>
                       )}
-                      <Button size="sm" variant="ghost" onClick={() => setTitular(null)}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setTitular(null);
+                          setTitularApenasFinanceiro(false);
+                        }}
+                      >
                         Trocar
                       </Button>
                     </div>
@@ -1212,16 +1219,39 @@ function NovoContratoForm({
                       </Button>
                     </div>
                   ) : null}
-                  </div>
-                  <div className="flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2 md:self-stretch md:min-w-[260px] md:max-w-[340px]">
+                  </>
+                  ) : (
+                    <PatientSearchInput
+                      clinicaIdsOverride={[clinicaId]}
+                      placeholder="Buscar por nome, CPF, prontuário, pasta ou nascimento…"
+                      onSelect={async (p) => {
+                        if (!p) return;
+                        if (deps.find((d) => d.id === p.id)) {
+                          toast.error("Esse paciente já está como dependente.");
+                          return;
+                        }
+                        const full = await carregarPacienteCompleto(p);
+                        setTitular(full);
+                      }}
+                      onRequestCreate={(q) => setQuickCreate({ alvo: "titular", nome: q })}
+                    />
+                  )}
+                </div>
+                <div
+                  className={`flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2 md:self-stretch md:min-w-[260px] md:max-w-[340px] ${!titular ? "opacity-60" : ""}`}
+                >
                     <input
                       id="tit-apenas-fin-novo"
                       type="checkbox"
                       className="mt-0.5"
-                      checked={titularApenasFinanceiro}
+                      disabled={!titular}
+                      checked={!!titular && titularApenasFinanceiro}
                       onChange={(e) => setTitularApenasFinanceiro(e.target.checked)}
                     />
-                    <label htmlFor="tit-apenas-fin-novo" className="text-sm cursor-pointer">
+                    <label
+                      htmlFor="tit-apenas-fin-novo"
+                      className={`text-sm ${titular ? "cursor-pointer" : "cursor-not-allowed text-muted-foreground"}`}
+                    >
                       <span className="font-medium">Apenas titular financeiro</span>
                       <span className="text-muted-foreground"> — paga o plano, mas não usufrui dos benefícios.</span>
                       <span
@@ -1230,25 +1260,14 @@ function NovoContratoForm({
                       >
                         <Info className="h-3.5 w-3.5" />
                       </span>
+                      {!titular ? (
+                        <span className="block text-xs text-muted-foreground mt-1">
+                          Selecione o paciente titular para habilitar.
+                        </span>
+                      ) : null}
                     </label>
                   </div>
-                </div>
-              ) : (
-                <PatientSearchInput
-                  clinicaIdsOverride={[clinicaId]}
-                  placeholder="Buscar por nome, CPF, prontuário, pasta ou nascimento…"
-                  onSelect={async (p) => {
-                    if (!p) return;
-                    if (deps.find((d) => d.id === p.id)) {
-                      toast.error("Esse paciente já está como dependente.");
-                      return;
-                    }
-                    const full = await carregarPacienteCompleto(p);
-                    setTitular(full);
-                  }}
-                  onRequestCreate={(q) => setQuickCreate({ alvo: "titular", nome: q })}
-                />
-              )}
+              </div>
             </div>
             <div className={faixas.length > 0 ? undefined : "col-span-2"}>
               <Label>Convênio</Label>
