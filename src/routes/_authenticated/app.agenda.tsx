@@ -6446,8 +6446,8 @@ function AgendaPage() {
         className="rounded-2xl border bg-card p-3 shadow-sm mb-10 [&_input]:h-8 [&_input]:text-xs [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:text-xs"
         style={{ ["--clinic" as never]: corClinica }}
       >
-        {/* Linha 1: Filtros principais */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2">
+        {/* Filtros em 2 linhas de 4 colunas */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           {/* Profissional */}
           <div className="space-y-0">
             <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Profissional</Label>

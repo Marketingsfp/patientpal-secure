@@ -1,32 +1,41 @@
-# Corrigir filtro da Agenda (modo "a partir de")
+## Reorganizar filtros da agenda em 2 linhas
 
-## Diagnóstico
+Hoje os 8 filtros ficam numa linha só (`lg:grid-cols-8`), o que aperta demais os campos de texto — principalmente **Profissional** e **Cliente**.
 
-Na Agenda (rota `/app/agenda`, `src/routes/_authenticated/app.agenda.tsx`, função `load` em ~L1473), a busca no banco:
+### O que muda
 
-1. Ordena por `inicio` **descendente** (L1483).
-2. Quando "Exibir apenas a data selecionada" está **desligado**, aplica `gte(inicio, dataRef 00:00)` sem limite superior (L1541-1546) e limita a `range(0, 9999)` (L1548-1550).
+Dividir o grid em duas linhas de 4 colunas cada, mantendo o mesmo card e o mesmo checkbox "Exibir apenas a data selecionada" logo abaixo.
 
-O problema: com ordem **descendente** + `gte(hoje)`, o Postgres retorna as 10.000 linhas **mais futuras** (agendamentos meses/anos à frente na clínica), e o dia selecionado (ex.: 16/07/2026) fica **fora da janela retornada**. Resultado: lista vazia.
+**Linha 1 (4 colunas):**
+1. Profissional
+2. Tipo
+3. Data
+4. Cliente
 
-Quando o usuário marca "Exibir apenas a data selecionada", o `lte(inicio, 23:59)` restringe ao próprio dia e a lista aparece. Ou seja, o filtro de situação (Agendado) e demais filtros nunca foram o problema — o defeito está no modo padrão "a partir de".
+**Linha 2 (4 colunas):**
+1. Nº Ficha
+2. Situação
+3. Especialidade
+4. Ações (botão **Exibir** + botão **X** para limpar) — na mesma célula, como já estão hoje
 
-## Correção
+**Abaixo do grid (inalterado):** checkbox "Exibir apenas a data selecionada" alinhado à esquerda com o cabeçalho da tabela.
 
-Arquivo único: `src/routes/_authenticated/app.agenda.tsx`, dentro da função `load`.
+### Antes / Depois
 
-- Quando `apenasData === false` (modo "a partir de"), aplicar `order("inicio", { ascending: true })` na query, para que as 10.000 linhas retornadas comecem no dia selecionado e sigam em direção ao futuro — garantindo que o dia escolhido apareça primeiro.
-- Manter `order("inicio", { ascending: false })` (comportamento atual) quando `apenasData === true`, preservando exatamente o comportamento que já funciona.
+**Antes:** 1 linha × 8 colunas → cada campo com ~140 px, Cliente e Profissional truncando texto.
 
-Isso é apenas troca de ordenação condicional na query; a ordenação visual da lista já é recalculada em memória por outros `useMemo` (agrupamento por horário/ficha), então a UI final não muda.
+**Depois:** 2 linhas × 4 colunas → cada campo com ~280 px, respiro para digitar nome/CPF do paciente e ver o nome completo do profissional.
 
-## Fora do escopo
+### Detalhes técnicos
 
-- Nenhuma mudança em regra de negócio, filtros de situação, permissões, RLS, componentes de UI ou outros módulos.
-- Nenhum outro arquivo é tocado.
+- Arquivo: `src/routes/_authenticated/app.agenda.tsx` (~linha 6450).
+- Trocar `grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8` por `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4` (2 colunas em tablet, 4 em desktop; empilha em mobile).
+- Reordenar os blocos de filtro dentro do mesmo `<div className="grid …">` para: Profissional → Tipo → Data → Cliente → Nº Ficha → Situação → Especialidade → Ações. Como cada bloco é uma célula do grid, o resultado natural são 2 linhas de 4.
+- Nenhuma lógica de negócio muda. Nenhum filtro é adicionado, removido ou renomeado.
 
-## Validação após aplicar
+### Validação
 
-- Selecionar data 16/07/2026 + Situação "Agendado" + clicar Exibir → deve listar os agendamentos do dia e seguintes.
-- Marcar "Exibir apenas a data selecionada" → deve continuar listando só o dia (comportamento atual preservado).
-- Filtros combinados (profissional, cliente, especialidade) devem continuar funcionando nos dois modos.
+- Verificar visualmente em desktop (1440 px): 4+4, campos largos.
+- Verificar em tablet: 2+2+2+2 (2 colunas).
+- Verificar em mobile: empilha um por linha.
+- Confirmar que o checkbox "Exibir apenas a data selecionada" continua alinhado com a coluna FICHA da tabela.
