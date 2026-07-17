@@ -4503,12 +4503,12 @@ function AgendaPage() {
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm">
-            <CalendarDays className="h-6 w-6" />
+          <div className="flex h-10 w-10 xl:h-12 xl:w-12 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm">
+            <CalendarDays className="h-5 w-5 xl:h-6 xl:w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-foreground">Agendas</h1>
-            <p className="text-xs text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
+            <h1 className="text-xl xl:text-2xl font-bold tracking-tight text-slate-900 dark:text-foreground">Agendas</h1>
+            <p className="hidden xl:block text-xs text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
