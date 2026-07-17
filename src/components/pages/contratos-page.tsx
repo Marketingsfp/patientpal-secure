@@ -3072,6 +3072,16 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           <TableCell>
                             {isAdesao(m) ? (
                               <Badge variant="secondary">Adesão</Badge>
+                            ) : isTaxaInclusao(m) ? (
+                              <Badge
+                                variant="secondary"
+                                title={
+                                  (m as unknown as { observacoes?: string | null }).observacoes ??
+                                  "Taxa de inclusão de dependente"
+                                }
+                              >
+                                Taxa inclusão
+                              </Badge>
                             ) : (
                               m.numero_parcela
                             )}
