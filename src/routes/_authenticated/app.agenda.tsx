@@ -6418,11 +6418,11 @@ function AgendaPage() {
 
       {/* 🔥 FILTROS AGRUPADOS EM LINHAS LÓGICAS */}
       <div
-        className="rounded-2xl border bg-card p-3 shadow-sm mb-10 [&_input]:h-8 [&_input]:text-xs [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:text-xs"
+        className="rounded-2xl border bg-card p-2 xl:p-3 shadow-sm mb-6 [&_input]:h-8 [&_input]:text-xs [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:text-xs"
         style={{ ["--clinic" as never]: corClinica }}
       >
         {/* Linha 1: Filtros principais */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1 xl:gap-1.5">
 
           {/* Profissional */}
           <div className="space-y-0">
