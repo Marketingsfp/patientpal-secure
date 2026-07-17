@@ -113,6 +113,7 @@ type Paciente = {
   telefone: string | null;
   email: string | null;
   face_descriptor?: number[] | null;
+  codigo_prontuario?: string | null;
 };
 type Contrato = {
   id: string;
