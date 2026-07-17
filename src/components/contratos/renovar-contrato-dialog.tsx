@@ -163,7 +163,6 @@ export function RenovarContratoDialog({
   const [saving, setSaving] = useState(false);
   const [faixas, setFaixas] = useState<Faixa[]>([]);
   const [faixaId, setFaixaId] = useState<string>("");
-  const [faixaTocada, setFaixaTocada] = useState(false);
   const [confirmacaoAberta, setConfirmacaoAberta] = useState(false);
   const [erroRenovacao, setErroRenovacao] = useState<RenovacaoError | null>(null);
 
@@ -208,7 +207,6 @@ export function RenovarContratoDialog({
         cobrar_taxa_inclusao: false,
       }));
       setDeps(rows);
-      setFaixaTocada(false);
     })();
   }, [open, clinicaId, convenioAtualId, contratoId]);
 
@@ -253,19 +251,13 @@ export function RenovarContratoDialog({
     return `${range} — ${BRL(Number(f.valor_mensal))}`;
   };
 
-  // Ao trocar de convênio, reseta o "toque" para permitir auto-seleção pela quantidade.
-  useEffect(() => {
-    setFaixaTocada(false);
-  }, [novoConvenioId]);
-
-  // Auto-seleciona a faixa correspondente ao total de pessoas, a menos que
-  // o usuário tenha escolhido manualmente uma faixa nesta sessão.
+  // Auto-seleciona a faixa correspondente ao total de pessoas.
+  // Sempre re-sincroniza quando dependentes são incluídos ou removidos.
   useEffect(() => {
     if (faixasDoConvenio.length === 0) {
       setFaixaId("");
       return;
     }
-    if (faixaTocada) return;
     const alvo =
       faixasDoConvenio.find(
         (f) =>
@@ -273,7 +265,7 @@ export function RenovarContratoDialog({
           (f.vidas_ate == null || totalPessoas <= f.vidas_ate),
       ) ?? faixasDoConvenio[faixasDoConvenio.length - 1];
     setFaixaId(alvo.id);
-  }, [faixasDoConvenio, totalPessoas, faixaTocada]);
+  }, [faixasDoConvenio, totalPessoas]);
 
   const novosComTaxa = deps.filter(
     (d) => d.id === null && d.paciente_id && d.cobrar_taxa_inclusao,
@@ -437,10 +429,7 @@ export function RenovarContratoDialog({
                 <>
                   <Select
                     value={faixaId}
-                    onValueChange={(v) => {
-                      setFaixaId(v);
-                      setFaixaTocada(true);
-                    }}
+                    onValueChange={(v) => setFaixaId(v)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione a faixa…" />
