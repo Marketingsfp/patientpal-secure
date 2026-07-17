@@ -8578,10 +8578,6 @@ export type Database = {
         Args: { _clinica_id: string; _cpf: string }
         Returns: Json
       }
-      totem_checkin_paciente: {
-        Args: { _clinica_id: string; _paciente_id: string }
-        Returns: Json
-      }
       totem_match_biometria: {
         Args: { _clinica_id: string; _descriptor: Json; _threshold?: number }
         Returns: {
