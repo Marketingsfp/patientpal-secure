@@ -1937,7 +1937,7 @@ function DetalheContrato({
       (contrato as any).valor_mensal = novoValorMensal;
       setValorMensalAtual(novoValorMensal);
       // Recalcula parcelas em aberto para o novo valor
-      const abertas = mens.filter((m) => !isAdesao(m) && m.status !== "pago");
+      const abertas = mens.filter((m) => !isEncargoAvulso(m) && m.status !== "pago");
       if (abertas.length > 0) {
         await Promise.all(
           abertas.map((m) => {
