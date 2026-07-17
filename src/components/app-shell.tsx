@@ -495,7 +495,7 @@ export function AppShell() {
       )}
       {!isChooser && !useMenuV2 && (
       <aside
-        className={`${collapsed ? "w-16" : "w-64"} transition-all duration-200 shrink-0 text-white h-screen overflow-hidden hidden md:flex flex-col`}
+        className={`${collapsed ? "w-16" : "w-56 2xl:w-64"} transition-all duration-200 shrink-0 text-white h-screen overflow-hidden hidden md:flex flex-col`}
         style={{ backgroundColor: clinicColor }}
       >
         <div className="px-3 py-3 border-b border-white/10 flex items-center justify-between gap-2">

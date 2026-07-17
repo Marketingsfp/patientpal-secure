@@ -4503,12 +4503,12 @@ function AgendaPage() {
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm">
-            <CalendarDays className="h-6 w-6" />
+          <div className="flex h-10 w-10 xl:h-12 xl:w-12 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm">
+            <CalendarDays className="h-5 w-5 xl:h-6 xl:w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-foreground">Agendas</h1>
-            <p className="text-xs text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
+            <h1 className="text-xl xl:text-2xl font-bold tracking-tight text-slate-900 dark:text-foreground">Agendas</h1>
+            <p className="hidden xl:block text-xs text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -6418,11 +6418,11 @@ function AgendaPage() {
 
       {/* 🔥 FILTROS AGRUPADOS EM LINHAS LÓGICAS */}
       <div
-        className="rounded-2xl border bg-card p-3 shadow-sm mb-10 [&_input]:h-8 [&_input]:text-xs [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:text-xs"
+        className="rounded-2xl border bg-card p-2 xl:p-3 shadow-sm mb-6 [&_input]:h-8 [&_input]:text-xs [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:text-xs"
         style={{ ["--clinic" as never]: corClinica }}
       >
         {/* Linha 1: Filtros principais */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1 xl:gap-1.5">
 
           {/* Profissional */}
           <div className="space-y-0">
@@ -6546,14 +6546,14 @@ function AgendaPage() {
         </label>
         {/* KPIs REMOVIDOS */}
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
-        <div className="h-8"></div> {/* ← ADICIONE ESTA LINHA */}
+        <div className="h-4 xl:h-8"></div>
         {/* Tabela - Com botões de ação na linha */}
         {/* Sem overflow-hidden aqui: um ancestral com overflow != visible vira
             o contexto de scroll do sticky, e como este div nunca rola
             internamente (quem rola é o <main> do app-shell), o cabeçalho
             "sticky top-0" parava de acompanhar o scroll da página. */}
         <div className="rounded-lg border border-border bg-card overflow-x-auto">
-          <Table className="min-w-[900px] max-lg:table max-lg:overflow-visible">
+          <Table className="min-w-[820px] xl:min-w-[900px] max-lg:table max-lg:overflow-visible">
             <TableHeader className="sticky top-0 z-20">
               <TableRow className="bg-muted">
                 <TableHead className="w-8 rounded-tl-lg" title="Selecione para ações em lote">
@@ -6567,13 +6567,13 @@ function AgendaPage() {
                 </TableHead>
                 <TableHead className="w-20 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
                 <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
-                <TableHead className="min-w-[130px] font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="min-w-[110px] xl:min-w-[130px] font-semibold text-xs uppercase text-muted-foreground">
                   Profissional
                 </TableHead>
-                <TableHead className="min-w-[150px] font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="min-w-[130px] xl:min-w-[150px] font-semibold text-xs uppercase text-muted-foreground">
                   Cliente
                 </TableHead>
-                <TableHead className="min-w-[110px] font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="min-w-[100px] xl:min-w-[110px] font-semibold text-xs uppercase text-muted-foreground">
                   Serviço
                 </TableHead>
                 <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
