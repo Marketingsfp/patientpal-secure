@@ -47,6 +47,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { estornarLancamentoReceita } from "@/lib/estornar-lancamento";
 import { incluirDependenteContrato } from "@/lib/contrato-dependentes";
