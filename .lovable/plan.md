@@ -1,36 +1,44 @@
 ## Objetivo
 
-Na tela **Novo contrato** (Cartão Benefícios → Vendas), deixar o campo **"Apenas titular financeiro"** sempre visível na área do Paciente titular, porém **desabilitado** enquanto o titular não for selecionado. Após escolher o paciente titular, o checkbox fica habilitado para marcar/desmarcar.
+No **Comprovante de Agendamento** (impressão térmica 80mm):
 
-## Comportamento
-
-**Antes:** o checkbox "Apenas titular financeiro" só aparece depois que o paciente titular é selecionado (fica escondido no estado inicial da tela).
-
-**Depois:**
-- O bloco do checkbox aparece fixo, ao lado da área do titular, desde a abertura da tela.
-- Enquanto `titular` for `null`:
-  - `input[type=checkbox]` fica com `disabled` e `checked={false}`.
-  - Rótulo em cor mais suave (`text-muted-foreground`, `opacity-60`, `cursor-not-allowed`).
-  - Texto auxiliar curto: "Selecione o paciente titular para habilitar."
-- Assim que o titular é selecionado, o checkbox é habilitado e permite marcar/desmarcar normalmente (mesmo estado `titularApenasFinanceiro` já existente).
-- Ao trocar o titular (botão "Trocar"), o checkbox volta a ficar desabilitado e é resetado para desmarcado.
+1. Mostrar o **nº de prontuário** do paciente, no mesmo padrão da GR.
+2. Corrigir o disparo duplicado de `window.print()`, que abre dois pop-ups de impressão.
 
 ## Onde muda
 
-Apenas em `src/components/pages/contratos-page.tsx`, no wizard **Novo contrato** (bloco atual entre as linhas ~1140–1252, onde hoje há `{titular ? (...) : (PatientSearchInput)}`):
+Apenas `src/lib/print-comprovante-agendamento.ts`.
 
-1. Reestruturar o bloco do "Paciente titular" para que o checkbox "Apenas titular financeiro" fique **fora** do ramo `titular ? …`, permanecendo sempre renderizado ao lado (mantendo o layout md:flex já usado — coluna do titular à esquerda, caixa do checkbox à direita, `md:min-w-[260px] md:max-w-[340px]`).
-2. Adicionar `disabled={!titular}` no `<input type="checkbox">` e ajustar as classes do label para refletir o estado desabilitado.
-3. No handler do botão **Trocar** (`onClick={() => setTitular(null)}`), também chamar `setTitularApenasFinanceiro(false)` para não deixar um valor "fantasma" marcado sem titular.
-4. Adicionar uma linha de ajuda curta abaixo do rótulo, exibida apenas quando `!titular`.
+### 1. Nº de prontuário
+
+- Incluir `codigo_prontuario` no `select` da tabela `pacientes` (linha ~69).
+- Adicionar o campo no tipo local do `paciente`.
+- Renderizar logo abaixo do nome / CPF, como uma linha centralizada:
+  `PRONTUÁRIO: 00001` (usando classe `sm` já existente). Só exibe quando `codigo_prontuario` estiver preenchido — mantém o comportamento de identificadores legados (leitura, nunca escrita).
+
+### 2. Pop-up duplicado
+
+Hoje `imprimirViaIframe` chama `dispararPrint` duas vezes (linhas 228–229): via `iframe.onload` **e** via `setTimeout(600)`. Em navegadores rápidos, os dois disparam e aparecem dois diálogos de impressão.
+
+Ajuste: adicionar uma flag `jaImprimiu` para garantir que `cw.print()` execute uma única vez. O `setTimeout(600)` fica só como fallback para o caso do `onload` não disparar.
+
+```
+let jaImprimiu = false;
+const dispararPrint = () => {
+  if (jaImprimiu) return;
+  jaImprimiu = true;
+  try { cw.focus(); cw.print(); } catch {}
+  setTimeout(cleanup, 4000);
+};
+```
 
 ## Fora de escopo
 
-- Aba **Dados** de contratos já existentes (comportamento continua idêntico ao atual — o toggle já aparece lá com titular sempre presente).
-- Regras de negócio de `titular_apenas_financeiro` (cálculo de vidas, carteirinha, cobrança) — nada muda.
-- Migrações, RLS, tipos gerados, layout de "Convênio + Nº de pessoas" e ordem dos campos (já ajustados anteriormente).
+- Layout geral do comprovante (fontes, separadores, orientações) permanece igual.
+- GR e demais impressões (carnê, cartão, orçamento) — nenhuma alteração.
+- Regras de negócio, banco e RLS — nada muda.
 
 ## Validação
 
 - `tsgo --noEmit` sem erros.
-- Abrir `Cartão Benefícios → Vendas → Novo contrato`: checkbox visível e desabilitado antes de escolher titular; habilita ao selecionar; reseta ao clicar em "Trocar".
+- Reagendar/agendar um paciente com `codigo_prontuario` cadastrado e imprimir o comprovante: só abre 1 diálogo e o campo `PRONTUÁRIO: xxxxx` aparece abaixo do CPF.

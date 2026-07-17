@@ -66,7 +66,7 @@ export async function printComprovanteAgendamento(
     a.paciente_id
       ? supabase
           .from("pacientes")
-          .select("nome, cpf, telefone, data_nascimento")
+          .select("nome, cpf, telefone, data_nascimento, codigo_prontuario")
           .eq("id", a.paciente_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -79,7 +79,13 @@ export async function printComprovanteAgendamento(
       : Promise.resolve({ data: null }),
   ]);
 
-  const paciente = pac.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
+  const paciente = pac.data as {
+    nome: string;
+    cpf: string | null;
+    telefone: string | null;
+    data_nascimento: string | null;
+    codigo_prontuario: string | null;
+  } | null;
   const medicoBasic = med.data as { nome: string; especialidade: { nome: string } | null } | null;
   const medicoNome = medicoBasic?.nome ?? "—";
   let espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
@@ -159,6 +165,7 @@ export async function printComprovanteAgendamento(
     <div class="sep"></div>
 
     <div class="center" style="font-size:12pt; font-weight:700">${esc(paciente?.nome ?? a.paciente_nome)}</div>
+    ${paciente?.codigo_prontuario ? `<div class="center sm">PRONTUÁRIO: ${esc(paciente.codigo_prontuario)}</div>` : ""}
     ${paciente?.cpf ? `<div class="center sm">CPF: ${esc(paciente.cpf)}</div>` : ""}
     ${paciente?.telefone ? `<div class="center sm">FONE: ${esc(paciente.telefone)}</div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: ${fmtDataSimples(paciente.data_nascimento)}</div>` : ""}
@@ -221,7 +228,10 @@ function imprimirViaIframe(html: string): void {
   doc.write(html);
   doc.close();
   const cleanup = () => { try { document.body.removeChild(iframe); } catch { /* noop */ } };
+  let jaImprimiu = false;
   const dispararPrint = () => {
+    if (jaImprimiu) return;
+    jaImprimiu = true;
     try { cw.focus(); cw.print(); } catch { /* noop */ }
     setTimeout(cleanup, 4000);
   };
