@@ -3509,7 +3509,16 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setIncOpen(true)}
+                        onClick={() => {
+                          const hoje = new Date().toISOString().slice(0, 10);
+                          const dataInicioIso = (contrato.data_inicio ?? "").slice(0, 10);
+                          const mesmoDiaVenda = !!dataInicioIso && dataInicioIso === hoje;
+                          const valorPadrao = Number(convenio?.taxa_inclusao_dependente ?? 0) || 0;
+                          setIncCobrarTaxa(!mesmoDiaVenda);
+                          setIncTaxaValor(valorPadrao.toFixed(2));
+                          setIncTaxaVenc(hoje);
+                          setIncOpen(true);
+                        }}
                         disabled={cancelado || maxDep === 0 || depsAtivos.length >= maxDep}
                       >
                         <Plus className="h-4 w-4 mr-1" /> Incluir dependente
