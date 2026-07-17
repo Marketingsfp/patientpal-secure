@@ -3194,17 +3194,21 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       codigo={admPaciente?.codigo_prontuario ?? pacienteFull?.codigo_prontuario}
                     />
                   </div>
-                  <PatientSearchInput
-                    value={admPaciente}
-                    onSelect={(p) => setAdmPaciente(p)}
-                    placeholder="Buscar paciente por nome ou CPF…"
-                  />
-                  <ApenasFinanceiroToggle
-                    contratoId={contrato.id}
-                    checked={apenasFinanceiro}
-                    saving={savingApenasFin}
-                    disabled={cancelado && !isAdmin}
-                    onChange={async (v) => {
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] items-start">
+                    <div className="min-w-0">
+                      <PatientSearchInput
+                        value={admPaciente}
+                        onSelect={(p) => setAdmPaciente(p)}
+                        placeholder="Buscar paciente por nome ou CPF…"
+                      />
+                    </div>
+                    <div className="md:min-w-[260px] md:max-w-[340px]">
+                      <ApenasFinanceiroToggle
+                        contratoId={contrato.id}
+                        checked={apenasFinanceiro}
+                        saving={savingApenasFin}
+                        disabled={cancelado && !isAdmin}
+                        onChange={async (v) => {
                       setSavingApenasFin(true);
                       const { error } = await supabase
                         .from("contratos_assinatura")
@@ -3223,8 +3227,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       toast.success(v
                         ? "Marcado como Titular financeiro (não utiliza os benefícios)."
                         : "Titular passa a usufruir dos benefícios normalmente.");
-                    }}
-                  />
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <>
