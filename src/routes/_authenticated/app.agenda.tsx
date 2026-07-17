@@ -33,6 +33,7 @@ import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import { PatientSearchInput } from "@/components/patient-search-input";
 import { PacienteQuickActions } from "@/components/agenda/paciente-quick-actions";
+import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { FichaEmUsoAlert } from "@/components/agenda/ficha-em-uso-alert";
 import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
 import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
