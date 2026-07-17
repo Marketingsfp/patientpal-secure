@@ -404,7 +404,11 @@ export function TotemPage() {
         )}
 
         {step === "checkin" && (
-          <div className="w-full max-w-xl bg-card border rounded-3xl p-10 shadow-xl space-y-6">
+          // self-start: o bloco cresceu (CPF + teclado + botão facial + ações)
+          // e a centralização vertical do <main> deixava muito vazio em cima
+          // e empurrava "Voltar/Confirmar" pra baixo. Sobe o bloco mantendo a
+          // centralização horizontal (justify-center do <main> continua valendo).
+          <div className="w-full max-w-xl bg-card border rounded-3xl p-10 shadow-xl space-y-6 self-start mt-4">
             <div className="text-center space-y-2">
               <h2 className="text-3xl font-bold">Check-in</h2>
               <p className="text-muted-foreground">Digite seu CPF no teclado abaixo</p>
