@@ -1,34 +1,43 @@
-## Objetivo
-Ao renovar um contrato, o botão "RENOVAÇÃO" deve ficar desabilitado, e ao passar o mouse deve exibir a data em que a renovação foi feita.
+## Diagnóstico
+O erro da foto 2 vem da função de renovação no backend: ela só aceita renovar contrato com `status = 'ativo'` e sem cancelamento. Consultei o contrato da paciente Quédima e encontrei este cenário:
 
-## Escopo
-Somente frontend. Arquivo: `src/components/pages/contratos-page.tsx` (bloco do botão RENOVAÇÃO, linhas ~2968-2985).
+- Contrato original `#20261894`: já ficou com `status = renovado` e `renovado_em` preenchido.
+- Foi criado um novo contrato `#20261895`, mas ele está `cancelado`.
+- Ao tentar renovar de novo o contrato original, o backend bloqueia com `Contrato nao esta ativo`.
 
-## Como detectar que já foi renovado
-A tabela `contrato_renovacoes` já registra cada renovação com `contrato_id` (contrato de origem) e `created_at`. Buscar a renovação mais recente onde `contrato_id = contrato.id`:
-- Se existir → botão desabilitado, com tooltip "Renovado em DD/MM/AAAA".
-- Se não existir → mantém comportamento atual (habilitado quando as 12 parcelas estão pagas).
+Ou seja: o sistema já registrou uma renovação anterior e, por isso, não deve permitir uma segunda renovação pelo mesmo botão. O erro da foto 1 é a confirmação normal antes de executar; o problema é que o botão continuou disponível depois da renovação.
 
-## Alterações
-1. Adicionar `useQuery` na view do contrato para buscar a renovação existente:
-   ```
-   supabase.from('contrato_renovacoes')
-     .select('created_at, tipo, contrato_novo_id')
-     .eq('contrato_id', contrato.id)
-     .order('created_at', { desc: true })
-     .limit(1).maybeSingle()
-   ```
-2. No bloco do botão RENOVAÇÃO:
-   - Continuar exigindo `podeRenovar` (12/12 pagas) para exibir.
-   - Se houver renovação registrada: renderizar o botão com `disabled`, estilo esmaecido, envolto em `Tooltip` do shadcn mostrando `Renovado em {dd/MM/yyyy}` (usar `format` do date-fns já disponível no arquivo).
-   - Sem renovação: botão vermelho ativo como hoje.
-3. Invalidar essa query no `onSuccess` do fluxo de renovação (mesmo padrão de invalidação já usado após renovar) para o botão desabilitar imediatamente após a ação.
+## Tipo do pedido
+- Regra de negócio: contrato já renovado não deve renovar novamente pelo mesmo botão.
+- Erro de experiência do usuário: botão ainda clicável e mensagem técnica aparecendo.
+- Inconsistência operacional percebida: renovação anterior gerou contrato novo que depois foi cancelado.
+
+## Plano de correção
+1. Finalizar o ajuste no botão `RENOVAÇÃO` em `src/components/pages/contratos-page.tsx`:
+   - Se houver registro em `contrato_renovacoes` para o contrato atual, o botão fica desabilitado.
+   - Ao passar o mouse, mostra `Renovado em DD/MM/AAAA`.
+   - Se não houver renovação e todas as mensalidades estiverem pagas, mantém o botão vermelho ativo.
+
+2. Melhorar a proteção visual pelo status do contrato:
+   - Se `contrato.status` for `renovado`, o botão também fica desabilitado mesmo que a consulta de histórico ainda esteja carregando.
+   - Isso evita nova tentativa antes de terminar a leitura do histórico.
+
+3. Melhorar o tratamento do erro no diálogo de renovação:
+   - Mapear `Contrato nao esta ativo` para mensagem amigável: `Este contrato já foi renovado, cancelado ou não está ativo.`
+   - Orientação: `Use o contrato vigente do paciente para novas movimentações.`
+   - Isso substitui o erro genérico `RENOVACAO_ERRO_GERAL`.
+
+4. Após uma renovação concluída:
+   - Atualizar o estado local `renovadoEm` imediatamente.
+   - Recarregar os dados do contrato.
+   - Assim o botão fica desabilitado sem depender do usuário atualizar a página.
 
 ## Fora de escopo
-- Nenhuma mudança em RPCs, banco, permissões ou no fluxo do diálogo de renovação.
-- Não altera o botão "Cancelar contrato".
+- Não vou alterar dados existentes da paciente nem reativar/cancelar contratos.
+- Não vou mudar a regra de negócio de cancelamento do contrato novo.
+- Não vou mexer em mensalidades ou valores financeiros.
 
 ## Validação
-- Contrato já renovado (ex.: da Quédima após renovar): botão aparece desabilitado com tooltip da data.
-- Contrato quitado ainda não renovado: botão continua clicável e vermelho.
-- Após concluir uma nova renovação, o botão passa a desabilitado sem precisar recarregar a página.
+- Conferir no código que o botão fica desabilitado para contrato já renovado.
+- Conferir que o tooltip mostra a data da renovação.
+- Conferir que o erro técnico `Contrato nao esta ativo` passa a aparecer com identificação mais clara para o usuário.
