@@ -389,6 +389,7 @@ function ConveniosPage() {
       ativo,
       valor_mensal: valorMin,
       taxa_adesao: taxaAdesao,
+      taxa_inclusao_dependente: taxaInclusaoDep,
       num_parcelas: numParcelas,
       max_dependentes: maxDependentes,
       fidelidade_meses: fidelidadeMeses,
