@@ -904,7 +904,7 @@ function NovoContratoForm({
   async function carregarPacienteCompleto(p: PatientOption): Promise<Paciente> {
     const { data } = await supabase
       .from("pacientes")
-      .select("id, nome, cpf, telefone, email, face_descriptor")
+      .select("id, nome, cpf, telefone, email, face_descriptor, codigo_prontuario")
       .eq("id", p.id)
       .maybeSingle();
     return (
@@ -915,6 +915,7 @@ function NovoContratoForm({
         telefone: p.telefone,
         email: null,
         face_descriptor: null,
+        codigo_prontuario: null,
       }
     );
   }
