@@ -495,19 +495,7 @@ export function RenovarContratoDialog({
             )}
           </div>
 
-          {/* 3. Taxa de adesão (só troca) */}
-          {mode === "troca_plano" && taxaAdesaoConvenio > 0 ? (
-            <label className="flex items-start gap-2 rounded-md border p-2 text-sm cursor-pointer hover:bg-muted/40">
-              <Checkbox
-                checked={cobrarTaxa}
-                onCheckedChange={(v) => setCobrarTaxa(v === true)}
-                className="mt-0.5"
-              />
-              <span className="flex-1">
-                Cobrar taxa de adesão do novo convênio ({BRL(taxaAdesaoConvenio)})
-              </span>
-            </label>
-          ) : null}
+          {/* Renovação nunca cobra taxa de adesão — regra fixa. */}
 
           <div className="rounded-md bg-muted/40 p-3 text-sm space-y-1">
             <div className="flex justify-between">
