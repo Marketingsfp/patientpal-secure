@@ -568,12 +568,19 @@ function ConveniosPage() {
                   {nome.trim().length} / {NOME_MAX}
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
                   <Label>Taxa de adesão (R$)</Label>
                   <CurrencyInput
                     value={taxaAdesao ? taxaAdesao.toFixed(2) : ""}
                     onChange={(v) => setTaxaAdesao(v ? parseFloat(v) : 0)}
+                  />
+                </div>
+                <div>
+                  <Label>Taxa de inclusão de dependente (R$)</Label>
+                  <CurrencyInput
+                    value={taxaInclusaoDep ? taxaInclusaoDep.toFixed(2) : ""}
+                    onChange={(v) => setTaxaInclusaoDep(v ? parseFloat(v) : 0)}
                   />
                 </div>
                 <div>
