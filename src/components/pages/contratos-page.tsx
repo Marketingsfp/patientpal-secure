@@ -139,6 +139,7 @@ type Contrato = {
   tabela_legada?: boolean | null;
   migrar_apos?: string | null;
   criado_por?: string | null;
+  codigo_prontuario?: string | null;
 };
 type Mens = {
   id: string;
@@ -252,7 +253,29 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
         .order("nome"),
     ]);
     if (cs.error) mostrarErro(cs.error);
-    setList((cs.data ?? []) as Contrato[]);
+    const contratosRows = (cs.data ?? []) as Contrato[];
+    // Enriquecer com codigo_prontuario do paciente titular (leitura, imutável).
+    const pacIds = Array.from(
+      new Set(contratosRows.map((c) => c.paciente_id).filter((x): x is string => !!x)),
+    );
+    let prontMap: Record<string, string | null> = {};
+    if (pacIds.length > 0) {
+      const { data: pacs } = await supabase
+        .from("pacientes")
+        .select("id, codigo_prontuario")
+        .in("id", pacIds);
+      prontMap = Object.fromEntries(
+        ((pacs ?? []) as Array<{ id: string; codigo_prontuario: string | null }>).map(
+          (p) => [p.id, p.codigo_prontuario],
+        ),
+      );
+    }
+    setList(
+      contratosRows.map((c) => ({
+        ...c,
+        codigo_prontuario: c.paciente_id ? prontMap[c.paciente_id] ?? null : null,
+      })),
+    );
     setConvenios((cv.data ?? []) as Convenio[]);
     // Agregar parcelas dos contratos carregados
     const contratoIds = ((cs.data ?? []) as Array<{ id: string }>).map((c) => c.id);
@@ -706,6 +729,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <span>{c.paciente_nome}</span>
+                    <ProntuarioBadge codigo={c.codigo_prontuario} />
                     {c.tabela_legada ? (
                       <Badge
                         variant="outline"
