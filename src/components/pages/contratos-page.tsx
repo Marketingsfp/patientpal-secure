@@ -2748,11 +2748,68 @@ function DetalheContrato({
   const pagas = mensalidades.filter((m) => m.status === "pago").length;
   const totalPagoMens = mens.filter((m) => m.status === "pago").reduce((s, m) => s + Number(m.valor), 0);
   const totalPago = totalPagoMens + extraRecebido.total;
-  // "Pagas X/Y" reflete apenas as parcelas deste contrato — recebimentos
-  // avulsos (fin_lancamentos) continuam no card "Recebido" mas fora da
-  // contagem de parcelas, para não inflar o denominador com histórico.
-  const pagasTotal = pagas;
-  const totalParcelas = mensalidades.length;
+  // Segmenta mensalidades em CICLOS: ciclo 1 = parcelas 1..N0 (contrato
+  // original, N0 = contrato.num_parcelas); ciclos seguintes usam
+  // parcelas_geradas de cada renovação por extensão, em ordem cronológica.
+  // Renovações do tipo troca_plano geram contrato NOVO (não caem aqui) e
+  // aparecem em "Contratos anteriores deste paciente".
+  const parcelasMensais = mensalidades
+    .filter((m) => (m.numero_parcela ?? 0) > 0)
+    .sort((a, b) => (a.numero_parcela ?? 0) - (b.numero_parcela ?? 0));
+  const tamanhoOriginal = Math.max(
+    1,
+    Number((contrato as any).num_parcelas) || 12,
+  );
+  const tamanhosCiclos: number[] = [tamanhoOriginal];
+  for (const r of renovacoes) {
+    if (r.tipo === "extensao" && Number(r.parcelas_geradas ?? 0) > 0) {
+      tamanhosCiclos.push(Number(r.parcelas_geradas));
+    }
+  }
+  // Constrói ciclos como fatias sobre parcelasMensais (ordenadas). Se o total
+  // real de parcelas não bater com a soma dos tamanhos, o último ciclo
+  // absorve o excedente para não perder linhas.
+  type Ciclo = {
+    index: number; // 0 = original, 1 = 1ª renovação, ...
+    label: string;
+    tipo: "original" | "extensao";
+    parcelas: Mens[];
+    inicio: string | null;
+    fim: string | null;
+  };
+  const ciclos: Ciclo[] = [];
+  {
+    let cursor = 0;
+    for (let i = 0; i < tamanhosCiclos.length; i++) {
+      const isLast = i === tamanhosCiclos.length - 1;
+      const take = isLast
+        ? parcelasMensais.length - cursor
+        : Math.min(tamanhosCiclos[i], parcelasMensais.length - cursor);
+      const slice = parcelasMensais.slice(cursor, cursor + Math.max(0, take));
+      cursor += Math.max(0, take);
+      const tipoCiclo: Ciclo["tipo"] = i === 0 ? "original" : "extensao";
+      ciclos.push({
+        index: i,
+        tipo: tipoCiclo,
+        label: i === 0 ? "Ciclo original" : `Renovação ${i}`,
+        parcelas: slice,
+        inicio: slice[0]?.vencimento ?? null,
+        fim: slice[slice.length - 1]?.vencimento ?? null,
+      });
+      if (cursor >= parcelasMensais.length) break;
+    }
+  }
+  const cicloAtual = ciclos[ciclos.length - 1] ?? null;
+  const ciclosAnteriores = ciclos.slice(0, -1);
+  const temCiclosMultiplos = ciclos.length > 1;
+  // "Pagas X/Y" reflete o CICLO ATUAL quando o contrato tem renovações por
+  // extensão; caso contrário, é igual ao total de mensalidades do contrato.
+  const pagasTotal = temCiclosMultiplos
+    ? (cicloAtual?.parcelas.filter((m) => m.status === "pago").length ?? 0)
+    : pagas;
+  const totalParcelas = temCiclosMultiplos
+    ? (cicloAtual?.parcelas.length ?? 0)
+    : mensalidades.length;
   const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
 
   // ---- Dados da venda (aba "Dados") ----
