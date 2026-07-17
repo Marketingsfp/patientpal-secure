@@ -3995,6 +3995,42 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </Select>
               </div>
             </div>
+            <div className="rounded-md border p-3 space-y-2 bg-muted/20">
+              <label className="flex items-start gap-2 text-sm cursor-pointer">
+                <Checkbox
+                  checked={incCobrarTaxa}
+                  onCheckedChange={(v) => setIncCobrarTaxa(v === true)}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium">Cobrar taxa de inclusão de dependente</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Cobrança única — aparece em <strong>Mensalidades</strong> mas não conta como parcela.
+                  </span>
+                </span>
+              </label>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-xs">Valor (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={incTaxaValor}
+                    disabled={!incCobrarTaxa}
+                    onChange={(e) => setIncTaxaValor(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Vencimento</Label>
+                  <DateInputBR
+                    value={incTaxaVenc}
+                    onChange={(e) => setIncTaxaVenc(e.target.value)}
+                    disabled={!incCobrarTaxa}
+                  />
+                </div>
+              </div>
+            </div>
             {contrato.assinado_em && convenio?.termo_inclusao_html ? (
               <p className="text-xs text-muted-foreground">
                 Após incluir, será gerado o <strong>Termo de Inclusão</strong> para impressão/assinatura.
