@@ -1708,7 +1708,7 @@ function AgendaPage() {
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
-    const [m, e, me, pr, sr, mcRows, mp, er, erp, agendasRes] = await Promise.all([
+    const [m, e, me, pr, sr, mcRows, mp, agendasRes] = await Promise.all([
       supabase
         .from("medicos")
         .select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco")
@@ -1728,16 +1728,6 @@ function AgendaPage() {
         .not("medico_id", "is", null),
       getMedicoConveniosAgenda(clinicaAtual.clinica_id),
       fetchMedicoProcedimentosAgenda(clinicaAtual.clinica_id),
-      supabase
-        .from("enfermagem_recursos")
-        .select("id,nome")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true)
-        .order("nome"),
-      supabase
-        .from("enfermagem_recurso_procedimentos")
-        .select("recurso_id,procedimento_id,enfermagem_recursos!inner(clinica_id)")
-        .eq("enfermagem_recursos.clinica_id", clinicaAtual.clinica_id),
       supabase
         .from("medico_agendas")
         .select("id,nome,medico_id,ativo,ordem")
@@ -1781,24 +1771,8 @@ function AgendaPage() {
       especialidade_nome: x.especialidade_id ? (especialidadesPorId.get(x.especialidade_id) ?? null) : null,
       __recurso: false,
     }));
-    let recursosArr = (er.data ?? []) as RecursoEnf[];
-    // Se o usuário logado é enfermeiro, restringe agendas àquelas em que foi liberado
-    if (clinicaAtual.role === "enfermeiro" && user?.id) {
-      const { data: vinc } = await supabase
-        .from("enfermagem_recurso_atendentes")
-        .select("recurso_id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("user_id", user.id);
-      const allowed = new Set(((vinc ?? []) as Array<{ recurso_id: string }>).map((r) => r.recurso_id));
-      recursosArr = recursosArr.filter((r) => allowed.has(r.id));
-    }
-    const recursosComoMedicos: Medico[] = recursosArr.map((r) => ({
-      id: r.id,
-      nome: `🩺 ${r.nome}`,
-      sexo: null,
-    }));
-    setRecursoIds(new Set(recursosArr.map((r) => r.id)));
-    setMedicos([...medicosBase, ...recursosComoMedicos] as Medico[]);
+    setRecursoIds(new Set());
+    setMedicos(medicosBase as Medico[]);
     // Pacientes não são mais carregados em massa aqui: a seleção usa busca
     // server-side em PatientSearchInput. Isso evita travar a agenda em bases grandes.
     setPacientes([]);
