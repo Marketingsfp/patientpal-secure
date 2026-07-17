@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { isMedicoOnlyUser } from "@/lib/medico-only";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,17 +42,24 @@ function LoginPage() {
   const [resetLoading, setResetLoading] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && user) navigate({ to: "/app", replace: true });
+    if (!authLoading && user) {
+      (async () => {
+        const soMedico = await isMedicoOnlyUser(user.id);
+        navigate({ to: soMedico ? "/medico" : "/app", replace: true });
+      })();
+    }
   }, [authLoading, navigate, user]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) { mostrarErro(error); return; }
     toast.success("Bem-vindo!");
-    navigate({ to: "/app", replace: true });
+    const uid = data.user?.id;
+    const soMedico = uid ? await isMedicoOnlyUser(uid) : false;
+    navigate({ to: soMedico ? "/medico" : "/app", replace: true });
   };
 
   const handleForgotPassword = async () => {
