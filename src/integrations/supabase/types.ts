@@ -2542,6 +2542,7 @@ export type Database = {
           convenio_anterior_id: string | null
           convenio_novo_id: string | null
           created_at: string
+          dependentes_incluidos: Json | null
           id: string
           observacao: string | null
           parcelas_geradas: number
@@ -2559,6 +2560,7 @@ export type Database = {
           convenio_anterior_id?: string | null
           convenio_novo_id?: string | null
           created_at?: string
+          dependentes_incluidos?: Json | null
           id?: string
           observacao?: string | null
           parcelas_geradas?: number
@@ -2576,6 +2578,7 @@ export type Database = {
           convenio_anterior_id?: string | null
           convenio_novo_id?: string | null
           created_at?: string
+          dependentes_incluidos?: Json | null
           id?: string
           observacao?: string | null
           parcelas_geradas?: number
@@ -8586,28 +8589,23 @@ export type Database = {
         }
       }
       renovar_contrato_extensao: {
-        Args: { _contrato_id: string; _observacao?: string }
+        Args: {
+          _contrato_id: string
+          _dependentes?: Json
+          _observacao?: string
+        }
         Returns: Json
       }
-      renovar_contrato_troca_plano:
-        | {
-            Args: {
-              _contrato_id: string
-              _convenio_novo_id: string
-              _observacao?: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _cobrar_taxa_adesao?: boolean
-              _contrato_id: string
-              _convenio_novo_id: string
-              _dependentes_manter?: string[]
-              _observacao?: string
-            }
-            Returns: Json
-          }
+      renovar_contrato_troca_plano: {
+        Args: {
+          _cobrar_taxa_adesao?: boolean
+          _contrato_id: string
+          _convenio_novo_id: string
+          _dependentes?: Json
+          _observacao?: string
+        }
+        Returns: Json
+      }
       resolver_clinica_por_token: {
         Args: { _token: string }
         Returns: {
