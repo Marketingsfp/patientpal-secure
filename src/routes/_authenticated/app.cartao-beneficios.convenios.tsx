@@ -42,6 +42,10 @@ const convenioSchema = z
     descricao: z.string().trim().max(DESCRICAO_MAX, `Descrição pode ter no máximo ${DESCRICAO_MAX} caracteres`).optional(),
     beneficios: z.string().trim().max(BENEFICIOS_MAX, `Benefícios pode ter no máximo ${BENEFICIOS_MAX} caracteres`).optional(),
     taxa_adesao: z.number().min(0, "Taxa não pode ser negativa").max(100000, "Taxa acima do permitido"),
+    taxa_inclusao_dependente: z
+      .number()
+      .min(0, "Taxa não pode ser negativa")
+      .max(100000, "Taxa acima do permitido"),
     num_parcelas: z.number().int().min(1, "Nº de parcelas deve ser ≥ 1").max(60, "Máximo de 60 parcelas"),
     max_dependentes: z.number().int().min(0).max(50, "Máximo de 50 dependentes"),
     fidelidade_meses: z.number().int().min(0).max(120),
