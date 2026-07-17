@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Smile, Save } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -14,8 +14,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { type OdontoStatus, STATUS_LABEL } from "@/lib/odonto";
 import { formatDatePura } from "@/lib/date-utils";
+import { OrcamentoTab } from "@/components/odontologia/orcamento-tab";
 
 export const Route = createFileRoute("/_authenticated/app/odontologia")({
   component: OdontologiaPage,
@@ -42,6 +44,23 @@ function OdontologiaPage() {
   const [statusNovo, setStatusNovo] = useState<OdontoStatus>("cariado");
   const [procNovo, setProcNovo] = useState("");
   const [obsNovo, setObsNovo] = useState("");
+  const [orcadoSet, setOrcadoSet] = useState<Set<number>>(new Set());
+  const [itensPorDente, setItensPorDente] = useState<Array<{
+    id: string; descricao: string; valor_total: number; orcamento_id: string;
+    orcamento_numero: number | null; dentes: number[];
+  }>>([]);
+  const [especialidadeOdontoId, setEspecialidadeOdontoId] = useState<string | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase
+        .from("especialidades")
+        .select("id")
+        .ilike("nome", "odontologia")
+        .maybeSingle();
+      setEspecialidadeOdontoId(data?.id ?? null);
+    })();
+  }, []);
 
   useEffect(() => {
     if (!pacienteId || !clinicaAtual) { setDentes([]); setProntuario(null); return; }
@@ -51,20 +70,54 @@ function OdontologiaPage() {
 
   async function carregar() {
     if (!pacienteId || !clinicaAtual) return;
-    const [{ data: d }, { data: p }] = await Promise.all([
+    const [{ data: d }, { data: p }, { data: orcs }] = await Promise.all([
       supabase.from("odonto_dentes").select("id,dente,status,procedimento,observacoes,data")
         .eq("paciente_id", pacienteId).eq("clinica_id", clinicaAtual.clinica_id)
         .order("data", { ascending: false }),
       supabase.from("odonto_prontuarios").select("id,queixa_principal,historia_dental,plano_tratamento,observacoes")
         .eq("paciente_id", pacienteId).eq("clinica_id", clinicaAtual.clinica_id).maybeSingle(),
+      supabase.from("orcamentos")
+        .select("id, numero, status")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("paciente_id", pacienteId)
+        .eq("status", "aberto"),
     ]);
     setDentes((d as DenteRow[]) ?? []);
     setProntuario((p as ProntuarioOdonto) ?? null);
+    const orcIds = ((orcs ?? []) as { id: string; numero: number }[]).map((o) => o.id);
+    if (orcIds.length === 0) { setOrcadoSet(new Set()); setItensPorDente([]); return; }
+    const numeroById = new Map<string, number>(
+      ((orcs ?? []) as { id: string; numero: number }[]).map((o) => [o.id, o.numero]),
+    );
+    const { data: itensAbertos } = await supabase
+      .from("orcamento_itens")
+      .select("id, descricao, valor_total, orcamento_id, dentes")
+      .in("orcamento_id", orcIds)
+      .not("dentes", "is", null);
+    const rows = ((itensAbertos ?? []) as Array<{
+      id: string; descricao: string; valor_total: number; orcamento_id: string; dentes: number[] | null;
+    }>).map((r) => ({
+      id: r.id,
+      descricao: r.descricao,
+      valor_total: Number(r.valor_total),
+      orcamento_id: r.orcamento_id,
+      orcamento_numero: numeroById.get(r.orcamento_id) ?? null,
+      dentes: r.dentes ?? [],
+    }));
+    setItensPorDente(rows);
+    const s = new Set<number>();
+    for (const r of rows) for (const d of r.dentes) s.add(d);
+    setOrcadoSet(s);
   }
 
   // Pega o estado mais recente de cada dente
   const estados: Record<number, OdontoStatus> = {};
   for (const r of [...dentes].reverse()) estados[r.dente] = r.status;
+
+  const itensDoDenteSelecionado = useMemo(
+    () => (selecionado ? itensPorDente.filter((it) => it.dentes.includes(selecionado)) : []),
+    [selecionado, itensPorDente],
+  );
 
   async function salvarDente() {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
