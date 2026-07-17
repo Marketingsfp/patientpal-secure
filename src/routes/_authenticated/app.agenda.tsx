@@ -5823,6 +5823,33 @@ function AgendaPage() {
                 onChange={(e) => setNovoPac((p) => ({ ...p, email: e.target.value }))}
               />
             </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                type="button"
+                variant={descritorFace ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setFaceOpen(true)}
+              >
+                {descritorFace ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-1 text-green-600" /> Foto capturada — refazer
+                  </>
+                ) : (
+                  <>
+                    <Camera className="h-4 w-4 mr-1" /> Tirar foto (reconhecimento facial)
+                  </>
+                )}
+              </Button>
+              {descritorFace && (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground underline"
+                  onClick={() => setDescritorFace(null)}
+                >
+                  remover
+                </button>
+              )}
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setNovoPacOpen(false)}>
                 Cancelar
@@ -5832,6 +5859,15 @@ function AgendaPage() {
               </Button>
             </DialogFooter>
           </form>
+          <FaceCaptureDialog
+            open={faceOpen}
+            onClose={() => setFaceOpen(false)}
+            onCaptured={(desc) => {
+              setDescritorFace(desc);
+              toast.success("Foto capturada. Será vinculada ao cadastrar.");
+            }}
+            titulo="Cadastrar rosto do paciente"
+          />
         </DialogContent>
       </Dialog>
 
