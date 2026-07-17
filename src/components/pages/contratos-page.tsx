@@ -1808,6 +1808,8 @@ function DetalheContrato({
   const [canceladoEm, setCanceladoEm] = useState<string | null>(contrato.cancelado_em ?? null);
   const [cancelMotivoAtual, setCancelMotivoAtual] = useState<string | null>(contrato.cancelamento_motivo ?? null);
   const cancelado = !!canceladoEm;
+  // Renovação do contrato
+  const [renovarOpen, setRenovarOpen] = useState(false);
   // Valor mensal vigente (atualizado quando recalculamos as parcelas em aberto)
   const [valorMensalAtual, setValorMensalAtual] = useState<number>(Number(contrato.valor_mensal));
   useEffect(() => {
