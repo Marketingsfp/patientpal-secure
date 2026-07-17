@@ -6439,9 +6439,30 @@ function AgendaPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">TODAS</SelectItem>
-                {Array.from(agendasPorMedico.values()).flat().map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
-                ))}
+                {(() => {
+                  // Quando um médico específico está selecionado, listamos
+                  // as agendas dele por id (permite distinguir turnos/salas).
+                  // Quando é "TODOS", agrupamos por NOME (ex.: "AGENDA",
+                  // "CONSULTAS") para não repetir a mesma opção uma vez
+                  // por médico.
+                  if (filtroMedico !== "todos") {
+                    const arr = agendasPorMedico.get(filtroMedico) ?? [];
+                    return arr.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
+                    ));
+                  }
+                  const seen = new Set<string>();
+                  const out: { key: string; nome: string }[] = [];
+                  for (const a of Array.from(agendasPorMedico.values()).flat()) {
+                    const k = (a.nome ?? "").trim().toUpperCase();
+                    if (!k || seen.has(k)) continue;
+                    seen.add(k);
+                    out.push({ key: k, nome: a.nome });
+                  }
+                  return out.map((o) => (
+                    <SelectItem key={`nome:${o.key}`} value={`nome:${o.key}`}>{o.nome}</SelectItem>
+                  ));
+                })()}
               </SelectContent>
             </Select>
           </div>
