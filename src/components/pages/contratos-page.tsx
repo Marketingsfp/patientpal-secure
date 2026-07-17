@@ -3189,8 +3189,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       <div className="text-sm font-medium">Paciente titular</div>
                       <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
                     </div>
-                    <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                      {contrato.paciente_nome}{pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}
+                    <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm flex items-center gap-2 flex-wrap">
+                      <span>{contrato.paciente_nome}{pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}</span>
+                      <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
                     </div>
                   </div>
                   {apenasFinanceiro ? (
