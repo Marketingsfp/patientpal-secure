@@ -163,11 +163,6 @@ function EquipePage() {
     setMedicoPrefillUserId(undefined);
     setMedicoDialog({ open: true, id: null });
   };
-  const escolherEnfermagem = () => {
-    setOpenChooser(false);
-    setEnfDialog({ open: true, userId: null });
-  };
-
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
 
   const q = busca.trim().toLowerCase();
@@ -182,11 +177,6 @@ function EquipePage() {
     : medicosPorStatus;
   const medicosAtivosCount = medicos.filter((m) => m.ativo).length;
   const medicosInativosCount = medicos.length - medicosAtivosCount;
-  const enfermeirosFiltrados = q
-    ? enfermeiros.filter((e) =>
-        e.nome.toLowerCase().includes(q) ||
-        e.agendas.some((a) => a.toLowerCase().includes(q)))
-    : enfermeiros;
 
   return (
     <div className="space-y-6">
@@ -204,7 +194,7 @@ function EquipePage() {
         )}
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "funcionarios" | "medicos" | "enfermagem")}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "funcionarios" | "medicos")}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <TabsList>
             <TabsTrigger value="funcionarios">
