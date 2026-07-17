@@ -2750,7 +2750,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
       // Reflete imediatamente no objeto recebido por prop, para textos derivados
       (contrato as any).valor_mensal = novoValor;
     }
-    const abertas = mens.filter((m) => !isAdesao(m) && m.status !== "pago");
+    const abertas = mens.filter((m) => !isEncargoAvulso(m) && m.status !== "pago");
     if (abertas.length === 0) return;
     await Promise.all(
       abertas.map((m) => {
