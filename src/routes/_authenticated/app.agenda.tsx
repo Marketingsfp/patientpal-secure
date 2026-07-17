@@ -115,7 +115,6 @@ type Agendamento = {
   atendimento_grupo_id?: string | null;
   ficha_numero?: number | null;
   forma_pagamento_prevista?: string | null;
-  enfermagem_recurso_id?: string | null;
 };
 type Medico = {
   id: string;
@@ -1477,7 +1476,7 @@ function AgendaPage() {
     let q = supabase
       .from("agendamentos")
       .select(
-        "id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never,
+        "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never,
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: apenasData ? false : true });
@@ -1493,7 +1492,7 @@ function AgendaPage() {
     // linhas do PostgREST e descartar os agendamentos do profissional/dia
     // selecionado.
     if (filtroMedico !== "todos") {
-      q = q.or(`medico_id.eq.${filtroMedico},enfermagem_recurso_id.eq.${filtroMedico}`);
+      q = q.eq("medico_id", filtroMedico);
     }
     // Empurra a busca por nome de cliente para o servidor — sem isso a
     // janela de 30 dias pode trazer mais que o limite do PostgREST e
@@ -1556,12 +1555,9 @@ function AgendaPage() {
       mostrarErro(error);
       return;
     }
-    // Recursos de enfermagem aparecem como "médicos virtuais": mapeamos o
-    // enfermagem_recurso_id no campo medico_id para reuso de toda a UI.
     const mapped = (
       (data ?? []) as unknown as Array<
         Agendamento & {
-          enfermagem_recurso_id?: string | null;
           medico?: { nome: string | null; sexo: string | null } | null;
           orcamento?: { numero: number | null } | null;
         }
@@ -1569,7 +1565,7 @@ function AgendaPage() {
     ).map((a) => ({
       ...a,
       paciente_nome: isSlotLivre(a.paciente_nome) ? "DISPONÍVEL" : a.paciente_nome,
-      medico_id: a.medico_id ?? a.enfermagem_recurso_id ?? null,
+      medico_id: a.medico_id ?? null,
       medico_nome: a.medico_nome ?? a.medico?.nome ?? null,
       medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
       orcamento_numero: a.orcamento_numero ?? a.orcamento?.numero ?? null,
@@ -3437,13 +3433,11 @@ function AgendaPage() {
       return;
     }
     setSaving(true);
-    const ehRecurso = !!form.medico_id && recursoIds.has(form.medico_id);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       paciente_nome: form.paciente_nome.trim(),
       paciente_id: form.paciente_id || null,
-      medico_id: ehRecurso ? null : form.medico_id || null,
-      enfermagem_recurso_id: ehRecurso ? form.medico_id : null,
+      medico_id: form.medico_id || null,
       inicio: new Date(form.inicio).toISOString(),
       fim: new Date(form.fim).toISOString(),
       procedimento: procedimentoTexto || null,
@@ -5970,7 +5964,6 @@ function AgendaPage() {
                   paciente_nome: "Paciente",
                   paciente_id: "Paciente (id)",
                   medico_id: "Profissional",
-                  enfermagem_recurso_id: "Recurso de enfermagem",
                   inicio: "Início",
                   fim: "Fim",
                   status: "Status",
@@ -6918,14 +6911,6 @@ function AgendaPage() {
                               {podeEscrever && !ehLivre && (
                                 <>
                                   <DropdownMenuSeparator />
-                                  {a.enfermagem_recurso_id && a.status !== "realizado" && (
-                                    <DropdownMenuItem
-                                      onClick={() => iniciarAtendimentoEnf(a)}
-                                      className="text-green-700 font-medium"
-                                    >
-                                      <CheckCircle2 className="h-4 w-4 mr-2" /> Dar baixa (Enfermagem)
-                                    </DropdownMenuItem>
-                                  )}
                                   {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
                                     <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
                                       <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}
