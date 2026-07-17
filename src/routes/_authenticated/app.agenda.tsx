@@ -1264,7 +1264,7 @@ function AgendaPage() {
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
   const [faceOpen, setFaceOpen] = useState(false);
-  const [descritorFace, setDescritorFace] = useState<Float32Array | null>(null);
+  const [descritorFace, setDescritorFace] = useState<number[] | null>(null);
   const [savingPac, setSavingPac] = useState(false);
   const [equipeList, setEquipeList] = useState<
     Array<{ nome: string | null; email: string | null; user_id: string | null; role: string | null }>
