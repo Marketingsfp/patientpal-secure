@@ -3388,6 +3388,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         <li key={d.id} className="flex items-center justify-between gap-2">
                           <div className={d.ativo ? "" : "text-muted-foreground line-through"}>
                             • {d.paciente_nome}
+                            {d.codigo_prontuario ? (
+                              <span className="ml-2 no-underline align-middle inline-block">
+                                <ProntuarioBadge codigo={d.codigo_prontuario} />
+                              </span>
+                            ) : null}
                             <span className="text-muted-foreground no-underline">
                               {" "}
                               — {d.parentesco ?? "—"} ({d.tipo}){d.cpf ? ` — CPF ${d.cpf}` : ""}
