@@ -3144,55 +3144,6 @@ h1, h2, h3 { margin: 0 0 6mm; }
               ) : null}
               {isAdmin && podeEscrever ? (
                 <div className="space-y-1">
-                  <Label>Convênio</Label>
-                  <Select value={admConvenioId} onValueChange={setAdmConvenioId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o convênio" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {conveniosAdm.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <DadosField label="Convênio" value={convenio?.nome ?? "—"} />
-              )}
-              {isAdmin && podeEscrever && faixas.length > 0 ? (
-                <div className="space-y-1">
-                  <Label>Nº de pessoas no contrato</Label>
-                  <Select value={admFaixaId} onValueChange={setAdmFaixaId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a faixa…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {faixas.map((f) => {
-                        const range =
-                          f.vidas_ate == null
-                            ? `${f.vidas_de}+ pessoas`
-                            : f.vidas_ate === f.vidas_de
-                              ? `${f.vidas_de} ${f.vidas_de === 1 ? "pessoa" : "pessoas"}`
-                              : `${f.vidas_de} a ${f.vidas_ate} pessoas`;
-                        return (
-                          <SelectItem key={f.id} value={f.id}>
-                            {range} — {BRL(Number(f.valor_mensal))}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Ao salvar, o valor mensal do contrato e das parcelas em aberto serão atualizados para a faixa selecionada.
-                  </p>
-                </div>
-              ) : (
-                <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
-              )}
-              {isAdmin && podeEscrever ? (
-                <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <Label>Paciente titular</Label>
                     <ProntuarioBadge
@@ -3249,6 +3200,57 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   ) : null}
                 </>
               )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {isAdmin && podeEscrever ? (
+                <div className="space-y-1">
+                  <Label>Convênio</Label>
+                  <Select value={admConvenioId} onValueChange={setAdmConvenioId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o convênio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {conveniosAdm.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <DadosField label="Convênio" value={convenio?.nome ?? "—"} />
+              )}
+              {isAdmin && podeEscrever && faixas.length > 0 ? (
+                <div className="space-y-1">
+                  <Label>Nº de pessoas no contrato</Label>
+                  <Select value={admFaixaId} onValueChange={setAdmFaixaId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a faixa…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {faixas.map((f) => {
+                        const range =
+                          f.vidas_ate == null
+                            ? `${f.vidas_de}+ pessoas`
+                            : f.vidas_ate === f.vidas_de
+                              ? `${f.vidas_de} ${f.vidas_de === 1 ? "pessoa" : "pessoas"}`
+                              : `${f.vidas_de} a ${f.vidas_ate} pessoas`;
+                        return (
+                          <SelectItem key={f.id} value={f.id}>
+                            {range} — {BRL(Number(f.valor_mensal))}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Ao salvar, o valor mensal do contrato e das parcelas em aberto serão atualizados para a faixa selecionada.
+                  </p>
+                </div>
+              ) : (
+                <DadosField label="Nº de pessoas no contrato" value={faixaLabel} />
+              )}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {isAdmin && podeEscrever ? (
                   <div className="space-y-1">
