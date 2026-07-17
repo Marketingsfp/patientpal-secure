@@ -84,6 +84,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) =>
   s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—";
+const MESES_PT = [
+  "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+  "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
+];
+const competenciaDe = (s?: string | null): string => {
+  if (!s) return "—";
+  const [, m, ] = s.slice(0, 10).split("-").map(Number);
+  if (!m || m < 1 || m > 12) return "—";
+  return MESES_PT[m - 1];
+};
 // Adiciona 1 ano à data inicial (formato ISO YYYY-MM-DD). Retorna null se inválida.
 const addUmAno = (s?: string | null): string | null => {
   if (!s) return null;
@@ -3610,6 +3620,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       <TableRow>
                         <TableHead>Cobrança</TableHead>
                         <TableHead>Vencimento</TableHead>
+                        <TableHead>Competência</TableHead>
                         <TableHead>Valor</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Pago em</TableHead>
@@ -3619,7 +3630,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     <TableBody>
                       {loading ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">
+                          <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
                             Carregando…
                           </TableCell>
                         </TableRow>
@@ -3636,7 +3647,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           if (ciclo && ciclo.index > 0 && ciclo.parcelas[0]?.id === m.id) {
                             cicloHeader = (
                               <TableRow key={`hdr-${ciclo.index}`} className="bg-muted/40">
-                                <TableCell colSpan={6} className="text-xs font-semibold py-2">
+                                <TableCell colSpan={7} className="text-xs font-semibold py-2">
                                   {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a {ciclo.fim ? fmtD(ciclo.fim) : "—"}
                                 </TableCell>
                               </TableRow>
@@ -3644,7 +3655,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           } else if (ciclo && ciclo.index === 0 && ciclo.parcelas[0]?.id === m.id) {
                             cicloHeader = (
                               <TableRow key={`hdr-${ciclo.index}`} className="bg-muted/40">
-                                <TableCell colSpan={6} className="text-xs font-semibold py-2">
+                                <TableCell colSpan={7} className="text-xs font-semibold py-2">
                                   {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a {ciclo.fim ? fmtD(ciclo.fim) : "—"}
                                 </TableCell>
                               </TableRow>
@@ -3685,6 +3696,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                             ) : (
                               fmtD(m.vencimento)
                             )}
+                          </TableCell>
+                          <TableCell className="capitalize">
+                            {competenciaDe(m.vencimento)}
                           </TableCell>
                           <TableCell>
                             {isAdmin && podeEscrever ? (
