@@ -345,18 +345,18 @@ async function obterInfoConvenioPaciente(params: {
   // 1) Contrato ativo: paciente como titular OU dependente ativo
   const { data: titularContratos } = await supabase
     .from("contratos_assinatura")
-    .select("id,convenio_id,cb_convenios(nome)")
+    .select("id,convenio_id,contrato_origem_id,numero_renovacoes,cb_convenios(nome)")
     .eq("clinica_id", clinicaId)
     .eq("status", "ativo")
     .eq("paciente_id", pacienteId)
     .limit(5);
-  let contrato: { id: string; convenio_id: string | null; cb_convenios: { nome: string } | null } | null =
+  let contrato: { id: string; convenio_id: string | null; contrato_origem_id?: string | null; numero_renovacoes?: number | null; cb_convenios: { nome: string } | null } | null =
     ((titularContratos ?? [])[0] as any) ?? null;
 
   if (!contrato) {
     const { data: deps } = await supabase
       .from("contrato_dependentes")
-      .select("contrato_id,ativo,contratos_assinatura!inner(id,clinica_id,status,convenio_id,cb_convenios(nome))")
+      .select("contrato_id,ativo,contratos_assinatura!inner(id,clinica_id,status,convenio_id,contrato_origem_id,numero_renovacoes,cb_convenios(nome))")
       .eq("paciente_id", pacienteId)
       .eq("ativo", true)
       .limit(5);
@@ -495,7 +495,14 @@ async function obterInfoConvenioPaciente(params: {
   //     (paga particular). Já era feito antes, agora fica junto com o resto.
   let avisoLimite: string | undefined;
   let bloquear = false;
-  if (regraMatch && !carenciaCumprida(regraMatch, mensalidadesPagas)) {
+  // Contratos oriundos de renovação (extensão do mesmo contrato ou troca de
+  // plano gerando novo contrato) não têm carência — o paciente já é cliente
+  // do convênio há pelo menos um ciclo. Considera renovação quando o contrato
+  // já foi renovado ao menos uma vez ou tem contrato de origem.
+  const isRenovacao =
+    Number((contrato as any)?.numero_renovacoes ?? 0) > 0 ||
+    !!(contrato as any)?.contrato_origem_id;
+  if (regraMatch && !isRenovacao && !carenciaCumprida(regraMatch, mensalidadesPagas)) {
     const n = Number(regraMatch.carencia_mensalidades) || 0;
     desconto = null;
     beneficioEscolhido = null;
