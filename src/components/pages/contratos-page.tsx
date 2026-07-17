@@ -163,10 +163,23 @@ type Dep = {
   parentesco: string | null;
   tipo: string;
   cpf?: string | null;
+  codigo_prontuario?: string | null;
   incluido_em: string | null;
   excluido_em: string | null;
   ativo: boolean;
 };
+
+/** Badge compacta com o código de prontuário do paciente, para diferenciar
+ *  homônimos ao lado do nome (titular/dependente). Omitida quando o paciente
+ *  não tem código cadastrado. */
+function ProntuarioBadge({ codigo }: { codigo?: string | null }) {
+  if (!codigo) return null;
+  return (
+    <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted whitespace-nowrap">
+      Prontuário {codigo}
+    </span>
+  );
+}
 
 export function ContratosPage({ initialContratoId, modulo = "contratos" }: { initialContratoId?: string; modulo?: string } = {}) {
   const { clinicaAtual } = useClinica();
@@ -2132,7 +2145,7 @@ function DetalheContrato({
         .maybeSingle(),
       supabase
         .from("pacientes")
-        .select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep")
+        .select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep, codigo_prontuario")
         .eq("id", (contrato as any).paciente_id ?? "")
         .maybeSingle(),
       contrato.convenio_id
@@ -2166,9 +2179,14 @@ function DetalheContrato({
     const rows = (d.data ?? []) as any[];
     const pids = Array.from(new Set(rows.map((r) => r.paciente_id).filter(Boolean)));
     let cpfMap: Record<string, string | null> = {};
+    let prontMap: Record<string, string | null> = {};
     if (pids.length) {
-      const { data: pacs } = await supabase.from("pacientes").select("id, cpf").in("id", pids);
+      const { data: pacs } = await supabase
+        .from("pacientes")
+        .select("id, cpf, codigo_prontuario")
+        .in("id", pids);
       cpfMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.cpf]));
+      prontMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.codigo_prontuario]));
     }
     const depsRows = rows.map((r) => ({
       id: r.id,
@@ -2177,6 +2195,7 @@ function DetalheContrato({
       parentesco: r.parentesco,
       tipo: r.tipo,
       cpf: cpfMap[r.paciente_id] ?? null,
+      codigo_prontuario: prontMap[r.paciente_id] ?? null,
       incluido_em: r.incluido_em ?? null,
       excluido_em: r.excluido_em ?? null,
       ativo: !!r.ativo,
@@ -2794,8 +2813,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
         </Button>
-        <h1 className="text-2xl font-bold">
-          Contrato #{contrato.numero} — {contrato.paciente_nome}
+        <h1 className="text-2xl font-bold flex items-center gap-2 flex-wrap justify-center">
+          <span>Contrato #{contrato.numero} — {contrato.paciente_nome}</span>
+          <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
         </h1>
         <div>
           {!cancelado && podeEscrever ? (
@@ -2832,11 +2852,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </div>
               ) : null}
               {apenasFinanceiro ? (
-                <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
+                <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200 flex-wrap">
                   <Info className="h-4 w-4 shrink-0" />
                   <span>
                     <strong>Titular financeiro</strong> — {contrato.paciente_nome} paga o plano, mas <strong>não utiliza</strong> os benefícios. Não conta na quantidade de vidas do contrato.
                   </span>
+                  <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
                 </div>
               ) : null}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
@@ -3169,7 +3190,12 @@ h1, h2, h3 { margin: 0 0 6mm; }
               )}
               {isAdmin && podeEscrever ? (
                 <div className="space-y-1">
-                  <Label>Paciente titular</Label>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Label>Paciente titular</Label>
+                    <ProntuarioBadge
+                      codigo={admPaciente?.codigo_prontuario ?? pacienteFull?.codigo_prontuario}
+                    />
+                  </div>
                   <PatientSearchInput
                     value={admPaciente}
                     onSelect={(p) => setAdmPaciente(p)}
@@ -3204,10 +3230,15 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </div>
               ) : (
                 <>
-                  <DadosField
-                    label="Paciente titular"
-                    value={`${contrato.paciente_nome}${pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}`}
-                  />
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="text-sm font-medium">Paciente titular</div>
+                      <ProntuarioBadge codigo={pacienteFull?.codigo_prontuario} />
+                    </div>
+                    <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                      {contrato.paciente_nome}{pacienteFull?.cpf ? ` — CPF ${pacienteFull.cpf}` : ""}
+                    </div>
+                  </div>
                   {apenasFinanceiro ? (
                     <div className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1">
                       <Info className="h-3.5 w-3.5" /> Titular financeiro — não utiliza os benefícios.
@@ -3357,6 +3388,11 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         <li key={d.id} className="flex items-center justify-between gap-2">
                           <div className={d.ativo ? "" : "text-muted-foreground line-through"}>
                             • {d.paciente_nome}
+                            {d.codigo_prontuario ? (
+                              <span className="ml-2 no-underline align-middle inline-block">
+                                <ProntuarioBadge codigo={d.codigo_prontuario} />
+                              </span>
+                            ) : null}
                             <span className="text-muted-foreground no-underline">
                               {" "}
                               — {d.parentesco ?? "—"} ({d.tipo}){d.cpf ? ` — CPF ${d.cpf}` : ""}
