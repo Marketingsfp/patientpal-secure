@@ -84,6 +84,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) =>
   s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—";
+const MESES_PT = [
+  "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+  "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
+];
+const competenciaDe = (s?: string | null): string => {
+  if (!s) return "—";
+  const [, m, ] = s.slice(0, 10).split("-").map(Number);
+  if (!m || m < 1 || m > 12) return "—";
+  return MESES_PT[m - 1];
+};
 // Adiciona 1 ano à data inicial (formato ISO YYYY-MM-DD). Retorna null se inválida.
 const addUmAno = (s?: string | null): string | null => {
   if (!s) return null;
