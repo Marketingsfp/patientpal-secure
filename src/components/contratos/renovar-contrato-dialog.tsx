@@ -130,6 +130,10 @@ const normalizarErro = (erro: unknown): RenovacaoError => {
     codigo = "RENOVACAO_CONTRATO_NAO_ENCONTRADO";
     titulo = "Contrato não encontrado";
     orientacao = "Atualize a tela e tente novamente. O contrato pode ter sido alterado por outro usuário.";
+  } else if (lower.includes("contrato nao esta ativo") || lower.includes("contrato não está ativo")) {
+    codigo = "RENOVACAO_CONTRATO_INATIVO";
+    titulo = "Este contrato não pode ser renovado novamente";
+    orientacao = "Este contrato já foi renovado, cancelado ou não está ativo. Use o contrato vigente do paciente para novas movimentações.";
   }
 
   return {
