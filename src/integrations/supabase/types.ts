@@ -2097,6 +2097,7 @@ export type Database = {
           nome: string
           num_parcelas: number
           taxa_adesao: number
+          taxa_inclusao_dependente: number
           termo_inclusao_html: string | null
           updated_at: string
           valor_mensal: number
@@ -2116,6 +2117,7 @@ export type Database = {
           nome: string
           num_parcelas?: number
           taxa_adesao?: number
+          taxa_inclusao_dependente?: number
           termo_inclusao_html?: string | null
           updated_at?: string
           valor_mensal?: number
@@ -2135,6 +2137,7 @@ export type Database = {
           nome?: string
           num_parcelas?: number
           taxa_adesao?: number
+          taxa_inclusao_dependente?: number
           termo_inclusao_html?: string | null
           updated_at?: string
           valor_mensal?: number
