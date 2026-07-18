@@ -289,6 +289,11 @@ function ClientesPage() {
         </div>
       </div>
 
+      {atingiuTeto && (
+        <div className="rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+          Mostrando os primeiros {LIMITE_BUSCA.toLocaleString("pt-BR")} resultados. Refine a busca (nome completo, CPF ou telefone) para ver mais.
+        </div>
+      )}
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
           <TableHeader className="sticky top-0 z-20">
@@ -317,7 +322,7 @@ function ClientesPage() {
                   <div className="flex items-center gap-2">
                     <div className="h-8 w-8 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
                       {fotoSigned[p.id] ? (
-                        <img src={fotoSigned[p.id]} alt={p.nome} className="h-full w-full object-cover" />
+                        <img src={fotoSigned[p.id]} alt={p.nome} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                       ) : (
                         <Users className="h-4 w-4 text-muted-foreground" />
                       )}
