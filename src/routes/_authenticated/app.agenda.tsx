@@ -38,6 +38,7 @@ import { FichaEmUsoAlert } from "@/components/agenda/ficha-em-uso-alert";
 import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
 import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
 import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
+import { useTurboDisabled } from "@/hooks/use-turbo-disabled";
 import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/dividir-orcamento-dialog";
 import { calcularAvisoLimitePendentes } from "@/lib/agenda/aviso-limite-pendentes";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
@@ -850,6 +851,7 @@ const EMPTY = {
 
 function AgendaPage() {
   const { clinicaAtual } = useClinica();
+  const turboDisabled = useTurboDisabled();
   const podeEscrever = usePodeEscrever("agenda");
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
   const [usuarioEhMedico, setUsuarioEhMedico] = useState(false);
@@ -4536,7 +4538,7 @@ function AgendaPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <TurboModeToggle />
+          {!turboDisabled && <TurboModeToggle />}
           <div className="inline-flex rounded-full border bg-card p-0.5">
             <button
               type="button"
