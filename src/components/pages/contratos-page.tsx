@@ -3822,10 +3822,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
                             {isAdmin && podeEscrever ? (
                               <DateInputBR
                                 className="h-8 w-40"
-                                value={m.vencimento}
-                                onBlur={(e) => {
+                                value={rascunhos[m.id]?.vencimento ?? m.vencimento}
+                                onChange={(e) => {
                                   const v = e.target.value;
-                                  if (v && v !== m.vencimento) atualizarParcela(m.id, { vencimento: v });
+                                  if (v) setRascunho(m.id, { vencimento: v });
                                 }}
                               />
                             ) : (
@@ -3833,7 +3833,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                             )}
                           </TableCell>
                           <TableCell className="capitalize">
-                            {competenciaDe(m.vencimento)}
+                            {competenciaDe(rascunhos[m.id]?.vencimento ?? m.vencimento)}
                           </TableCell>
                           <TableCell>
                             {isAdmin && podeEscrever ? (
@@ -3842,10 +3842,13 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                 step="0.01"
                                 min={0}
                                 className="h-8 w-28"
-                                defaultValue={Number(m.valor ?? 0).toFixed(2)}
-                                onBlur={(e) => {
+                                key={`valor-${m.id}-${rascunhos[m.id] ? "d" : "o"}`}
+                                defaultValue={Number(
+                                  rascunhos[m.id]?.valor ?? m.valor ?? 0,
+                                ).toFixed(2)}
+                                onChange={(e) => {
                                   const v = Number(String(e.target.value).replace(",", "."));
-                                  if (Number.isFinite(v) && v !== Number(m.valor)) atualizarParcela(m.id, { valor: v });
+                                  if (Number.isFinite(v)) setRascunho(m.id, { valor: v });
                                 }}
                               />
                             ) : (
@@ -3869,7 +3872,24 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                   : "Pendente"}
                             </Badge>
                           </TableCell>
-                          <TableCell>{fmtD(m.pago_em)}</TableCell>
+                          <TableCell>
+                            {isAdmin && podeEscrever ? (
+                              <DateInputBR
+                                className="h-8 w-40"
+                                value={
+                                  rascunhos[m.id] && "pago_em" in rascunhos[m.id]!
+                                    ? rascunhos[m.id]!.pago_em ?? ""
+                                    : m.pago_em ?? ""
+                                }
+                                onChange={(e) => {
+                                  const v = e.target.value || null;
+                                  setRascunho(m.id, { pago_em: v });
+                                }}
+                              />
+                            ) : (
+                              fmtD(m.pago_em)
+                            )}
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1 justify-end">
                               {podeEscrever && (m.status === "pago" ? (
