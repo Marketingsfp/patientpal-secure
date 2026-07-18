@@ -13,6 +13,7 @@ import { CENTROS, PERFIL_DEFAULTS, findItem, type Centro, type MenuItem, type Pe
 import { useMenuPrefs } from "@/hooks/use-menu-prefs";
 import { usePermissoes } from "@/hooks/use-permissoes";
 import { moduloDaRota } from "@/lib/permissoes-rotas";
+import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
 
 const MAX_INLINE = 6;
 
@@ -187,7 +188,14 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
   const { allowed: allowedModules, loading: permsLoading } = usePermissoes();
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const defaults = PERFIL_DEFAULTS[perfil];
-  const centrosBase = CENTROS.filter((c) => defaults.centros.includes(c.key));
+  const { disabled: atendimentoMultiploDisabled } = useAtendimentoMultiploDisabled();
+  const centrosBase = CENTROS.filter((c) => defaults.centros.includes(c.key)).map((c) => {
+    if (!atendimentoMultiploDisabled) return c;
+    return {
+      ...c,
+      items: c.items.filter((it) => it.path !== "/app/atendimento-multiplo"),
+    };
+  });
   // Filtra itens de cada centro pelas permissões do perfil. Enquanto
   // permissões carregam, escondemos tudo (fail-closed) para não vazar
   // links de módulos negados.
@@ -218,7 +226,8 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
   const pinnedItems = effectivePinned
     .map((p) => findItem(p))
     .filter((x): x is MenuItem => Boolean(x))
-    .filter((it) => pathAllowed(it.path, allowedModules));
+    .filter((it) => pathAllowed(it.path, allowedModules))
+    .filter((it) => !atendimentoMultiploDisabled || it.path !== "/app/atendimento-multiplo");
 
   const recentesFiltrados = prefs.recent
     .filter((r) => !effectivePinned.includes(r.path) && r.path !== currentPath)
@@ -226,12 +235,14 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
     // mesma coisa em "Recentes" e no grupo do centro logo acima.
     .filter((r) => !centrosVisiveis.some((c) => c.items.some((i) => i.path === r.path)))
     .filter((r) => pathAllowed(r.path, allowedModules))
+    .filter((r) => !atendimentoMultiploDisabled || r.path !== "/app/atendimento-multiplo")
     .slice(0, 5);
 
   const favoritos = prefs.favorites
     .map((p) => findItem(p))
     .filter((x): x is MenuItem => Boolean(x))
-    .filter((it) => pathAllowed(it.path, allowedModules));
+    .filter((it) => pathAllowed(it.path, allowedModules))
+    .filter((it) => !atendimentoMultiploDisabled || it.path !== "/app/atendimento-multiplo");
 
   if (loading || permsLoading) {
     return <div className="p-4 text-sm text-muted-foreground">Carregando menu…</div>;

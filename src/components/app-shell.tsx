@@ -18,6 +18,7 @@ import { EstornosBell } from "@/components/EstornosBell";
 import { UniversalSearchBar } from "@/components/universal-search-bar";
 import { MenuV2 } from "@/components/menu-v2/menu-v2";
 import { useMenuV2Flag } from "@/hooks/use-menu-prefs";
+import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
 import type { PerfilKey } from "@/components/menu-v2/menu-catalog";
 
 function corDaClinica(nome?: string): string {
@@ -361,10 +362,23 @@ export function AppShell() {
       return { ...row, items };
     })
     .filter((row) => row.items.length > 0);
+  // Feature flag por clínica: `atendimento_multiplo_disabled` remove o item
+  // "Atendimento Múltiplo" do menu para a clínica atual.
+  const { disabled: atendimentoMultiploDisabled } = useAtendimentoMultiploDisabled();
+  const flagFilteredRows = atendimentoMultiploDisabled
+    ? permissionFilteredRows
+        .map((row) => ({
+          ...row,
+          items: row.items.filter(
+            (it) => isParent(it) || it.to !== "/app/atendimento-multiplo",
+          ),
+        }))
+        .filter((row) => row.items.length > 0)
+    : permissionFilteredRows;
   // O perfil médico também deve respeitar a matriz configurada em Perfis de
   // Acesso. O escopo clínico do médico continua sendo aplicado pelos hooks e
   // consultas de cada módulo; não substitua as permissões por um menu fixo.
-  const visibleNavRows = permissionFilteredRows;
+  const visibleNavRows = flagFilteredRows;
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
   // Kill-switch gradual: MenuV2 só é ativado se a flag `menu_v2` estiver on
