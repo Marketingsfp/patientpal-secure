@@ -1936,6 +1936,34 @@ function DetalheContrato({
     </div>
   );
   const [mens, setMens] = useState<Mens[]>([]);
+  // Rascunhos de edição da tabela Mensalidades (vencimento/valor/pago_em).
+  // Só persistem no banco quando o usuário clica em "Salvar alterações".
+  type RascunhoMens = { vencimento?: string; valor?: number; pago_em?: string | null };
+  const [rascunhos, setRascunhos] = useState<Record<string, RascunhoMens>>({});
+  const [salvandoRascunhos, setSalvandoRascunhos] = useState(false);
+  const setRascunho = (id: string, patch: RascunhoMens) => {
+    setRascunhos((prev) => {
+      const atual = { ...(prev[id] ?? {}), ...patch };
+      // remove chaves iguais ao valor original para permitir descarte automático
+      const original = mens.find((m) => m.id === id);
+      if (original) {
+        if (atual.vencimento !== undefined && atual.vencimento === original.vencimento)
+          delete atual.vencimento;
+        if (atual.valor !== undefined && Number(atual.valor) === Number(original.valor))
+          delete atual.valor;
+        if (
+          atual.pago_em !== undefined &&
+          (atual.pago_em ?? null) === (original.pago_em ?? null)
+        )
+          delete atual.pago_em;
+      }
+      const novo = { ...prev };
+      if (Object.keys(atual).length === 0) delete novo[id];
+      else novo[id] = atual;
+      return novo;
+    });
+  };
+  const totalRascunhos = Object.keys(rascunhos).length;
   const [extraRecebido, setExtraRecebido] = useState<{ total: number; count: number }>({ total: 0, count: 0 });
   const [drill, setDrill] = useState<null | "pagas" | "recebido" | "areceber">(null);
   const [deps, setDeps] = useState<Dep[]>([]);
