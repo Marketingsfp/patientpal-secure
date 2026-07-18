@@ -3718,9 +3718,35 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="font-semibold text-sm">Mensalidades</h3>
                   {isAdmin && podeEscrever ? (
-                    <Button size="sm" variant="outline" onClick={adicionarParcela}>
-                      <Plus className="h-3 w-3 mr-1" /> Adicionar parcela
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {totalRascunhos > 0 ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={descartarRascunhos}
+                            disabled={salvandoRascunhos}
+                          >
+                            Descartar
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={salvarRascunhos}
+                            disabled={salvandoRascunhos}
+                          >
+                            {salvandoRascunhos ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                              <Check className="h-3 w-3 mr-1" />
+                            )}
+                            Salvar alterações ({totalRascunhos})
+                          </Button>
+                        </>
+                      ) : null}
+                      <Button size="sm" variant="outline" onClick={adicionarParcela}>
+                        <Plus className="h-3 w-3 mr-1" /> Adicionar parcela
+                      </Button>
+                    </div>
                   ) : null}
                 </div>
                 <div className="rounded-md border">
