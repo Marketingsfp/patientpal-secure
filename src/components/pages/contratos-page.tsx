@@ -3578,6 +3578,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
               <TabsTrigger value="resumo">Resumo</TabsTrigger>
               <TabsTrigger value="dados">Dados</TabsTrigger>
               <TabsTrigger value="contrato">Contrato</TabsTrigger>
+              <TabsTrigger value="historico">Histórico</TabsTrigger>
             </TabsList>
             <TabsContent value="resumo" className="space-y-4 mt-4">
               {cancelado ? (
