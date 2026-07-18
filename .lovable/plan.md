@@ -1,64 +1,44 @@
 ## Objetivo
 
-Permitir que perfis **Admin** e **Gestor** marquem um contrato como **"sem carência"**, para casos em que o contrato está na tabela antiga ("migrar") mas na prática já é uma renovação de um cliente antigo — hoje o sistema não tem como saber isso e aplica carência como se fosse um contrato novo.
+Melhorar a visualização das mensalidades em contratos com renovação (como o da paciente Quédima Suelen), atendendo dois pontos:
 
-## Estado atual (verificado)
+1. **Reiniciar a contagem de parcelas a cada renovação** — quando o contrato tiver ciclos (Original + Renovação 1, Renovação 2…), cada ciclo mostra parcelas numeradas de **1 a 12** (ou o total do ciclo). Hoje, a coluna `#` mostra 1..24 (números absolutos do banco), o que confunde a leitura.
+2. **Novas parcelas (mais recentes) aparecem no topo da lista** — hoje a tabela começa pelo ciclo original (parcela 1 do contrato antigo) e as parcelas da renovação, que são as que ainda precisam ser pagas, ficam lá embaixo. Vamos inverter a ordem dos ciclos: a **renovação mais recente aparece primeiro**, seguida pelas anteriores, e por último o ciclo original.
 
-- `contratos_assinatura` já tem `contrato_origem_id` e `numero_renovacoes`. Quando qualquer um está preenchido, a Agenda/Caixa considera **renovação** e **ignora carência** (`src/routes/_authenticated/app.agenda.tsx` linhas 494–510).
-- Contratos legados da "tabela antiga — migrar" não têm nenhum dos dois → sistema trata como novo → aplica carência da regra do convênio.
-- Não existe hoje um campo "isenção manual de carência".
+Nenhuma regra de negócio ou dado do banco muda — o ajuste é puramente de exibição na aba **Mensalidades** dos contratos.
 
-## Mudança proposta
+## Como será o comportamento
 
-### 1. Banco (migração)
+- Coluna `#` (Parcela):
+  - Adesão continua com o selo "Adesão".
+  - Taxa de inclusão continua com o selo "Taxa inclusão".
+  - Parcelas mensais passam a mostrar a posição **dentro do ciclo** (1/12, 2/12… reiniciando a cada renovação). Contratos sem renovação continuam exatamente como estão.
+- Ordem das linhas:
+  1. Adesão (topo).
+  2. Taxas de inclusão de dependente (por vencimento).
+  3. Parcelas mensais agrupadas por ciclo, **do mais recente para o mais antigo** (Renovação 2 → Renovação 1 → Original). Dentro de cada ciclo, mantém a ordem por número da parcela (1, 2, 3…).
+- Cabeçalho de ciclo (ex. "Renovação 1 — 27/06/2026 a 27/05/2027") continua aparecendo antes do primeiro item do ciclo.
+- Card "Pagas X/Y" no topo do contrato continua refletindo o ciclo atual (já é assim hoje).
 
-Adicionar em `contratos_assinatura`:
+## Detalhes técnicos
 
-- `sem_carencia boolean NOT NULL DEFAULT false` — flag manual.
-- `sem_carencia_motivo text` — motivo curto informado por quem marcou (ex.: "Contrato migrado — cliente desde 2022").
-- `sem_carencia_por uuid` — usuário que marcou.
-- `sem_carencia_em timestamptz` — quando foi marcado.
+Arquivo: `src/components/pages/contratos-page.tsx`.
 
-Backfill: nada automático. Cada contrato migrado será tratado caso a caso pelo Admin/Gestor.
+1. Criar um mapa `parcelaLocalPorId: Record<string, { pos: number; total: number }>` a partir da segmentação já existente em `ciclos` (linhas 3150-3170). Para cada ciclo, iterar `ciclo.parcelas` e gravar `pos = idx + 1`, `total = ciclo.parcelas.length`.
+2. Na coluna `#` (linha 3889), substituir `m.numero_parcela` por `parcelaLocalPorId[m.id]?.pos ?? m.numero_parcela` quando `temCiclosMultiplos`. Sem renovação, mantém `m.numero_parcela`.
+3. Ajustar o sort de `linhasCobranca` (linhas 3099-3106) para, quando `ra === 2` (parcela mensal), ordenar primeiro por **índice do ciclo decrescente** e depois por `numero_parcela` crescente. Usar um `Map<id, cicloIndex>` derivado de `ciclos` para O(1).
+4. Manter o cabeçalho de ciclo já existente (linhas 3844-3870); ele funciona por "primeira parcela do ciclo encontrada na iteração", então continua correto após a inversão (a 1ª parcela do ciclo mais recente aparece primeiro).
 
-### 2. Regra de negócio (frontend)
+Sem alterações no banco, RPCs ou lógica de geração de parcelas. Sem impacto em agenda, caixa, comprovantes, exportações ou renovação — apenas a renderização da tabela de mensalidades.
 
-Em `src/routes/_authenticated/app.agenda.tsx` (`carregarInfoConvenio`), estender a condição de renovação:
+## Fora de escopo
 
-```
-const isRenovacao =
-  Number(contrato?.numero_renovacoes ?? 0) > 0 ||
-  !!contrato?.contrato_origem_id ||
-  !!contrato?.sem_carencia;   // ← novo
-```
-
-O mesmo `select` do contrato passa a buscar `sem_carencia`. Como Caixa e Agenda usam o mesmo helper, a isenção passa a valer nos dois fluxos automaticamente.
-
-### 3. UI — aba "Dados" do contrato (`src/components/pages/contratos-page.tsx`)
-
-Novo bloco **"Carência"** visível para **todos**, mas editável apenas para Admin/Gestor (`useRolesGestao` / equivalente já existente):
-
-- Checkbox **"Este contrato é isento de carência"**.
-- Campo texto **"Motivo"** (obrigatório quando o checkbox é marcado).
-- Ao salvar: grava `sem_carencia`, `sem_carencia_motivo`, `sem_carencia_por = auth.uid()`, `sem_carencia_em = now()`.
-- Para outros perfis: mostra somente leitura ("Isento — motivo: … marcado por Fulano em dd/mm/aaaa").
-
-Ao lado da badge "Tabela antiga — migrar" na listagem, exibir badge extra **"Sem carência"** quando `sem_carencia = true`, para deixar visível na lista.
-
-### 4. Auditoria
-
-Registrar a mudança em `audit_log` (a tabela já existe no projeto) com ação `contrato.sem_carencia.toggle` e diff antes/depois. Assim fica rastreável quem alterou.
-
-## Fora do escopo
-
-- Não altera a lógica de "Tabela antiga — migrar" nem a data `migrar_apos`.
-- Não altera regras de taxa de adesão.
-- Não faz backfill em massa — cada contrato é marcado individualmente pelo gestor.
+- Reescrever contagem no banco (`numero_parcela` permanece contínuo internamente).
+- Mudar carne/impressos.
+- Mudar ordem em portal do paciente / cartão digital.
 
 ## Validação
 
-1. Marcar um contrato migrado como "sem carência" com usuário Admin.
-2. Abrir agendamento na Agenda usando esse contrato → o benefício do convênio deve ser aplicado imediatamente, sem exigir mensalidades pagas.
-3. Repetir no Caixa (mesma função `carregarInfoConvenio`).
-4. Testar com usuário Recepção → checkbox deve aparecer desabilitado/somente leitura.
-5. Desmarcar → carência volta a valer.
+- Verificar visualmente no contrato da Quédima Suelen: Renovação 1 aparece no topo com parcelas 1/12…12/12 e ciclo Original abaixo, também 1/12…12/12.
+- Conferir um contrato sem renovação para garantir que nada mudou.
+- Conferir contrato só com adesão + taxa de inclusão para garantir que continuam no topo.
