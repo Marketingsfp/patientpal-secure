@@ -851,6 +851,7 @@ const EMPTY = {
 
 function AgendaPage() {
   const { clinicaAtual } = useClinica();
+  const turboDisabled = useTurboDisabled();
   const podeEscrever = usePodeEscrever("agenda");
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
   const [usuarioEhMedico, setUsuarioEhMedico] = useState(false);
