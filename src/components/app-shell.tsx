@@ -531,7 +531,7 @@ export function AppShell() {
                 {!collapsed && !hideLabel && (
                   <button
                     type="button"
-                    onClick={() => setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? false) }))}
+                    onClick={() => setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? true) }))}
                     className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70 hover:opacity-100 transition-opacity rounded-md"
                     aria-expanded={open}
                   >
