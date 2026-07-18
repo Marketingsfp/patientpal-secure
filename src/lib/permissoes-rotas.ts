@@ -15,7 +15,6 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app": null,
   "/app/agenda": "agenda",
   "/app/agenda-v2": "agenda",
-  "/app/atendimento-multiplo": "atendimento-multiplo",
   "/app/checkin": "checkin",
   "/app/caixa": "caixa",
   "/app/chat": "chat",
