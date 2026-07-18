@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
+import { descriptorDaFoto, registrarBiometriaPaciente } from "@/lib/biometria";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 interface Props {
@@ -336,6 +337,18 @@ function FotoDialog({
         .update({ foto_url: path, foto_atualizado_em: new Date().toISOString() })
         .eq("id", pacienteId);
       if (updErr) throw updErr;
+
+      // A foto do paciente é a fonte da biometria usada no reconhecimento do totem
+      const descriptor = await descriptorDaFoto(blob);
+      if (descriptor) {
+        const bioErr = await registrarBiometriaPaciente(pacienteId, clinicaId, descriptor);
+        if (bioErr) mostrarErro(bioErr, "foto salva, mas a biometria facial falhou");
+      } else {
+        toast.warning(
+          "Foto salva, mas nenhum rosto foi detectado nela — o totem não vai reconhecer o paciente com esta foto.",
+        );
+      }
+
       const { data: signed } = await supabase.storage
         .from("pacientes-fotos")
         .createSignedUrl(path, 3600);

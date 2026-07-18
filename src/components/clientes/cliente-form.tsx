@@ -15,6 +15,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
+import { descriptorDaFoto, registrarBiometriaPaciente } from "@/lib/biometria";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export interface Paciente {
@@ -655,17 +656,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   async function salvarBiometria(descriptor: number[]) {
     if (!editing) return;
     setBioLoading(true);
-    await supabase.from("paciente_biometria")
-      .update({ revogado_em: new Date().toISOString() })
-      .eq("paciente_id", editing.id)
-      .eq("clinica_id", clinicaId)
-      .is("revogado_em", null);
-    const { error } = await supabase.from("paciente_biometria").insert({
-      paciente_id: editing.id,
-      clinica_id: clinicaId,
-      descriptor: descriptor as any,
-      consentimento_em: new Date().toISOString(),
-    });
+    const error = await registrarBiometriaPaciente(editing.id, clinicaId, descriptor);
     setBioLoading(false);
     if (error) { mostrarErro(error); return; }
     setHasBiometria(true);
@@ -802,6 +793,21 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       await supabase.from("pacientes")
         .update({ foto_url: path, foto_atualizado_em: new Date().toISOString() })
         .eq("id", pacienteId);
+
+      // A foto do cadastro é a fonte da biometria usada no reconhecimento do totem
+      const descriptor = await descriptorDaFoto(fotoFile);
+      if (descriptor) {
+        const bioErr = await registrarBiometriaPaciente(pacienteId, clinicaId, descriptor);
+        if (bioErr) {
+          mostrarErro(bioErr, "foto salva, mas a biometria facial falhou");
+        } else {
+          setHasBiometria(true);
+        }
+      } else {
+        toast.warning(
+          "Foto salva, mas nenhum rosto foi detectado nela — o totem não vai reconhecer o paciente com esta foto. Tire uma foto de frente, com boa iluminação, ou use a aba Biometria.",
+        );
+      }
     }
 
     setSaving(false);
