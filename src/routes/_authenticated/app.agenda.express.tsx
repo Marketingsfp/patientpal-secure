@@ -6,6 +6,7 @@ import { PatientSearchInput, type PatientOption } from "@/components/patient-sea
 import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
 import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
 import { useTurboDisabled } from "@/hooks/use-turbo-disabled";
+import { useAgendaExpressDisabled } from "@/hooks/use-agenda-express-disabled";
 import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
 import { ProcedimentoPicker, type ProcedimentoOption } from "@/components/agenda/procedimento-picker";
 import { Button } from "@/components/ui/button";
@@ -75,7 +76,11 @@ function groupByDia(slots: Slot[]) {
 function AgendaExpressPage() {
   const { clinicaAtual, modoTodas } = useClinica();
   const turboDisabled = useTurboDisabled();
+  const agendaExpressDisabled = useAgendaExpressDisabled();
   const navigate = useNavigate();
+  useEffect(() => {
+    if (agendaExpressDisabled) navigate({ to: "/app/agenda", replace: true });
+  }, [agendaExpressDisabled, navigate]);
   const podeEscrever = usePodeEscrever("agenda");
   const clinicaId = clinicaAtual?.clinica_id ?? null;
 
