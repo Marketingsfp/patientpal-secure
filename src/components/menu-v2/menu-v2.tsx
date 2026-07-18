@@ -13,6 +13,7 @@ import { CENTROS, PERFIL_DEFAULTS, findItem, type Centro, type MenuItem, type Pe
 import { useMenuPrefs } from "@/hooks/use-menu-prefs";
 import { usePermissoes } from "@/hooks/use-permissoes";
 import { moduloDaRota } from "@/lib/permissoes-rotas";
+import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
 
 const MAX_INLINE = 6;
 
@@ -187,7 +188,14 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
   const { allowed: allowedModules, loading: permsLoading } = usePermissoes();
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const defaults = PERFIL_DEFAULTS[perfil];
-  const centrosBase = CENTROS.filter((c) => defaults.centros.includes(c.key));
+  const { disabled: atendimentoMultiploDisabled } = useAtendimentoMultiploDisabled();
+  const centrosBase = CENTROS.filter((c) => defaults.centros.includes(c.key)).map((c) => {
+    if (!atendimentoMultiploDisabled) return c;
+    return {
+      ...c,
+      items: c.items.filter((it) => it.path !== "/app/atendimento-multiplo"),
+    };
+  });
   // Filtra itens de cada centro pelas permissões do perfil. Enquanto
   // permissões carregam, escondemos tudo (fail-closed) para não vazar
   // links de módulos negados.
