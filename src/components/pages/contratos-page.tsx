@@ -2381,7 +2381,7 @@ function DetalheContrato({
         if (Object.keys(payload).length === 0) continue;
         const { error } = await supabase
           .from("contrato_mensalidades")
-          .update(payload)
+          .update(payload as any)
           .eq("id", id);
         if (error) {
           mostrarErro(error);
