@@ -1,36 +1,49 @@
-## Objetivo
-Na aba de **Mensalidades** do Cartão Benefícios / Contratos:
-1. Tornar o campo **"Pago em"** editável (hoje é somente-leitura).
-2. Adicionar um botão **"Salvar"** que consolida as alterações dos campos editáveis (Vencimento, Valor e Pago em). Hoje cada campo salva sozinho no `onBlur`, o que causa a sensação de que o sistema "não acata" edições enquanto o cursor não sai do campo.
+## Problema observado
 
-## Comportamento novo
-- Vencimento, Valor e Pago em passam a atualizar apenas um **estado local (rascunho)** por parcela — não gravam mais no banco a cada `onBlur`.
-- Aparece um botão **"Salvar alterações"** ao lado de "Adicionar parcela" (área circulada em vermelho no print). Ele fica:
-  - **Oculto/desabilitado** quando não há edições pendentes.
-  - **Habilitado (destacado)** quando existe ao menos uma parcela com rascunho diferente do banco, mostrando a contagem (ex.: "Salvar alterações (3)").
-- Ao clicar em **Salvar**:
-  - Aplica em lote as mudanças de cada parcela em `contrato_mensalidades` (campos alterados: `vencimento`, `valor`, `pago_em`).
-  - Se `pago_em` foi preenchido em uma parcela **pendente**, marca `status = 'pago'` (sem gerar lançamento no caixa — segue o padrão da "Paga (histórica)" já existente).
-  - Se `pago_em` foi **limpo** em uma parcela paga que **não tem `lancamento_id`** (ou seja, marcação histórica sem caixa vinculado), volta para `status = 'pendente'`. Se a parcela tiver `lancamento_id` (paga via Caixa), bloqueia a limpeza e mostra aviso pedindo estorno pelo Caixa — evita descasar caixa e mensalidade.
-  - Mostra toast único: "N parcela(s) atualizada(s)".
-- Botão **"Descartar"** ao lado do Salvar, para reverter rascunhos ao estado do banco.
-- Se o usuário tentar sair da aba com rascunhos pendentes, exibe `confirm()` "Há alterações não salvas. Descartar?".
+Na tela **Clientes** (`/app/clientes`), ao pesquisar "kauan":
+1. **Nem todos os pacientes aparecem** — a busca corta o resultado.
+2. **Ao rolar para baixo, a tela congela** — não há carregamento de mais itens e a rolagem trava.
 
-## Escopo técnico (arquivo único)
-`src/components/pages/contratos-page.tsx` — bloco da tabela "Mensalidades" do contrato (linhas ~3608–3737) e função `atualizarParcela` (~2262).
+## Diagnóstico (confirmado por leitura do código)
 
-- Novo estado `rascunhos: Record<string, { vencimento?: string; valor?: number; pago_em?: string | null }>`.
-- Trocar `onBlur` que chama `atualizarParcela` por handlers que só gravam no `rascunhos`.
-- Nova célula "Pago em" com `DateInputBR` (limpável) quando `isAdmin && podeEscrever`.
-- Nova função `salvarRascunhos()` percorrendo o mapa, enviando `update` por id (mesmo padrão já usado, agrupando os campos alterados) e recarregando via `load()`.
-- Botão "Salvar alterações" e "Descartar" no header da seção (junto ao "Adicionar parcela").
-- A aba resumo do contrato **(Renovações / Ciclos)** continua funcionando porque `load()` recalcula tudo após o save.
+Arquivo: `src/routes/_authenticated/app.clientes.index.tsx`
 
-## Fora do escopo
-- Não altera regras de repasse, NFS-e, caixa, boletos ou lógica de renovação.
-- Não muda outras tabelas de parcelas (ex.: renovações antigas na aba "Renovações" continuam como estão).
-- Não introduz nova coluna no banco.
+- A função `load()` chama a RPC `buscar_pacientes` com **`_limit: q ? 80 : 120`**. Ou seja, qualquer busca retorna **no máximo 80 registros**, sem paginação e sem aviso ao usuário. Se existirem mais pacientes com "kauan" no nome, eles simplesmente não aparecem.
+- Não existe scroll infinito nem botão "Carregar mais": ao rolar, nada acontece porque a lista já está completa (limitada a 80).
+- O "congelamento" ao rolar tem uma causa adicional: a cada mudança em `items` (inclusive quando você digita), o `useEffect` roda `createSignedUrls` para **todas** as fotos, o que provoca re-render pesado e trava a rolagem em listas com muitas linhas com foto.
 
-## Riscos e validação
-- Risco: alguém marcar `pago_em` numa parcela já vinculada a lançamento do Caixa — mitigado pelo bloqueio descrito.
-- Validação sugerida após implementação: editar vencimento + valor + pago_em de 1 parcela pendente → Salvar → recarregar e conferir gravação; testar Descartar; testar navegação com rascunho pendente.
+## O que vou ajustar (somente frontend/apresentação)
+
+Escopo mínimo, sem mexer em regra de negócio, RLS, RPC ou dados:
+
+1. **Aumentar o limite e mostrar contagem correta na busca**
+   - Elevar `_limit` de busca para um teto seguro (ex.: **500**) — suficiente para os casos reais da clínica sem estourar a resposta.
+   - Exibir um aviso discreto acima da tabela quando o resultado atingir o teto: *"Mostrando os primeiros 500 resultados. Refine a busca para ver mais."*
+
+2. **Resolver o travamento da rolagem**
+   - Estabilizar o efeito das fotos assinadas: só re-assinar quando o conjunto de `foto_url` realmente mudar (comparação por chave), evitando refazer `createSignedUrls` a cada digitação/re-render.
+   - Manter `loading:"lazy"` no `<img>` das linhas para reduzir custo de scroll.
+
+3. **Feedback de "sem mais resultados"**
+   - Quando a busca retornar exatamente o teto, sinalizar visualmente para o usuário refinar (nome + sobrenome, CPF, etc.).
+
+## O que NÃO será alterado
+
+- RPC `buscar_pacientes` e qualquer regra de banco.
+- Layout, colunas, ações, permissões, exportação.
+- Fluxo do V2 (`ClientesShellV2`) — este ajuste é apenas no clássico, que é o que está em uso na tela reportada.
+
+## Validação
+
+- Repetir a busca "kauan" e conferir se todos os pacientes esperados aparecem.
+- Rolar a lista de cima até o fim sem travamento.
+- Buscar por termos com poucos resultados e por termos amplos (ex.: "silva") para confirmar o aviso de teto quando aplicável.
+
+## Antes × Depois
+
+- **Antes:** busca cortava em 80 resultados sem avisar; rolagem congelava por reprocessamento das fotos.
+- **Depois:** busca traz até 500 resultados com aviso quando atinge o teto; rolagem fluida porque as URLs assinadas só são recalculadas quando a lista de fotos muda de fato.
+
+## Pendências / Observações
+
+- Se, na prática, houver pesquisas legítimas com mais de 500 resultados, o próximo passo será introduzir paginação real (scroll infinito) — mas isso é uma mudança maior e só faria sentido após confirmar a necessidade.

@@ -124,6 +124,7 @@ function ClientesPage() {
   const podeEscrever = usePodeEscrever("clientes");
   const [items, setItems] = useState<Paciente[]>([]);
   const [totalPacientes, setTotalPacientes] = useState<number | null>(null);
+  const [atingiuTeto, setAtingiuTeto] = useState(false);
   const [busca, setBusca] = useState(() => {
     if (typeof window === "undefined") return "";
     const params = new URLSearchParams(window.location.search);
@@ -134,6 +135,9 @@ function ClientesPage() {
   const loadSeq = useRef(0);
 
   const [fotoSigned, setFotoSigned] = useState<Record<string, string>>({});
+
+  const LIMITE_BUSCA = 500;
+  const LIMITE_LISTA = 500;
 
   const load = async (termo: string = "") => {
     if (!clinicaAtual) return;
@@ -149,7 +153,7 @@ function ClientesPage() {
       const dataRequest = supabase.rpc("buscar_pacientes", {
         _clinica_id: clinicaAtual.clinica_id,
         _termo: q,
-        _limit: q ? 80 : 120,
+        _limit: q ? LIMITE_BUSCA : LIMITE_LISTA,
       });
       const countRequest = q
         ? Promise.resolve({ count: totalPacientes, error: null })
@@ -162,7 +166,9 @@ function ClientesPage() {
       setLoading(false);
       if (error) { toast.error("Não foi possível concluir esta busca. Tente novamente com mais letras do nome."); return; }
       if (countError) { mostrarErro(countError); } else { setTotalPacientes(count ?? 0); }
-      setItems((data ?? []) as any);
+      const rows = (data ?? []) as any[];
+      setItems(rows as any);
+      setAtingiuTeto(rows.length >= (q ? LIMITE_BUSCA : LIMITE_LISTA));
     } catch {
       if (requestId !== loadSeq.current) return;
       setLoading(false);
@@ -178,20 +184,33 @@ function ClientesPage() {
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [busca, clinicaAtual?.clinica_id]);
 
+  // Chave estável baseada apenas em foto_url (não em items completo).
+  // Evita re-executar createSignedUrls a cada re-render/digitação, o que
+  // travava a rolagem quando havia muitas fotos.
+  const fotoPathsKey = items
+    .map((p) => (p.foto_url ? `${p.id}::${p.foto_url}` : ""))
+    .filter(Boolean)
+    .join("|");
   useEffect(() => {
-    const paths = items.filter(p => p.foto_url).map(p => p.foto_url as string);
-    if (paths.length === 0) { setFotoSigned({}); return; }
+    if (!fotoPathsKey) { setFotoSigned({}); return; }
+    const entries = fotoPathsKey.split("|").map((s) => {
+      const [id, ...rest] = s.split("::");
+      return { id, path: rest.join("::") };
+    });
+    const paths = entries.map((e) => e.path);
+    let cancelled = false;
     (async () => {
       const { data } = await supabase.storage.from("pacientes-fotos").createSignedUrls(paths, 3600);
+      if (cancelled) return;
       const map: Record<string, string> = {};
-      items.forEach((p) => {
-        if (!p.foto_url) return;
-        const found = data?.find(d => d.path === p.foto_url);
-        if (found?.signedUrl) map[p.id] = found.signedUrl;
+      entries.forEach((e) => {
+        const found = data?.find((d) => d.path === e.path);
+        if (found?.signedUrl) map[e.id] = found.signedUrl;
       });
       setFotoSigned(map);
     })();
-  }, [items]);
+    return () => { cancelled = true; };
+  }, [fotoPathsKey]);
 
   const filtrados = items;
 
@@ -270,6 +289,11 @@ function ClientesPage() {
         </div>
       </div>
 
+      {atingiuTeto && (
+        <div className="rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+          Mostrando os primeiros {LIMITE_BUSCA.toLocaleString("pt-BR")} resultados. Refine a busca (nome completo, CPF ou telefone) para ver mais.
+        </div>
+      )}
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
           <TableHeader className="sticky top-0 z-20">
@@ -298,7 +322,7 @@ function ClientesPage() {
                   <div className="flex items-center gap-2">
                     <div className="h-8 w-8 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
                       {fotoSigned[p.id] ? (
-                        <img src={fotoSigned[p.id]} alt={p.nome} className="h-full w-full object-cover" />
+                        <img src={fotoSigned[p.id]} alt={p.nome} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                       ) : (
                         <Users className="h-4 w-4 text-muted-foreground" />
                       )}
