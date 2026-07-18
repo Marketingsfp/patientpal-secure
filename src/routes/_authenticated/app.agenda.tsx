@@ -853,6 +853,7 @@ const EMPTY = {
 function AgendaPage() {
   const { clinicaAtual } = useClinica();
   const turboDisabled = useTurboDisabled();
+  const agendaExpressDisabled = useAgendaExpressDisabled();
   const podeEscrever = usePodeEscrever("agenda");
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
   const [usuarioEhMedico, setUsuarioEhMedico] = useState(false);
@@ -4557,20 +4558,22 @@ function AgendaPage() {
             </button>
           </div>
           <EncerrarExpedienteButton />
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="h-7 text-[11px] px-2"
-            title="Agendamento rápido em 4 passos"
-          >
-            <Link
-              to="/app/agenda/express"
-              activeProps={{ className: "bg-primary text-primary-foreground border-primary hover:bg-primary/90 hover:text-primary-foreground" }}
+          {!agendaExpressDisabled && (
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11px] px-2"
+              title="Agendamento rápido em 4 passos"
             >
-              <Clock className="h-3 w-3 mr-1.5" /> Agenda Express
-            </Link>
-          </Button>
+              <Link
+                to="/app/agenda/express"
+                activeProps={{ className: "bg-primary text-primary-foreground border-primary hover:bg-primary/90 hover:text-primary-foreground" }}
+              >
+                <Clock className="h-3 w-3 mr-1.5" /> Agenda Express
+              </Link>
+            </Button>
+          )}
           <Button
             asChild
             variant="outline"
