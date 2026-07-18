@@ -1377,55 +1377,18 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                         </div>
                       </div>
 
-                      <div className="border-t overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted/30">
-                            <tr className="text-left">
-                              <th className="px-3 py-2 w-12">Nº</th>
-                              <th className="px-3 py-2">Vencimento</th>
-                              <th className="px-3 py-2">Valor</th>
-                              <th className="px-3 py-2">Status</th>
-                              <th className="px-3 py-2">Pago em</th>
-                              <th className="px-3 py-2">Valor pago</th>
-                              <th className="px-3 py-2 w-28"></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {c.parcelas.length === 0 ? (
-                              <tr><td colSpan={7} className="px-3 py-4 text-center text-muted-foreground">Sem parcelas registradas.</td></tr>
-                            ) : c.parcelas.map((p) => {
-                              const paga = isPaga(p);
-                              const atras = isAtraso(p);
-                              const cls = paga ? "bg-green-50/50" : atras ? "bg-red-50/60" : "";
-                              const label = paga ? "Paga" : atras ? "Em atraso" : "Pendente";
-                              const labelCls = paga ? "text-green-700" : atras ? "text-red-700" : "text-foreground";
-                              return (
-                                <tr key={p.id} className={`border-t ${cls}`}>
-                                  <td className="px-3 py-2 tabular-nums">{p.numero_parcela}</td>
-                                  <td className="px-3 py-2 tabular-nums">{fmtData(p.vencimento)}</td>
-                                  <td className="px-3 py-2 tabular-nums">{fmtBRL(p.valor)}</td>
-                                  <td className={`px-3 py-2 font-medium ${labelCls}`}>{label}</td>
-                                  <td className="px-3 py-2 tabular-nums">{fmtData(p.pago_em)}</td>
-                                  <td className="px-3 py-2 tabular-nums">{p.valor_pago != null ? fmtBRL(p.valor_pago) : "—"}</td>
-                                  <td className="px-3 py-2 text-right">
-                                    {paga ? (
-                                      <span className="text-xs text-muted-foreground">—</span>
-                                    ) : (
-                                      <Link
-                                        to="/app/cartao-beneficios/contratos"
-                                        search={{ contratoId: c.id }}
-                                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
-                                        title="Abrir contrato no Cartão Benefícios para registrar pagamento"
-                                      >
-                                        <Check className="h-3.5 w-3.5" /> Pagar
-                                      </Link>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                      <div className="border-t px-4 py-3 flex flex-wrap items-center justify-between gap-2 bg-muted/10">
+                        <div className="text-xs text-muted-foreground">
+                          Mensalidades e pagamentos são gerenciados na tela do contrato.
+                        </div>
+                        <Link
+                          to="/app/cartao-beneficios/contratos"
+                          search={{ contratoId: c.id }}
+                          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
+                          title="Abrir contrato no Cartão Benefícios"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" /> Abrir contrato
+                        </Link>
                       </div>
                     </div>
                   );
