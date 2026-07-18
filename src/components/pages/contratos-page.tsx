@@ -163,6 +163,10 @@ type Contrato = {
   migrar_apos?: string | null;
   criado_por?: string | null;
   codigo_prontuario?: string | null;
+  sem_carencia?: boolean | null;
+  sem_carencia_motivo?: string | null;
+  sem_carencia_por?: string | null;
+  sem_carencia_em?: string | null;
 };
 type Mens = {
   id: string;
@@ -787,6 +791,14 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                         className="text-amber-700 border-amber-400 bg-amber-50 dark:bg-amber-950/30"
                       >
                         Tabela antiga — migrar {c.migrar_apos ? `em ${fmtD(c.migrar_apos)}` : ""}
+                      </Badge>
+                    ) : null}
+                    {c.sem_carencia ? (
+                      <Badge
+                        variant="outline"
+                        className="text-emerald-700 border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30"
+                      >
+                        Sem carência
                       </Badge>
                     ) : null}
                   </div>
@@ -2085,6 +2097,16 @@ function DetalheContrato({
     !!(contrato as any).titular_apenas_financeiro,
   );
   const [savingApenasFin, setSavingApenasFin] = useState(false);
+  // Isenção manual de carência (Admin/Gestor).
+  const [semCarencia, setSemCarencia] = useState<boolean>(
+    !!(contrato as any).sem_carencia,
+  );
+  const [semCarenciaMotivo, setSemCarenciaMotivo] = useState<string>(
+    (contrato as any).sem_carencia_motivo ?? "",
+  );
+  const [savingSemCarencia, setSavingSemCarencia] = useState(false);
+  const roleAtual = (clinicaAtual?.role ?? "").toLowerCase();
+  const podeEditarCarencia = roleAtual === "admin" || roleAtual === "gestor";
   const [retroDialog, setRetroDialog] = useState<{ open: boolean; parcelasPagas: string; dataInicio: string } | null>(null);
   const [regerandoRetro, setRegerandoRetro] = useState(false);
   useEffect(() => {
@@ -2094,6 +2116,8 @@ function DetalheContrato({
     setAdmForma(contrato.forma_pagamento ?? "");
     setAdmObs(contrato.observacoes ?? "");
     setApenasFinanceiro(!!(contrato as any).titular_apenas_financeiro);
+    setSemCarencia(!!(contrato as any).sem_carencia);
+    setSemCarenciaMotivo((contrato as any).sem_carencia_motivo ?? "");
   }, [contrato.id]);
 
   // Carrega lista de convênios ativos (ADM)
@@ -2225,6 +2249,53 @@ function DetalheContrato({
         setRetroDialog({ open: true, parcelasPagas: String(sugestao), dataInicio: admDataInicio });
       }
     }
+  };
+
+  // Salva a isenção manual de carência (Admin/Gestor).
+  const salvarSemCarencia = async (novoValor: boolean, motivo: string) => {
+    if (!podeEditarCarencia) {
+      toast.error("Apenas Admin ou Gestor podem alterar a carência.");
+      return;
+    }
+    if (novoValor && !motivo.trim()) {
+      toast.error("Informe o motivo da isenção de carência.");
+      return;
+    }
+    setSavingSemCarencia(true);
+    const payload: any = novoValor
+      ? {
+          sem_carencia: true,
+          sem_carencia_motivo: motivo.trim(),
+          sem_carencia_por: user?.id ?? null,
+          sem_carencia_em: new Date().toISOString(),
+        }
+      : {
+          sem_carencia: false,
+          sem_carencia_motivo: null,
+          sem_carencia_por: null,
+          sem_carencia_em: null,
+        };
+    const { error } = await supabase
+      .from("contratos_assinatura")
+      .update(payload)
+      .eq("id", contrato.id);
+    setSavingSemCarencia(false);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    (contrato as any).sem_carencia = payload.sem_carencia;
+    (contrato as any).sem_carencia_motivo = payload.sem_carencia_motivo;
+    (contrato as any).sem_carencia_por = payload.sem_carencia_por;
+    (contrato as any).sem_carencia_em = payload.sem_carencia_em;
+    setSemCarencia(payload.sem_carencia);
+    setSemCarenciaMotivo(payload.sem_carencia_motivo ?? "");
+    toast.success(
+      payload.sem_carencia
+        ? "Contrato marcado como isento de carência."
+        : "Isenção de carência removida.",
+    );
+    await load();
   };
 
   // Regenera as 12 parcelas a partir da nova data de início; as N primeiras entram como pagas.
@@ -4305,6 +4376,60 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </div>
               ) : contrato.observacoes ? (
                 <DadosField label="Observações" value={contrato.observacoes} />
+              ) : null}
+              {podeEditarCarencia ? (
+                <div className="rounded-md border border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20 p-3 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <input
+                      id={`sem-carencia-${contrato.id}`}
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={semCarencia}
+                      disabled={savingSemCarencia}
+                      onChange={(e) => {
+                        const v = e.target.checked;
+                        setSemCarencia(v);
+                        if (!v) void salvarSemCarencia(false, "");
+                      }}
+                    />
+                    <label htmlFor={`sem-carencia-${contrato.id}`} className="text-sm cursor-pointer">
+                      <span className="font-medium">Isento de carência</span>
+                      <span className="text-muted-foreground"> — marcar quando o contrato veio de renovação histórica (tabela antiga) ou migração e o paciente já cumpriu carência em contrato anterior.</span>
+                    </label>
+                  </div>
+                  {semCarencia ? (
+                    <div className="space-y-2 pl-6">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Motivo (obrigatório)</Label>
+                        <Input
+                          value={semCarenciaMotivo}
+                          onChange={(e) => setSemCarenciaMotivo(e.target.value)}
+                          placeholder="Ex.: Renovação de contrato migrado da tabela antiga"
+                          disabled={savingSemCarencia}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => salvarSemCarencia(true, semCarenciaMotivo)}
+                          disabled={savingSemCarencia || !semCarenciaMotivo.trim()}
+                        >
+                          {savingSemCarencia ? "Salvando…" : "Confirmar isenção"}
+                        </Button>
+                        {(contrato as any).sem_carencia_em ? (
+                          <span className="text-xs text-muted-foreground">
+                            Marcado em {fmtD(String((contrato as any).sem_carencia_em).slice(0, 10))}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (contrato as any).sem_carencia ? (
+                <DadosField
+                  label="Carência"
+                  value={`Isento — ${(contrato as any).sem_carencia_motivo ?? "sem motivo registrado"}`}
+                />
               ) : null}
               {isAdmin && podeEscrever ? (
                 <div className="flex justify-end pt-2">

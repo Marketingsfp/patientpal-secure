@@ -2653,6 +2653,10 @@ export type Database = {
           paciente_nome: string
           plano_id: string | null
           renovado_em: string | null
+          sem_carencia: boolean
+          sem_carencia_em: string | null
+          sem_carencia_motivo: string | null
+          sem_carencia_por: string | null
           status: string
           tabela_legada: boolean
           taxa_adesao: number
@@ -2686,6 +2690,10 @@ export type Database = {
           paciente_nome: string
           plano_id?: string | null
           renovado_em?: string | null
+          sem_carencia?: boolean
+          sem_carencia_em?: string | null
+          sem_carencia_motivo?: string | null
+          sem_carencia_por?: string | null
           status?: string
           tabela_legada?: boolean
           taxa_adesao?: number
@@ -2719,6 +2727,10 @@ export type Database = {
           paciente_nome?: string
           plano_id?: string | null
           renovado_em?: string | null
+          sem_carencia?: boolean
+          sem_carencia_em?: string | null
+          sem_carencia_motivo?: string | null
+          sem_carencia_por?: string | null
           status?: string
           tabela_legada?: boolean
           taxa_adesao?: number
