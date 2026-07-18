@@ -328,6 +328,15 @@ export function HistoricoContratoTab({ contratoId }: { contratoId: string }) {
     const arr = eventos.filter((e) => {
       const g = grupoDe(e.tipo);
       if (!filtros[g]) return false;
+      // Oculta eventos de alteração sem diff relevante (ruído de auditoria).
+      if (e.tipo === "contrato_alterado" &&
+          diffCampos(e.dados_antes, e.dados_depois, LABELS_CONTRATO).length === 0) {
+        return false;
+      }
+      if (e.tipo === "mensalidade_alterada" &&
+          diffCampos(e.dados_antes, e.dados_depois, LABELS_MENS).length === 0) {
+        return false;
+      }
       if (!q) return true;
       const hay = [
         TituloEvento(e),
