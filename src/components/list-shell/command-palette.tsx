@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useAgendaExpressDisabled } from "@/hooks/use-agenda-express-disabled";
 import {
   CommandDialog, CommandEmpty, CommandGroup, CommandInput,
   CommandItem, CommandList, CommandSeparator, CommandShortcut,
@@ -123,7 +122,6 @@ export function useCommandPaletteToggle(): [boolean, (v: boolean) => void] {
 /** Helper: entradas padrão de navegação (telas). Sem convênios externos. */
 export function useDefaultScreenEntries(): CommandEntry[] {
   const navigate = useNavigate();
-  const agendaExpressDisabled = useAgendaExpressDisabled();
   return useMemo(() => {
     const nav = (to: string) => () => { void navigate({ to: to as never }); };
     const mk = (label: string, to: string, hint?: string, keywords?: string[]): CommandEntry => ({
@@ -132,7 +130,6 @@ export function useDefaultScreenEntries(): CommandEntry[] {
     const all: (CommandEntry | null)[] = [
       mk("Início", "/app", "Painel inicial"),
       mk("Agenda", "/app/agenda"),
-      agendaExpressDisabled ? null : mk("Agenda Express", "/app/agenda/express"),
       mk("Recepção", "/app/recepcao"),
       mk("Check-in", "/app/checkin"),
       mk("Clientes", "/app/clientes"),
@@ -168,5 +165,5 @@ export function useDefaultScreenEntries(): CommandEntry[] {
       mk("Relatórios", "/app/relatorios"),
     ];
     return all.filter((e): e is CommandEntry => e !== null);
-  }, [navigate, agendaExpressDisabled]);
+  }, [navigate]);
 }
