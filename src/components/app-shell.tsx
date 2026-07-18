@@ -171,7 +171,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/cargos", label: "Cargos", icon: Briefcase },
     { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
     { to: "/app/funcionarios", label: "Funcionários", icon: Contact },
-    { to: "/app/configuracoes/nfse", label: "NFS-e", icon: FileText },
+    { to: "/app/configuracoes/nfse", label: "Configuração NFS-e", icon: FileText },
     { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
     { to: "/app/auditoria", label: "Segurança & Compliance", icon: ShieldCheck },
     { to: "/app/setores", label: "Setores", icon: Building2 },
