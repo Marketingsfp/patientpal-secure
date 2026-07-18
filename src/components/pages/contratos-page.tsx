@@ -2303,6 +2303,11 @@ function DetalheContrato({
     );
   };
   const adicionarParcela = async () => {
+    // Alerta se houver rascunhos pendentes — evita perder edições ao recarregar.
+    if (totalRascunhos > 0) {
+      if (!confirm("Existem alterações não salvas nas mensalidades. Deseja descartar e adicionar uma nova parcela?")) return;
+      setRascunhos({});
+    }
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const prox = mensalidades.reduce((mx, m) => Math.max(mx, Number(m.numero_parcela) || 0), 0) + 1;
     const hoje = new Date().toISOString().slice(0, 10);
@@ -2324,7 +2329,83 @@ function DetalheContrato({
     const { error } = await supabase.from("contrato_mensalidades").delete().eq("id", id);
     if (error) return mostrarErro(error);
     toast.success("Parcela removida.");
+    setRascunhos((prev) => { const n = { ...prev }; delete n[id]; return n; });
     await load();
+  };
+
+  // Persiste em lote as alterações feitas nos campos editáveis da tabela
+  // Mensalidades (vencimento / valor / pago_em). Também ajusta status para
+  // "pago" quando o usuário preencher pago_em em uma parcela pendente, e volta
+  // para "pendente" quando limpar pago_em de uma parcela paga historicamente
+  // (sem lançamento no caixa).
+  const salvarRascunhos = async () => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    const ids = Object.keys(rascunhos);
+    if (ids.length === 0) return;
+    setSalvandoRascunhos(true);
+    let ok = 0;
+    let bloqueadas = 0;
+    try {
+      for (const id of ids) {
+        const original = mens.find((m) => m.id === id);
+        if (!original) continue;
+        const draft = rascunhos[id];
+        const payload: Record<string, any> = {};
+        if (draft.vencimento !== undefined) payload.vencimento = draft.vencimento;
+        if (draft.valor !== undefined) payload.valor = Number(draft.valor);
+        if (draft.pago_em !== undefined) {
+          const novoPagoEm = draft.pago_em || null;
+          const eraPago = original.status === "pago";
+          // Bloqueia limpar pago_em quando existe lançamento vinculado (Caixa)
+          if (!novoPagoEm && eraPago && original.lancamento_id) {
+            bloqueadas++;
+            continue;
+          }
+          payload.pago_em = novoPagoEm;
+          if (novoPagoEm && !eraPago) {
+            payload.status = "pago";
+            if (original.valor && (payload as any).valor === undefined) {
+              payload.valor_pago = Number(original.valor);
+            } else if (payload.valor !== undefined) {
+              payload.valor_pago = Number(payload.valor);
+            }
+          } else if (!novoPagoEm && eraPago && !original.lancamento_id) {
+            payload.status = "pendente";
+            payload.valor_pago = null;
+            payload.forma_pagamento = null;
+          }
+        }
+        if (Object.keys(payload).length === 0) continue;
+        const { error } = await supabase
+          .from("contrato_mensalidades")
+          .update(payload)
+          .eq("id", id);
+        if (error) {
+          mostrarErro(error);
+          continue;
+        }
+        ok++;
+      }
+      if (bloqueadas > 0) {
+        toast.error(
+          `${bloqueadas} parcela(s) não puderam ter "Pago em" removido — foram pagas pelo Caixa. Estorne pelo Caixa antes.`,
+        );
+      }
+      if (ok > 0) toast.success(`${ok} parcela(s) atualizada(s).`);
+      setRascunhos({});
+      await load();
+    } finally {
+      setSalvandoRascunhos(false);
+    }
+  };
+
+  const descartarRascunhos = () => {
+    if (totalRascunhos === 0) return;
+    if (!confirm("Descartar todas as alterações não salvas?")) return;
+    setRascunhos({});
   };
 
   const salvarDadosFinanceiros = async () => {
