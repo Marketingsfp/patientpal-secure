@@ -14,8 +14,12 @@ import { useMenuPrefs } from "@/hooks/use-menu-prefs";
 import { usePermissoes } from "@/hooks/use-permissoes";
 import { moduloDaRota } from "@/lib/permissoes-rotas";
 import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
 const MAX_INLINE = 6;
+
+const HOVER_SCALE_CLASSES =
+  "relative transform-gpu origin-center transition-all duration-200 ease-out hover:z-10 hover:scale-[1.04] hover:shadow-md active:scale-[0.98] motion-reduce:transform-none motion-reduce:hover:scale-100 [@media(hover:none)]:hover:scale-100 [@media(hover:none)]:hover:shadow-none [@media(hover:none)]:active:scale-100";
 
 /**
  * Um path do menu é permitido quando:
@@ -56,10 +60,11 @@ function IconBtn({
 }
 
 function Row({
-  item, active, pinned, favorited, onTogglePin, onToggleFav,
+  item, active, pinned, favorited, onTogglePin, onToggleFav, hoverScale,
 }: {
   item: MenuItem; active: boolean; pinned: boolean; favorited: boolean;
   onTogglePin: () => void; onToggleFav: () => void;
+  hoverScale?: boolean;
 }) {
   const Icon = item.icon;
   return (
@@ -68,6 +73,7 @@ function Row({
         "group flex items-center gap-2 pl-3 pr-2 h-9 rounded-md text-sm transition-colors",
         "hover:bg-sidebar-accent",
         active && "bg-sidebar-accent border-l-2 border-primary",
+        hoverScale && HOVER_SCALE_CLASSES,
       )}
     >
       <Link to={item.path} className="flex items-center gap-2 flex-1 min-w-0">
@@ -87,13 +93,14 @@ function Row({
 }
 
 function CentroGroup({
-  centro, currentPath, open, onToggleOpen, prefs, onPin, onFav, hidePaths,
+  centro, currentPath, open, onToggleOpen, prefs, onPin, onFav, hidePaths, hoverScale,
 }: {
   centro: Centro; currentPath: string; open: boolean; onToggleOpen: () => void;
   prefs: { pinned: string[]; favorites: string[] };
   onPin: (p: string) => void; onFav: (p: string) => void;
   /** paths a esconder dentro do centro (ex.: já mostrados em "Fixados") */
   hidePaths?: ReadonlyArray<string>;
+  hoverScale?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const hide = new Set(hidePaths ?? []);
@@ -131,6 +138,7 @@ function CentroGroup({
               favorited={prefs.favorites.includes(it.path)}
               onTogglePin={() => onPin(it.path)}
               onToggleFav={() => onFav(it.path)}
+              hoverScale={hoverScale}
             />
           ))}
           {hasMore && (
@@ -168,6 +176,7 @@ function CentroGroup({
                       favorited={prefs.favorites.includes(it.path)}
                       onTogglePin={() => onPin(it.path)}
                       onToggleFav={() => onFav(it.path)}
+                      hoverScale={hoverScale}
                     />
                   ))}
                   {filtered.length === 0 && (
@@ -189,6 +198,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const defaults = PERFIL_DEFAULTS[perfil];
   const { disabled: atendimentoMultiploDisabled } = useAtendimentoMultiploDisabled();
+  const { enabled: hoverScale } = useClinicFeatureFlag("menu_hover_scale");
   const centrosBase = CENTROS.filter((c) => defaults.centros.includes(c.key)).map((c) => {
     if (!atendimentoMultiploDisabled) return c;
     return {
@@ -277,7 +287,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
         </div>
 
         {collapsed ? (
-          <div className="p-2 space-y-1 overflow-y-auto flex-1">
+          <div className="p-2 space-y-1 overflow-y-auto overflow-x-visible flex-1">
             {pinnedItems.map((it) => {
               const Icon = it.icon;
               const active = currentPath === it.path || currentPath.startsWith(it.path + "/");
@@ -289,6 +299,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                       className={cn(
                         "flex items-center justify-center h-9 w-full rounded-md hover:bg-sidebar-accent",
                         active && "bg-sidebar-accent border-l-2 border-primary",
+                        hoverScale && HOVER_SCALE_CLASSES,
                       )}
                     >
                       <Icon className="h-4 w-4" />
@@ -316,6 +327,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                             className={cn(
                               "flex items-center justify-center h-9 w-full rounded-md hover:bg-sidebar-accent",
                               active && "bg-sidebar-accent border-l-2 border-primary",
+                              hoverScale && HOVER_SCALE_CLASSES,
                             )}
                           >
                             <Icon className="h-4 w-4" />
@@ -330,7 +342,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
             })}
           </div>
         ) : (
-        <div className="p-3 space-y-4 overflow-y-auto flex-1">
+        <div className="p-3 space-y-4 overflow-y-auto overflow-x-visible flex-1">
           {/* Fixados */}
           {pinnedItems.length > 0 && (
             <div>
@@ -347,6 +359,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                     favorited={prefs.favorites.includes(it.path)}
                     onTogglePin={() => togglePin(it.path)}
                     onToggleFav={() => toggleFavorite(it.path)}
+                    hoverScale={hoverScale}
                   />
                 ))}
               </div>
@@ -366,6 +379,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                 onPin={togglePin}
                 onFav={toggleFavorite}
                 hidePaths={effectivePinned}
+                hoverScale={hoverScale}
               />
             ))}
           </div>
@@ -381,7 +395,10 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                   <Link
                     key={r.path}
                     to={r.path}
-                    className="flex items-center gap-2 pl-3 pr-2 h-8 rounded-md text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                    className={cn(
+                      "flex items-center gap-2 pl-3 pr-2 h-8 rounded-md text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+                      hoverScale && HOVER_SCALE_CLASSES,
+                    )}
                   >
                     <span className="truncate">{r.label}</span>
                   </Link>
@@ -406,6 +423,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                     favorited
                     onTogglePin={() => togglePin(it.path)}
                     onToggleFav={() => toggleFavorite(it.path)}
+                    hoverScale={hoverScale}
                   />
                 ))}
               </div>
