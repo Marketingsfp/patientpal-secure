@@ -3900,7 +3900,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                 Taxa inclusão
                               </Badge>
                             ) : (
-                              m.numero_parcela
+                              temCiclosMultiplos && parcelaLocalPorId[m.id]
+                                ? `${parcelaLocalPorId[m.id].pos}/${parcelaLocalPorId[m.id].total}`
+                                : m.numero_parcela
                             )}
                           </TableCell>
                           <TableCell>
