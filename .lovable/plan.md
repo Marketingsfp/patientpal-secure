@@ -1,49 +1,64 @@
-## Problema observado
+## Objetivo
 
-Na tela **Clientes** (`/app/clientes`), ao pesquisar "kauan":
-1. **Nem todos os pacientes aparecem** — a busca corta o resultado.
-2. **Ao rolar para baixo, a tela congela** — não há carregamento de mais itens e a rolagem trava.
+Permitir que perfis **Admin** e **Gestor** marquem um contrato como **"sem carência"**, para casos em que o contrato está na tabela antiga ("migrar") mas na prática já é uma renovação de um cliente antigo — hoje o sistema não tem como saber isso e aplica carência como se fosse um contrato novo.
 
-## Diagnóstico (confirmado por leitura do código)
+## Estado atual (verificado)
 
-Arquivo: `src/routes/_authenticated/app.clientes.index.tsx`
+- `contratos_assinatura` já tem `contrato_origem_id` e `numero_renovacoes`. Quando qualquer um está preenchido, a Agenda/Caixa considera **renovação** e **ignora carência** (`src/routes/_authenticated/app.agenda.tsx` linhas 494–510).
+- Contratos legados da "tabela antiga — migrar" não têm nenhum dos dois → sistema trata como novo → aplica carência da regra do convênio.
+- Não existe hoje um campo "isenção manual de carência".
 
-- A função `load()` chama a RPC `buscar_pacientes` com **`_limit: q ? 80 : 120`**. Ou seja, qualquer busca retorna **no máximo 80 registros**, sem paginação e sem aviso ao usuário. Se existirem mais pacientes com "kauan" no nome, eles simplesmente não aparecem.
-- Não existe scroll infinito nem botão "Carregar mais": ao rolar, nada acontece porque a lista já está completa (limitada a 80).
-- O "congelamento" ao rolar tem uma causa adicional: a cada mudança em `items` (inclusive quando você digita), o `useEffect` roda `createSignedUrls` para **todas** as fotos, o que provoca re-render pesado e trava a rolagem em listas com muitas linhas com foto.
+## Mudança proposta
 
-## O que vou ajustar (somente frontend/apresentação)
+### 1. Banco (migração)
 
-Escopo mínimo, sem mexer em regra de negócio, RLS, RPC ou dados:
+Adicionar em `contratos_assinatura`:
 
-1. **Aumentar o limite e mostrar contagem correta na busca**
-   - Elevar `_limit` de busca para um teto seguro (ex.: **500**) — suficiente para os casos reais da clínica sem estourar a resposta.
-   - Exibir um aviso discreto acima da tabela quando o resultado atingir o teto: *"Mostrando os primeiros 500 resultados. Refine a busca para ver mais."*
+- `sem_carencia boolean NOT NULL DEFAULT false` — flag manual.
+- `sem_carencia_motivo text` — motivo curto informado por quem marcou (ex.: "Contrato migrado — cliente desde 2022").
+- `sem_carencia_por uuid` — usuário que marcou.
+- `sem_carencia_em timestamptz` — quando foi marcado.
 
-2. **Resolver o travamento da rolagem**
-   - Estabilizar o efeito das fotos assinadas: só re-assinar quando o conjunto de `foto_url` realmente mudar (comparação por chave), evitando refazer `createSignedUrls` a cada digitação/re-render.
-   - Manter `loading:"lazy"` no `<img>` das linhas para reduzir custo de scroll.
+Backfill: nada automático. Cada contrato migrado será tratado caso a caso pelo Admin/Gestor.
 
-3. **Feedback de "sem mais resultados"**
-   - Quando a busca retornar exatamente o teto, sinalizar visualmente para o usuário refinar (nome + sobrenome, CPF, etc.).
+### 2. Regra de negócio (frontend)
 
-## O que NÃO será alterado
+Em `src/routes/_authenticated/app.agenda.tsx` (`carregarInfoConvenio`), estender a condição de renovação:
 
-- RPC `buscar_pacientes` e qualquer regra de banco.
-- Layout, colunas, ações, permissões, exportação.
-- Fluxo do V2 (`ClientesShellV2`) — este ajuste é apenas no clássico, que é o que está em uso na tela reportada.
+```
+const isRenovacao =
+  Number(contrato?.numero_renovacoes ?? 0) > 0 ||
+  !!contrato?.contrato_origem_id ||
+  !!contrato?.sem_carencia;   // ← novo
+```
+
+O mesmo `select` do contrato passa a buscar `sem_carencia`. Como Caixa e Agenda usam o mesmo helper, a isenção passa a valer nos dois fluxos automaticamente.
+
+### 3. UI — aba "Dados" do contrato (`src/components/pages/contratos-page.tsx`)
+
+Novo bloco **"Carência"** visível para **todos**, mas editável apenas para Admin/Gestor (`useRolesGestao` / equivalente já existente):
+
+- Checkbox **"Este contrato é isento de carência"**.
+- Campo texto **"Motivo"** (obrigatório quando o checkbox é marcado).
+- Ao salvar: grava `sem_carencia`, `sem_carencia_motivo`, `sem_carencia_por = auth.uid()`, `sem_carencia_em = now()`.
+- Para outros perfis: mostra somente leitura ("Isento — motivo: … marcado por Fulano em dd/mm/aaaa").
+
+Ao lado da badge "Tabela antiga — migrar" na listagem, exibir badge extra **"Sem carência"** quando `sem_carencia = true`, para deixar visível na lista.
+
+### 4. Auditoria
+
+Registrar a mudança em `audit_log` (a tabela já existe no projeto) com ação `contrato.sem_carencia.toggle` e diff antes/depois. Assim fica rastreável quem alterou.
+
+## Fora do escopo
+
+- Não altera a lógica de "Tabela antiga — migrar" nem a data `migrar_apos`.
+- Não altera regras de taxa de adesão.
+- Não faz backfill em massa — cada contrato é marcado individualmente pelo gestor.
 
 ## Validação
 
-- Repetir a busca "kauan" e conferir se todos os pacientes esperados aparecem.
-- Rolar a lista de cima até o fim sem travamento.
-- Buscar por termos com poucos resultados e por termos amplos (ex.: "silva") para confirmar o aviso de teto quando aplicável.
-
-## Antes × Depois
-
-- **Antes:** busca cortava em 80 resultados sem avisar; rolagem congelava por reprocessamento das fotos.
-- **Depois:** busca traz até 500 resultados com aviso quando atinge o teto; rolagem fluida porque as URLs assinadas só são recalculadas quando a lista de fotos muda de fato.
-
-## Pendências / Observações
-
-- Se, na prática, houver pesquisas legítimas com mais de 500 resultados, o próximo passo será introduzir paginação real (scroll infinito) — mas isso é uma mudança maior e só faria sentido após confirmar a necessidade.
+1. Marcar um contrato migrado como "sem carência" com usuário Admin.
+2. Abrir agendamento na Agenda usando esse contrato → o benefício do convênio deve ser aplicado imediatamente, sem exigir mensalidades pagas.
+3. Repetir no Caixa (mesma função `carregarInfoConvenio`).
+4. Testar com usuário Recepção → checkbox deve aparecer desabilitado/somente leitura.
+5. Desmarcar → carência volta a valer.
