@@ -122,7 +122,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
         { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
       ],
     },
-    { to: "/app/odontologia", label: "Odontologia", icon: HeartPulse },
+    { to: "/app/odontologia", label: "Odontologia", icon: Tooth },
     { to: "/app/exames-resultados", label: "Resultados de Exames", icon: FlaskConical },
     ],
   },
