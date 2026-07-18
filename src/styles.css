@@ -616,17 +616,3 @@ html.theme-emerald {
 @media print {
   @page { size: A4 portrait; margin: 12mm; }
 }
-
-/* Micro-interações do menu (feature flag por clínica: `menu_micro_interactions`).
-   Só ativa em dispositivos com mouse/pointer preciso — em touch mantém comportamento neutro. */
-@media (hover: hover) and (pointer: fine) {
-  .menu-micro-scope a,
-  .menu-micro-scope button {
-    transition: transform 200ms ease-out;
-    transform-origin: center;
-  }
-  .menu-micro-scope a:hover,
-  .menu-micro-scope button:hover { transform: scale(1.03); }
-  .menu-micro-scope a:active,
-  .menu-micro-scope button:active { transform: scale(0.98); }
-}
