@@ -2251,6 +2251,53 @@ function DetalheContrato({
     }
   };
 
+  // Salva a isenção manual de carência (Admin/Gestor).
+  const salvarSemCarencia = async (novoValor: boolean, motivo: string) => {
+    if (!podeEditarCarencia) {
+      toast.error("Apenas Admin ou Gestor podem alterar a carência.");
+      return;
+    }
+    if (novoValor && !motivo.trim()) {
+      toast.error("Informe o motivo da isenção de carência.");
+      return;
+    }
+    setSavingSemCarencia(true);
+    const payload: any = novoValor
+      ? {
+          sem_carencia: true,
+          sem_carencia_motivo: motivo.trim(),
+          sem_carencia_por: user?.id ?? null,
+          sem_carencia_em: new Date().toISOString(),
+        }
+      : {
+          sem_carencia: false,
+          sem_carencia_motivo: null,
+          sem_carencia_por: null,
+          sem_carencia_em: null,
+        };
+    const { error } = await supabase
+      .from("contratos_assinatura")
+      .update(payload)
+      .eq("id", contrato.id);
+    setSavingSemCarencia(false);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    (contrato as any).sem_carencia = payload.sem_carencia;
+    (contrato as any).sem_carencia_motivo = payload.sem_carencia_motivo;
+    (contrato as any).sem_carencia_por = payload.sem_carencia_por;
+    (contrato as any).sem_carencia_em = payload.sem_carencia_em;
+    setSemCarencia(payload.sem_carencia);
+    setSemCarenciaMotivo(payload.sem_carencia_motivo ?? "");
+    toast.success(
+      payload.sem_carencia
+        ? "Contrato marcado como isento de carência."
+        : "Isenção de carência removida.",
+    );
+    await load();
+  };
+
   // Regenera as 12 parcelas a partir da nova data de início; as N primeiras entram como pagas.
   const regerarComPagas = async (n: number) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
