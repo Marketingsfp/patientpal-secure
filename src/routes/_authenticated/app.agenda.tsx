@@ -4538,7 +4538,7 @@ function AgendaPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <TurboModeToggle />
+          {!turboDisabled && <TurboModeToggle />}
           <div className="inline-flex rounded-full border bg-card p-0.5">
             <button
               type="button"
