@@ -793,6 +793,14 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                         Tabela antiga — migrar {c.migrar_apos ? `em ${fmtD(c.migrar_apos)}` : ""}
                       </Badge>
                     ) : null}
+                    {c.sem_carencia ? (
+                      <Badge
+                        variant="outline"
+                        className="text-emerald-700 border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30"
+                      >
+                        Sem carência
+                      </Badge>
+                    ) : null}
                   </div>
                 </TableCell>
                 <TableCell>
