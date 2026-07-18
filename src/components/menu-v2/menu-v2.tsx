@@ -93,13 +93,14 @@ function Row({
 }
 
 function CentroGroup({
-  centro, currentPath, open, onToggleOpen, prefs, onPin, onFav, hidePaths,
+  centro, currentPath, open, onToggleOpen, prefs, onPin, onFav, hidePaths, hoverScale,
 }: {
   centro: Centro; currentPath: string; open: boolean; onToggleOpen: () => void;
   prefs: { pinned: string[]; favorites: string[] };
   onPin: (p: string) => void; onFav: (p: string) => void;
   /** paths a esconder dentro do centro (ex.: já mostrados em "Fixados") */
   hidePaths?: ReadonlyArray<string>;
+  hoverScale?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const hide = new Set(hidePaths ?? []);
@@ -137,6 +138,7 @@ function CentroGroup({
               favorited={prefs.favorites.includes(it.path)}
               onTogglePin={() => onPin(it.path)}
               onToggleFav={() => onFav(it.path)}
+              hoverScale={hoverScale}
             />
           ))}
           {hasMore && (
@@ -174,6 +176,7 @@ function CentroGroup({
                       favorited={prefs.favorites.includes(it.path)}
                       onTogglePin={() => onPin(it.path)}
                       onToggleFav={() => onFav(it.path)}
+                      hoverScale={hoverScale}
                     />
                   ))}
                   {filtered.length === 0 && (
