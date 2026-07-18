@@ -380,7 +380,7 @@ export function AppShell() {
     const leaves: string[] = [];
     for (const row of visibleNavRows) {
       const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
-      const open = collapsed || hideLabel || row.label === "Operação" ? true : (openGroups[row.label] ?? false);
+      const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? true);
       if (!open) continue;
       for (const item of row.items) {
         if (isParent(item)) {
@@ -525,13 +525,13 @@ export function AppShell() {
             const itemHasActive = (it: NavItem): boolean => isParent(it) ? it.children.some((c) => leafIsActive(c.to, c.hash)) : leafIsActive(it.to);
             const groupHasActive = row.items.some(itemHasActive);
             const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
-            const open = collapsed || hideLabel || row.label === "Operação" ? true : (openGroups[row.label] ?? false);
+            const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? true);
             return (
               <div key={row.label} className="space-y-1">
                 {!collapsed && !hideLabel && (
                   <button
                     type="button"
-                    onClick={() => setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? false) }))}
+                    onClick={() => setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? true) }))}
                     className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70 hover:opacity-100 transition-opacity rounded-md"
                     aria-expanded={open}
                   >
