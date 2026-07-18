@@ -1936,6 +1936,34 @@ function DetalheContrato({
     </div>
   );
   const [mens, setMens] = useState<Mens[]>([]);
+  // Rascunhos de edição da tabela Mensalidades (vencimento/valor/pago_em).
+  // Só persistem no banco quando o usuário clica em "Salvar alterações".
+  type RascunhoMens = { vencimento?: string; valor?: number; pago_em?: string | null };
+  const [rascunhos, setRascunhos] = useState<Record<string, RascunhoMens>>({});
+  const [salvandoRascunhos, setSalvandoRascunhos] = useState(false);
+  const setRascunho = (id: string, patch: RascunhoMens) => {
+    setRascunhos((prev) => {
+      const atual = { ...(prev[id] ?? {}), ...patch };
+      // remove chaves iguais ao valor original para permitir descarte automático
+      const original = mens.find((m) => m.id === id);
+      if (original) {
+        if (atual.vencimento !== undefined && atual.vencimento === original.vencimento)
+          delete atual.vencimento;
+        if (atual.valor !== undefined && Number(atual.valor) === Number(original.valor))
+          delete atual.valor;
+        if (
+          atual.pago_em !== undefined &&
+          (atual.pago_em ?? null) === (original.pago_em ?? null)
+        )
+          delete atual.pago_em;
+      }
+      const novo = { ...prev };
+      if (Object.keys(atual).length === 0) delete novo[id];
+      else novo[id] = atual;
+      return novo;
+    });
+  };
+  const totalRascunhos = Object.keys(rascunhos).length;
   const [extraRecebido, setExtraRecebido] = useState<{ total: number; count: number }>({ total: 0, count: 0 });
   const [drill, setDrill] = useState<null | "pagas" | "recebido" | "areceber">(null);
   const [deps, setDeps] = useState<Dep[]>([]);
@@ -2275,6 +2303,11 @@ function DetalheContrato({
     );
   };
   const adicionarParcela = async () => {
+    // Alerta se houver rascunhos pendentes — evita perder edições ao recarregar.
+    if (totalRascunhos > 0) {
+      if (!confirm("Existem alterações não salvas nas mensalidades. Deseja descartar e adicionar uma nova parcela?")) return;
+      setRascunhos({});
+    }
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const prox = mensalidades.reduce((mx, m) => Math.max(mx, Number(m.numero_parcela) || 0), 0) + 1;
     const hoje = new Date().toISOString().slice(0, 10);
@@ -2296,7 +2329,83 @@ function DetalheContrato({
     const { error } = await supabase.from("contrato_mensalidades").delete().eq("id", id);
     if (error) return mostrarErro(error);
     toast.success("Parcela removida.");
+    setRascunhos((prev) => { const n = { ...prev }; delete n[id]; return n; });
     await load();
+  };
+
+  // Persiste em lote as alterações feitas nos campos editáveis da tabela
+  // Mensalidades (vencimento / valor / pago_em). Também ajusta status para
+  // "pago" quando o usuário preencher pago_em em uma parcela pendente, e volta
+  // para "pendente" quando limpar pago_em de uma parcela paga historicamente
+  // (sem lançamento no caixa).
+  const salvarRascunhos = async () => {
+    if (!podeEscrever) {
+      toast.error("Você não tem permissão de edição neste módulo.");
+      return;
+    }
+    const ids = Object.keys(rascunhos);
+    if (ids.length === 0) return;
+    setSalvandoRascunhos(true);
+    let ok = 0;
+    let bloqueadas = 0;
+    try {
+      for (const id of ids) {
+        const original = mens.find((m) => m.id === id);
+        if (!original) continue;
+        const draft = rascunhos[id];
+        const payload: Record<string, any> = {};
+        if (draft.vencimento !== undefined) payload.vencimento = draft.vencimento;
+        if (draft.valor !== undefined) payload.valor = Number(draft.valor);
+        if (draft.pago_em !== undefined) {
+          const novoPagoEm = draft.pago_em || null;
+          const eraPago = original.status === "pago";
+          // Bloqueia limpar pago_em quando existe lançamento vinculado (Caixa)
+          if (!novoPagoEm && eraPago && original.lancamento_id) {
+            bloqueadas++;
+            continue;
+          }
+          payload.pago_em = novoPagoEm;
+          if (novoPagoEm && !eraPago) {
+            payload.status = "pago";
+            if (original.valor && (payload as any).valor === undefined) {
+              payload.valor_pago = Number(original.valor);
+            } else if (payload.valor !== undefined) {
+              payload.valor_pago = Number(payload.valor);
+            }
+          } else if (!novoPagoEm && eraPago && !original.lancamento_id) {
+            payload.status = "pendente";
+            payload.valor_pago = null;
+            payload.forma_pagamento = null;
+          }
+        }
+        if (Object.keys(payload).length === 0) continue;
+        const { error } = await supabase
+          .from("contrato_mensalidades")
+          .update(payload as any)
+          .eq("id", id);
+        if (error) {
+          mostrarErro(error);
+          continue;
+        }
+        ok++;
+      }
+      if (bloqueadas > 0) {
+        toast.error(
+          `${bloqueadas} parcela(s) não puderam ter "Pago em" removido — foram pagas pelo Caixa. Estorne pelo Caixa antes.`,
+        );
+      }
+      if (ok > 0) toast.success(`${ok} parcela(s) atualizada(s).`);
+      setRascunhos({});
+      await load();
+    } finally {
+      setSalvandoRascunhos(false);
+    }
+  };
+
+  const descartarRascunhos = () => {
+    if (totalRascunhos === 0) return;
+    if (!confirm("Descartar todas as alterações não salvas?")) return;
+    setRascunhos({});
   };
 
   const salvarDadosFinanceiros = async () => {
@@ -3609,9 +3718,35 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="font-semibold text-sm">Mensalidades</h3>
                   {isAdmin && podeEscrever ? (
-                    <Button size="sm" variant="outline" onClick={adicionarParcela}>
-                      <Plus className="h-3 w-3 mr-1" /> Adicionar parcela
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {totalRascunhos > 0 ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={descartarRascunhos}
+                            disabled={salvandoRascunhos}
+                          >
+                            Descartar
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={salvarRascunhos}
+                            disabled={salvandoRascunhos}
+                          >
+                            {salvandoRascunhos ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                              <Check className="h-3 w-3 mr-1" />
+                            )}
+                            Salvar alterações ({totalRascunhos})
+                          </Button>
+                        </>
+                      ) : null}
+                      <Button size="sm" variant="outline" onClick={adicionarParcela}>
+                        <Plus className="h-3 w-3 mr-1" /> Adicionar parcela
+                      </Button>
+                    </div>
                   ) : null}
                 </div>
                 <div className="rounded-md border">
@@ -3687,10 +3822,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
                             {isAdmin && podeEscrever ? (
                               <DateInputBR
                                 className="h-8 w-40"
-                                value={m.vencimento}
-                                onBlur={(e) => {
+                                value={rascunhos[m.id]?.vencimento ?? m.vencimento}
+                                onChange={(e) => {
                                   const v = e.target.value;
-                                  if (v && v !== m.vencimento) atualizarParcela(m.id, { vencimento: v });
+                                  if (v) setRascunho(m.id, { vencimento: v });
                                 }}
                               />
                             ) : (
@@ -3698,7 +3833,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                             )}
                           </TableCell>
                           <TableCell className="capitalize">
-                            {competenciaDe(m.vencimento)}
+                            {competenciaDe(rascunhos[m.id]?.vencimento ?? m.vencimento)}
                           </TableCell>
                           <TableCell>
                             {isAdmin && podeEscrever ? (
@@ -3707,10 +3842,13 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                 step="0.01"
                                 min={0}
                                 className="h-8 w-28"
-                                defaultValue={Number(m.valor ?? 0).toFixed(2)}
-                                onBlur={(e) => {
+                                key={`valor-${m.id}-${rascunhos[m.id] ? "d" : "o"}`}
+                                defaultValue={Number(
+                                  rascunhos[m.id]?.valor ?? m.valor ?? 0,
+                                ).toFixed(2)}
+                                onChange={(e) => {
                                   const v = Number(String(e.target.value).replace(",", "."));
-                                  if (Number.isFinite(v) && v !== Number(m.valor)) atualizarParcela(m.id, { valor: v });
+                                  if (Number.isFinite(v)) setRascunho(m.id, { valor: v });
                                 }}
                               />
                             ) : (
@@ -3734,7 +3872,24 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                   : "Pendente"}
                             </Badge>
                           </TableCell>
-                          <TableCell>{fmtD(m.pago_em)}</TableCell>
+                          <TableCell>
+                            {isAdmin && podeEscrever ? (
+                              <DateInputBR
+                                className="h-8 w-40"
+                                value={
+                                  rascunhos[m.id] && "pago_em" in rascunhos[m.id]!
+                                    ? rascunhos[m.id]!.pago_em ?? ""
+                                    : m.pago_em ?? ""
+                                }
+                                onChange={(e) => {
+                                  const v = e.target.value || null;
+                                  setRascunho(m.id, { pago_em: v });
+                                }}
+                              />
+                            ) : (
+                              fmtD(m.pago_em)
+                            )}
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1 justify-end">
                               {podeEscrever && (m.status === "pago" ? (
