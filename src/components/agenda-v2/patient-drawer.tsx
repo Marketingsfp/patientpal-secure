@@ -408,7 +408,7 @@ function QuickAction({
 
 // Sprint 3 · S3-A — painel do Prontuário no drawer. Substitui o
 // placeholder por um resumo do procedimento atual + CTA que abre o
-// Atendimento IA daquele agendamento (mesma rota da Agenda Express).
+// Atendimento IA daquele agendamento.
 function ProntuarioPanel({
   proc,
   canOpen,
