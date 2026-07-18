@@ -325,7 +325,7 @@ export function HistoricoContratoTab({ contratoId }: { contratoId: string }) {
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    return eventos.filter((e) => {
+    const arr = eventos.filter((e) => {
       const g = grupoDe(e.tipo);
       if (!filtros[g]) return false;
       if (!q) return true;
@@ -340,6 +340,15 @@ export function HistoricoContratoTab({ contratoId }: { contratoId: string }) {
         .join(" ")
         .toLowerCase();
       return hay.includes(q);
+    });
+    // Ordena por ts desc; em empate, "contrato_criado" tem prioridade (aparece no topo).
+    return arr.slice().sort((a, b) => {
+      const ta = new Date(a.ts).getTime();
+      const tb = new Date(b.ts).getTime();
+      if (tb !== ta) return tb - ta;
+      const ac = a.tipo === "contrato_criado" ? 1 : 0;
+      const bc = b.tipo === "contrato_criado" ? 1 : 0;
+      return bc - ac;
     });
   }, [eventos, busca, filtros]);
 
