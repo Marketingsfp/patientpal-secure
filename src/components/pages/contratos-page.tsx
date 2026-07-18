@@ -75,6 +75,7 @@ import { PatientSearchInput, type PatientOption } from "@/components/patient-sea
 import { EditarPacienteRapidoDialog } from "@/components/contratos/editar-paciente-rapido-dialog";
 import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 import { RenovarContratoDialog } from "@/components/contratos/renovar-contrato-dialog";
+import { HistoricoContratoTab } from "@/components/contratos/historico-contrato-tab";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
@@ -3577,6 +3578,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
               <TabsTrigger value="resumo">Resumo</TabsTrigger>
               <TabsTrigger value="dados">Dados</TabsTrigger>
               <TabsTrigger value="contrato">Contrato</TabsTrigger>
+              <TabsTrigger value="historico">Histórico</TabsTrigger>
             </TabsList>
             <TabsContent value="resumo" className="space-y-4 mt-4">
               {cancelado ? (
@@ -4488,6 +4490,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <strong>Cartão de Benefícios → Convênios</strong>.
                 </div>
               )}
+            </TabsContent>
+            <TabsContent value="historico" className="mt-4">
+              <HistoricoContratoTab contratoId={contrato.id} />
             </TabsContent>
           </Tabs>
         </CardContent>
