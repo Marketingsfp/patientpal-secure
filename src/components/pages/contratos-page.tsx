@@ -4377,6 +4377,60 @@ h1, h2, h3 { margin: 0 0 6mm; }
               ) : contrato.observacoes ? (
                 <DadosField label="Observações" value={contrato.observacoes} />
               ) : null}
+              {podeEditarCarencia ? (
+                <div className="rounded-md border border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20 p-3 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <input
+                      id={`sem-carencia-${contrato.id}`}
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={semCarencia}
+                      disabled={savingSemCarencia}
+                      onChange={(e) => {
+                        const v = e.target.checked;
+                        setSemCarencia(v);
+                        if (!v) void salvarSemCarencia(false, "");
+                      }}
+                    />
+                    <label htmlFor={`sem-carencia-${contrato.id}`} className="text-sm cursor-pointer">
+                      <span className="font-medium">Isento de carência</span>
+                      <span className="text-muted-foreground"> — marcar quando o contrato veio de renovação histórica (tabela antiga) ou migração e o paciente já cumpriu carência em contrato anterior.</span>
+                    </label>
+                  </div>
+                  {semCarencia ? (
+                    <div className="space-y-2 pl-6">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Motivo (obrigatório)</Label>
+                        <Input
+                          value={semCarenciaMotivo}
+                          onChange={(e) => setSemCarenciaMotivo(e.target.value)}
+                          placeholder="Ex.: Renovação de contrato migrado da tabela antiga"
+                          disabled={savingSemCarencia}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => salvarSemCarencia(true, semCarenciaMotivo)}
+                          disabled={savingSemCarencia || !semCarenciaMotivo.trim()}
+                        >
+                          {savingSemCarencia ? "Salvando…" : "Confirmar isenção"}
+                        </Button>
+                        {(contrato as any).sem_carencia_em ? (
+                          <span className="text-xs text-muted-foreground">
+                            Marcado em {fmtD(String((contrato as any).sem_carencia_em).slice(0, 10))}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (contrato as any).sem_carencia ? (
+                <DadosField
+                  label="Carência"
+                  value={`Isento — ${(contrato as any).sem_carencia_motivo ?? "sem motivo registrado"}`}
+                />
+              ) : null}
               {isAdmin && podeEscrever ? (
                 <div className="flex justify-end pt-2">
                   <Button onClick={salvarContratoAdmin} disabled={savingAdm}>
