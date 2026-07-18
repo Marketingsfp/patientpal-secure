@@ -11,6 +11,7 @@ import {
   Zap, LogIn, Workflow, ListChecks, Brain, Sparkles, Bell, FileSignature,
   TrendingUp, HardDrive,
 } from "lucide-react";
+import { Tooth } from "@/components/icons/tooth";
 
 export type MenuItem = {
   path: string;
@@ -80,7 +81,7 @@ export const CENTROS: Centro[] = [
       { path: "/app/procedimentos", label: "Catálogo de Serviços", icon: LayoutGrid },
       { path: "/app/exames-resultados", label: "Resultados de Exames / Laudos IA", icon: FlaskConical, modulo: "exames-resultados" },
       { path: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: BookOpen },
-      { path: "/app/odontologia", label: "Odontograma", icon: Activity, modulo: "odontologia" },
+      { path: "/app/odontologia", label: "Odontograma", icon: Tooth, modulo: "odontologia" },
       { path: "/app/medicos", label: "Médicos", icon: Stethoscope },
       { path: "/app/disponibilidades", label: "Disponibilidades", icon: CalendarDays },
     ],
