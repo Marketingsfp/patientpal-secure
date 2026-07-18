@@ -167,5 +167,6 @@ export function useDefaultScreenEntries(): CommandEntry[] {
       mk("LGPD", "/app/lgpd"),
       mk("Relatórios", "/app/relatorios"),
     ];
-  }, [navigate]);
+    return all.filter((e): e is CommandEntry => e !== null);
+  }, [navigate, agendaExpressDisabled]);
 }
