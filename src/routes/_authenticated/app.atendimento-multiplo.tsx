@@ -307,6 +307,10 @@ function AtendimentoMultiploPage() {
     }
   }
 
+  if (flagLoading || multiploDisabled) {
+    return null;
+  }
+
   return (
     <div className="p-3 sm:p-4 lg:p-6 max-w-6xl mx-auto space-y-4">
       <header className="flex flex-wrap items-start justify-between gap-3">
