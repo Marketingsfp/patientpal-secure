@@ -14,8 +14,12 @@ import { useMenuPrefs } from "@/hooks/use-menu-prefs";
 import { usePermissoes } from "@/hooks/use-permissoes";
 import { moduloDaRota } from "@/lib/permissoes-rotas";
 import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
 const MAX_INLINE = 6;
+
+const HOVER_SCALE_CLASSES =
+  "relative transform-gpu origin-center transition-all duration-200 ease-out hover:z-10 hover:scale-[1.04] hover:shadow-md active:scale-[0.98] motion-reduce:transform-none motion-reduce:hover:scale-100 [@media(hover:none)]:hover:scale-100 [@media(hover:none)]:hover:shadow-none [@media(hover:none)]:active:scale-100";
 
 /**
  * Um path do menu é permitido quando:
@@ -56,10 +60,11 @@ function IconBtn({
 }
 
 function Row({
-  item, active, pinned, favorited, onTogglePin, onToggleFav,
+  item, active, pinned, favorited, onTogglePin, onToggleFav, hoverScale,
 }: {
   item: MenuItem; active: boolean; pinned: boolean; favorited: boolean;
   onTogglePin: () => void; onToggleFav: () => void;
+  hoverScale?: boolean;
 }) {
   const Icon = item.icon;
   return (
@@ -68,6 +73,7 @@ function Row({
         "group flex items-center gap-2 pl-3 pr-2 h-9 rounded-md text-sm transition-colors",
         "hover:bg-sidebar-accent",
         active && "bg-sidebar-accent border-l-2 border-primary",
+        hoverScale && HOVER_SCALE_CLASSES,
       )}
     >
       <Link to={item.path} className="flex items-center gap-2 flex-1 min-w-0">
