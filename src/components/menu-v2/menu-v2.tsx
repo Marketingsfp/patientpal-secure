@@ -14,6 +14,7 @@ import { useMenuPrefs } from "@/hooks/use-menu-prefs";
 import { usePermissoes } from "@/hooks/use-permissoes";
 import { moduloDaRota } from "@/lib/permissoes-rotas";
 import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
 const MAX_INLINE = 6;
 
@@ -189,6 +190,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const defaults = PERFIL_DEFAULTS[perfil];
   const { disabled: atendimentoMultiploDisabled } = useAtendimentoMultiploDisabled();
+  const { enabled: menuMicroFx } = useClinicFeatureFlag("menu_micro_interactions");
   const centrosBase = CENTROS.filter((c) => defaults.centros.includes(c.key)).map((c) => {
     if (!atendimentoMultiploDisabled) return c;
     return {
@@ -255,6 +257,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
         className={cn(
           "shrink-0 bg-sidebar text-sidebar-foreground border-r border-border h-full flex flex-col transition-all duration-200",
           collapsed ? "w-16" : "w-64",
+          menuMicroFx && "menu-micro-scope",
         )}
         style={clinicColor ? { backgroundColor: clinicColor, color: "#ffffff" } : undefined}
       >
