@@ -2315,6 +2315,53 @@ export type Database = {
           },
         ]
       }
+      clinica_feature_flags: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          config: Json
+          created_at: string
+          created_by: string | null
+          descricao: string | null
+          flag_key: string
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          flag_key: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          descricao?: string | null
+          flag_key?: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinica_feature_flags_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinica_memberships: {
         Row: {
           ativo: boolean
@@ -8222,6 +8269,10 @@ export type Database = {
       estornar_lancamento_receita: {
         Args: { _clinica_id: string; _lancamento_id: string }
         Returns: Json
+      }
+      feature_flag_ativa: {
+        Args: { _clinica_id: string; _flag_key: string }
+        Returns: boolean
       }
       fila_caixa_hoje: {
         Args: { _clinica_id: string; _data?: string }
