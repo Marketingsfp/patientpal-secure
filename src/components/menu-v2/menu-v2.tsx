@@ -198,6 +198,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const defaults = PERFIL_DEFAULTS[perfil];
   const { disabled: atendimentoMultiploDisabled } = useAtendimentoMultiploDisabled();
+  const { enabled: hoverScale } = useClinicFeatureFlag("menu_hover_scale");
   const centrosBase = CENTROS.filter((c) => defaults.centros.includes(c.key)).map((c) => {
     if (!atendimentoMultiploDisabled) return c;
     return {
@@ -286,7 +287,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
         </div>
 
         {collapsed ? (
-          <div className="p-2 space-y-1 overflow-y-auto flex-1">
+          <div className="p-2 space-y-1 overflow-y-auto overflow-x-visible flex-1">
             {pinnedItems.map((it) => {
               const Icon = it.icon;
               const active = currentPath === it.path || currentPath.startsWith(it.path + "/");
@@ -298,6 +299,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                       className={cn(
                         "flex items-center justify-center h-9 w-full rounded-md hover:bg-sidebar-accent",
                         active && "bg-sidebar-accent border-l-2 border-primary",
+                        hoverScale && HOVER_SCALE_CLASSES,
                       )}
                     >
                       <Icon className="h-4 w-4" />
@@ -325,6 +327,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                             className={cn(
                               "flex items-center justify-center h-9 w-full rounded-md hover:bg-sidebar-accent",
                               active && "bg-sidebar-accent border-l-2 border-primary",
+                              hoverScale && HOVER_SCALE_CLASSES,
                             )}
                           >
                             <Icon className="h-4 w-4" />
@@ -339,7 +342,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
             })}
           </div>
         ) : (
-        <div className="p-3 space-y-4 overflow-y-auto flex-1">
+        <div className="p-3 space-y-4 overflow-y-auto overflow-x-visible flex-1">
           {/* Fixados */}
           {pinnedItems.length > 0 && (
             <div>
@@ -356,6 +359,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                     favorited={prefs.favorites.includes(it.path)}
                     onTogglePin={() => togglePin(it.path)}
                     onToggleFav={() => toggleFavorite(it.path)}
+                    hoverScale={hoverScale}
                   />
                 ))}
               </div>
@@ -375,6 +379,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                 onPin={togglePin}
                 onFav={toggleFavorite}
                 hidePaths={effectivePinned}
+                hoverScale={hoverScale}
               />
             ))}
           </div>
@@ -390,7 +395,10 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                   <Link
                     key={r.path}
                     to={r.path}
-                    className="flex items-center gap-2 pl-3 pr-2 h-8 rounded-md text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                    className={cn(
+                      "flex items-center gap-2 pl-3 pr-2 h-8 rounded-md text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+                      hoverScale && HOVER_SCALE_CLASSES,
+                    )}
                   >
                     <span className="truncate">{r.label}</span>
                   </Link>
@@ -415,6 +423,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                     favorited
                     onTogglePin={() => togglePin(it.path)}
                     onToggleFav={() => toggleFavorite(it.path)}
+                    hoverScale={hoverScale}
                   />
                 ))}
               </div>
