@@ -226,7 +226,8 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
   const pinnedItems = effectivePinned
     .map((p) => findItem(p))
     .filter((x): x is MenuItem => Boolean(x))
-    .filter((it) => pathAllowed(it.path, allowedModules));
+    .filter((it) => pathAllowed(it.path, allowedModules))
+    .filter((it) => !atendimentoMultiploDisabled || it.path !== "/app/atendimento-multiplo");
 
   const recentesFiltrados = prefs.recent
     .filter((r) => !effectivePinned.includes(r.path) && r.path !== currentPath)
@@ -234,12 +235,14 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
     // mesma coisa em "Recentes" e no grupo do centro logo acima.
     .filter((r) => !centrosVisiveis.some((c) => c.items.some((i) => i.path === r.path)))
     .filter((r) => pathAllowed(r.path, allowedModules))
+    .filter((r) => !atendimentoMultiploDisabled || r.path !== "/app/atendimento-multiplo")
     .slice(0, 5);
 
   const favoritos = prefs.favorites
     .map((p) => findItem(p))
     .filter((x): x is MenuItem => Boolean(x))
-    .filter((it) => pathAllowed(it.path, allowedModules));
+    .filter((it) => pathAllowed(it.path, allowedModules))
+    .filter((it) => !atendimentoMultiploDisabled || it.path !== "/app/atendimento-multiplo");
 
   if (loading || permsLoading) {
     return <div className="p-4 text-sm text-muted-foreground">Carregando menu…</div>;
