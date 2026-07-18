@@ -81,6 +81,7 @@ const GRUPOS: Grupo[] = [
     label: "Operação",
     modulos: [
       { key: "agenda", nome: "Agenda", descricao: "Calendário e agendamentos" },
+      { key: "atendimento-multiplo", nome: "Atendimento Múltiplo", descricao: "Atendimentos e pagamentos agrupados" },
       { key: "checkin", nome: "Check-in", descricao: "Check-in de pacientes" },
       { key: "caixa", nome: "Caixa", descricao: "Operação de caixa diário" },
       { key: "chat", nome: "Chat interno", descricao: "Mensagens entre equipe" },
