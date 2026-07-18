@@ -163,6 +163,10 @@ type Contrato = {
   migrar_apos?: string | null;
   criado_por?: string | null;
   codigo_prontuario?: string | null;
+  sem_carencia?: boolean | null;
+  sem_carencia_motivo?: string | null;
+  sem_carencia_por?: string | null;
+  sem_carencia_em?: string | null;
 };
 type Mens = {
   id: string;
