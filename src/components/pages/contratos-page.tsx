@@ -2097,6 +2097,16 @@ function DetalheContrato({
     !!(contrato as any).titular_apenas_financeiro,
   );
   const [savingApenasFin, setSavingApenasFin] = useState(false);
+  // Isenção manual de carência (Admin/Gestor).
+  const [semCarencia, setSemCarencia] = useState<boolean>(
+    !!(contrato as any).sem_carencia,
+  );
+  const [semCarenciaMotivo, setSemCarenciaMotivo] = useState<string>(
+    (contrato as any).sem_carencia_motivo ?? "",
+  );
+  const [savingSemCarencia, setSavingSemCarencia] = useState(false);
+  const roleAtual = (clinicaAtual?.role ?? "").toLowerCase();
+  const podeEditarCarencia = roleAtual === "admin" || roleAtual === "gestor";
   const [retroDialog, setRetroDialog] = useState<{ open: boolean; parcelasPagas: string; dataInicio: string } | null>(null);
   const [regerandoRetro, setRegerandoRetro] = useState(false);
   useEffect(() => {
@@ -2106,6 +2116,8 @@ function DetalheContrato({
     setAdmForma(contrato.forma_pagamento ?? "");
     setAdmObs(contrato.observacoes ?? "");
     setApenasFinanceiro(!!(contrato as any).titular_apenas_financeiro);
+    setSemCarencia(!!(contrato as any).sem_carencia);
+    setSemCarenciaMotivo((contrato as any).sem_carencia_motivo ?? "");
   }, [contrato.id]);
 
   // Carrega lista de convênios ativos (ADM)
