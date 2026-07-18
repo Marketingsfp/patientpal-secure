@@ -3092,18 +3092,6 @@ function DetalheContrato({
   };
 
   const mensalidades = mens.filter((m) => !isEncargoAvulso(m));
-  // Linhas exibidas na tabela de "Mensalidades": inclui adesão (numero_parcela = 0)
-  // e taxas de inclusão (numero_parcela < 0). Ordenação: adesão primeiro, depois
-  // taxas de inclusão pela data de vencimento, e por último as parcelas mensais
-  // em ordem crescente. Os contadores N/M continuam usando apenas `mensalidades`.
-  const linhasCobranca = [...mens].sort((a, b) => {
-    const rank = (m: Mens) => (isAdesao(m) ? 0 : isTaxaInclusao(m) ? 1 : 2);
-    const ra = rank(a);
-    const rb = rank(b);
-    if (ra !== rb) return ra - rb;
-    if (ra === 2) return a.numero_parcela - b.numero_parcela;
-    return (a.vencimento || "").localeCompare(b.vencimento || "");
-  });
   // Adesão embutida na 1ª parcela (numero_parcela = 1 com taxa_adesao > 0):
   // enquanto essa parcela estiver pendente, a linha da adesão é cobrada junto
   // com ela e o botão "Pagar" da linha da adesão fica oculto para evitar dupla
