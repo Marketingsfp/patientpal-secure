@@ -4491,6 +4491,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </div>
               )}
             </TabsContent>
+            <TabsContent value="historico" className="mt-4">
+              <HistoricoContratoTab contratoId={contrato.id} />
+            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
