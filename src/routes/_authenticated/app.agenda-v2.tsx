@@ -1,8 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AlertCircle, Shield } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAgendaV2Flag } from "@/hooks/use-agenda-v2-flag";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -28,8 +29,25 @@ export const Route = createFileRoute("/_authenticated/app/agenda-v2")({
 function AgendaV2Page() {
   const { clinicaAtual } = useClinica();
   const { enabled, loading, setEnabled } = useAgendaV2Flag();
+  const { enabled: disabledForClinic, loading: flagLoading } = useClinicFeatureFlag(
+    "agenda_v2_disabled",
+  );
+  const navigate = useNavigate();
   const [toggleMs, setToggleMs] = useState<number | null>(null);
   const toggleStartRef = useRef<number>(0);
+
+  // Se a clínica atual tem a flag `agenda_v2_disabled` ligada, a Agenda V2
+  // não está disponível nessa clínica. Redireciona silenciosamente para a
+  // agenda clássica.
+  useEffect(() => {
+    if (!flagLoading && disabledForClinic) {
+      navigate({ to: "/app/agenda", replace: true });
+    }
+  }, [flagLoading, disabledForClinic, navigate]);
+
+  if (flagLoading || disabledForClinic) {
+    return null;
+  }
 
   // Modo full-bleed no mobile: recolhe o menu externo do app-shell e o padding
   // do <main>, dando 100% da largura útil para a Agenda V2. Só ativa quando a
