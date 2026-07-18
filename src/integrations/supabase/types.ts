@@ -7983,6 +7983,7 @@ export type Database = {
         Args: { _clinica_ids: string[]; _limite?: number; _termo: string }
         Returns: {
           associado_convenio: string
+          associado_tipo: string
           cadastro_incompleto: boolean
           clinica_id: string
           codigo_prontuario: string
