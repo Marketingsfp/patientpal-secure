@@ -8091,6 +8091,7 @@ export type Database = {
       }
       checkin_agendamento: { Args: { _token: string }; Returns: Json }
       consulta_publica: { Args: { _token: string }; Returns: Json }
+      contrato_historico: { Args: { _contrato_id: string }; Returns: Json }
       contrato_publico: { Args: { _token: string }; Returns: Json }
       converter_item_agendamento: {
         Args: { p_item_id: string; p_payload: Json }
