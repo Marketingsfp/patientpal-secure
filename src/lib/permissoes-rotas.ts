@@ -14,7 +14,6 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   // Operação
   "/app": null,
   "/app/agenda": "agenda",
-  "/app/agenda/express": "agenda",
   "/app/agenda-v2": "agenda",
   "/app/atendimento-multiplo": "atendimento-multiplo",
   "/app/checkin": "checkin",
