@@ -18,6 +18,7 @@ import { EstornosBell } from "@/components/EstornosBell";
 import { UniversalSearchBar } from "@/components/universal-search-bar";
 import { MenuV2 } from "@/components/menu-v2/menu-v2";
 import { useMenuV2Flag } from "@/hooks/use-menu-prefs";
+import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
 import type { PerfilKey } from "@/components/menu-v2/menu-catalog";
 
 function corDaClinica(nome?: string): string {
