@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { criarAtendimentoMultiplo } from "@/lib/atendimento-multiplo/criar.functions";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-multiplo")({
   component: AtendimentoMultiploPage,
@@ -104,6 +105,16 @@ function AtendimentoMultiploPage() {
   const navigate = useNavigate();
   const podeEscrever = usePodeEscrever("atendimento-multiplo");
   const criarMultiplo = useServerFn(criarAtendimentoMultiplo);
+
+  // Clínicas que optaram por não oferecer "Atendimento Múltiplo" (feature
+  // flag `atendimento_multiplo_disabled`) redirecionam silenciosamente para
+  // a Agenda. Mantém o código no repositório para as demais clínicas.
+  const { disabled: multiploDisabled, loading: flagLoading } = useAtendimentoMultiploDisabled();
+  useEffect(() => {
+    if (!flagLoading && multiploDisabled) {
+      navigate({ to: "/app/agenda", replace: true });
+    }
+  }, [flagLoading, multiploDisabled, navigate]);
 
   const dataInicial = useMemo(() => {
     const d = new Date();
