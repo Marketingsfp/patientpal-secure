@@ -19,6 +19,8 @@ import { ClienteForm } from "@/components/clientes/cliente-form";
 import { IdadeIcon, calcIdadeAnos } from "@/components/idade-icon";
 import { ClientesShellV2 } from "@/components/clientes-v2/clientes-shell";
 import { useClientesV2Flag } from "@/hooks/use-clientes-v2-flag";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
+import { TableSkeletonRows } from "@/components/ui/table-skeleton";
 import { useClinica as useClinicaGate } from "@/hooks/use-clinica";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/")({
@@ -122,6 +124,8 @@ interface Paciente {
 function ClientesPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("clientes");
+  // Piloto de UX (só São Francisco de Paula): skeleton no lugar de "Carregando…"
+  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const [items, setItems] = useState<Paciente[]>([]);
   const [totalPacientes, setTotalPacientes] = useState<number | null>(null);
   const [atingiuTeto, setAtingiuTeto] = useState(false);
@@ -310,7 +314,9 @@ function ClientesPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+              uxMelhorias
+                ? <TableSkeletonRows cols={8} />
+                : <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
             ) : !clinicaAtual ? (
               <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
             ) : filtrados.length === 0 ? (

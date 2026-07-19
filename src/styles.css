@@ -171,6 +171,10 @@
   --status-in-service: oklch(0.72 0.15 240);
   --status-canceled: oklch(0.70 0.22 25);
   --status-refunded: oklch(0.70 0.20 300);
+  /* Superfície do conteúdo (usada no <main> do app-shell) — sem override
+   * o fundo ficaria claro com os cards escuros no tema dark. */
+  --surface-cream: oklch(0.16 0.035 264);
+  --surface-cream-soft: oklch(0.19 0.038 264);
 }
 
 @layer base {

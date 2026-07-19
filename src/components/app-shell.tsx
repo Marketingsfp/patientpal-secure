@@ -1,6 +1,6 @@
-import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
+import { Link, Outlet, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins, FileBarChart2, Menu as MenuIcon } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins, FileBarChart2, Moon, Sun, Menu as MenuIcon } from "lucide-react";
 import { Tooth } from "@/components/icons/tooth";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -16,6 +16,7 @@ import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
 import { EstornosBell } from "@/components/EstornosBell";
 import { UniversalSearchBar } from "@/components/universal-search-bar";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
+import { useTheme } from "@/hooks/use-theme";
 import { HOVER_SCALE_CLASSES } from "@/lib/menu-hover";
 import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
 
@@ -196,9 +197,23 @@ export function AppShell() {
   // só nas clínicas com a flag `menu_hover_scale` (hoje apenas a São Francisco).
   const { enabled: menuHoverScale } = useClinicFeatureFlag("menu_hover_scale");
   const hoverScaleCls = menuHoverScale ? ` ${HOVER_SCALE_CLASSES}` : "";
+  // Pacote de melhorias de UX (navegação SPA, transição de rota, dark mode) —
+  // flag `ux_melhorias`, ligada só para a São Francisco de Paula.
+  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
+  const theme = useTheme(uxMelhorias);
   const location = useLocation();
   const navigate = useNavigate();
+  const router = useRouter();
   const navScrollRef = useRef<HTMLElement | null>(null);
+  // Navegação do menu: com `ux_melhorias` ligada, troca de tela via SPA (sem
+  // recarregar a página). Nas demais clínicas mantém o reload completo atual.
+  const irPara = (href: string) => {
+    if (uxMelhorias) {
+      router.history.push(href);
+      return;
+    }
+    window.location.assign(href);
+  };
   const lastArrowNavAtRef = useRef(0);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -594,7 +609,7 @@ export function AppShell() {
                               onClick={(event) => {
                                 if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
                                 event.preventDefault();
-                                window.location.assign(href);
+                                irPara(href);
                               }}
                               className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all ${
                                 active
@@ -625,7 +640,7 @@ export function AppShell() {
                       onClick={(event) => {
                         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
                         event.preventDefault();
-                        window.location.assign(href);
+                        irPara(href);
                       }}
                       className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-all ${
                         active
@@ -729,6 +744,18 @@ export function AppShell() {
             <UniversalSearchBar />
           </div>
           <div className="flex items-center gap-2">
+            {uxMelhorias && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 p-0 rounded-full"
+                title={theme.isDark ? "Mudar para tema claro" : "Mudar para tema escuro"}
+                aria-label={theme.isDark ? "Mudar para tema claro" : "Mudar para tema escuro"}
+                onClick={() => theme.set(theme.isDark ? "light" : "dark")}
+              >
+                {theme.isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -743,7 +770,11 @@ export function AppShell() {
             <EstornosBell />
           </div>
         </header>
-        <main className="flex-1 px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4 lg:px-6 lg:pt-2 lg:pb-6 overflow-auto min-w-0" style={{ background: "var(--surface-cream)" }}>
+        <main
+          key={uxMelhorias ? location.pathname : "static"}
+          className={`flex-1 px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4 lg:px-6 lg:pt-2 lg:pb-6 overflow-auto min-w-0${uxMelhorias ? " animate-in fade-in duration-200 motion-reduce:animate-none" : ""}`}
+          style={{ background: "var(--surface-cream)" }}
+        >
           {guardedOutlet}
         </main>
       </div>
@@ -790,7 +821,7 @@ export function AppShell() {
                                   if (e.metaKey || e.ctrlKey || e.shiftKey) return;
                                   e.preventDefault();
                                   setMobileNavOpen(false);
-                                  window.location.assign(href);
+                                  irPara(href);
                                 }}
                                 className="flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-full text-sm text-white/85 hover:bg-white/10 hover:text-white"
                               >
@@ -813,7 +844,7 @@ export function AppShell() {
                           if (e.metaKey || e.ctrlKey || e.shiftKey) return;
                           e.preventDefault();
                           setMobileNavOpen(false);
-                          window.location.assign(item.to);
+                          irPara(item.to);
                         }}
                         className={`flex items-center gap-2.5 px-3 py-2 rounded-full text-sm font-medium ${
                           active
