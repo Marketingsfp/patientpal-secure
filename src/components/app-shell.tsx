@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins, FileBarChart2, Moon, Sun, Menu as MenuIcon } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins, FileBarChart2, Moon, Sun, Pin, PinOff, Menu as MenuIcon } from "lucide-react";
 import { Tooth } from "@/components/icons/tooth";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -235,11 +235,27 @@ export function AppShell() {
     void router.preloadRoute({ to } as Parameters<typeof router.preloadRoute>[0]).catch(() => {});
   };
   const lastArrowNavAtRef = useRef(0);
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
+  const [collapsedManual, setCollapsedManual] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     if (window.innerWidth < 1024) return true;
     return window.localStorage.getItem("appshell:collapsed") === "1";
   });
+  // Menu que expande ao passar o mouse (só São Francisco de Paula).
+  // `fixadoAberto` é um "alfinete" opcional: mantém aberto sem depender do
+  // mouse. Chave própria no localStorage para não afetar o menu clássico.
+  const [hoverSidebar, setHoverSidebar] = useState(false);
+  const [fixadoAberto, setFixadoAberto] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("appshell:menu-fixado") === "1";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("appshell:menu-fixado", fixadoAberto ? "1" : "0");
+    }
+  }, [fixadoAberto]);
+  // Com a flag: recolhido por padrão, expande no hover (ou se estiver fixado).
+  // Sem a flag: exatamente o comportamento anterior (só o botão controla).
+  const collapsed = uxMelhorias ? (!fixadoAberto && !hoverSidebar) : collapsedManual;
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {};
     try { return JSON.parse(window.localStorage.getItem("appshell:openGroups") ?? "{}"); } catch { return {}; }
@@ -251,14 +267,14 @@ export function AppShell() {
   }, [openGroups]);
   useEffect(() => {
     if (typeof window !== "undefined") {
-      window.localStorage.setItem("appshell:collapsed", collapsed ? "1" : "0");
+      window.localStorage.setItem("appshell:collapsed", collapsedManual ? "1" : "0");
     }
-  }, [collapsed]);
+  }, [collapsedManual]);
   // Auto-collapse on small screens
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onResize = () => {
-      if (window.innerWidth < 1024) setCollapsed(true);
+      if (window.innerWidth < 1024) setCollapsedManual(true);
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -534,9 +550,19 @@ export function AppShell() {
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
+      {/* No modo hover o menu flutua sobre o conteúdo; este espaçador reserva
+          a largura recolhida para o conteúdo não pular ao expandir. */}
+      {!isChooser && uxMelhorias && <div className="hidden md:block w-16 shrink-0" aria-hidden />}
       {!isChooser && (
       <aside
-        className={`${collapsed ? "w-16" : "w-56 2xl:w-64"} transition-all duration-200 shrink-0 text-white h-screen overflow-hidden hidden md:flex flex-col`}
+        onMouseEnter={uxMelhorias ? () => setHoverSidebar(true) : undefined}
+        onMouseLeave={uxMelhorias ? () => setHoverSidebar(false) : undefined}
+        className={cn(
+          "transition-all duration-200 text-white h-screen overflow-hidden hidden md:flex flex-col",
+          collapsed ? "w-16" : "w-56 2xl:w-64",
+          uxMelhorias ? "fixed inset-y-0 left-0 z-40" : "shrink-0",
+          uxMelhorias && !collapsed && "shadow-2xl",
+        )}
         style={{ backgroundColor: corSidebar }}
       >
         <div className="px-3 py-3 border-b border-white/10 flex items-center justify-between gap-2">
@@ -544,15 +570,32 @@ export function AppShell() {
             <Activity className="h-5 w-5 shrink-0" />
             {!collapsed && <span className="font-semibold tracking-tight truncate">ClinicaOS</span>}
           </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-white hover:bg-white/10 hover:text-white h-7 w-7 p-0 shrink-0"
-            onClick={() => setCollapsed((v) => !v)}
-            title={collapsed ? "Expandir menu" : "Recolher menu"}
-          >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </Button>
+          {/* No modo hover o botão vira "fixar aberto" e só aparece com o
+              menu expandido — recolhido, basta passar o mouse. */}
+          {uxMelhorias ? (
+            !collapsed && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white hover:bg-white/10 hover:text-white h-7 w-7 p-0 shrink-0"
+                onClick={() => setFixadoAberto((v) => !v)}
+                title={fixadoAberto ? "Desafixar (expandir só ao passar o mouse)" : "Fixar menu aberto"}
+                aria-pressed={fixadoAberto}
+              >
+                {fixadoAberto ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+              </Button>
+            )
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/10 hover:text-white h-7 w-7 p-0 shrink-0"
+              onClick={() => setCollapsedManual((v) => !v)}
+              title={collapsed ? "Expandir menu" : "Recolher menu"}
+            >
+              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </Button>
+          )}
         </div>
         <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto">
           {visibleNavRows.map((row) => {
