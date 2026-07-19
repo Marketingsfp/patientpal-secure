@@ -2838,13 +2838,6 @@ function Page() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button asChild size="lg" className="bg-emerald-600 hover:bg-emerald-700">
-                  <Link to="/app/financeiro/atendimentos">
-                    <HandCoins className="h-4 w-4 mr-2" />
-                    Abrir tela completa de Repasse
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Link>
-                </Button>
                 <Button variant="outline" onClick={() => void loadRepasseHoje()}>
                   Atualizar resumo
                 </Button>
