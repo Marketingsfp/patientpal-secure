@@ -2,7 +2,7 @@ import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-rout
 import {
   LayoutDashboard, ArrowLeftRight, BarChart3, LineChart,
   Building, FileText, FileBarChart, PieChart, Bell, Tag, Wallet,
-  Sparkles, AlertTriangle, Undo2, ChevronLeft, ChevronRight,
+  Sparkles, AlertTriangle, Undo2, ChevronLeft, ChevronRight, Stethoscope,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ export const Route = createFileRoute("/_authenticated/app/financeiro")({
 const subnav = [
   { to: "/app/financeiro", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/app/financeiro/movimento", label: "Mov. Caixa", icon: ArrowLeftRight },
+  { to: "/app/financeiro/atendimentos", label: "Atendimentos", icon: Stethoscope },
   { to: "/app/financeiro/bi", label: "BI", icon: BarChart3 },
   { to: "/app/financeiro/analitico", label: "Analítico", icon: LineChart },
   { to: "/app/financeiro/estorno", label: "Estorno", icon: Undo2 },
