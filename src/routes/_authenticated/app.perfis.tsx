@@ -298,7 +298,17 @@ function PerfisPage() {
               const chave = idToChave[row.perfil_id];
               if (!chave) continue;
               if (!seen[chave]) {
-                next[chave] = Object.fromEntries(TODOS_MODULOS.map((k) => [k, "none" as Acesso]));
+                // Reseta módulos "normais" para "none"; submódulos ficam com
+                // o default herdado do pai (via buildInitialState) para que
+                // ativar a granularidade não retire acesso já concedido.
+                const preset = PRESETS[chave];
+                const parentFin = (preset["financeiro"] ?? "none") as Acesso;
+                next[chave] = Object.fromEntries(TODOS_MODULOS.map((k) => [
+                  k,
+                  k.startsWith("financeiro-")
+                    ? ((preset[k] ?? parentFin) as Acesso)
+                    : ("none" as Acesso),
+                ]));
                 seen[chave] = true;
               }
               next[chave][row.modulo] = row.acesso as Acesso;
