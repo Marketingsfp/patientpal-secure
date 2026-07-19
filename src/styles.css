@@ -590,6 +590,26 @@ html.theme-emerald {
   animation: hhp-kpi-in 320ms var(--hhp-ease, cubic-bezier(0.32, 0.72, 0, 1)) both;
 }
 
+/* Stagger de entrada para grades de KPI (painel/dashboard) — piloto São
+ * Francisco de Paula, ligado via classe condicional (flag ux_melhorias). */
+.kpi-stagger > * {
+  animation: hhp-kpi-in 320ms var(--hhp-ease, cubic-bezier(0.32, 0.72, 0, 1)) both;
+}
+.kpi-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.kpi-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.kpi-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.kpi-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.kpi-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.kpi-stagger > *:nth-child(6) { animation-delay: 200ms; }
+.kpi-stagger > *:nth-child(7) { animation-delay: 240ms; }
+.kpi-stagger > *:nth-child(8) { animation-delay: 280ms; }
+.kpi-stagger > *:nth-child(9) { animation-delay: 320ms; }
+.kpi-stagger > *:nth-child(10) { animation-delay: 360ms; }
+.kpi-stagger > *:nth-child(n+11) { animation-delay: 400ms; }
+@media (prefers-reduced-motion: reduce) {
+  .kpi-stagger > * { animation: none; }
+}
+
 /* Impressão global do app: força A4 retrato para janelas de print padrão
  * (window.print()). Impressões térmicas usam iframes com documento próprio
  * e @page interno, portanto não são afetadas por esta regra. */

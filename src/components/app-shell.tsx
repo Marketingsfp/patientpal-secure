@@ -18,6 +18,8 @@ import { UniversalSearchBar } from "@/components/universal-search-bar";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useTheme } from "@/hooks/use-theme";
 import { HOVER_SCALE_CLASSES } from "@/lib/menu-hover";
+import { garantirContrasteTextoBranco } from "@/lib/contrast";
+import { cn } from "@/lib/utils";
 import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
 
 function corDaClinica(nome?: string): string {
@@ -60,6 +62,15 @@ type NavLeaf = { to: string; label: string; icon: typeof LayoutDashboard; hash?:
 type NavParent = { label: string; icon: typeof LayoutDashboard; children: ReadonlyArray<NavLeaf> };
 type NavItem = NavLeaf | NavParent;
 const isParent = (it: NavItem): it is NavParent => "children" in it;
+
+// Bottom nav mobile — piloto São Francisco de Paula (flag ux_melhorias).
+// Os 4 atalhos mais usados; o resto do menu continua acessível via "Mais".
+const BOTTOM_NAV_ITENS: ReadonlyArray<{ to: string; label: string; Icon: typeof CalendarDays }> = [
+  { to: "/app/agenda", label: "Agenda", Icon: CalendarDays },
+  { to: "/app/clientes", label: "Clientes", Icon: Users },
+  { to: "/app/caixa", label: "Caixa", Icon: Wallet },
+  { to: "/app/recepcao", label: "Recepção", Icon: ConciergeBell },
+];
 
 // Mapeia rota do menu → chave de módulo da tela de Perfis de Acesso.
 // O mapa vive em src/lib/permissoes-rotas.ts (compartilhado com o guard
@@ -319,6 +330,10 @@ export function AppShell() {
           ? corDaClinica(clinicaAtual.clinica.nome)
           : "#0f172a"
   ), [modoTodas, branding?.primary, clinicaAtual]);
+  // Contraste automático da sidebar (texto branco) — só São Francisco de
+  // Paula. Escurece a cor da clínica quando necessário para legibilidade
+  // (WCAG AA); não altera --primary/--ring usados em botões no resto do app.
+  const corSidebar = uxMelhorias ? garantirContrasteTextoBranco(clinicColor) : clinicColor;
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -522,7 +537,7 @@ export function AppShell() {
       {!isChooser && (
       <aside
         className={`${collapsed ? "w-16" : "w-56 2xl:w-64"} transition-all duration-200 shrink-0 text-white h-screen overflow-hidden hidden md:flex flex-col`}
-        style={{ backgroundColor: clinicColor }}
+        style={{ backgroundColor: corSidebar }}
       >
         <div className="px-3 py-3 border-b border-white/10 flex items-center justify-between gap-2">
           <Link to="/app" className="flex items-center gap-2 min-w-0">
@@ -785,7 +800,12 @@ export function AppShell() {
         </header>
         <main
           key={uxMelhorias ? location.pathname : "static"}
-          className={`flex-1 px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4 lg:px-6 lg:pt-2 lg:pb-6 overflow-auto min-w-0${uxMelhorias ? " animate-in fade-in duration-200 motion-reduce:animate-none" : ""}`}
+          className={cn(
+            "flex-1 px-3 pt-1 sm:px-4 sm:pt-1.5 lg:px-6 lg:pt-2 overflow-auto min-w-0",
+            // Espaço extra embaixo no mobile para não ficar atrás da bottom nav.
+            uxMelhorias ? "pb-20 sm:pb-20 md:pb-4 lg:pb-6" : "pb-3 sm:pb-4 lg:pb-6",
+            uxMelhorias && "animate-in fade-in duration-200 motion-reduce:animate-none",
+          )}
           style={{ background: "var(--surface-cream)" }}
         >
           {guardedOutlet}
@@ -802,7 +822,7 @@ export function AppShell() {
           <SheetContent
             side="left"
             className="w-[280px] p-0 border-0 text-white overflow-y-auto md:hidden"
-            style={{ backgroundColor: clinicColor }}
+            style={{ backgroundColor: corSidebar }}
           >
             <SheetHeader className="px-4 py-3 border-b border-white/10 text-left">
               <SheetTitle className="text-white flex items-center gap-2 text-base">
@@ -875,6 +895,43 @@ export function AppShell() {
             </nav>
           </SheetContent>
         </Sheet>
+      )}
+      {!isChooser && uxMelhorias && (
+        <nav
+          className="md:hidden fixed bottom-0 inset-x-0 z-40 h-16 pb-[env(safe-area-inset-bottom)] bg-card border-t flex items-stretch"
+          aria-label="Navegação principal"
+        >
+          {BOTTOM_NAV_ITENS.map(({ to, label, Icon }) => {
+            const active = location.pathname === to || location.pathname.startsWith(`${to}/`);
+            return (
+              <a
+                key={to}
+                href={to}
+                aria-current={active ? "page" : undefined}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+                  e.preventDefault();
+                  irPara(to);
+                }}
+                className={cn(
+                  "flex-1 flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium",
+                  active ? "text-primary" : "text-muted-foreground",
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                {label}
+              </a>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(true)}
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground"
+          >
+            <MenuIcon className="h-5 w-5" />
+            Mais
+          </button>
+        </nav>
       )}
     </div>
   );

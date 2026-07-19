@@ -21,6 +21,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
@@ -853,6 +854,8 @@ const EMPTY = {
 
 function AgendaPage() {
   const { clinicaAtual } = useClinica();
+  // Undo em exclusões em lote — só São Francisco de Paula (flag ux_melhorias).
+  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const turboDisabled = useTurboDisabled();
   const podeEscrever = usePodeEscrever("agenda");
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
@@ -2823,15 +2826,33 @@ function AgendaPage() {
       );
       return;
     }
-    if (!confirm(`Excluir ${ids.length} horário(s)? Esta ação não pode ser desfeita.`)) return;
-    const { error } = await supabase.from("agendamentos").delete().in("id", ids);
-    if (error) {
-      mostrarErro(error);
+    const apagarNoBanco = async () => {
+      const { error } = await supabase.from("agendamentos").delete().in("id", ids);
+      if (error) { mostrarErro(error); await load(); return; }
+      await load();
+    };
+
+    if (!uxMelhorias) {
+      if (!confirm(`Excluir ${ids.length} horário(s)? Esta ação não pode ser desfeita.`)) return;
+      await apagarNoBanco();
+      toast.success(`${ids.length} horário(s) excluído(s).`);
+      setSelecionados(new Set());
       return;
     }
-    toast.success(`${ids.length} horário(s) excluído(s).`);
+
+    // Piloto São Francisco: some da tela na hora, mas só apaga do banco
+    // depois de alguns segundos — dá tempo do usuário desfazer, sem confirm().
     setSelecionados(new Set());
-    await load();
+    setItems((prev) => prev.filter((a) => !ids.includes(a.id)));
+    let desfeito = false;
+    const timer = setTimeout(() => { if (!desfeito) void apagarNoBanco(); }, 5000);
+    toast(`${ids.length} horário(s) excluído(s).`, {
+      duration: 5000,
+      action: {
+        label: "Desfazer",
+        onClick: () => { desfeito = true; clearTimeout(timer); void load(); },
+      },
+    });
   };
 
   // === Reagendamento em lote: move vários agendamentos para outra agenda já aberta ===
