@@ -5539,14 +5539,14 @@ function AgendaPage() {
                       await consultarNfseFn({ data: { id: nfseId } });
                       toast.success("NFS-e emitida com sucesso.");
                     } else {
-                      toast.warning("NFS-e enviada — acompanhe o status em Financeiro › Atendimentos.");
+                      toast.warning("NFS-e enviada — acompanhe o status em Financeiro › NFS-e.");
                     }
                   }
                 }
               }
             } catch (err) {
               mostrarErro(err, "falha ao emitir NFS-e");
-              navigate({ to: "/app/financeiro/atendimentos" });
+              navigate({ to: "/app/nfse" });
             }
           }
         }}
