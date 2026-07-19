@@ -88,7 +88,16 @@ function leafAllowed(to: string, allowed: Set<string> | null): boolean {
   const mod = ROUTE_TO_MODULE[to];
   if (mod === null) return true;       // rota livre/sistema
   if (mod === undefined) return false; // rota não mapeada → ocultar
-  return allowed.has(mod);
+  if (allowed.has(mod)) return true;
+  // Item de menu do módulo-pai (ex.: "Financeiro") permanece visível quando
+  // o usuário tem acesso a pelo menos um submódulo (mov. caixa, estorno,
+  // atendimentos), mesmo sem acesso ao pai. O submenu do Financeiro já
+  // filtra as abas individuais e a rota-pai redireciona para a primeira
+  // aba visível.
+  const temSub = Object.entries(SUBMODULE_PARENT).some(
+    ([sub, parent]) => parent === mod && allowed.has(sub),
+  );
+  return temSub;
 }
 
 const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> = [
