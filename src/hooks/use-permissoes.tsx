@@ -28,6 +28,7 @@ function nivelDoPreset(role: string): Map<string, "read" | "write"> {
 export function usePermissoes(): {
   allowed: Set<string> | null;
   nivel: Map<string, "read" | "write"> | null;
+  configured: Set<string> | null;
   loading: boolean;
 } {
   const { clinicaAtual } = useClinica();
@@ -36,12 +37,14 @@ export function usePermissoes(): {
   // Começa fechado. `null` é reservado exclusivamente ao admin já identificado.
   const [allowed, setAllowed] = useState<Set<string> | null>(() => new Set());
   const [nivel, setNivel] = useState<Map<string, "read" | "write"> | null>(() => new Map());
+  const [configured, setConfigured] = useState<Set<string> | null>(() => new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!clinicaId || !role) {
       setAllowed(new Set());
       setNivel(new Map());
+      setConfigured(new Set());
       setLoading(false);
       return;
     }
@@ -49,6 +52,7 @@ export function usePermissoes(): {
     if (role === "admin") {
       setAllowed(null);
       setNivel(null);
+      setConfigured(null);
       setLoading(false);
       return;
     }
@@ -57,6 +61,7 @@ export function usePermissoes(): {
     // Troca de clínica/perfil: não preserve permissões da sessão anterior.
     setAllowed(new Set());
     setNivel(new Map());
+    setConfigured(new Set());
     setLoading(true);
     void (async () => {
       try {
@@ -72,6 +77,7 @@ export function usePermissoes(): {
         if (!perfil) {
           setAllowed(presetAllowedSet(role));
           setNivel(nivelDoPreset(role));
+          setConfigured(new Set());
           return;
         }
 
@@ -85,12 +91,15 @@ export function usePermissoes(): {
         if (!perms || perms.length === 0) {
           setAllowed(presetAllowedSet(role));
           setNivel(nivelDoPreset(role));
+          setConfigured(new Set());
           return;
         }
 
         const set = new Set<string>();
         const nvl = new Map<string, "read" | "write">();
+        const cfg = new Set<string>();
         for (const p of perms) {
+          if (p.modulo) cfg.add(p.modulo);
           if (p.acesso && p.acesso !== "none") {
             set.add(p.modulo);
             if (p.acesso === "read" || p.acesso === "write") nvl.set(p.modulo, p.acesso);
@@ -98,10 +107,11 @@ export function usePermissoes(): {
         }
         setAllowed(set);
         setNivel(nvl);
+        setConfigured(cfg);
       } catch (e) {
         console.error("[usePermissoes] erro carregando permissões", e);
         // Autorização deve falhar fechada: erro de rede/RLS nunca amplia acesso.
-        if (!cancelled) { setAllowed(new Set()); setNivel(new Map()); }
+        if (!cancelled) { setAllowed(new Set()); setNivel(new Map()); setConfigured(new Set()); }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -110,7 +120,7 @@ export function usePermissoes(): {
     return () => { cancelled = true; };
   }, [clinicaId, role]);
 
-  return { allowed, nivel, loading };
+  return { allowed, nivel, configured, loading };
 }
 
 /**

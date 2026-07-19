@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePermissoes } from "@/hooks/use-permissoes";
-import { ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE, moduloDaRota } from "@/lib/permissoes-rotas";
+import { ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE, moduloDaRota, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
 import { SemPermissao } from "@/components/sem-permissao";
 import { supabase } from "@/integrations/supabase/client";
 import { getSubsystem, setSubsystem, subscribeSubsystem, SUBSYSTEMS } from "@/lib/subsystem";
@@ -208,7 +208,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
 export function AppShell() {
   const { user, signOut, loading } = useAuth();
   const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } = useClinica();
-  const { allowed: allowedModules, loading: permsLoading } = usePermissoes();
+  const { allowed: allowedModules, configured: configuredModules, loading: permsLoading } = usePermissoes();
   // Efeito "expandir ao passar o mouse" nos itens do menu clássico — ligado
   // só nas clínicas com a flag `menu_hover_scale` (hoje apenas a São Francisco).
   const { enabled: menuHoverScale } = useClinicFeatureFlag("menu_hover_scale");
@@ -607,10 +607,21 @@ export function AppShell() {
   // por padrão. Enquanto as permissões carregam, mostramos o próprio outlet
   // para evitar flash de "Acesso negado".
   const currentModulo = moduloDaRota(location.pathname);
-  const rotaPermitida =
-    allowedModules === null
-    || currentModulo === null
-    || (typeof currentModulo === "string" && allowedModules.has(currentModulo));
+  const rotaPermitida = (() => {
+    if (allowedModules === null) return true;
+    if (currentModulo === null) return true;
+    if (typeof currentModulo !== "string") return false;
+    if (allowedModules.has(currentModulo)) return true;
+    // Submódulos (ex.: financeiro-estorno) herdam do pai quando não têm
+    // configuração explícita salva no perfil. Se a linha existir no banco
+    // (configuredModules contém a chave), respeitamos o valor — mesmo que
+    // seja "none" — para permitir bloqueio granular.
+    const pai = SUBMODULE_PARENT[currentModulo];
+    if (pai && !configuredModules?.has(currentModulo) && allowedModules.has(pai)) {
+      return true;
+    }
+    return false;
+  })();
   const guardedOutlet = permsLoading
     ? <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">Carregando permissões…</div>
     : rotaPermitida

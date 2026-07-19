@@ -17,6 +17,7 @@ import {
   ChevronDown, ChevronRight, Save, Loader2,
 } from "lucide-react";
 import { PRESETS, type Acesso, type PerfilKey } from "@/lib/permissoes-presets";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
 export const Route = createFileRoute("/_authenticated/app/perfis")({
   component: PerfisPage,
@@ -76,7 +77,13 @@ const PERFIS: Array<{
 type Modulo = { key: string; nome: string; descricao: string };
 type Grupo = { label: string; modulos: Modulo[] };
 
-const GRUPOS: Grupo[] = [
+const SUBMODULOS_FINANCEIRO: Modulo[] = [
+  { key: "financeiro-movcaixa", nome: "Financeiro › Mov. Caixa", descricao: "Aba Movimento de Caixa dentro do Financeiro" },
+  { key: "financeiro-atendimentos", nome: "Financeiro › Atendimentos", descricao: "Aba Atendimentos/Repasse dentro do Financeiro" },
+  { key: "financeiro-estorno", nome: "Financeiro › Estorno", descricao: "Aba Estorno dentro do Financeiro" },
+];
+
+const GRUPOS_BASE: Grupo[] = [
   {
     label: "Operação",
     modulos: [
@@ -168,14 +175,31 @@ const GRUPOS: Grupo[] = [
   },
 ];
 
-const TODOS_MODULOS = GRUPOS.flatMap((g) => g.modulos.map((m) => m.key));
+function aplicaGranularidade(grupos: Grupo[], granular: boolean): Grupo[] {
+  if (!granular) return grupos;
+  return grupos.map((g) => {
+    if (g.label !== "Gestão") return g;
+    const idx = g.modulos.findIndex((m) => m.key === "financeiro");
+    if (idx < 0) return g;
+    const novos = [...g.modulos];
+    novos.splice(idx + 1, 0, ...SUBMODULOS_FINANCEIRO);
+    return { ...g, modulos: novos };
+  });
+}
 
-function buildInitialState(): Record<PerfilKey, Record<string, Acesso>> {
+function buildInitialState(todosModulos: string[]): Record<PerfilKey, Record<string, Acesso>> {
   const out = {} as Record<PerfilKey, Record<string, Acesso>>;
   for (const p of PERFIS) {
     const preset = PRESETS[p.key];
+    const financeiroDefault = (preset["financeiro"] ?? "none") as Acesso;
     out[p.key] = Object.fromEntries(
-      TODOS_MODULOS.map((k) => [k, (preset[k] ?? "none") as Acesso]),
+      todosModulos.map((k) => {
+        // Submódulos do financeiro herdam do acesso do pai por padrão,
+        // para que ativar a granularidade não retire acesso de perfis
+        // que já tinham "financeiro" liberado.
+        if (k.startsWith("financeiro-")) return [k, (preset[k] ?? financeiroDefault) as Acesso];
+        return [k, (preset[k] ?? "none") as Acesso];
+      }),
     );
   }
   return out;
@@ -184,6 +208,9 @@ function buildInitialState(): Record<PerfilKey, Record<string, Acesso>> {
 function PerfisPage() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
+  const { enabled: financeiroGranular } = useClinicFeatureFlag("permissoes_financeiro_granular");
+  const GRUPOS = useMemo(() => aplicaGranularidade(GRUPOS_BASE, financeiroGranular), [financeiroGranular]);
+  const TODOS_MODULOS = useMemo(() => GRUPOS.flatMap((g) => g.modulos.map((m) => m.key)), [GRUPOS]);
   // Deliberadamente hardcoded para role === "admin", e NÃO
   // usePodeEscrever("perfis") — quem gerencia permissões precisa ser um
   // admin de verdade, mesmo que a matriz configure "perfis: Edição" para
@@ -193,7 +220,29 @@ function PerfisPage() {
   const podeAdministrar = clinicaAtual?.role === "admin";
   const [tab, setTab] = useState<"perfis" | "permissoes">("perfis");
   const [perfilSel, setPerfilSel] = useState<PerfilKey>("admin");
-  const [matriz, setMatriz] = useState<Record<PerfilKey, Record<string, Acesso>>>(buildInitialState);
+  const [matriz, setMatriz] = useState<Record<PerfilKey, Record<string, Acesso>>>(() => buildInitialState(GRUPOS_BASE.flatMap((g) => g.modulos.map((m) => m.key))));
+
+  // Quando a granularidade muda (flag carrega), garante que as novas chaves
+  // apareçam na matriz com o valor padrão herdado do pai.
+  useEffect(() => {
+    setMatriz((prev) => {
+      const next = { ...prev } as Record<PerfilKey, Record<string, Acesso>>;
+      for (const p of PERFIS) {
+        const preset = PRESETS[p.key];
+        const parentDefault = (preset["financeiro"] ?? "none") as Acesso;
+        const atual = next[p.key] ?? {};
+        const novo: Record<string, Acesso> = { ...atual };
+        for (const k of TODOS_MODULOS) {
+          if (!(k in novo)) {
+            if (k.startsWith("financeiro-")) novo[k] = (preset[k] ?? parentDefault) as Acesso;
+            else novo[k] = (preset[k] ?? "none") as Acesso;
+          }
+        }
+        next[p.key] = novo;
+      }
+      return next;
+    });
+  }, [TODOS_MODULOS]);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
     () => Object.fromEntries(GRUPOS.map((g) => [g.label, true])),
   );
@@ -249,7 +298,17 @@ function PerfisPage() {
               const chave = idToChave[row.perfil_id];
               if (!chave) continue;
               if (!seen[chave]) {
-                next[chave] = Object.fromEntries(TODOS_MODULOS.map((k) => [k, "none" as Acesso]));
+                // Reseta módulos "normais" para "none"; submódulos ficam com
+                // o default herdado do pai (via buildInitialState) para que
+                // ativar a granularidade não retire acesso já concedido.
+                const preset = PRESETS[chave];
+                const parentFin = (preset["financeiro"] ?? "none") as Acesso;
+                next[chave] = Object.fromEntries(TODOS_MODULOS.map((k) => [
+                  k,
+                  k.startsWith("financeiro-")
+                    ? ((preset[k] ?? parentFin) as Acesso)
+                    : ("none" as Acesso),
+                ]));
                 seen[chave] = true;
               }
               next[chave][row.modulo] = row.acesso as Acesso;
