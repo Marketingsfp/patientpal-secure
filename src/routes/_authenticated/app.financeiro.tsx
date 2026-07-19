@@ -36,6 +36,19 @@ const subnav = [
 function FinLayout() {
   const location = useLocation();
   const { allowed, configured } = usePermissoes();
+  // ATENÇÃO: todos os hooks (useState/useEffect) precisam ficar ACIMA de
+  // qualquer `return` condicional. O redirecionamento de rota-pai abaixo é um
+  // early-return que, se colocado antes destes hooks, muda a quantidade de
+  // hooks entre renders quando as permissões carregam (Set vazio → Set final),
+  // violando as Rules of Hooks e derrubando a tela com o error boundary.
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("fin-subnav:collapsed") === "1";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("fin-subnav:collapsed", collapsed ? "1" : "0");
+  }, [collapsed]);
 
   // Filtra as abas do submenu com base nas permissões do perfil.
   // - Admin (allowed === null) vê tudo.
@@ -64,14 +77,6 @@ function FinLayout() {
   if (semFinanceiroPai && primeiraAbaSub) {
     return <Navigate to={primeiraAbaSub.to} replace />;
   }
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem("fin-subnav:collapsed") === "1";
-  });
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("fin-subnav:collapsed", collapsed ? "1" : "0");
-  }, [collapsed]);
   return (
     <TooltipProvider delayDuration={300}>
     <div className="flex gap-3 -m-4 h-[calc(100vh-4rem)]">
