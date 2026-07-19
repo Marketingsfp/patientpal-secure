@@ -654,13 +654,14 @@ export function AppShell() {
   }
 
   return (
-    <div className="h-screen flex bg-background overflow-hidden">
+    <div className={cn("flex bg-background overflow-hidden", uxMelhorias ? "h-[100dvh]" : "h-screen")}>
       {!isChooser && (
       <aside
         onMouseEnter={uxMelhorias ? () => setHoverSidebar(true) : undefined}
         onMouseLeave={uxMelhorias ? () => setHoverSidebar(false) : undefined}
         className={cn(
-          "transition-all duration-200 shrink-0 text-white h-screen overflow-hidden hidden md:flex flex-col",
+          "transition-all duration-200 shrink-0 text-white overflow-hidden hidden md:flex flex-col",
+          uxMelhorias ? "h-[100dvh]" : "h-screen",
           collapsed ? "w-16" : "w-56 2xl:w-64",
         )}
         style={{ backgroundColor: corSidebar }}

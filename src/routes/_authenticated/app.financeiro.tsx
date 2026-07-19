@@ -8,7 +8,9 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePermissoes } from "@/hooks/use-permissoes";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { moduloDaRota, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro")({
   component: FinLayout,
@@ -36,6 +38,9 @@ const subnav = [
 function FinLayout() {
   const location = useLocation();
   const { allowed, configured } = usePermissoes();
+  // Altura de tela correta em navegador mobile (barra de endereço) — piloto
+  // São Francisco de Paula (flag ux_melhorias).
+  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   // ATENÇÃO: todos os hooks (useState/useEffect) precisam ficar ACIMA de
   // qualquer `return` condicional. O redirecionamento de rota-pai abaixo é um
   // early-return que, se colocado antes destes hooks, muda a quantidade de
@@ -79,7 +84,7 @@ function FinLayout() {
   }
   return (
     <TooltipProvider delayDuration={300}>
-    <div className="flex gap-3 -m-4 h-[calc(100vh-4rem)]">
+    <div className={cn("flex gap-3 -m-4", uxMelhorias ? "h-[calc(100dvh-4rem)]" : "h-[calc(100vh-4rem)]")}>
       <aside className={`${collapsed ? "w-12" : "w-48"} bg-card border-r border-border p-2 shrink-0 overflow-y-auto h-full transition-all duration-200`}>
         <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} mb-1`}>
           {!collapsed && (

@@ -1,15 +1,22 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
 const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement> & { containerClassName?: string }
->(({ className, containerClassName, ...props }, ref) => (
-  <div className={cn("relative w-full", containerClassName)}>
-    <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
-  </div>
-));
+>(({ className, containerClassName, ...props }, ref) => {
+  // Rolagem horizontal em vez de cortar colunas em telas estreitas — piloto
+  // São Francisco de Paula (flag ux_melhorias). Sem a flag, comportamento
+  // idêntico ao atual (sem overflow-x, para não mudar nada nas outras clínicas).
+  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
+  return (
+    <div className={cn("relative w-full", uxMelhorias && "overflow-x-auto", containerClassName)}>
+      <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
+    </div>
+  );
+});
 Table.displayName = "Table";
 
 const TableHeader = React.forwardRef<
