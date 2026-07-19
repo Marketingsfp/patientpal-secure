@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePermissoes } from "@/hooks/use-permissoes";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { moduloDaRota, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
 import { cn } from "@/lib/utils";
 
@@ -38,9 +39,12 @@ const subnav = [
 function FinLayout() {
   const location = useLocation();
   const { allowed, configured } = usePermissoes();
-  // Altura de tela correta em navegador mobile (barra de endereço) — piloto
-  // São Francisco de Paula (flag ux_melhorias).
+  // Altura de tela correta em navegador mobile (barra de endereço) e
+  // submenu responsivo (vira barra horizontal no celular) — piloto São
+  // Francisco de Paula (flag ux_melhorias).
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
+  const isMobile = useIsMobile();
+  const modoMobile = uxMelhorias && isMobile;
   // ATENÇÃO: todos os hooks (useState/useEffect) precisam ficar ACIMA de
   // qualquer `return` condicional. O redirecionamento de rota-pai abaixo é um
   // early-return que, se colocado antes destes hooks, muda a quantidade de
@@ -84,30 +88,59 @@ function FinLayout() {
   }
   return (
     <TooltipProvider delayDuration={300}>
-    <div className={cn("flex gap-3 -m-4", uxMelhorias ? "h-[calc(100dvh-4rem)]" : "h-[calc(100vh-4rem)]")}>
-      <aside className={`${collapsed ? "w-12" : "w-48"} bg-card border-r border-border p-2 shrink-0 overflow-y-auto h-full transition-all duration-200`}>
-        <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} mb-1`}>
-          {!collapsed && (
-            <p className="px-1 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Financeiro
-            </p>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={() => setCollapsed((v) => !v)}
-            title={collapsed ? "Expandir menu" : "Recolher menu"}
-            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-          >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </Button>
-        </div>
-        <nav className="space-y-0.5">
+    <div className={cn(
+      "gap-3 -m-4",
+      modoMobile ? "flex flex-col" : "flex",
+      uxMelhorias ? "h-[calc(100dvh-4rem)]" : "h-[calc(100vh-4rem)]",
+    )}>
+      <aside className={cn(
+        "bg-card p-2 shrink-0 transition-all duration-200",
+        modoMobile
+          ? "w-full border-b border-border overflow-x-auto"
+          : cn(collapsed ? "w-12" : "w-48", "border-r border-border overflow-y-auto h-full"),
+      )}>
+        {!modoMobile && (
+          <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} mb-1`}>
+            {!collapsed && (
+              <p className="px-1 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Financeiro
+              </p>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setCollapsed((v) => !v)}
+              title={collapsed ? "Expandir menu" : "Recolher menu"}
+              aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+            >
+              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </Button>
+          </div>
+        )}
+        <nav className={modoMobile ? "flex items-center gap-1.5" : "space-y-0.5"}>
           {visibleSubnav.map((item) => {
             const active = "exact" in item && item.exact
               ? location.pathname === item.to
               : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
+            // Barra horizontal no celular: sempre ícone + rótulo, sem o
+            // estado "recolhido" (não faz sentido numa faixa que já rola).
+            if (modoMobile) {
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={`flex items-center gap-1.5 shrink-0 whitespace-nowrap rounded-md px-3 py-2 text-sm transition-colors ${
+                    active
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-foreground/70 hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  <item.icon className="h-4 w-4 shrink-0" />
+                  {item.label}
+                </Link>
+              );
+            }
             if (collapsed) {
               return (
                 <Tooltip key={item.to}>
@@ -144,7 +177,7 @@ function FinLayout() {
           })}
         </nav>
       </aside>
-      <div className="flex-1 p-3 overflow-auto min-w-0 h-full">
+      <div className={cn("flex-1 p-3 overflow-auto min-w-0", !modoMobile && "h-full")}>
         <Outlet />
       </div>
     </div>
