@@ -91,6 +91,7 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/financeiro": "financeiro",
   "/app/financeiro/alertas": "financeiro",
   "/app/financeiro/analitico": "financeiro",
+  "/app/financeiro/atendimentos": "financeiro",
   "/app/financeiro/bi": "financeiro",
   "/app/financeiro/categorias": "financeiro",
   "/app/financeiro/contas": "financeiro",
