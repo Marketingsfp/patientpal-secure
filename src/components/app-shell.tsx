@@ -17,6 +17,7 @@ import { EstornosBell } from "@/components/EstornosBell";
 import { UniversalSearchBar } from "@/components/universal-search-bar";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useTheme } from "@/hooks/use-theme";
+import { useMenuOrdem } from "@/hooks/use-menu-ordem";
 import { HOVER_SCALE_CLASSES } from "@/lib/menu-hover";
 import { garantirContrasteTextoBranco } from "@/lib/contrast";
 import { cn } from "@/lib/utils";
@@ -62,6 +63,11 @@ type NavLeaf = { to: string; label: string; icon: typeof LayoutDashboard; hash?:
 type NavParent = { label: string; icon: typeof LayoutDashboard; children: ReadonlyArray<NavLeaf> };
 type NavItem = NavLeaf | NavParent;
 const isParent = (it: NavItem): it is NavParent => "children" in it;
+
+// Chave estável de um item de menu para a ordem personalizada por usuário
+// (leaf = rota + hash; grupo expansível = prefixo com o rótulo).
+const navItemKey = (it: NavItem): string =>
+  isParent(it) ? `grupo:${it.label}` : `${it.to}${it.hash ? `#${it.hash}` : ""}`;
 
 // Bottom nav mobile — piloto São Francisco de Paula (flag ux_melhorias).
 // Os 4 atalhos mais usados; o resto do menu continua acessível via "Mais".
@@ -212,6 +218,10 @@ export function AppShell() {
   // flag `ux_melhorias`, ligada só para a São Francisco de Paula.
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const theme = useTheme(uxMelhorias);
+  // Ordem personalizada dos itens do menu (arrastar e soltar) — por usuário.
+  const { ordem: menuOrdem, salvar: salvarMenuOrdem } = useMenuOrdem(uxMelhorias);
+  const [dragMenu, setDragMenu] = useState<{ row: string; key: string } | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const router = useRouter();
@@ -433,7 +443,75 @@ export function AppShell() {
   // O perfil médico também deve respeitar a matriz configurada em Perfis de
   // Acesso. O escopo clínico do médico continua sendo aplicado pelos hooks e
   // consultas de cada módulo; não substitua as permissões por um menu fixo.
-  const visibleNavRows = flagFilteredRows;
+  // Ordem personalizada por usuário (arrastar e soltar) — só com a flag.
+  // Itens sem posição salva (ex.: telas novas) vão para o fim do grupo,
+  // mantendo a ordem padrão entre si.
+  const visibleNavRows = useMemo(() => {
+    if (!uxMelhorias) return flagFilteredRows;
+    return flagFilteredRows.map((row) => {
+      const salvos = menuOrdem[row.label];
+      if (!salvos || salvos.length === 0) return row;
+      const pos = new Map(salvos.map((k, i) => [k, i] as const));
+      const items = [...row.items].sort((a, b) => {
+        const ia = pos.get(navItemKey(a));
+        const ib = pos.get(navItemKey(b));
+        if (ia === undefined && ib === undefined) return 0;
+        if (ia === undefined) return 1;
+        if (ib === undefined) return -1;
+        return ia - ib;
+      });
+      return { ...row, items };
+    });
+  }, [flagFilteredRows, menuOrdem, uxMelhorias]);
+
+  // Solta um item do menu sobre outro do MESMO grupo: insere na posição do
+  // alvo e salva a lista completa de chaves do grupo no perfil do usuário.
+  const soltarItemMenu = (rowLabel: string, targetKey: string) => {
+    const drag = dragMenu;
+    setDragMenu(null);
+    setDragOverKey(null);
+    if (!drag || drag.row !== rowLabel || drag.key === targetKey) return;
+    const row = visibleNavRows.find((r) => r.label === rowLabel);
+    if (!row) return;
+    const keys = row.items.map(navItemKey);
+    const from = keys.indexOf(drag.key);
+    const to = keys.indexOf(targetKey);
+    if (from < 0 || to < 0) return;
+    keys.splice(to, 0, keys.splice(from, 1)[0]);
+    void salvarMenuOrdem({ ...menuOrdem, [rowLabel]: keys });
+  };
+
+  // Props de arrastar/soltar de um item do menu desktop (só com a flag).
+  const dragProps = (rowLabel: string, key: string) =>
+    uxMelhorias
+      ? {
+          draggable: true,
+          onDragStart: (e: React.DragEvent) => {
+            e.dataTransfer.effectAllowed = "move";
+            setDragMenu({ row: rowLabel, key });
+          },
+          onDragOver: (e: React.DragEvent) => {
+            if (!dragMenu || dragMenu.row !== rowLabel) return;
+            e.preventDefault();
+            if (dragOverKey !== key) setDragOverKey(key);
+          },
+          onDrop: (e: React.DragEvent) => {
+            e.preventDefault();
+            soltarItemMenu(rowLabel, key);
+          },
+          onDragEnd: () => {
+            setDragMenu(null);
+            setDragOverKey(null);
+          },
+        }
+      : {};
+
+  // Realce visual durante o arraste: item arrastado fica translúcido e o
+  // alvo atual ganha um anel.
+  const dragCls = (key: string) =>
+    uxMelhorias && dragMenu
+      ? cn(dragMenu.key === key && "opacity-50", dragOverKey === key && dragMenu.key !== key && "ring-1 ring-white/70")
+      : "";
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
   // Lista plana de rotas visíveis no menu (respeitando grupos abertos) para navegação por seta
@@ -623,7 +701,7 @@ export function AppShell() {
                     const subKey = `${row.label}::${item.label}`;
                     const subOpen = collapsed ? true : (openGroups[subKey] ?? false);
                     return (
-                      <div key={subKey} className="space-y-1">
+                      <div key={subKey} className={cn("space-y-1 rounded-md", dragCls(navItemKey(item)))} {...dragProps(row.label, navItemKey(item))}>
                         {collapsed ? (
                           <div className="flex justify-center py-2" title={item.label}>
                             <item.icon className="h-4 w-4 shrink-0 opacity-80" />
@@ -708,11 +786,15 @@ export function AppShell() {
                         event.preventDefault();
                         irPara(href);
                       }}
-                      className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-all ${
-                        active
-                          ? "bg-white text-slate-900 shadow-sm"
-                          : "text-white/85 hover:bg-white/10 hover:text-white"
-                      }${hoverScaleCls}`}
+                      {...dragProps(row.label, navItemKey(item))}
+                      className={cn(
+                        `relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-all ${
+                          active
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-white/85 hover:bg-white/10 hover:text-white"
+                        }${hoverScaleCls}`,
+                        dragCls(navItemKey(item)),
+                      )}
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span className="truncate">{item.label}</span>}
