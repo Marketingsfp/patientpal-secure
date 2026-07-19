@@ -51,6 +51,7 @@ import { ptBR } from "date-fns/locale";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -2424,7 +2425,7 @@ function AtendimentosPage() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="py-12 text-center text-muted-foreground">Carregando...</div>
+            <ListSkeleton rows={7} fallback={<div className="py-12 text-center text-muted-foreground">Carregando...</div>} />
           ) : filteredItems.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
               <Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />

@@ -19,6 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ListSkeleton } from "@/components/ui/list-skeleton";
+import { TableSkeletonRows } from "@/components/ui/table-skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
@@ -6613,7 +6615,7 @@ function AgendaPage() {
         {/* ============ LISTA MOBILE / TABLET (cards empilhados) ============ */}
         <div className="lg:hidden space-y-2">
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground text-sm">Carregando…</div>
+            <ListSkeleton rows={6} fallback={<div className="text-center py-8 text-muted-foreground text-sm">Carregando…</div>} />
           ) : !clinicaAtual ? (
             <div className="text-center py-8 text-muted-foreground text-sm">Selecione uma clínica.</div>
           ) : paginados.length === 0 ? (
@@ -6836,11 +6838,16 @@ function AgendaPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                    Carregando…
-                  </TableCell>
-                </TableRow>
+                <TableSkeletonRows
+                  cols={9}
+                  fallback={
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        Carregando…
+                      </TableCell>
+                    </TableRow>
+                  }
+                />
               ) : !clinicaAtual ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">

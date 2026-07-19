@@ -214,6 +214,15 @@ export function AppShell() {
     }
     window.location.assign(href);
   };
+  // Pré-carrega o código da rota ao passar o mouse no item do menu — quando o
+  // clique acontece, o chunk JS já chegou. Só com a flag de UX ligada.
+  const preCarregar = (href: string) => {
+    if (!uxMelhorias) return;
+    const to = href.split("#")[0];
+    // Cast necessário: os paths do menu vêm de configuração em runtime
+    // (string), não do union de rotas tipado do router.
+    void router.preloadRoute({ to } as Parameters<typeof router.preloadRoute>[0]).catch(() => {});
+  };
   const lastArrowNavAtRef = useRef(0);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -606,6 +615,8 @@ export function AppShell() {
                               title={collapsed ? child.label : undefined}
                               data-nav-to={child.to}
                               data-nav-active={active ? "true" : undefined}
+                              aria-current={uxMelhorias && active ? "page" : undefined}
+                              onMouseEnter={() => preCarregar(child.to)}
                               onClick={(event) => {
                                 if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
                                 event.preventDefault();
@@ -637,6 +648,8 @@ export function AppShell() {
                       title={collapsed ? item.label : undefined}
                       data-nav-to={item.to}
                       data-nav-active={active ? "true" : undefined}
+                      aria-current={uxMelhorias && active ? "page" : undefined}
+                      onMouseEnter={() => preCarregar(item.to)}
                       onClick={(event) => {
                         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
                         event.preventDefault();

@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
 import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
@@ -2114,7 +2115,7 @@ function Page() {
 
         {/* ===================== MEU CAIXA ===================== */}
         <TabsContent value="meu" className="space-y-4 pt-4">
-          {loading && <p className="text-sm text-muted-foreground">Carregando…</p>}
+          {loading && <ListSkeleton rows={4} fallback={<p className="text-sm text-muted-foreground">Carregando…</p>} />}
 
           {!loading && (
             <Tabs defaultValue="saldo" className="w-full">

@@ -19,8 +19,8 @@ import { ClienteForm } from "@/components/clientes/cliente-form";
 import { IdadeIcon, calcIdadeAnos } from "@/components/idade-icon";
 import { ClientesShellV2 } from "@/components/clientes-v2/clientes-shell";
 import { useClientesV2Flag } from "@/hooks/use-clientes-v2-flag";
-import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useClinica as useClinicaGate } from "@/hooks/use-clinica";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/")({
@@ -124,8 +124,6 @@ interface Paciente {
 function ClientesPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("clientes");
-  // Piloto de UX (só São Francisco de Paula): skeleton no lugar de "Carregando…"
-  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const [items, setItems] = useState<Paciente[]>([]);
   const [totalPacientes, setTotalPacientes] = useState<number | null>(null);
   const [atingiuTeto, setAtingiuTeto] = useState(false);
@@ -314,13 +312,28 @@ function ClientesPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              uxMelhorias
-                ? <TableSkeletonRows cols={8} />
-                : <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+              <TableSkeletonRows
+                cols={8}
+                fallback={<TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>}
+              />
             ) : !clinicaAtual ? (
               <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
             ) : filtrados.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={8} className="p-0">
+                  <EmptyState
+                    icon={<Users className="h-10 w-10" />}
+                    titulo="Nenhum cliente encontrado."
+                    descricao={busca.trim() ? "Tente refinar a busca — nome completo, CPF ou telefone." : "Cadastre o primeiro cliente desta clínica."}
+                    acao={podeEscrever && !busca.trim() ? (
+                      <Button size="sm" onClick={() => setOpenNovo(true)}>
+                        <Plus className="h-4 w-4 mr-1" /> Novo cliente
+                      </Button>
+                    ) : undefined}
+                    fallback={<div className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</div>}
+                  />
+                </TableCell>
+              </TableRow>
             ) : filtrados.map(p => (
               <TableRow key={p.id}>
                 <TableCell className="font-mono text-xs text-muted-foreground">{p.codigo_prontuario ?? "—"}</TableCell>
