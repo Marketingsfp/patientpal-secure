@@ -1,13 +1,12 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import {
-  LayoutDashboard, ArrowLeftRight, BarChart3, LineChart, Stethoscope,
+  LayoutDashboard, ArrowLeftRight, BarChart3, LineChart,
   Building, FileText, FileBarChart, PieChart, Bell, Tag, Wallet,
   Sparkles, AlertTriangle, Undo2, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useMedicoContext } from "@/hooks/use-medico-context";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro")({
   component: FinLayout,
@@ -19,7 +18,6 @@ const subnav = [
   { to: "/app/financeiro/movimento", label: "Mov. Caixa", icon: ArrowLeftRight },
   { to: "/app/financeiro/bi", label: "BI", icon: BarChart3 },
   { to: "/app/financeiro/analitico", label: "Analítico", icon: LineChart },
-  { to: "/app/financeiro/atendimentos", label: "Atendimentos", icon: Stethoscope },
   { to: "/app/financeiro/estorno", label: "Estorno", icon: Undo2 },
   { to: "/app/financeiro/empresas", label: "Empresas", icon: Building },
   { to: "/app/financeiro/notas", label: "Notas Pacientes", icon: FileText },
@@ -34,10 +32,7 @@ const subnav = [
 
 function FinLayout() {
   const location = useLocation();
-  const { isMedicoOnly } = useMedicoContext();
-  const visibleSubnav = isMedicoOnly
-    ? subnav.filter((i) => i.to === "/app/financeiro/atendimentos").map((i) => ({ ...i, label: "Repasse" }))
-    : subnav;
+  const visibleSubnav = subnav;
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("fin-subnav:collapsed") === "1";

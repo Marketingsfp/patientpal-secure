@@ -94,7 +94,6 @@ import { Route as AuthenticatedAppCaixaRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAppBoletosRouteImport } from './routes/_authenticated/app.boletos'
 import { Route as AuthenticatedAppBackupsRouteImport } from './routes/_authenticated/app.backups'
 import { Route as AuthenticatedAppAuditoriaRouteImport } from './routes/_authenticated/app.auditoria'
-import { Route as AuthenticatedAppAtendimentosRouteImport } from './routes/_authenticated/app.atendimentos'
 import { Route as AuthenticatedAppAtendimentoMultiploRouteImport } from './routes/_authenticated/app.atendimento-multiplo'
 import { Route as AuthenticatedAppAtendimentoIaRouteImport } from './routes/_authenticated/app.atendimento-ia'
 import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authenticated/app.anamneses'
@@ -124,7 +123,6 @@ import { Route as AuthenticatedAppFinanceiroEmpresasRouteImport } from './routes
 import { Route as AuthenticatedAppFinanceiroContasRouteImport } from './routes/_authenticated/app.financeiro.contas'
 import { Route as AuthenticatedAppFinanceiroCategoriasRouteImport } from './routes/_authenticated/app.financeiro.categorias'
 import { Route as AuthenticatedAppFinanceiroBiRouteImport } from './routes/_authenticated/app.financeiro.bi'
-import { Route as AuthenticatedAppFinanceiroAtendimentosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos'
 import { Route as AuthenticatedAppFinanceiroAnaliticoRouteImport } from './routes/_authenticated/app.financeiro.analitico'
 import { Route as AuthenticatedAppFinanceiroAlertasRouteImport } from './routes/_authenticated/app.financeiro.alertas'
 import { Route as AuthenticatedAppConfiguracoesPainelTotemRouteImport } from './routes/_authenticated/app.configuracoes.painel-totem'
@@ -605,12 +603,6 @@ const AuthenticatedAppAuditoriaRoute =
     path: '/auditoria',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppAtendimentosRoute =
-  AuthenticatedAppAtendimentosRouteImport.update({
-    id: '/atendimentos',
-    path: '/atendimentos',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
 const AuthenticatedAppAtendimentoMultiploRoute =
   AuthenticatedAppAtendimentoMultiploRouteImport.update({
     id: '/atendimento-multiplo',
@@ -784,12 +776,6 @@ const AuthenticatedAppFinanceiroBiRoute =
     path: '/bi',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
-const AuthenticatedAppFinanceiroAtendimentosRoute =
-  AuthenticatedAppFinanceiroAtendimentosRouteImport.update({
-    id: '/atendimentos',
-    path: '/atendimentos',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
-  } as any)
 const AuthenticatedAppFinanceiroAnaliticoRoute =
   AuthenticatedAppFinanceiroAnaliticoRouteImport.update({
     id: '/analitico',
@@ -916,7 +902,6 @@ export interface FileRoutesByFullPath {
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   '/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
-  '/app/atendimentos': typeof AuthenticatedAppAtendimentosRoute
   '/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
   '/app/backups': typeof AuthenticatedAppBackupsRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -991,7 +976,6 @@ export interface FileRoutesByFullPath {
   '/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
-  '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
   '/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
@@ -1047,7 +1031,6 @@ export interface FileRoutesByTo {
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
-  '/app/atendimentos': typeof AuthenticatedAppAtendimentosRoute
   '/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
   '/app/backups': typeof AuthenticatedAppBackupsRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -1120,7 +1103,6 @@ export interface FileRoutesByTo {
   '/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
-  '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
   '/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
@@ -1180,7 +1162,6 @@ export interface FileRoutesById {
   '/_authenticated/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/_authenticated/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   '/_authenticated/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
-  '/_authenticated/app/atendimentos': typeof AuthenticatedAppAtendimentosRoute
   '/_authenticated/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
   '/_authenticated/app/backups': typeof AuthenticatedAppBackupsRoute
   '/_authenticated/app/boletos': typeof AuthenticatedAppBoletosRoute
@@ -1255,7 +1236,6 @@ export interface FileRoutesById {
   '/_authenticated/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
   '/_authenticated/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/_authenticated/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
-  '/_authenticated/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
   '/_authenticated/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/_authenticated/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/_authenticated/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
@@ -1315,7 +1295,6 @@ export interface FileRouteTypes {
     | '/app/anamneses'
     | '/app/atendimento-ia'
     | '/app/atendimento-multiplo'
-    | '/app/atendimentos'
     | '/app/auditoria'
     | '/app/backups'
     | '/app/boletos'
@@ -1390,7 +1369,6 @@ export interface FileRouteTypes {
     | '/app/configuracoes/painel-totem'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
-    | '/app/financeiro/atendimentos'
     | '/app/financeiro/bi'
     | '/app/financeiro/categorias'
     | '/app/financeiro/contas'
@@ -1446,7 +1424,6 @@ export interface FileRouteTypes {
     | '/app/alertas-enfermagem'
     | '/app/anamneses'
     | '/app/atendimento-multiplo'
-    | '/app/atendimentos'
     | '/app/auditoria'
     | '/app/backups'
     | '/app/boletos'
@@ -1519,7 +1496,6 @@ export interface FileRouteTypes {
     | '/app/configuracoes/painel-totem'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
-    | '/app/financeiro/atendimentos'
     | '/app/financeiro/bi'
     | '/app/financeiro/categorias'
     | '/app/financeiro/contas'
@@ -1578,7 +1554,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/anamneses'
     | '/_authenticated/app/atendimento-ia'
     | '/_authenticated/app/atendimento-multiplo'
-    | '/_authenticated/app/atendimentos'
     | '/_authenticated/app/auditoria'
     | '/_authenticated/app/backups'
     | '/_authenticated/app/boletos'
@@ -1653,7 +1628,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/configuracoes/painel-totem'
     | '/_authenticated/app/financeiro/alertas'
     | '/_authenticated/app/financeiro/analitico'
-    | '/_authenticated/app/financeiro/atendimentos'
     | '/_authenticated/app/financeiro/bi'
     | '/_authenticated/app/financeiro/categorias'
     | '/_authenticated/app/financeiro/contas'
@@ -2310,13 +2284,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppAuditoriaRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/atendimentos': {
-      id: '/_authenticated/app/atendimentos'
-      path: '/atendimentos'
-      fullPath: '/app/atendimentos'
-      preLoaderRoute: typeof AuthenticatedAppAtendimentosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
     '/_authenticated/app/atendimento-multiplo': {
       id: '/_authenticated/app/atendimento-multiplo'
       path: '/atendimento-multiplo'
@@ -2520,13 +2487,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroBiRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
-    '/_authenticated/app/financeiro/atendimentos': {
-      id: '/_authenticated/app/financeiro/atendimentos'
-      path: '/atendimentos'
-      fullPath: '/app/financeiro/atendimentos'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroAtendimentosRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
     '/_authenticated/app/financeiro/analitico': {
       id: '/_authenticated/app/financeiro/analitico'
       path: '/analitico'
@@ -2713,7 +2673,6 @@ const AuthenticatedAppEquipeRouteWithChildren =
 interface AuthenticatedAppFinanceiroRouteChildren {
   AuthenticatedAppFinanceiroAlertasRoute: typeof AuthenticatedAppFinanceiroAlertasRoute
   AuthenticatedAppFinanceiroAnaliticoRoute: typeof AuthenticatedAppFinanceiroAnaliticoRoute
-  AuthenticatedAppFinanceiroAtendimentosRoute: typeof AuthenticatedAppFinanceiroAtendimentosRoute
   AuthenticatedAppFinanceiroBiRoute: typeof AuthenticatedAppFinanceiroBiRoute
   AuthenticatedAppFinanceiroCategoriasRoute: typeof AuthenticatedAppFinanceiroCategoriasRoute
   AuthenticatedAppFinanceiroContasRoute: typeof AuthenticatedAppFinanceiroContasRoute
@@ -2734,8 +2693,6 @@ const AuthenticatedAppFinanceiroRouteChildren: AuthenticatedAppFinanceiroRouteCh
       AuthenticatedAppFinanceiroAlertasRoute,
     AuthenticatedAppFinanceiroAnaliticoRoute:
       AuthenticatedAppFinanceiroAnaliticoRoute,
-    AuthenticatedAppFinanceiroAtendimentosRoute:
-      AuthenticatedAppFinanceiroAtendimentosRoute,
     AuthenticatedAppFinanceiroBiRoute: AuthenticatedAppFinanceiroBiRoute,
     AuthenticatedAppFinanceiroCategoriasRoute:
       AuthenticatedAppFinanceiroCategoriasRoute,
@@ -2771,7 +2728,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAnamnesesRoute: typeof AuthenticatedAppAnamnesesRoute
   AuthenticatedAppAtendimentoIaRoute: typeof AuthenticatedAppAtendimentoIaRouteWithChildren
   AuthenticatedAppAtendimentoMultiploRoute: typeof AuthenticatedAppAtendimentoMultiploRoute
-  AuthenticatedAppAtendimentosRoute: typeof AuthenticatedAppAtendimentosRoute
   AuthenticatedAppAuditoriaRoute: typeof AuthenticatedAppAuditoriaRoute
   AuthenticatedAppBackupsRoute: typeof AuthenticatedAppBackupsRoute
   AuthenticatedAppBoletosRoute: typeof AuthenticatedAppBoletosRoute
@@ -2854,7 +2810,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppAtendimentoIaRouteWithChildren,
   AuthenticatedAppAtendimentoMultiploRoute:
     AuthenticatedAppAtendimentoMultiploRoute,
-  AuthenticatedAppAtendimentosRoute: AuthenticatedAppAtendimentosRoute,
   AuthenticatedAppAuditoriaRoute: AuthenticatedAppAuditoriaRoute,
   AuthenticatedAppBackupsRoute: AuthenticatedAppBackupsRoute,
   AuthenticatedAppBoletosRoute: AuthenticatedAppBoletosRoute,
@@ -2998,13 +2953,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
