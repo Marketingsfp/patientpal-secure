@@ -524,29 +524,6 @@ html.agenda-v2-active .agenda-v2-scope h3 {
 }
 
 /* =====================================================================
- * MenuV2 sidebar — legibilidade em fundo navy
- * A sidebar agora é mid-navy; o markup interno usa text-muted-foreground
- * (que no tema light é escuro). Redefinimos os tokens *dentro* da aside
- * para tons claros, sem afetar o resto do app.
- * ===================================================================== */
-[data-testid="menu-v2"] {
-  --muted-foreground: oklch(0.88 0.02 250);
-  --foreground: oklch(0.99 0 0);
-  --border: oklch(0.38 0.10 258);
-  --primary: oklch(0.86 0.10 240);
-  --ring: oklch(0.86 0.10 240);
-  color: var(--sidebar-foreground);
-}
-[data-testid="menu-v2"] input {
-  background-color: color-mix(in oklab, white 8%, transparent);
-  color: var(--sidebar-foreground);
-  border-color: var(--sidebar-border);
-}
-[data-testid="menu-v2"] input::placeholder {
-  color: color-mix(in oklab, white 55%, transparent);
-}
-
-/* =====================================================================
  * Paletas institucionais — troc\u00e1veis via html.theme-*
  * Aplicadas globalmente (background + sidebar). O accent tamb\u00e9m sobrescreve
  * o --clinic-accent default para manter coer\u00eancia com skins de cl\u00ednica.

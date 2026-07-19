@@ -5,7 +5,6 @@ import { Tooth } from "@/components/icons/tooth";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
-import { useMedicoContext } from "@/hooks/use-medico-context";
 import { usePermissoes } from "@/hooks/use-permissoes";
 import { ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE, moduloDaRota } from "@/lib/permissoes-rotas";
 import { SemPermissao } from "@/components/sem-permissao";
@@ -16,10 +15,9 @@ import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
 import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
 import { EstornosBell } from "@/components/EstornosBell";
 import { UniversalSearchBar } from "@/components/universal-search-bar";
-import { MenuV2 } from "@/components/menu-v2/menu-v2";
-import { useMenuV2Flag } from "@/hooks/use-menu-prefs";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
+import { HOVER_SCALE_CLASSES } from "@/lib/menu-hover";
 import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
-import type { PerfilKey } from "@/components/menu-v2/menu-catalog";
 
 function corDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
@@ -193,9 +191,11 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
 export function AppShell() {
   const { user, signOut, loading } = useAuth();
   const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } = useClinica();
-  const { isMedicoOnly } = useMedicoContext();
   const { allowed: allowedModules, loading: permsLoading } = usePermissoes();
-  const { enabled: menuV2Enabled } = useMenuV2Flag();
+  // Efeito "expandir ao passar o mouse" nos itens do menu clássico — ligado
+  // só nas clínicas com a flag `menu_hover_scale` (hoje apenas a São Francisco).
+  const { enabled: menuHoverScale } = useClinicFeatureFlag("menu_hover_scale");
+  const hoverScaleCls = menuHoverScale ? ` ${HOVER_SCALE_CLASSES}` : "";
   const location = useLocation();
   const navigate = useNavigate();
   const navScrollRef = useRef<HTMLElement | null>(null);
@@ -381,14 +381,6 @@ export function AppShell() {
   const visibleNavRows = flagFilteredRows;
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
-  // Kill-switch gradual: MenuV2 só é ativado se a flag `menu_v2` estiver on
-  // E o role atual for admin ou gestor. Recepção/médico/caixa/financeiro
-  // continuam vendo o menu antigo mesmo se a flag estiver ligada.
-  const roleAtual = clinicaAtual?.role ?? null;
-  const menuV2Allowed = roleAtual === "admin" || roleAtual === "gestor";
-  const useMenuV2 = menuV2Enabled && menuV2Allowed && !isMedicoOnly;
-  const perfilV2: PerfilKey = roleAtual === "admin" ? "admin" : "gestor";
-
   // Lista plana de rotas visíveis no menu (respeitando grupos abertos) para navegação por seta
   const flatNavLeaves = useMemo(() => {
     const leaves: string[] = [];
@@ -503,12 +495,7 @@ export function AppShell() {
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
-      {!isChooser && useMenuV2 && (
-        <div className="hidden md:flex h-screen">
-          <MenuV2 perfil={perfilV2} clinicColor={clinicColor} />
-        </div>
-      )}
-      {!isChooser && !useMenuV2 && (
+      {!isChooser && (
       <aside
         className={`${collapsed ? "w-16" : "w-56 2xl:w-64"} transition-all duration-200 shrink-0 text-white h-screen overflow-hidden hidden md:flex flex-col`}
         style={{ backgroundColor: clinicColor }}
@@ -568,7 +555,7 @@ export function AppShell() {
                           <button
                             type="button"
                             onClick={() => setOpenGroups((prev) => ({ ...prev, [subKey]: !(prev[subKey] ?? false) }))}
-                            className={`w-full flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium transition-all ${subActive ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"}`}
+                            className={`w-full flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium transition-all ${subActive ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
                             aria-expanded={subOpen}
                           >
                             <item.icon className="h-4 w-4 shrink-0" />
@@ -590,7 +577,7 @@ export function AppShell() {
                                 rel="noopener noreferrer"
                                 title={collapsed ? child.label : undefined}
                                 data-nav-to={child.to}
-                                className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all text-white/85 hover:bg-white/10 hover:text-white`}
+                                className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all text-white/85 hover:bg-white/10 hover:text-white${hoverScaleCls}`}
                               >
                                 <child.icon className="h-4 w-4 shrink-0" />
                                 {!collapsed && <span className="truncate">{child.label}</span>}
@@ -613,7 +600,7 @@ export function AppShell() {
                                 active
                                   ? "bg-white text-slate-900 shadow-sm"
                                   : "text-white/85 hover:bg-white/10 hover:text-white"
-                              }`}
+                              }${hoverScaleCls}`}
                             >
                               <child.icon className="h-4 w-4 shrink-0" />
                               {!collapsed && <span className="truncate">{child.label}</span>}
@@ -644,7 +631,7 @@ export function AppShell() {
                         active
                           ? "bg-white text-slate-900 shadow-sm"
                           : "text-white/85 hover:bg-white/10 hover:text-white"
-                      }`}
+                      }${hoverScaleCls}`}
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span className="truncate">{item.label}</span>}

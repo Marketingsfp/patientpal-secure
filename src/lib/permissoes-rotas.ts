@@ -122,7 +122,6 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/dev-clientes-shell": null,
   "/app/dev-hhp": null,
   "/app/dev-list-shell": null,
-  "/app/dev-menu-shell": null,
   "/app/dev-orcamentos-shell": null,
   "/app/sem-permissao": null,
 };

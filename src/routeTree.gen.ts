@@ -77,7 +77,6 @@ import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
 import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
 import { Route as AuthenticatedAppDevOrcamentosShellRouteImport } from './routes/_authenticated/app.dev-orcamentos-shell'
-import { Route as AuthenticatedAppDevMenuShellRouteImport } from './routes/_authenticated/app.dev-menu-shell'
 import { Route as AuthenticatedAppDevListShellRouteImport } from './routes/_authenticated/app.dev-list-shell'
 import { Route as AuthenticatedAppDevHhpRouteImport } from './routes/_authenticated/app.dev-hhp'
 import { Route as AuthenticatedAppDevClientesShellRouteImport } from './routes/_authenticated/app.dev-clientes-shell'
@@ -512,12 +511,6 @@ const AuthenticatedAppDevOrcamentosShellRoute =
     path: '/dev-orcamentos-shell',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppDevMenuShellRoute =
-  AuthenticatedAppDevMenuShellRouteImport.update({
-    id: '/dev-menu-shell',
-    path: '/dev-menu-shell',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
 const AuthenticatedAppDevListShellRoute =
   AuthenticatedAppDevListShellRouteImport.update({
     id: '/dev-list-shell',
@@ -941,7 +934,6 @@ export interface FileRoutesByFullPath {
   '/app/dev-clientes-shell': typeof AuthenticatedAppDevClientesShellRoute
   '/app/dev-hhp': typeof AuthenticatedAppDevHhpRoute
   '/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
-  '/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
@@ -1073,7 +1065,6 @@ export interface FileRoutesByTo {
   '/app/dev-clientes-shell': typeof AuthenticatedAppDevClientesShellRoute
   '/app/dev-hhp': typeof AuthenticatedAppDevHhpRoute
   '/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
-  '/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
@@ -1207,7 +1198,6 @@ export interface FileRoutesById {
   '/_authenticated/app/dev-clientes-shell': typeof AuthenticatedAppDevClientesShellRoute
   '/_authenticated/app/dev-hhp': typeof AuthenticatedAppDevHhpRoute
   '/_authenticated/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
-  '/_authenticated/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/_authenticated/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
   '/_authenticated/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/_authenticated/app/documentos': typeof AuthenticatedAppDocumentosRoute
@@ -1343,7 +1333,6 @@ export interface FileRouteTypes {
     | '/app/dev-clientes-shell'
     | '/app/dev-hhp'
     | '/app/dev-list-shell'
-    | '/app/dev-menu-shell'
     | '/app/dev-orcamentos-shell'
     | '/app/disponibilidades'
     | '/app/documentos'
@@ -1475,7 +1464,6 @@ export interface FileRouteTypes {
     | '/app/dev-clientes-shell'
     | '/app/dev-hhp'
     | '/app/dev-list-shell'
-    | '/app/dev-menu-shell'
     | '/app/dev-orcamentos-shell'
     | '/app/disponibilidades'
     | '/app/documentos'
@@ -1608,7 +1596,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/dev-clientes-shell'
     | '/_authenticated/app/dev-hhp'
     | '/_authenticated/app/dev-list-shell'
-    | '/_authenticated/app/dev-menu-shell'
     | '/_authenticated/app/dev-orcamentos-shell'
     | '/_authenticated/app/disponibilidades'
     | '/_authenticated/app/documentos'
@@ -2202,13 +2189,6 @@ declare module '@tanstack/react-router' {
       path: '/dev-orcamentos-shell'
       fullPath: '/app/dev-orcamentos-shell'
       preLoaderRoute: typeof AuthenticatedAppDevOrcamentosShellRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/dev-menu-shell': {
-      id: '/_authenticated/app/dev-menu-shell'
-      path: '/dev-menu-shell'
-      fullPath: '/app/dev-menu-shell'
-      preLoaderRoute: typeof AuthenticatedAppDevMenuShellRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/dev-list-shell': {
@@ -2809,7 +2789,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppDevClientesShellRoute: typeof AuthenticatedAppDevClientesShellRoute
   AuthenticatedAppDevHhpRoute: typeof AuthenticatedAppDevHhpRoute
   AuthenticatedAppDevListShellRoute: typeof AuthenticatedAppDevListShellRoute
-  AuthenticatedAppDevMenuShellRoute: typeof AuthenticatedAppDevMenuShellRoute
   AuthenticatedAppDevOrcamentosShellRoute: typeof AuthenticatedAppDevOrcamentosShellRoute
   AuthenticatedAppDisponibilidadesRoute: typeof AuthenticatedAppDisponibilidadesRoute
   AuthenticatedAppDocumentosRoute: typeof AuthenticatedAppDocumentosRoute
@@ -2894,7 +2873,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppDevClientesShellRoute: AuthenticatedAppDevClientesShellRoute,
   AuthenticatedAppDevHhpRoute: AuthenticatedAppDevHhpRoute,
   AuthenticatedAppDevListShellRoute: AuthenticatedAppDevListShellRoute,
-  AuthenticatedAppDevMenuShellRoute: AuthenticatedAppDevMenuShellRoute,
   AuthenticatedAppDevOrcamentosShellRoute:
     AuthenticatedAppDevOrcamentosShellRoute,
   AuthenticatedAppDisponibilidadesRoute: AuthenticatedAppDisponibilidadesRoute,
