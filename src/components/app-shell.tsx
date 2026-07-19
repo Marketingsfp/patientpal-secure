@@ -620,6 +620,14 @@ export function AppShell() {
     if (pai && !configuredModules?.has(currentModulo) && allowedModules.has(pai)) {
       return true;
     }
+    // Caminho inverso: usuário está na rota-pai (ex.: /app/financeiro) e
+    // não tem acesso ao módulo pai, mas TEM acesso a pelo menos um
+    // submódulo dele. Liberamos a entrada no layout pai — o submenu já
+    // esconde as abas às quais ele não tem acesso.
+    const temSubPermitido = Object.entries(SUBMODULE_PARENT).some(
+      ([sub, parent]) => parent === currentModulo && allowedModules.has(sub),
+    );
+    if (temSubPermitido) return true;
     return false;
   })();
   const guardedOutlet = permsLoading

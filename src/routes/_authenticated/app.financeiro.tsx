@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation, Navigate } from "@tanstack/react-router";
 import {
   LayoutDashboard, ArrowLeftRight, BarChart3, LineChart,
   Building, FileText, FileBarChart, PieChart, Bell, Tag, Wallet,
@@ -7,6 +7,8 @@ import {
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePermissoes } from "@/hooks/use-permissoes";
+import { moduloDaRota, SUBMODULE_PARENT } from "@/lib/permissoes-rotas";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro")({
   component: FinLayout,
@@ -33,7 +35,35 @@ const subnav = [
 
 function FinLayout() {
   const location = useLocation();
-  const visibleSubnav = subnav;
+  const { allowed, configured } = usePermissoes();
+
+  // Filtra as abas do submenu com base nas permissões do perfil.
+  // - Admin (allowed === null) vê tudo.
+  // - Cada aba mapeia para um módulo via ROUTE_TO_MODULE (moduloDaRota).
+  // - Sub-abas (movimento / atendimentos / estorno) têm módulo próprio;
+  //   se não houver linha explícita, herdam de "financeiro".
+  // - Demais abas caem em "financeiro" e só aparecem se o perfil tiver
+  //   acesso a esse módulo.
+  const visibleSubnav = subnav.filter((item) => {
+    if (allowed === null) return true;
+    const mod = moduloDaRota(item.to);
+    if (!mod) return true;
+    if (allowed.has(mod)) return true;
+    const pai = SUBMODULE_PARENT[mod];
+    if (pai && !configured?.has(mod) && allowed.has(pai)) return true;
+    return false;
+  });
+
+  // Se o usuário não tem acesso ao módulo "financeiro" em si (apenas a
+  // submódulos), redireciona a entrada raiz /app/financeiro para a
+  // primeira aba visível — evita mostrar o Dashboard do Financeiro.
+  const modoAtual = moduloDaRota(location.pathname);
+  const semFinanceiroPai =
+    allowed !== null && modoAtual === "financeiro" && !allowed.has("financeiro");
+  const primeiraAbaSub = visibleSubnav.find((i) => moduloDaRota(i.to) !== "financeiro");
+  if (semFinanceiroPai && primeiraAbaSub) {
+    return <Navigate to={primeiraAbaSub.to} replace />;
+  }
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("fin-subnav:collapsed") === "1";
