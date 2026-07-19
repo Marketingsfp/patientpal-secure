@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
-  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight, Undo2, Printer, CalendarIcon, X, Search,
+  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, Undo2, Printer, CalendarIcon, X, Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -2838,13 +2837,6 @@ function Page() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button asChild size="lg" className="bg-emerald-600 hover:bg-emerald-700">
-                  <Link to="/app/financeiro/atendimentos">
-                    <HandCoins className="h-4 w-4 mr-2" />
-                    Abrir tela completa de Repasse
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Link>
-                </Button>
                 <Button variant="outline" onClick={() => void loadRepasseHoje()}>
                   Atualizar resumo
                 </Button>
