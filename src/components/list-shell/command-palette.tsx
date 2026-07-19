@@ -148,7 +148,6 @@ export function useDefaultScreenEntries(): CommandEntry[] {
       mk("Contratos do Cartão", "/app/cartao-beneficios/contratos"),
       mk("Empresas associadas", "/app/cartao-beneficios/convenios", "Empresas / entidades associadas", ["empresa","associada","grupos"]),
       mk("Financeiro — Movimento", "/app/financeiro/movimento"),
-      mk("Financeiro — Atendimentos", "/app/financeiro/atendimentos"),
       mk("Financeiro — Notas", "/app/financeiro/notas"),
       mk("Financeiro — Relatórios", "/app/financeiro/relatorios"),
       mk("Boletos", "/app/boletos"),
