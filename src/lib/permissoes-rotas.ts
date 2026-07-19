@@ -91,15 +91,15 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/financeiro": "financeiro",
   "/app/financeiro/alertas": "financeiro",
   "/app/financeiro/analitico": "financeiro",
-  "/app/financeiro/atendimentos": "financeiro",
+  "/app/financeiro/atendimentos": "financeiro-atendimentos",
   "/app/financeiro/bi": "financeiro",
   "/app/financeiro/categorias": "financeiro",
   "/app/financeiro/contas": "financeiro",
   "/app/financeiro/empresas": "financeiro",
   "/app/financeiro/estatisticas": "financeiro",
-  "/app/financeiro/estorno": "financeiro",
+  "/app/financeiro/estorno": "financeiro-estorno",
   "/app/financeiro/lembretes": "financeiro",
-  "/app/financeiro/movimento": "financeiro",
+  "/app/financeiro/movimento": "financeiro-movcaixa",
   "/app/financeiro/notas": "financeiro",
   "/app/financeiro/regras-ia": "financeiro",
   "/app/financeiro/relatorios": "financeiro",
@@ -123,6 +123,19 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/dev-list-shell": null,
   "/app/dev-orcamentos-shell": null,
   "/app/sem-permissao": null,
+};
+
+/**
+ * Submódulos que herdam de um módulo pai quando não há configuração
+ * explícita no perfil. Se o perfil não tem linha para o submódulo em
+ * `perfil_permissoes`, o guard cai no acesso do pai. Assim clínicas que
+ * não usam a granularidade (flag `permissoes_financeiro_granular`)
+ * continuam funcionando com o acesso "financeiro" atual.
+ */
+export const SUBMODULE_PARENT: Record<string, string> = {
+  "financeiro-estorno": "financeiro",
+  "financeiro-atendimentos": "financeiro",
+  "financeiro-movcaixa": "financeiro",
 };
 
 /**
