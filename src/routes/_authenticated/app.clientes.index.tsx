@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, Pencil, Users, Download, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -21,6 +22,7 @@ import { ClientesShellV2 } from "@/components/clientes-v2/clientes-shell";
 import { useClientesV2Flag } from "@/hooks/use-clientes-v2-flag";
 import { TableSkeletonRows } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useClinica as useClinicaGate } from "@/hooks/use-clinica";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/")({
@@ -124,15 +126,18 @@ interface Paciente {
 function ClientesPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("clientes");
-  const [items, setItems] = useState<Paciente[]>([]);
-  const [totalPacientes, setTotalPacientes] = useState<number | null>(null);
-  const [atingiuTeto, setAtingiuTeto] = useState(false);
+  // Cache de dados (React Query) — só São Francisco de Paula. Desligada,
+  // segue 100% no caminho manual abaixo (idêntico ao comportamento anterior).
+  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
+  const [itemsManual, setItemsManual] = useState<Paciente[]>([]);
+  const [totalPacientesManual, setTotalPacientesManual] = useState<number | null>(null);
+  const [atingiuTetoManual, setAtingiuTetoManual] = useState(false);
   const [busca, setBusca] = useState(() => {
     if (typeof window === "undefined") return "";
     const params = new URLSearchParams(window.location.search);
     return params.get("q") ?? "";
   });
-  const [loading, setLoading] = useState(false);
+  const [loadingManual, setLoadingManual] = useState(false);
   const [openNovo, setOpenNovo] = useState(false);
   const loadSeq = useRef(0);
 
@@ -141,14 +146,14 @@ function ClientesPage() {
   const LIMITE_BUSCA = 500;
   const LIMITE_LISTA = 500;
 
-  const load = async (termo: string = "") => {
+  const loadManual = async (termo: string = "") => {
     if (!clinicaAtual) return;
     const requestId = ++loadSeq.current;
-    setLoading(true);
+    setLoadingManual(true);
     const q = termo.trim();
     if (q && q.length < 3 && q.replace(/\D/g, "").length < 3) {
-      setItems([]);
-      setLoading(false);
+      setItemsManual([]);
+      setLoadingManual(false);
       return;
     }
     try {
@@ -158,33 +163,98 @@ function ClientesPage() {
         _limit: q ? LIMITE_BUSCA : LIMITE_LISTA,
       });
       const countRequest = q
-        ? Promise.resolve({ count: totalPacientes, error: null })
+        ? Promise.resolve({ count: totalPacientesManual, error: null })
         : supabase
           .from("pacientes")
           .select("id", { count: "estimated", head: true })
           .eq("clinica_id", clinicaAtual.clinica_id);
       const [{ data, error }, { count, error: countError }] = await Promise.all([dataRequest, countRequest]);
       if (requestId !== loadSeq.current) return;
-      setLoading(false);
+      setLoadingManual(false);
       if (error) { toast.error("Não foi possível concluir esta busca. Tente novamente com mais letras do nome."); return; }
-      if (countError) { mostrarErro(countError); } else { setTotalPacientes(count ?? 0); }
+      if (countError) { mostrarErro(countError); } else { setTotalPacientesManual(count ?? 0); }
       const rows = (data ?? []) as any[];
-      setItems(rows as any);
-      setAtingiuTeto(rows.length >= (q ? LIMITE_BUSCA : LIMITE_LISTA));
+      setItemsManual(rows as any);
+      setAtingiuTetoManual(rows.length >= (q ? LIMITE_BUSCA : LIMITE_LISTA));
     } catch {
       if (requestId !== loadSeq.current) return;
-      setLoading(false);
+      setLoadingManual(false);
       toast.error("Não foi possível concluir esta busca. Tente novamente com mais letras do nome.");
     }
   };
 
-  // Debounced server-side search
+  // Debounce único da busca, usado pelos dois caminhos (manual e cache).
+  const [debouncedBusca, setDebouncedBusca] = useState(busca);
   useEffect(() => {
-    if (!clinicaAtual) return;
-    const t = setTimeout(() => { void load(busca); }, 300);
+    const t = setTimeout(() => setDebouncedBusca(busca), 300);
     return () => clearTimeout(t);
+  }, [busca]);
+
+  // Caminho manual (sem a flag): idêntico ao comportamento anterior.
+  useEffect(() => {
+    if (!clinicaAtual || uxMelhorias) return;
+    void loadManual(debouncedBusca);
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [busca, clinicaAtual?.clinica_id]);
+  }, [debouncedBusca, clinicaAtual?.clinica_id, uxMelhorias]);
+
+  // Caminho com cache (só São Francisco): staleTime de 60s — revisitar a
+  // tela com o mesmo termo mostra os dados na hora e revalida em segundo
+  // plano, sem piscar o skeleton de novo.
+  const clinicaId = clinicaAtual?.clinica_id;
+  const totalQuery = useQuery({
+    queryKey: ["clientes-total", clinicaId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("pacientes")
+        .select("id", { count: "estimated", head: true })
+        .eq("clinica_id", clinicaId!);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: uxMelhorias && !!clinicaId,
+    staleTime: 60_000,
+  });
+  const listaQuery = useQuery({
+    queryKey: ["clientes-lista", clinicaId, debouncedBusca],
+    queryFn: async () => {
+      const q = debouncedBusca.trim();
+      if (q && q.length < 3 && q.replace(/\D/g, "").length < 3) {
+        return { items: [] as Paciente[], atingiuTeto: false };
+      }
+      const { data, error } = await supabase.rpc("buscar_pacientes", {
+        _clinica_id: clinicaId!,
+        _termo: q,
+        _limit: q ? LIMITE_BUSCA : LIMITE_LISTA,
+      });
+      if (error) throw error;
+      const rows = (data ?? []) as Paciente[];
+      return { items: rows, atingiuTeto: rows.length >= (q ? LIMITE_BUSCA : LIMITE_LISTA) };
+    },
+    enabled: uxMelhorias && !!clinicaId,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+  });
+  useEffect(() => {
+    if (listaQuery.error) toast.error("Não foi possível concluir esta busca. Tente novamente com mais letras do nome.");
+  }, [listaQuery.error]);
+  useEffect(() => {
+    if (totalQuery.error) mostrarErro(totalQuery.error);
+  }, [totalQuery.error]);
+
+  const items = uxMelhorias ? (listaQuery.data?.items ?? []) : itemsManual;
+  const totalPacientes = uxMelhorias ? (totalQuery.data ?? null) : totalPacientesManual;
+  const atingiuTeto = uxMelhorias ? (listaQuery.data?.atingiuTeto ?? false) : atingiuTetoManual;
+  const loading = uxMelhorias ? listaQuery.isLoading : loadingManual;
+
+  const queryClient = useQueryClient();
+  const refrescar = () => {
+    if (uxMelhorias) {
+      void queryClient.invalidateQueries({ queryKey: ["clientes-lista", clinicaId] });
+      void queryClient.invalidateQueries({ queryKey: ["clientes-total", clinicaId] });
+    } else {
+      void loadManual(busca);
+    }
+  };
 
   // Chave estável baseada apenas em foto_url (não em items completo).
   // Evita re-executar createSignedUrls a cada re-render/digitação, o que
@@ -395,7 +465,7 @@ function ClientesPage() {
               paciente={null}
               stickyFooter
               onCancel={() => setOpenNovo(false)}
-              onSaved={() => { setOpenNovo(false); void load(busca); }}
+              onSaved={() => { setOpenNovo(false); refrescar(); }}
             />
           )}
         </DialogContent>
