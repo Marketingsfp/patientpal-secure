@@ -550,18 +550,13 @@ export function AppShell() {
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
-      {/* No modo hover o menu flutua sobre o conteúdo; este espaçador reserva
-          a largura recolhida para o conteúdo não pular ao expandir. */}
-      {!isChooser && uxMelhorias && <div className="hidden md:block w-16 shrink-0" aria-hidden />}
       {!isChooser && (
       <aside
         onMouseEnter={uxMelhorias ? () => setHoverSidebar(true) : undefined}
         onMouseLeave={uxMelhorias ? () => setHoverSidebar(false) : undefined}
         className={cn(
-          "transition-all duration-200 text-white h-screen overflow-hidden hidden md:flex flex-col",
+          "transition-all duration-200 shrink-0 text-white h-screen overflow-hidden hidden md:flex flex-col",
           collapsed ? "w-16" : "w-56 2xl:w-64",
-          uxMelhorias ? "fixed inset-y-0 left-0 z-40" : "shrink-0",
-          uxMelhorias && !collapsed && "shadow-2xl",
         )}
         style={{ backgroundColor: corSidebar }}
       >
