@@ -653,20 +653,9 @@ html.theme-emerald {
   @page { size: A4 portrait; margin: 12mm; }
 }
 
-/* Scrollbar do menu lateral — visível em fundo escuro */
+/* Menu lateral — barra de rolagem oculta (rolagem continua funcional) */
 .sidebar-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.28) transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-.sidebar-scroll::-webkit-scrollbar { width: 8px; }
-.sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-.sidebar-scroll::-webkit-scrollbar-thumb {
-  background-color: rgba(255,255,255,0.24);
-  border-radius: 8px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-.sidebar-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255,255,255,0.42);
-  background-clip: content-box;
-}
+.sidebar-scroll::-webkit-scrollbar { width: 0; height: 0; display: none; }
