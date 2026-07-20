@@ -591,7 +591,7 @@ export function RenovarContratoDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Data da renovação</Label>
+            <Label className="text-xs">{isTroca ? "Data da troca" : "Data da renovação"}</Label>
             <DateInputBR
               value={dataRenovacao}
               onChange={(e) => setDataRenovacao(e.target.value)}
@@ -599,12 +599,12 @@ export function RenovarContratoDialog({
             />
             {retroativa ? (
               <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                Renovação retroativa — as novas parcelas serão geradas a partir de {formatDatePura(dataRenovacao)}.
-                Use este campo quando a renovação foi feita fora do sistema.
+                {isTroca ? "Troca retroativa" : "Renovação retroativa"} — as novas parcelas serão geradas a partir de {formatDatePura(dataRenovacao)}.
+                Use este campo quando a operação foi feita fora do sistema.
               </p>
             ) : (
               <p className="text-[11px] text-muted-foreground">
-                Se a renovação já aconteceu em uma data anterior, informe aqui para registrar corretamente.
+                Se a {isTroca ? "troca" : "renovação"} já aconteceu em uma data anterior, informe aqui para registrar corretamente.
               </p>
             )}
           </div>
@@ -616,7 +616,7 @@ export function RenovarContratoDialog({
           </Button>
           <Button onClick={abrirConfirmacao} disabled={!podeConfirmar} className="bg-red-600 hover:bg-red-700 text-white">
             <RefreshCw className="h-4 w-4 mr-1" />
-            Confirmar renovação
+            {isTroca ? "Confirmar troca" : "Confirmar renovação"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -626,10 +626,12 @@ export function RenovarContratoDialog({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-red-700">
               <AlertTriangle className="h-5 w-5" />
-              Revisar e confirmar renovação
+              {isTroca ? "Revisar e confirmar troca de convênio" : "Revisar e confirmar renovação"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Confira a identificação do contrato, dependentes e movimentos financeiros antes de concluir.
+              {isTroca
+                ? "O contrato atual será cancelado, suas mensalidades pendentes serão canceladas e um novo contrato será criado sem taxa de adesão e sem carência."
+                : "Confira a identificação do contrato, dependentes e movimentos financeiros antes de concluir."}
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -641,10 +643,10 @@ export function RenovarContratoDialog({
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
                 <span className="text-muted-foreground">Tipo</span>
-                <span className="font-medium">{mode === "extensao" ? "Renovar contrato atual" : "Criar novo contrato"}</span>
+                <span className="font-medium">{isTroca ? "Troca de convênio" : mode === "extensao" ? "Renovar contrato atual" : "Criar novo contrato"}</span>
                 <span className="text-muted-foreground">Convênio anterior</span>
                 <span className="font-medium">{convenioAtualNome ?? "—"}</span>
-                <span className="text-muted-foreground">Convênio da renovação</span>
+                <span className="text-muted-foreground">{isTroca ? "Novo convênio" : "Convênio da renovação"}</span>
                 <span className="font-medium">{novoConvenio?.nome ?? "—"}</span>
                 <span className="text-muted-foreground">Pessoas no contrato</span>
                 <span className="font-medium">{totalPessoas}</span>
@@ -706,7 +708,7 @@ export function RenovarContratoDialog({
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
-              Confirmar renovação
+              {isTroca ? "Confirmar troca" : "Confirmar renovação"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
