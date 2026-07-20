@@ -5962,6 +5962,81 @@ export type Database = {
           },
         ]
       }
+      odonto_anamnese: {
+        Row: {
+          alergias: string | null
+          bebida_alcoolica: boolean | null
+          bruxismo: boolean | null
+          cirurgias: string | null
+          clinica_id: string
+          created_at: string
+          doencas: string | null
+          em_tratamento_desc: string | null
+          em_tratamento_medico: boolean | null
+          fumante: boolean | null
+          gestante: boolean | null
+          id: string
+          medicamentos: string | null
+          motivo_consulta: string | null
+          observacoes: string | null
+          paciente_id: string
+          respondida_em: string | null
+          respondida_por: string | null
+          sangramento_gengival: boolean | null
+          sensibilidade: boolean | null
+          ultima_visita_dentista: string | null
+          updated_at: string
+        }
+        Insert: {
+          alergias?: string | null
+          bebida_alcoolica?: boolean | null
+          bruxismo?: boolean | null
+          cirurgias?: string | null
+          clinica_id: string
+          created_at?: string
+          doencas?: string | null
+          em_tratamento_desc?: string | null
+          em_tratamento_medico?: boolean | null
+          fumante?: boolean | null
+          gestante?: boolean | null
+          id?: string
+          medicamentos?: string | null
+          motivo_consulta?: string | null
+          observacoes?: string | null
+          paciente_id: string
+          respondida_em?: string | null
+          respondida_por?: string | null
+          sangramento_gengival?: boolean | null
+          sensibilidade?: boolean | null
+          ultima_visita_dentista?: string | null
+          updated_at?: string
+        }
+        Update: {
+          alergias?: string | null
+          bebida_alcoolica?: boolean | null
+          bruxismo?: boolean | null
+          cirurgias?: string | null
+          clinica_id?: string
+          created_at?: string
+          doencas?: string | null
+          em_tratamento_desc?: string | null
+          em_tratamento_medico?: boolean | null
+          fumante?: boolean | null
+          gestante?: boolean | null
+          id?: string
+          medicamentos?: string | null
+          motivo_consulta?: string | null
+          observacoes?: string | null
+          paciente_id?: string
+          respondida_em?: string | null
+          respondida_por?: string | null
+          sangramento_gengival?: boolean | null
+          sensibilidade?: boolean | null
+          ultima_visita_dentista?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       odonto_dentes: {
         Row: {
           clinica_id: string
@@ -6006,6 +6081,65 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      odonto_evolucoes: {
+        Row: {
+          agendamento_id: string | null
+          anexos: Json | null
+          clinica_id: string
+          created_at: string
+          created_by: string | null
+          data: string
+          dentes: number[] | null
+          descricao: string
+          id: string
+          paciente_id: string
+          procedimento: string | null
+          profissional_id: string | null
+          titulo: string | null
+          updated_at: string
+        }
+        Insert: {
+          agendamento_id?: string | null
+          anexos?: Json | null
+          clinica_id: string
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          dentes?: number[] | null
+          descricao: string
+          id?: string
+          paciente_id: string
+          procedimento?: string | null
+          profissional_id?: string | null
+          titulo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agendamento_id?: string | null
+          anexos?: Json | null
+          clinica_id?: string
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          dentes?: number[] | null
+          descricao?: string
+          id?: string
+          paciente_id?: string
+          procedimento?: string | null
+          profissional_id?: string | null
+          titulo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "odonto_evolucoes_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       odonto_prontuarios: {
         Row: {
