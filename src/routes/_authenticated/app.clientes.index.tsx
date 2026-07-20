@@ -190,6 +190,13 @@ function ClientesPage() {
     return () => clearTimeout(t);
   }, [busca]);
 
+  // Página atual (paginação de 500 em 500) — apenas usada no caminho
+  // com cache (São Francisco de Paula via flag `ux_melhorias`) e somente
+  // quando não há termo de busca. Ao buscar por nome/CPF/telefone o
+  // filtro roda no banco todo em uma página só.
+  const [pagina, setPagina] = useState(0);
+  useEffect(() => { setPagina(0); }, [debouncedBusca]);
+
   // Caminho manual (sem a flag): idêntico ao comportamento anterior.
   useEffect(() => {
     if (!clinicaAtual || uxMelhorias) return;
@@ -215,7 +222,7 @@ function ClientesPage() {
     staleTime: 60_000,
   });
   const listaQuery = useQuery({
-    queryKey: ["clientes-lista", clinicaId, debouncedBusca],
+    queryKey: ["clientes-lista", clinicaId, debouncedBusca, pagina],
     queryFn: async () => {
       const q = debouncedBusca.trim();
       if (q && q.length < 3 && q.replace(/\D/g, "").length < 3) {
@@ -225,7 +232,8 @@ function ClientesPage() {
         _clinica_id: clinicaId!,
         _termo: q,
         _limit: q ? LIMITE_BUSCA : LIMITE_LISTA,
-      });
+        _offset: q ? 0 : pagina * LIMITE_LISTA,
+      } as any);
       if (error) throw error;
       const rows = (data ?? []) as Paciente[];
       return { items: rows, atingiuTeto: rows.length >= (q ? LIMITE_BUSCA : LIMITE_LISTA) };
