@@ -5121,6 +5121,20 @@ h1, h2, h3 { margin: 0 0 6mm; }
           }
         }}
       />
+      <RenovarContratoDialog
+        open={trocarConvenioOpen}
+        onOpenChange={setTrocarConvenioOpen}
+        contratoId={contrato.id}
+        clinicaId={(contrato as any).clinica_id}
+        convenioAtualId={contrato.convenio_id ?? null}
+        convenioAtualNome={convenio?.nome ?? null}
+        valorAtual={Number(contrato.valor_mensal ?? 0)}
+        modo="troca_convenio"
+        onRenovado={() => {
+          // O contrato atual foi cancelado; volta para a lista para abrir o novo.
+          onBack();
+        }}
+      />
       <Dialog
         open={!!retroDialog?.open}
         onOpenChange={(o) => { if (!o && !regerandoRetro) setRetroDialog(null); }}
