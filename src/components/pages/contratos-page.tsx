@@ -3598,6 +3598,15 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   </Button>
                 );
               })()}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setTrocarConvenioOpen(true)}
+                className="border-amber-600 text-amber-700 hover:bg-amber-50"
+                title="Cancelar este contrato para o paciente aderir a outro convênio, sem taxa de adesão nem carência."
+              >
+                <RefreshCw className="h-4 w-4 mr-1" /> Trocar convênio
+              </Button>
               <Button size="sm" variant="destructive" onClick={() => setCancelOpen(true)}>
                 <Ban className="h-4 w-4 mr-1" /> Cancelar contrato
               </Button>
