@@ -431,8 +431,8 @@ export function TotemPage() {
         {step === "menu" && (
           <div className="w-full max-w-4xl space-y-10">
             <div className="text-center space-y-2">
-              <h2 className="text-5xl font-bold tracking-tight">Como podemos ajudar?</h2>
-              <p className="text-xl text-muted-foreground">Toque em uma das opções</p>
+              <h2 className="text-[clamp(1.75rem,4.5vw,3rem)] font-bold tracking-tight">Como podemos ajudar?</h2>
+              <p className="text-[clamp(1rem,2.2vw,1.25rem)] text-muted-foreground">Toque em uma das opções</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <button
@@ -467,10 +467,13 @@ export function TotemPage() {
         {step === "senha" && (
           <div className="w-full max-w-5xl space-y-8">
             <div className="text-center space-y-2">
-              <h2 className="text-4xl font-bold tracking-tight">Retire sua senha</h2>
-              <p className="text-lg text-muted-foreground">Toque na opção desejada</p>
+              <h2 className="text-[clamp(1.5rem,4vw,2.25rem)] font-bold tracking-tight">Retire sua senha</h2>
+              <p className="text-[clamp(0.95rem,2vw,1.125rem)] text-muted-foreground">Toque na opção desejada</p>
             </div>
-            <div className="grid grid-cols-2 gap-6">
+            {/* 1 coluna em retrato (formato mais comum de totem) e 2 colunas
+                em paisagem — em vez de grid-cols-2 fixo, que apertava os
+                cartões em telas verticais. */}
+            <div className="grid grid-cols-1 [@media(orientation:landscape)]:grid-cols-2 gap-6">
               {TIPOS.map(({ tipo: t, titulo, sub, Icon, classe }) => (
                 <button
                   key={t}
@@ -480,10 +483,10 @@ export function TotemPage() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
-                      <div className="text-3xl font-bold">{titulo}</div>
+                      <div className="text-[clamp(1.5rem,3.5vw,1.875rem)] font-bold">{titulo}</div>
                       <div className="text-white/90 text-sm">{sub}</div>
                     </div>
-                    <div className="text-6xl font-black opacity-90">{t}</div>
+                    <div className="text-[clamp(2.5rem,6vw,3.75rem)] font-black opacity-90">{t}</div>
                   </div>
                   <Icon className="absolute -right-4 -bottom-4 h-32 w-32 opacity-10" />
                 </button>
@@ -561,8 +564,8 @@ export function TotemPage() {
         {step === "checkin-ok" && checkinInfo && (
           <div className="text-center space-y-6 max-w-2xl animate-in fade-in zoom-in duration-300">
             <CheckCircle2 className="h-24 w-24 text-emerald-500 mx-auto" />
-            <h2 className="text-4xl font-bold">Check-in confirmado!</h2>
-            <p className="text-2xl">Olá, {checkinInfo.paciente_nome}</p>
+            <h2 className="text-[clamp(1.5rem,4vw,2.25rem)] font-bold">Check-in confirmado!</h2>
+            <p className="text-[clamp(1.25rem,3vw,1.5rem)]">Olá, {checkinInfo.paciente_nome}</p>
             <div className="bg-card border rounded-2xl p-6 text-left space-y-2">
               {checkinInfo.inicio && (
                 <div>
@@ -592,8 +595,10 @@ export function TotemPage() {
         {step === "ticket" && ticket && (
           <div className="text-center space-y-6 animate-in fade-in zoom-in duration-300">
             <div className="text-muted-foreground uppercase tracking-widest text-sm">Sua senha</div>
-            <div className="text-[12rem] leading-none font-black text-primary tabular-nums">{ticket.codigo}</div>
-            <div className="text-2xl">Retire sua senha impressa</div>
+            {/* clamp com min(vw,vh): nunca estoura nem a largura nem a altura
+                da viewport do totem, em qualquer proporção de tela. */}
+            <div className="text-[clamp(4rem,min(18vw,28vh),12rem)] leading-none font-black text-primary tabular-nums">{ticket.codigo}</div>
+            <div className="text-[clamp(1.25rem,3vw,1.5rem)]">Retire sua senha impressa</div>
             <p className="text-muted-foreground">Acompanhe o painel de chamada na sala de espera.</p>
           </div>
         )}
