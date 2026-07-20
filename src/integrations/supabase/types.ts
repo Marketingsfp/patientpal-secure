@@ -2315,6 +2315,53 @@ export type Database = {
           },
         ]
       }
+      clima_diario: {
+        Row: {
+          choveu: boolean
+          clinica_id: string
+          created_at: string
+          data: string
+          fonte: string
+          id: string
+          precipitacao_mm: number | null
+          temp_max: number | null
+          temp_min: number | null
+          weather_code: number | null
+        }
+        Insert: {
+          choveu?: boolean
+          clinica_id: string
+          created_at?: string
+          data: string
+          fonte?: string
+          id?: string
+          precipitacao_mm?: number | null
+          temp_max?: number | null
+          temp_min?: number | null
+          weather_code?: number | null
+        }
+        Update: {
+          choveu?: boolean
+          clinica_id?: string
+          created_at?: string
+          data?: string
+          fonte?: string
+          id?: string
+          precipitacao_mm?: number | null
+          temp_max?: number | null
+          temp_min?: number | null
+          weather_code?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clima_diario_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinica_feature_flags: {
         Row: {
           ativo: boolean
