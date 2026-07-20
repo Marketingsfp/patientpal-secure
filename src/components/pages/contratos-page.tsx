@@ -1046,6 +1046,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           convenioAtualId={renovInfo.convenioId}
           convenioAtualNome={renovInfo.convenioNome}
           valorAtual={renovInfo.valorMensal}
+          modo={flowType}
           onRenovado={() => {
             setRenovInfo(null);
             load();
