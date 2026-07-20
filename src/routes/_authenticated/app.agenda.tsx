@@ -316,6 +316,10 @@ type ConvenioInfo = {
   desconto: DescontoConvenio | null;
   avisoLimite?: string;
   bloquear?: boolean;
+  /** Contrato com parcela(s) vencida(s) dentro da tolerância de 5 dias. */
+  emCarencia?: boolean;
+  /** Dias restantes de tolerância na parcela vencida mais crítica. */
+  diasCarenciaRestantes?: number | null;
 };
 
 function aplicarDesconto(valor: number, d: DescontoConvenio): number {
