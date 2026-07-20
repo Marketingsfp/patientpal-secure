@@ -270,6 +270,10 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     convenioNome: string | null;
     valorMensal: number;
   } | null>(null);
+  // "renovacao" (padrão) exige mensalidades pagas; "troca_convenio" cancela o
+  // contrato atual e as mensalidades pendentes para criar um novo contrato sem
+  // taxa de adesão nem carência.
+  const [flowType, setFlowType] = useState<"renovacao" | "troca_convenio">("renovacao");
 
   // Termo com debounce para acionar busca server-side sem bater a cada tecla.
   const [qDebounced, setQDebounced] = useState("");
@@ -886,42 +890,64 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       <AlertDialog open={perguntaRenovOpen} onOpenChange={setPerguntaRenovOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Este contrato é uma renovação?</AlertDialogTitle>
+            <AlertDialogTitle>Que tipo de operação você quer registrar?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se for renovação de um contrato anterior do mesmo paciente, não haverá
-              cobrança de taxa de adesão e a carência não se aplicará.
+              <strong>Renovação</strong>: continua o convênio depois que todas as parcelas foram pagas.
+              <br />
+              <strong>Troca de convênio</strong>: o paciente desiste do convênio atual antes do fim do ciclo para aderir a outro — cancela o contrato atual e as mensalidades pendentes.
+              <br />
+              Em ambos os casos, não há cobrança de taxa de adesão e a carência não se aplica.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex-col sm:flex-row sm:justify-end gap-2">
             <AlertDialogCancel
               onClick={() => {
                 setPerguntaRenovOpen(false);
                 setView("new");
               }}
             >
-              Não, é venda nova
+              É venda nova
             </AlertDialogCancel>
             <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700 text-white"
               onClick={() => {
+                setFlowType("troca_convenio");
                 setPerguntaRenovOpen(false);
                 setPacRenov(null);
                 setContratosPac([]);
                 setEscolhaContratoOpen(true);
               }}
             >
-              Sim, é renovação
+              Troca de convênio
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => {
+                setFlowType("renovacao");
+                setPerguntaRenovOpen(false);
+                setPacRenov(null);
+                setContratosPac([]);
+                setEscolhaContratoOpen(true);
+              }}
+            >
+              Renovação
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Passo 2: escolher o titular e o contrato anterior a renovar */}
+      {/* Passo 2: escolher o titular e o contrato a renovar ou trocar */}
       <Dialog open={escolhaContratoOpen} onOpenChange={setEscolhaContratoOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Selecionar contrato para renovação</DialogTitle>
+            <DialogTitle>
+              {flowType === "troca_convenio"
+                ? "Selecionar contrato para troca de convênio"
+                : "Selecionar contrato para renovação"}
+            </DialogTitle>
             <DialogDescription>
-              Busque o paciente titular e escolha qual contrato será renovado.
+              {flowType === "troca_convenio"
+                ? "Busque o titular e escolha o contrato que será cancelado para a troca de convênio."
+                : "Busque o paciente titular e escolha qual contrato será renovado."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -940,7 +966,13 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                     .eq("clinica_id", clinicaAtual.clinica_id)
                     .eq("paciente_id", p.id)
                     .order("data_inicio", { ascending: false });
-                  setContratosPac((data ?? []) as Contrato[]);
+                  const rows = ((data ?? []) as Contrato[]);
+                  // Na troca de convênio, só contratos ativos podem ser trocados.
+                  setContratosPac(
+                    flowType === "troca_convenio"
+                      ? rows.filter((c) => c.status === "ativo")
+                      : rows,
+                  );
                   setLoadingContratosPac(false);
                 }}
               />
@@ -952,8 +984,9 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                 </div>
               ) : contratosPac.length === 0 ? (
                 <div className="rounded-md border bg-muted/40 p-3 text-sm">
-                  Este paciente não possui contrato anterior. A venda seguirá como
-                  contrato novo (com taxa de adesão e carência normais).
+                  {flowType === "troca_convenio"
+                    ? "Este paciente não possui contrato ativo — a troca de convênio só pode ser aplicada em contratos ativos."
+                    : "Este paciente não possui contrato anterior. A venda seguirá como contrato novo (com taxa de adesão e carência normais)."}
                 </div>
               ) : (
                 <div className="rounded-md border divide-y max-h-72 overflow-y-auto">
@@ -1013,6 +1046,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           convenioAtualId={renovInfo.convenioId}
           convenioAtualNome={renovInfo.convenioNome}
           valorAtual={renovInfo.valorMensal}
+          modo={flowType}
           onRenovado={() => {
             setRenovInfo(null);
             load();
@@ -2046,6 +2080,8 @@ function DetalheContrato({
   const cancelado = !!canceladoEm;
   // Renovação do contrato
   const [renovarOpen, setRenovarOpen] = useState(false);
+  // Troca de convênio (cancela o contrato atual e cria um novo sem taxa/carência).
+  const [trocarConvenioOpen, setTrocarConvenioOpen] = useState(false);
   const [renovadoEm, setRenovadoEm] = useState<string | null>(null);
   useEffect(() => {
     let cancelado = false;
@@ -3562,6 +3598,15 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   </Button>
                 );
               })()}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setTrocarConvenioOpen(true)}
+                className="border-amber-600 text-amber-700 hover:bg-amber-50"
+                title="Cancelar este contrato para o paciente aderir a outro convênio, sem taxa de adesão nem carência."
+              >
+                <RefreshCw className="h-4 w-4 mr-1" /> Trocar convênio
+              </Button>
               <Button size="sm" variant="destructive" onClick={() => setCancelOpen(true)}>
                 <Ban className="h-4 w-4 mr-1" /> Cancelar contrato
               </Button>
@@ -5074,6 +5119,20 @@ h1, h2, h3 { margin: 0 0 6mm; }
           } else {
             load();
           }
+        }}
+      />
+      <RenovarContratoDialog
+        open={trocarConvenioOpen}
+        onOpenChange={setTrocarConvenioOpen}
+        contratoId={contrato.id}
+        clinicaId={(contrato as any).clinica_id}
+        convenioAtualId={contrato.convenio_id ?? null}
+        convenioAtualNome={convenio?.nome ?? null}
+        valorAtual={Number(contrato.valor_mensal ?? 0)}
+        modo="troca_convenio"
+        onRenovado={() => {
+          // O contrato atual foi cancelado; volta para a lista para abrir o novo.
+          onBack();
         }}
       />
       <Dialog

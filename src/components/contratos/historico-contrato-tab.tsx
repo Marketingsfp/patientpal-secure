@@ -169,6 +169,7 @@ function TituloEvento(e: Evento): string {
     case "renovacao": {
       const dd = e.dados_depois ?? {};
       const t = (dd.tipo as string) || "";
+      if (t === "troca_convenio") return "Troca de convênio";
       return t === "troca_plano" ? "Renovação com troca de plano" : "Renovação do contrato";
     }
     case "dependente_incluido":
@@ -208,7 +209,13 @@ function CorpoEvento({ evento }: { evento: Evento }) {
       <div className="text-xs text-muted-foreground space-y-1">
         <div>
           Tipo:{" "}
-          <strong>{d.tipo === "troca_plano" ? "Troca de plano" : "Extensão"}</strong>{" "}
+          <strong>
+            {d.tipo === "troca_convenio"
+              ? "Troca de convênio"
+              : d.tipo === "troca_plano"
+                ? "Troca de plano"
+                : "Extensão"}
+          </strong>{" "}
           · Parcelas geradas: <strong>{String(d.parcelas_geradas ?? 0)}</strong>
         </div>
         <div>
