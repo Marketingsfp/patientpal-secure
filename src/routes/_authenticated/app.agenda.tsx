@@ -938,8 +938,13 @@ function AgendaPage() {
   // sem precisar ampliar a janela manualmente. Marcando o checkbox
   // "Exibir apenas a data selecionada" o filtro passa a trazer só o dia
   // escolhido (comportamento antigo).
-  const [apenasData, setApenasData] = useState(false);
-  const [mostrarLivres, setMostrarLivres] = useState(true);
+  // Sempre restringe à data selecionada (comportamento travado).
+  const apenasData = true;
+  // Por padrão, oculta slots livres/bloqueios ("consultas não agendadas").
+  // Continua acessível via filtro de Status = "Livres" quando o usuário
+  // precisa visualizar/clicar em horários livres para reagendar em lote
+  // ou criar novos agendamentos.
+  const [mostrarLivres] = useState(false);
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
