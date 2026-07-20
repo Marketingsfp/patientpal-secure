@@ -2080,6 +2080,8 @@ function DetalheContrato({
   const cancelado = !!canceladoEm;
   // Renovação do contrato
   const [renovarOpen, setRenovarOpen] = useState(false);
+  // Troca de convênio (cancela o contrato atual e cria um novo sem taxa/carência).
+  const [trocarConvenioOpen, setTrocarConvenioOpen] = useState(false);
   const [renovadoEm, setRenovadoEm] = useState<string | null>(null);
   useEffect(() => {
     let cancelado = false;
