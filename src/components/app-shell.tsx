@@ -969,7 +969,7 @@ export function AppShell() {
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
           <SheetContent
             side="left"
-            className="w-[280px] p-0 border-0 text-white overflow-y-auto md:hidden"
+            className="w-[280px] p-0 border-0 text-white overflow-y-auto md:hidden sidebar-scroll"
             style={{ backgroundColor: corSidebar }}
           >
             <SheetHeader className="px-4 py-3 border-b border-white/10 text-left">
