@@ -8930,6 +8930,17 @@ export type Database = {
         }
         Returns: string
       }
+      trocar_convenio_contrato: {
+        Args: {
+          _contrato_id: string
+          _convenio_novo_id: string
+          _data_inicio?: string
+          _dependentes?: Json
+          _observacao?: string
+          _valor_mensal?: number
+        }
+        Returns: Json
+      }
       unaccent: { Args: { "": string }; Returns: string }
       user_is_any_manager: { Args: { _user_id: string }; Returns: boolean }
       verificar_certificado: { Args: { _codigo: string }; Returns: Json }
