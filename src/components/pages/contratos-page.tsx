@@ -340,19 +340,30 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     // Agregar parcelas dos contratos carregados
     const contratoIds = ((cs.data ?? []) as Array<{ id: string }>).map((c) => c.id);
     if (contratoIds.length > 0) {
-      const { data: mens } = await supabase
-        .from("contrato_mensalidades")
-        .select("contrato_id, status, vencimento")
-        .in("contrato_id", contratoIds);
+      // Buscar mensalidades em lotes de contratos para evitar o teto de 1000
+      // linhas por request do PostgREST (ex.: 500 contratos × 12 parcelas
+      // ≈ 6000 linhas retornariam truncadas, deixando contratos com "0/0").
       const hojeStr = new Date().toISOString().slice(0, 10);
       const agg: Record<string, { pagas: number; total: number; temAtrasada: boolean }> = {};
       for (const id of contratoIds) agg[id] = { pagas: 0, total: 0, temAtrasada: false };
-      for (const m of (mens ?? []) as Array<{ contrato_id: string; status: string; vencimento: string }>) {
-        const a = agg[m.contrato_id];
-        if (!a) continue;
-        a.total += 1;
-        if (m.status === "pago") a.pagas += 1;
-        else if (m.vencimento && m.vencimento < hojeStr) a.temAtrasada = true;
+      const LOTE = 60; // ~60 contratos × 12 parcelas = 720 linhas por lote
+      for (let i = 0; i < contratoIds.length; i += LOTE) {
+        const slice = contratoIds.slice(i, i + LOTE);
+        const { data: mens } = await supabase
+          .from("contrato_mensalidades")
+          .select("contrato_id, status, vencimento, numero_parcela")
+          .in("contrato_id", slice);
+        for (const m of (mens ?? []) as Array<{ contrato_id: string; status: string; vencimento: string; numero_parcela: number }>) {
+          const a = agg[m.contrato_id];
+          if (!a) continue;
+          // Contar apenas mensalidades mensais (numero_parcela > 0). Adesão
+          // (=0) e taxas de inclusão de dependente (<0) não entram no N/M.
+          if (Number(m.numero_parcela) > 0) {
+            a.total += 1;
+            if (m.status === "pago") a.pagas += 1;
+            else if (m.vencimento && m.vencimento < hojeStr) a.temAtrasada = true;
+          }
+        }
       }
       setParcAgg(agg);
     } else {
