@@ -353,13 +353,23 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           .from("contrato_mensalidades")
           .select("contrato_id, status, vencimento, numero_parcela")
           .in("contrato_id", slice);
+        // Agrupa por contrato para segmentar em ciclos de 12 parcelas
+        // (renovações acrescentam parcelas 13..24, 25..36, etc.). A contagem
+        // exibida é sempre do ciclo atual (últimas 12 parcelas), pois cada
+        // contrato representa um período de 12 meses.
+        const porContrato: Record<string, Array<{ status: string; vencimento: string; numero_parcela: number }>> = {};
         for (const m of (mens ?? []) as Array<{ contrato_id: string; status: string; vencimento: string; numero_parcela: number }>) {
-          const a = agg[m.contrato_id];
+          if (Number(m.numero_parcela) <= 0) continue; // ignora adesão/taxas
+          (porContrato[m.contrato_id] ||= []).push(m);
+        }
+        for (const [cid, arr] of Object.entries(porContrato)) {
+          const a = agg[cid];
           if (!a) continue;
-          // Contar apenas mensalidades mensais (numero_parcela > 0). Adesão
-          // (=0) e taxas de inclusão de dependente (<0) não entram no N/M.
-          if (Number(m.numero_parcela) > 0) {
-            a.total += 1;
+          // Ciclo atual = as 12 parcelas com maior numero_parcela.
+          arr.sort((x, y) => y.numero_parcela - x.numero_parcela);
+          const cicloAtual = arr.slice(0, 12);
+          a.total = cicloAtual.length;
+          for (const m of cicloAtual) {
             if (m.status === "pago") a.pagas += 1;
             else if (m.vencimento && m.vencimento < hojeStr) a.temAtrasada = true;
           }
