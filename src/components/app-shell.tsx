@@ -698,7 +698,7 @@ export function AppShell() {
             </Button>
           )}
         </div>
-        <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto">
+        <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll">
           {visibleNavRows.map((row) => {
             const leafIsActive = (to: string, hash?: string) => {
               const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
@@ -969,7 +969,7 @@ export function AppShell() {
         <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
           <SheetContent
             side="left"
-            className="w-[280px] p-0 border-0 text-white overflow-y-auto md:hidden"
+            className="w-[280px] p-0 border-0 text-white overflow-y-auto md:hidden sidebar-scroll"
             style={{ backgroundColor: corSidebar }}
           >
             <SheetHeader className="px-4 py-3 border-b border-white/10 text-left">
