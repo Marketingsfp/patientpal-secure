@@ -423,7 +423,7 @@ function ClientesPage() {
         </div>
       </div>
 
-      {atingiuTeto && (
+      {atingiuTeto && !(uxMelhorias && !debouncedBusca.trim()) && (
         <div className="rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
           Mostrando os primeiros {LIMITE_BUSCA.toLocaleString("pt-BR")} resultados. Refine a busca (nome completo, CPF ou telefone) para ver mais.
         </div>
