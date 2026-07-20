@@ -41,7 +41,7 @@ type TipoSenha = "N" | "P" | "C" | "R";
 
 function formatarNomeClinica(nome: string): string {
   return nome
-    .replace(/\bSao\b/gi, (m) => (m[0] === "S" ? "São" : "são"))
+    .replace(/\bSao\b/gi, (m) => (m === m.toUpperCase() ? "SÃO" : m[0] === "S" ? "São" : "são"))
     .replace(/\bPoliclinica\b/gi, (m) => (m[0] === "P" ? "Policlínica" : "policlínica"))
     .replace(/\bPOLICLINICA\b/g, "POLICLÍNICA");
 }
