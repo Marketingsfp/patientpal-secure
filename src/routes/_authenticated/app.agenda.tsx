@@ -846,7 +846,40 @@ async function obterInfoConvenioPaciente(params: {
     }
   }
 
-  return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear };
+  // 6) Trava de tolerância (5 dias corridos após vencimento).
+  //    Dentro da carência o convênio libera APENAS consultas cujo valor com
+  //    o benefício fique ≤ R$ 9,99. Exames e demais procedimentos ficam sem
+  //    o benefício (paga particular) até a mensalidade ser quitada.
+  if (emCarencia) {
+    const LIMITE_CONSULTA = 9.99;
+    const tipoLower = (procedimentoTipo ?? "").toLowerCase();
+    const nomeLower = (procedimentoNome ?? "").toLowerCase();
+    const ehExame = tipoLower.includes("exame") || nomeLower.includes("exame");
+    const ehConsulta = tipoLower.includes("consulta") || nomeLower.includes("consulta");
+    let valorFinalConvenio: number | null = null;
+    if (desconto?.tipo === "gratuidade") valorFinalConvenio = 0;
+    else if (desconto?.tipo === "valor_fixo") valorFinalConvenio = Number(desconto.valor) || 0;
+    // percentual/valor: não conseguimos garantir ≤ R$ 9,99 sem base — reprova.
+    const elegivelCarencia =
+      !ehExame && ehConsulta && valorFinalConvenio !== null && valorFinalConvenio <= LIMITE_CONSULTA;
+    const diasAtraso = DIAS_TOLERANCIA - (diasCarenciaRestantes ?? 0);
+    const suffix = ` Mensalidade em atraso há ${diasAtraso} dia(s) — dentro da tolerância de ${DIAS_TOLERANCIA} dias apenas consultas até R$ ${LIMITE_CONSULTA.toFixed(2)} são cobertas pelo convênio.`;
+    if (!elegivelCarencia) {
+      desconto = null;
+      const motivo = ehExame
+        ? "Convênio suspenso para exames enquanto a mensalidade não for quitada."
+        : ehConsulta && valorFinalConvenio !== null && valorFinalConvenio > LIMITE_CONSULTA
+          ? `Convênio suspenso: benefício desta consulta (R$ ${valorFinalConvenio.toFixed(2)}) está acima do teto de R$ ${LIMITE_CONSULTA.toFixed(2)} permitido na tolerância.`
+          : "Convênio suspenso: procedimento fora da tolerância — cobrando valor particular.";
+      avisoLimite = `${motivo}${suffix}`;
+    } else {
+      // Consulta permitida: informa mas não bloqueia.
+      const info = `Contrato em carência — parcela vence sem juros por mais ${diasCarenciaRestantes ?? 0} dia(s). Consulta liberada por estar dentro do teto de R$ ${LIMITE_CONSULTA.toFixed(2)}.`;
+      avisoLimite = avisoLimite ? `${info} ${avisoLimite}` : info;
+    }
+  }
+
+  return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear, emCarencia, diasCarenciaRestantes };
 }
 
 const toLocalInput = (iso: string) => {
