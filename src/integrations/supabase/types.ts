@@ -8872,6 +8872,12 @@ export type Database = {
         | "implante"
         | "protese"
         | "fratura"
+        | "selante"
+        | "sangramento"
+        | "mobilidade"
+        | "tartaro"
+        | "aparelho"
+        | "faceta"
       pagamento_forma:
         | "paytime_credito"
         | "paytime_debito"
@@ -9110,6 +9116,12 @@ export const Constants = {
         "implante",
         "protese",
         "fratura",
+        "selante",
+        "sangramento",
+        "mobilidade",
+        "tartaro",
+        "aparelho",
+        "faceta",
       ],
       pagamento_forma: [
         "paytime_credito",
