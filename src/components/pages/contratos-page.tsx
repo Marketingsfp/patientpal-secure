@@ -270,6 +270,10 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     convenioNome: string | null;
     valorMensal: number;
   } | null>(null);
+  // "renovacao" (padrão) exige mensalidades pagas; "troca_convenio" cancela o
+  // contrato atual e as mensalidades pendentes para criar um novo contrato sem
+  // taxa de adesão nem carência.
+  const [flowType, setFlowType] = useState<"renovacao" | "troca_convenio">("renovacao");
 
   // Termo com debounce para acionar busca server-side sem bater a cada tecla.
   const [qDebounced, setQDebounced] = useState("");
