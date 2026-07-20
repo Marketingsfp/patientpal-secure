@@ -34,6 +34,7 @@ const BRL = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 type Mode = "extensao" | "troca_plano";
+type ModoDialog = "renovacao" | "troca_convenio";
 
 interface Convenio {
   id: string;
@@ -86,7 +87,14 @@ interface Props {
   convenioAtualId: string | null;
   convenioAtualNome?: string | null;
   valorAtual: number;
-  onRenovado: (result: { tipo: Mode; contratoNovoId?: string | null }) => void;
+  onRenovado: (result: { tipo: Mode | "troca_convenio"; contratoNovoId?: string | null }) => void;
+  /**
+   * "renovacao" (padrão) mantém o fluxo original de renovação, exige mensalidades pagas.
+   * "troca_convenio" cancela o contrato atual + mensalidades pendentes e cria um novo
+   * contrato sem taxa de adesão e sem carência, para pacientes que trocam de convênio
+   * antes do fim do ciclo.
+   */
+  modo?: ModoDialog;
 }
 
 type RenovacaoError = {
@@ -156,7 +164,9 @@ export function RenovarContratoDialog({
   convenioAtualNome,
   valorAtual,
   onRenovado,
+  modo = "renovacao",
 }: Props) {
+  const isTroca = modo === "troca_convenio";
   const [observacao, setObservacao] = useState("");
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   const [novoConvenioId, setNovoConvenioId] = useState<string>("");
@@ -213,8 +223,12 @@ export function RenovarContratoDialog({
   }, [open, clinicaId, convenioAtualId, contratoId]);
 
   const novoConvenio = convenios.find((c) => c.id === novoConvenioId);
-  const mode: Mode =
-    novoConvenioId && convenioAtualId && novoConvenioId === convenioAtualId ? "extensao" : "troca_plano";
+  // Na troca de convênio, é sempre criação de novo contrato (nunca extensão).
+  const mode: Mode = isTroca
+    ? "troca_plano"
+    : novoConvenioId && convenioAtualId && novoConvenioId === convenioAtualId
+      ? "extensao"
+      : "troca_plano";
   const parcelasRenovacao = novoConvenio ? Number(novoConvenio.num_parcelas ?? 12) : 12;
   const taxaAdesaoConvenio = novoConvenio ? Number(novoConvenio.taxa_adesao ?? 0) : 0;
   const taxaInclusaoConvenio = novoConvenio ? Number(novoConvenio.taxa_inclusao_dependente ?? 0) : 0;
@@ -351,7 +365,24 @@ export function RenovarContratoDialog({
     setSaving(true);
     try {
       const payloadDeps = buildPayloadDeps();
-      if (mode === "extensao") {
+      if (isTroca) {
+        const { data, error } = await (supabase.rpc as any)("trocar_convenio_contrato", {
+          _contrato_id: contratoId,
+          _convenio_novo_id: novoConvenioId,
+          _observacao: observacao || null,
+          _dependentes: payloadDeps,
+          _valor_mensal: faixaSelecionada ? Number(faixaSelecionada.valor_mensal) : null,
+          _data_inicio: dataRenovacao || null,
+        });
+        if (error) throw error;
+        const canceladas = Number((data as any)?.mensalidades_canceladas ?? 0);
+        toast.success(
+          canceladas > 0
+            ? `Convênio trocado — ${canceladas} mensalidade(s) pendente(s) canceladas e novo contrato criado.`
+            : "Convênio trocado — novo contrato criado.",
+        );
+        onRenovado({ tipo: "troca_convenio", contratoNovoId: (data as any)?.contrato_novo_id ?? null });
+      } else if (mode === "extensao") {
         const { data, error } = await (supabase.rpc as any)("renovar_contrato_extensao", {
           _contrato_id: contratoId,
           _observacao: observacao || null,
@@ -400,10 +431,12 @@ export function RenovarContratoDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <RefreshCw className="h-5 w-5 text-red-600" />
-            Renovar contrato
+            {isTroca ? "Trocar convênio do contrato" : "Renovar contrato"}
           </DialogTitle>
           <DialogDescription>
-            Todas as mensalidades deste contrato estão pagas. Escolha o convênio da renovação e revise os dependentes.
+            {isTroca
+              ? "O contrato atual será cancelado e as mensalidades pendentes serão canceladas. Um novo contrato será criado no convênio escolhido, sem taxa de adesão e sem carência."
+              : "Todas as mensalidades deste contrato estão pagas. Escolha o convênio da renovação e revise os dependentes."}
           </DialogDescription>
         </DialogHeader>
 
@@ -411,7 +444,7 @@ export function RenovarContratoDialog({
           {/* 1. Convênio da renovação */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">Convênio da renovação</Label>
+              <Label className="text-xs">{isTroca ? "Novo convênio" : "Convênio da renovação"}</Label>
               <Select value={novoConvenioId} onValueChange={setNovoConvenioId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o convênio" />
@@ -426,7 +459,9 @@ export function RenovarContratoDialog({
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">
-                {mode === "extensao"
+                {isTroca
+                  ? "Sem taxa de adesão e sem carência. O contrato atual será cancelado."
+                  : mode === "extensao"
                   ? "Mesmo convênio: estende este contrato sem cobrar taxa de adesão."
                   : "Convênio diferente: cria um novo contrato e cobra a taxa de adesão do convênio escolhido."}
               </p>
