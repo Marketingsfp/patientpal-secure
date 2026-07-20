@@ -17,7 +17,6 @@ import {
   CheckCircle2,
   Camera,
   X,
-  Contrast,
 } from "lucide-react";
 import { imprimirSenhaTotem, gerarSenhaPdfBase64 } from "@/lib/print-senha";
 import { imprimirDocumentoSilencioso } from "@/utils/printService";
@@ -68,64 +67,6 @@ export function TotemPage() {
   const [scanMsg, setScanMsg] = useState("Posicione seu rosto na câmera");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-
-  // ---- Acessibilidade (idosos / baixa visão / PCD) ----
-  // escalaIdx: índice em ESCALAS aplicado ao font-size do <html> (rem → escala
-  // proporcional de toda a interface). contraste: liga o modo alto contraste.
-  const ESCALAS = [1, 1.12, 1.24];
-  const [escalaIdx, setEscalaIdx] = useState(0);
-  const [contraste, setContraste] = useState(false);
-  const [announce, setAnnounce] = useState("");
-
-  // Restaura preferências salvas (persistem entre atendimentos e recargas).
-  useEffect(() => {
-    try {
-      const e = Number(localStorage.getItem("totem.escala") ?? "0");
-      if (Number.isFinite(e) && e >= 0 && e <= ESCALAS.length - 1) setEscalaIdx(e);
-      setContraste(localStorage.getItem("totem.contraste") === "1");
-    } catch { /* ignora */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Aplica a escala no <html>. Como o Tailwind usa rem, mexer no font-size da
-  // raiz amplia headings, botões e teclado juntos. Limpa ao sair do totem.
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    const html = document.documentElement;
-    html.style.fontSize = `${16 * ESCALAS[escalaIdx]}px`;
-    return () => { html.style.fontSize = ""; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [escalaIdx]);
-
-  function mudarEscala(delta: number) {
-    setEscalaIdx((i) => {
-      const next = Math.min(ESCALAS.length - 1, Math.max(0, i + delta));
-      try { localStorage.setItem("totem.escala", String(next)); } catch { /* ignora */ }
-      return next;
-    });
-  }
-  function toggleContraste() {
-    setContraste((c) => {
-      const next = !c;
-      try { localStorage.setItem("totem.contraste", next ? "1" : "0"); } catch { /* ignora */ }
-      return next;
-    });
-  }
-
-  // Região aria-live: anuncia por leitor de tela as transições que hoje só
-  // existem visualmente (senha emitida, check-in, etapa da câmera).
-  useEffect(() => {
-    if (step === "ticket" && ticket) {
-      const nome = TIPOS.find((t) => t.tipo === ticket.tipo)?.titulo ?? "";
-      setAnnounce(`Senha ${nome}, número ${ticket.codigo}. Retire sua senha impressa e acompanhe o painel de chamada.`);
-    } else if (step === "checkin-ok" && checkinInfo) {
-      setAnnounce(`Check-in confirmado. Olá, ${checkinInfo.paciente_nome}. Aguarde sua chamada no painel.`);
-    } else if (step === "checkin-facial") {
-      setAnnounce(scanMsg);
-    } else {
-      setAnnounce("");
-    }
-  }, [step, ticket, checkinInfo, scanMsg]);
 
   // Pré-carrega os modelos de reconhecimento facial em segundo plano para a
   // câmera abrir rápida quando o paciente escolher essa opção.
@@ -382,39 +323,7 @@ export function TotemPage() {
     // h-screen + overflow-hidden (em vez de min-h-screen): a página do totem
     // não pode rolar de jeito nenhum — trava exatamente na altura da
     // viewport e cada tela (header/main/footer) precisa caber dentro disso.
-    <div className={`h-[100dvh] overflow-hidden bg-gradient-to-br from-background via-background to-muted/40 flex flex-col cursor-none [&_*]:cursor-none${contraste ? " totem-hc" : ""}`}>
-      {/* Anúncios para leitor de tela (invisível visualmente). */}
-      <div aria-live="assertive" role="status" className="sr-only">{announce}</div>
-
-      {/* Barra de acessibilidade — fixa, sempre acessível em qualquer etapa.
-          Ampliar/reduzir texto e alternar alto contraste. */}
-      <div className="fixed bottom-3 left-3 z-50 flex items-center gap-2">
-        <button
-          onClick={() => mudarEscala(-1)}
-          disabled={escalaIdx === 0}
-          aria-label="Diminuir tamanho do texto"
-          className="h-14 w-14 rounded-2xl border-2 bg-card text-foreground shadow-md flex items-center justify-center text-lg font-bold disabled:opacity-40 active:scale-95 transition"
-        >
-          A<span className="text-xs align-sub">−</span>
-        </button>
-        <button
-          onClick={() => mudarEscala(1)}
-          disabled={escalaIdx === ESCALAS.length - 1}
-          aria-label="Aumentar tamanho do texto"
-          className="h-14 w-14 rounded-2xl border-2 bg-card text-foreground shadow-md flex items-center justify-center text-2xl font-bold disabled:opacity-40 active:scale-95 transition"
-        >
-          A<span className="text-sm align-super">+</span>
-        </button>
-        <button
-          onClick={toggleContraste}
-          aria-pressed={contraste}
-          aria-label="Alternar alto contraste"
-          className={`h-14 w-14 rounded-2xl border-2 shadow-md flex items-center justify-center active:scale-95 transition ${contraste ? "bg-foreground text-background border-foreground" : "bg-card text-foreground"}`}
-        >
-          <Contrast className="h-6 w-6" />
-        </button>
-      </div>
-
+    <div className="h-[100dvh] overflow-hidden bg-gradient-to-br from-background via-background to-muted/40 flex flex-col cursor-none [&_*]:cursor-none">
       {/* Header */}
       <header className="px-6 py-3 flex items-center justify-between shrink-0">
         <div>
@@ -442,7 +351,7 @@ export function TotemPage() {
                 <Ticket className="h-14 w-14" />
                 <div>
                   <div className="text-3xl font-bold">Retirar senha</div>
-                  <div className="text-white/90 text-sm mt-1">Comum, preferencial, cartão ou retorno</div>
+                  <div className="text-white/85 text-sm mt-1">Comum, preferencial, cartão ou retorno</div>
                 </div>
                 <Ticket className="absolute -right-6 -bottom-6 h-40 w-40 opacity-10" />
               </button>
@@ -453,7 +362,7 @@ export function TotemPage() {
                 <BadgeCheck className="h-14 w-14" />
                 <div>
                   <div className="text-3xl font-bold">Fazer check-in</div>
-                  <div className="text-white/90 text-sm mt-1">Confirme presença na sua consulta de hoje</div>
+                  <div className="text-white/85 text-sm mt-1">Confirme presença na sua consulta de hoje</div>
                 </div>
                 <BadgeCheck className="absolute -right-6 -bottom-6 h-40 w-40 opacity-10" />
               </button>
@@ -481,7 +390,7 @@ export function TotemPage() {
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
                       <div className="text-3xl font-bold">{titulo}</div>
-                      <div className="text-white/90 text-sm">{sub}</div>
+                      <div className="text-white/85 text-sm">{sub}</div>
                     </div>
                     <div className="text-6xl font-black opacity-90">{t}</div>
                   </div>
@@ -502,18 +411,17 @@ export function TotemPage() {
           // totem (a página é h-[100dvh] + overflow-hidden). Sem "max-h-full
           // overflow-hidden" no card — se algum item passar, preferimos
           // reduzir tamanhos aqui a esconder conteúdo por corte.
-          <div className="w-full max-w-md bg-card border rounded-3xl p-6 shadow-xl space-y-4 my-auto">
-            <div className="text-center space-y-1">
-              <h2 className="text-2xl font-bold">Check-in</h2>
-              <p className="text-sm text-muted-foreground">Digite seu CPF no teclado abaixo</p>
+          <div className="w-full max-w-sm bg-card border rounded-3xl p-5 shadow-xl space-y-3 my-auto">
+            <div className="text-center space-y-0.5">
+              <h2 className="text-xl font-bold">Check-in</h2>
+              <p className="text-xs text-muted-foreground">Digite seu CPF no teclado abaixo</p>
             </div>
             <input
               readOnly
               inputMode="none"
               value={formatarCpfParcial(cpf)}
               placeholder="000.000.000-00"
-              aria-label="CPF digitado"
-              className="w-full h-14 px-4 text-2xl tracking-widest rounded-xl border bg-background text-center tabular-nums"
+              className="w-full h-12 px-4 text-xl tracking-widest rounded-xl border bg-background text-center tabular-nums"
             />
             <TecladoNumerico
               disabled={busy}
@@ -523,18 +431,18 @@ export function TotemPage() {
             />
             <Button
               variant="outline"
-              className="w-full h-12 text-base"
+              className="w-full h-10 text-sm"
               disabled={busy}
               onClick={() => void iniciarCheckinFacial()}
             >
-              <Camera className="h-5 w-5 mr-2" /> Usar reconhecimento facial
+              <Camera className="h-4 w-4 mr-2" /> Usar reconhecimento facial
             </Button>
             <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" className="h-12 text-base" onClick={reset}>
-                <ArrowLeft className="h-5 w-5 mr-2" /> Voltar
+              <Button variant="outline" className="h-10" onClick={reset}>
+                <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
               </Button>
-              <Button className="h-12 text-base" disabled={busy || cpf.length !== 11} onClick={() => void fazerCheckin()}>
-                {busy && <Loader2 className="h-5 w-5 mr-2 animate-spin" />} Confirmar
+              <Button className="h-10" disabled={busy || cpf.length !== 11} onClick={() => void fazerCheckin()}>
+                {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Confirmar
               </Button>
             </div>
           </div>

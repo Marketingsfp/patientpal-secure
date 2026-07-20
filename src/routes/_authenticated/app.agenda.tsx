@@ -938,13 +938,8 @@ function AgendaPage() {
   // sem precisar ampliar a janela manualmente. Marcando o checkbox
   // "Exibir apenas a data selecionada" o filtro passa a trazer só o dia
   // escolhido (comportamento antigo).
-  // Sempre restringe à data selecionada (comportamento travado).
-  const apenasData = true;
-  // Por padrão, oculta slots livres/bloqueios ("consultas não agendadas").
-  // Continua acessível via filtro de Status = "Livres" quando o usuário
-  // precisa visualizar/clicar em horários livres para reagendar em lote
-  // ou criar novos agendamentos.
-  const [mostrarLivres] = useState(false);
+  const [apenasData, setApenasData] = useState(false);
+  const [mostrarLivres, setMostrarLivres] = useState(true);
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
@@ -2517,9 +2512,7 @@ function AgendaPage() {
 
   const filtrados = useMemo(() => {
     return items.filter((a) => {
-      // Oculta slots livres/bloqueios ("não agendadas") por padrão, exceto
-      // quando o usuário escolhe explicitamente o filtro Status = "Livres".
-      if (!mostrarLivres && filtroStatus !== "livres" && isSlotLivre(a.paciente_nome)) return false;
+      if (!mostrarLivres && isSlotLivre(a.paciente_nome)) return false;
       if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
       const ehLivre = isSlotLivre(a.paciente_nome);
       if (filtroStatus === "livres") {
@@ -6647,6 +6640,15 @@ function AgendaPage() {
               setDataFim={setDataFim}
               compact
             />
+            {/* Toggle "apenas a data selecionada" — ao lado do seletor de data, pois depende dele */}
+            <label className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer select-none w-fit hover:text-slate-900 transition-colors">
+              <Checkbox
+                checked={apenasData}
+                onCheckedChange={(v) => setApenasData(v === true)}
+                className="h-3.5 w-3.5 rounded border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+              />
+              Exibir apenas a data selecionada
+            </label>
           </div>
 
           {/* Especialidade */}
