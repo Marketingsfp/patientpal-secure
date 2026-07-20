@@ -520,6 +520,35 @@ function ClientesPage() {
         </Table>
       </div>
 
+      {uxMelhorias && !debouncedBusca.trim() && totalPacientes !== null && totalPacientes > LIMITE_LISTA && (
+        <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
+          <div className="text-muted-foreground">
+            Página <span className="font-medium text-foreground">{pagina + 1}</span> de{" "}
+            <span className="font-medium text-foreground">{Math.max(1, Math.ceil(totalPacientes / LIMITE_LISTA))}</span>
+            {" · "}Mostrando {pagina * LIMITE_LISTA + 1}–{pagina * LIMITE_LISTA + filtrados.length} de{" "}
+            {totalPacientes.toLocaleString("pt-BR")}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagina === 0 || loading}
+              onClick={() => setPagina((p) => Math.max(0, p - 1))}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={loading || (pagina + 1) * LIMITE_LISTA >= totalPacientes || filtrados.length < LIMITE_LISTA}
+              onClick={() => setPagina((p) => p + 1)}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Novo cliente */}
       <Dialog open={openNovo} onOpenChange={setOpenNovo}>
         <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
