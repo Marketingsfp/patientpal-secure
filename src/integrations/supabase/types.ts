@@ -6141,6 +6141,91 @@ export type Database = {
           },
         ]
       }
+      odonto_imagens: {
+        Row: {
+          altura: number | null
+          categoria: Database["public"]["Enums"]["odonto_imagem_categoria"]
+          clinica_id: string
+          created_at: string
+          criado_por: string | null
+          data_exame: string
+          deletado_em: string | null
+          dentes: number[]
+          descricao: string | null
+          id: string
+          largura: number | null
+          mime_type: string
+          paciente_id: string
+          prontuario_id: string | null
+          storage_path: string
+          tags: string[]
+          tamanho_bytes: number | null
+          updated_at: string
+        }
+        Insert: {
+          altura?: number | null
+          categoria?: Database["public"]["Enums"]["odonto_imagem_categoria"]
+          clinica_id: string
+          created_at?: string
+          criado_por?: string | null
+          data_exame?: string
+          deletado_em?: string | null
+          dentes?: number[]
+          descricao?: string | null
+          id?: string
+          largura?: number | null
+          mime_type: string
+          paciente_id: string
+          prontuario_id?: string | null
+          storage_path: string
+          tags?: string[]
+          tamanho_bytes?: number | null
+          updated_at?: string
+        }
+        Update: {
+          altura?: number | null
+          categoria?: Database["public"]["Enums"]["odonto_imagem_categoria"]
+          clinica_id?: string
+          created_at?: string
+          criado_por?: string | null
+          data_exame?: string
+          deletado_em?: string | null
+          dentes?: number[]
+          descricao?: string | null
+          id?: string
+          largura?: number | null
+          mime_type?: string
+          paciente_id?: string
+          prontuario_id?: string | null
+          storage_path?: string
+          tags?: string[]
+          tamanho_bytes?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "odonto_imagens_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "odonto_imagens_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "odonto_imagens_prontuario_id_fkey"
+            columns: ["prontuario_id"]
+            isOneToOne: false
+            referencedRelation: "odonto_prontuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       odonto_prontuarios: {
         Row: {
           clinica_id: string
@@ -9011,6 +9096,14 @@ export type Database = {
         | "transferencia"
       lms_licao_tipo: "video" | "texto" | "quiz"
       modulo_acesso: "none" | "read" | "write"
+      odonto_imagem_categoria:
+        | "intraoral"
+        | "extraoral"
+        | "radiografia_periapical"
+        | "radiografia_panoramica"
+        | "tomografia"
+        | "foto_documentacao"
+        | "outro"
       odonto_status:
         | "higido"
         | "cariado"
@@ -9255,6 +9348,15 @@ export const Constants = {
       ],
       lms_licao_tipo: ["video", "texto", "quiz"],
       modulo_acesso: ["none", "read", "write"],
+      odonto_imagem_categoria: [
+        "intraoral",
+        "extraoral",
+        "radiografia_periapical",
+        "radiografia_panoramica",
+        "tomografia",
+        "foto_documentacao",
+        "outro",
+      ],
       odonto_status: [
         "higido",
         "cariado",
