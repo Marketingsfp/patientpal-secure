@@ -4663,7 +4663,15 @@ h1, h2, h3 { margin: 0 0 6mm; }
               </div>
             </div>
           ) : null}
-          {pagMens && pagDiasAtraso > 0 ? (
+          {pagMens && pagDiasAtraso > 0 && pagDiasAtraso <= 5 ? (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+              <div className="font-semibold">Dentro da tolerância — sem encargos</div>
+              <div className="text-muted-foreground">
+                Parcela vencida há {pagDiasAtraso} dia(s). Até 5 dias corridos após o vencimento não incidem multa nem juros.
+              </div>
+            </div>
+          ) : null}
+          {pagMens && pagDiasAtraso > 5 ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs space-y-0.5">
               <div className="flex justify-between">
                 <span>Valor original</span>
