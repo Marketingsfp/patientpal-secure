@@ -365,6 +365,68 @@ function OdontologiaPage() {
               )}
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                Plano de tratamento
+                {planoPorDente.length > 0 && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    · {planoPorDente.length} dente(s) com item aberto
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {planoPorDente.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum item em orçamento aberto vinculado a dentes. Selecione um dente no odontograma e clique em "Incluir em orçamento".
+                </p>
+              ) : (
+                <ul className="divide-y">
+                  {planoPorDente.map(([d, items]) => (
+                    <li key={d} className="py-2 flex items-start gap-3">
+                      <button
+                        type="button"
+                        onClick={() => { setSelecionado(d); setFaceSelecionada("INTEIRO"); }}
+                        className={`shrink-0 h-9 w-10 rounded-md border-2 text-sm font-mono transition ${
+                          selecionado === d
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-amber-300 bg-amber-50 text-amber-800 hover:border-primary/60"
+                        }`}
+                        title={`Selecionar dente ${d} no odontograma`}
+                      >
+                        {d}
+                      </button>
+                      <ul className="flex-1 space-y-1 text-sm">
+                        {items.map((it) => (
+                          <li key={`${d}-${it.id}`} className="flex items-center justify-between gap-2">
+                            <span>
+                              <span className="text-xs text-muted-foreground mr-1">Orç. {it.orcamento_numero ?? "—"}</span>
+                              {it.descricao}
+                              <span className="text-xs text-muted-foreground ml-1">
+                                · R$ {Number(it.valor_total).toFixed(2)}
+                              </span>
+                            </span>
+                            {podeEscrever && (
+                              <button
+                                type="button"
+                                onClick={() => void removerDenteDoItem(it.id, d)}
+                                className="text-muted-foreground hover:text-destructive"
+                                title={`Remover dente ${d} deste item`}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
             </TabsContent>
 
             <TabsContent value="anamnese">
@@ -478,6 +540,21 @@ function OdontologiaPage() {
             )}
           </TabsContent>
         </Tabs>
+
+      {clinicaAtual && pacienteId && selecionado && (
+        <AddToOrcamentoDialog
+          open={addOrcOpen}
+          onClose={() => setAddOrcOpen(false)}
+          clinicaId={clinicaAtual.clinica_id}
+          pacienteId={pacienteId}
+          pacienteNome={pacienteSel?.nome ?? ""}
+          pacienteTelefone={pacienteSel?.telefone ?? null}
+          especialidadeOdontoId={especialidadeOdontoId}
+          userId={user?.id ?? null}
+          dente={selecionado}
+          onCreated={() => void carregar()}
+        />
+      )}
     </div>
   );
 }
