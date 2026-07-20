@@ -38,6 +38,8 @@ function OdontologiaPage() {
   const podeEscrever = usePodeEscrever("odontologia");
   const [pacienteId, setPacienteId] = useState<string | null>(null);
   const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
+  const [pacienteIdOrc, setPacienteIdOrc] = useState<string | null>(null);
+  const [pacienteSelOrc, setPacienteSelOrc] = useState<PatientOption | null>(null);
   const [dentes, setDentes] = useState<DenteRow[]>([]);
   const [prontuario, setProntuario] = useState<ProntuarioOdonto | null>(null);
   const [selecionado, setSelecionado] = useState<number | null>(null);
@@ -168,24 +170,27 @@ function OdontologiaPage() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="pt-6 space-y-3">
-          <Label>Paciente</Label>
-          <PatientSearchInput
-            value={pacienteSel}
-            onSelect={(p) => { setPacienteSel(p); setPacienteId(p?.id ?? null); }}
-          />
-        </CardContent>
-      </Card>
-
-      {pacienteId && (
-        <Tabs defaultValue="prontuario" className="space-y-4">
+      <Tabs defaultValue="prontuario" className="space-y-4">
           <TabsList>
             <TabsTrigger value="prontuario">Prontuário</TabsTrigger>
             <TabsTrigger value="orcamento">Orçamento</TabsTrigger>
           </TabsList>
 
           <TabsContent value="prontuario" className="space-y-6">
+          <Card>
+            <CardContent className="pt-6 space-y-3">
+              <Label>Paciente</Label>
+              <PatientSearchInput
+                value={pacienteSel}
+                onSelect={(p) => { setPacienteSel(p); setPacienteId(p?.id ?? null); }}
+              />
+            </CardContent>
+          </Card>
+
+          {!pacienteId ? (
+            <p className="text-sm text-muted-foreground">Selecione um paciente para começar.</p>
+          ) : (
+          <>
           <Card>
             <CardHeader><CardTitle>Odontograma</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -300,22 +305,36 @@ function OdontologiaPage() {
               )}
             </CardContent>
           </Card>
+          </>
+          )}
           </TabsContent>
 
           <TabsContent value="orcamento">
             <Card>
-              <CardContent className="pt-6">
+              <CardContent className="pt-6 space-y-3">
+                <Label>Paciente</Label>
+                <PatientSearchInput
+                  value={pacienteSelOrc}
+                  onSelect={(p) => { setPacienteSelOrc(p); setPacienteIdOrc(p?.id ?? null); }}
+                />
+              </CardContent>
+            </Card>
+            {!pacienteIdOrc ? (
+              <p className="text-sm text-muted-foreground mt-4">Selecione um paciente para começar.</p>
+            ) : (
+            <Card>
+              <CardContent className="pt-6 mt-4">
                 <OrcamentoTab
-                  pacienteId={pacienteId}
-                  pacienteNome={pacienteSel?.nome ?? ""}
-                  pacienteTelefone={pacienteSel?.telefone ?? null}
+                  pacienteId={pacienteIdOrc}
+                  pacienteNome={pacienteSelOrc?.nome ?? ""}
+                  pacienteTelefone={pacienteSelOrc?.telefone ?? null}
                   especialidadeOdontoId={especialidadeOdontoId}
                 />
               </CardContent>
             </Card>
+            )}
           </TabsContent>
         </Tabs>
-      )}
     </div>
   );
 }
