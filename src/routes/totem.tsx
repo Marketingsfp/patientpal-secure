@@ -18,6 +18,7 @@ import {
   Camera,
   X,
   Contrast,
+  AlertTriangle,
 } from "lucide-react";
 import { imprimirSenhaTotem, gerarSenhaPdfBase64 } from "@/lib/print-senha";
 import { imprimirDocumentoSilencioso } from "@/utils/printService";
@@ -39,7 +40,7 @@ function TotemRoute() {
 type TipoSenha = "N" | "P" | "C" | "R";
 
 const TIPOS: { tipo: TipoSenha; titulo: string; sub: string; Icon: typeof Hash; classe: string }[] = [
-  { tipo: "N", titulo: "Comum", sub: "Atendimento padrão", Icon: Hash, classe: "from-primary/90 to-primary" },
+  { tipo: "N", titulo: "Comum", sub: "Atendimento padrão", Icon: Hash, classe: "from-sky-600 to-sky-700" },
   { tipo: "P", titulo: "Preferencial", sub: "Idoso · Gestante · PCD · Crianças de colo", Icon: Accessibility, classe: "from-amber-500 to-amber-600" },
   { tipo: "C", titulo: "Cartão consulta", sub: "Titulares do cartão benefício", Icon: Stethoscope, classe: "from-rose-600 to-rose-700" },
   { tipo: "R", titulo: "Retorno", sub: "Pacientes em retorno", Icon: RotateCcw, classe: "from-emerald-600 to-emerald-700" },
@@ -68,6 +69,8 @@ export function TotemPage() {
   const [scanMsg, setScanMsg] = useState("Posicione seu rosto na câmera");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  // Status da impressão da senha — ver item 10 (feedback de impressão).
+  const [printStatus, setPrintStatus] = useState<"imprimindo" | "ok" | "falha" | null>(null);
 
   // ---- Acessibilidade (idosos / baixa visão / PCD) ----
   // escalaIdx: índice em ESCALAS aplicado ao font-size do <html> (rem → escala
@@ -117,7 +120,11 @@ export function TotemPage() {
   useEffect(() => {
     if (step === "ticket" && ticket) {
       const nome = TIPOS.find((t) => t.tipo === ticket.tipo)?.titulo ?? "";
-      setAnnounce(`Senha ${nome}, número ${ticket.codigo}. Retire sua senha impressa e acompanhe o painel de chamada.`);
+      const avisoImpressao =
+        printStatus === "falha"
+          ? "Não foi possível imprimir. Anote o número ou procure a recepção."
+          : "Retire sua senha impressa.";
+      setAnnounce(`Senha ${nome}, número ${ticket.codigo}. ${avisoImpressao} Acompanhe o painel de chamada.`);
     } else if (step === "checkin-ok" && checkinInfo) {
       setAnnounce(`Check-in confirmado. Olá, ${checkinInfo.paciente_nome}. Aguarde sua chamada no painel.`);
     } else if (step === "checkin-facial") {
@@ -125,7 +132,7 @@ export function TotemPage() {
     } else {
       setAnnounce("");
     }
-  }, [step, ticket, checkinInfo, scanMsg]);
+  }, [step, ticket, checkinInfo, scanMsg, printStatus]);
 
   // Pré-carrega os modelos de reconhecimento facial em segundo plano para a
   // câmera abrir rápida quando o paciente escolher essa opção.
@@ -152,10 +159,55 @@ export function TotemPage() {
   // Telas de conclusão voltam sozinhas para o menu inicial — a senha já saiu
   // impressa, então o ticket fica só alguns segundos na tela (sem botão
   // "Concluir"); o check-in fica um pouco mais para o paciente ler os dados.
+  // A contagem é exibida na tela (item 9) para o paciente saber que ela vai
+  // mudar sozinha, em vez de um timeout silencioso.
+  const DURACAO_CONCLUSAO = { ticket: 4, "checkin-ok": 8 } as const;
+  const [contagem, setContagem] = useState<number | null>(null);
+
   useEffect(() => {
-    if (step !== "ticket" && step !== "checkin-ok") return;
-    const t = setTimeout(() => reset(), step === "ticket" ? 4000 : 8000);
-    return () => clearTimeout(t);
+    if (step !== "ticket" && step !== "checkin-ok") {
+      setContagem(null);
+      return;
+    }
+    setContagem(DURACAO_CONCLUSAO[step]);
+    const id = setInterval(() => {
+      setContagem((c) => (c !== null ? c - 1 : null));
+    }, 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+  useEffect(() => {
+    if (contagem !== null && contagem <= 0) reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contagem]);
+
+  // Timeout de inatividade (item 8) — se o paciente abandona o totem no meio
+  // da digitação do CPF ou na tela de tipos de senha, volta ao menu sozinho
+  // após ~45s sem nenhum toque/clique/tecla, em vez de ficar travado ali.
+  // Fica de fora do "menu" (já é o início) e do "checkin-facial" (fluxo
+  // automático da câmera, sem toque esperado — tem seu próprio bounded loop).
+  const INATIVIDADE_MS = 45_000;
+  const ultimaAtividadeRef = useRef(Date.now());
+  useEffect(() => {
+    const bump = () => { ultimaAtividadeRef.current = Date.now(); };
+    window.addEventListener("pointerdown", bump);
+    window.addEventListener("keydown", bump);
+    return () => {
+      window.removeEventListener("pointerdown", bump);
+      window.removeEventListener("keydown", bump);
+    };
+  }, []);
+  useEffect(() => {
+    ultimaAtividadeRef.current = Date.now();
+  }, [step]);
+  useEffect(() => {
+    if (step === "menu" || step === "checkin-facial") return;
+    const id = setInterval(() => {
+      if (Date.now() - ultimaAtividadeRef.current >= INATIVIDADE_MS) reset();
+    }, 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   function stopCamera() {
@@ -168,6 +220,7 @@ export function TotemPage() {
     setTicket(null);
     setCpf("");
     setCheckinInfo(null);
+    setPrintStatus(null);
     setStep("menu");
   }
 
@@ -181,9 +234,7 @@ export function TotemPage() {
     // clínicas com token público habilitado emitem sem exigir login.
     const { data: { session } } = await supabase.auth.getSession();
     const rpcName = session ? "emitir_senha" : "emitir_senha_publica";
-    const args: Record<string, unknown> = session
-      ? { _clinica_id: clinicaAtual.clinica_id, _tipo }
-      : { _clinica_id: clinicaAtual.clinica_id, _tipo };
+    const args: Record<string, unknown> = { _clinica_id: clinicaAtual.clinica_id, _tipo };
     const { data, error } = await (supabase.rpc as unknown as (
       fn: string,
       a: Record<string, unknown>,
@@ -201,6 +252,10 @@ export function TotemPage() {
     // 2º) em qualquer falha (QZ Tray não instalado / websocket recusado /
     //     impressora não encontrada), cai no fluxo antigo por iframe/HTML
     //     que abre o diálogo do Chrome (ou imprime direto no modo --kiosk-printing).
+    // Item 10: acompanha o status para avisar o paciente se nada pôde ser
+    // impresso (nem silenciosamente nem via diálogo), em vez de dizer
+    // "retire sua senha impressa" quando não saiu nada da impressora.
+    setPrintStatus("imprimindo");
     void (async () => {
       try {
         const pdfBase64 = await gerarSenhaPdfBase64({
@@ -209,12 +264,14 @@ export function TotemPage() {
           clinicaNome: clinicaAtual.clinica?.nome ?? null,
         });
         await imprimirDocumentoSilencioso(pdfBase64);
+        setPrintStatus("ok");
       } catch {
-        imprimirSenhaTotem({
+        const agendou = imprimirSenhaTotem({
           codigo: row.codigo,
           tipo: _tipo,
           clinicaNome: clinicaAtual.clinica?.nome ?? null,
         });
+        setPrintStatus(agendou ? "ok" : "falha");
       }
     })();
   }
@@ -437,7 +494,7 @@ export function TotemPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <button
                 onClick={() => setStep("senha")}
-                className="group relative overflow-hidden rounded-3xl p-8 text-left text-white bg-gradient-to-br from-primary/90 to-primary shadow-lg hover:shadow-2xl transition-all active:scale-[0.98] min-h-[240px] flex flex-col justify-between"
+                className="group relative overflow-hidden rounded-3xl p-8 text-left text-white bg-gradient-to-br from-sky-600 to-sky-700 shadow-lg hover:shadow-2xl transition-all active:scale-[0.98] min-h-[240px] flex flex-col justify-between"
               >
                 <Ticket className="h-14 w-14" />
                 <div>
@@ -589,6 +646,7 @@ export function TotemPage() {
               )}
             </div>
             <p className="text-muted-foreground">Aguarde sua chamada no painel.</p>
+            {contagem !== null && <Contagem segundos={contagem} total={DURACAO_CONCLUSAO["checkin-ok"]} />}
           </div>
         )}
 
@@ -598,8 +656,23 @@ export function TotemPage() {
             {/* clamp com min(vw,vh): nunca estoura nem a largura nem a altura
                 da viewport do totem, em qualquer proporção de tela. */}
             <div className="text-[clamp(4rem,min(18vw,28vh),12rem)] leading-none font-black text-primary tabular-nums">{ticket.codigo}</div>
-            <div className="text-[clamp(1.25rem,3vw,1.5rem)]">Retire sua senha impressa</div>
+            {/* Item 10: feedback do status de impressão em vez de sempre
+                afirmar "retire sua senha impressa" mesmo quando nada saiu. */}
+            {printStatus === "imprimindo" && (
+              <div className="flex items-center justify-center gap-2 text-[clamp(1.25rem,3vw,1.5rem)] text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" /> Imprimindo…
+              </div>
+            )}
+            {printStatus === "ok" && (
+              <div className="text-[clamp(1.25rem,3vw,1.5rem)]">Retire sua senha impressa</div>
+            )}
+            {printStatus === "falha" && (
+              <div className="flex items-center justify-center gap-2 text-[clamp(1.1rem,2.6vw,1.35rem)] text-amber-600 dark:text-amber-400 font-semibold">
+                <AlertTriangle className="h-6 w-6 shrink-0" /> Não foi possível imprimir — anote o número ou procure a recepção
+              </div>
+            )}
             <p className="text-muted-foreground">Acompanhe o painel de chamada na sala de espera.</p>
+            {contagem !== null && <Contagem segundos={contagem} total={DURACAO_CONCLUSAO.ticket} />}
           </div>
         )}
       </main>
@@ -609,6 +682,25 @@ export function TotemPage() {
           <button onClick={reset} className="underline ml-2">Voltar ao início</button>
         )}
       </footer>
+    </div>
+  );
+}
+
+// Item 9: contagem regressiva visível nas telas de conclusão (ticket /
+// check-in confirmado), com barra de progresso, em vez de a tela mudar sem
+// aviso quando o timeout silencioso expira.
+function Contagem({ segundos, total }: { segundos: number; total: number }) {
+  const restante = Math.max(segundos, 0);
+  const pct = total > 0 ? Math.max(0, Math.min(100, (restante / total) * 100)) : 0;
+  return (
+    <div className="pt-1 space-y-1.5">
+      <p className="text-xs text-muted-foreground">Voltando ao início em {restante}s…</p>
+      <div className="h-1.5 w-40 mx-auto rounded-full bg-muted overflow-hidden">
+        <div
+          className="h-full bg-primary transition-[width] duration-1000 ease-linear"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }

@@ -73,11 +73,17 @@ export async function gerarSenhaPdfBase64(params: {
   return dataUrl.replace(/^data:application\/pdf(?:;filename=.*?)?;base64,/, "");
 }
 
+/**
+ * Retorna `true` quando conseguiu montar o iframe e agendar a impressão
+ * (mesmo que a impressora física falhe depois — isso o JS não enxerga), e
+ * `false` só no caso em que nem o documento do iframe pôde ser criado.
+ * O totem usa esse retorno para decidir se mostra aviso de falha ao paciente.
+ */
 export function imprimirSenhaTotem(params: {
   codigo: string;
   tipo: string;
   clinicaNome?: string | null;
-}) {
+}): boolean {
   const { codigo, tipo, clinicaNome } = params;
   const label = TIPO_LABEL[tipo] ?? "SENHA";
   const agora = new Date().toLocaleString("pt-BR", {
@@ -139,7 +145,7 @@ export function imprimirSenhaTotem(params: {
   const doc = iframe.contentDocument;
   if (!doc) {
     document.body.removeChild(iframe);
-    return;
+    return false;
   }
   doc.open();
   doc.write(html);
@@ -166,6 +172,7 @@ export function imprimirSenhaTotem(params: {
   } else {
     iframe.addEventListener("load", () => setTimeout(doPrint, 50), { once: true });
   }
+  return true;
 }
 
 function escapeHtml(s: string) {
