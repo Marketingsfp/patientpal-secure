@@ -8273,6 +8273,7 @@ export type Database = {
       }
       checkin_agendamento: { Args: { _token: string }; Returns: Json }
       consulta_publica: { Args: { _token: string }; Returns: Json }
+      contrato_dias_tolerancia: { Args: never; Returns: number }
       contrato_historico: { Args: { _contrato_id: string }; Returns: Json }
       contrato_publico: { Args: { _token: string }; Returns: Json }
       converter_item_agendamento: {
@@ -8633,6 +8634,10 @@ export type Database = {
         }[]
       }
       paciente_cartao_inadimplente: {
+        Args: { _clinica_id: string; _paciente_id: string }
+        Returns: Json
+      }
+      paciente_cartao_status: {
         Args: { _clinica_id: string; _paciente_id: string }
         Returns: Json
       }
