@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Users, Download, Eye } from "lucide-react";
+import { Plus, Search, Pencil, Users, Download, Eye, IdCard } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -472,12 +472,12 @@ function ClientesPage() {
                     </div>
                     <span>{p.nome}</span>
                     {convenios?.get(p.id) && (
-                      <span
-                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
-                        title={`Convênio: ${convenios.get(p.id)!.convenio}`}
+                      <IdCard
+                        className="h-4 w-4 text-emerald-600 shrink-0"
+                        aria-label={`Associado - ${convenios.get(p.id)!.tipo} — ${convenios.get(p.id)!.convenio}`}
                       >
-                        Associado - {convenios.get(p.id)!.tipo} — {convenios.get(p.id)!.convenio}
-                      </span>
+                        <title>{`Associado - ${convenios.get(p.id)!.tipo} — ${convenios.get(p.id)!.convenio}`}</title>
+                      </IdCard>
                     )}
                   </div>
                 </TableCell>
