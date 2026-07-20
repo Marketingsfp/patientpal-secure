@@ -2517,7 +2517,9 @@ function AgendaPage() {
 
   const filtrados = useMemo(() => {
     return items.filter((a) => {
-      if (!mostrarLivres && isSlotLivre(a.paciente_nome)) return false;
+      // Oculta slots livres/bloqueios ("não agendadas") por padrão, exceto
+      // quando o usuário escolhe explicitamente o filtro Status = "Livres".
+      if (!mostrarLivres && filtroStatus !== "livres" && isSlotLivre(a.paciente_nome)) return false;
       if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
       const ehLivre = isSlotLivre(a.paciente_nome);
       if (filtroStatus === "livres") {
