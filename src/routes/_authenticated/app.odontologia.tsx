@@ -22,6 +22,7 @@ import { OrcamentoTab } from "@/components/odontologia/orcamento-tab";
 import { AnamneseOdontoTab } from "@/components/odontologia/anamnese-odonto-tab";
 import { EvolucaoOdontoTab } from "@/components/odontologia/evolucao-odonto-tab";
 import { AddToOrcamentoDialog } from "@/components/odontologia/add-to-orcamento-dialog";
+import { GaleriaOdontoTab } from "@/components/odontologia/galeria-odonto-tab";
 
 export const Route = createFileRoute("/_authenticated/app/odontologia")({
   component: OdontologiaPage,
@@ -250,6 +251,7 @@ function OdontologiaPage() {
               <TabsTrigger value="odontograma">Odontograma</TabsTrigger>
               <TabsTrigger value="anamnese">Anamnese</TabsTrigger>
               <TabsTrigger value="evolucao">Evolução</TabsTrigger>
+              <TabsTrigger value="galeria">Galeria</TabsTrigger>
               <TabsTrigger value="notas">Notas clínicas</TabsTrigger>
             </TabsList>
 
@@ -438,6 +440,21 @@ function OdontologiaPage() {
             <TabsContent value="evolucao">
               <Card><CardContent className="pt-6">
                 <EvolucaoOdontoTab pacienteId={pacienteId} readOnly={!podeEscrever} />
+              </CardContent></Card>
+            </TabsContent>
+
+            <TabsContent value="galeria">
+              <Card><CardContent className="pt-6">
+                {clinicaAtual && (
+                  <GaleriaOdontoTab
+                    clinicaId={clinicaAtual.clinica_id}
+                    pacienteId={pacienteId}
+                    criadoPor={user?.id ?? null}
+                    readOnly={!podeEscrever}
+                    denteFiltro={selecionado}
+                    onDenteFiltroChange={(d) => setSelecionado(d)}
+                  />
+                )}
               </CardContent></Card>
             </TabsContent>
 
