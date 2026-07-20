@@ -6640,6 +6640,15 @@ function AgendaPage() {
               setDataFim={setDataFim}
               compact
             />
+            {/* Toggle "apenas a data selecionada" — ao lado do seletor de data, pois depende dele */}
+            <label className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer select-none w-fit hover:text-slate-900 transition-colors">
+              <Checkbox
+                checked={apenasData}
+                onCheckedChange={(v) => setApenasData(v === true)}
+                className="h-3.5 w-3.5 rounded border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+              />
+              Exibir apenas a data selecionada
+            </label>
           </div>
 
           {/* Especialidade */}
@@ -6675,15 +6684,6 @@ function AgendaPage() {
             </div>
           </div>
         </div>
-        {/* Toggle "apenas a data selecionada" — alinhado à esquerda do cabeçalho da tabela abaixo */}
-        <label className="mt-2 flex items-center gap-2 text-[12px] text-slate-600 cursor-pointer select-none w-fit hover:text-slate-900 transition-colors">
-          <Checkbox
-            checked={apenasData}
-            onCheckedChange={(v) => setApenasData(v === true)}
-            className="h-4 w-4 rounded border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-          />
-          Exibir apenas a data selecionada
-        </label>
         {/* KPIs REMOVIDOS */}
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
         <div className="h-4 xl:h-8"></div>
