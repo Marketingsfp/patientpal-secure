@@ -35,7 +35,7 @@ export function isDecidua(dente: number): boolean {
 }
 
 export const STATUS_COR: Record<OdontoStatus, string> = {
-  higido: "hsl(var(--muted))",
+  higido: "#f8fafc",
   cariado: "#ef4444",
   restaurado: "#3b82f6",
   ausente: "#1f2937",
