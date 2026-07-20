@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Smile, Save } from "lucide-react";
+import { Smile, Save, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { OdontogramaClinico, type FacesEstado } from "@/components/odontologia/odontograma-clinico";
@@ -20,6 +21,7 @@ import { formatDatePura } from "@/lib/date-utils";
 import { OrcamentoTab } from "@/components/odontologia/orcamento-tab";
 import { AnamneseOdontoTab } from "@/components/odontologia/anamnese-odonto-tab";
 import { EvolucaoOdontoTab } from "@/components/odontologia/evolucao-odonto-tab";
+import { AddToOrcamentoDialog } from "@/components/odontologia/add-to-orcamento-dialog";
 
 export const Route = createFileRoute("/_authenticated/app/odontologia")({
   component: OdontologiaPage,
@@ -37,6 +39,7 @@ interface ProntuarioOdonto {
 
 function OdontologiaPage() {
   const { clinicaAtual } = useClinica();
+  const { user } = useAuth();
   const podeEscrever = usePodeEscrever("odontologia");
   const [pacienteId, setPacienteId] = useState<string | null>(null);
   const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
@@ -55,6 +58,7 @@ function OdontologiaPage() {
     orcamento_numero: number | null; dentes: number[];
   }>>([]);
   const [especialidadeOdontoId, setEspecialidadeOdontoId] = useState<string | null>(null);
+  const [addOrcOpen, setAddOrcOpen] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -135,6 +139,33 @@ function OdontologiaPage() {
     () => (selecionado ? dentes.filter((r) => r.dente === selecionado) : []),
     [selecionado, dentes],
   );
+
+  // Plano de tratamento: itens de orçamentos abertos agrupados por dente.
+  const planoPorDente = useMemo(() => {
+    const map = new Map<number, typeof itensPorDente>();
+    for (const it of itensPorDente) {
+      for (const d of it.dentes) {
+        const arr = map.get(d) ?? [];
+        arr.push(it);
+        map.set(d, arr);
+      }
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a - b);
+  }, [itensPorDente]);
+
+  async function removerDenteDoItem(itemId: string, dente: number) {
+    if (!podeEscrever) { toast.error("Sem permissão de edição."); return; }
+    const it = itensPorDente.find((x) => x.id === itemId);
+    if (!it) return;
+    const novos = it.dentes.filter((d) => d !== dente);
+    const { error } = await supabase
+      .from("orcamento_itens")
+      .update({ dentes: novos.length ? novos : null })
+      .eq("id", itemId);
+    if (error) { mostrarErro(error); return; }
+    toast.success(`Dente ${dente} removido do item`);
+    void carregar();
+  }
 
   async function salvarDente() {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
@@ -239,8 +270,20 @@ function OdontologiaPage() {
                   </p>
                   <ul className="text-xs text-amber-900/90 space-y-0.5">
                     {itensDoDenteSelecionado.map((it) => (
-                      <li key={it.id}>
-                        Orç. {it.orcamento_numero ?? "—"} · {it.descricao} · R$ {Number(it.valor_total).toFixed(2)}
+                      <li key={it.id} className="flex items-center justify-between gap-2">
+                        <span>
+                          Orç. {it.orcamento_numero ?? "—"} · {it.descricao} · R$ {Number(it.valor_total).toFixed(2)}
+                        </span>
+                        {podeEscrever && (
+                          <button
+                            type="button"
+                            onClick={() => void removerDenteDoItem(it.id, selecionado)}
+                            className="text-amber-900/70 hover:text-destructive"
+                            title={`Remover dente ${selecionado} deste item`}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -248,9 +291,20 @@ function OdontologiaPage() {
               )}
               {selecionado && podeEscrever && (
                 <div className="border rounded-md p-4 space-y-3">
-                  <p className="font-medium">
-                    Dente {selecionado} · <span className="text-primary">{FACE_LABEL[faceSelecionada]}</span>
-                  </p>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="font-medium">
+                      Dente {selecionado} · <span className="text-primary">{FACE_LABEL[faceSelecionada]}</span>
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setAddOrcOpen(true)}
+                      disabled={!especialidadeOdontoId || !pacienteSel}
+                      className="border-amber-400 text-amber-700 hover:bg-amber-50"
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Incluir em orçamento
+                    </Button>
+                  </div>
                   <div className="grid md:grid-cols-4 gap-3">
                     <div>
                       <Label>Face</Label>
