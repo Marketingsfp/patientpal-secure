@@ -40,7 +40,10 @@ function TotemRoute() {
 type TipoSenha = "N" | "P" | "C" | "R";
 
 function formatarNomeClinica(nome: string): string {
-  return nome.replace(/\bSao\b/gi, (m) => (m[0] === "S" ? "São" : "são"));
+  return nome
+    .replace(/\bSao\b/gi, (m) => (m[0] === "S" ? "São" : "são"))
+    .replace(/\bPoliclinica\b/gi, (m) => (m[0] === "P" ? "Policlínica" : "policlínica"))
+    .replace(/\bPOLICLINICA\b/g, "POLICLÍNICA");
 }
 
 const TIPOS: { tipo: TipoSenha; titulo: string; sub: string; Icon: typeof Hash; classe: string }[] = [
