@@ -39,6 +39,10 @@ function TotemRoute() {
 
 type TipoSenha = "N" | "P" | "C" | "R";
 
+function formatarNomeClinica(nome: string): string {
+  return nome.replace(/\bSao\b/gi, (m) => (m[0] === "S" ? "São" : "são"));
+}
+
 const TIPOS: { tipo: TipoSenha; titulo: string; sub: string; Icon: typeof Hash; classe: string }[] = [
   { tipo: "N", titulo: "Comum", sub: "Atendimento padrão", Icon: Hash, classe: "from-sky-600 to-sky-700" },
   { tipo: "P", titulo: "Preferencial", sub: "Idoso · Gestante · PCD · Crianças de colo", Icon: Accessibility, classe: "from-amber-500 to-amber-600" },
