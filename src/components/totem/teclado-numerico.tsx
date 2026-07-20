@@ -17,15 +17,15 @@ export function TecladoNumerico({
   disabled?: boolean;
 }) {
   const base =
-    "h-12 rounded-xl border-2 text-xl font-semibold bg-background transition active:scale-95 disabled:opacity-40 hover:border-primary hover:bg-primary/5";
+    "h-16 rounded-xl border-2 text-2xl font-semibold bg-background transition active:scale-95 disabled:opacity-40 hover:border-primary hover:bg-primary/5";
   return (
-    <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto select-none">
+    <div className="grid grid-cols-3 gap-2.5 max-w-sm mx-auto select-none">
       {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
         <button key={d} type="button" className={base} disabled={disabled} onClick={() => onDigit(d)}>
           {d}
         </button>
       ))}
-      <button type="button" className={`${base} text-base text-muted-foreground`} disabled={disabled} onClick={onClear}>
+      <button type="button" className={`${base} text-lg text-muted-foreground`} disabled={disabled} onClick={onClear}>
         Limpar
       </button>
       <button type="button" className={base} disabled={disabled} onClick={() => onDigit("0")}>
@@ -38,7 +38,7 @@ export function TecladoNumerico({
         onClick={onBackspace}
         aria-label="Apagar"
       >
-        <Delete className="h-6 w-6" />
+        <Delete className="h-7 w-7" />
       </button>
     </div>
   );
