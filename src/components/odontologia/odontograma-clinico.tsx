@@ -100,6 +100,20 @@ function DenteFaces({
   const c = (f: OdontoFace) => STATUS_COR[estados[`${dente}-${f}`] ?? estados[`${dente}-INTEIRO`] ?? "higido"];
   const s = (f: OdontoFace) => estados[`${dente}-${f}`] ?? estados[`${dente}-INTEIRO`] ?? "higido";
   const decidua = isDecidua(dente);
+  // Superior (quadrantes 1,2,5,6) → raiz para cima; Inferior (3,4,7,8) → raiz para baixo.
+  const quad = Math.floor(dente / 10);
+  const superior = quad === 1 || quad === 2 || quad === 5 || quad === 6;
+  const clipId = `tooth-crown-${dente}`;
+  const rootId = `tooth-root-${dente}`;
+  // Coroa ocupa y=16..56 (superior) ou y=0..40 (inferior); raiz no lado oposto.
+  const crownY = superior ? 16 : 0;
+  const rootPath = superior
+    ? `M8,16 C6,10 8,4 14,2 C18,0 22,0 26,2 C32,4 34,10 32,16 Z`
+    : `M8,40 C6,46 8,52 14,54 C18,56 22,56 26,54 C32,52 34,46 32,40 Z`;
+  // Coroa arredondada como clipPath para dar forma de dente às 5 faces.
+  const crownPath = `M4,${crownY + 4} C4,${crownY} 8,${crownY - 2} 12,${crownY - 2} L28,${crownY - 2} C32,${crownY - 2} 36,${crownY} 36,${crownY + 4} L36,${crownY + 32} C36,${crownY + 38} 30,${crownY + 40} 20,${crownY + 40} C10,${crownY + 40} 4,${crownY + 38} 4,${crownY + 32} Z`;
+  const cx0 = 4, cy0 = crownY, cw = 32, ch = 40;
+  const cIn = { x: cx0 + 10, y: cy0 + 12, w: cw - 20, h: ch - 24 }; // face oclusal (central)
   return (
     <div
       className={`flex flex-col items-center gap-0.5 rounded-md p-0.5 transition ${
@@ -108,62 +122,64 @@ function DenteFaces({
       title={`Dente ${dente}${orcado ? " · orçado" : ""}`}
     >
       <span className={`text-[10px] font-mono ${decidua ? "text-amber-700" : "text-foreground/70"}`}>{dente}</span>
-      <svg viewBox="0 0 40 40" className="h-10 w-10">
-        {/* Vestibular (topo) */}
-        <polygon
-          points="0,0 40,0 30,10 10,10"
-          fill={c("V")}
-          stroke="hsl(var(--border))"
-          strokeWidth="0.7"
-          className="cursor-pointer hover:opacity-80"
-          onClick={(e) => { e.stopPropagation(); onClickFace(dente, "V"); }}
-        >
-          <title>{`${dente} · Vestibular · ${STATUS_LABEL[s("V")]}`}</title>
-        </polygon>
-        {/* Mesial (direita — lado da linha média) */}
-        <polygon
-          points="40,0 40,40 30,30 30,10"
-          fill={c("M")}
-          stroke="hsl(var(--border))"
-          strokeWidth="0.7"
-          className="cursor-pointer hover:opacity-80"
-          onClick={(e) => { e.stopPropagation(); onClickFace(dente, "M"); }}
-        >
-          <title>{`${dente} · Mesial · ${STATUS_LABEL[s("M")]}`}</title>
-        </polygon>
-        {/* Lingual/Palatina (base) */}
-        <polygon
-          points="0,40 40,40 30,30 10,30"
-          fill={c("L")}
-          stroke="hsl(var(--border))"
-          strokeWidth="0.7"
-          className="cursor-pointer hover:opacity-80"
-          onClick={(e) => { e.stopPropagation(); onClickFace(dente, "L"); }}
-        >
-          <title>{`${dente} · Lingual/Palatina · ${STATUS_LABEL[s("L")]}`}</title>
-        </polygon>
-        {/* Distal (esquerda) */}
-        <polygon
-          points="0,0 0,40 10,30 10,10"
-          fill={c("D")}
-          stroke="hsl(var(--border))"
-          strokeWidth="0.7"
-          className="cursor-pointer hover:opacity-80"
-          onClick={(e) => { e.stopPropagation(); onClickFace(dente, "D"); }}
-        >
-          <title>{`${dente} · Distal · ${STATUS_LABEL[s("D")]}`}</title>
-        </polygon>
-        {/* Oclusal / Incisal (centro) */}
-        <rect
-          x="10" y="10" width="20" height="20"
-          fill={c("O")}
-          stroke="hsl(var(--border))"
-          strokeWidth="0.7"
-          className="cursor-pointer hover:opacity-80"
-          onClick={(e) => { e.stopPropagation(); onClickFace(dente, "O"); }}
-        >
-          <title>{`${dente} · Oclusal/Incisal · ${STATUS_LABEL[s("O")]}`}</title>
-        </rect>
+      <svg viewBox="0 0 40 56" className="h-14 w-10">
+        <defs>
+          <clipPath id={clipId}>
+            <path d={crownPath} />
+          </clipPath>
+        </defs>
+        {/* Raiz (não clicável, apenas visual) */}
+        <path d={rootPath} fill="hsl(var(--muted))" stroke="hsl(var(--border))" strokeWidth="0.7" id={rootId} />
+        {/* Faces da coroa recortadas no formato de dente */}
+        <g clipPath={`url(#${clipId})`}>
+          {/* Vestibular (topo da coroa) */}
+          <polygon
+            points={`${cx0},${cy0} ${cx0 + cw},${cy0} ${cIn.x + cIn.w},${cIn.y} ${cIn.x},${cIn.y}`}
+            fill={c("V")}
+            className="cursor-pointer hover:opacity-80"
+            onClick={(e) => { e.stopPropagation(); onClickFace(dente, "V"); }}
+          >
+            <title>{`${dente} · Vestibular · ${STATUS_LABEL[s("V")]}`}</title>
+          </polygon>
+          {/* Mesial (lateral direita da caixa — lado da linha média) */}
+          <polygon
+            points={`${cx0 + cw},${cy0} ${cx0 + cw},${cy0 + ch} ${cIn.x + cIn.w},${cIn.y + cIn.h} ${cIn.x + cIn.w},${cIn.y}`}
+            fill={c("M")}
+            className="cursor-pointer hover:opacity-80"
+            onClick={(e) => { e.stopPropagation(); onClickFace(dente, "M"); }}
+          >
+            <title>{`${dente} · Mesial · ${STATUS_LABEL[s("M")]}`}</title>
+          </polygon>
+          {/* Lingual / Palatina (base) */}
+          <polygon
+            points={`${cx0},${cy0 + ch} ${cx0 + cw},${cy0 + ch} ${cIn.x + cIn.w},${cIn.y + cIn.h} ${cIn.x},${cIn.y + cIn.h}`}
+            fill={c("L")}
+            className="cursor-pointer hover:opacity-80"
+            onClick={(e) => { e.stopPropagation(); onClickFace(dente, "L"); }}
+          >
+            <title>{`${dente} · Lingual/Palatina · ${STATUS_LABEL[s("L")]}`}</title>
+          </polygon>
+          {/* Distal (lateral esquerda) */}
+          <polygon
+            points={`${cx0},${cy0} ${cx0},${cy0 + ch} ${cIn.x},${cIn.y + cIn.h} ${cIn.x},${cIn.y}`}
+            fill={c("D")}
+            className="cursor-pointer hover:opacity-80"
+            onClick={(e) => { e.stopPropagation(); onClickFace(dente, "D"); }}
+          >
+            <title>{`${dente} · Distal · ${STATUS_LABEL[s("D")]}`}</title>
+          </polygon>
+          {/* Oclusal / Incisal (centro) */}
+          <rect
+            x={cIn.x} y={cIn.y} width={cIn.w} height={cIn.h}
+            fill={c("O")}
+            className="cursor-pointer hover:opacity-80"
+            onClick={(e) => { e.stopPropagation(); onClickFace(dente, "O"); }}
+          >
+            <title>{`${dente} · Oclusal/Incisal · ${STATUS_LABEL[s("O")]}`}</title>
+          </rect>
+        </g>
+        {/* Contorno da coroa por cima */}
+        <path d={crownPath} fill="none" stroke="hsl(var(--border))" strokeWidth="0.9" />
       </svg>
       {orcado && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />}
     </div>
