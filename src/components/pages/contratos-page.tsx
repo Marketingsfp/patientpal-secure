@@ -3066,7 +3066,10 @@ function DetalheContrato({
     }
   };
 
-  // Multa de 10% + juros de 0,33% ao dia para parcelas vencidas
+  // Multa de 10% + juros de 0,33% ao dia para parcelas vencidas.
+  // Regra de negócio: tolerância de 5 dias corridos após o vencimento — nesse
+  // intervalo não incidem encargos. A partir do 6º dia de atraso aplica-se
+  // multa e juros retroativos.
   const calcValorComJuros = (m: Mens | null): number => {
     if (!m) return 0;
     const base = Number(m.valor) || 0;
@@ -3075,7 +3078,7 @@ function DetalheContrato({
     hoje.setHours(0, 0, 0, 0);
     const venc = new Date(m.vencimento + "T00:00:00");
     const diasAtraso = Math.floor((hoje.getTime() - venc.getTime()) / 86400000);
-    if (diasAtraso <= 0) return base;
+    if (diasAtraso <= 5) return base;
     return base * 1.1 + base * 0.0033 * diasAtraso;
   };
   const pagValorFinal = calcValorComJuros(pagMens);
