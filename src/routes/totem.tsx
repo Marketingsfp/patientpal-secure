@@ -39,6 +39,10 @@ function TotemRoute() {
 
 type TipoSenha = "N" | "P" | "C" | "R";
 
+function formatarNomeClinica(nome: string): string {
+  return nome.replace(/\bSao\b/gi, (m) => (m[0] === "S" ? "São" : "são"));
+}
+
 const TIPOS: { tipo: TipoSenha; titulo: string; sub: string; Icon: typeof Hash; classe: string }[] = [
   { tipo: "N", titulo: "Comum", sub: "Atendimento padrão", Icon: Hash, classe: "from-sky-600 to-sky-700" },
   { tipo: "P", titulo: "Preferencial", sub: "Idoso · Gestante · PCD · Crianças de colo", Icon: Accessibility, classe: "from-amber-500 to-amber-600" },
@@ -476,7 +480,7 @@ export function TotemPage() {
       <header className="px-6 py-3 flex items-center justify-between shrink-0">
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Bem-vindo a</div>
-          <h1 className="text-xl md:text-2xl font-bold">{clinicaAtual.clinica.nome}</h1>
+          <h1 className="text-xl md:text-2xl font-bold">{formatarNomeClinica(clinicaAtual.clinica.nome)}</h1>
         </div>
         <div className="text-right text-sm text-muted-foreground">
           <div className="capitalize">{new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}</div>
