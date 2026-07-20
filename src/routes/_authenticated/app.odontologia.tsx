@@ -18,6 +18,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { type OdontoStatus, type OdontoFace, STATUS_LABEL, FACE_LABEL } from "@/lib/odonto";
 import { formatDatePura } from "@/lib/date-utils";
 import { OrcamentoTab } from "@/components/odontologia/orcamento-tab";
+import { AnamneseOdontoTab } from "@/components/odontologia/anamnese-odonto-tab";
+import { EvolucaoOdontoTab } from "@/components/odontologia/evolucao-odonto-tab";
 
 export const Route = createFileRoute("/_authenticated/app/odontologia")({
   component: OdontologiaPage,
@@ -212,6 +214,15 @@ function OdontologiaPage() {
             <p className="text-sm text-muted-foreground">Selecione um paciente para começar.</p>
           ) : (
           <>
+          <Tabs defaultValue="odontograma" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="odontograma">Odontograma</TabsTrigger>
+              <TabsTrigger value="anamnese">Anamnese</TabsTrigger>
+              <TabsTrigger value="evolucao">Evolução</TabsTrigger>
+              <TabsTrigger value="notas">Notas clínicas</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="odontograma" className="space-y-4">
           <Card>
             <CardHeader><CardTitle>Odontograma</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -300,7 +311,21 @@ function OdontologiaPage() {
               )}
             </CardContent>
           </Card>
+            </TabsContent>
 
+            <TabsContent value="anamnese">
+              <Card><CardContent className="pt-6">
+                <AnamneseOdontoTab pacienteId={pacienteId} readOnly={!podeEscrever} />
+              </CardContent></Card>
+            </TabsContent>
+
+            <TabsContent value="evolucao">
+              <Card><CardContent className="pt-6">
+                <EvolucaoOdontoTab pacienteId={pacienteId} readOnly={!podeEscrever} />
+              </CardContent></Card>
+            </TabsContent>
+
+            <TabsContent value="notas" className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <Card>
               <CardHeader><CardTitle>Queixa principal</CardTitle></CardHeader>
@@ -367,6 +392,8 @@ function OdontologiaPage() {
               )}
             </CardContent>
           </Card>
+            </TabsContent>
+          </Tabs>
           </>
           )}
           </TabsContent>
