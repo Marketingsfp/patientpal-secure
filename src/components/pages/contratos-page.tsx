@@ -3066,7 +3066,10 @@ function DetalheContrato({
     }
   };
 
-  // Multa de 10% + juros de 0,33% ao dia para parcelas vencidas
+  // Multa de 10% + juros de 0,33% ao dia para parcelas vencidas.
+  // Regra de negócio: tolerância de 5 dias corridos após o vencimento — nesse
+  // intervalo não incidem encargos. A partir do 6º dia de atraso aplica-se
+  // multa e juros retroativos.
   const calcValorComJuros = (m: Mens | null): number => {
     if (!m) return 0;
     const base = Number(m.valor) || 0;
@@ -3075,7 +3078,7 @@ function DetalheContrato({
     hoje.setHours(0, 0, 0, 0);
     const venc = new Date(m.vencimento + "T00:00:00");
     const diasAtraso = Math.floor((hoje.getTime() - venc.getTime()) / 86400000);
-    if (diasAtraso <= 0) return base;
+    if (diasAtraso <= 5) return base;
     return base * 1.1 + base * 0.0033 * diasAtraso;
   };
   const pagValorFinal = calcValorComJuros(pagMens);
@@ -4660,7 +4663,15 @@ h1, h2, h3 { margin: 0 0 6mm; }
               </div>
             </div>
           ) : null}
-          {pagMens && pagDiasAtraso > 0 ? (
+          {pagMens && pagDiasAtraso > 0 && pagDiasAtraso <= 5 ? (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+              <div className="font-semibold">Dentro da tolerância — sem encargos</div>
+              <div className="text-muted-foreground">
+                Parcela vencida há {pagDiasAtraso} dia(s). Até 5 dias corridos após o vencimento não incidem multa nem juros.
+              </div>
+            </div>
+          ) : null}
+          {pagMens && pagDiasAtraso > 5 ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs space-y-0.5">
               <div className="flex justify-between">
                 <span>Valor original</span>

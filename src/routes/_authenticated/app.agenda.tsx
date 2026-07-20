@@ -316,6 +316,10 @@ type ConvenioInfo = {
   desconto: DescontoConvenio | null;
   avisoLimite?: string;
   bloquear?: boolean;
+  /** Contrato com parcela(s) vencida(s) dentro da tolerância de 5 dias. */
+  emCarencia?: boolean;
+  /** Dias restantes de tolerância na parcela vencida mais crítica. */
+  diasCarenciaRestantes?: number | null;
 };
 
 function aplicarDesconto(valor: number, d: DescontoConvenio): number {
@@ -373,7 +377,11 @@ async function obterInfoConvenioPaciente(params: {
 
   const convenioNome = contrato.cb_convenios?.nome ?? "Convênio";
 
-  // 2) Verifica mensalidades em atraso do contrato
+  // 2) Verifica mensalidades em atraso do contrato.
+  //    Regra de negócio: tolerância de 5 dias corridos após o vencimento.
+  //    - 0..5 dias de atraso → contrato "em carência" (uso do convênio
+  //      restrito a consultas ≤ R$ 9,99, sem exames).
+  //    - > 5 dias → parcela conta como atrasada e o convênio é bloqueado.
   const hojeStr = new Date().toISOString().slice(0, 10);
   const { data: mens } = await supabase
     .from("contrato_mensalidades")
@@ -381,8 +389,21 @@ async function obterInfoConvenioPaciente(params: {
     .eq("contrato_id", contrato.id)
     .in("status", ["pendente", "aberto", "atrasado"])
     .lte("vencimento", hojeStr);
-  const parcelasAtrasadas = (mens ?? []).length;
-  const emDia = parcelasAtrasadas === 0;
+  const DIAS_TOLERANCIA = 5;
+  const hojeMs = new Date(hojeStr + "T00:00:00").getTime();
+  const diasAtrasoLista = (mens ?? []).map((m: any) => {
+    const v = new Date(String(m.vencimento) + "T00:00:00").getTime();
+    return Math.max(0, Math.floor((hojeMs - v) / 86400000));
+  });
+  const parcelasAtrasadas = diasAtrasoLista.filter((d) => d > DIAS_TOLERANCIA).length;
+  const parcelasEmCarencia = diasAtrasoLista.filter((d) => d >= 0 && d <= DIAS_TOLERANCIA).length;
+  const emDia = parcelasAtrasadas === 0 && parcelasEmCarencia === 0;
+  const emCarencia = parcelasAtrasadas === 0 && parcelasEmCarencia > 0;
+  const diasCarenciaRestantes = emCarencia
+    ? Math.min(
+        ...diasAtrasoLista.filter((d) => d <= DIAS_TOLERANCIA).map((d) => DIAS_TOLERANCIA - d),
+      )
+    : null;
 
   // 2b) Conta mensalidades pagas do contrato (para checagem de carência).
   const { count: pagasCount } = await supabase
@@ -825,7 +846,40 @@ async function obterInfoConvenioPaciente(params: {
     }
   }
 
-  return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear };
+  // 6) Trava de tolerância (5 dias corridos após vencimento).
+  //    Dentro da carência o convênio libera APENAS consultas cujo valor com
+  //    o benefício fique ≤ R$ 9,99. Exames e demais procedimentos ficam sem
+  //    o benefício (paga particular) até a mensalidade ser quitada.
+  if (emCarencia) {
+    const LIMITE_CONSULTA = 9.99;
+    const tipoLower = (procedimentoTipo ?? "").toLowerCase();
+    const nomeLower = (procedimentoNome ?? "").toLowerCase();
+    const ehExame = tipoLower.includes("exame") || nomeLower.includes("exame");
+    const ehConsulta = tipoLower.includes("consulta") || nomeLower.includes("consulta");
+    let valorFinalConvenio: number | null = null;
+    if (desconto?.tipo === "gratuidade") valorFinalConvenio = 0;
+    else if (desconto?.tipo === "valor_fixo") valorFinalConvenio = Number(desconto.valor) || 0;
+    // percentual/valor: não conseguimos garantir ≤ R$ 9,99 sem base — reprova.
+    const elegivelCarencia =
+      !ehExame && ehConsulta && valorFinalConvenio !== null && valorFinalConvenio <= LIMITE_CONSULTA;
+    const diasAtraso = DIAS_TOLERANCIA - (diasCarenciaRestantes ?? 0);
+    const suffix = ` Mensalidade em atraso há ${diasAtraso} dia(s) — dentro da tolerância de ${DIAS_TOLERANCIA} dias apenas consultas até R$ ${LIMITE_CONSULTA.toFixed(2)} são cobertas pelo convênio.`;
+    if (!elegivelCarencia) {
+      desconto = null;
+      const motivo = ehExame
+        ? "Convênio suspenso para exames enquanto a mensalidade não for quitada."
+        : ehConsulta && valorFinalConvenio !== null && valorFinalConvenio > LIMITE_CONSULTA
+          ? `Convênio suspenso: benefício desta consulta (R$ ${valorFinalConvenio.toFixed(2)}) está acima do teto de R$ ${LIMITE_CONSULTA.toFixed(2)} permitido na tolerância.`
+          : "Convênio suspenso: procedimento fora da tolerância — cobrando valor particular.";
+      avisoLimite = `${motivo}${suffix}`;
+    } else {
+      // Consulta permitida: informa mas não bloqueia.
+      const info = `Contrato em carência — parcela vence sem juros por mais ${diasCarenciaRestantes ?? 0} dia(s). Consulta liberada por estar dentro do teto de R$ ${LIMITE_CONSULTA.toFixed(2)}.`;
+      avisoLimite = avisoLimite ? `${info} ${avisoLimite}` : info;
+    }
+  }
+
+  return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear, emCarencia, diasCarenciaRestantes };
 }
 
 const toLocalInput = (iso: string) => {
