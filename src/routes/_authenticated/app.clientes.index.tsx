@@ -471,6 +471,14 @@ function ClientesPage() {
                       )}
                     </div>
                     <span>{p.nome}</span>
+                    {convenios?.get(p.id) && (
+                      <span
+                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                        title={`Convênio: ${convenios.get(p.id)!.convenio}`}
+                      >
+                        Associado - {convenios.get(p.id)!.tipo} — {convenios.get(p.id)!.convenio}
+                      </span>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{p.cpf ?? "—"}</TableCell>
