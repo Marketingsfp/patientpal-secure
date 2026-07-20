@@ -1,53 +1,60 @@
-## Objetivo
+## Regra de negócio (confirmada)
 
-Permitir que um paciente desista de um convênio para aderir a outro, cancelando o contrato atual e emitindo um novo contrato **sem taxa de adesão e sem carência**, com rastreabilidade completa. Aplicável às 3 clínicas.
+Aplicável às **3 clínicas**. Para toda mensalidade de contrato de convênio (Cartão Benefício):
 
-## Comportamento
+- Do dia do vencimento até **5 dias corridos depois**, o paciente:
+  - paga a parcela **sem juros e sem multa**;
+  - continua podendo usar o convênio, **mas somente para consultas com valor ≤ R$ 9,99**;
+  - **não** pode usar o convênio para **exames** (tipo de serviço = Exame) nem para outros procedimentos.
+- A partir do **6º dia** de atraso:
+  - passam a incidir os encargos já previstos (multa 10% + juros 0,033% ao dia — hoje contam desde o 1º dia);
+  - o convênio fica **totalmente bloqueado** (agendamento com Tipo = Convênio é barrado) até a regularização.
+- O texto contratual já prevê esse período de tolerância de 5 dias — o sistema hoje ainda não respeita.
 
-Na página de Contratos (Cartão Benefícios), quando o pop-up de "Nova venda" pergunta o tipo, além de "Nova adesão" e "Renovação", passa a existir a opção **"Troca de convênio"**. Ao selecionar:
+## O que muda
 
-1. Usuário escolhe o contrato antigo (busca por titular/número).
-2. Escolhe o novo convênio, nº de pessoas e dependentes (mesma UX da renovação).
-3. Ao confirmar:
-   - Contrato antigo → status `cancelado`, motivo `Troca de convênio → #<novo>`, `cancelado_em = hoje`.
-   - Todas as mensalidades **pendentes** (não pagas) do contrato antigo → status `cancelada`. Pagas ficam intactas.
-   - Novo contrato é criado com `contrato_origem_id = antigo`, **taxa de adesão R$ 0**, **sem carência** (mesma regra já aplicada em renovação), 12 parcelas normais do novo plano.
-   - Registro em `contrato_renovacoes` com `tipo = 'troca_convenio'` ligando antigo → novo.
+### 1. Banco — RPCs e função utilitária
 
-## Onde muda
+- Nova função `public.contrato_dias_tolerancia()` retornando `5` (constante única, fácil de ajustar depois).
+- Atualizar `paciente_cartao_inadimplente(_paciente_id, _clinica_id)`:
+  - só considera "bloqueado" quando existir parcela com `dias_atraso > 5`;
+  - retorna também `em_carencia` (booleano) e a lista das parcelas em carência (0–5 dias de atraso).
+- Nova RPC `paciente_cartao_status(_paciente_id, _clinica_id)` combinando os três estados: `ok | em_carencia | bloqueado`, mais `dias_carencia_restantes` da parcela mais crítica.
+- Ambas continuam SECURITY DEFINER, com o mesmo check de `clinica_memberships` já existente.
 
-**Backend (migration)**
-- Nova RPC `trocar_convenio_contrato(_contrato_antigo, _novo_convenio_id, _nova_faixa_id, _dependentes, _data_inicio)` que, em transação:
-  - valida permissão (`is_member`),
-  - cancela contrato antigo + mensalidades pendentes,
-  - chama a lógica de criação de novo contrato reutilizando o caminho de renovação (isento de taxa/carência),
-  - insere linha em `contrato_renovacoes` com `tipo = 'troca_convenio'`.
-- Ajuste no ENUM/CHECK de `contrato_renovacoes.tipo` se necessário para aceitar `troca_convenio`.
-- Ajuste em `contrato_historico` para rotular eventos de troca.
+### 2. Backend do fluxo de agenda (`src/routes/_authenticated/app.agenda.tsx`)
 
-**Frontend**
-- `src/components/pages/contratos-page.tsx`: adicionar terceira opção no AlertDialog de tipo de venda.
-- Novo `src/components/contratos/trocar-convenio-dialog.tsx` derivado do `renovar-contrato-dialog.tsx` (mesma UX de convênio/faixa/dependentes, sem campo de "data da renovação retroativa" — usar data de hoje por padrão, permitindo ajuste).
-- `historico-contrato-tab.tsx`: exibir evento "Troca de convênio" com link para o contrato de origem/destino.
+- Ampliar `ConvenioInfo`: adicionar `emCarencia: boolean` e `diasCarenciaRestantes: number | null` (mantém `emDia`, `parcelasAtrasadas` por compatibilidade).
+- Ao montar `ConvenioInfo`, usar a nova RPC:
+  - `bloqueado` → `emDia=false`, tratado igual à inadimplência de hoje (cobra particular / bloqueia benefício).
+  - `em_carencia` → aplica uma **trava de elegibilidade**:
+    - carrega o procedimento (`procedimentos.tipo`, `tipo_procedimento`, `valor_padrao`);
+    - permite o desconto/regra do convênio **apenas** se: (a) tipo/nome indicar **consulta** *e* (b) valor final que o paciente pagaria pelo convênio ≤ **R$ 9,99**;
+    - se o procedimento for **Exame** (`procedimentos.tipo` ILIKE '%exame%' ou `tipo_procedimento`/`tipo_servico` = Exame), o desconto é anulado e é emitido `avisoLimite` claro: "Mensalidade em atraso há X dia(s) — dentro da tolerância de 5 dias apenas consultas até R$ 9,99 são cobertas pelo convênio";
+    - para os demais procedimentos que não caibam na exceção: cobra valor particular com o mesmo aviso.
+  - `ok` → comportamento atual.
 
-## Regras de negócio confirmadas
+### 3. Bloqueio no `criar-agendamento.functions.ts`
 
-- Sem taxa de adesão no novo contrato.
-- Sem carência (mesmo tratamento de renovação — `contrato_origem_id` já isenta).
-- Mensalidades pagas do contrato antigo permanecem; pendentes viram `cancelada`.
-- Aplicável às 3 clínicas (sem feature flag).
+- O bloqueio duro de inadimplência passa a valer só quando `bloqueado === true` (parcelas com >5 dias). Em carência a criação não é barrada, mas o desconto do convênio segue as regras acima.
 
-## Fora de escopo
+### 4. Pagamento de mensalidade em `contratos-page.tsx`
 
-- Estorno financeiro de mensalidades já pagas do contrato antigo.
-- Proporcionalização de mês corrente (usuário optou por cancelar todas as pendentes).
-- Mudança de titular na troca (mantém o mesmo titular; troca de titular continua exigindo cancelamento manual).
+- Ajustar `calcValorComJuros` para começar a cobrar multa+juros somente a partir do **6º dia** de atraso (`diasAtraso > 5`).
+- No dialog de pagamento, mostrar badge "Dentro da tolerância — sem encargos" quando estiver de 1 a 5 dias vencida.
 
-## Validação
+### 5. Testes / validação
 
-- Criar troca de teste entre dois convênios distintos em contrato fictício, conferir:
-  - contrato antigo cancelado + mensalidades pendentes canceladas,
-  - novo contrato sem parcela 0 (taxa de adesão) e sem carência,
-  - `contrato_renovacoes` com `tipo = 'troca_convenio'`,
-  - aba Histórico mostrando o evento nos dois contratos.
-- Reverter registros de teste ao final.
+- Consultas SQL de verificação nas 3 clínicas para conferir contratos com parcelas em janela de tolerância.
+- Testes manuais: (a) parcela vencida há 2 dias → agendar CONSULTA R$ 9,99 (permitido); agendar EXAME (bloqueado); pagar mensalidade (sem juros). (b) parcela vencida há 7 dias → agendamento bloqueado; pagamento com multa+juros.
+
+## Fora do escopo
+
+- Não altero regras de preço em `cb_convenio_regras`.
+- Não mudo o valor da multa (10%) nem do juros (0,033%/dia) — só o marco inicial (D+6).
+- Sem migração de dados histórica: parcelas já pagas com juros no passado permanecem como estão.
+
+## Riscos
+
+- Toco em `paciente_cartao_inadimplente`, que é chamada tanto pela Agenda quanto por criação de agendamento — a nova versão preserva o contrato (`bloqueado`, `total_aberto`, `mensalidades`) e apenas adiciona campos.
+- Como a regra vale para as 3 clínicas, não uso feature flag; a constante fica em uma função SQL para futuro ajuste.
