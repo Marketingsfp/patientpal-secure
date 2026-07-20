@@ -377,7 +377,11 @@ async function obterInfoConvenioPaciente(params: {
 
   const convenioNome = contrato.cb_convenios?.nome ?? "Convênio";
 
-  // 2) Verifica mensalidades em atraso do contrato
+  // 2) Verifica mensalidades em atraso do contrato.
+  //    Regra de negócio: tolerância de 5 dias corridos após o vencimento.
+  //    - 0..5 dias de atraso → contrato "em carência" (uso do convênio
+  //      restrito a consultas ≤ R$ 9,99, sem exames).
+  //    - > 5 dias → parcela conta como atrasada e o convênio é bloqueado.
   const hojeStr = new Date().toISOString().slice(0, 10);
   const { data: mens } = await supabase
     .from("contrato_mensalidades")
@@ -385,8 +389,21 @@ async function obterInfoConvenioPaciente(params: {
     .eq("contrato_id", contrato.id)
     .in("status", ["pendente", "aberto", "atrasado"])
     .lte("vencimento", hojeStr);
-  const parcelasAtrasadas = (mens ?? []).length;
-  const emDia = parcelasAtrasadas === 0;
+  const DIAS_TOLERANCIA = 5;
+  const hojeMs = new Date(hojeStr + "T00:00:00").getTime();
+  const diasAtrasoLista = (mens ?? []).map((m: any) => {
+    const v = new Date(String(m.vencimento) + "T00:00:00").getTime();
+    return Math.max(0, Math.floor((hojeMs - v) / 86400000));
+  });
+  const parcelasAtrasadas = diasAtrasoLista.filter((d) => d > DIAS_TOLERANCIA).length;
+  const parcelasEmCarencia = diasAtrasoLista.filter((d) => d >= 0 && d <= DIAS_TOLERANCIA).length;
+  const emDia = parcelasAtrasadas === 0 && parcelasEmCarencia === 0;
+  const emCarencia = parcelasAtrasadas === 0 && parcelasEmCarencia > 0;
+  const diasCarenciaRestantes = emCarencia
+    ? Math.min(
+        ...diasAtrasoLista.filter((d) => d <= DIAS_TOLERANCIA).map((d) => DIAS_TOLERANCIA - d),
+      )
+    : null;
 
   // 2b) Conta mensalidades pagas do contrato (para checagem de carência).
   const { count: pagasCount } = await supabase
