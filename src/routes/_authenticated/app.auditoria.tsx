@@ -237,7 +237,7 @@ async function resolverNomesLista(rows: AuditRow[]): Promise<Record<string, stri
       });
     }) : Promise.resolve(),
     contratos.size ? supabase.from("contratos_assinatura").select("id, numero").in("id", Array.from(contratos)).then(({ data }) => {
-      ((data ?? []) as Array<{ id: string; numero: string | null }>).forEach((r) => { nomes[r.id] = r.numero ? `Contrato ${r.numero}` : "Contrato"; });
+      ((data ?? []) as unknown as Array<{ id: string; numero: string | number | null }>).forEach((r) => { nomes[r.id] = r.numero ? `Contrato ${r.numero}` : "Contrato"; });
     }) : Promise.resolve(),
     orcamentos.size ? supabase.from("orcamentos").select("id, numero").in("id", Array.from(orcamentos)).then(({ data }) => {
       ((data ?? []) as Array<{ id: string; numero: number | null }>).forEach((r) => { nomes[r.id] = r.numero ? `Orçamento #${r.numero}` : "Orçamento"; });
