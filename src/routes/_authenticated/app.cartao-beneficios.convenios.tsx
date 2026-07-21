@@ -419,7 +419,7 @@ function ConveniosPage() {
     }
     // Substitui faixas de preço
     await supabase.from("cb_convenio_faixas").delete().eq("convenio_id", convenioId!);
-    const rowsToInsert = faixas.map((f) => ({
+    const rowsToInsert = faixasParaSalvar.map((f) => ({
       convenio_id: convenioId!,
       vidas_de: Number(f.vidas_de),
       vidas_ate: f.vidas_ate === null ? null : Number(f.vidas_ate),
