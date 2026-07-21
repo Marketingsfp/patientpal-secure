@@ -109,6 +109,73 @@ function formatValor(v: unknown): string {
   return JSON.stringify(v);
 }
 
+// Campos UUID que devem ser resolvidos para nomes humanos
+const FK_TABELA: Record<string, string> = {
+  medico_id: "medicos",
+  paciente_id: "pacientes",
+  agendamento_id: "agendamentos",
+  agenda_id: "agendas",
+  orcamento_id: "orcamentos",
+  contrato_id: "contratos_assinatura",
+  pacote_id: "pacotes",
+};
+
+function formatValorComNome(v: unknown, campo: string, nomes: Record<string, string>): string {
+  if (typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-/.test(v)) {
+    const nome = nomes[v];
+    if (nome) return nome;
+  }
+  return formatValor(v);
+}
+
+async function resolverNomes(rows: Diff[], tabela: string, rowRecordId: string | null): Promise<Record<string, string>> {
+  const mapa: Record<string, Set<string>> = {};
+  const add = (campo: string, val: unknown) => {
+    if (typeof val !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-/.test(val)) return;
+    const alvo = FK_TABELA[campo];
+    if (!alvo) return;
+    (mapa[alvo] ??= new Set()).add(val);
+  };
+  for (const d of rows) {
+    add(d.campo, d.antes);
+    add(d.campo, d.depois);
+  }
+  // Se a própria tabela do registro tem um "nome" ou "paciente_nome", também busca
+  if (rowRecordId && (tabela === "medicos" || tabela === "pacientes" || tabela === "agendamentos")) {
+    (mapa[tabela] ??= new Set()).add(rowRecordId);
+  }
+  const nomes: Record<string, string> = {};
+  await Promise.all(Object.entries(mapa).map(async ([tab, set]) => {
+    const ids = Array.from(set);
+    if (ids.length === 0) return;
+    if (tab === "medicos") {
+      const { data } = await supabase.from("medicos").select("id, nome").in("id", ids);
+      (data ?? []).forEach((r: { id: string; nome: string }) => { nomes[r.id] = `Dr(a). ${r.nome}`; });
+    } else if (tab === "pacientes") {
+      const { data } = await supabase.from("pacientes").select("id, nome, prontuario").in("id", ids);
+      (data ?? []).forEach((r: { id: string; nome: string; prontuario: string | null }) => {
+        nomes[r.id] = r.prontuario ? `${r.nome} (#${r.prontuario})` : r.nome;
+      });
+    } else if (tab === "agendamentos") {
+      const { data } = await supabase.from("agendamentos").select("id, paciente_nome, inicio").in("id", ids);
+      (data ?? []).forEach((r: { id: string; paciente_nome: string | null; inicio: string }) => {
+        const dt = new Date(r.inicio).toLocaleString("pt-BR");
+        nomes[r.id] = `${r.paciente_nome ?? "Agendamento"} — ${dt}`;
+      });
+    } else if (tab === "agendas") {
+      const { data } = await supabase.from("agendas").select("id, nome").in("id", ids);
+      (data ?? []).forEach((r: { id: string; nome: string }) => { nomes[r.id] = r.nome; });
+    } else if (tab === "orcamentos") {
+      const { data } = await supabase.from("orcamentos").select("id, numero").in("id", ids);
+      (data ?? []).forEach((r: { id: string; numero: number | null }) => { nomes[r.id] = r.numero ? `Orçamento #${r.numero}` : "Orçamento"; });
+    } else if (tab === "contratos_assinatura") {
+      const { data } = await supabase.from("contratos_assinatura").select("id, numero_contrato").in("id", ids);
+      (data ?? []).forEach((r: { id: string; numero_contrato: string | null }) => { nomes[r.id] = r.numero_contrato ? `Contrato ${r.numero_contrato}` : "Contrato"; });
+    }
+  }));
+  return nomes;
+}
+
 interface Diff { campo: string; antes: unknown; depois: unknown }
 function computarDiff(antes: Record<string, unknown> | null, depois: Record<string, unknown> | null): Diff[] {
   const a = antes ?? {};
@@ -297,9 +364,22 @@ function Page() {
 
 function DetalheAlteracao({ row }: { row: AuditRow }) {
   const [verBruto, setVerBruto] = useState(false);
+  const [nomes, setNomes] = useState<Record<string, string>>({});
   const diff = row.action === "UPDATE" ? computarDiff(row.dados_antes, row.dados_depois) : [];
   const criados = row.action === "INSERT" ? camposRelevantes(row.dados_depois) : [];
   const excluidos = row.action === "DELETE" ? camposRelevantes(row.dados_antes) : [];
+
+  useEffect(() => {
+    let cancel = false;
+    const todos = [...diff, ...criados, ...excluidos];
+    void resolverNomes(todos, row.table_name, row.record_id).then((n) => {
+      if (!cancel) setNomes(n);
+    });
+    return () => { cancel = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id]);
+
+  const contexto = row.record_id ? nomes[row.record_id] : null;
 
   const resumo = row.action === "INSERT"
     ? `Criou um registro em ${labelTabela(row.table_name)}.`
@@ -315,6 +395,7 @@ function DetalheAlteracao({ row }: { row: AuditRow }) {
         <div className="flex flex-wrap items-center gap-2">
           <Badge className={ACTION_COLOR[row.action]}>{ACTION_LABEL[row.action] ?? row.action}</Badge>
           <span className="font-medium">{labelTabela(row.table_name)}</span>
+          {contexto && <span className="text-muted-foreground">— {contexto}</span>}
         </div>
         <div className="text-muted-foreground">{resumo}</div>
         <div className="text-xs text-muted-foreground pt-1">
@@ -331,8 +412,8 @@ function DetalheAlteracao({ row }: { row: AuditRow }) {
           {diff.map((d) => (
             <div key={d.campo} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)] px-3 py-2 border-t items-start gap-2">
               <div className="font-medium">{labelCampo(d.campo)}</div>
-              <div className="text-rose-700 break-words">{formatValor(d.antes)}</div>
-              <div className="text-emerald-700 break-words">{formatValor(d.depois)}</div>
+              <div className="text-rose-700 break-words">{formatValorComNome(d.antes, d.campo, nomes)}</div>
+              <div className="text-emerald-700 break-words">{formatValorComNome(d.depois, d.campo, nomes)}</div>
             </div>
           ))}
         </div>
@@ -346,7 +427,7 @@ function DetalheAlteracao({ row }: { row: AuditRow }) {
           {(criados.length > 0 ? criados : excluidos).map((d) => (
             <div key={d.campo} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] px-3 py-2 border-t items-start gap-2">
               <div className="font-medium">{labelCampo(d.campo)}</div>
-              <div className="break-words">{formatValor(row.action === "INSERT" ? d.depois : d.antes)}</div>
+              <div className="break-words">{formatValorComNome(row.action === "INSERT" ? d.depois : d.antes, d.campo, nomes)}</div>
             </div>
           ))}
         </div>
