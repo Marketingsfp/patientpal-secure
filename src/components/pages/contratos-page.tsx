@@ -2847,7 +2847,7 @@ function DetalheContrato({
     if (!clinicaAtual?.clinica_id) { setEmitentes([]); setEmitenteId(""); return; }
     let cancel = false;
     void supabase
-      .from("nfse_emitentes")
+      .from("nfse_emitentes_publico")
       .select("id, nome")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)

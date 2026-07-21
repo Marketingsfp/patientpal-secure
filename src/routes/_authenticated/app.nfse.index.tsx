@@ -62,7 +62,7 @@ function NfsePage() {
     if (!clinicaAtual) return;
     void (async () => {
       const { data } = await supabase
-        .from("nfse_emitentes")
+        .from("nfse_emitentes_publico")
         .select("id, nome, cnpj")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .order("nome");
@@ -75,15 +75,21 @@ function NfsePage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("nfse")
-      .select("id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, emitente_id, erro_mensagem, payload_resposta, emitente:nfse_emitentes(nome, cnpj)")
+      .select("id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, emitente_id, erro_mensagem, payload_resposta")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("data_emissao", { ascending: false })
       .limit(500);
     setLoading(false);
     if (error) { mostrarErro(error); return; }
-    setRows((data ?? []) as unknown as Row[]);
+    // Enriquece cliente-side com nome/CNPJ do emitente a partir do state,
+    // já que a view pública nfse_emitentes_publico não expõe FK para embed.
+    const map = new Map(emitentes.map((e) => [e.id, e]));
+    setRows(((data ?? []) as unknown as Row[]).map((r) => ({
+      ...r,
+      emitente: r.emitente_id ? (map.get(r.emitente_id) ? { nome: map.get(r.emitente_id)!.nome, cnpj: map.get(r.emitente_id)!.cnpj } : null) : null,
+    })));
   };
-  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id]);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id, emitentes]);
 
   // Auto-polling: a cada 15s consulta o Focus para notas em "processando"
   // (webhook do Focus pode falhar/não estar configurado).
@@ -110,7 +116,7 @@ function NfsePage() {
     if (!erroDetalhe?.emitente_id) { setRpsAtual(null); setRpsNovoInput(""); return; }
     void (async () => {
       const { data } = await supabase
-        .from("nfse_emitentes")
+        .from("nfse_emitentes_publico")
         .select("rps_proximo_numero")
         .eq("id", erroDetalhe.emitente_id!)
         .maybeSingle();

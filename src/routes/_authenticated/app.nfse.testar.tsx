@@ -49,7 +49,7 @@ function TestarNfse() {
     if (!clinicaAtual) return;
     void (async () => {
       const { data } = await supabase
-        .from("nfse_emitentes")
+        .from("nfse_emitentes_publico")
         .select("id, nome, cnpj, focus_ambiente, descricao_servico_padrao")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true);

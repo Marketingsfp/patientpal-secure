@@ -83,7 +83,7 @@ function Page() {
   };
   const loadEmit = async () => {
     if (!clinicaAtual) return;
-    const { data } = await supabase.from("nfse_emitentes")
+    const { data } = await supabase.from("nfse_emitentes_publico")
       .select("id, nome, codigo_municipio")
       .eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome");
     const list = (data ?? []) as Emitente[];

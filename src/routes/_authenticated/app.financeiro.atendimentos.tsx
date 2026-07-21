@@ -599,7 +599,7 @@ function AtendimentosPage() {
       return;
     }
     void supabase
-      .from("nfse_emitentes")
+      .from("nfse_emitentes_publico")
       .select("id, nome, codigo_municipio")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
