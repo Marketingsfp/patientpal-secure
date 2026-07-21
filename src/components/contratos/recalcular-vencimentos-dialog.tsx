@@ -69,8 +69,8 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
 
   const [parcelaId, setParcelaId] = useState<string>("");
   const [novoVenc, setNovoVenc] = useState<string>("");
-  const [intervaloTipo, setIntervaloTipo] = useState<"dias" | "meses">("dias");
-  const [intervaloValor, setIntervaloValor] = useState<string>("30");
+  const [intervaloTipo, setIntervaloTipo] = useState<"dias" | "meses">("meses");
+  const [intervaloValor, setIntervaloValor] = useState<string>("1");
   const [cascatear, setCascatear] = useState<boolean>(true);
   const [salvando, setSalvando] = useState(false);
 
@@ -78,8 +78,8 @@ export function RecalcularVencimentosDialog({ open, onOpenChange, parcelas, onDo
     if (!open) return;
     setParcelaId(primeiraPendente?.id ?? "");
     setNovoVenc(primeiraPendente?.vencimento ?? "");
-    setIntervaloTipo("dias");
-    setIntervaloValor("30");
+    setIntervaloTipo("meses");
+    setIntervaloValor("1");
     setCascatear(true);
     setSalvando(false);
   }, [open, primeiraPendente]);
