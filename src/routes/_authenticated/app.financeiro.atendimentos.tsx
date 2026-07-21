@@ -833,7 +833,7 @@ function AtendimentosPage() {
       .from(tabela)
       .update({
         medico_laudador_id: null,
-        valor_laudo: null as unknown as number,
+        valor_laudo: 0,
         laudo_status: null,
         laudo_emitido_em: null,
       } as never)
