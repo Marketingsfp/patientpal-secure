@@ -8234,102 +8234,56 @@ export type Database = {
           telefone: string
         }[]
       }
-      buscar_pacientes:
-        | {
-            Args: { _clinica_id: string; _limit?: number; _termo: string }
-            Returns: {
-              ativo: boolean
-              bairro: string | null
-              cep: string | null
-              cidade: string | null
-              clinica_id: string
-              codigo_prontuario: string | null
-              codigo_prontuario_anterior: string | null
-              complemento: string | null
-              consentimento_lgpd_em: string | null
-              cpf: string | null
-              cpf_digits: string | null
-              created_at: string
-              data_nascimento: string | null
-              email: string | null
-              estado: string | null
-              face_atualizado_em: string | null
-              face_descriptor: number[] | null
-              foto_atualizado_em: string | null
-              foto_url: string | null
-              id: string
-              legacy_id: number | null
-              logradouro: string | null
-              nome: string
-              numero: string | null
-              numero_pasta: string | null
-              prontuarios_anteriores: string | null
-              responsavel_cpf: string | null
-              responsavel_nome: string | null
-              responsavel_parentesco: string | null
-              responsavel_telefone: string | null
-              sexo: string
-              telefone: string | null
-              telefone2: string | null
-              updated_at: string
-            }[]
-            SetofOptions: {
-              from: "*"
-              to: "pacientes"
-              isOneToOne: false
-              isSetofReturn: true
-            }
-          }
-        | {
-            Args: {
-              _clinica_id: string
-              _limit?: number
-              _offset?: number
-              _termo: string
-            }
-            Returns: {
-              ativo: boolean
-              bairro: string | null
-              cep: string | null
-              cidade: string | null
-              clinica_id: string
-              codigo_prontuario: string | null
-              codigo_prontuario_anterior: string | null
-              complemento: string | null
-              consentimento_lgpd_em: string | null
-              cpf: string | null
-              cpf_digits: string | null
-              created_at: string
-              data_nascimento: string | null
-              email: string | null
-              estado: string | null
-              face_atualizado_em: string | null
-              face_descriptor: number[] | null
-              foto_atualizado_em: string | null
-              foto_url: string | null
-              id: string
-              legacy_id: number | null
-              logradouro: string | null
-              nome: string
-              numero: string | null
-              numero_pasta: string | null
-              prontuarios_anteriores: string | null
-              responsavel_cpf: string | null
-              responsavel_nome: string | null
-              responsavel_parentesco: string | null
-              responsavel_telefone: string | null
-              sexo: string
-              telefone: string | null
-              telefone2: string | null
-              updated_at: string
-            }[]
-            SetofOptions: {
-              from: "*"
-              to: "pacientes"
-              isOneToOne: false
-              isSetofReturn: true
-            }
-          }
+      buscar_pacientes: {
+        Args: {
+          _clinica_id: string
+          _limit?: number
+          _offset?: number
+          _termo: string
+        }
+        Returns: {
+          ativo: boolean
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          clinica_id: string
+          codigo_prontuario: string | null
+          codigo_prontuario_anterior: string | null
+          complemento: string | null
+          consentimento_lgpd_em: string | null
+          cpf: string | null
+          cpf_digits: string | null
+          created_at: string
+          data_nascimento: string | null
+          email: string | null
+          estado: string | null
+          face_atualizado_em: string | null
+          face_descriptor: number[] | null
+          foto_atualizado_em: string | null
+          foto_url: string | null
+          id: string
+          legacy_id: number | null
+          logradouro: string | null
+          nome: string
+          numero: string | null
+          numero_pasta: string | null
+          prontuarios_anteriores: string | null
+          responsavel_cpf: string | null
+          responsavel_nome: string | null
+          responsavel_parentesco: string | null
+          responsavel_telefone: string | null
+          sexo: string
+          telefone: string | null
+          telefone2: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "pacientes"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       buscar_pacientes_agenda: {
         Args: { _clinica_ids: string[]; _limite?: number; _termo: string }
         Returns: {
