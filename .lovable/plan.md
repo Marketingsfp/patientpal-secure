@@ -1,27 +1,47 @@
-## Problema
+## Diagnóstico
 
-Na 2ª via do "Comprovante de pagamento de repasse", no preview dentro do modal, as colunas **Data** e **Paciente** aparecem coladas (sem espaçamento). No modo impressão sai correto — o preview é que está sem estilo.
+Confirmei via banco: os lançamentos de repasse da CLAUDIA MARIA (Menino Jesus, 13/07 e 15/07) estão em `fin_lancamentos` com `valor = 130,00 / 110,00 / 60,00 / 52,00 …` (valor cheio do serviço) e `valor_medico_override = NULL`.
 
-## Causa
+- **Aba Atendimentos** (`src/routes/_authenticated/app.financeiro.atendimentos.tsx`) — chama `calcRepasseFull(medico, valor, procedimento, descricao)` que aplica as regras de convênio/cartão-benefícios do médico e devolve o repasse correto (ex.: R$ 55,00 em consulta de R$ 110). Por isso a coluna **MÉDICO** aparece com o valor certo.
+- **Segunda via do comprovante** (`src/components/financeiro/comprovantes-tab.tsx`, linhas 167–170) — usa apenas `valor_medico_override ?? valor`. Como os lançamentos históricos não têm override preenchido, imprime o `valor` cheio (R$ 130 / R$ 110 …) e o total soma R$ 702,00 em vez de R$ 295,80.
 
-Em `src/components/financeiro/comprovantes-tab.tsx`:
-- O preview usa `dangerouslySetInnerHTML` com o HTML retornado por `renderComprovanteHtml(...)`.
-- Todo o CSS da tabela (padding, larguras fixas por coluna, `border-collapse`) fica dentro do `<style>` do iframe de impressão (linhas ~297–321). No dialog esse CSS não existe, então `<td>` sai sem padding e as colunas ficam grudadas.
+**Confirmado:** o bug está apenas na exibição/impressão do comprovante (frontend). Os dados no banco estão corretos e a aba Atendimentos continua certa — nenhuma regra de negócio muda.
+
+## Escopo
+
+- Correção puramente técnica (categoria: erro de código).
+- Afeta **todas as clínicas** que usam a aba "Comprovantes" (a lógica é única). Isso é intencional: hoje qualquer clínica com lançamentos sem `valor_medico_override` está imprimindo valor errado.
+- Não altera banco, RPCs, permissões, agenda, GR nem impressão original (a primeira via, feita ao pagar o repasse, continua idêntica — ela já usa o valor calculado em memória).
 
 ## Plano
 
-Alteração escopada apenas ao arquivo `src/components/financeiro/comprovantes-tab.tsx`, clínica-alvo: todas (é correção visual de renderização, sem regra de negócio). Se preferir aplicar só à Menino Jesus, me avise antes.
+1. **Extrair `calcRepasseFull` para módulo compartilhado**
+   - Criar `src/lib/repasse-calc.ts` exportando `calcRepasseFull({ medicos, convenios, procTipos, medicoId, totalPago, procNome, descricao })` com a **mesma lógica** da função hoje embutida em `app.financeiro.atendimentos.tsx` (linhas 950–1050): cartão consulta, convênio por nome/variantes, categoria (`__CAT__:TIPO`), fallback pelo padrão do médico.
+   - Alterar `app.financeiro.atendimentos.tsx` para importar dessa util (a função vira wrapper fino que injeta o state local). Sem mudança de comportamento.
 
-1. Em `renderComprovanteHtml`, prefixar o HTML retornado com um bloco `<style>` escopado (ex.: seletor `.repasse-preview` no wrapper) contendo as mesmas regras já usadas na impressão para: `.header`, `.reimp`, `.resumo`, `table`, `th/td`, larguras `nth-child`, `.sig`, `.mut`, `.tot`.
-2. Envolver o conteúdo em `<div class="repasse-preview">…</div>` para não vazar estilos para o restante do dialog.
-3. Manter o `<style>` do iframe de impressão como está (redundância inofensiva; o preview continua idêntico ao impresso).
+2. **Usar o cálculo no comprovante**
+   - Em `src/components/financeiro/comprovantes-tab.tsx`:
+     - Carregar (uma vez, ao montar / mudar clínica) as listas mínimas: `medicos` (campos de repasse), `medico_convenios` e o mapa de tipos de procedimento (mesmas queries usadas na aba Atendimentos).
+     - Ao mapear cada `Row` vinda de `fin_lancamentos`, se `valor_medico_override` **não** estiver preenchido, calcular `valor_medico = calcRepasseFull(...)` em vez de cair no `valor` cheio.
+     - Para `fin_atendimentos` a lógica continua a mesma (`valor_medico + valor_laudo`), pois lá o campo já é o repasse correto.
+   - Isso corrige a **tabela do preview** (linhas Data/Paciente/Serviço/Valor), o **rodapé Total** e o **campo "Total pago ao médico"** no cabeçalho do resumo, todos exibindo agora o repasse (R$ 295,80), igual à aba Atendimentos.
+
+3. **Validação**
+   - Reabrir a segunda via do comprovante da CLAUDIA MARIA (13/07 e 15/07): confirmar que cada linha exibe o valor de repasse (R$ 55 / R$ 10,40 …) e que o total bate com o "PAGO R$ 295,80" da aba Atendimentos.
+   - Conferir um comprovante de outra clínica (SFP) para garantir que continua correto (lá muitos lançamentos já têm override; o resultado deve ser idêntico ao atual).
+   - Conferir um comprovante que use `fin_atendimentos` puro (sem agenda): deve continuar exatamente como está hoje.
+
+## Fora do escopo
+
+- Não vou alterar o banco nem preencher `valor_medico_override` retroativamente.
+- Não vou mexer na primeira via de impressão (fluxo "Pagar repasse"), que já usa o valor calculado corretamente.
+- Não vou mexer na GR nem em outras telas.
+
+## Riscos
+
+- Baixo. A função `calcRepasseFull` é a mesma já usada em produção pela aba Atendimentos; só está sendo reaproveitada. Se por algum motivo `medicos`/`medico_convenios` demorarem a carregar, o preview do comprovante mostra "—" ou o valor antigo até o fetch terminar; posso adicionar um loading suave se preferir.
 
 ## Antes / Depois esperado
 
-- **Antes:** no preview, "13/07/2026PRISCILA DIAS CRUZ" sai colado.
-- **Depois:** colunas com padding, bordas leves e largura fixa (Data 18mm, Paciente 42mm, Serviço auto, Valor 24mm à direita), iguais à versão impressa.
-
-## Validação
-
-- Abrir Financeiro → Comprovantes → visualizar um repasse com múltiplos pacientes e conferir separação das colunas.
-- Clicar "Imprimir" e "Imprimir resumo" para garantir que a impressão continua igual.
+- **Antes:** segunda via imprime valores cheios do serviço (R$ 130, R$ 110 …) e total R$ 702,00.
+- **Depois:** segunda via imprime valores de repasse do médico (R$ 55, R$ 10,40 …) e total R$ 295,80, iguais aos exibidos na aba Atendimentos e ao efetivamente pago.
