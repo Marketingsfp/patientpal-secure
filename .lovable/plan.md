@@ -1,50 +1,33 @@
 ## Objetivo
-Cadastrar descontos automáticos de funcionário (titular + dependentes) reaproveitando 100% o motor do **Cartão Benefícios**, sem código novo de regra de negócio.
+No editor do convênio **FUNCIONARIO** (usado só para descontos de funcionários), esconder as abas que não fazem sentido para esse caso e manter apenas o essencial. As telas gerais de **Benefícios (regras)** e **Dependentes** continuam funcionando normalmente.
 
-## Como funciona (linguagem simples)
-- Criamos **um convênio chamado "Funcionário"** em cada clínica (SFP, Menino Jesus, Ergoclínica).
-- Esse convênio já suporta cadastrar descontos **por serviço, por especialidade ou por categoria/tipo**, em **percentual ou valor fixo** — é a mesma tela de **Cartão Benefícios → Regras** usada hoje.
-- Cada funcionário vira um **contrato** desse convênio, com dependentes vinculados. Quando o paciente (titular ou dependente) for atendido, o sistema já busca as regras do convênio automaticamente na Agenda / no Pagamento e aplica o desconto.
-- **Sem carência e sem mensalidade**: o convênio nasce com `valor_mensal = 0`, `taxa_adesao = 0`, `num_parcelas = 0`, `fidelidade_meses = 0`, e o contrato entra com carência isenta.
+## Suposição a confirmar
+No print, a aba de preços chama-se **"Faixas de Preço"** (não existe uma aba com o nome "Faixa etária" nesse editor). Vou assumir que é essa a aba a ocultar. Se você quis dizer outra, me avise.
 
-Vantagem: nada quebra em outros módulos (Agenda, Pagamento, Estorno, NFS-e). Já testado — é o mesmo caminho de qualquer convênio.
+## Escopo
+Arquivo único: `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx`.
 
-## O que eu vou fazer
+Quando o convênio em edição for o **FUNCIONARIO** (identificado pelo `nome` do convênio, case-insensitive, para valer nas 3 clínicas sem precisar de flag):
 
-### 1. Migration (cria a base nas 3 clínicas)
-- Inserir 1 registro em `cb_convenios` por clínica com nome "Funcionário", ativo, sem mensalidade, sem carência, sem taxa de adesão.
-- Sem alteração de schema — só dados de configuração.
+- Ocultar os `TabsTrigger` e respectivos `TabsContent` de:
+  - Faixas de Preço
+  - Contrato
+  - Informativo
+  - Termo de Inclusão
+- Manter visíveis:
+  - **Informações** (nome, descrição, taxas, parcelas, vigência, fidelidade, máx. dependentes)
+  - **Benefícios** (regras de desconto por especialidade / categoria / serviço)
+- Aba padrão ao abrir passa a ser **Informações**.
+- No `salvar()`, pular a validação de faixas quando for FUNCIONARIO e persistir uma faixa mínima automática (1 vida, R$ 0) para não quebrar o schema atual da tabela.
+- Não mexer em nada fora desse arquivo. **Dependentes** e as regras de **Benefícios** continuam funcionando exatamente como hoje — são telas separadas.
 
-### 2. Ajuste mínimo no fluxo de novo contrato
-- No cadastro de contrato do convênio "Funcionário", pular a geração de mensalidades (já acontece hoje quando `num_parcelas = 0`, mas confirmo por segurança).
-- Marcar automaticamente `carencia_isenta = true` para todo contrato desse convênio, com justificativa "Convênio de funcionário".
+## Fora do escopo
+- Alterar o schema do banco.
+- Mudar comportamento de outros convênios.
+- Mexer na aba **Dependentes** do menu principal ou na tela de **Vendas**.
 
-### 3. Cadastro das regras (sem código)
-- Cada clínica entra em **Cartão Benefícios → Convênio "Funcionário" → Regras** e cadastra os descontos que já pratica:
-  - por serviço específico (ex.: TC Crânio 50%),
-  - por especialidade (ex.: Cardiologia 30%),
-  - por categoria/tipo (ex.: Consulta 100%, Imagem 40%).
-- Regras podem ser percentual **ou** valor fixo — o motor já resolve especificidade (serviço > especialidade+tipo > especialidade > tipo).
+## Erro de build reportado
+Foi uma falha transitória de upload S3 do preview (`InternalError` do S3, não erro de código). Nada a corrigir no código; o próximo build normaliza sozinho.
 
-### 4. Vincular funcionários
-- Na tela de contratos, criar o contrato do funcionário como titular do convênio "Funcionário" e adicionar cônjuge/filhos como dependentes. Isso já existe hoje.
-
-## O que NÃO muda
-- Motor de cálculo (`findRegra` / `computeValor` em `src/lib/cb-regras.ts`) permanece intacto.
-- Agenda, Pagamento, Estorno e Repasse continuam iguais.
-- Cartão Benefícios comercial dos pacientes normais não é afetado.
-
-## Impacto (4 eixos)
-- 💰 **Financeiro**: descontos padronizados, rastreáveis, sem risco de a recepção esquecer ou aplicar percentual errado.
-- ⏱️ **Operacional**: recepção não precisa lembrar do desconto — sistema aplica sozinho ao selecionar o funcionário no atendimento.
-- 😊 **Experiência**: funcionário e dependentes atendidos sem fricção, mesmo desconto todo mês.
-- 🛡️ **Auditoria**: cada aplicação de desconto fica registrada no lançamento com o `cb_convenio_id` — auditável em qualquer relatório.
-
-## Riscos
-- Baixos. É a mesma trilha já validada do Cartão Benefícios; a única diferença é `valor_mensal = 0`.
-- Um funcionário que já tenha Cartão Benefícios comercial poderia ter **2 contratos** — combinamos: prevalece a regra do "Funcionário" quando for o mesmo paciente (posso implementar preferência por nome do convênio se você quiser, mas não é obrigatório na entrega inicial).
-
-## Pendências para você confirmar antes de eu executar
-1. Nome exato do convênio nas 3 clínicas: **"Funcionário"** ou prefere outro (ex.: "Colaborador", "Equipe")?
-2. Posso já criar o convênio nas 3 clínicas na mesma migration ou você quer testar antes só em uma?
-3. Regras iniciais (percentuais e valores) você quer cadastrar pela tela ou me passa uma planilha e eu carrego direto no banco?
+## Clínica-alvo
+A regra de esconder abas vale para o convênio **FUNCIONARIO** em qualquer clínica (SFP, Menino Jesus e Ergoclínica), já que criamos ele nas 3. Confirma?

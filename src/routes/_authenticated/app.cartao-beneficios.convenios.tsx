@@ -364,10 +364,19 @@ function ConveniosPage() {
       toast.error(first?.message ?? "Dados inválidos.");
       return;
     }
-    // 3) Faixas: exigir pelo menos 1, valor > 0 e sem vidas_de duplicado
-    if (!faixas.length) { toast.error("Adicione pelo menos uma faixa de preço."); return; }
+    // 3) Faixas: exigir pelo menos 1, valor >= 0 e sem vidas_de duplicado
+    //    (convênio FUNCIONARIO não usa faixas — pulamos a validação e garantimos
+    //     uma faixa mínima automática de 1 vida com valor R$ 0)
+    const isFuncionario = (nomeClean || editing?.nome || "").trim().toUpperCase() === "FUNCIONARIO";
+    let faixasParaSalvar = faixas;
+    if (isFuncionario && !faixasParaSalvar.length) {
+      faixasParaSalvar = [{ vidas_de: 1, vidas_ate: 1, valor_mensal: 0 }];
+      setFaixas(faixasParaSalvar);
+    }
+    if (!isFuncionario && !faixasParaSalvar.length) { toast.error("Adicione pelo menos uma faixa de preço."); return; }
     const vistas = new Set<number>();
-    for (const f of faixas) {
+    for (const f of faixasParaSalvar) {
+      if (isFuncionario) break;
       if (!f.vidas_de || f.vidas_de < 1) { toast.error("Campo 'De' inválido em uma faixa."); return; }
       if (f.vidas_ate !== null && f.vidas_ate < f.vidas_de) {
         toast.error("Campo 'Até' deve ser maior ou igual a 'De'."); return;
@@ -381,7 +390,7 @@ function ConveniosPage() {
       vistas.add(f.vidas_de);
     }
     setSaving(true);
-    const valorMin = faixas.reduce((m, f) => Math.min(m, Number(f.valor_mensal) || 0), Number(faixas[0].valor_mensal) || 0);
+    const valorMin = faixasParaSalvar.reduce((m, f) => Math.min(m, Number(f.valor_mensal) || 0), Number(faixasParaSalvar[0].valor_mensal) || 0);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: nomeClean,
@@ -410,7 +419,7 @@ function ConveniosPage() {
     }
     // Substitui faixas de preço
     await supabase.from("cb_convenio_faixas").delete().eq("convenio_id", convenioId!);
-    const rowsToInsert = faixas.map((f) => ({
+    const rowsToInsert = faixasParaSalvar.map((f) => ({
       convenio_id: convenioId!,
       vidas_de: Number(f.vidas_de),
       vidas_ate: f.vidas_ate === null ? null : Number(f.vidas_ate),
@@ -549,11 +558,17 @@ function ConveniosPage() {
             <Tabs defaultValue="info" className="w-full">
             <TabsList>
               <TabsTrigger value="info">Informações</TabsTrigger>
-              <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
+              {!((nome || editing?.nome || "").trim().toUpperCase() === "FUNCIONARIO") && (
+                <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
+              )}
               <TabsTrigger value="regras"><Gift className="h-4 w-4 mr-1" />Benefícios</TabsTrigger>
-              <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
-              <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
-              <TabsTrigger value="termo"><FileSignature className="h-4 w-4 mr-1" />Termo de Inclusão</TabsTrigger>
+              {!((nome || editing?.nome || "").trim().toUpperCase() === "FUNCIONARIO") && (
+                <>
+                  <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
+                  <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
+                  <TabsTrigger value="termo"><FileSignature className="h-4 w-4 mr-1" />Termo de Inclusão</TabsTrigger>
+                </>
+              )}
             </TabsList>
             <TabsContent value="info" className="space-y-3 mt-3">
               <div>
