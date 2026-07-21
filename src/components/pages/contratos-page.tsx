@@ -4044,7 +4044,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     <TableBody>
                       {loading ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
+                          <TableCell colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7} className="text-center py-4 text-muted-foreground">
                             Carregando…
                           </TableCell>
                         </TableRow>
@@ -4061,7 +4061,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           if (ciclo && ciclo.index > 0 && ciclo.parcelas[0]?.id === m.id) {
                             cicloHeader = (
                               <TableRow key={`hdr-${ciclo.index}`} className="bg-muted/40">
-                                <TableCell colSpan={7} className="text-xs font-semibold py-2">
+                                <TableCell colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7} className="text-xs font-semibold py-2">
                                   {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a {ciclo.fim ? fmtD(ciclo.fim) : "—"}
                                 </TableCell>
                               </TableRow>
@@ -4069,7 +4069,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           } else if (ciclo && ciclo.index === 0 && ciclo.parcelas[0]?.id === m.id) {
                             cicloHeader = (
                               <TableRow key={`hdr-${ciclo.index}`} className="bg-muted/40">
-                                <TableCell colSpan={7} className="text-xs font-semibold py-2">
+                                <TableCell colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7} className="text-xs font-semibold py-2">
                                   {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a {ciclo.fim ? fmtD(ciclo.fim) : "—"}
                                 </TableCell>
                               </TableRow>
@@ -4080,6 +4080,18 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         <Fragment key={m.id}>
                         {cicloHeader}
                         <TableRow>
+                          {podeEscrever && !(cancelado && !isAdmin) ? (
+                            <TableCell className="w-8">
+                              {m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida) ? (
+                                <input
+                                  type="checkbox"
+                                  aria-label="Selecionar parcela para pagamento histórico"
+                                  checked={selectedHistIds.has(m.id)}
+                                  onChange={() => toggleHistSel(m.id)}
+                                />
+                              ) : null}
+                            </TableCell>
+                          ) : null}
                           <TableCell>
                             {isAdesao(m) ? (
                               <Badge variant="secondary">Adesão</Badge>
