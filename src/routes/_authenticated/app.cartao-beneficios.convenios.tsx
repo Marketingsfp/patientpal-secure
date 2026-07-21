@@ -368,12 +368,14 @@ function ConveniosPage() {
     //    (convênio FUNCIONARIO não usa faixas — pulamos a validação e garantimos
     //     uma faixa mínima automática de 1 vida com valor R$ 0)
     const isFuncionario = (nomeClean || editing?.nome || "").trim().toUpperCase() === "FUNCIONARIO";
-    if (isFuncionario && !faixas.length) {
-      setFaixas([{ vidas_de: 1, vidas_ate: 1, valor_mensal: 0 }]);
+    let faixasParaSalvar = faixas;
+    if (isFuncionario && !faixasParaSalvar.length) {
+      faixasParaSalvar = [{ vidas_de: 1, vidas_ate: 1, valor_mensal: 0 }];
+      setFaixas(faixasParaSalvar);
     }
-    if (!isFuncionario && !faixas.length) { toast.error("Adicione pelo menos uma faixa de preço."); return; }
+    if (!isFuncionario && !faixasParaSalvar.length) { toast.error("Adicione pelo menos uma faixa de preço."); return; }
     const vistas = new Set<number>();
-    for (const f of faixas) {
+    for (const f of faixasParaSalvar) {
       if (isFuncionario) break;
       if (!f.vidas_de || f.vidas_de < 1) { toast.error("Campo 'De' inválido em uma faixa."); return; }
       if (f.vidas_ate !== null && f.vidas_ate < f.vidas_de) {
@@ -388,7 +390,7 @@ function ConveniosPage() {
       vistas.add(f.vidas_de);
     }
     setSaving(true);
-    const valorMin = faixas.reduce((m, f) => Math.min(m, Number(f.valor_mensal) || 0), Number(faixas[0].valor_mensal) || 0);
+    const valorMin = faixasParaSalvar.reduce((m, f) => Math.min(m, Number(f.valor_mensal) || 0), Number(faixasParaSalvar[0].valor_mensal) || 0);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: nomeClean,
