@@ -2009,6 +2009,18 @@ function DetalheContrato({
   type RascunhoMens = { vencimento?: string; valor?: number; pago_em?: string | null };
   const [rascunhos, setRascunhos] = useState<Record<string, RascunhoMens>>({});
   const [salvandoRascunhos, setSalvandoRascunhos] = useState(false);
+  // Seleção múltipla para marcar parcelas como "Paga (histórica)" em lote.
+  // Não afeta o fluxo de "Pagar" com forma de pagamento (esse continua unitário).
+  const [selectedHistIds, setSelectedHistIds] = useState<Set<string>>(new Set());
+  const [aplicandoHistLote, setAplicandoHistLote] = useState(false);
+  const toggleHistSel = (id: string) => {
+    setSelectedHistIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const limparHistSel = () => setSelectedHistIds(new Set());
   const setRascunho = (id: string, patch: RascunhoMens) => {
     setRascunhos((prev) => {
       const atual = { ...(prev[id] ?? {}), ...patch };
@@ -2995,6 +3007,51 @@ function DetalheContrato({
     load();
   };
 
+  const marcarPagasHistoricasEmLote = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    const ids = Array.from(selectedHistIds);
+    const alvos = mens.filter((m) => ids.includes(m.id) && m.status !== "pago");
+    if (alvos.length === 0) { toast.error("Selecione ao menos uma parcela em aberto."); return; }
+    const total = alvos.reduce((s, m) => s + (Number(m.valor) || 0), 0);
+    const nums = alvos
+      .map((m) => (isAdesao(m) ? "Adesão" : isTaxaInclusao(m) ? "Taxa" : `#${m.numero_parcela}`))
+      .join(", ");
+    const ok = confirm(
+      `Marcar ${alvos.length} parcela(s) como paga (histórica)?\n\n` +
+      `Parcelas: ${nums}\n` +
+      `Total: R$ ${total.toFixed(2).replace(".", ",")}\n\n` +
+      `Elas ficarão como PAGAS no contrato, mas NÃO gerarão movimento no caixa nem lançamento financeiro. ` +
+      `Use apenas para regularizar pagamentos feitos fora do sistema.`,
+    );
+    if (!ok) return;
+    setAplicandoHistLote(true);
+    try {
+      // Cada parcela precisa de pago_em/valor_pago próprios — updates em
+      // paralelo mantêm o mesmo comportamento do fluxo unitário.
+      const results = await Promise.all(
+        alvos.map((m) =>
+          supabase
+            .from("contrato_mensalidades")
+            .update({
+              status: "pago",
+              pago_em: m.vencimento,
+              valor_pago: Number(m.valor) || 0,
+              forma_pagamento: null,
+              lancamento_id: null,
+            })
+            .eq("id", m.id),
+        ),
+      );
+      const erro = results.find((r) => r.error)?.error;
+      if (erro) return mostrarErro(erro);
+      toast.success(`${alvos.length} parcela(s) marcada(s) como paga (histórica). Não foram lançadas no caixa.`);
+      limparHistSel();
+      load();
+    } finally {
+      setAplicandoHistLote(false);
+    }
+  };
+
   const abrirFormaPag = (m: Mens) => {
     setPagMens(m);
     setFormaPagOpen(true);
@@ -3905,10 +3962,76 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     </div>
                   ) : null}
                 </div>
+                {podeEscrever && !(cancelado && !isAdmin) ? (() => {
+                  const selecionaveis = mens.filter(
+                    (m) => m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida),
+                  );
+                  const selecionadas = selecionaveis.filter((m) => selectedHistIds.has(m.id));
+                  const total = selecionadas.reduce((s, m) => s + (Number(m.valor) || 0), 0);
+                  if (selecionadas.length === 0) return null;
+                  return (
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+                      <div>
+                        <strong>{selecionadas.length}</strong> parcela(s) selecionada(s) — Total{" "}
+                        <strong>R$ {total.toFixed(2).replace(".", ",")}</strong>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={limparHistSel}
+                          disabled={aplicandoHistLote}
+                        >
+                          Limpar seleção
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={marcarPagasHistoricasEmLote}
+                          disabled={aplicandoHistLote}
+                        >
+                          {aplicandoHistLote ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : null}
+                          Marcar selecionadas como Paga (histórica)
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })() : null}
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        {podeEscrever && !(cancelado && !isAdmin) ? (
+                          <TableHead className="w-8">
+                            {(() => {
+                              const selecionaveis = mens.filter(
+                                (m) => m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida),
+                              );
+                              const allSel = selecionaveis.length > 0 &&
+                                selecionaveis.every((m) => selectedHistIds.has(m.id));
+                              const someSel = selecionaveis.some((m) => selectedHistIds.has(m.id));
+                              return (
+                                <input
+                                  type="checkbox"
+                                  aria-label="Selecionar todas as parcelas em aberto"
+                                  ref={(el) => {
+                                    if (el) el.indeterminate = !allSel && someSel;
+                                  }}
+                                  checked={allSel}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedHistIds(new Set(selecionaveis.map((m) => m.id)));
+                                    } else {
+                                      limparHistSel();
+                                    }
+                                  }}
+                                />
+                              );
+                            })()}
+                          </TableHead>
+                        ) : null}
                         <TableHead>Cobrança</TableHead>
                         <TableHead>Vencimento</TableHead>
                         <TableHead>Competência</TableHead>
@@ -3921,7 +4044,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     <TableBody>
                       {loading ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
+                          <TableCell colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7} className="text-center py-4 text-muted-foreground">
                             Carregando…
                           </TableCell>
                         </TableRow>
@@ -3938,7 +4061,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           if (ciclo && ciclo.index > 0 && ciclo.parcelas[0]?.id === m.id) {
                             cicloHeader = (
                               <TableRow key={`hdr-${ciclo.index}`} className="bg-muted/40">
-                                <TableCell colSpan={7} className="text-xs font-semibold py-2">
+                                <TableCell colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7} className="text-xs font-semibold py-2">
                                   {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a {ciclo.fim ? fmtD(ciclo.fim) : "—"}
                                 </TableCell>
                               </TableRow>
@@ -3946,7 +4069,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           } else if (ciclo && ciclo.index === 0 && ciclo.parcelas[0]?.id === m.id) {
                             cicloHeader = (
                               <TableRow key={`hdr-${ciclo.index}`} className="bg-muted/40">
-                                <TableCell colSpan={7} className="text-xs font-semibold py-2">
+                                <TableCell colSpan={podeEscrever && !(cancelado && !isAdmin) ? 8 : 7} className="text-xs font-semibold py-2">
                                   {ciclo.label} — {ciclo.inicio ? fmtD(ciclo.inicio) : "—"} a {ciclo.fim ? fmtD(ciclo.fim) : "—"}
                                 </TableCell>
                               </TableRow>
@@ -3957,6 +4080,18 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         <Fragment key={m.id}>
                         {cicloHeader}
                         <TableRow>
+                          {podeEscrever && !(cancelado && !isAdmin) ? (
+                            <TableCell className="w-8">
+                              {m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida) ? (
+                                <input
+                                  type="checkbox"
+                                  aria-label="Selecionar parcela para pagamento histórico"
+                                  checked={selectedHistIds.has(m.id)}
+                                  onChange={() => toggleHistSel(m.id)}
+                                />
+                              ) : null}
+                            </TableCell>
+                          ) : null}
                           <TableCell>
                             {isAdesao(m) ? (
                               <Badge variant="secondary">Adesão</Badge>
