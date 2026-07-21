@@ -5326,6 +5326,17 @@ h1, h2, h3 { margin: 0 0 6mm; }
           onBack();
         }}
       />
+      <RecalcularVencimentosDialog
+        open={recalcVencOpen}
+        onOpenChange={setRecalcVencOpen}
+        parcelas={mens.map((m) => ({
+          id: m.id,
+          numero_parcela: m.numero_parcela,
+          vencimento: m.vencimento,
+          status: m.status,
+        }))}
+        onDone={load}
+      />
       <Dialog
         open={!!retroDialog?.open}
         onOpenChange={(o) => { if (!o && !regerandoRetro) setRetroDialog(null); }}
