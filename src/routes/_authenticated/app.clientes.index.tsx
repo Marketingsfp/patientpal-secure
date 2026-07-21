@@ -190,6 +190,13 @@ function ClientesPage() {
     return () => clearTimeout(t);
   }, [busca]);
 
+  // Página atual (paginação de 500 em 500) — apenas usada no caminho
+  // com cache (São Francisco de Paula via flag `ux_melhorias`) e somente
+  // quando não há termo de busca. Ao buscar por nome/CPF/telefone o
+  // filtro roda no banco todo em uma página só.
+  const [pagina, setPagina] = useState(0);
+  useEffect(() => { setPagina(0); }, [debouncedBusca]);
+
   // Caminho manual (sem a flag): idêntico ao comportamento anterior.
   useEffect(() => {
     if (!clinicaAtual || uxMelhorias) return;
@@ -215,7 +222,7 @@ function ClientesPage() {
     staleTime: 60_000,
   });
   const listaQuery = useQuery({
-    queryKey: ["clientes-lista", clinicaId, debouncedBusca],
+    queryKey: ["clientes-lista", clinicaId, debouncedBusca, pagina],
     queryFn: async () => {
       const q = debouncedBusca.trim();
       if (q && q.length < 3 && q.replace(/\D/g, "").length < 3) {
@@ -225,7 +232,8 @@ function ClientesPage() {
         _clinica_id: clinicaId!,
         _termo: q,
         _limit: q ? LIMITE_BUSCA : LIMITE_LISTA,
-      });
+        _offset: q ? 0 : pagina * LIMITE_LISTA,
+      } as any);
       if (error) throw error;
       const rows = (data ?? []) as Paciente[];
       return { items: rows, atingiuTeto: rows.length >= (q ? LIMITE_BUSCA : LIMITE_LISTA) };
@@ -415,7 +423,7 @@ function ClientesPage() {
         </div>
       </div>
 
-      {atingiuTeto && (
+      {atingiuTeto && !(uxMelhorias && !debouncedBusca.trim()) && (
         <div className="rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
           Mostrando os primeiros {LIMITE_BUSCA.toLocaleString("pt-BR")} resultados. Refine a busca (nome completo, CPF ou telefone) para ver mais.
         </div>
@@ -511,6 +519,35 @@ function ClientesPage() {
           </TableBody>
         </Table>
       </div>
+
+      {uxMelhorias && !debouncedBusca.trim() && totalPacientes !== null && totalPacientes > LIMITE_LISTA && (
+        <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
+          <div className="text-muted-foreground">
+            Página <span className="font-medium text-foreground">{pagina + 1}</span> de{" "}
+            <span className="font-medium text-foreground">{Math.max(1, Math.ceil(totalPacientes / LIMITE_LISTA))}</span>
+            {" · "}Mostrando {pagina * LIMITE_LISTA + 1}–{pagina * LIMITE_LISTA + filtrados.length} de{" "}
+            {totalPacientes.toLocaleString("pt-BR")}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagina === 0 || loading}
+              onClick={() => setPagina((p) => Math.max(0, p - 1))}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={loading || (pagina + 1) * LIMITE_LISTA >= totalPacientes || filtrados.length < LIMITE_LISTA}
+              onClick={() => setPagina((p) => p + 1)}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Novo cliente */}
       <Dialog open={openNovo} onOpenChange={setOpenNovo}>
