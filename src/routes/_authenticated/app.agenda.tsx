@@ -528,9 +528,51 @@ async function obterInfoConvenioPaciente(params: {
   // Coleta TODAS as regras candidatas e escolhe a de maior score
   // (procedimento_id > especialidade_id > tipo > prioridade) para não
   // parar na primeira que casar por coincidência.
-  const espsTentativa: (string | null)[] = Array.from(
-    new Set<string | null>([...especialidadesProcedimento, ...especialidadesMedico, null]),
-  );
+  // Especialidade explicitamente indicada no nome do serviço (sufixo
+  // "(DERMATOLOGIA)"). É a fonte mais forte de desambiguação quando o
+  // procedimento base ("CONSULTA") está vinculado a várias especialidades
+  // via procedimento_especialidades — sem isso, a regra de menor valor
+  // encontrada primeiro (ex.: NUTRICAO R$60) vencia a regra correta
+  // (DERMATOLOGIA R$9,99) por empate de score.
+  const sufixoMatch = (procedimentoNome ?? "").match(/\(([^()]+)\)\s*$/);
+  const sufixoEsp = sufixoMatch ? sufixoMatch[1].trim() : "";
+  let especialidadeSufixoId: string | null = null;
+  if (sufixoEsp) {
+    const sufixoNorm = sufixoEsp
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+    const { data: espData } = await supabase
+      .from("especialidades")
+      .select("id,nome")
+      .ilike("nome", sufixoEsp)
+      .limit(5);
+    const acha =
+      ((espData ?? []) as Array<{ id: string; nome: string }>).find(
+        (e) =>
+          (e.nome ?? "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim() === sufixoNorm,
+      ) ?? ((espData ?? [])[0] as any);
+    especialidadeSufixoId = (acha as any)?.id ?? null;
+  }
+  // Se o sufixo casou com uma especialidade do médico, usa APENAS ela —
+  // o operador foi explícito sobre qual especialidade da consulta.
+  const sufixoBateComMedico =
+    !!especialidadeSufixoId && especialidadesMedico.includes(especialidadeSufixoId);
+  const espsTentativa: (string | null)[] = sufixoBateComMedico
+    ? [especialidadeSufixoId]
+    : Array.from(
+        new Set<string | null>([
+          ...(especialidadeSufixoId ? [especialidadeSufixoId] : []),
+          ...especialidadesMedico,
+          ...especialidadesProcedimento,
+          null,
+        ]),
+      );
   const scoreRegra = (r: any) =>
     (r.procedimento_id ? 100 : 0)
     + (r.especialidade_id ? 10 : 0)
