@@ -1074,46 +1074,66 @@ function AtendimentosPage() {
     // não a data em que o paciente pagou no caixa. Assim pagamento antecipado não
     // libera repasse antes do dia do atendimento/reagendamento.
     const agendaFimDia = `${fFim}T23:59:59.999`;
-    let qManual = supabase
-      .from("fin_atendimentos")
-      .select(
-        "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, laudo_status, medico_laudador_id, valor_laudo, lancamento_id",
-      )
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .gte("data", fIni)
-      .lte("data", fFim);
-    let qAgenda = supabase
-      .from("fin_lancamentos")
-      .select(
-        "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos!inner(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
-      )
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("tipo", "receita")
-      .eq("status", "confirmado")
-      .not("agendamento_id", "is", null)
-      .gte("agendamento.inicio", `${fIni}T00:00:00`)
-      .lte("agendamento.inicio", agendaFimDia);
-    const qReceitasSemAgenda = supabase
-      .from("fin_lancamentos")
-      .select(
-        "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
-      )
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("tipo", "receita")
-      .eq("status", "confirmado")
-      .is("agendamento_id", null)
-      .gte("data", fIni)
-      .lte("data", fFim);
-    if (fMedico !== "todos") {
-      qManual = qManual.eq("medico_id", fMedico);
-      // Para agenda: não filtramos no servidor porque o lançamento pode estar
-      // com medico_id nulo (médico vem do agendamento). Filtramos client-side
-      // logo após o mapeamento abaixo.
-    }
+    // PostgREST corta em 1.000 linhas por padrão. Em clínicas movimentadas
+    // (ex.: Menino Jesus com ~3.000 lançamentos no mês), registros ficam de
+    // fora silenciosamente. Paginamos em blocos de 1.000 até esgotar.
+    const PAGE_SIZE = 1000;
+    const buildManual = () => {
+      let q = supabase
+        .from("fin_atendimentos")
+        .select(
+          "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, laudo_status, medico_laudador_id, valor_laudo, lancamento_id",
+        )
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .gte("data", fIni)
+        .lte("data", fFim);
+      if (fMedico !== "todos") q = q.eq("medico_id", fMedico);
+      return q;
+    };
+    const buildAgenda = () =>
+      supabase
+        .from("fin_lancamentos")
+        .select(
+          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos!inner(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+        )
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .not("agendamento_id", "is", null)
+        .gte("agendamento.inicio", `${fIni}T00:00:00`)
+        .lte("agendamento.inicio", agendaFimDia);
+    const buildSemAgenda = () =>
+      supabase
+        .from("fin_lancamentos")
+        .select(
+          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+        )
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .is("agendamento_id", null)
+        .gte("data", fIni)
+        .lte("data", fFim);
+    const fetchAllPaged = async <T,>(
+      builder: () => { order: (col: string, opts: { ascending: boolean }) => { range: (from: number, to: number) => Promise<{ data: T[] | null; error: unknown }> } },
+    ): Promise<{ data: T[]; error: unknown }> => {
+      const acc: T[] = [];
+      for (let offset = 0; ; offset += PAGE_SIZE) {
+        const res = await builder()
+          .order("data", { ascending: false })
+          .range(offset, offset + PAGE_SIZE - 1);
+        if (res.error) return { data: acc, error: res.error };
+        const rows = res.data ?? [];
+        acc.push(...rows);
+        if (rows.length < PAGE_SIZE) break;
+        if (offset > 100_000) break; // guard-rail
+      }
+      return { data: acc, error: null };
+    };
     const [mr, ar, sr] = await Promise.all([
-      qManual.order("data", { ascending: false }),
-      qAgenda.order("data", { ascending: false }),
-      qReceitasSemAgenda.order("data", { ascending: false }),
+      fetchAllPaged<any>(buildManual as any),
+      fetchAllPaged<any>(buildAgenda as any),
+      fetchAllPaged<any>(buildSemAgenda as any),
     ]);
     if (mr.error) {
       mostrarErro(mr.error);
