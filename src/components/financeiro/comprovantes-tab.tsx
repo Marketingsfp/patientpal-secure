@@ -10,6 +10,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DateInputBR } from "@/components/ui/date-input-br";
+import {
+  calcRepasseFull,
+  normRepasse,
+  type RepasseCtx,
+  type RepasseMedico,
+  type RepasseConvenio,
+} from "@/lib/repasse-calc";
 
 type Row = {
   id: string;
@@ -87,6 +94,11 @@ export function ComprovantesTab() {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [contas, setContas] = useState<{ id: string; nome: string }[]>([]);
+  const [repasseCtx, setRepasseCtx] = useState<RepasseCtx>({
+    medicos: [],
+    convenios: [],
+    procTipos: new Map(),
+  });
 
   useEffect(() => {
     let cancel = false;
@@ -97,6 +109,97 @@ export function ComprovantesTab() {
         .select("id, nome")
         .eq("clinica_id", clinicaId);
       if (!cancel) setContas(data ?? []);
+    })();
+    // Carrega contexto para recalcular o repasse médico quando o lançamento
+    // não tem `valor_medico_override` gravado (histórico antigo). Mesmo
+    // conjunto de dados usado pela aba Atendimentos do Financeiro.
+    (async () => {
+      if (!clinicaId) return;
+      const [{ data: meds }, rep] = await Promise.all([
+        supabase
+          .from("medicos")
+          .select(
+            "id, aceita_cartao_beneficios, cb_tipo_repasse, cb_valor_repasse, cb_percentual_repasse",
+          )
+          .eq("clinica_id", clinicaId)
+          .eq("ativo", true),
+        supabase.rpc("medicos_repasse_lista", { _clinica_id: clinicaId }),
+      ]);
+      const repMap = new Map<
+        string,
+        { tipo_repasse: string | null; percentual_repasse_padrao: number | null; valor_repasse_padrao: number | null }
+      >();
+      for (const r of ((rep.data as unknown[] | null) ?? []) as Array<{
+        id: string;
+        tipo_repasse: string | null;
+        percentual_repasse_padrao: number | null;
+        valor_repasse_padrao: number | null;
+      }>) {
+        repMap.set(r.id, r);
+      }
+      const medicosCtx: RepasseMedico[] = ((meds ?? []) as Array<Record<string, unknown>>).map((x) => {
+        const r = repMap.get(x.id as string);
+        return {
+          id: x.id as string,
+          tipo_repasse: r?.tipo_repasse ?? "percentual",
+          percentual_repasse_padrao: Number(r?.percentual_repasse_padrao ?? 0),
+          valor_repasse_padrao: r?.valor_repasse_padrao ?? null,
+          aceita_cartao_beneficios: !!x.aceita_cartao_beneficios,
+          cb_tipo_repasse: (x.cb_tipo_repasse as string) ?? null,
+          cb_valor_repasse: (x.cb_valor_repasse as number) ?? null,
+          cb_percentual_repasse: (x.cb_percentual_repasse as number) ?? null,
+        };
+      });
+      // Convênios por médico — paginado (PostgREST teto 1000).
+      const ids = medicosCtx.map((m) => m.id);
+      const conveniosCtx: RepasseConvenio[] = [];
+      if (ids.length) {
+        const CHUNK = 1000;
+        const MAX = 50000;
+        let offset = 0;
+        for (;;) {
+          const { data: cv, error } = await supabase
+            .from("medico_convenios")
+            .select("medico_id, nome, tipo_repasse, percentual, valor")
+            .in("medico_id", ids)
+            .eq("ativo", true)
+            .range(offset, offset + CHUNK - 1);
+          if (error) break;
+          const rowsCv = (cv ?? []) as RepasseConvenio[];
+          conveniosCtx.push(...rowsCv);
+          if (rowsCv.length < CHUNK) break;
+          offset += CHUNK;
+          if (offset >= MAX) break;
+        }
+      }
+      // Mapa de tipos de procedimento (para fallback por categoria __CAT__).
+      const procTipos = new Map<string, string>();
+      {
+        const CHUNK = 1000;
+        const MAX = 50000;
+        let offset = 0;
+        for (;;) {
+          const { data, error } = await supabase
+            .from("procedimentos")
+            .select("nome, tipo")
+            .eq("clinica_id", clinicaId)
+            .eq("ativo", true)
+            .range(offset, offset + CHUNK - 1);
+          if (error) break;
+          const rowsPr = (data ?? []) as Array<{ nome: string | null; tipo: string | null }>;
+          for (const pr of rowsPr) {
+            if (!pr.nome || !pr.tipo) continue;
+            const key = normRepasse(pr.nome);
+            if (!procTipos.has(key)) procTipos.set(key, pr.tipo);
+          }
+          if (rowsPr.length < CHUNK) break;
+          offset += CHUNK;
+          if (offset >= MAX) break;
+        }
+      }
+      if (!cancel) {
+        setRepasseCtx({ medicos: medicosCtx, convenios: conveniosCtx, procTipos });
+      }
     })();
     return () => {
       cancel = true;
@@ -164,10 +267,23 @@ export function ComprovantesTab() {
       }));
       const mappedLc: Row[] = (lcRes.data ?? []).map((r: Record<string, unknown>) => {
         const info = parseDescricao((r.descricao as string) ?? null);
+        // Se o lançamento tem override manual, usa direto. Caso contrário
+        // recalcula o repasse pela regra do médico/convênio — mesma lógica
+        // exibida na aba "Atendimentos". Antes caía no valor cheio (`valor`),
+        // fazendo a segunda via imprimir o valor do serviço em vez do
+        // repasse.
+        const valorPago = Number(r.valor) || 0;
+        const override = r.valor_medico_override;
         const valorMed =
-          r.valor_medico_override != null
-            ? Number(r.valor_medico_override)
-            : Number(r.valor) || 0;
+          override != null && override !== ""
+            ? Number(override)
+            : calcRepasseFull(
+                repasseCtx,
+                (r.medico_id as string) ?? null,
+                valorPago,
+                info.procedimento,
+                (r.descricao as string) ?? null,
+              ).repasse;
         return {
           id: r.id as string,
           data: (r.data as string) ?? "",
