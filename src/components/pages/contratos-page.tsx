@@ -2933,15 +2933,20 @@ function DetalheContrato({
     forma?: string | null,
     lancamentoId?: string | null,
     valorPago?: number | null,
+    pagoEm?: string | null,
   ) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     // Grava lancamento_id + valor_pago junto com o status: sem isso a
     // mensalidade fica marcada como paga sem ponte confiável para o
     // lançamento financeiro (auditoria/estorno não conseguem localizá-lo).
+    // Quando o operador escolhe uma data retroativa no LancamentoDialog,
+    // `pagoEm` traz essa data — sem isso `pago_em` ficaria sempre em "hoje",
+    // mesmo que o lançamento e o movimento de caixa já tenham ido para a data
+    // retroativa correta (a RPC fn_registrar_lancamento_e_caixa cuida disso).
     const patch = paga
       ? {
           status: "pago",
-          pago_em: new Date().toISOString().slice(0, 10),
+          pago_em: pagoEm && pagoEm.length > 0 ? pagoEm : new Date().toISOString().slice(0, 10),
           ...(forma !== undefined ? { forma_pagamento: forma } : {}),
           ...(lancamentoId ? { lancamento_id: lancamentoId } : {}),
           ...(valorPago != null ? { valor_pago: valorPago } : {}),
