@@ -195,6 +195,77 @@ function camposRelevantes(obj: Record<string, unknown> | null): Diff[] {
     .sort((x, y) => labelCampo(x.campo).localeCompare(labelCampo(y.campo)));
 }
 
+async function resolverNomesLista(rows: AuditRow[]): Promise<Record<string, string>> {
+  const medicos = new Set<string>();
+  const pacientes = new Set<string>();
+  const agendamentos = new Set<string>();
+  const contratos = new Set<string>();
+  const orcamentos = new Set<string>();
+  for (const r of rows) {
+    const merged = { ...(r.dados_antes ?? {}), ...(r.dados_depois ?? {}) } as Record<string, unknown>;
+    const pick = (k: string, set: Set<string>) => {
+      const v = merged[k];
+      if (typeof v === "string" && /^[0-9a-f]{8}-/.test(v)) set.add(v);
+    };
+    pick("medico_id", medicos);
+    pick("paciente_id", pacientes);
+    pick("agendamento_id", agendamentos);
+    pick("contrato_id", contratos);
+    pick("orcamento_id", orcamentos);
+    if (r.record_id && /^[0-9a-f]{8}-/.test(r.record_id)) {
+      if (r.table_name === "medicos") medicos.add(r.record_id);
+      else if (r.table_name === "pacientes") pacientes.add(r.record_id);
+      else if (r.table_name === "agendamentos") agendamentos.add(r.record_id);
+      else if (r.table_name === "contratos_assinatura") contratos.add(r.record_id);
+      else if (r.table_name === "orcamentos") orcamentos.add(r.record_id);
+    }
+  }
+  const nomes: Record<string, string> = {};
+  await Promise.all([
+    medicos.size ? supabase.from("medicos").select("id, nome").in("id", Array.from(medicos)).then(({ data }) => {
+      ((data ?? []) as Array<{ id: string; nome: string }>).forEach((r) => { nomes[r.id] = `Dr(a). ${r.nome}`; });
+    }) : Promise.resolve(),
+    pacientes.size ? supabase.from("pacientes").select("id, nome, codigo_prontuario").in("id", Array.from(pacientes)).then(({ data }) => {
+      ((data ?? []) as Array<{ id: string; nome: string; codigo_prontuario: string | null }>).forEach((r) => {
+        nomes[r.id] = r.codigo_prontuario ? `${r.nome} (#${r.codigo_prontuario})` : r.nome;
+      });
+    }) : Promise.resolve(),
+    agendamentos.size ? supabase.from("agendamentos").select("id, paciente_nome, inicio, medico_id").in("id", Array.from(agendamentos)).then(({ data }) => {
+      ((data ?? []) as Array<{ id: string; paciente_nome: string | null; inicio: string; medico_id: string | null }>).forEach((r) => {
+        const dt = new Date(r.inicio).toLocaleString("pt-BR");
+        nomes[r.id] = `${r.paciente_nome ?? "Agendamento"} — ${dt}`;
+      });
+    }) : Promise.resolve(),
+    contratos.size ? supabase.from("contratos_assinatura").select("id, numero").in("id", Array.from(contratos)).then(({ data }) => {
+      ((data ?? []) as unknown as Array<{ id: string; numero: string | number | null }>).forEach((r) => { nomes[r.id] = r.numero ? `Contrato ${r.numero}` : "Contrato"; });
+    }) : Promise.resolve(),
+    orcamentos.size ? supabase.from("orcamentos").select("id, numero").in("id", Array.from(orcamentos)).then(({ data }) => {
+      ((data ?? []) as Array<{ id: string; numero: number | null }>).forEach((r) => { nomes[r.id] = r.numero ? `Orçamento #${r.numero}` : "Orçamento"; });
+    }) : Promise.resolve(),
+  ]);
+  return nomes;
+}
+
+function RegistroCell({ row, nomes }: { row: AuditRow; nomes: Record<string, string> }) {
+  const principal = row.record_id ? nomes[row.record_id] : null;
+  const merged = { ...(row.dados_antes ?? {}), ...(row.dados_depois ?? {}) } as Record<string, unknown>;
+  const medicoId = typeof merged.medico_id === "string" ? merged.medico_id : null;
+  const pacienteId = typeof merged.paciente_id === "string" ? merged.paciente_id : null;
+  const medico = medicoId ? nomes[medicoId] : null;
+  const paciente = pacienteId ? nomes[pacienteId] : null;
+  const extras: string[] = [];
+  if (medico && !principal?.includes("Dr")) extras.push(medico);
+  if (paciente && paciente !== principal) extras.push(paciente);
+  return (
+    <div className="flex flex-col">
+      <span className="truncate">{principal ?? row.record_id ?? "—"}</span>
+      {extras.length > 0 && (
+        <span className="text-xs text-muted-foreground truncate">{extras.join(" · ")}</span>
+      )}
+    </div>
+  );
+}
+
 function Page() {
   const { clinicaAtual } = useClinica();
   const [rows, setRows] = useState<AuditRow[]>([]);
@@ -205,6 +276,7 @@ function Page() {
   const [dataIni, setDataIni] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [detalhe, setDetalhe] = useState<AuditRow | null>(null);
+  const [nomesLista, setNomesLista] = useState<Record<string, string>>({});
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -223,7 +295,9 @@ function Page() {
     const { data, error } = await q;
     setLoading(false);
     if (error) { mostrarErro(error); return; }
-    setRows((data as unknown as AuditRow[]) ?? []);
+    const list = ((data as unknown as AuditRow[]) ?? []);
+    setRows(list);
+    void resolverNomesLista(list).then(setNomesLista);
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
@@ -334,8 +408,10 @@ function Page() {
                 <TableCell className="text-sm">{new Date(r.created_at).toLocaleString("pt-BR")}</TableCell>
                 <TableCell className="text-sm">{r.user_email ?? "—"}</TableCell>
                 <TableCell><Badge className={ACTION_COLOR[r.action]}>{ACTION_LABEL[r.action] ?? r.action}</Badge></TableCell>
-                <TableCell className="text-sm font-mono">{r.table_name}</TableCell>
-                <TableCell className="text-xs font-mono text-muted-foreground truncate max-w-[200px]">{r.record_id ?? "—"}</TableCell>
+                <TableCell className="text-sm">{labelTabela(r.table_name)}</TableCell>
+                <TableCell className="text-sm max-w-[320px]">
+                  <RegistroCell row={r} nomes={nomesLista} />
+                </TableCell>
                 <TableCell className="text-right">
                   <Button size="sm" variant="ghost" onClick={() => setDetalhe(r)}>Ver</Button>
                 </TableCell>
