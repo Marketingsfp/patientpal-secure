@@ -833,10 +833,10 @@ function AtendimentosPage() {
       .from(tabela)
       .update({
         medico_laudador_id: null,
-        valor_laudo: null,
+        valor_laudo: null as unknown as number,
         laudo_status: null,
         laudo_emitido_em: null,
-      })
+      } as never)
       .eq("id", a.id);
     if (error) {
       mostrarErro(error);
