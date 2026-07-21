@@ -817,6 +817,35 @@ function AtendimentosPage() {
     await load();
   };
 
+  const desvincularLaudo = async (a: Atend) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (
+      !confirm(
+        "Desvincular o médico laudador deste atendimento?\n\n" +
+          "• O laudo voltará ao status 'Pendente'.\n" +
+          "• O repasse do laudador deixará de ser devido por este atendimento.\n" +
+          "• Você poderá vincular outro médico depois clicando em 'Vincular'.",
+      )
+    )
+      return;
+    const tabela = a.origem === "agenda" ? "fin_lancamentos" : "fin_atendimentos";
+    const { error } = await supabase
+      .from(tabela)
+      .update({
+        medico_laudador_id: null,
+        valor_laudo: null as unknown as number,
+        laudo_status: null,
+        laudo_emitido_em: null,
+      } as never)
+      .eq("id", a.id);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    toast.success("Laudador desvinculado");
+    await load();
+  };
+
   const abrirLaudoLote = () => {
     if (selectedLaudoElegiveis.length === 0) {
       toast.info("Selecione atendimentos que exijam laudo e ainda não vinculados.");
@@ -2582,13 +2611,26 @@ function AtendimentosPage() {
                           const exigeLaudo = procKey && procLaudo.get(procKey);
                           if (a.laudo_status === "emitido")
                             return (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
-                              >
-                                <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
-                                Vinculado
-                              </Badge>
+                              podeEscrever ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-6 text-[10px] px-2 bg-sky-500/10 text-sky-700 border-sky-500/30 hover:bg-sky-500/20"
+                                  title="Laudo vinculado a um médico laudador. Clique para desvincular e reabrir para nova vinculação."
+                                  onClick={() => desvincularLaudo(a)}
+                                >
+                                  <CheckCircle2 className="h-3 w-3 mr-0.5" />
+                                  Vinculado
+                                </Button>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
+                                >
+                                  <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
+                                  Vinculado
+                                </Badge>
+                              )
                             );
                           if (!exigeLaudo) return <span className="text-muted-foreground text-[10px]">—</span>;
                           if (!podeEstornar || !podeEscrever) return <span className="text-amber-600 text-[10px]">Pendente</span>;
@@ -2697,7 +2739,7 @@ function AtendimentosPage() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7"
-                                  title="Excluir"
+                                  title="Excluir este atendimento do financeiro. Remove o lançamento e o repasse vinculado. Não apaga o agendamento na agenda — use apenas para lançamentos criados por engano."
                                   onClick={() => remove(a)}
                                 >
                                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -2796,7 +2838,13 @@ function AtendimentosPage() {
                                 </Button>
                               )}
                               {podeEscrever && (
-                                <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" onClick={() => remove(a)}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Excluir este atendimento manual do financeiro. Remove o lançamento e o repasse médico. Use apenas para lançamentos criados por engano."
+                                  onClick={() => remove(a)}
+                                >
                                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
                                 </Button>
                               )}
