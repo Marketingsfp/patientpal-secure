@@ -555,7 +555,6 @@ function ConveniosPage() {
               <h2 className="text-lg font-semibold">{editing ? `Editar convênio: ${editing.nome}` : "Novo convênio"}</h2>
               <div />
             </div>
-            {(() => null)()}
             <Tabs defaultValue="info" className="w-full">
             <TabsList>
               <TabsTrigger value="info">Informações</TabsTrigger>
