@@ -1,57 +1,47 @@
-## Diagnóstico (confirmado no banco)
+## Diagnóstico confirmado
 
-**Paciente:** Ana Maria Miranda Alves — contrato ativo no convênio `CARTÃO CONSULTA` na clínica **Menino Jesus** (não SFP, apesar do print).
-**Serviço:** TC CRANIO (Tomografia Computadorizada), agendamento `6c0d5bfa…`.
+A paciente **Erica Kariny** existe na Menino Jesus e possui **3 lançamentos válidos** no período (13/07/26) que deveriam aparecer na aba **Atendimentos → Financeiro**:
 
-Verificado nas regras `cb_convenio_regras` do convênio:
-- Especialidade **Tomografia Computadorizada** → **5%** (correto, prioridade 10).
-- Existem outras regras de **10%** por especialidade: Raio-X, Mamografia, Laboratório.
+- `cc6e15ae` — USG TRANSVAGINAL (Dra. Isis Serrano)
+- `76a40786` — CONSULTA (Dr. Marcílio)
+- `fdbb066b` — PREVENTIVO (Dr. Marcílio)
 
-O agendamento tem `especialidade_id = NULL` e `medico_id` apontando para o "médico placeholder" da unidade, que tem **52 especialidades** cadastradas (inclui Mamografia, Raio-X e Tomografia).
+Todos com `status='confirmado'`, `tipo='receita'`, agendamento válido no intervalo `01/07 → 21/07/2026`. A consulta bruta no banco retorna os 3 corretamente.
 
-### Causa raiz
+**Causa raiz:** no período 01/07 – 21/07 a Menino Jesus tem **2.959 lançamentos**, mas a tela `app.financeiro.atendimentos.tsx` usa um único `supabase.from("fin_lancamentos").select(...)` sem paginação. O PostgREST corta em **1.000 linhas** por padrão, ordenado por `data desc`. Como todos os 2.959 registros são do mesmo período (empate na ordenação), os 3 registros da Erika ficam fora do lote retornado — junto com centenas de outros atendimentos que também estão "sumindo" silenciosamente na Menino Jesus.
 
-Em `src/routes/_authenticated/app.agenda.tsx` (linhas 490–498), a busca da regra faz:
+Isso é **bug técnico**, não regra de negócio. Já vimos o mesmo padrão de teto de 1.000 em outras telas da Menino Jesus/SFP (buscar_pacientes, mensalidades, etc.).
 
-```ts
-for (const eid of espsTentativa) {
-  const r = findRegra(regrasCb, eid, procedimentoTipo, procedimentoId);
-  if (r) { regraMatch = r; break; }
-}
-```
+## Escopo
 
-O loop varre TODAS as especialidades do médico e para no **primeiro match**. Como o placeholder tem Mamografia (regra 10%) antes de Tomografia (regra 5%) na lista, o sistema aplica **10%** em vez de 5%. O mesmo padrão pode afetar qualquer procedimento cujo médico tenha múltiplas especialidades com regras diferentes.
+- **Somente frontend / consultas.** Nenhuma alteração em banco, regras de negócio, RPCs ou dados históricos.
+- Aplicação **global** (todas as clínicas): é bug técnico de paginação e não altera nenhum comportamento visível para clínicas menores.
 
-### Escopo do impacto
+## O que será alterado
 
-Bug técnico global. Ocorre sempre que:
-1. O agendamento não tem `especialidade_id` preenchida; **e**
-2. O médico do slot tem várias especialidades cadastradas com regras de desconto diferentes no convênio.
+Arquivo: `src/routes/_authenticated/app.financeiro.atendimentos.tsx`
 
-Não é regra de negócio — é seleção incorreta de regra.
+1. Trocar as 3 consultas do bloco de carregamento (`qManual` em `fin_atendimentos`, `qAgenda` e `qReceitasSemAgenda` em `fin_lancamentos`) por **loops paginados em blocos de 1.000** usando `.range(offset, offset+999)`, iterando até o lote vir com menos de 1.000 linhas.
+2. Manter todos os filtros existentes (clinica_id, tipo, status, período, agendamento inner join) exatamente iguais.
+3. Manter a mesma ordenação por `data` desc; a ordenação final da tela continua sendo aplicada em memória depois da união.
 
-## O que vou alterar
+Nenhuma alteração em: tipos, cálculo de repasse, filtros de tela (paciente/médico/status/tipo), lógica de espelho manual↔agenda, mensagens, layout.
 
-**Frontend apenas** (`src/routes/_authenticated/app.agenda.tsx`, função de resolução de desconto do convênio):
+## Antes / Depois
 
-1. Quando o `procedimentoId` for conhecido, consultar `procedimento_especialidades` para obter a(s) especialidade(s) **do próprio procedimento** e usar essas como preferência antes das do médico.
-2. Trocar o `for … break` por uma coleta de todos os matches candidatos e escolher o **mais específico** com o critério já existente em `findRegra` (procedimento > especialidade > tipo > genérico; empate desempata por `prioridade`).
-3. Manter o fallback atual (especialidades do médico + `null`) apenas quando a especialidade do procedimento não estiver cadastrada.
-
-Sem mudanças em banco, em `cb-regras.ts`, no Caixa nem em regras de negócio.
+- **Antes:** Menino Jesus com >1.000 lançamentos no período mostra apenas os primeiros 1.000; Erica (e outros) somem da aba.
+- **Depois:** todos os atendimentos do período são carregados, independentemente do volume da clínica.
 
 ## Validação
 
-1. Reabrir o modal de pagamento da Ana Maria (TC CRANIO) — deve exibir `-5%`.
-2. Simular outro procedimento com médico multi-especialidade para confirmar que a especialidade correta é escolhida.
-3. Rodar a Agenda em consulta simples (fluxo `tipo=consulta`, valor_fixo) para garantir que não regrediu.
+Após aplicar:
+1. Abrir `Financeiro → Atendimentos` na Menino Jesus com filtro 01/07 – 21/07/2026 e digitar "erica kariny" — devem aparecer as 3 linhas (USG, Consulta, Preventivo, com Dr. Marcílio / Dra. Isis).
+2. Conferir o total geral (`R$ 0,00` atual) — deve subir refletindo os ~2.959 lançamentos completos.
+3. Testar SFP no mesmo período para confirmar que o resultado bate com o esperado (nada some, nada duplica).
 
-## Fora do escopo
+## Riscos / Pendências
 
-- Nada de UPDATE em lote nos lançamentos históricos que já foram pagos com 10%. Se você quiser corrigir retroativos, me diga quais e faço caso a caso.
-- Não vou preencher `especialidade_id` nos agendamentos antigos automaticamente.
-- Não vou mexer no cadastro do "médico placeholder".
+- Carregar 2.959+ linhas em uma clínica movimentada é mais pesado em rede, mas o payload por linha é pequeno; sem impacto perceptível na UX. Se ficar lento no futuro, dá para reduzir o range padrão para últimos 7 dias na aba.
+- Não altera nada em produção fora do carregamento desta tela.
 
-## Clínica-alvo
-
-A correção é técnica (erro de seleção de regra), sem regra de negócio nova. **Confirma que posso aplicar globalmente** (Menino Jesus, SFP e Ergoclínica)? Se preferir restringir só à Menino Jesus, aplico via feature flag.
+Confirma que posso aplicar essa correção **global** (afeta as 3 clínicas, sem tocar em dados)?
