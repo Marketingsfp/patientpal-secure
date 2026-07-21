@@ -59,6 +59,15 @@ const carenciaShort = (n: number | null | undefined) => {
   return v === 0 ? "Imediato" : `Após ${v}ª`;
 };
 
+// Detecta o convênio interno de funcionários (nome pode variar entre clínicas:
+// "FUNCIONARIO", "CONVÊNIO FUNCIONARIO" etc.). Normaliza acentos e casing.
+const isConvenioFuncionario = (nome: string) =>
+  (nome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .includes("FUNCIONARIO");
+
 export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props) {
   const [regras, setRegras] = useState<CbRegra[]>([]);
   const [especialidades, setEspecialidades] = useState<EspOpt[]>([]);
