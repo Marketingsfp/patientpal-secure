@@ -3007,6 +3007,51 @@ function DetalheContrato({
     load();
   };
 
+  const marcarPagasHistoricasEmLote = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    const ids = Array.from(selectedHistIds);
+    const alvos = mens.filter((m) => ids.includes(m.id) && m.status !== "pago");
+    if (alvos.length === 0) { toast.error("Selecione ao menos uma parcela em aberto."); return; }
+    const total = alvos.reduce((s, m) => s + (Number(m.valor) || 0), 0);
+    const nums = alvos
+      .map((m) => (isAdesao(m) ? "Adesão" : isTaxaInclusao(m) ? "Taxa" : `#${m.numero_parcela}`))
+      .join(", ");
+    const ok = confirm(
+      `Marcar ${alvos.length} parcela(s) como paga (histórica)?\n\n` +
+      `Parcelas: ${nums}\n` +
+      `Total: R$ ${total.toFixed(2).replace(".", ",")}\n\n` +
+      `Elas ficarão como PAGAS no contrato, mas NÃO gerarão movimento no caixa nem lançamento financeiro. ` +
+      `Use apenas para regularizar pagamentos feitos fora do sistema.`,
+    );
+    if (!ok) return;
+    setAplicandoHistLote(true);
+    try {
+      // Cada parcela precisa de pago_em/valor_pago próprios — updates em
+      // paralelo mantêm o mesmo comportamento do fluxo unitário.
+      const results = await Promise.all(
+        alvos.map((m) =>
+          supabase
+            .from("contrato_mensalidades")
+            .update({
+              status: "pago",
+              pago_em: m.vencimento,
+              valor_pago: Number(m.valor) || 0,
+              forma_pagamento: null,
+              lancamento_id: null,
+            })
+            .eq("id", m.id),
+        ),
+      );
+      const erro = results.find((r) => r.error)?.error;
+      if (erro) return mostrarErro(erro);
+      toast.success(`${alvos.length} parcela(s) marcada(s) como paga (histórica). Não foram lançadas no caixa.`);
+      limparHistSel();
+      load();
+    } finally {
+      setAplicandoHistLote(false);
+    }
+  };
+
   const abrirFormaPag = (m: Mens) => {
     setPagMens(m);
     setFormaPagOpen(true);
