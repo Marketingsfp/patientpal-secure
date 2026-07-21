@@ -288,8 +288,14 @@ function Page() {
         transferSentido: m.tipo === "suprimento" ? "entrada" : "saida",
       }));
     }
-    // Merge ordenado por data desc
-    let merged = [...finList, ...caixaList].sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0));
+    // Merge ordenado por data + hora desc (mais recente primeiro)
+    let merged = [...finList, ...caixaList].sort((a, b) => {
+      if (a.data !== b.data) return a.data < b.data ? 1 : -1;
+      const ha = a.hora ?? "";
+      const hb = b.hora ?? "";
+      if (ha !== hb) return ha < hb ? 1 : -1;
+      return 0;
+    });
     // Filtros client-side: valor exato e nº da ficha (referência).
     const vNum = filterValorDebounced ? Number(filterValorDebounced.replace(",", ".")) : NaN;
     if (Number.isFinite(vNum)) {
