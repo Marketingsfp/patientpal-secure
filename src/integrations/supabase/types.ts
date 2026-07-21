@@ -5860,6 +5860,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "nfse_emitente_id_fkey"
+            columns: ["emitente_id"]
+            isOneToOne: false
+            referencedRelation: "nfse_emitentes_publico"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "nfse_orcamento_id_fkey"
             columns: ["orcamento_id"]
             isOneToOne: false
@@ -8174,6 +8181,128 @@ export type Database = {
       }
     }
     Views: {
+      nfse_emitentes_publico: {
+        Row: {
+          aliquota_iss: number | null
+          ativo: boolean | null
+          bairro: string | null
+          cep: string | null
+          certificado_validade: string | null
+          clinica_id: string | null
+          cnpj: string | null
+          codigo_cnae: string | null
+          codigo_municipio: string | null
+          codigo_tributario_municipio: string | null
+          complemento: string | null
+          created_at: string | null
+          descricao_servico_padrao: string | null
+          email: string | null
+          focus_ambiente: string | null
+          id: string | null
+          incentivador_cultural: boolean | null
+          inscricao_estadual: string | null
+          inscricao_municipal: string | null
+          item_lista_servico: string | null
+          logradouro: string | null
+          municipio: string | null
+          nome: string | null
+          nome_fantasia: string | null
+          numero: string | null
+          optante_simples: boolean | null
+          padrao: boolean | null
+          razao_social: string | null
+          regime_tributario: string | null
+          rps_proximo_numero: number | null
+          rps_serie: string | null
+          telefone: string | null
+          uf: string | null
+          updated_at: string | null
+          usar_ambiente_nacional: boolean | null
+        }
+        Insert: {
+          aliquota_iss?: number | null
+          ativo?: boolean | null
+          bairro?: string | null
+          cep?: string | null
+          certificado_validade?: string | null
+          clinica_id?: string | null
+          cnpj?: string | null
+          codigo_cnae?: string | null
+          codigo_municipio?: string | null
+          codigo_tributario_municipio?: string | null
+          complemento?: string | null
+          created_at?: string | null
+          descricao_servico_padrao?: string | null
+          email?: string | null
+          focus_ambiente?: string | null
+          id?: string | null
+          incentivador_cultural?: boolean | null
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
+          item_lista_servico?: string | null
+          logradouro?: string | null
+          municipio?: string | null
+          nome?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          optante_simples?: boolean | null
+          padrao?: boolean | null
+          razao_social?: string | null
+          regime_tributario?: string | null
+          rps_proximo_numero?: number | null
+          rps_serie?: string | null
+          telefone?: string | null
+          uf?: string | null
+          updated_at?: string | null
+          usar_ambiente_nacional?: boolean | null
+        }
+        Update: {
+          aliquota_iss?: number | null
+          ativo?: boolean | null
+          bairro?: string | null
+          cep?: string | null
+          certificado_validade?: string | null
+          clinica_id?: string | null
+          cnpj?: string | null
+          codigo_cnae?: string | null
+          codigo_municipio?: string | null
+          codigo_tributario_municipio?: string | null
+          complemento?: string | null
+          created_at?: string | null
+          descricao_servico_padrao?: string | null
+          email?: string | null
+          focus_ambiente?: string | null
+          id?: string | null
+          incentivador_cultural?: boolean | null
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
+          item_lista_servico?: string | null
+          logradouro?: string | null
+          municipio?: string | null
+          nome?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          optante_simples?: boolean | null
+          padrao?: boolean | null
+          razao_social?: string | null
+          regime_tributario?: string | null
+          rps_proximo_numero?: number | null
+          rps_serie?: string | null
+          telefone?: string | null
+          uf?: string | null
+          updated_at?: string | null
+          usar_ambiente_nacional?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nfse_emitentes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_pacientes_duplicados_suspeitos: {
         Row: {
           chave: string | null
