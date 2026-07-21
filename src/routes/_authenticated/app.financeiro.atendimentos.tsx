@@ -413,18 +413,18 @@ function AtendimentosPage() {
               padding: 2.4mm;
               margin-bottom: 2.5mm;
             }
-            table { width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8.2pt; }
+            table { width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8pt; }
             thead { display: table-header-group; }
             tfoot { display: table-footer-group; }
             tr { break-inside: avoid; page-break-inside: avoid; }
-            th, td { padding: 1.4mm 1.2mm; border-bottom: 1px solid #d7d7d7; vertical-align: top; overflow-wrap: anywhere; word-break: normal; }
+            th, td { padding: 1.4mm 1mm; border-bottom: 1px solid #d7d7d7; vertical-align: top; overflow-wrap: break-word; word-break: normal; }
             th { text-align: left; font-weight: 700; background: #f4f4f5; }
-            th:nth-child(1), td:nth-child(1) { width: 18mm; white-space: nowrap; }
-            th:nth-child(2), td:nth-child(2) { width: 31mm; white-space: nowrap; }
-            th:nth-child(3), td:nth-child(3) { width: 32mm; }
-            th:nth-child(4), td:nth-child(4) { width: 38mm; }
-            th:nth-child(5), td:nth-child(5) { width: auto; }
-            th:nth-child(6), td:nth-child(6) { width: 24mm; text-align: right; white-space: nowrap; }
+            th:nth-child(1), td:nth-child(1) { width: 9%; white-space: nowrap; }
+            th:nth-child(2), td:nth-child(2) { width: 15%; }
+            th:nth-child(3), td:nth-child(3) { width: 18%; }
+            th:nth-child(4), td:nth-child(4) { width: 20%; }
+            th:nth-child(5), td:nth-child(5) { width: 26%; }
+            th:nth-child(6), td:nth-child(6) { width: 12%; text-align: right; white-space: nowrap; }
             body.print-resumo-only .print-area .comprovante-bloco > *:not(.comprovante-resumo) { display: none !important; }
             body.print-resumo-only .print-area .comprovante-resumo { margin-top: 0 !important; }
           </style>
