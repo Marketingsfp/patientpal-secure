@@ -214,7 +214,7 @@ export function ComprovantesTab() {
         supabase
           .from("fin_atendimentos")
           .select(
-            "id, data, procedimento, valor_medico, valor_laudo, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, medico_id, paciente_id, medicos:medico_id(nome), pacientes:paciente_id(nome)",
+            "id, data, procedimento, valor_total, valor_medico, valor_laudo, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, medico_id, paciente_id, medicos:medico_id(nome), pacientes:paciente_id(nome)",
           )
           .eq("clinica_id", clinicaId)
           .eq("repasse_pago", true)
@@ -247,24 +247,37 @@ export function ComprovantesTab() {
           procedimento: partes[1]?.trim() || null,
         };
       };
-      const mappedAt: Row[] = (atRes.data ?? []).map((r: Record<string, unknown>) => ({
-        id: r.id as string,
-        data: r.data as string,
-        procedimento: (r.procedimento as string) ?? null,
-        valor_medico: Number(r.valor_medico) || 0,
-        valor_laudo: Number(r.valor_laudo) || 0,
-        repasse_pago_em: (r.repasse_pago_em as string) ?? null,
-        repasse_pago_at: (r.repasse_pago_at as string) ?? null,
-        repasse_forma_pagamento: (r.repasse_forma_pagamento as string) ?? null,
-        repasse_conta_id: (r.repasse_conta_id as string) ?? null,
-        repasse_lancamento_id: (r.repasse_lancamento_id as string) ?? null,
-        medico_id: (r.medico_id as string) ?? null,
-        medico_nome:
-          (r.medicos as { nome?: string } | null)?.nome ?? null,
-        paciente_id: (r.paciente_id as string) ?? null,
-        paciente_nome:
-          (r.pacientes as { nome?: string } | null)?.nome ?? null,
-      }));
+      const mappedAt: Row[] = (atRes.data ?? []).map((r: Record<string, unknown>) => {
+        // Atendimentos antigos podem ter `valor_medico` gravado com o valor
+        // cheio do serviço. A aba Atendimentos recalcula esses casos pela
+        // regra do médico/convênio; a 2ª via precisa fazer o mesmo.
+        const valorTotal = Number(r.valor_total) || Number(r.valor_medico) || 0;
+        const repasseCalc = calcRepasseFull(
+          repasseCtx,
+          (r.medico_id as string) ?? null,
+          valorTotal,
+          (r.procedimento as string) ?? null,
+          null,
+        ).repasse;
+        return {
+          id: r.id as string,
+          data: r.data as string,
+          procedimento: (r.procedimento as string) ?? null,
+          valor_medico: repasseCalc > 0 ? repasseCalc : Number(r.valor_medico) || 0,
+          valor_laudo: Number(r.valor_laudo) || 0,
+          repasse_pago_em: (r.repasse_pago_em as string) ?? null,
+          repasse_pago_at: (r.repasse_pago_at as string) ?? null,
+          repasse_forma_pagamento: (r.repasse_forma_pagamento as string) ?? null,
+          repasse_conta_id: (r.repasse_conta_id as string) ?? null,
+          repasse_lancamento_id: (r.repasse_lancamento_id as string) ?? null,
+          medico_id: (r.medico_id as string) ?? null,
+          medico_nome:
+            (r.medicos as { nome?: string } | null)?.nome ?? null,
+          paciente_id: (r.paciente_id as string) ?? null,
+          paciente_nome:
+            (r.pacientes as { nome?: string } | null)?.nome ?? null,
+        };
+      });
       const mappedLc: Row[] = (lcRes.data ?? []).map((r: Record<string, unknown>) => {
         const info = parseDescricao((r.descricao as string) ?? null);
         // Se o lançamento tem override manual, usa direto. Caso contrário
