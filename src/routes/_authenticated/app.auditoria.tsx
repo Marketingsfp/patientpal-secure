@@ -114,10 +114,8 @@ const FK_TABELA: Record<string, string> = {
   medico_id: "medicos",
   paciente_id: "pacientes",
   agendamento_id: "agendamentos",
-  agenda_id: "agendas",
   orcamento_id: "orcamentos",
   contrato_id: "contratos_assinatura",
-  pacote_id: "pacotes",
 };
 
 function formatValorComNome(v: unknown, campo: string, nomes: Record<string, string>): string {
@@ -150,27 +148,24 @@ async function resolverNomes(rows: Diff[], tabela: string, rowRecordId: string |
     if (ids.length === 0) return;
     if (tab === "medicos") {
       const { data } = await supabase.from("medicos").select("id, nome").in("id", ids);
-      (data ?? []).forEach((r: { id: string; nome: string }) => { nomes[r.id] = `Dr(a). ${r.nome}`; });
+      ((data ?? []) as unknown as Array<{ id: string; nome: string }>).forEach((r) => { nomes[r.id] = `Dr(a). ${r.nome}`; });
     } else if (tab === "pacientes") {
-      const { data } = await supabase.from("pacientes").select("id, nome, prontuario").in("id", ids);
-      (data ?? []).forEach((r: { id: string; nome: string; prontuario: string | null }) => {
-        nomes[r.id] = r.prontuario ? `${r.nome} (#${r.prontuario})` : r.nome;
+      const { data } = await supabase.from("pacientes").select("id, nome, codigo_prontuario").in("id", ids);
+      ((data ?? []) as unknown as Array<{ id: string; nome: string; codigo_prontuario: string | null }>).forEach((r) => {
+        nomes[r.id] = r.codigo_prontuario ? `${r.nome} (#${r.codigo_prontuario})` : r.nome;
       });
     } else if (tab === "agendamentos") {
       const { data } = await supabase.from("agendamentos").select("id, paciente_nome, inicio").in("id", ids);
-      (data ?? []).forEach((r: { id: string; paciente_nome: string | null; inicio: string }) => {
+      ((data ?? []) as unknown as Array<{ id: string; paciente_nome: string | null; inicio: string }>).forEach((r) => {
         const dt = new Date(r.inicio).toLocaleString("pt-BR");
         nomes[r.id] = `${r.paciente_nome ?? "Agendamento"} — ${dt}`;
       });
-    } else if (tab === "agendas") {
-      const { data } = await supabase.from("agendas").select("id, nome").in("id", ids);
-      (data ?? []).forEach((r: { id: string; nome: string }) => { nomes[r.id] = r.nome; });
     } else if (tab === "orcamentos") {
       const { data } = await supabase.from("orcamentos").select("id, numero").in("id", ids);
-      (data ?? []).forEach((r: { id: string; numero: number | null }) => { nomes[r.id] = r.numero ? `Orçamento #${r.numero}` : "Orçamento"; });
+      ((data ?? []) as unknown as Array<{ id: string; numero: number | null }>).forEach((r) => { nomes[r.id] = r.numero ? `Orçamento #${r.numero}` : "Orçamento"; });
     } else if (tab === "contratos_assinatura") {
-      const { data } = await supabase.from("contratos_assinatura").select("id, numero_contrato").in("id", ids);
-      (data ?? []).forEach((r: { id: string; numero_contrato: string | null }) => { nomes[r.id] = r.numero_contrato ? `Contrato ${r.numero_contrato}` : "Contrato"; });
+      const { data } = await supabase.from("contratos_assinatura").select("id, numero").in("id", ids);
+      ((data ?? []) as unknown as Array<{ id: string; numero: string | null }>).forEach((r) => { nomes[r.id] = r.numero ? `Contrato ${r.numero}` : "Contrato"; });
     }
   }));
   return nomes;
