@@ -367,7 +367,7 @@ function ConveniosPage() {
     // 3) Faixas: exigir pelo menos 1, valor >= 0 e sem vidas_de duplicado
     //    (convênio FUNCIONARIO não usa faixas — pulamos a validação e garantimos
     //     uma faixa mínima automática de 1 vida com valor R$ 0)
-    const isFuncionario = (nomeClean || editing?.nome || "").trim().toUpperCase() === "FUNCIONARIO";
+    const isFuncionario = isConvenioFuncionario(nomeClean || editing?.nome || "");
     let faixasParaSalvar = faixas;
     if (isFuncionario && !faixasParaSalvar.length) {
       faixasParaSalvar = [{ vidas_de: 1, vidas_ate: 1, valor_mensal: 0 }];
@@ -558,11 +558,11 @@ function ConveniosPage() {
             <Tabs defaultValue="info" className="w-full">
             <TabsList>
               <TabsTrigger value="info">Informações</TabsTrigger>
-              {!((nome || editing?.nome || "").trim().toUpperCase() === "FUNCIONARIO") && (
+              {!isConvenioFuncionario(nome || editing?.nome || "") && (
                 <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
               )}
               <TabsTrigger value="regras"><Gift className="h-4 w-4 mr-1" />Benefícios</TabsTrigger>
-              {!((nome || editing?.nome || "").trim().toUpperCase() === "FUNCIONARIO") && (
+              {!isConvenioFuncionario(nome || editing?.nome || "") && (
                 <>
                   <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
                   <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
