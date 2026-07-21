@@ -205,6 +205,7 @@ function Page() {
   const [dataIni, setDataIni] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [detalhe, setDetalhe] = useState<AuditRow | null>(null);
+  const [nomesLista, setNomesLista] = useState<Record<string, string>>({});
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -223,7 +224,9 @@ function Page() {
     const { data, error } = await q;
     setLoading(false);
     if (error) { mostrarErro(error); return; }
-    setRows((data as unknown as AuditRow[]) ?? []);
+    const list = ((data as unknown as AuditRow[]) ?? []);
+    setRows(list);
+    void resolverNomesLista(list).then(setNomesLista);
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
@@ -334,8 +337,10 @@ function Page() {
                 <TableCell className="text-sm">{new Date(r.created_at).toLocaleString("pt-BR")}</TableCell>
                 <TableCell className="text-sm">{r.user_email ?? "—"}</TableCell>
                 <TableCell><Badge className={ACTION_COLOR[r.action]}>{ACTION_LABEL[r.action] ?? r.action}</Badge></TableCell>
-                <TableCell className="text-sm font-mono">{r.table_name}</TableCell>
-                <TableCell className="text-xs font-mono text-muted-foreground truncate max-w-[200px]">{r.record_id ?? "—"}</TableCell>
+                <TableCell className="text-sm">{labelTabela(r.table_name)}</TableCell>
+                <TableCell className="text-sm max-w-[320px]">
+                  <RegistroCell row={r} nomes={nomesLista} />
+                </TableCell>
                 <TableCell className="text-right">
                   <Button size="sm" variant="ghost" onClick={() => setDetalhe(r)}>Ver</Button>
                 </TableCell>
