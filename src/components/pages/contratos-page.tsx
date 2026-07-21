@@ -2009,6 +2009,18 @@ function DetalheContrato({
   type RascunhoMens = { vencimento?: string; valor?: number; pago_em?: string | null };
   const [rascunhos, setRascunhos] = useState<Record<string, RascunhoMens>>({});
   const [salvandoRascunhos, setSalvandoRascunhos] = useState(false);
+  // Seleção múltipla para marcar parcelas como "Paga (histórica)" em lote.
+  // Não afeta o fluxo de "Pagar" com forma de pagamento (esse continua unitário).
+  const [selectedHistIds, setSelectedHistIds] = useState<Set<string>>(new Set());
+  const [aplicandoHistLote, setAplicandoHistLote] = useState(false);
+  const toggleHistSel = (id: string) => {
+    setSelectedHistIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const limparHistSel = () => setSelectedHistIds(new Set());
   const setRascunho = (id: string, patch: RascunhoMens) => {
     setRascunhos((prev) => {
       const atual = { ...(prev[id] ?? {}), ...patch };
