@@ -473,6 +473,22 @@ async function obterInfoConvenioPaciente(params: {
     if (!especialidadeId && extras[0]) especialidadeId = extras[0];
   }
 
+  // Especialidades do PROCEDIMENTO (fonte de verdade quando o médico é
+  // um "placeholder" com N especialidades — sem isso, a busca pegava a
+  // primeira especialidade do médico que casasse com QUALQUER regra do
+  // convênio, aplicando o desconto errado, ex.: 10% de Mamografia em
+  // vez dos 5% da Tomografia.
+  let especialidadesProcedimento: string[] = [];
+  if (procedimentoId) {
+    const { data: procEsps } = await (supabase as any)
+      .from("procedimento_especialidades")
+      .select("especialidade_id")
+      .eq("procedimento_id", procedimentoId);
+    especialidadesProcedimento = ((procEsps ?? []) as Array<{ especialidade_id: string | null }>)
+      .map((r) => r.especialidade_id)
+      .filter((x): x is string => !!x);
+  }
+
   // 4) Fonte única de regras de desconto: cb_convenio_regras (aba Regras de Preço).
   //    A Agenda passou a ler exatamente as mesmas regras que o Caixa usa —
   //    a aba antiga "Benefícios (regras)" (cb_beneficios) foi removida.
@@ -486,14 +502,24 @@ async function obterInfoConvenioPaciente(params: {
   const regrasCb = (regrasRaw ?? []) as any[];
   const { findRegra, carenciaCumprida } = await import("@/lib/cb-regras");
 
-  // Escolhe a regra mais específica dentre as especialidades possíveis do médico.
-  const espsTentativa: (string | null)[] = especialidadesMedico.length ? [...especialidadesMedico, null] : [null];
+  // Ordem de tentativa: especialidade do procedimento primeiro (mais
+  // específica ao serviço), depois especialidades do médico, por fim null.
+  // Coleta TODAS as regras candidatas e escolhe a de maior score
+  // (procedimento_id > especialidade_id > tipo > prioridade) para não
+  // parar na primeira que casar por coincidência.
+  const espsTentativa: (string | null)[] = Array.from(
+    new Set<string | null>([...especialidadesProcedimento, ...especialidadesMedico, null]),
+  );
+  const scoreRegra = (r: any) =>
+    (r.procedimento_id ? 100 : 0)
+    + (r.especialidade_id ? 10 : 0)
+    + (r.tipo ? 5 : 0)
+    + (Number(r.prioridade) || 0) * 0.01;
   let regraMatch: any = null;
   for (const eid of espsTentativa) {
     const r = findRegra(regrasCb as any, eid, procedimentoTipo, procedimentoId);
-    if (r) {
+    if (r && (!regraMatch || scoreRegra(r) > scoreRegra(regraMatch))) {
       regraMatch = r;
-      break;
     }
   }
 
@@ -801,9 +827,8 @@ async function obterInfoConvenioPaciente(params: {
           let fallback: any = null;
           for (const eid of espsTentativa) {
             const r = findRegra(regrasCb as any, eid, procedimentoTipo, procedimentoId, { excludeGratuito: true });
-            if (r) {
+            if (r && (!fallback || scoreRegra(r) > scoreRegra(fallback))) {
               fallback = r;
-              break;
             }
           }
           if (fallback) {
