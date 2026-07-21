@@ -487,6 +487,28 @@ function renderComprovanteHtml(g: Grupo, clinicaNome: string): string {
     })
     .join("");
   return `
+    <style>
+      .repasse-preview { color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 10pt; line-height: 1.35; }
+      .repasse-preview * { box-sizing: border-box; }
+      .repasse-preview .header { display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid #d4d4d4; padding-bottom: 8px; margin-bottom: 8px; }
+      .repasse-preview .header .right { text-align: right; }
+      .repasse-preview .reimp { border: 2px solid #be123c; background: #ffe4e6; color: #881337; border-radius: 4px; padding: 8px; text-align: center; margin-bottom: 8px; }
+      .repasse-preview .reimp .t { font-size: 13pt; font-weight: 800; text-transform: uppercase; }
+      .repasse-preview .reimp .s { font-size: 9pt; margin-top: 2px; }
+      .repasse-preview .resumo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; row-gap: 4px; border: 1px solid #d4d4d4; border-radius: 4px; padding: 8px; margin-bottom: 10px; }
+      .repasse-preview .mut { color: #555; font-size: 9pt; }
+      .repasse-preview .tot { font-size: 11pt; font-weight: 700; }
+      .repasse-preview table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9pt; }
+      .repasse-preview th, .repasse-preview td { padding: 6px 8px; border-bottom: 1px solid #e5e5e5; vertical-align: top; overflow-wrap: anywhere; }
+      .repasse-preview th { text-align: left; font-weight: 700; background: #f4f4f5; }
+      .repasse-preview th:nth-child(1), .repasse-preview td:nth-child(1) { width: 90px; white-space: nowrap; }
+      .repasse-preview th:nth-child(2), .repasse-preview td:nth-child(2) { width: 32%; }
+      .repasse-preview th:nth-child(3), .repasse-preview td:nth-child(3) { width: auto; }
+      .repasse-preview th:nth-child(4), .repasse-preview td:nth-child(4) { width: 110px; text-align: right; white-space: nowrap; }
+      .repasse-preview .sig { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; margin-top: 32px; padding-top: 12px; font-size: 9pt; text-align: center; }
+      .repasse-preview .sig .line { border-top: 1px solid #d4d4d4; padding-top: 4px; }
+    </style>
+    <div class="repasse-preview">
     <div class="reimp">
       <div class="t">Segunda via — Reimpressão de comprovante</div>
       <div class="s">Pagamento realizado em <b>${dataPagBR}${hora ? ` às ${hora}` : " (horário não registrado)"}</b></div>
@@ -532,6 +554,7 @@ function renderComprovanteHtml(g: Grupo, clinicaNome: string): string {
         <div><div class="line">Assinatura do médico</div></div>
         <div><div class="line">Assinatura da clínica</div></div>
       </div>
+    </div>
     </div>
   `;
 }
