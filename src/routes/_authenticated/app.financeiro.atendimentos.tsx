@@ -2611,13 +2611,26 @@ function AtendimentosPage() {
                           const exigeLaudo = procKey && procLaudo.get(procKey);
                           if (a.laudo_status === "emitido")
                             return (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
-                              >
-                                <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
-                                Vinculado
-                              </Badge>
+                              podeEscrever ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-6 text-[10px] px-2 bg-sky-500/10 text-sky-700 border-sky-500/30 hover:bg-sky-500/20"
+                                  title="Laudo vinculado a um médico laudador. Clique para desvincular e reabrir para nova vinculação."
+                                  onClick={() => desvincularLaudo(a)}
+                                >
+                                  <CheckCircle2 className="h-3 w-3 mr-0.5" />
+                                  Vinculado
+                                </Button>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
+                                >
+                                  <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
+                                  Vinculado
+                                </Badge>
+                              )
                             );
                           if (!exigeLaudo) return <span className="text-muted-foreground text-[10px]">—</span>;
                           if (!podeEstornar || !podeEscrever) return <span className="text-amber-600 text-[10px]">Pendente</span>;
