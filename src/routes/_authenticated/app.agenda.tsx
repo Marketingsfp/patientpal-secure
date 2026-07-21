@@ -6563,10 +6563,10 @@ function AgendaPage() {
         style={{ ["--clinic" as never]: corClinica }}
       >
         {/* Linha 1: Filtros principais */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1 xl:gap-1.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-1 xl:gap-1.5">
 
           {/* Profissional */}
-          <div className="space-y-0">
+          <div className="space-y-0 lg:col-span-2">
             <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
@@ -6579,7 +6579,7 @@ function AgendaPage() {
           </div>
 
           {/* Tipo de Agenda */}
-          <div className="space-y-0">
+          <div className="space-y-0 lg:col-span-1">
             <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Tipo de agenda</Label>
             <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
               <SelectTrigger className="h-8 text-xs w-full">
@@ -6614,7 +6614,7 @@ function AgendaPage() {
           </div>
 
           {/* Situação */}
-          <div className="space-y-0">
+          <div className="space-y-0 lg:col-span-1">
             <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
               <SelectTrigger className="h-8 text-xs w-full">
@@ -6632,7 +6632,7 @@ function AgendaPage() {
           </div>
 
           {/* Data */}
-          <div className="space-y-0">
+          <div className="space-y-0 lg:col-span-1">
             <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Data</Label>
             <DataRefField
               dataRef={dataRef}
@@ -6653,7 +6653,7 @@ function AgendaPage() {
           </div>
 
           {/* Especialidade */}
-          <div className="space-y-0">
+          <div className="space-y-0 lg:col-span-1">
             <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
               <SelectTrigger className="h-8 text-xs w-full">
@@ -6667,7 +6667,7 @@ function AgendaPage() {
           </div>
 
           {/* Cliente + Ações rápidas juntos */}
-          <div className="space-y-0">
+          <div className="space-y-0 lg:col-span-2">
             <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Cliente</Label>
             <div className="flex items-center gap-1">
               <Input
