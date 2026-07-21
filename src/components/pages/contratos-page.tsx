@@ -4913,7 +4913,17 @@ h1, h2, h3 { margin: 0 0 6mm; }
           const taxaAdesao = Number(pagMens.taxa_adesao ?? 0) || 0;
           const ehAdesaoAvulsa = isAdesao(pagMens);
           const ehTaxaInclusao = isTaxaInclusao(pagMens);
-          await marcarPago(mensId, true, dados.forma_pagamento ?? "misto", dados.lancamento_id, dados.valor);
+          // Repassa a data escolhida no diálogo (retroativa ou não) como
+          // `pago_em` — a RPC já usou essa mesma data para o lançamento e o
+          // movimento de caixa; a mensalidade precisa ficar coerente.
+          await marcarPago(
+            mensId,
+            true,
+            dados.forma_pagamento ?? "misto",
+            dados.lancamento_id,
+            dados.valor,
+            dados.data,
+          );
           // Pagamentos avulsos da linha de adesão ou da taxa de inclusão de
           // dependente: o próprio LancamentoDialog já gravou lançamento +
           // movimento de caixa via RPC atômica com a categoria correta. Não
@@ -4943,7 +4953,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 // 2) Insere lançamento independente para a taxa de adesão,
                 // com mesma forma de pagamento escolhida pelo operador.
                 // Abordagem B: RPC atômica lançamento + caixa (Postgres cuida do rollback).
-                const hojeStr = new Date().toISOString().slice(0, 10);
+                // Segue a mesma data escolhida no diálogo (permite retroativo):
+                // se o operador pagou 20/07, tanto a mensalidade quanto a taxa
+                // de adesão vinculada vão para 20/07 no financeiro e no caixa.
+                const dataLanc = dados.data || new Date().toISOString().slice(0, 10);
                 const descricaoTaxa = `Taxa de adesão — Contrato #${contrato.numero} — ${contrato.paciente_nome}`;
                 const { data: rpcData, error: rpcErr } = await supabase.rpc("fn_registrar_lancamento_e_caixa", {
                   p_lancamento: {
@@ -4951,7 +4964,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     tipo: "receita",
                     descricao: descricaoTaxa,
                     valor: taxaAdesao,
-                    data: hojeStr,
+                    data: dataLanc,
                     status: "confirmado",
                     categoria_id: categoriaTaxaId,
                     forma_pagamento: dados.forma_pagamento,
@@ -4991,6 +5004,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     dados.forma_pagamento ?? "misto",
                     taxaRpcResult.lancamento_id ?? null,
                     taxaAdesao,
+                    dataLanc,
                   );
                 }
 
