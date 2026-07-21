@@ -2739,7 +2739,7 @@ function AtendimentosPage() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7"
-                                  title="Excluir"
+                                  title="Excluir este atendimento do financeiro. Remove o lançamento e o repasse vinculado. Não apaga o agendamento na agenda — use apenas para lançamentos criados por engano."
                                   onClick={() => remove(a)}
                                 >
                                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -2838,7 +2838,13 @@ function AtendimentosPage() {
                                 </Button>
                               )}
                               {podeEscrever && (
-                                <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" onClick={() => remove(a)}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Excluir este atendimento manual do financeiro. Remove o lançamento e o repasse médico. Use apenas para lançamentos criados por engano."
+                                  onClick={() => remove(a)}
+                                >
                                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
                                 </Button>
                               )}
