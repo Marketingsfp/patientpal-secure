@@ -227,6 +227,15 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     const items = regras
       .map((r, idx) => ({ r, idx }))
       .filter(({ r }) => {
+        // Exceções do convênio FUNCIONARIO ficam apenas no bloco próprio.
+        if (
+          isFuncionario &&
+          r.procedimento_id &&
+          r.modo === "percentual_desconto" &&
+          Number(r.percentual) === 0 &&
+          !r.gratuito &&
+          !r.limite_qtd
+        ) return false;
         if (filtroGratuito === "sim" && !r.gratuito) return false;
         if (filtroGratuito === "nao" && r.gratuito) return false;
         if (filtroCarencia !== "todos" && Number(r.carencia_mensalidades ?? 0) !== Number(filtroCarencia)) return false;
@@ -262,7 +271,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       return 0;
     });
     return items;
-  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, filtroEspecialidade, filtroTipo, filtroProcedimento, filtroModo, filtroPrioridade, procById, espById]);
+  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, filtroEspecialidade, filtroTipo, filtroProcedimento, filtroModo, filtroPrioridade, procById, espById, isFuncionario]);
 
   const prioridadesUsadas = useMemo(() => {
     const s = new Set<number>();
