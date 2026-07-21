@@ -1,67 +1,32 @@
 ## Problema
-A política SELECT em `nfse_emitentes` só permite gestores. Usuários comuns precisam ler dados básicos do emitente (id, nome, CNPJ, município, ambiente Focus, ambiente padrão) para emitir NF-e, mas **não podem** ver colunas sensíveis (certificado digital, senha do certificado, tokens Focus NFe homologação/produção).
 
-## Solução: view segura + refatorar leituras client-side
-Global (todas as clínicas).
+Nas telas de edição do convênio de funcionário, as abas "Faixas de Preço", "Contrato", "Informativo" e "Termo de Inclusão" continuam visíveis.
 
-### 1. Migration — criar view `nfse_emitentes_publico`
+**Causa raiz:** a verificação em `src/routes/_authenticated/app.cartao-beneficios.convenios.tsx` compara o nome exatamente com `"FUNCIONARIO"` (`nome.trim().toUpperCase() === "FUNCIONARIO"`). Na Menino Jesus (e provavelmente nas outras clínicas) o convênio foi cadastrado como **"CONVÊNIO FUNCIONARIO"**, então a condição nunca é verdadeira e as abas continuam sendo exibidas.
 
-```sql
-CREATE OR REPLACE VIEW public.nfse_emitentes_publico AS
-SELECT
-  id, clinica_id, nome, razao_social, cnpj, inscricao_municipal,
-  codigo_municipio, municipio, uf, endereco, numero, bairro, cep,
-  telefone, email, regime_tributario, item_lista_servico, cnae,
-  codigo_tributacao_municipio, aliquota_iss, iss_retido,
-  descricao_servico_padrao, focus_ambiente, focus_serie_rps,
-  rps_proximo_numero, rps_lote_proximo, ativo, padrao,
-  created_at, updated_at
-FROM public.nfse_emitentes;
--- Sem security_invoker → executa como owner, ignora RLS do base
--- mas exclui: focus_token_producao, focus_token_homologacao,
--- certificado_a1_base64, certificado_a1_senha, e outros campos sigilosos.
+## Escopo da correção
 
--- Filtro de linhas via política própria (a view herda RLS quando
--- security_invoker=on). Como usamos DEFINER, aplicamos filtro no SQL:
-CREATE OR REPLACE VIEW public.nfse_emitentes_publico
-WITH (security_invoker=off) AS
-SELECT ...campos acima...
-FROM public.nfse_emitentes e
-WHERE EXISTS (
-  SELECT 1 FROM public.clinica_memberships m
-  WHERE m.user_id = auth.uid()
-    AND m.clinica_id = e.clinica_id
-    AND m.ativo = true
-);
+Ajustar apenas o front-end do editor de convênios (nenhuma mudança de banco, regra ou outras telas).
 
-REVOKE ALL ON public.nfse_emitentes_publico FROM PUBLIC, anon;
-GRANT SELECT ON public.nfse_emitentes_publico TO authenticated;
-```
+## Clínica-alvo
 
-Colunas sigilosas ficam ausentes da view; ninguém que use a view consegue vê-las, mesmo por engano.
+Regra técnica de detecção do convênio de funcionário — proponho aplicar **globalmente** (SFP, Menino Jesus e Ergoclínica), já que o convênio "FUNCIONARIO" existe nas três clínicas e o comportamento esperado é o mesmo. Confirme se prefere restringir a uma clínica específica.
 
-### 2. Refatorar 6 pontos client-side para consumir a view
-Todos apenas leem colunas não sensíveis:
+## O que vou alterar
 
-- `src/components/nfse/use-pick-emitente.tsx` (2 selects)
-- `src/routes/_authenticated/app.nfse.index.tsx` (2 selects — lista + `rps_proximo_numero`)
-- `src/routes/_authenticated/app.nfse.testar.tsx`
-- `src/routes/_authenticated/app.financeiro.notas.tsx`
-- `src/routes/_authenticated/app.financeiro.atendimentos.tsx`
-- `src/components/pages/contratos-page.tsx`
-- `src/routes/_authenticated/app.nfse.index.tsx` join embutido: `emitente:nfse_emitentes(nome, cnpj)` → apontar para `nfse_emitentes_publico` via FK hint.
+Em `app.cartao-beneficios.convenios.tsx`:
 
-### 3. Não alterar
-- Tabela base `nfse_emitentes` mantém as políticas atuais (só gestores selecionam/gerenciam), então cadastro/edição na tela **Configurações → NF-e** continua exclusiva para gestores.
-- `nfse.functions.ts` (backend) continua usando a tabela base — roda com service role / gestor.
-- Backup diário e emissão via server function continuam intactos (usam service role).
+1. Extrair um helper local `isConvenioFuncionario(nome)` que retorne `true` quando o nome (após `trim().toUpperCase()`) **contiver** a palavra `FUNCIONARIO` (cobre "FUNCIONARIO", "CONVÊNIO FUNCIONARIO", "CONVENIO FUNCIONARIOS" etc.).
+2. Substituir as 3 ocorrências atuais da comparação estrita (linhas ~370, 561, 565) por esse helper, tanto na renderização das abas quanto na validação de faixas ao salvar.
+3. Manter o comportamento automático já existente (faixa padrão 1 vida R$ 0, sem carência).
 
 ## Validação
-- Logar como usuário comum da SFP: abrir "Financeiro → Notas" e "Financeiro → Atendimentos" → dropdown de emitente carrega.
-- Emitir NF-e de teste com usuário comum.
-- Logar como gestor: tela Configurações → NF-e continua funcionando (CRUD via tabela base).
-- Conferir no console/network: nenhuma query cliente lê `focus_token_*` nem `certificado_*`.
 
-## Fora de escopo
-- Não mexer no motor de emissão.
-- Não alterar política de UPDATE/INSERT/DELETE (permanece restrita a gestores).
+- Abrir o convênio "CONVÊNIO FUNCIONARIO" na Menino Jesus: só devem aparecer as abas **Informações** e **Benefícios**.
+- Repetir na SFP e Ergoclínica.
+- Abrir um convênio comum (ex.: "Cartão Consulta") e confirmar que todas as abas continuam visíveis.
+- Salvar o convênio de funcionário e confirmar que não pede faixa de preço nem contrato.
+
+## Pendências / riscos
+
+- Se algum dia existir um convênio legítimo com a palavra "FUNCIONARIO" no nome mas que deva ter contrato/faixas, o helper esconderá as abas. Se isso for uma preocupação, podemos evoluir depois para uma flag `tipo = 'funcionario'` na tabela `convenios` — não faço isso agora para manter o escopo pequeno.
