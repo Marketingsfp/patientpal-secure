@@ -44,6 +44,9 @@ export interface LancamentoSavedData {
   parcelas: number | null;
   bandeira_cartao: string | null;
   emitir_nfse: boolean;
+  /** Data (YYYY-MM-DD) escolhida no diálogo — permite que quem chama repasse
+   *  a mesma data retroativa para `pago_em` da mensalidade, etc. */
+  data: string;
   pagamentos_detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
 }
 
@@ -683,6 +686,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       parcelas: parcelasFinal,
       bandeira_cartao: bandeiraFinal,
       emitir_nfse: emitirNfse,
+      data,
       pagamentos_detalhe: pagamentoMisto
         ? pagamentos
             .map((p, i) => ({

@@ -2933,15 +2933,20 @@ function DetalheContrato({
     forma?: string | null,
     lancamentoId?: string | null,
     valorPago?: number | null,
+    pagoEm?: string | null,
   ) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     // Grava lancamento_id + valor_pago junto com o status: sem isso a
     // mensalidade fica marcada como paga sem ponte confiável para o
     // lançamento financeiro (auditoria/estorno não conseguem localizá-lo).
+    // Quando o operador escolhe uma data retroativa no LancamentoDialog,
+    // `pagoEm` traz essa data — sem isso `pago_em` ficaria sempre em "hoje",
+    // mesmo que o lançamento e o movimento de caixa já tenham ido para a data
+    // retroativa correta (a RPC fn_registrar_lancamento_e_caixa cuida disso).
     const patch = paga
       ? {
           status: "pago",
-          pago_em: new Date().toISOString().slice(0, 10),
+          pago_em: pagoEm && pagoEm.length > 0 ? pagoEm : new Date().toISOString().slice(0, 10),
           ...(forma !== undefined ? { forma_pagamento: forma } : {}),
           ...(lancamentoId ? { lancamento_id: lancamentoId } : {}),
           ...(valorPago != null ? { valor_pago: valorPago } : {}),
@@ -4908,7 +4913,17 @@ h1, h2, h3 { margin: 0 0 6mm; }
           const taxaAdesao = Number(pagMens.taxa_adesao ?? 0) || 0;
           const ehAdesaoAvulsa = isAdesao(pagMens);
           const ehTaxaInclusao = isTaxaInclusao(pagMens);
-          await marcarPago(mensId, true, dados.forma_pagamento ?? "misto", dados.lancamento_id, dados.valor);
+          // Repassa a data escolhida no diálogo (retroativa ou não) como
+          // `pago_em` — a RPC já usou essa mesma data para o lançamento e o
+          // movimento de caixa; a mensalidade precisa ficar coerente.
+          await marcarPago(
+            mensId,
+            true,
+            dados.forma_pagamento ?? "misto",
+            dados.lancamento_id,
+            dados.valor,
+            dados.data,
+          );
           // Pagamentos avulsos da linha de adesão ou da taxa de inclusão de
           // dependente: o próprio LancamentoDialog já gravou lançamento +
           // movimento de caixa via RPC atômica com a categoria correta. Não
@@ -4938,7 +4953,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 // 2) Insere lançamento independente para a taxa de adesão,
                 // com mesma forma de pagamento escolhida pelo operador.
                 // Abordagem B: RPC atômica lançamento + caixa (Postgres cuida do rollback).
-                const hojeStr = new Date().toISOString().slice(0, 10);
+                // Segue a mesma data escolhida no diálogo (permite retroativo):
+                // se o operador pagou 20/07, tanto a mensalidade quanto a taxa
+                // de adesão vinculada vão para 20/07 no financeiro e no caixa.
+                const dataLanc = dados.data || new Date().toISOString().slice(0, 10);
                 const descricaoTaxa = `Taxa de adesão — Contrato #${contrato.numero} — ${contrato.paciente_nome}`;
                 const { data: rpcData, error: rpcErr } = await supabase.rpc("fn_registrar_lancamento_e_caixa", {
                   p_lancamento: {
@@ -4946,7 +4964,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     tipo: "receita",
                     descricao: descricaoTaxa,
                     valor: taxaAdesao,
-                    data: hojeStr,
+                    data: dataLanc,
                     status: "confirmado",
                     categoria_id: categoriaTaxaId,
                     forma_pagamento: dados.forma_pagamento,
@@ -4986,6 +5004,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     dados.forma_pagamento ?? "misto",
                     taxaRpcResult.lancamento_id ?? null,
                     taxaAdesao,
+                    dataLanc,
                   );
                 }
 
