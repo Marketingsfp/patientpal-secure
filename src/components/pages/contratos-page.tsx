@@ -3962,10 +3962,76 @@ h1, h2, h3 { margin: 0 0 6mm; }
                     </div>
                   ) : null}
                 </div>
+                {podeEscrever && !(cancelado && !isAdmin) ? (() => {
+                  const selecionaveis = mens.filter(
+                    (m) => m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida),
+                  );
+                  const selecionadas = selecionaveis.filter((m) => selectedHistIds.has(m.id));
+                  const total = selecionadas.reduce((s, m) => s + (Number(m.valor) || 0), 0);
+                  if (selecionadas.length === 0) return null;
+                  return (
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+                      <div>
+                        <strong>{selecionadas.length}</strong> parcela(s) selecionada(s) — Total{" "}
+                        <strong>R$ {total.toFixed(2).replace(".", ",")}</strong>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={limparHistSel}
+                          disabled={aplicandoHistLote}
+                        >
+                          Limpar seleção
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={marcarPagasHistoricasEmLote}
+                          disabled={aplicandoHistLote}
+                        >
+                          {aplicandoHistLote ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : null}
+                          Marcar selecionadas como Paga (histórica)
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })() : null}
                 <div className="rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        {podeEscrever && !(cancelado && !isAdmin) ? (
+                          <TableHead className="w-8">
+                            {(() => {
+                              const selecionaveis = mens.filter(
+                                (m) => m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida),
+                              );
+                              const allSel = selecionaveis.length > 0 &&
+                                selecionaveis.every((m) => selectedHistIds.has(m.id));
+                              const someSel = selecionaveis.some((m) => selectedHistIds.has(m.id));
+                              return (
+                                <input
+                                  type="checkbox"
+                                  aria-label="Selecionar todas as parcelas em aberto"
+                                  ref={(el) => {
+                                    if (el) el.indeterminate = !allSel && someSel;
+                                  }}
+                                  checked={allSel}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedHistIds(new Set(selecionaveis.map((m) => m.id)));
+                                    } else {
+                                      limparHistSel();
+                                    }
+                                  }}
+                                />
+                              );
+                            })()}
+                          </TableHead>
+                        ) : null}
                         <TableHead>Cobrança</TableHead>
                         <TableHead>Vencimento</TableHead>
                         <TableHead>Competência</TableHead>
