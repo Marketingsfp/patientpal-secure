@@ -1,35 +1,19 @@
-## Objetivo
-Aumentar a largura do campo **Cliente** na barra de filtros da Agenda, reduzindo os demais campos (Tipo de agenda, Situação, Data, Especialidade). O campo **Profissional** não será reduzido.
+## Contexto
+O filtro "Tipo de agenda" agrupa as agendas dos profissionais pelo nome cadastrado em `medico_agendas.nome`. Na Menino Jesus há 5 rótulos hoje: CONSULTAS (132), AGENDA (5), EXAMES (2), ENFERMAGEM (1), TESTE ERGOMETRICO (1).
 
-## Escopo
-- Arquivo único: `src/routes/_authenticated/app.agenda.tsx`
-- Bloco alterado: grid de filtros na linha 6566 (comentário "Linha 1: Filtros principais").
-- Apenas ajuste visual / CSS de layout — nenhuma alteração de estado, lógica de busca, RPC ou banco.
+O rótulo genérico **"AGENDA"** provavelmente é resíduo de cadastros rápidos onde não renomearam. Aparecer no filtro polui a lista.
 
-## Clínica-alvo
-Alteração **visual global** (todas as clínicas — SFP, Menino Jesus e Novo Rumo). Se preferir que valha apenas para uma clínica, me avise antes de aplicar que eu envelopo com feature flag.
+## Pergunta pendente para você
+Antes de qualquer alteração, preciso confirmar:
 
-## Antes
-```
-lg:grid-cols-6  → todos os 6 campos com a mesma largura (~16,6% cada)
-Ordem: Profissional | Tipo agenda | Situação | Data | Especialidade | Cliente
-```
+1. **Clínica-alvo:** aplico só na **Menino Jesus** (é onde vocês veem o problema)?
+2. **O que fazer com as 5 agendas chamadas "AGENDA"?**
+   - (a) Renomear todas para **"CONSULTAS"** (unificar no filtro).
+   - (b) Renomear caso a caso — eu listo os 5 médicos e você me diz o nome correto de cada um.
+   - (c) Não mexer — só queria entender o que era.
 
-## Depois
-```
-lg:grid-cols-8  → col-spans desiguais
-Profissional  col-span-2   (~25% — não reduz, fica ligeiramente maior)
-Tipo agenda   col-span-1   (~12,5%)
-Situação      col-span-1   (~12,5%)
-Data          col-span-1   (~12,5%)
-Especialidade col-span-1   (~12,5%)
-Cliente       col-span-2   (~25% — ganha ~50% de largura)
-```
-Nos breakpoints menores (`grid-cols-2 sm:grid-cols-3 md:grid-cols-4`) mantenho o comportamento atual (cada campo ocupa uma célula), para não quebrar mobile/tablet.
+Assim que responder 1 + 2, eu executo (se for renomear, via migration/UPDATE no banco, somente na Menino Jesus, mantendo `id`/`medico_id` para não quebrar agendamentos existentes).
 
-## Riscos e validação
-- Risco baixo: mudança puramente de classes Tailwind no container.
-- Validação: abrir `/app/agenda` em 1280×720 e 1920×1080, conferir alinhamento e que nada quebra em tablet/mobile.
-
-## Pendências
-- Confirmar se a mudança deve ser global ou restrita a uma clínica específica.
+## Fora do escopo
+- Não vou alterar código do filtro. A lista é gerada dinamicamente a partir dos nomes cadastrados — corrigindo o cadastro, o filtro se resolve sozinho.
+- Não vou tocar em SFP nem Novo Rumo.
