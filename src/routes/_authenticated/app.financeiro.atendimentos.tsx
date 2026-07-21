@@ -818,6 +818,37 @@ function AtendimentosPage() {
   };
 
   const abrirLaudoLote = () => {
+
+  const desvincularLaudo = async (a: Atend) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (
+      !confirm(
+        "Desvincular o médico laudador deste atendimento?\n\n" +
+          "• O laudo voltará ao status 'Pendente'.\n" +
+          "• O repasse do laudador deixará de ser devido por este atendimento.\n" +
+          "• Você poderá vincular outro médico depois clicando em 'Vincular'.",
+      )
+    )
+      return;
+    const tabela = a.origem === "agenda" ? "fin_lancamentos" : "fin_atendimentos";
+    const { error } = await supabase
+      .from(tabela)
+      .update({
+        medico_laudador_id: null,
+        valor_laudo: null,
+        laudo_status: null,
+        laudo_emitido_em: null,
+      })
+      .eq("id", a.id);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    toast.success("Laudador desvinculado");
+    await load();
+  };
+
+  const _abrirLaudoLote = () => {
     if (selectedLaudoElegiveis.length === 0) {
       toast.info("Selecione atendimentos que exijam laudo e ainda não vinculados.");
       return;
