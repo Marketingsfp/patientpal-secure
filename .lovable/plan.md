@@ -1,27 +1,40 @@
-## Problema
-No convênio **FUNCIONARIO** da POLICLINICA MENINO JESUS, as 6 exceções cadastradas apareceram também dentro da tabela "Regras de preço automáticas" (com 0% / prio 999). Elas deveriam ficar visíveis apenas no bloco "Exceções (sem desconto)".
+## O que está acontecendo
 
-## Causa
-Em `src/components/cartao-beneficios/regras-tab.tsx`, as exceções são gravadas na mesma tabela `cb_convenio_regras` (por design — o motor de preço precisa dessas linhas). O bloco de exceções filtra corretamente essas linhas para exibir separadas, mas o `regrasFiltradas` (linhas 224‑265) não as remove — por isso elas aparecem duplicadas na tabela geral.
+**1. Nome do laudador não aparece.** Na coluna "Laudo" da tela de Atendimentos, quando o laudo já foi vinculado, aparece apenas o selo azul "Vinculado" — o nome do médico que ficou com o laudo não é exibido em lugar nenhum da linha.
 
-## Clínica-alvo
-Correção puramente técnica de UI. Confirmar: aplicar globalmente (todas as clínicas)? Como o bloco "Exceções" só é renderizado quando `isConvenioFuncionario`, o efeito prático fica restrito ao convênio FUNCIONARIO nas 3 clínicas. Assumo global.
+**2. Repasse do Dr. Sandro não mostra o laudo da Maria.**
+Verifiquei o banco:
+- Maria Coelho de Moura (ELETROCARDIOGRAMA de **20/07**) foi vinculada ao Dr. Sandro em **21/07**.
+- O sistema criou corretamente o lançamento "[LAUDO] ELETROCARDIOGRAMA (ECG)" para o Dr. Sandro no valor de R$ 18,00.
+- **Porém, esse lançamento ficou com data = 21/07 (dia em que o laudo foi vinculado), e não 20/07 (dia do atendimento).**
 
-## Mudança
-Só front-end, em `regras-tab.tsx`:
+Como a tela filtra por período do atendimento (De 20/07 até 20/07), o repasse do laudo da Maria fica fora do intervalo e "some". O mesmo aconteceria com qualquer laudo vinculado em data diferente da realização do exame. O caso do Antonio Jose de Almeida aparece só porque a vinculação foi feita no mesmo dia do exame.
 
-1. No `useMemo` do `regrasFiltradas`, adicionar filtro extra que, quando `isFuncionario === true`, **descarta** linhas cujo `procedimento_id` esteja em `excecoesProcIds` **e** que correspondam ao formato de exceção (`modo === "percentual_desconto"`, `percentual === 0`, `!gratuito`, sem `limite_qtd`).
-2. Incluir `isFuncionario` e `excecoesProcIds` nas dependências do `useMemo`.
+A causa está na trigger do banco `gerar_repasse_laudador_lanc` (e sua irmã `gerar_repasse_laudador`), que grava `data = COALESCE(laudo_emitido_em::date, CURRENT_DATE)` no repasse "[LAUDO]".
 
-Resultado: as 6 linhas de bloco (BLOCO DE CERAMICA, BLOCO EM ART GLASS, etc.) somem da tabela geral e continuam apenas no bloco "Exceções (sem desconto)". Nenhuma linha é apagada do banco — só ocultada na tabela geral. Motor de cálculo (`cb-regras.ts`) segue funcionando igual.
+## O que vai ser alterado
 
-## Fora do escopo
-- Motor de preços (não muda).
-- Estrutura do banco (não muda).
-- Outros convênios (só o FUNCIONARIO tem o bloco de exceções).
+Aplicado nas duas clínicas (Menino Jesus e SFP) — é uma correção puramente técnica.
 
-## Validação
-Após a alteração: recarregar a tela do convênio FUNCIONARIO e conferir que (a) o bloco "Exceções" continua listando os 6 serviços, (b) a tabela "Regras de preço automáticas" não os mostra mais, (c) o cálculo de preço na agenda para esses serviços continua sem desconto (regra ainda existe no banco).
+### Frontend — coluna Laudo
 
-## Risco
-Baixo — só filtro de exibição.
+- Na coluna **Laudo** da tela de Atendimentos, quando o status for "emitido", exibir o nome do médico laudador logo abaixo do selo "Vinculado" (usa o `medico_laudador_id` já disponível no item + o mapa de médicos já carregado na página). Tooltip continua explicando que clicar desvincula.
+
+### Banco — corrigir data do repasse "[LAUDO]"
+
+- Ajustar as duas triggers `gerar_repasse_laudador` (em `fin_atendimentos`) e `gerar_repasse_laudador_lanc` (em `fin_lancamentos`) para gravar o repasse do laudo com a **data do atendimento original** (`NEW.data`) em vez da data em que o laudo foi vinculado. Assim o repasse acompanha o dia da realização do exame, que é o campo pelo qual a tela filtra.
+- Backfill dos repasses "[LAUDO]" já existentes que ficaram com data descolada: ajustar `fin_atendimentos.data` do "[LAUDO]" para bater com a data do atendimento/lançamento de origem (usando `laudo_lancamento_id`).
+
+### Validação
+
+- Após a correção, o "[LAUDO] ELETROCARDIOGRAMA (ECG)" da Maria passará a aparecer na lista do Dr. Sandro no dia 20/07/2026.
+- Novas vinculações de laudo (individual ou em lote) já entram com a data correta.
+
+### Fora do escopo
+
+- Regras de cálculo de valor de laudo, cadastro de laudadores, layout do comprovante — nada disso muda.
+- Fluxo de estorno/desvinculação continua igual.
+
+## Pendências para confirmar
+
+- Confirma que quer a alteração aplicada nas **duas clínicas** (Menino Jesus e SFP)? A regra da trigger é compartilhada, então é global por natureza; só quero registrar sua confirmação conforme a Regra 1.10 do AGENTS.md.
