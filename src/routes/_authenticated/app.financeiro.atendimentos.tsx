@@ -2609,27 +2609,54 @@ function AtendimentosPage() {
                         {(() => {
                           const procKey = a.procedimento ? norm(a.procedimento) : "";
                           const exigeLaudo = procKey && procLaudo.get(procKey);
+                          const laudadorNome = a.medico_laudador_id
+                            ? medMap.get(a.medico_laudador_id) ?? null
+                            : null;
                           if (a.laudo_status === "emitido")
                             return (
                               podeEscrever ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-6 text-[10px] px-2 bg-sky-500/10 text-sky-700 border-sky-500/30 hover:bg-sky-500/20"
-                                  title="Laudo vinculado a um médico laudador. Clique para desvincular e reabrir para nova vinculação."
-                                  onClick={() => desvincularLaudo(a)}
-                                >
-                                  <CheckCircle2 className="h-3 w-3 mr-0.5" />
-                                  Vinculado
-                                </Button>
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-6 text-[10px] px-2 bg-sky-500/10 text-sky-700 border-sky-500/30 hover:bg-sky-500/20"
+                                    title={
+                                      laudadorNome
+                                        ? `Laudador: ${laudadorNome}. Clique para desvincular.`
+                                        : "Laudo vinculado a um médico laudador. Clique para desvincular e reabrir para nova vinculação."
+                                    }
+                                    onClick={() => desvincularLaudo(a)}
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 mr-0.5" />
+                                    Vinculado
+                                  </Button>
+                                  {laudadorNome && (
+                                    <span
+                                      className="text-[9px] leading-tight text-muted-foreground max-w-[110px] truncate"
+                                      title={laudadorNome}
+                                    >
+                                      {laudadorNome}
+                                    </span>
+                                  )}
+                                </div>
                               ) : (
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
-                                >
-                                  <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
-                                  Vinculado
-                                </Badge>
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
+                                    Vinculado
+                                  </Badge>
+                                  {laudadorNome && (
+                                    <span
+                                      className="text-[9px] leading-tight text-muted-foreground max-w-[110px] truncate"
+                                      title={laudadorNome}
+                                    >
+                                      {laudadorNome}
+                                    </span>
+                                  )}
+                                </div>
                               )
                             );
                           if (!exigeLaudo) return <span className="text-muted-foreground text-[10px]">—</span>;
