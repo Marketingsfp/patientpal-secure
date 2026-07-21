@@ -62,7 +62,7 @@ function NfsePage() {
     if (!clinicaAtual) return;
     void (async () => {
       const { data } = await supabase
-        .from("nfse_emitentes")
+        .from("nfse_emitentes_publico")
         .select("id, nome, cnpj")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .order("nome");
@@ -75,7 +75,7 @@ function NfsePage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("nfse")
-      .select("id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, emitente_id, erro_mensagem, payload_resposta, emitente:nfse_emitentes(nome, cnpj)")
+      .select("id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, emitente_id, erro_mensagem, payload_resposta, emitente:nfse_emitentes_publico(nome, cnpj)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("data_emissao", { ascending: false })
       .limit(500);
@@ -110,7 +110,7 @@ function NfsePage() {
     if (!erroDetalhe?.emitente_id) { setRpsAtual(null); setRpsNovoInput(""); return; }
     void (async () => {
       const { data } = await supabase
-        .from("nfse_emitentes")
+        .from("nfse_emitentes_publico")
         .select("rps_proximo_numero")
         .eq("id", erroDetalhe.emitente_id!)
         .maybeSingle();
