@@ -59,6 +59,15 @@ const carenciaShort = (n: number | null | undefined) => {
   return v === 0 ? "Imediato" : `Após ${v}ª`;
 };
 
+// Detecta o convênio interno de funcionários (nome pode variar entre clínicas:
+// "FUNCIONARIO", "CONVÊNIO FUNCIONARIO" etc.). Normaliza acentos e casing.
+const isConvenioFuncionario = (nome: string) =>
+  (nome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .includes("FUNCIONARIO");
+
 export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props) {
   const [regras, setRegras] = useState<CbRegra[]>([]);
   const [especialidades, setEspecialidades] = useState<EspOpt[]>([]);
@@ -147,6 +156,62 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     especialidades.forEach(e => m.set(e.id, e.nome));
     return m;
   }, [especialidades]);
+
+  // ---- Exceções (apenas convênio FUNCIONARIO) ---------------------------
+  // Uma exceção é um procedimento que NÃO recebe desconto neste convênio.
+  // Gravamos como regra específica por procedimento com percentual = 0 e
+  // prioridade alta — o motor (cb-regras.ts) já dá preferência a regras
+  // com procedimento_id, então a exceção vence sobre regras por categoria.
+  const isFuncionario = isConvenioFuncionario(convenioNome);
+  const [excSel, setExcSel] = useState<string>("__any__");
+  const [excSaving, setExcSaving] = useState(false);
+  const excecoes = useMemo(
+    () => regras.filter(r =>
+      r.procedimento_id &&
+      r.modo === "percentual_desconto" &&
+      Number(r.percentual) === 0 &&
+      !r.gratuito &&
+      !r.limite_qtd
+    ),
+    [regras],
+  );
+  const excecoesProcIds = useMemo(
+    () => new Set(excecoes.map(e => e.procedimento_id as string)),
+    [excecoes],
+  );
+  const addExcecao = async () => {
+    if (!convenioId || excSel === "__any__") return;
+    if (excecoesProcIds.has(excSel)) {
+      toast.info("Esse serviço já está na lista de exceções.");
+      return;
+    }
+    setExcSaving(true);
+    const payload = {
+      convenio_id: convenioId,
+      procedimento_id: excSel,
+      especialidade_id: null,
+      tipo: null,
+      modo: "percentual_desconto",
+      valor: null,
+      percentual: 0,
+      prioridade: 999,
+      ativo: true,
+      gratuito: false,
+      carencia_mensalidades: 0,
+    };
+    const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
+    setExcSaving(false);
+    if (error) { mostrarErro(error); return; }
+    toast.success("Exceção adicionada.");
+    setExcSel("__any__");
+    await load();
+  };
+  const removeExcecao = async (id: string) => {
+    const { error } = await (supabase as any).from("cb_convenio_regras").delete().eq("id", id);
+    if (error) { mostrarErro(error); return; }
+    toast.success("Exceção removida.");
+    await load();
+  };
 
   const regrasFiltradas = useMemo(() => {
     const HIGH = "\uffff";
@@ -403,6 +468,53 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
 
   return (
     <div className="space-y-3">
+      {isFuncionario && (
+        <div className="border rounded-md p-3 bg-muted/30 space-y-3">
+          <div>
+            <div className="font-medium">Exceções (sem desconto)</div>
+            <p className="text-xs text-muted-foreground">
+              Serviços listados aqui são cobrados como <strong>particular</strong> para este convênio, ignorando qualquer regra por categoria ou especialidade.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <Label className="text-xs">Serviço</Label>
+              <SearchableSelect
+                options={procOpts}
+                value={excSel}
+                onChange={(v) => setExcSel(v)}
+                placeholder="Selecione um serviço"
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={addExcecao}
+              disabled={excSel === "__any__" || excSaving}
+            >
+              <Plus className="h-4 w-4 mr-1" /> Adicionar exceção
+            </Button>
+          </div>
+          {excecoes.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">Nenhuma exceção cadastrada.</p>
+          ) : (
+            <ul className="divide-y border rounded-md bg-background">
+              {excecoes.map(e => (
+                <li key={e.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                  <span className="truncate">{procById.get(e.procedimento_id as string) ?? "(serviço removido)"}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => removeExcecao(e.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="font-medium">Regras de preço automáticas</div>
