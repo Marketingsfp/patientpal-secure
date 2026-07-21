@@ -555,14 +555,21 @@ function ConveniosPage() {
               <h2 className="text-lg font-semibold">{editing ? `Editar convênio: ${editing.nome}` : "Novo convênio"}</h2>
               <div />
             </div>
+            {(() => null)()}
             <Tabs defaultValue="info" className="w-full">
             <TabsList>
               <TabsTrigger value="info">Informações</TabsTrigger>
-              <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
+              {!((nome || editing?.nome || "").trim().toUpperCase() === "FUNCIONARIO") && (
+                <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
+              )}
               <TabsTrigger value="regras"><Gift className="h-4 w-4 mr-1" />Benefícios</TabsTrigger>
-              <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
-              <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
-              <TabsTrigger value="termo"><FileSignature className="h-4 w-4 mr-1" />Termo de Inclusão</TabsTrigger>
+              {!((nome || editing?.nome || "").trim().toUpperCase() === "FUNCIONARIO") && (
+                <>
+                  <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
+                  <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
+                  <TabsTrigger value="termo"><FileSignature className="h-4 w-4 mr-1" />Termo de Inclusão</TabsTrigger>
+                </>
+              )}
             </TabsList>
             <TabsContent value="info" className="space-y-3 mt-3">
               <div>
