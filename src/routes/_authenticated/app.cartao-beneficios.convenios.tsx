@@ -364,10 +364,17 @@ function ConveniosPage() {
       toast.error(first?.message ?? "Dados inválidos.");
       return;
     }
-    // 3) Faixas: exigir pelo menos 1, valor > 0 e sem vidas_de duplicado
-    if (!faixas.length) { toast.error("Adicione pelo menos uma faixa de preço."); return; }
+    // 3) Faixas: exigir pelo menos 1, valor >= 0 e sem vidas_de duplicado
+    //    (convênio FUNCIONARIO não usa faixas — pulamos a validação e garantimos
+    //     uma faixa mínima automática de 1 vida com valor R$ 0)
+    const isFuncionario = (nomeClean || editing?.nome || "").trim().toUpperCase() === "FUNCIONARIO";
+    if (isFuncionario && !faixas.length) {
+      setFaixas([{ vidas_de: 1, vidas_ate: 1, valor_mensal: 0 }]);
+    }
+    if (!isFuncionario && !faixas.length) { toast.error("Adicione pelo menos uma faixa de preço."); return; }
     const vistas = new Set<number>();
     for (const f of faixas) {
+      if (isFuncionario) break;
       if (!f.vidas_de || f.vidas_de < 1) { toast.error("Campo 'De' inválido em uma faixa."); return; }
       if (f.vidas_ate !== null && f.vidas_ate < f.vidas_de) {
         toast.error("Campo 'Até' deve ser maior ou igual a 'De'."); return;
