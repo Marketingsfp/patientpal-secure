@@ -686,6 +686,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       parcelas: parcelasFinal,
       bandeira_cartao: bandeiraFinal,
       emitir_nfse: emitirNfse,
+      data,
       pagamentos_detalhe: pagamentoMisto
         ? pagamentos
             .map((p, i) => ({
