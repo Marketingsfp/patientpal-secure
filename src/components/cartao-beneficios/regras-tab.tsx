@@ -157,6 +157,62 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     return m;
   }, [especialidades]);
 
+  // ---- Exceções (apenas convênio FUNCIONARIO) ---------------------------
+  // Uma exceção é um procedimento que NÃO recebe desconto neste convênio.
+  // Gravamos como regra específica por procedimento com percentual = 0 e
+  // prioridade alta — o motor (cb-regras.ts) já dá preferência a regras
+  // com procedimento_id, então a exceção vence sobre regras por categoria.
+  const isFuncionario = isConvenioFuncionario(convenioNome);
+  const [excSel, setExcSel] = useState<string>("__any__");
+  const [excSaving, setExcSaving] = useState(false);
+  const excecoes = useMemo(
+    () => regras.filter(r =>
+      r.procedimento_id &&
+      r.modo === "percentual_desconto" &&
+      Number(r.percentual) === 0 &&
+      !r.gratuito &&
+      !r.limite_qtd
+    ),
+    [regras],
+  );
+  const excecoesProcIds = useMemo(
+    () => new Set(excecoes.map(e => e.procedimento_id as string)),
+    [excecoes],
+  );
+  const addExcecao = async () => {
+    if (!convenioId || excSel === "__any__") return;
+    if (excecoesProcIds.has(excSel)) {
+      toast.info("Esse serviço já está na lista de exceções.");
+      return;
+    }
+    setExcSaving(true);
+    const payload = {
+      convenio_id: convenioId,
+      procedimento_id: excSel,
+      especialidade_id: null,
+      tipo: null,
+      modo: "percentual_desconto",
+      valor: null,
+      percentual: 0,
+      prioridade: 999,
+      ativo: true,
+      gratuito: false,
+      carencia_mensalidades: 0,
+    };
+    const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
+    setExcSaving(false);
+    if (error) { mostrarErro(error); return; }
+    toast.success("Exceção adicionada.");
+    setExcSel("__any__");
+    await load();
+  };
+  const removeExcecao = async (id: string) => {
+    const { error } = await (supabase as any).from("cb_convenio_regras").delete().eq("id", id);
+    if (error) { mostrarErro(error); return; }
+    toast.success("Exceção removida.");
+    await load();
+  };
+
   const regrasFiltradas = useMemo(() => {
     const HIGH = "\uffff";
     const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
