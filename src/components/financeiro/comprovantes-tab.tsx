@@ -214,7 +214,7 @@ export function ComprovantesTab() {
         supabase
           .from("fin_atendimentos")
           .select(
-            "id, data, procedimento, valor_medico, valor_laudo, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, medico_id, paciente_id, medicos:medico_id(nome), pacientes:paciente_id(nome)",
+            "id, data, procedimento, valor_total, valor_medico, valor_laudo, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, medico_id, paciente_id, medicos:medico_id(nome), pacientes:paciente_id(nome)",
           )
           .eq("clinica_id", clinicaId)
           .eq("repasse_pago", true)
@@ -225,7 +225,7 @@ export function ComprovantesTab() {
         supabase
           .from("fin_lancamentos")
           .select(
-            "id, data, descricao, valor, valor_medico_override, valor_laudo, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, medico_id, paciente_id, medicos:medico_id(nome), pacientes:paciente_id(nome)",
+            "id, data, descricao, valor, valor_medico_override, valor_laudo, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, medico_id, paciente_id, agendamento_id, medicos:medico_id(nome), pacientes:paciente_id(nome), agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio)",
           )
           .eq("clinica_id", clinicaId)
           .eq("repasse_pago", true)
@@ -247,26 +247,50 @@ export function ComprovantesTab() {
           procedimento: partes[1]?.trim() || null,
         };
       };
-      const mappedAt: Row[] = (atRes.data ?? []).map((r: Record<string, unknown>) => ({
-        id: r.id as string,
-        data: r.data as string,
-        procedimento: (r.procedimento as string) ?? null,
-        valor_medico: Number(r.valor_medico) || 0,
-        valor_laudo: Number(r.valor_laudo) || 0,
-        repasse_pago_em: (r.repasse_pago_em as string) ?? null,
-        repasse_pago_at: (r.repasse_pago_at as string) ?? null,
-        repasse_forma_pagamento: (r.repasse_forma_pagamento as string) ?? null,
-        repasse_conta_id: (r.repasse_conta_id as string) ?? null,
-        repasse_lancamento_id: (r.repasse_lancamento_id as string) ?? null,
-        medico_id: (r.medico_id as string) ?? null,
-        medico_nome:
-          (r.medicos as { nome?: string } | null)?.nome ?? null,
-        paciente_id: (r.paciente_id as string) ?? null,
-        paciente_nome:
-          (r.pacientes as { nome?: string } | null)?.nome ?? null,
-      }));
+      const mappedAt: Row[] = (atRes.data ?? []).map((r: Record<string, unknown>) => {
+        // Atendimentos antigos podem ter `valor_medico` gravado com o valor
+        // cheio do serviço. A aba Atendimentos recalcula esses casos pela
+        // regra do médico/convênio; a 2ª via precisa fazer o mesmo.
+        const valorTotal = Number(r.valor_total) || Number(r.valor_medico) || 0;
+        const repasseCalc = calcRepasseFull(
+          repasseCtx,
+          (r.medico_id as string) ?? null,
+          valorTotal,
+          (r.procedimento as string) ?? null,
+          null,
+        ).repasse;
+        return {
+          id: r.id as string,
+          data: r.data as string,
+          procedimento: (r.procedimento as string) ?? null,
+          valor_medico: repasseCalc > 0 ? repasseCalc : Number(r.valor_medico) || 0,
+          valor_laudo: Number(r.valor_laudo) || 0,
+          repasse_pago_em: (r.repasse_pago_em as string) ?? null,
+          repasse_pago_at: (r.repasse_pago_at as string) ?? null,
+          repasse_forma_pagamento: (r.repasse_forma_pagamento as string) ?? null,
+          repasse_conta_id: (r.repasse_conta_id as string) ?? null,
+          repasse_lancamento_id: (r.repasse_lancamento_id as string) ?? null,
+          medico_id: (r.medico_id as string) ?? null,
+          medico_nome:
+            (r.medicos as { nome?: string } | null)?.nome ?? null,
+          paciente_id: (r.paciente_id as string) ?? null,
+          paciente_nome:
+            (r.pacientes as { nome?: string } | null)?.nome ?? null,
+        };
+      });
       const mappedLc: Row[] = (lcRes.data ?? []).map((r: Record<string, unknown>) => {
         const info = parseDescricao((r.descricao as string) ?? null);
+        const agendamento = r.agendamento as {
+          procedimento?: string | null;
+          paciente_nome?: string | null;
+          paciente_id?: string | null;
+          medico_id?: string | null;
+          inicio?: string | null;
+        } | null;
+        const procedimento = agendamento?.procedimento ?? info.procedimento;
+        const medicoId = ((r.medico_id as string | null) ?? agendamento?.medico_id) ?? null;
+        const pacienteId = ((r.paciente_id as string | null) ?? agendamento?.paciente_id) ?? null;
+        const dataAtendimento = agendamento?.inicio ? agendamento.inicio.slice(0, 10) : ((r.data as string) ?? "");
         // Se o lançamento tem override manual, usa direto. Caso contrário
         // recalcula o repasse pela regra do médico/convênio — mesma lógica
         // exibida na aba "Atendimentos". Antes caía no valor cheio (`valor`),
@@ -279,15 +303,15 @@ export function ComprovantesTab() {
             ? Number(override)
             : calcRepasseFull(
                 repasseCtx,
-                (r.medico_id as string) ?? null,
+                medicoId,
                 valorPago,
-                info.procedimento,
+                procedimento,
                 (r.descricao as string) ?? null,
               ).repasse;
         return {
           id: r.id as string,
-          data: (r.data as string) ?? "",
-          procedimento: info.procedimento,
+          data: dataAtendimento,
+          procedimento,
           valor_medico: valorMed,
           valor_laudo: Number(r.valor_laudo) || 0,
           repasse_pago_em: (r.repasse_pago_em as string) ?? null,
@@ -295,11 +319,11 @@ export function ComprovantesTab() {
           repasse_forma_pagamento: (r.repasse_forma_pagamento as string) ?? null,
           repasse_conta_id: (r.repasse_conta_id as string) ?? null,
           repasse_lancamento_id: (r.repasse_lancamento_id as string) ?? null,
-          medico_id: (r.medico_id as string) ?? null,
+          medico_id: medicoId,
           medico_nome: (r.medicos as { nome?: string } | null)?.nome ?? null,
-          paciente_id: (r.paciente_id as string) ?? null,
+          paciente_id: pacienteId,
           paciente_nome:
-            (r.pacientes as { nome?: string } | null)?.nome ?? info.paciente,
+            (r.pacientes as { nome?: string } | null)?.nome ?? agendamento?.paciente_nome ?? info.paciente,
         };
       });
       setRows([...mappedAt, ...mappedLc]);
@@ -370,6 +394,10 @@ export function ComprovantesTab() {
   // Modal / impressão
   const [open, setOpen] = useState(false);
   const [grupoAtual, setGrupoAtual] = useState<Grupo | null>(null);
+  const grupoVisualizado = useMemo(
+    () => (grupoAtual ? grupos.find((g) => g.key === grupoAtual.key) ?? grupoAtual : null),
+    [grupoAtual, grupos],
+  );
   const printAreaRef = useRef<HTMLDivElement | null>(null);
 
   const abrir = (g: Grupo) => {
@@ -378,7 +406,7 @@ export function ComprovantesTab() {
   };
 
   const imprimir = (somenteResumo = false, gForce?: Grupo) => {
-    const g = gForce ?? grupoAtual;
+    const g = gForce ?? grupoVisualizado;
     if (!g) return;
     // Se está sendo impresso direto da lista sem abrir modal, renderizamos
     // temporariamente o conteúdo em memória.
@@ -559,11 +587,11 @@ body.resumo-only .rows-full { display: none !important; }
           <DialogHeader>
             <DialogTitle>Comprovante de pagamento de repasse — 2ª via</DialogTitle>
           </DialogHeader>
-          {grupoAtual && (
+          {grupoVisualizado && (
             <div
               ref={printAreaRef}
               className="bg-white text-black text-sm max-h-[70vh] overflow-y-auto p-4 rounded-md border"
-              dangerouslySetInnerHTML={{ __html: renderComprovanteHtml(grupoAtual, clinicaNome) }}
+              dangerouslySetInnerHTML={{ __html: renderComprovanteHtml(grupoVisualizado, clinicaNome) }}
             />
           )}
           <DialogFooter>
