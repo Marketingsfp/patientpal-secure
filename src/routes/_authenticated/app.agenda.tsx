@@ -424,28 +424,49 @@ async function obterInfoConvenioPaciente(params: {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
-  const { data: procs } = await supabase
-    .from("procedimentos")
-    .select("id,nome,tipo")
-    .eq("clinica_id", clinicaId)
-    .eq("ativo", true)
-    .limit(5000);
-  const procRow =
-    (procs ?? []).find(
-      (p: any) =>
-        (p.nome ?? "")
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toLowerCase()
-          .trim() === procNorm,
-    ) ??
-    (procs ?? []).find((p: any) =>
-      (p.nome ?? "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .includes(procNorm),
-    );
+  // Busca direto por nome (case-insensitive) — antes puxávamos todos os
+  // procedimentos da clínica com .limit(5000), mas o PostgREST corta em
+  // 1000 por default. Em clínicas com >1000 procedimentos ativos, o item
+  // procurado podia ficar fora do lote e procedimentoId caía como null,
+  // o que fazia o cálculo de desconto do convênio pegar a especialidade
+  // errada do médico placeholder (ex.: Mamografia 10% em vez de
+  // Tomografia 5%).
+  let procRow: { id: string; nome: string; tipo: string | null } | null = null;
+  if (procNomeBase) {
+    const { data: exact } = await supabase
+      .from("procedimentos")
+      .select("id,nome,tipo")
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true)
+      .ilike("nome", procNomeBase)
+      .limit(5);
+    procRow =
+      ((exact ?? []) as any[]).find(
+        (p) =>
+          (p.nome ?? "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim() === procNorm,
+      ) ?? ((exact ?? [])[0] as any) ?? null;
+    if (!procRow) {
+      const { data: fuzzy } = await supabase
+        .from("procedimentos")
+        .select("id,nome,tipo")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .ilike("nome", `%${procNomeBase}%`)
+        .limit(10);
+      procRow =
+        ((fuzzy ?? []) as any[]).find((p) =>
+          (p.nome ?? "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .includes(procNorm),
+        ) ?? null;
+    }
+  }
   const procedimentoId = (procRow as any)?.id ?? null;
   const procedimentoTipo = ((procRow as any)?.tipo ?? "").toString().toLowerCase() || null;
 
