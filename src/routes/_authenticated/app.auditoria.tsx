@@ -41,6 +41,98 @@ const ACTION_COLOR: Record<string, string> = {
   DELETE: "bg-rose-100 text-rose-700",
 };
 
+// Rótulos amigáveis para nomes técnicos de tabelas e colunas
+const TABLE_LABEL: Record<string, string> = {
+  agendamentos: "Agendamento",
+  pacientes: "Paciente",
+  medicos: "Médico",
+  fin_lancamentos: "Lançamento financeiro",
+  fin_atendimentos: "Atendimento financeiro",
+  contratos_assinatura: "Contrato",
+  contrato_mensalidades: "Mensalidade do contrato",
+  contrato_dependentes: "Dependente do contrato",
+  orcamentos: "Orçamento",
+  orcamento_itens: "Item de orçamento",
+  pagamentos: "Pagamento",
+  caixa_sessoes: "Sessão de caixa",
+  caixa_movimentos: "Movimento de caixa",
+  triagens_enfermagem: "Triagem de enfermagem",
+  prontuarios: "Prontuário",
+  senhas: "Senha",
+};
+
+const FIELD_LABEL: Record<string, string> = {
+  inicio: "Início", fim: "Fim", status: "Status", observacoes: "Observações",
+  procedimento: "Procedimento", fluxo_etapa: "Etapa", prioridade: "Prioridade",
+  paciente_id: "Paciente", medico_id: "Médico", agenda_id: "Agenda",
+  clinica_id: "Clínica", pacote_id: "Pacote", ficha_numero: "Ficha",
+  executado_em: "Executado em", orcamento_id: "Orçamento",
+  valor: "Valor", valor_total: "Valor total", valor_pago: "Valor pago",
+  desconto: "Desconto", forma_pagamento: "Forma de pagamento",
+  data_vencimento: "Vencimento", data_pagamento: "Pago em",
+  competencia: "Competência", numero_parcela: "Parcela",
+  ativo: "Ativo", nome: "Nome", cpf: "CPF", telefone: "Telefone",
+  email: "E-mail", data_nascimento: "Nascimento",
+  repasse_pago: "Repasse pago", repasse_valor: "Valor do repasse",
+};
+
+// Campos técnicos que não interessam ao operador
+const CAMPOS_OCULTOS = new Set([
+  "id", "created_at", "updated_at", "criado_por", "atualizado_por",
+  "clinica_id", "search_tsv", "nome_norm",
+]);
+
+function labelTabela(t: string): string {
+  return TABLE_LABEL[t] ?? t.replace(/_/g, " ");
+}
+function labelCampo(c: string): string {
+  return FIELD_LABEL[c] ?? c.replace(/_/g, " ").replace(/^./, (s) => s.toUpperCase());
+}
+function formatValor(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "boolean") return v ? "Sim" : "Não";
+  if (typeof v === "string") {
+    // Data ISO
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) {
+      const d = new Date(v);
+      if (!isNaN(d.getTime())) return d.toLocaleString("pt-BR");
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      const [y, m, d] = v.split("-");
+      return `${d}/${m}/${y}`;
+    }
+    // UUID → encurta
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-/.test(v)) return v.slice(0, 8) + "…";
+    return v;
+  }
+  if (typeof v === "number") return String(v);
+  return JSON.stringify(v);
+}
+
+interface Diff { campo: string; antes: unknown; depois: unknown }
+function computarDiff(antes: Record<string, unknown> | null, depois: Record<string, unknown> | null): Diff[] {
+  const a = antes ?? {};
+  const d = depois ?? {};
+  const keys = new Set([...Object.keys(a), ...Object.keys(d)]);
+  const out: Diff[] = [];
+  for (const k of keys) {
+    if (CAMPOS_OCULTOS.has(k)) continue;
+    const va = a[k];
+    const vd = d[k];
+    if (JSON.stringify(va) === JSON.stringify(vd)) continue;
+    out.push({ campo: k, antes: va, depois: vd });
+  }
+  return out.sort((x, y) => labelCampo(x.campo).localeCompare(labelCampo(y.campo)));
+}
+
+function camposRelevantes(obj: Record<string, unknown> | null): Diff[] {
+  if (!obj) return [];
+  return Object.entries(obj)
+    .filter(([k, v]) => !CAMPOS_OCULTOS.has(k) && v !== null && v !== "")
+    .map(([k, v]) => ({ campo: k, antes: undefined, depois: v }))
+    .sort((x, y) => labelCampo(x.campo).localeCompare(labelCampo(y.campo)));
+}
+
 function Page() {
   const { clinicaAtual } = useClinica();
   const [rows, setRows] = useState<AuditRow[]>([]);
