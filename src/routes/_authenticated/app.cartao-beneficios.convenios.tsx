@@ -36,6 +36,15 @@ const BENEFICIOS_MAX = 2000;
 const stripHtml = (v: string) =>
   DOMPurify.sanitize(v, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
 
+// Detecta o convênio interno de funcionários (nome pode variar entre clínicas:
+// "FUNCIONARIO", "CONVÊNIO FUNCIONARIO" etc.). Normaliza acentos e casing.
+const isConvenioFuncionario = (nome: string) =>
+  (nome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .includes("FUNCIONARIO");
+
 const convenioSchema = z
   .object({
     nome: z.string().trim().min(2, "Nome deve ter ao menos 2 caracteres").max(NOME_MAX, `Nome pode ter no máximo ${NOME_MAX} caracteres`),
