@@ -76,6 +76,7 @@ import { EditarPacienteRapidoDialog } from "@/components/contratos/editar-pacien
 import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 import { RenovarContratoDialog } from "@/components/contratos/renovar-contrato-dialog";
 import { HistoricoContratoTab } from "@/components/contratos/historico-contrato-tab";
+import { RecalcularVencimentosDialog } from "@/components/contratos/recalcular-vencimentos-dialog";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
