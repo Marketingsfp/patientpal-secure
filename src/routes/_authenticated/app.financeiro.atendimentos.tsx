@@ -817,8 +817,6 @@ function AtendimentosPage() {
     await load();
   };
 
-  const abrirLaudoLote = () => {
-
   const desvincularLaudo = async (a: Atend) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (
@@ -848,7 +846,7 @@ function AtendimentosPage() {
     await load();
   };
 
-  const _abrirLaudoLote = () => {
+  const abrirLaudoLote = () => {
     if (selectedLaudoElegiveis.length === 0) {
       toast.info("Selecione atendimentos que exijam laudo e ainda não vinculados.");
       return;
