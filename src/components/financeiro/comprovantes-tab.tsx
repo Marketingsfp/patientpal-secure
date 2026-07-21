@@ -313,7 +313,7 @@ export function ComprovantesTab() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clinicaId, de, ate]);
+  }, [clinicaId, de, ate, repasseCtx]);
 
   const medicosDisponiveis = useMemo(() => {
     const m = new Map<string, string>();
