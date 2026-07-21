@@ -76,6 +76,7 @@ import { EditarPacienteRapidoDialog } from "@/components/contratos/editar-pacien
 import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 import { RenovarContratoDialog } from "@/components/contratos/renovar-contrato-dialog";
 import { HistoricoContratoTab } from "@/components/contratos/historico-contrato-tab";
+import { RecalcularVencimentosDialog } from "@/components/contratos/recalcular-vencimentos-dialog";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
@@ -2179,6 +2180,7 @@ function DetalheContrato({
   const podeEditarCarencia = roleAtual === "admin" || roleAtual === "gestor";
   const [retroDialog, setRetroDialog] = useState<{ open: boolean; parcelasPagas: string; dataInicio: string } | null>(null);
   const [regerandoRetro, setRegerandoRetro] = useState(false);
+  const [recalcVencOpen, setRecalcVencOpen] = useState(false);
   useEffect(() => {
     setAdmConvenioId(contrato.convenio_id ?? "");
     setAdmDataInicio(contrato.data_inicio ?? "");
@@ -3964,6 +3966,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       <Button size="sm" variant="outline" onClick={adicionarParcela}>
                         <Plus className="h-3 w-3 mr-1" /> Adicionar parcela
                       </Button>
+                      <Button size="sm" variant="outline" onClick={() => setRecalcVencOpen(true)}>
+                        <RefreshCw className="h-3 w-3 mr-1" /> Recalcular vencimentos
+                      </Button>
                     </div>
                   ) : null}
                 </div>
@@ -5320,6 +5325,17 @@ h1, h2, h3 { margin: 0 0 6mm; }
           // O contrato atual foi cancelado; volta para a lista para abrir o novo.
           onBack();
         }}
+      />
+      <RecalcularVencimentosDialog
+        open={recalcVencOpen}
+        onOpenChange={setRecalcVencOpen}
+        parcelas={mens.map((m) => ({
+          id: m.id,
+          numero_parcela: m.numero_parcela,
+          vencimento: m.vencimento,
+          status: m.status,
+        }))}
+        onDone={load}
       />
       <Dialog
         open={!!retroDialog?.open}
