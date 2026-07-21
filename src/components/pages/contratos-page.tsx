@@ -3966,6 +3966,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                       <Button size="sm" variant="outline" onClick={adicionarParcela}>
                         <Plus className="h-3 w-3 mr-1" /> Adicionar parcela
                       </Button>
+                      <Button size="sm" variant="outline" onClick={() => setRecalcVencOpen(true)}>
+                        <RefreshCw className="h-3 w-3 mr-1" /> Recalcular vencimentos
+                      </Button>
                     </div>
                   ) : null}
                 </div>
