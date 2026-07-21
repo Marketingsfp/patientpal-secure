@@ -287,26 +287,92 @@ function Page() {
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
           <DialogHeader><DialogTitle>Detalhes da alteração</DialogTitle></DialogHeader>
           {detalhe && (
-            <div className="space-y-3 text-sm">
-              <div><strong>Usuário:</strong> {detalhe.user_email ?? "—"}</div>
-              <div><strong>Data:</strong> {new Date(detalhe.created_at).toLocaleString("pt-BR")}</div>
-              <div><strong>Tabela:</strong> {detalhe.table_name} | <strong>Ação:</strong> {ACTION_LABEL[detalhe.action]}</div>
-              {detalhe.dados_antes && (
-                <div>
-                  <strong>Antes:</strong>
-                  <pre className="bg-muted p-3 rounded text-xs overflow-auto mt-1">{JSON.stringify(detalhe.dados_antes, null, 2)}</pre>
-                </div>
-              )}
-              {detalhe.dados_depois && (
-                <div>
-                  <strong>Depois:</strong>
-                  <pre className="bg-muted p-3 rounded text-xs overflow-auto mt-1">{JSON.stringify(detalhe.dados_depois, null, 2)}</pre>
-                </div>
-              )}
-            </div>
+            <DetalheAlteracao row={detalhe} />
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function DetalheAlteracao({ row }: { row: AuditRow }) {
+  const [verBruto, setVerBruto] = useState(false);
+  const diff = row.action === "UPDATE" ? computarDiff(row.dados_antes, row.dados_depois) : [];
+  const criados = row.action === "INSERT" ? camposRelevantes(row.dados_depois) : [];
+  const excluidos = row.action === "DELETE" ? camposRelevantes(row.dados_antes) : [];
+
+  const resumo = row.action === "INSERT"
+    ? `Criou um registro em ${labelTabela(row.table_name)}.`
+    : row.action === "DELETE"
+    ? `Excluiu um registro de ${labelTabela(row.table_name)}.`
+    : diff.length === 0
+    ? `Alterou um registro em ${labelTabela(row.table_name)} (sem mudanças de campo detectadas).`
+    : `Alterou ${diff.length} ${diff.length === 1 ? "campo" : "campos"} em ${labelTabela(row.table_name)}.`;
+
+  return (
+    <div className="space-y-4 text-sm">
+      <div className="rounded-lg border bg-muted/40 p-3 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className={ACTION_COLOR[row.action]}>{ACTION_LABEL[row.action] ?? row.action}</Badge>
+          <span className="font-medium">{labelTabela(row.table_name)}</span>
+        </div>
+        <div className="text-muted-foreground">{resumo}</div>
+        <div className="text-xs text-muted-foreground pt-1">
+          Por <span className="text-foreground">{row.user_email ?? "Sistema"}</span> em{" "}
+          {new Date(row.created_at).toLocaleString("pt-BR")}
+        </div>
+      </div>
+
+      {row.action === "UPDATE" && diff.length > 0 && (
+        <div className="rounded-lg border overflow-hidden">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)] text-xs uppercase tracking-wide bg-muted/60 px-3 py-2">
+            <div>Campo</div><div>Antes</div><div>Depois</div>
+          </div>
+          {diff.map((d) => (
+            <div key={d.campo} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.2fr)] px-3 py-2 border-t items-start gap-2">
+              <div className="font-medium">{labelCampo(d.campo)}</div>
+              <div className="text-rose-700 break-words">{formatValor(d.antes)}</div>
+              <div className="text-emerald-700 break-words">{formatValor(d.depois)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(criados.length > 0 || excluidos.length > 0) && (
+        <div className="rounded-lg border overflow-hidden">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] text-xs uppercase tracking-wide bg-muted/60 px-3 py-2">
+            <div>Campo</div><div>Valor</div>
+          </div>
+          {(criados.length > 0 ? criados : excluidos).map((d) => (
+            <div key={d.campo} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] px-3 py-2 border-t items-start gap-2">
+              <div className="font-medium">{labelCampo(d.campo)}</div>
+              <div className="break-words">{formatValor(row.action === "INSERT" ? d.depois : d.antes)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex justify-end">
+        <Button size="sm" variant="ghost" onClick={() => setVerBruto((v) => !v)}>
+          {verBruto ? "Ocultar dados técnicos" : "Ver dados técnicos"}
+        </Button>
+      </div>
+      {verBruto && (
+        <div className="space-y-2">
+          {row.dados_antes && (
+            <div>
+              <div className="text-xs font-semibold text-muted-foreground mb-1">Antes (bruto)</div>
+              <pre className="bg-muted p-3 rounded text-xs overflow-auto">{JSON.stringify(row.dados_antes, null, 2)}</pre>
+            </div>
+          )}
+          {row.dados_depois && (
+            <div>
+              <div className="text-xs font-semibold text-muted-foreground mb-1">Depois (bruto)</div>
+              <pre className="bg-muted p-3 rounded text-xs overflow-auto">{JSON.stringify(row.dados_depois, null, 2)}</pre>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
