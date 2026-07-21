@@ -2180,6 +2180,7 @@ function DetalheContrato({
   const podeEditarCarencia = roleAtual === "admin" || roleAtual === "gestor";
   const [retroDialog, setRetroDialog] = useState<{ open: boolean; parcelasPagas: string; dataInicio: string } | null>(null);
   const [regerandoRetro, setRegerandoRetro] = useState(false);
+  const [recalcVencOpen, setRecalcVencOpen] = useState(false);
   useEffect(() => {
     setAdmConvenioId(contrato.convenio_id ?? "");
     setAdmDataInicio(contrato.data_inicio ?? "");
