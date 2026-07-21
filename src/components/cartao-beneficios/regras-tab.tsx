@@ -191,6 +191,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     setExcSaving(true);
     const payload = novos.map(procedimento_id => ({
       convenio_id: convenioId,
+      clinica_id: clinicaId,
       procedimento_id,
       especialidade_id: null,
       tipo: null,
