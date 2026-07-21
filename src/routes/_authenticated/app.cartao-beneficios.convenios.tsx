@@ -372,8 +372,8 @@ function ConveniosPage() {
       if (f.vidas_ate !== null && f.vidas_ate < f.vidas_de) {
         toast.error("Campo 'Até' deve ser maior ou igual a 'De'."); return;
       }
-      if (!(Number(f.valor_mensal) > 0)) {
-        toast.error(`Valor mensal da faixa de ${f.vidas_de} pessoa(s) deve ser maior que zero.`); return;
+      if (!(Number(f.valor_mensal) >= 0)) {
+        toast.error(`Valor mensal da faixa de ${f.vidas_de} pessoa(s) é inválido.`); return;
       }
       if (vistas.has(f.vidas_de)) {
         toast.error(`Faixa duplicada para ${f.vidas_de} pessoa(s). Remova a repetição.`); return;
