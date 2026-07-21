@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
 import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
@@ -163,7 +164,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   // prioridade alta — o motor (cb-regras.ts) já dá preferência a regras
   // com procedimento_id, então a exceção vence sobre regras por categoria.
   const isFuncionario = isConvenioFuncionario(convenioNome);
-  const [excSel, setExcSel] = useState<string>("__any__");
+  const [excSel, setExcSel] = useState<string[]>([]);
   const [excSaving, setExcSaving] = useState(false);
   const excecoes = useMemo(
     () => regras.filter(r =>
@@ -180,15 +181,17 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     [excecoes],
   );
   const addExcecao = async () => {
-    if (!convenioId || excSel === "__any__") return;
-    if (excecoesProcIds.has(excSel)) {
-      toast.info("Esse serviço já está na lista de exceções.");
+    if (!convenioId || excSel.length === 0) return;
+    const novos = excSel.filter(id => !excecoesProcIds.has(id));
+    const jaExistiam = excSel.length - novos.length;
+    if (novos.length === 0) {
+      toast.info("Todos os serviços selecionados já estão nas exceções.");
       return;
     }
     setExcSaving(true);
-    const payload = {
+    const payload = novos.map(procedimento_id => ({
       convenio_id: convenioId,
-      procedimento_id: excSel,
+      procedimento_id,
       especialidade_id: null,
       tipo: null,
       modo: "percentual_desconto",
@@ -198,12 +201,16 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       ativo: true,
       gratuito: false,
       carencia_mensalidades: 0,
-    };
+    }));
     const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
     setExcSaving(false);
     if (error) { mostrarErro(error); return; }
-    toast.success("Exceção adicionada.");
-    setExcSel("__any__");
+    toast.success(
+      jaExistiam > 0
+        ? `${novos.length} exceção(ões) adicionada(s). ${jaExistiam} já existia(m).`
+        : `${novos.length} exceção(ões) adicionada(s).`,
+    );
+    setExcSel([]);
     await load();
   };
   const removeExcecao = async (id: string) => {
@@ -479,19 +486,20 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
             <div className="flex-1 min-w-0 space-y-1.5">
               <Label className="text-xs">Serviço</Label>
-              <SearchableSelect
-                options={procOpts}
+              <SearchableMultiSelect
+                options={procOpts.filter(o => o.value !== "__any__").map(o => ({ value: o.value, label: o.label }))}
                 value={excSel}
-                onChange={(v) => setExcSel(v)}
-                placeholder="Selecione um serviço"
+                onChange={setExcSel}
+                placeholder="Selecione um ou mais serviços"
               />
             </div>
             <Button
               size="sm"
               onClick={addExcecao}
-              disabled={excSel === "__any__" || excSaving}
+              disabled={excSel.length === 0 || excSaving}
             >
-              <Plus className="h-4 w-4 mr-1" /> Adicionar exceção
+              <Plus className="h-4 w-4 mr-1" />
+              {excSel.length > 1 ? `Adicionar exceções (${excSel.length})` : "Adicionar exceção"}
             </Button>
           </div>
           {excecoes.length === 0 ? (
