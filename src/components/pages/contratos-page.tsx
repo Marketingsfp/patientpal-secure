@@ -3928,6 +3928,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
               ) : null}
 
               <div>
+                {(() => { return null; })()}
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="font-semibold text-sm">Mensalidades</h3>
                   {isAdmin && podeEscrever ? (
