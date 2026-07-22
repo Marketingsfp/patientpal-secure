@@ -154,7 +154,6 @@ export function useDefaultScreenEntries(): CommandEntry[] {
       mk("NFS-e", "/app/nfse"),
       mk("Procedimentos", "/app/procedimentos"),
       mk("Especialidades", "/app/especialidades"),
-      mk("Médicos", "/app/medicos"),
       mk("Médicos", "/app/equipe"),
       mk("Funcionários", "/app/hr-contratos"),
       mk("Unidades", "/app/unidades"),

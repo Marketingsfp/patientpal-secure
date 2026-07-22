@@ -1,59 +1,59 @@
-## Objetivo
-Centralizar todo cadastro de funcionário em **Recursos Humanos → Funcionários** (rota `/app/hr-contratos`). O item **Equipe** passa a mostrar apenas a aba **Médicos**. Nenhum usuário perde acesso — só mudam as portas de entrada da UI.
+# Unificar telas de Médicos
 
-## Clínica-alvo
-Aplicar para **todas as clínicas** (mudança estrutural de UI/menu, sem regra de negócio por clínica). Confirmo antes de executar caso queira restringir.
+Hoje existem duas entradas em **Cadastros → Médicos** apontando para páginas diferentes que editam o **mesmo registro** via `MedicoFormDialog`:
 
-## Antes × Depois
+- `/app/equipe` — lista com status ativo/inativo, especialidades, telefone e detecção de "cadastro pendente" (perfil médico sem CRM).
+- `/app/medicos` — lista simples com coluna **Repasse** (via RPC `medicos_repasse_lista`, restrita a gestor) e botão **Exportar Excel**.
 
-**Antes**
-- `/app/equipe` (aba Funcionários) — cria/edita login + perfil via `FuncionarioFormDialog`
-- `/app/funcionarios` — lista alternativa vinculada ao contrato (`FuncionarioDadosDialog`)
-- `/app/hr-contratos` — contrato de trabalho (dados trabalhistas + criar login só no cadastro novo)
-- `/app/equipe/funcionario/:userId/editar` — página de edição do funcionário via Equipe
+O financeiro **não depende de nenhuma das duas telas** — ele lê os campos de repasse direto da tabela `medicos` em `src/lib/repasse-calc.ts`. Portanto a unificação é puramente de UX.
 
-**Depois**
-- `/app/hr-contratos` — **única** porta de entrada para funcionários (lista com busca, novo, editar, excluir)
-- `/app/hr-contratos/:id` — página de edição com abas:
-  - **Dados do contrato** (nome, CPF, cargo, setor, regime, salário, admissão, demissão, status, sexo, e-mail/telefone/nascimento já existentes)
-  - **Acesso ao sistema** (perfil/role, ativar/desativar login, e-mail de login somente leitura, "Definir/Alterar senha", vincular a login existente quando o contrato ainda não tem `user_id`)
-- `/app/equipe` — mostra apenas a aba **Médicos** (chooser vira botão único "Novo médico"; título passa a "Médicos")
+## O que será feito
 
-## Passos
+**Escopo:** aplicar em **todas as clínicas** (dedup técnica de tela, sem mudança de regra de negócio). Confirmar antes de executar.
 
-### 1. Página de edição em RH (`app.hr-contratos.$id.tsx`)
-Ampliar a aba **Acesso ao sistema** para também funcionar em edição (hoje bloqueia com "não pode ser alterado"):
-- Se o contrato tem `user_id`: mostrar e-mail (leitura), perfil (`clinica_memberships.role`), toggle Ativo/Inativo, botão **Definir nova senha** (usa `definirSenhaFuncionario`), salvar role via `editarMembro`.
-- Se o contrato **não** tem `user_id`: opção "Criar login agora" (fluxo atual) **ou** "Vincular a um login existente da clínica" (select dos memberships sem contrato).
-- Reaproveita 100% os server functions já existentes em `src/lib/equipe.functions.ts` (`cadastrarUsuario`, `editarMembro`, `getFuncionarioLogin`, `definirSenhaFuncionario`). Sem mudanças em backend/RLS/migrations.
+### 1. Consolidar tudo em `/app/equipe`
 
-### 2. Página Equipe (`app.equipe.index.tsx`)
-- Remover a aba **Funcionários** e o chooser de tipo.
-- Deixar só a listagem de **Médicos** (badge, filtros, edição existentes intactos).
-- Título: "Médicos" · Botão único: "Novo médico".
-- Manter rota `/app/equipe/medico/:medicoId/editar` (não mexe).
-- Deletar rota `/app/equipe/funcionario/:userId/editar` (`app.equipe.funcionario.$userId.editar.tsx`).
+Na tabela de `src/routes/_authenticated/app.equipe.index.tsx`:
 
-### 3. Rotas legadas de funcionário
-- Excluir `src/routes/_authenticated/app.funcionarios.tsx` e `app.funcionario.$userId.tsx` (substituídas por `/app/hr-contratos`).
-- Redirecionar qualquer link antigo para `/app/hr-contratos` (busca em `command-palette.tsx`, `app-shell.tsx`, `permissoes-rotas.ts`, `section-tabs.tsx`).
+- Adicionar coluna **Repasse** (à direita de Especialidade), populada pela mesma RPC `medicos_repasse_lista` usada hoje em `/app/medicos`. A RPC já é restrita — quem não for gestor simplesmente vê "—" (comportamento atual da outra tela).
+- Adicionar botão **Exportar Excel** no topo (ao lado de "Novo médico"), reaproveitando `exportToExcel` de `src/lib/export-csv.ts` com as colunas: Nome, CRM, Especialidades, Telefone, Repasse, Status.
+- Linhas "cadastro pendente" continuam aparecendo com "—" nas colunas de CRM/Repasse (já é o padrão).
 
-### 4. Menu lateral (`app-shell.tsx`) + subsistema
-- Em **Recursos Humanos**, renomear "Contratos" para **"Funcionários"** apontando para `/app/hr-contratos`.
-- Manter "Equipe" no menu (subsistema Gestor Clínico) apenas como **Médicos**; opcionalmente renomear o item para "Médicos".
+### 2. Aposentar `/app/medicos`
 
-### 5. Permissões
-- Módulo `hr-contratos` já existe e continua rezendo a página. Nenhum ajuste em `perfil_permissoes` — quem já tinha acesso ao contrato passa a gerenciar o login também (mesma equivalência funcional do `equipe` de hoje para admin/gestor). Sem migration.
+- Trocar o corpo de `src/routes/_authenticated/app.medicos.tsx` por um `<Navigate to="/app/equipe" replace />` para não quebrar:
+  - links antigos salvos por usuários;
+  - `useUniversalSearch` (`/app/medicos?abrir=<id>` — trocar por `/app/equipe?abrir=<id>` e tratar o param na equipe para abrir o dialog);
+  - o atalho de "rateio/repasse" no `app-shell` (linha 337) — repontar para `/app/equipe`.
+- Manter o arquivo como redirect (não deletar a rota) por 1 ciclo, para não invalidar bookmarks.
 
-## Validação (sem risco a usuários ativos)
-1. Editar um funcionário existente com login: alterar nome, trocar perfil, desativar, definir nova senha — verificar em `clinica_memberships` e `auth.users`.
-2. Cadastrar funcionário novo com "Criar login" e sem login.
-3. Vincular contrato existente sem `user_id` a um login solto.
-4. Excluir funcionário (fluxo atual da lista) — checar cascata como hoje.
-5. Confirmar que `/app/equipe` só mostra Médicos e que o menu de RH abre a lista nova.
-6. Buscar por links quebrados: `command-palette`, `section-tabs`, favoritos.
+### 3. Atualizar navegação e permissões
 
-## Fora do escopo
-- Médicos (permanece em Equipe conforme escolha do usuário).
-- Backend/RLS/schema — nada muda.
-- Regras de negócio por clínica.
+- `src/components/app-shell.tsx`:
+  - Remover o item duplicado `{ to: "/app/medicos", label: "Médicos" }` do grupo Cadastros (linha 176).
+  - Repointar o atalho `"/app/medicos"` do bloco `/rateio|repasse/` (linha 337) para `/app/equipe`.
+- `src/components/list-shell/command-palette.tsx`: remover a entrada `mk("Médicos", "/app/medicos")` (linha 157), já existe a de `/app/equipe`.
+- `src/lib/permissoes-rotas.ts`: manter o mapeamento `"/app/medicos" → "medicos"` (para o redirect não perder permissão) e garantir que `/app/equipe` também mapeia para `"medicos"` (verificar; caso não, adicionar).
+- `src/hooks/use-universal-search.ts`: trocar `/app/medicos?abrir=…` por `/app/equipe?abrir=…`.
+
+### 4. Suporte a `?abrir=<id>` em `/app/equipe`
+
+Adicionar `validateSearch` para aceitar `abrir` (id do médico) e, no primeiro render, abrir o `MedicoFormDialog` correspondente — replicando o comportamento antigo de `/app/medicos?abrir=…` que a busca universal usa.
+
+## Fora de escopo
+
+- Nenhuma mudança em `MedicoFormDialog`, `repasse-calc.ts`, RPC `medicos_repasse_lista`, ou em qualquer cálculo/lançamento do financeiro.
+- Nenhuma mudança em `/app/medico/$medicoId` (detalhe/edição via página cheia — segue existindo e continua acessível pelo botão de editar).
+
+## Validação
+
+- Abrir `/app/equipe` como admin: coluna Repasse preenchida + botão Exportar Excel gera arquivo com as 6 colunas.
+- Abrir `/app/equipe` como perfil não-gestor: Repasse aparece "—" (RPC retorna vazio).
+- Acessar `/app/medicos`: redireciona para `/app/equipe`.
+- Buscar um médico na busca universal e clicar no resultado: abre o dialog dentro de `/app/equipe`.
+- Menu lateral em Cadastros: apenas **uma** entrada "Médicos".
+
+## Perguntas antes de executar
+
+1. Aplicar em **todas as clínicas** ou só em uma específica?
+2. Manter URL canônica em **`/app/equipe`** (com `/app/medicos` como redirect), ou prefere que a URL canônica seja `/app/medicos`?
