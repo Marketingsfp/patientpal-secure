@@ -5923,6 +5923,52 @@ export type Database = {
           },
         ]
       }
+      nfse_agendamentos: {
+        Row: {
+          agendamento_id: string
+          clinica_id: string
+          created_at: string
+          id: string
+          nfse_id: string
+        }
+        Insert: {
+          agendamento_id: string
+          clinica_id: string
+          created_at?: string
+          id?: string
+          nfse_id: string
+        }
+        Update: {
+          agendamento_id?: string
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          nfse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nfse_agendamentos_agendamento_id_fkey"
+            columns: ["agendamento_id"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfse_agendamentos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfse_agendamentos_nfse_id_fkey"
+            columns: ["nfse_id"]
+            isOneToOne: false
+            referencedRelation: "nfse"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nfse_emitentes: {
         Row: {
           aliquota_iss: number
