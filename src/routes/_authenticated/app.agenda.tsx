@@ -323,6 +323,12 @@ type ConvenioInfo = {
   emCarencia?: boolean;
   /** Dias restantes de tolerância na parcela vencida mais crítica. */
   diasCarenciaRestantes?: number | null;
+  /** Acréscimo configurado no convênio para pagamentos não-dinheiro. */
+  acrescimoCartao?: {
+    modo: "percentual" | "valor_fixo" | null;
+    percentual: number;
+    valor: number;
+  } | null;
 };
 
 function aplicarDesconto(valor: number, d: DescontoConvenio): number {
@@ -340,6 +346,25 @@ function aplicarDescontoPorForma(valor: number, forma: string, d: DescontoConven
     return Math.max(0, v || 0);
   }
   return aplicarDesconto(valor, d);
+}
+
+/**
+ * Aplica o acréscimo configurado no convênio quando a forma de pagamento
+ * NÃO é dinheiro (PIX, débito, crédito, etc.). Não afeta valores <= 0 nem
+ * o Convênio Funcionário (checagem já feita antes de setar `acrescimoCartao`).
+ */
+function aplicarAcrescimoCartaoAgenda(
+  valor: number,
+  forma: string,
+  acr: NonNullable<ConvenioInfo["acrescimoCartao"]> | null | undefined,
+): number {
+  if (!acr || !acr.modo) return valor;
+  if (forma === "dinheiro") return valor;
+  if (!(valor > 0)) return valor;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  if (acr.modo === "percentual") return round2(valor * (1 + (Number(acr.percentual) || 0) / 100));
+  if (acr.modo === "valor_fixo") return round2(valor + (Number(acr.valor) || 0));
+  return valor;
 }
 
 async function obterInfoConvenioPaciente(params: {
