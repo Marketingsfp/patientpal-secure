@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SectionTabs, SERVICOS_TABS, SERVICOS_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
@@ -22,25 +23,29 @@ interface Tipo { id: string; nome: string; ativo: boolean }
 
 function TiposServicoPage() {
   const podeEscrever = usePodeEscrever("tipos-servico");
-  const [rows, setRows] = useState<Tipo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Tipo | null>(null);
   const [form, setForm] = useState({ nome: "", ativo: true });
   const [saving, setSaving] = useState(false);
 
-  async function load() {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("tipos_servico")
-      .select("id,nome,ativo")
-      .order("nome");
-    if (error) mostrarErro(error);
-    else setRows((data ?? []) as Tipo[]);
-    setLoading(false);
-  }
-  useEffect(() => { void load(); }, []);
+  // Catálogo de baixo risco (raramente muda) — cache de 5min via React Query.
+  // Revisitar a tela mostra os dados na hora; invalidamos ao salvar.
+  const { data: rows = [], isLoading: loading, error } = useQuery({
+    queryKey: ["tipos-servico"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tipos_servico")
+        .select("id,nome,ativo")
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Tipo[];
+    },
+    staleTime: 5 * 60_000,
+  });
+  useEffect(() => { if (error) mostrarErro(error); }, [error]);
+  const load = () => queryClient.invalidateQueries({ queryKey: ["tipos-servico"] });
 
   function openNew() {
     setEditing(null);

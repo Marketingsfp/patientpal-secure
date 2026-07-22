@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift, FileSignature, Stethoscope, Scale } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -154,8 +155,7 @@ type EspOpt = { id: string; nome: string };
 function ConveniosPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("cartao-beneficios");
-  const [rows, setRows] = useState<Convenio[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [view, setView] = useState<"list" | "form">("list");
   const [editing, setEditing] = useState<Convenio | null>(null);
   const [nome, setNome] = useState("");
@@ -172,7 +172,6 @@ function ConveniosPage() {
   const [informativoHtml, setInformativoHtml] = useState("");
   const [termoInclusaoHtml, setTermoInclusaoHtml] = useState("");
   const [faixas, setFaixas] = useState<Faixa[]>([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
-  const [valoresMin, setValoresMin] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<Convenio | null>(null);
 
@@ -261,18 +260,21 @@ function ConveniosPage() {
     setEscopoDialogOpen(false);
   };
 
-  const load = async () => {
-    if (!clinicaAtual) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("cb_convenios")
-      .select("*")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("nome");
-    if (error) mostrarErro(error);
-    const list = (data ?? []) as Convenio[];
-    setRows(list);
-    if (list.length) {
+  const clinicaId = clinicaAtual?.clinica_id;
+  // Lista de convênios oferecidos — catálogo de baixo risco, cache de 5min.
+  // A edição/detalhe (benefícios, faixas no form, catálogos) continua sob
+  // demanda, sem cache — só a listagem principal se beneficia aqui.
+  const { data: listData, isLoading: loading, error: loadError } = useQuery({
+    queryKey: ["cb-convenios", clinicaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cb_convenios")
+        .select("*")
+        .eq("clinica_id", clinicaId!)
+        .order("nome");
+      if (error) throw error;
+      const list = (data ?? []) as Convenio[];
+      if (!list.length) return { rows: list, valoresMin: {} as Record<string, number> };
       const { data: vs } = await supabase
         .from("cb_convenio_faixas")
         .select("convenio_id, valor_mensal")
@@ -284,14 +286,15 @@ function ConveniosPage() {
           minMap[v.convenio_id] = val;
         }
       });
-      setValoresMin(minMap);
-    } else {
-      setValoresMin({});
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id]);
+      return { rows: list, valoresMin: minMap };
+    },
+    enabled: !!clinicaId,
+    staleTime: 5 * 60_000,
+  });
+  useEffect(() => { if (loadError) mostrarErro(loadError); }, [loadError]);
+  const rows = listData?.rows ?? [];
+  const valoresMin = listData?.valoresMin ?? {};
+  const load = () => queryClient.invalidateQueries({ queryKey: ["cb-convenios", clinicaId] });
 
   const openNew = () => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }

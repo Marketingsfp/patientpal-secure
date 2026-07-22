@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -28,25 +29,28 @@ function TreinamentosPage() {
   const podeEscrever = usePodeEscrever("treinamentos");
   const clinicaId = clinicaAtual?.clinica_id;
 
-  const [cursos, setCursos] = useState<Curso[]>([]);
   const [cursoSel, setCursoSel] = useState<string | null>(null);
   const [modulos, setModulos] = useState<Modulo[]>([]);
   const [licoes, setLicoes] = useState<Licao[]>([]);
   const [concluidas, setConcluidas] = useState<Set<string>>(new Set());
   const [licaoAtiva, setLicaoAtiva] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!clinicaId) return;
-    (async () => {
-      const { data } = await supabase
+  // Catálogo de cursos publicados — baixo risco (raramente muda), cache de 5min.
+  const { data: cursos = [] } = useQuery({
+    queryKey: ["lms-cursos", clinicaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
         .from("lms_cursos")
         .select("id, titulo, descricao, capa_url, carga_horaria_min")
-        .eq("clinica_id", clinicaId)
+        .eq("clinica_id", clinicaId!)
         .eq("publicado", true)
         .order("created_at", { ascending: false });
-      setCursos((data ?? []) as Curso[]);
-    })();
-  }, [clinicaId]);
+      if (error) throw error;
+      return (data ?? []) as Curso[];
+    },
+    enabled: !!clinicaId,
+    staleTime: 5 * 60_000,
+  });
 
   useEffect(() => {
     if (!cursoSel || !user) return;

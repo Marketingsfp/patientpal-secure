@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SectionTabs, SEGURANCA_TABS, SEGURANCA_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -46,27 +47,31 @@ const STATUS_COLORS: Record<string, "default" | "secondary" | "destructive"> = {
 function LgpdPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("lgpd");
-  const [rows, setRows] = useState<Solicitacao[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ tipo: "acesso", descricao: "" });
   const [saving, setSaving] = useState(false);
   const [respondendo, setRespondendo] = useState<Solicitacao | null>(null);
   const [respostaForm, setRespostaForm] = useState({ status: "atendida", resposta: "" });
 
-  async function load() {
-    if (!clinicaAtual) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("lgpd_solicitacoes")
-      .select("id,tipo,descricao,status,resposta,respondido_em,created_at")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("created_at", { ascending: false });
-    if (error) mostrarErro(error);
-    else setRows((data ?? []) as Solicitacao[]);
-    setLoading(false);
-  }
-  useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
+  const clinicaId = clinicaAtual?.clinica_id;
+  // Baixo impacto de staleness (nenhum efeito financeiro/clínico) — cache de 5min.
+  const { data: rows = [], isLoading: loading, error } = useQuery({
+    queryKey: ["lgpd-solicitacoes", clinicaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lgpd_solicitacoes")
+        .select("id,tipo,descricao,status,resposta,respondido_em,created_at")
+        .eq("clinica_id", clinicaId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Solicitacao[];
+    },
+    enabled: !!clinicaId,
+    staleTime: 5 * 60_000,
+  });
+  useEffect(() => { if (error) mostrarErro(error); }, [error]);
+  const load = () => queryClient.invalidateQueries({ queryKey: ["lgpd-solicitacoes", clinicaId] });
 
   async function criarSolicitacao() {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
