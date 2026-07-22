@@ -3748,7 +3748,7 @@ function AgendaPage() {
     setPendingOrcItemIds([]);
     setSaving(false);
     toast.success("Salvo");
-    setOpen(false);
+    fecharDialogoAgenda();
     await load();
     if (irParaPagamento && novoId) {
       let [lista, info] = await Promise.all([
