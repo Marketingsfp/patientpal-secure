@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ClinicaProvider, useClinica } from "@/hooks/use-clinica";
+import { useClinica } from "@/hooks/use-clinica";
 import { Loader2 } from "lucide-react";
 type Senha = {
   id: string;
