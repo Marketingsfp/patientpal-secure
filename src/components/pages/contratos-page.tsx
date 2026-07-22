@@ -2492,6 +2492,23 @@ function DetalheContrato({
     }
     const ids = Object.keys(rascunhos);
     if (ids.length === 0) return;
+    // Valida formato completo YYYY-MM-DD antes de enviar ao banco,
+    // evitando o erro genérico "Uma das datas informadas está em formato inválido".
+    const dataOk = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
+    for (const id of ids) {
+      const original = mens.find((m) => m.id === id);
+      if (!original) continue;
+      const draft = rascunhos[id];
+      const parcelaLabel = `parcela ${original.numero_parcela ?? "?"}`;
+      if (draft.vencimento !== undefined && draft.vencimento !== null && draft.vencimento !== "" && !dataOk(String(draft.vencimento))) {
+        toast.error(`Vencimento inválido em ${parcelaLabel} — use o formato completo (dd/mm/aaaa).`);
+        return;
+      }
+      if (draft.pago_em !== undefined && draft.pago_em !== null && draft.pago_em !== "" && !dataOk(String(draft.pago_em))) {
+        toast.error(`"Pago em" inválido em ${parcelaLabel} — use o formato completo (dd/mm/aaaa).`);
+        return;
+      }
+    }
     setSalvandoRascunhos(true);
     let ok = 0;
     let bloqueadas = 0;
