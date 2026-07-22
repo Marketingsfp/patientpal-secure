@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { z } from "zod";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Users, Stethoscope } from "lucide-react";
+import { Plus, Pencil, Stethoscope } from "lucide-react";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,27 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { FuncionarioFormDialog } from "@/components/funcionarios/FuncionarioFormDialog";
 import { MedicoFormDialog } from "@/components/medicos/MedicoFormDialog";
 
 export const Route = createFileRoute("/_authenticated/app/equipe/")({
   component: EquipePage,
-  head: () => ({ meta: [{ title: "Equipe — ClinicaOS" }] }),
-  validateSearch: z.object({
-    tab: z.enum(["funcionarios", "medicos"]).optional(),
-  }),
+  head: () => ({ meta: [{ title: "Médicos — ClinicaOS" }] }),
 });
-
-interface Funcionario {
-  id: string;
-  user_id: string;
-  nome: string;
-  role: string;
-  ativo: boolean;
-}
 
 interface Medico {
   id: string;
@@ -54,16 +39,10 @@ const limparPrefixoMedico = (nome: string) =>
 function EquipePage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("equipe");
-  const { tab: tabFromUrl } = Route.useSearch();
-  const [tab, setTab] = useState<"funcionarios" | "medicos">(tabFromUrl ?? "funcionarios");
-  useEffect(() => { if (tabFromUrl) setTab(tabFromUrl); }, [tabFromUrl]);
-  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [loading, setLoading] = useState(false);
-  const [openChooser, setOpenChooser] = useState(false);
   const [busca, setBusca] = useState("");
   const [medicoStatus, setMedicoStatus] = useState<"ativos" | "inativos" | "todos">("ativos");
-  const [funcDialog, setFuncDialog] = useState<{ open: boolean; userId?: string | null }>({ open: false, userId: null });
   const [medicoDialog, setMedicoDialog] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
   const [medicoPrefillNome, setMedicoPrefillNome] = useState<string | undefined>(undefined);
   const [medicoPrefillUserId, setMedicoPrefillUserId] = useState<string | undefined>(undefined);
@@ -73,11 +52,9 @@ function EquipePage() {
     if (!clinicaAtual) return;
     setLoading(true);
     void Promise.all([
-      // Todos os vínculos, inclusive role="medico": um perfil trocado para
-      // Médico só deve sair da lista de Funcionários quando o cadastro em
-      // `medicos` (CRM etc.) já existir — antes disso, some da lista de
-      // Funcionários E não aparece em Médicos por falta desse registro,
-      // desaparecendo do sistema por completo. Ver filtro abaixo.
+      // Precisamos dos memberships só para localizar perfis "Médico" que
+      // ainda não têm cadastro em `medicos` (falta CRM). Esses aparecem
+      // aqui como "cadastro pendente".
       supabase
         .from("clinica_memberships")
         .select("id, user_id, role, ativo")
@@ -91,26 +68,16 @@ function EquipePage() {
       const mems = (f.data ?? []) as Array<{ id: string; user_id: string; role: string; ativo: boolean }>;
       const medicosRaw = (m.data ?? []) as Array<{ user_id: string | null }>;
       const medicosUserIds = new Set(medicosRaw.map((x) => x.user_id).filter((x): x is string => !!x));
-      const ids = Array.from(new Set(mems.map((x) => x.user_id)));
+      const idsMedicoPendente = Array.from(new Set(
+        mems.filter((r) => r.role === "medico" && !medicosUserIds.has(r.user_id)).map((r) => r.user_id)
+      ));
       const nomeMap = new Map<string, string>();
-      if (ids.length) {
-        const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", ids);
+      if (idsMedicoPendente.length) {
+        const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", idsMedicoPendente);
         (profs ?? []).forEach((p: any) => nomeMap.set(p.id, p.nome));
       }
-      const allRows: Funcionario[] = mems.map((r) => ({
-        id: r.id,
-        user_id: r.user_id,
-        nome: nomeMap.get(r.user_id) ?? "(sem nome)",
-        role: r.role,
-        ativo: r.ativo,
-      }));
-      allRows.sort((a, b) => a.nome.localeCompare(b.nome));
-      // Quem é médico nunca aparece em Funcionários (nem "pendente" — esses
-      // vão para a aba Médicos, mesclados via medicosPendentes abaixo).
-      setFuncionarios(allRows.filter((r) => r.role !== "medico"));
       // Perfil "Médico" sem cadastro completo em `medicos` (falta CRM): mantém
-      // visível na aba Médicos como pendente — nunca deve desaparecer do
-      // sistema. Usa o próprio membership como linha sintética (id prefixado).
+      // visível como pendente — nunca deve desaparecer do sistema.
       const medicosPendentes: Medico[] = mems
         .filter((r) => r.role === "medico" && !medicosUserIds.has(r.user_id))
         .map((r) => ({
@@ -153,12 +120,7 @@ function EquipePage() {
     });
   }, [clinicaAtual?.clinica_id, reloadKey]);
 
-  const escolherFuncionario = () => {
-    setOpenChooser(false);
-    setFuncDialog({ open: true, userId: null });
-  };
-  const escolherMedico = () => {
-    setOpenChooser(false);
+  const novoMedico = () => {
     setMedicoPrefillNome(undefined);
     setMedicoPrefillUserId(undefined);
     setMedicoDialog({ open: true, id: null });
@@ -166,9 +128,6 @@ function EquipePage() {
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica primeiro.</p>;
 
   const q = busca.trim().toLowerCase();
-  const funcsFiltrados = q
-    ? funcionarios.filter((f) => f.nome.toLowerCase().includes(q) || f.role.toLowerCase().includes(q))
-    : funcionarios;
   const medicosPorStatus = medicos.filter((m) =>
     medicoStatus === "todos" ? true : medicoStatus === "ativos" ? m.ativo : !m.ativo
   );
@@ -182,80 +141,29 @@ function EquipePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold">Equipe</h1>
+          <h1 className="text-2xl font-semibold">Médicos</h1>
           <p className="text-sm text-muted-foreground">
-            Funcionários e médicos de {clinicaAtual.clinica.nome}. Aqui você cadastra a equipe e libera acesso ao sistema.
+            Cadastro de médicos de {clinicaAtual.clinica.nome} (CRM, especialidades e repasse).
+            Funcionários administrativos ficam em <Link to="/app/hr-contratos" className="underline">Recursos Humanos → Funcionários</Link>.
           </p>
         </div>
         {podeEscrever && (
-          <Button onClick={() => setOpenChooser(true)}>
-            <Plus className="h-4 w-4 mr-2" /> Novo cadastro
+          <Button onClick={novoMedico}>
+            <Plus className="h-4 w-4 mr-2" /> Novo médico
           </Button>
         )}
       </div>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "funcionarios" | "medicos")}>
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <TabsList>
-            <TabsTrigger value="funcionarios">
-              <Users className="h-4 w-4 mr-2" /> Funcionários
-              <Badge variant="secondary" className="ml-2">{funcionarios.length}</Badge>
-            </TabsTrigger>
-            <TabsTrigger value="medicos">
-              <Stethoscope className="h-4 w-4 mr-2" /> Médicos
-              <Badge variant="secondary" className="ml-2">{medicosAtivosCount}</Badge>
-            </TabsTrigger>
-          </TabsList>
+      <div className="space-y-4">
+        <div className="flex items-center justify-end">
           <Input
-            placeholder="Buscar por nome, CPF ou CRM…"
+            placeholder="Buscar por nome ou CRM…"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             className="w-full sm:w-72"
           />
         </div>
-
-        <TabsContent value="funcionarios" className="mt-4">
-          {loading ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">Carregando…</CardContent></Card>
-          ) : funcsFiltrados.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">
-              <Users className="h-8 w-8 mx-auto mb-2 opacity-50" /> Nenhum funcionário cadastrado.
-            </CardContent></Card>
-          ) : (
-            <Card>
-              <Table>
-                <TableHeader><TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Função</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-16 text-right">Ações</TableHead>
-                </TableRow></TableHeader>
-                <TableBody>
-                  {funcsFiltrados.map((f) => (
-                    <TableRow key={f.id}>
-                      <TableCell>{f.nome}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground capitalize">{f.role}</TableCell>
-                      <TableCell>
-                        <Badge variant={f.ativo ? "default" : "outline"}>{f.ativo ? "Ativo" : "Inativo"}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {podeEscrever && (
-                         <Button size="icon" variant="ghost" asChild>
-                            <Link to="/app/funcionarios" search={{ editUserId: f.user_id }}>
-                              <Pencil className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="medicos" className="mt-4">
+        <div>
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground mr-1">Status:</span>
             <Select value={medicoStatus} onValueChange={(v) => setMedicoStatus(v as typeof medicoStatus)}>
@@ -340,50 +248,9 @@ function EquipePage() {
               </Table>
             </Card>
           )}
-        </TabsContent>
+        </div>
+      </div>
 
-      </Tabs>
-
-      <Dialog open={openChooser} onOpenChange={setOpenChooser}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>O que você quer cadastrar?</DialogTitle>
-            <DialogDescription>
-              Escolha o tipo de cadastro. Em ambos é possível liberar acesso ao sistema.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={escolherFuncionario}
-              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-border bg-background p-4 text-center transition hover:border-primary hover:bg-accent"
-            >
-              <Users className="h-8 w-8 text-primary" />
-              <span className="font-medium">Funcionário</span>
-              <span className="text-xs text-muted-foreground">Administrativo, recepção, financeiro…</span>
-            </button>
-            <button
-              type="button"
-              onClick={escolherMedico}
-              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-border bg-background p-4 text-center transition hover:border-primary hover:bg-accent"
-            >
-              <Stethoscope className="h-8 w-8 text-primary" />
-              <span className="font-medium">Médico</span>
-              <span className="text-xs text-muted-foreground">CRM, especialidades e repasse</span>
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {clinicaAtual && (
-        <FuncionarioFormDialog
-          open={funcDialog.open}
-          onOpenChange={(o) => setFuncDialog((s) => ({ ...s, open: o }))}
-          clinicaId={clinicaAtual.clinica_id}
-          editingUserId={funcDialog.userId ?? null}
-          onSaved={() => setReloadKey((k) => k + 1)}
-        />
-      )}
       {clinicaAtual && (
         <MedicoFormDialog
           open={medicoDialog.open}
