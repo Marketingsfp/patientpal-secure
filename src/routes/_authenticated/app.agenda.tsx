@@ -995,7 +995,28 @@ async function obterInfoConvenioPaciente(params: {
     }
   }
 
-  return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear, emCarencia, diasCarenciaRestantes };
+  // Carrega acréscimo de cartão do convênio (aplicado no fluxo de cobrança
+  // quando a forma de pagamento não é dinheiro). Convênio Funcionário nunca
+  // recebe acréscimo — o nome do convênio já é normalizado abaixo.
+  let acrescimoCartao: ConvenioInfo["acrescimoCartao"] = null;
+  const nomeUpper = (convenioNome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  if (!nomeUpper.includes("FUNCIONARIO") && contrato.convenio_id) {
+    const { data: convRow } = await supabase
+      .from("cb_convenios")
+      .select("acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor")
+      .eq("id", contrato.convenio_id)
+      .maybeSingle();
+    const row = convRow as { acrescimo_cartao_modo: string | null; acrescimo_cartao_percentual: number | null; acrescimo_cartao_valor: number | null } | null;
+    if (row?.acrescimo_cartao_modo) {
+      acrescimoCartao = {
+        modo: row.acrescimo_cartao_modo as "percentual" | "valor_fixo",
+        percentual: Number(row.acrescimo_cartao_percentual) || 0,
+        valor: Number(row.acrescimo_cartao_valor) || 0,
+      };
+    }
+  }
+
+  return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear, emCarencia, diasCarenciaRestantes, acrescimoCartao };
 }
 
 const toLocalInput = (iso: string) => {
