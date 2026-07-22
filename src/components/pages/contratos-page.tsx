@@ -921,6 +921,12 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
             ) : null}
           </div>
         ) : null}
+        {filtered.some((c) => c.tabela_legada) ? (
+          <div className="flex items-center gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
+            <span className="inline-block h-3 w-3 rounded-sm bg-amber-100 border border-amber-300" aria-hidden />
+            Linhas em amarelo indicam contratos em <strong>tabela antiga</strong> — pendentes de migração.
+          </div>
+        ) : null}
       </div>
 
       {/* Passo 1: pergunta "É renovação?" antes de abrir a nova venda */}
