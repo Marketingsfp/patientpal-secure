@@ -3898,7 +3898,14 @@ function AgendaPage() {
           });
           descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
         } else if (info.desconto) {
-          opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
+          opcoes = opcoes.map((o) => ({
+            ...o,
+            valor: aplicarAcrescimoCartaoAgenda(
+              aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
+              o.forma,
+              info.acrescimoCartao,
+            ),
+          }));
           const rotulo =
             info.desconto.tipo === "gratuidade"
               ? "GRATUIDADE"
