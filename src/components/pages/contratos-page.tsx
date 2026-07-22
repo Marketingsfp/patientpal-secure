@@ -3708,8 +3708,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
         <CardContent className="p-6 space-y-4">
           <Tabs defaultValue={initialTab}>
             <TabsList>
-              <TabsTrigger value="resumo">Resumo</TabsTrigger>
               <TabsTrigger value="dados">Dados</TabsTrigger>
+              <TabsTrigger value="resumo">Resumo</TabsTrigger>
               <TabsTrigger value="contrato">Contrato</TabsTrigger>
               <TabsTrigger value="historico">Histórico</TabsTrigger>
             </TabsList>
