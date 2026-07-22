@@ -4852,6 +4852,39 @@ function AgendaPage() {
       {emitenteNfseDialog}
       {tomadorNfseDialog}
       {descricaoNfseDialog}
+      {nfseSel.size > 0 && (() => {
+        const selAgs = items.filter((a) => nfseSel.has(a.id));
+        const pacIds = new Set(selAgs.map((a) => a.paciente_id).filter(Boolean));
+        const mesmoPaciente = pacIds.size === 1;
+        const total = selAgs.reduce((s, a) => s + Number(pagoInfoMap.get(a.id)?.valor ?? 0), 0);
+        const pacNome = selAgs[0]?.paciente_nome ?? "";
+        return (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-white shadow-lg border-2 border-sky-400 rounded-lg px-4 py-3 flex items-center gap-4 max-w-[95vw]">
+            <div className="text-sm">
+              <div className="font-semibold text-sky-700">
+                {nfseSel.size} atendimento{nfseSel.size > 1 ? "s" : ""} selecionado{nfseSel.size > 1 ? "s" : ""}
+              </div>
+              <div className="text-xs text-slate-600">
+                {mesmoPaciente ? (
+                  <>Paciente: <b>{pacNome}</b> • Total: <b>{total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</b></>
+                ) : (
+                  <span className="text-rose-600">⚠ Selecione serviços de um único paciente</span>
+                )}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={emitirNfseAgrupada}
+              disabled={emitindoNfseLote || !mesmoPaciente || nfseSel.size < 2}
+            >
+              {emitindoNfseLote ? "Emitindo…" : "Emitir NFS-e agrupada"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setNfseSel(new Set())} disabled={emitindoNfseLote}>
+              Cancelar
+            </Button>
+          </div>
+        );
+      })()}
       {reagendandoAg && (
         <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
           <div className="flex flex-wrap items-center gap-3 text-sm">
