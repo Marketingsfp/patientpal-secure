@@ -240,8 +240,8 @@ function EquipePage() {
                       </TableCell>
                       <TableCell className="text-right">
                         {podeEscrever && (
-                          <Button size="icon" variant="ghost" asChild>
-                            <Link to="/app/equipe/funcionario/$userId/editar" params={{ userId: f.user_id }}>
+                         <Button size="icon" variant="ghost" asChild>
+                            <Link to="/app/funcionarios" search={{ editUserId: f.user_id }}>
                               <Pencil className="h-4 w-4" />
                             </Link>
                           </Button>
