@@ -5307,7 +5307,7 @@ function AgendaPage() {
                 </fieldset>
                 <DialogFooter className="sticky bottom-0 bg-white pt-3 pb-2 -mx-6 px-6 border-t border-slate-200 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] mt-4 flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
                   {editing && pagosSet.has(editing.id) ? (
-                    <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                    <Button type="button" variant="outline" onClick={fecharDialogoAgenda}>
                       Fechar
                     </Button>
                   ) : (
@@ -5338,7 +5338,7 @@ function AgendaPage() {
                           : "Desconto"}
                       </Button>
                       <div className="flex flex-nowrap gap-2 sm:justify-end">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+                        <Button type="button" variant="outline" onClick={fecharDialogoAgenda} disabled={saving}>
                           Cancelar
                         </Button>
                         <Button
