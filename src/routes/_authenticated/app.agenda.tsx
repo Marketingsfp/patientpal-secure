@@ -7226,6 +7226,11 @@ function AgendaPage() {
                       {/* Situação */}
                       <TableCell className="py-2.5">
                         {ehLivre ? (
+                          (() => { const lockNome = slotTravadoPorOutro(a); return lockNome ? (
+                          <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[11px] font-medium truncate max-w-full" title={`Em digitação por ${lockNome}`}>
+                            ⏳ {lockNome}
+                          </Badge>
+                          ) : (
                           <Button
                             variant="outline"
                             size="sm"
@@ -7235,6 +7240,7 @@ function AgendaPage() {
                             <UserPlus className="h-3 w-3 mr-1.5" />
                             Agendar
                           </Button>
+                          ); })()
                         ) : estornoPend ? (
                           <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-xs">
                             Estorno solicitado
