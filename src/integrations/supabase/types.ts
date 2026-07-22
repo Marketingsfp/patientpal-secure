@@ -2743,6 +2743,7 @@ export type Database = {
           numero: number
           numero_renovacoes: number
           observacoes: string | null
+          origem: string
           paciente_id: string
           paciente_nome: string
           plano_id: string | null
@@ -2780,6 +2781,7 @@ export type Database = {
           numero?: number
           numero_renovacoes?: number
           observacoes?: string | null
+          origem?: string
           paciente_id: string
           paciente_nome: string
           plano_id?: string | null
@@ -2817,6 +2819,7 @@ export type Database = {
           numero?: number
           numero_renovacoes?: number
           observacoes?: string | null
+          origem?: string
           paciente_id?: string
           paciente_nome?: string
           plano_id?: string | null
@@ -4069,6 +4072,7 @@ export type Database = {
           carga_horaria_semanal: number
           cargo_id: string | null
           clinica_id: string
+          convenio_contrato_id: string | null
           cpf: string | null
           created_at: string
           data_admissao: string
@@ -4093,6 +4097,7 @@ export type Database = {
           carga_horaria_semanal?: number
           cargo_id?: string | null
           clinica_id: string
+          convenio_contrato_id?: string | null
           cpf?: string | null
           created_at?: string
           data_admissao?: string
@@ -4117,6 +4122,7 @@ export type Database = {
           carga_horaria_semanal?: number
           cargo_id?: string | null
           clinica_id?: string
+          convenio_contrato_id?: string | null
           cpf?: string | null
           created_at?: string
           data_admissao?: string
@@ -4150,6 +4156,13 @@ export type Database = {
             columns: ["clinica_id"]
             isOneToOne: false
             referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_contratos_convenio_contrato_id_fkey"
+            columns: ["convenio_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_assinatura"
             referencedColumns: ["id"]
           },
           {
@@ -8814,6 +8827,26 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      hr_convenio_add_dependente: {
+        Args: {
+          _hr_contrato_id: string
+          _paciente_id: string
+          _parentesco: string
+        }
+        Returns: string
+      }
+      hr_convenio_remove_dependente: {
+        Args: { _dependente_id: string }
+        Returns: undefined
+      }
+      hr_toggle_convenio_funcionario: {
+        Args: {
+          _habilitar: boolean
+          _hr_contrato_id: string
+          _titular_paciente_id: string
+        }
+        Returns: string
       }
       is_chat_member: {
         Args: { _canal_id: string; _user_id: string }
