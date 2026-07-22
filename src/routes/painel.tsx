@@ -2,8 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ClinicaProvider } from "@/hooks/use-clinica";
 import { PainelPage } from "@/components/painel/painel-page";
 
-export { PainelPage } from "@/components/painel/painel-page";
-
 export const Route = createFileRoute("/painel")({
   component: PainelRoute,
   head: () => ({
