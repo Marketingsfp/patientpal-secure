@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FuncionarioDadosDialog } from "@/components/funcionarios/FuncionarioDadosDialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export const Route = createFileRoute("/_authenticated/app/funcionarios")({
   component: FuncionariosPage,
@@ -121,9 +122,16 @@ function FuncionariosPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     {podeEscrever && (
-                      <Button size="icon" variant="ghost" onClick={() => setDialog({ open: true, id: r.id })}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      <TooltipProvider delayDuration={200}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button size="icon" variant="ghost" onClick={() => setDialog({ open: true, id: r.id })} aria-label="Editar funcionário">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Editar funcionário</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                   </TableCell>
                 </TableRow>
