@@ -194,13 +194,16 @@ export function ConvenioFuncionarioTab({ hrContratoId, clinicaId, funcionarioNom
         )}
       </Card>
 
-      {habilitado && (
-        <Card className="p-4 space-y-3">
+      <Card className="p-4 space-y-3">
           <div className="flex items-center gap-2">
             <UserPlus className="h-4 w-4 text-primary" />
             <div className="font-medium">Dependentes</div>
           </div>
-          {dependentes.length === 0 ? (
+        {!habilitado ? (
+          <div className="text-sm text-muted-foreground rounded-md border border-dashed p-3">
+            Habilite o Convênio Funcionário acima para começar a incluir dependentes.
+          </div>
+        ) : dependentes.length === 0 ? (
             <div className="text-sm text-muted-foreground">Nenhum dependente cadastrado.</div>
           ) : (
             <div className="border rounded-md divide-y">
@@ -222,7 +225,7 @@ export function ConvenioFuncionarioTab({ hrContratoId, clinicaId, funcionarioNom
             </div>
           )}
 
-          {podeEscrever && (
+        {podeEscrever && habilitado && (
             <div className="border-t pt-3 space-y-2">
               <div className="text-sm font-medium">Adicionar dependente</div>
               <div className="grid grid-cols-1 md:grid-cols-[1fr,200px,auto] gap-2 items-end">
@@ -246,8 +249,7 @@ export function ConvenioFuncionarioTab({ hrContratoId, clinicaId, funcionarioNom
               <p className="text-xs text-muted-foreground">O dependente precisa estar cadastrado como cliente antes.</p>
             </div>
           )}
-        </Card>
-      )}
+      </Card>
     </div>
   );
 }
