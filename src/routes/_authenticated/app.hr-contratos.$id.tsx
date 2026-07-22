@@ -337,7 +337,7 @@ function EditarFuncionarioPage() {
         ) : (
         <Tabs defaultValue="dados" className="w-full">
           <TabsList className={`grid w-full ${isNovo ? "grid-cols-2" : "grid-cols-3"}`}>
-            <TabsTrigger value="dados">Dados do contrato</TabsTrigger>
+            <TabsTrigger value="dados">Dados do funcionário</TabsTrigger>
             <TabsTrigger value="login">Acesso ao sistema</TabsTrigger>
             {!isNovo && <TabsTrigger value="convenio">Convênio</TabsTrigger>}
           </TabsList>
