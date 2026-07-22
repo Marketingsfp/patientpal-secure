@@ -1067,6 +1067,7 @@ function AgendaPage() {
   // Seleção múltipla para emissão agrupada de NFS-e (mesmo paciente / mesmo dia).
   const [nfseSel, setNfseSel] = useState<Set<string>>(new Set());
   const [emitindoNfseLote, setEmitindoNfseLote] = useState(false);
+  useEffect(() => { setNfseSel(new Set()); }, [dataRef]);
   const [nascMap, setNascMap] = useState<Map<string, string | null>>(new Map());
   const [convenioMap, setConvenioMap] = useState<Map<string, string>>(new Map());
   const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
