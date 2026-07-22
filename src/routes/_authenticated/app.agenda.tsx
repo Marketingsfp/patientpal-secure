@@ -6945,6 +6945,11 @@ function AgendaPage() {
                   {/* Linha 4: ações rápidas */}
                   <div className="flex items-center gap-1.5 pt-2 border-t">
                     {ehLivre ? (
+                      (() => { const lockNome = slotTravadoPorOutro(a); return lockNome ? (
+                      <div className="h-8 flex-1 flex items-center justify-center rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-[11px] px-2 truncate" title={`Em digitação por ${lockNome}`}>
+                        ⏳ Em digitação por {lockNome}
+                      </div>
+                      ) : (
                       <Button
                         variant="outline"
                         size="sm"
@@ -6954,6 +6959,7 @@ function AgendaPage() {
                         <UserPlus className="h-3.5 w-3.5 mr-1.5" />
                         Agendar
                       </Button>
+                      ); })()
                     ) : (
                       <>
                         {podeCheckin && (
