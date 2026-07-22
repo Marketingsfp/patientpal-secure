@@ -179,12 +179,12 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     ],
   },
   {
-    label: "RH",
+    label: "Recursos Humanos",
     items: [
-    { to: "/app/hr-ponto", label: "RH - Ponto", icon: GraduationCap },
-    { to: "/app/hr-contratos", label: "RH · Contratos", icon: FileText },
-    { to: "/app/hr-ferias", label: "RH · Férias", icon: Palmtree },
-    { to: "/app/hr-holerites", label: "RH · Holerites", icon: FileText },
+    { to: "/app/hr-ponto", label: "Marcação de ponto", icon: GraduationCap },
+    { to: "/app/hr-contratos", label: "Contratos", icon: FileText },
+    { to: "/app/hr-ferias", label: "Férias", icon: Palmtree },
+    { to: "/app/hr-holerites", label: "Holerites", icon: FileText },
     { to: "/app/treinamentos", label: "Treinamentos", icon: GraduationCap },
     { to: "/app/lms-admin", label: "Cursos (admin)", icon: BookOpen },
     ],
@@ -526,7 +526,7 @@ export function AppShell() {
   const flatNavLeaves = useMemo(() => {
     const leaves: string[] = [];
     for (const row of visibleNavRows) {
-      const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
+      const hideLabel = subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
       const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? true);
       if (!open) continue;
       for (const item of row.items) {
@@ -708,7 +708,7 @@ export function AppShell() {
             };
             const itemHasActive = (it: NavItem): boolean => isParent(it) ? it.children.some((c) => leafIsActive(c.to, c.hash)) : leafIsActive(it.to);
             const groupHasActive = row.items.some(itemHasActive);
-            const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
+            const hideLabel = subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
             const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? true);
             return (
               <div key={row.label} className="space-y-1">
