@@ -100,6 +100,10 @@ function DenteFaces({
   const c = (f: OdontoFace) => STATUS_COR[estados[`${dente}-${f}`] ?? estados[`${dente}-INTEIRO`] ?? "higido"];
   const s = (f: OdontoFace) => estados[`${dente}-${f}`] ?? estados[`${dente}-INTEIRO`] ?? "higido";
   const decidua = isDecidua(dente);
+  // Ausente: qualquer face (ou INTEIRO) marcada como "ausente" → X vermelho sobre o dente.
+  const ausente = (["INTEIRO", "O", "V", "L", "M", "D"] as OdontoFace[]).some(
+    (f) => estados[`${dente}-${f}`] === "ausente",
+  );
   // Superior (quadrantes 1,2,5,6) → raiz para cima; Inferior (3,4,7,8) → raiz para baixo.
   const quad = Math.floor(dente / 10);
   const superior = quad === 1 || quad === 2 || quad === 5 || quad === 6;
@@ -176,6 +180,12 @@ function DenteFaces({
         </g>
         {/* Contorno da coroa por cima — traço fino, cor referência */}
         <path d={crownPath} fill="none" stroke="#94a3b8" strokeWidth="1" strokeLinejoin="round" strokeLinecap="round" />
+        {ausente && (
+          <g pointerEvents="none">
+            <line x1={cx0 - 2} y1={crownY - 2} x2={cx0 + cw + 2} y2={crownY + ch + 2} stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" />
+            <line x1={cx0 + cw + 2} y1={crownY - 2} x2={cx0 - 2} y2={crownY + ch + 2} stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" />
+          </g>
+        )}
       </svg>
       <span className={`text-[10px] font-sans tracking-tight ${decidua ? "text-amber-700" : "text-slate-500"}`}>{dente}</span>
       {orcado && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />}
@@ -215,9 +225,10 @@ function toothShape(dente: number, superior: boolean): ToothShape {
   const vbW = 40;
   const vbH = 90;
   // Coroa compacta; raiz longa para anteriores/caninos, mais curta para molares.
-  const chByType: Record<ToothType, number> = { molar: 36, premolar: 32, canine: 32, incisor: 32 };
-  const rhByType: Record<ToothType, number> = { molar: 40, premolar: 48, canine: 52, incisor: 48 };
-  const cwByType: Record<ToothType, number> = { molar: 34, premolar: 28, canine: 24, incisor: 24 };
+  // Coroas mais retangulares (altas) e raízes afiladas — próximas ao diagrama de referência.
+  const chByType: Record<ToothType, number> = { molar: 34, premolar: 30, canine: 30, incisor: 30 };
+  const rhByType: Record<ToothType, number> = { molar: 42, premolar: 46, canine: 52, incisor: 44 };
+  const cwByType: Record<ToothType, number> = { molar: 34, premolar: 26, canine: 22, incisor: 22 };
   const ch = chByType[type];
   const rootH = rhByType[type];
   const cw = cwByType[type];
@@ -273,15 +284,16 @@ function buildCrownPath(
   const neckY = superior ? crownY : crownY + ch;
   const edgeY = superior ? crownY + ch : crownY;
   // No colo a coroa é ligeiramente mais estreita (formando o contorno cervical).
-  const neckShrink = type === "molar" ? 0.08 : type === "premolar" ? 0.12 : 0.18;
+  // Colo levemente mais estreito que a coroa (contorno cervical suave, sem afilar demais).
+  const neckShrink = type === "molar" ? 0.05 : type === "premolar" ? 0.08 : 0.10;
   const nxL = cx0 + cw * neckShrink;
   const nxR = cx0 + cw - cw * neckShrink;
-  // Bulge máximo na "altura do contorno" (~35% da coroa a partir do colo).
-  const bulgeY = superior ? neckY + ch * 0.35 : neckY - ch * 0.35;
-  const bxL = cx0 - 0.5;
-  const bxR = cx0 + cw + 0.5;
+  // Laterais quase retas — coroas mais retangulares como no diagrama de referência.
+  const bulgeY = superior ? neckY + ch * 0.45 : neckY - ch * 0.45;
+  const bxL = cx0 + 0.4;
+  const bxR = cx0 + cw - 0.4;
   // Cantos incisais/oclusais arredondados.
-  const rEdge = Math.max(2, cw * 0.12);
+  const rEdge = Math.max(2, cw * 0.14);
   const eL = cx0 + rEdge;
   const eR = cx0 + cw - rEdge;
   const cx = cx0 + cw / 2;
