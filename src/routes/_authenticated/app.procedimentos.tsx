@@ -29,7 +29,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
-import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
+import { findRegra, computeValor, applyAcrescimoCartao, type CbRegra, type CbAcrescimoCartao } from "@/lib/cb-regras";
 
 export const Route = createFileRoute("/_authenticated/app/procedimentos")({
   component: ProcedimentosPageWithTabs,
@@ -73,7 +73,14 @@ interface Cartao {
   percentual_desconto: number;
   ativo: boolean;
 }
-interface CbConvenio { id: string; nome: string; ativo: boolean }
+interface CbConvenio {
+  id: string;
+  nome: string;
+  ativo: boolean;
+  acrescimo_cartao_modo?: "percentual" | "valor_fixo" | null;
+  acrescimo_cartao_percentual?: number | null;
+  acrescimo_cartao_valor?: number | null;
+}
 interface ConvValor { valor_dinheiro: number; valor_outros: number }
 interface CbConvenioRegra {
   id: string;
@@ -464,7 +471,7 @@ function ProcedimentosPage() {
     if (!clinicaAtual) return;
     const { data, error } = await (supabase as any)
       .from("cb_convenios")
-      .select("id,nome,ativo")
+      .select("id,nome,ativo,acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
       .order("nome");
@@ -536,7 +543,11 @@ function ProcedimentosPage() {
         const r = findRegra(regrasDoConv, espId, form.tipo, editing?.id ?? null);
         const calc = computeValor(r, baseDin, baseOut);
         if (calc) {
-          next[c.id] = { dinheiro: calc.dinheiro.toFixed(2), outros: calc.outros.toFixed(2) };
+          const acr: CbAcrescimoCartao | null = c.acrescimo_cartao_modo
+            ? { modo: c.acrescimo_cartao_modo, percentual: Number(c.acrescimo_cartao_percentual) || 0, valor: Number(c.acrescimo_cartao_valor) || 0 }
+            : null;
+          const outrosAcr = applyAcrescimoCartao(calc.outros, acr, c.nome);
+          next[c.id] = { dinheiro: calc.dinheiro.toFixed(2), outros: outrosAcr.toFixed(2) };
         } else if (!prev[c.id]) {
           next[c.id] = { dinheiro: "0", outros: "0" };
         }
@@ -612,7 +623,12 @@ function ProcedimentosPage() {
       Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao ?? 0),
       Number(p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao ?? 0),
     );
-    if (calculado) return { valor_dinheiro: calculado.dinheiro, valor_outros: calculado.outros };
+    if (calculado) {
+      const acr: CbAcrescimoCartao | null = c.acrescimo_cartao_modo
+        ? { modo: c.acrescimo_cartao_modo, percentual: Number(c.acrescimo_cartao_percentual) || 0, valor: Number(c.acrescimo_cartao_valor) || 0 }
+        : null;
+      return { valor_dinheiro: calculado.dinheiro, valor_outros: applyAcrescimoCartao(calculado.outros, acr, c.nome) };
+    }
     return salvo ?? { valor_dinheiro: 0, valor_outros: 0 };
   };
 
