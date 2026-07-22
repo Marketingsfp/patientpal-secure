@@ -1,35 +1,38 @@
-
 ## Objetivo
-Ao clicar no lápis de editar em **Recursos Humanos → Contratos**, abrir uma **página dedicada** (não modal) com um botão **"← Voltar para funcionários"** no topo.
+Corrigir a página **Recursos Humanos → Contratos**, para que o clique em **+ Novo funcionário** e no **lápis de editar** realmente abra a tela do formulário (rota `/app/hr-contratos/novo` e `/app/hr-contratos/<id>`).
 
-## Escopo
+## Causa do problema
+Hoje existem dois arquivos de rota:
 
-### 1. Nova rota de edição
-- Criar `src/routes/_authenticated/app.hr-contratos.$id.tsx` como página de edição do funcionário.
-- Estrutura da página:
-  - Cabeçalho com botão **"← Voltar"** (navega para `/app/hr-contratos`) e título "Editar funcionário — NOME".
-  - Abas **Dados** e **Login e perfil** (mesmas do modal atual), agora renderizadas em página cheia dentro do `AppShell`.
-  - Rodapé fixo com **Cancelar** (volta) e **Salvar** (persiste e volta para a lista).
-- Também criar `src/routes/_authenticated/app.hr-contratos.novo.tsx` para o botão "Novo funcionário" seguir o mesmo padrão (deixa de abrir modal).
+- `src/routes/_authenticated/app.hr-contratos.tsx` (lista de funcionários)
+- `src/routes/_authenticated/app.hr-contratos.$id.tsx` (formulário de novo/editar)
 
-### 2. Extrair o conteúdo do modal para um componente reutilizável
-- Extrair o corpo de `FuncionarioDadosDialog.tsx` (formulário + validações + salvamento) para `src/components/funcionarios/FuncionarioForm.tsx` sem `Dialog`.
-- Esse componente aceita `contratoId?`, `clinicaId`, `onSaved`, `onCancel` e é usado pela nova rota.
-- Manter o `FuncionarioDadosDialog` como wrapper fino apenas se ainda for usado em outro lugar; caso contrário, remover.
+Pelas regras do TanStack Router, o primeiro vira **rota-pai (layout)** do segundo. Uma rota-pai só mostra o conteúdo da rota-filha se o componente da pai renderizar um `<Outlet />`. O componente atual da lista não tem `<Outlet />`, então:
 
-### 3. Ajustar a lista
-- Em `src/routes/_authenticated/app.hr-contratos.tsx`:
-  - O botão **lápis** passa a navegar para `/app/hr-contratos/{id}` em vez de abrir o modal.
-  - O botão **Novo funcionário** navega para `/app/hr-contratos/novo`.
-  - Remover o state e a renderização do `FuncionarioDadosDialog`.
-- Em `src/routes/_authenticated/app.equipe.index.tsx`: o atalho que hoje passa `?editUserId=` continua funcionando — apenas troca para redirecionar direto para `/app/hr-contratos/{id}`.
+- A URL muda para `/app/hr-contratos/novo` ou `/app/hr-contratos/<id>`.
+- O formulário casa a rota, mas não tem onde ser desenhado.
+- Na tela continua aparecendo a lista, dando a impressão de que "não abriu".
 
-### 4. UX
-- Preservar exatamente os mesmos campos, validações e comportamentos atuais do modal.
-- Após salvar com sucesso: toast + `navigate({ to: "/app/hr-contratos" })`.
-- Botão "Voltar" no topo esquerdo e um segundo botão "Cancelar" no rodapé (ambos voltam sem salvar).
-- Layout responsivo: mesmo grid 2 colunas usado hoje, com scroll da página (não mais scroll interno de modal).
+## Correção proposta (apenas estrutura de rotas — nada de regra de negócio)
+Transformar a lista em um **leaf** próprio, para que a rota `/hr-contratos/<id>` deixe de ser filha da lista:
 
-## Fora de escopo
-- Alterações no formulário em si (campos, validações, regras).
-- Mudanças nas outras telas de RH (Férias, Holerites, Ponto).
+1. Renomear `src/routes/_authenticated/app.hr-contratos.tsx` para `src/routes/_authenticated/app.hr-contratos.index.tsx`.
+2. Atualizar dentro desse arquivo a chamada `createFileRoute("/_authenticated/app/hr-contratos")` para `createFileRoute("/_authenticated/app/hr-contratos/")` (novo caminho gerado pelo plugin do TanStack).
+3. Não alterar o arquivo do formulário (`app.hr-contratos.$id.tsx`); ele continua responsável por `/hr-contratos/novo` e `/hr-contratos/<id>`.
+4. Deixar o `routeTree.gen.ts` ser regenerado automaticamente pelo plugin — não editar à mão.
+
+Com isso, `/hr-contratos` continua abrindo a lista, e `/hr-contratos/novo` / `/hr-contratos/<id>` passam a abrir o formulário normalmente.
+
+## Fora do escopo
+- Não mexer em lógica de salvar, permissões, campos do formulário, RLS, banco, ou em qualquer outra tela.
+- Não alterar o design ou o comportamento do botão de excluir, do buscar, do redirecionamento vindo da aba Equipe.
+
+## Validação
+- Abrir `/app/hr-contratos` e confirmar que a lista continua igual.
+- Clicar em **+ Novo funcionário** → deve abrir a tela "Novo funcionário" com o botão "← Voltar para funcionários".
+- Clicar no **lápis** em uma linha → deve abrir "Editar funcionário — <nome>".
+- Clicar em **Voltar** → deve retornar para a lista.
+- Fluxo vindo da aba Equipe (parâmetro `editUserId`) deve continuar redirecionando para a tela de edição.
+
+## Clínica-alvo
+Correção puramente técnica de roteamento (bug de código). Vale para todas as clínicas — não há regra de negócio envolvida. Confirmar antes de aplicar se quer que eu suba a correção global.
