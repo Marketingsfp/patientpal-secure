@@ -1,53 +1,63 @@
+## Objetivo
 
-## Escopo confirmado (resposta anterior)
+- **Aba "Dados do contrato":** deixar de digitar o nome do funcionário livremente. O nome passa a ser escolhido da lista de clientes (pacientes) da clínica. Um botão ao lado abre o cadastro rápido de paciente para casos em que a pessoa ainda não existe.
+- **Aba "Convênio":** remover a nova seleção de titular. O titular já é o paciente vinculado na primeira aba — a aba só decide se o convênio está ligado/desligado e gere os dependentes.
 
-- Clínica-alvo: **todas as 3 clínicas** (cada uma já tem seu próprio "CONVÊNIO FUNCIONÁRIO", isolado por `clinica_id`).
-- Contratos antigos manuais: **mantidos como estão**, sem migração automática.
-- Cobrança: **gratuito** (sem mensalidade, sem taxa de inclusão).
-- Dependente: exige **grau de parentesco** e o paciente já precisa existir no cadastro de clientes.
+## Clínica-alvo
 
-## O que muda para o usuário
+Confirme, por favor: aplicar em **todas as três clínicas** (Menino Jesus, SFP, e a terceira) ou apenas em uma? A mudança é estrutural (cadastro de RH), então o padrão sugerido é global. Se for para valer só em uma, uso feature flag por `clinica_id`.
 
-No menu **Recursos Humanos → Funcionário (editar)**, além de "Dados do contrato" e "Acesso ao sistema", passa a existir uma terceira aba **"Convênio"**:
+## Escopo
 
-1. Toggle **"Habilitar Convênio Funcionário"**.
-   - Ao ligar: exige selecionar o **paciente titular** (o próprio funcionário no cadastro de clientes — busca por nome/CPF).
-   - Se o funcionário ainda não estiver como paciente, mostra atalho para cadastrá-lo antes.
-2. Lista de **Dependentes** (nome, parentesco, botão remover). Botão "Adicionar dependente" abre busca de paciente + campo parentesco obrigatório.
-3. Ao desligar o toggle: pergunta confirmação e encerra o vínculo (titular + dependentes ficam inativos).
+Dentro:
+- `src/routes/_authenticated/app.hr-contratos.$id.tsx` (aba Dados do contrato).
+- `src/components/funcionarios/ConvenioFuncionarioTab.tsx` (aba Convênio).
+- Nova coluna `hr_contratos.paciente_id` para guardar o vínculo.
 
-Regra de negócio: benefícios do "CONVÊNIO FUNCIONARIO" (regras já cadastradas em `cb_convenio_regras`) valem tanto para o titular quanto para os dependentes — o motor de preços da Agenda já resolve isso hoje via `contratos_assinatura` + `contrato_dependentes`, então reusamos essa mesma estrutura.
+Fora:
+- Nenhuma mudança em regras de agenda, preço, benefícios ou motor de convênio — o comportamento continua igual.
+- Nenhuma alteração em outros módulos de RH (ponto, férias, holerites).
+- Não vou mexer no listado de funcionários.
 
-## Como será construído (parte técnica)
+## Como vai funcionar (usuário)
 
-1. **Reuso de tabelas existentes** — sem schema novo pesado:
-   - Criar/atualizar um `contratos_assinatura` "sombra" por funcionário habilitado:
-     - `paciente_id` = paciente titular escolhido,
-     - `convenio_id` = o CONVÊNIO FUNCIONARIO da `clinica_id` do funcionário,
-     - `valor_mensalidade = 0`, `carencia_dias = 0`, `carencia_isenta = true`, `origem = 'rh_funcionario'`, `status = 'ativo'`,
-     - **sem geração de mensalidades** (o gerador só roda quando `valor_mensalidade > 0` — a lógica atual já respeita isso; validar em `functions.sql`).
-   - Vínculo com o funcionário: coluna nova `hr_contratos.convenio_contrato_id uuid null references contratos_assinatura(id) on delete set null` (migração enxuta, só isso).
-   - Dependentes reaproveitam `contrato_dependentes` (o motor da Agenda já enxerga como "Associado — dependente").
+### Aba "Dados do contrato"
+- O campo "Nome do funcionário" vira uma **busca de cliente** (mesmo componente já usado no restante do sistema).
+- Ao selecionar um paciente, o **Nome** e o **CPF** são preenchidos automaticamente a partir do cadastro do cliente e ficam somente leitura (para editar, edita-se o cadastro do paciente).
+- Ao lado do campo, um botão **"+ Cadastrar cliente"**. Ele abre o mesmo diálogo de cadastro rápido de paciente. Depois de cadastrar, o novo cliente vem já selecionado no campo.
+- Se o funcionário for editado (contrato já existente sem `paciente_id`), mostro o nome atual como texto e um botão "Vincular a um cliente" para não travar contratos antigos.
 
-2. **Migração SQL** (uma só):
-   - Adiciona `hr_contratos.convenio_contrato_id`.
-   - RPC `hr_toggle_convenio_funcionario(_contrato_hr uuid, _titular_paciente_id uuid, _habilitar bool)` — cria/ativa/desativa o `contratos_assinatura` sombra, escolhendo o `cb_convenios` do tipo "funcionário" da mesma `clinica_id`. Idempotente.
-   - RPC `hr_convenio_add_dependente(_contrato_hr uuid, _paciente_id uuid, _parentesco text)` e `hr_convenio_remove_dependente(_dep_id uuid)` — delegam para a lógica de `incluir/excluir dependente` já existente, mas **sem cobrar taxa de inclusão** (flag `taxa=null`).
-   - GRANTs para `authenticated` + `service_role`.
+### Aba "Convênio"
+- Sumiu a busca "Paciente titular (funcionário)" e a caixa que pedia CPF.
+- A aba mostra direto:
+  - Estado atual (Ativo/Desativado).
+  - Se ainda não estiver ligado, um botão único **"Habilitar Convênio Funcionário"** (usa o paciente vinculado na aba 1).
+  - Se estiver ligado, o nome do titular e o botão "Desligar convênio".
+  - Seção de **Dependentes** (adicionar/remover pelo mesmo componente de busca de cliente já existente).
+- Se a aba 1 ainda não tiver paciente vinculado, mostro um aviso: "Vincule o funcionário a um cliente na aba Dados do contrato para habilitar o convênio".
 
-3. **UI** — nova aba em `src/routes/_authenticated/app.hr-contratos.$id.tsx`:
-   - Novo componente `FuncionarioConvenioTab.tsx` (~200 linhas): toggle, busca de titular (reusa `PatientSearchInput`), lista de dependentes (reusa padrão de `contratos-page`), badge de prontuário ao lado do nome.
-   - Chama as RPCs acima; mostra toasts amigáveis; bloqueia com mensagem clara se não existir CONVÊNIO FUNCIONARIO cadastrado na clínica.
+## Pendências / riscos
 
-4. **Nada muda na tela de Contratos** — os contratos-sombra ficam ocultos da listagem padrão (filtro `origem <> 'rh_funcionario'` no `contratos-page`), para não poluir a operação. Aparecem só via aba Convênio do funcionário.
+- **Contratos antigos** hoje têm só nome livre, sem `paciente_id`. Não vou apagar o nome existente; ele continua exibido até que alguém vincule a um paciente. O convênio só pode ser habilitado após o vínculo.
+- Não vou renomear o campo `funcionario_nome` no banco; ele passa a ser preenchido a partir do paciente selecionado (snapshot), mas mantido para não quebrar telas que já leem esse campo.
 
-## Fora do escopo
+## Detalhes técnicos
 
-- Migrar automaticamente funcionários que já têm contrato manual no Cartão Benefícios (o usuário pediu para manter).
-- Cobrança / mensalidade / taxa de inclusão para esse convênio.
-- Alteração das regras de preço já cadastradas em `cb_convenio_regras` do "CONVÊNIO FUNCIONARIO".
+1. **Migração SQL** — adicionar `paciente_id uuid` em `hr_contratos` referenciando `public.pacientes(id)` (sem `ON DELETE CASCADE`; usar `ON DELETE SET NULL`) e índice.
+2. **Aba 1 (`app.hr-contratos.$id.tsx`)**:
+   - Substituir `<Input value={form.funcionario_nome} …>` por `<PatientSearchInput clinicaIdsOverride={[form.clinica_id]} onRequestCreate=… />`.
+   - Ao selecionar, setar `paciente_id`, `funcionario_nome` (snapshot) e `cpf` (só-leitura preenchido).
+   - Botão "+ Cadastrar cliente" abre `QuickPatientDialog` já existente e, ao criar, seleciona o paciente retornado.
+   - No `salvar()`, incluir `paciente_id` no upsert e validar (obrigatório para novos).
+3. **Aba 2 (`ConvenioFuncionarioTab.tsx`)**:
+   - Nova prop `pacienteId: string | null` (passada pela tela pai).
+   - Remover `PatientSearchInput` do titular e o fallback por CPF.
+   - Chamar `hr_toggle_convenio_funcionario` usando `pacienteId`.
+   - Se `pacienteId` for `null`, mostrar aviso e desabilitar o botão de habilitar.
+4. Reutilizar `QuickPatientDialog` de `src/components/pacientes/quick-patient-dialog.tsx` (já usado em contratos).
+5. Sem mudanças em RPCs — as três (`hr_toggle_convenio_funcionario`, `hr_convenio_add_dependente`, `hr_convenio_remove_dependente`) já recebem paciente por ID.
 
-## Validação após implementar
+## Antes / Depois (resumo)
 
-- Habilitar convênio para 1 funcionário de teste em cada clínica, adicionar 1 dependente, criar 1 agendamento e conferir se aparece "Associado — titular / dependente" e se o preço da regra do CONVÊNIO FUNCIONARIO é aplicado.
-- Desligar o toggle e conferir que titular/dependentes deixam de receber o benefício em novos agendamentos.
+- **Antes:** nome do funcionário digitado à mão; na aba Convênio era preciso buscar o funcionário novamente na lista de pacientes.
+- **Depois:** nome vem da lista de clientes (com atalho para cadastrar); a aba Convênio já usa esse vínculo e cuida só de habilitar e gerir dependentes.

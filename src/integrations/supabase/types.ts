@@ -4083,6 +4083,7 @@ export type Database = {
           id: string
           numero: number
           observacoes: string | null
+          paciente_id: string | null
           regime: string
           salario: number
           setor_id: string | null
@@ -4108,6 +4109,7 @@ export type Database = {
           id?: string
           numero?: number
           observacoes?: string | null
+          paciente_id?: string | null
           regime?: string
           salario?: number
           setor_id?: string | null
@@ -4133,6 +4135,7 @@ export type Database = {
           id?: string
           numero?: number
           observacoes?: string | null
+          paciente_id?: string | null
           regime?: string
           salario?: number
           setor_id?: string | null
@@ -4163,6 +4166,13 @@ export type Database = {
             columns: ["convenio_contrato_id"]
             isOneToOne: false
             referencedRelation: "contratos_assinatura"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_contratos_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
             referencedColumns: ["id"]
           },
           {
