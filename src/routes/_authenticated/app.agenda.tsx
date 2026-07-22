@@ -1064,6 +1064,9 @@ function AgendaPage() {
   const [nfseMap, setNfseMap] = useState<
     Map<string, { id: string; status: string | null; url_pdf: string | null; numero: string | null }>
   >(new Map());
+  // Seleção múltipla para emissão agrupada de NFS-e (mesmo paciente / mesmo dia).
+  const [nfseSel, setNfseSel] = useState<Set<string>>(new Set());
+  const [emitindoNfseLote, setEmitindoNfseLote] = useState(false);
   const [nascMap, setNascMap] = useState<Map<string, string | null>>(new Map());
   const [convenioMap, setConvenioMap] = useState<Map<string, string>>(new Map());
   const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
