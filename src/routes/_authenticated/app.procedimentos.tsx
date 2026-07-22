@@ -1200,13 +1200,13 @@ function ProcedimentosPage() {
 
       {/* ============ DIALOG PROCEDIMENTO ============ */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[95vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="px-6 pt-6 pb-2">
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b shrink-0 bg-background">
             <DialogTitle>{editing ? "Editar serviço" : "Novo serviço"}</DialogTitle>
             <DialogDescription>Preencha valores para cada forma de pagamento.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={onSubmit} className="flex flex-col min-h-0 flex-1">
-            <div className="space-y-4 overflow-y-auto px-6 py-4 flex-1 min-h-0">
+          <form onSubmit={onSubmit} className="flex flex-col min-h-0 flex-1 overflow-hidden">
+            <div className="space-y-4 overflow-y-auto overflow-x-hidden px-6 py-4 flex-1 min-h-0">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1 sm:col-span-2">
                 <Label>Nome *</Label>
@@ -1473,7 +1473,7 @@ function ProcedimentosPage() {
               </p>
             </div>
             </div>
-            <DialogFooter className="bg-background border-t px-6 py-3">
+            <DialogFooter className="bg-background border-t px-6 py-3 shrink-0">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button type="submit" disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
             </DialogFooter>
