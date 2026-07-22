@@ -100,6 +100,9 @@ function DenteFaces({
   const c = (f: OdontoFace) => STATUS_COR[estados[`${dente}-${f}`] ?? estados[`${dente}-INTEIRO`] ?? "higido"];
   const s = (f: OdontoFace) => estados[`${dente}-${f}`] ?? estados[`${dente}-INTEIRO`] ?? "higido";
   const decidua = isDecidua(dente);
+  const higidoAll = (["V", "M", "D", "L", "O"] as OdontoFace[]).every(
+    (f) => (estados[`${dente}-${f}`] ?? estados[`${dente}-INTEIRO`] ?? "higido") === "higido",
+  );
   // Ausente: qualquer face (ou INTEIRO) marcada como "ausente" → X vermelho sobre o dente.
   const ausente = (["INTEIRO", "O", "V", "L", "M", "D"] as OdontoFace[]).some(
     (f) => estados[`${dente}-${f}`] === "ausente",
@@ -110,6 +113,7 @@ function DenteFaces({
   const clipId = `tooth-crown-${dente}`;
   const shape = toothShape(dente, superior);
   const { crownPath, rootPath, cx0, crownY, cw, ch, vbW, vbH } = shape;
+  const faceFill = (f: OdontoFace) => (higidoAll ? "transparent" : c(f));
   // Face oclusal (central) — margem proporcional à largura da coroa
   const insetX = Math.max(5, cw * 0.28);
   const insetY = Math.max(8, ch * 0.28);
@@ -128,50 +132,46 @@ function DenteFaces({
             <path d={crownPath} />
           </clipPath>
         </defs>
-        {/* Raiz(es) — traço fino como no diagrama de referência */}
-        <path d={rootPath} fill="#ffffff" stroke="#94a3b8" strokeWidth="1" strokeLinejoin="round" strokeLinecap="round" fillRule="evenodd" />
+        {/* Raiz(es) — somente contorno, fiel ao diagrama de referência */}
+        <path d={rootPath} fill="none" stroke="#64748b" strokeWidth="1" strokeLinejoin="round" strokeLinecap="round" fillRule="evenodd" />
         {/* Faces da coroa recortadas no formato de dente */}
         <g clipPath={`url(#${clipId})`}>
           {/* Vestibular (topo da coroa) */}
           <polygon
             points={`${cx0},${cy0} ${cx0 + cw},${cy0} ${cIn.x + cIn.w},${cIn.y} ${cIn.x},${cIn.y}`}
-            fill={c("V")}
+            fill={faceFill("V")}
             className="cursor-pointer hover:opacity-80"
             onClick={(e) => { e.stopPropagation(); onClickFace(dente, "V"); }}
           >
             <title>{`${dente} · Vestibular · ${STATUS_LABEL[s("V")]}`}</title>
           </polygon>
-          {/* Mesial (lateral direita da caixa — lado da linha média) */}
           <polygon
             points={`${cx0 + cw},${cy0} ${cx0 + cw},${cy0 + ch} ${cIn.x + cIn.w},${cIn.y + cIn.h} ${cIn.x + cIn.w},${cIn.y}`}
-            fill={c("M")}
+            fill={faceFill("M")}
             className="cursor-pointer hover:opacity-80"
             onClick={(e) => { e.stopPropagation(); onClickFace(dente, "M"); }}
           >
             <title>{`${dente} · Mesial · ${STATUS_LABEL[s("M")]}`}</title>
           </polygon>
-          {/* Lingual / Palatina (base) */}
           <polygon
             points={`${cx0},${cy0 + ch} ${cx0 + cw},${cy0 + ch} ${cIn.x + cIn.w},${cIn.y + cIn.h} ${cIn.x},${cIn.y + cIn.h}`}
-            fill={c("L")}
+            fill={faceFill("L")}
             className="cursor-pointer hover:opacity-80"
             onClick={(e) => { e.stopPropagation(); onClickFace(dente, "L"); }}
           >
             <title>{`${dente} · Lingual/Palatina · ${STATUS_LABEL[s("L")]}`}</title>
           </polygon>
-          {/* Distal (lateral esquerda) */}
           <polygon
             points={`${cx0},${cy0} ${cx0},${cy0 + ch} ${cIn.x},${cIn.y + cIn.h} ${cIn.x},${cIn.y}`}
-            fill={c("D")}
+            fill={faceFill("D")}
             className="cursor-pointer hover:opacity-80"
             onClick={(e) => { e.stopPropagation(); onClickFace(dente, "D"); }}
           >
             <title>{`${dente} · Distal · ${STATUS_LABEL[s("D")]}`}</title>
           </polygon>
-          {/* Oclusal / Incisal (centro) */}
           <rect
             x={cIn.x} y={cIn.y} width={cIn.w} height={cIn.h}
-            fill={c("O")}
+            fill={faceFill("O")}
             className="cursor-pointer hover:opacity-80"
             onClick={(e) => { e.stopPropagation(); onClickFace(dente, "O"); }}
           >
@@ -179,7 +179,7 @@ function DenteFaces({
           </rect>
         </g>
         {/* Contorno da coroa por cima — traço fino, cor referência */}
-        <path d={crownPath} fill="none" stroke="#94a3b8" strokeWidth="1" strokeLinejoin="round" strokeLinecap="round" />
+        <path d={crownPath} fill="none" stroke="#64748b" strokeWidth="1" strokeLinejoin="round" strokeLinecap="round" />
         {ausente && (
           <g pointerEvents="none">
             <line x1={cx0 - 2} y1={crownY - 2} x2={cx0 + cw + 2} y2={crownY + ch + 2} stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" />
