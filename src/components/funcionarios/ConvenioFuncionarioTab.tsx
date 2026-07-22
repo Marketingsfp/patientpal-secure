@@ -107,7 +107,7 @@ export function ConvenioFuncionarioTab({ hrContratoId, clinicaId, funcionarioNom
     setBusy(true);
     const { error } = await supabase.rpc("hr_toggle_convenio_funcionario", {
       _hr_contrato_id: hrContratoId,
-      _titular_paciente_id: contrato?.paciente_id ?? null,
+      _titular_paciente_id: contrato?.paciente_id ?? hrContratoId,
       _habilitar: false,
     });
     setBusy(false);
