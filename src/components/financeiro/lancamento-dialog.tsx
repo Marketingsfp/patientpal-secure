@@ -356,7 +356,12 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // H2 — Roda jaPago + agendamento em paralelo. Antes eram duas queries
     // seriais (jaPago aqui, agendamento mais abaixo) e ainda uma 3ª query
     // duplicada para procedimento dentro do bloco de splits.
-    type AgPrefetch = { medico_id: string | null; paciente_id: string | null; procedimento: string | null };
+    type AgPrefetch = {
+      medico_id: string | null;
+      paciente_id: string | null;
+      procedimento: string | null;
+      paciente_nome: string | null;
+    };
     let agPrefetch: AgPrefetch | null = null;
     if (agendamentoId) {
       const [jaPagoRes, agRes] = await Promise.all([
@@ -372,7 +377,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           : Promise.resolve({ data: null }),
         supabase
           .from("agendamentos")
-          .select("medico_id, paciente_id, procedimento")
+          .select("medico_id, paciente_id, procedimento, pacientes:paciente_id(nome)")
           .eq("id", agendamentoId)
           .maybeSingle(),
       ]);
@@ -382,7 +387,15 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         onOpenChange(false);
         return;
       }
-      agPrefetch = (agRes.data as AgPrefetch | null) ?? null;
+      const raw = agRes.data as any;
+      agPrefetch = raw
+        ? {
+            medico_id: raw.medico_id ?? null,
+            paciente_id: raw.paciente_id ?? null,
+            procedimento: raw.procedimento ?? null,
+            paciente_nome: raw.pacientes?.nome ?? null,
+          }
+        : null;
     }
     const isCredito = formaPagamento === "cartao_credito";
     if (isCredito && !bandeiraCartao) {
