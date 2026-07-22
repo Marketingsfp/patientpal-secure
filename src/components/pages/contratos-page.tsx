@@ -244,7 +244,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
   const [q, setQ] = useState("");
   const [view, setView] = useState<"list" | "new">("list");
   const [detail, setDetail] = useState<Contrato | null>(null);
-  const [detailInitialTab, setDetailInitialTab] = useState<"resumo" | "dados" | "contrato">("resumo");
+  const [detailInitialTab, setDetailInitialTab] = useState<"resumo" | "dados" | "contrato">("dados");
   const [sortPaciente, setSortPaciente] = useState<null | "asc" | "desc">(null);
   // Filtros
   const [filtroSituacao, setFiltroSituacao] = useState<"todas" | "em_dia" | "pendente">("todas");
