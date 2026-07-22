@@ -15,7 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users, Plus, Pencil, Search } from "lucide-react";
+import { Users, Plus, Pencil, Search, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { formatDatePura } from "@/lib/date-utils";
@@ -70,6 +71,8 @@ function ContratosPage() {
   });
   const [saving, setSaving] = useState(false);
   const [prefillUserId, setPrefillUserId] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<Contrato | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     if (!clinicaAtual) return;
@@ -256,14 +259,24 @@ function ContratosPage() {
                 <TableCell className="text-right">
                   {podeEscrever && (
                     <TooltipProvider delayDuration={200}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button size="icon" variant="ghost" onClick={() => openEdit(r)} aria-label="Editar funcionário">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Editar funcionário</TooltipContent>
-                      </Tooltip>
+                      <div className="flex items-center justify-end gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button size="icon" variant="ghost" onClick={() => openEdit(r)} aria-label="Editar funcionário">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Editar funcionário</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button size="icon" variant="ghost" onClick={() => setToDelete(r)} aria-label="Excluir funcionário" className="text-destructive hover:text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Excluir funcionário</TooltipContent>
+                        </Tooltip>
+                      </div>
                     </TooltipProvider>
                   )}
                 </TableCell>
@@ -393,6 +406,37 @@ function ContratosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!toDelete} onOpenChange={(o) => { if (!o) setToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir funcionário</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o contrato de <strong>{toDelete?.funcionario_nome}</strong>? Esta ação não pode ser desfeita. O login de acesso (se houver) não será removido.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!toDelete) return;
+                setDeleting(true);
+                const { error } = await supabase.from("hr_contratos").delete().eq("id", toDelete.id);
+                setDeleting(false);
+                if (error) { mostrarErro(error); return; }
+                toast.success("Funcionário excluído");
+                setToDelete(null);
+                void load();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Excluindo…" : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
