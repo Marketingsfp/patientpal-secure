@@ -7928,6 +7928,12 @@ function FragmentDayCell({
   procedimentoFallback?: string;
 }) {
   const ehLivre = ag && isSlotLivre(ag.paciente_nome);
+  // Slot travado por alguém digitando (≤ 3 min). O próprio usuário que travou
+  // fica com o diálogo aberto; para todos os demais o slot vira "em digitação".
+  const lockNome = ag && ehLivre && ag.edit_lock_by && ag.edit_lock_at
+    && Date.parse(ag.edit_lock_at) > Date.now() - 3 * 60 * 1000
+    ? (ag.edit_lock_by_nome || "outro usuário")
+    : null;
   return (
     <>
       <td
@@ -7945,6 +7951,13 @@ function FragmentDayCell({
           >
             +
           </button>
+        ) : lockNome ? (
+          <div
+            className="w-full rounded-md px-2 py-1.5 text-[11px] leading-tight truncate bg-amber-100 text-amber-800 border border-amber-300"
+            title={`Em digitação por ${lockNome}`}
+          >
+            ⏳ {lockNome}
+          </div>
         ) : (
           <button
             type="button"
