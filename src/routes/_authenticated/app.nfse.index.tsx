@@ -1,13 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2, AlertCircle, Eye } from "lucide-react";
+import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2, AlertCircle, Eye, Search, Ban } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { consultarNfse, reenviarNfse, extrairNfseDeImagem, baixarNfseArquivo, avancarRpsProximoNumero } from "@/lib/nfse.functions";
+import { consultarNfse, reenviarNfse, extrairNfseDeImagem, baixarNfseArquivo, avancarRpsProximoNumero, cancelarNfse } from "@/lib/nfse.functions";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -41,6 +42,7 @@ function NfsePage() {
   const reenviar = useServerFn(reenviarNfse);
   const extrair = useServerFn(extrairNfseDeImagem);
   const avancarRps = useServerFn(avancarRpsProximoNumero);
+  const cancelar = useServerFn(cancelarNfse);
   const [reenviando, setReenviando] = useState<string | null>(null);
   const [conferirOpen, setConferirOpen] = useState(false);
   const [conferirLoading, setConferirLoading] = useState(false);
@@ -49,6 +51,10 @@ function NfsePage() {
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
   const [filtroEmitente, setFiltroEmitente] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [busca, setBusca] = useState<string>("");
+  const [cancelarAlvo, setCancelarAlvo] = useState<Row | null>(null);
+  const [cancelarJustificativa, setCancelarJustificativa] = useState<string>("");
+  const [cancelando, setCancelando] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [erroDetalhe, setErroDetalhe] = useState<Row | null>(null);
@@ -129,8 +135,14 @@ function NfsePage() {
   const filtrados = useMemo(() => rows.filter((r) => {
     if (filtroEmitente !== "todos" && r.emitente_id !== filtroEmitente) return false;
     if (filtroStatus !== "todos" && r.status !== filtroStatus) return false;
+    const q = busca.trim().toLowerCase();
+    if (q) {
+      const alvo = `${r.numero ?? ""} ${r.tomador_nome ?? ""} ${r.emitente?.nome ?? ""} ${r.emitente?.cnpj ?? ""}`.toLowerCase();
+      const qDigits = q.replace(/\D/g, "");
+      if (!alvo.includes(q) && !(qDigits && alvo.replace(/\D/g, "").includes(qDigits))) return false;
+    }
     return true;
-  }), [rows, filtroEmitente, filtroStatus]);
+  }), [rows, filtroEmitente, filtroStatus, busca]);
 
   const onReenviar = async (id: string) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
@@ -269,6 +281,18 @@ function NfsePage() {
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-1 flex-1 min-w-[220px]">
+          <label className="text-xs text-muted-foreground">Buscar</label>
+          <div className="relative">
+            <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Nº da nota, tomador, emitente ou CNPJ"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+            />
+          </div>
+        </div>
 
         {totais.length > 0 && (
           <div className="ml-auto flex gap-2 text-xs">
@@ -365,6 +389,16 @@ function NfsePage() {
                       >
                         <Send className="h-3.5 w-3.5 mr-1" />
                         {reenviando === r.id ? "Reenviando…" : "Reenviar"}
+                      </Button>
+                    )}
+                    {r.status === "emitida" && podeEscrever && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title="Cancelar nota"
+                        onClick={() => { setCancelarAlvo(r); setCancelarJustificativa(""); }}
+                      >
+                        <Ban className="h-3.5 w-3.5 text-red-600" />
                       </Button>
                     )}
                   </div>
@@ -584,6 +618,65 @@ function NfsePage() {
               </a>
             )}
             <Button variant="ghost" onClick={() => setPdfVisualizando(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!cancelarAlvo} onOpenChange={(o) => { if (!o) { setCancelarAlvo(null); setCancelarJustificativa(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Ban className="h-4 w-4 text-red-600" /> Cancelar NFS-e</DialogTitle>
+          </DialogHeader>
+          {cancelarAlvo && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-md bg-muted p-3 space-y-1">
+                <div><span className="text-muted-foreground">Número:</span> <b>{cancelarAlvo.numero ?? "—"}</b></div>
+                <div><span className="text-muted-foreground">Tomador:</span> {cancelarAlvo.tomador_nome ?? "—"}</div>
+                <div><span className="text-muted-foreground">Valor:</span> {Number(cancelarAlvo.valor_servicos).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Justificativa (15 a 255 caracteres)</label>
+                <Textarea
+                  rows={4}
+                  value={cancelarJustificativa}
+                  onChange={(e) => setCancelarJustificativa(e.target.value)}
+                  placeholder="Ex.: Nota emitida em duplicidade para o mesmo atendimento."
+                  maxLength={255}
+                />
+                <div className="text-xs text-muted-foreground text-right">{cancelarJustificativa.length}/255</div>
+              </div>
+              <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                O cancelamento é enviado à Prefeitura/Ambiente Nacional e não pode ser desfeito.
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCancelarAlvo(null)} disabled={cancelando}>Voltar</Button>
+            <Button
+              variant="destructive"
+              disabled={cancelando || cancelarJustificativa.trim().length < 15}
+              onClick={async () => {
+                if (!cancelarAlvo) return;
+                setCancelando(true);
+                try {
+                  const r = await cancelar({ data: { id: cancelarAlvo.id, justificativa: cancelarJustificativa.trim() } });
+                  if (r.ok) {
+                    toast.success("Nota cancelada.");
+                    setCancelarAlvo(null);
+                    setCancelarJustificativa("");
+                    await load();
+                  } else {
+                    toast.error(r.error ?? "Falha ao cancelar.");
+                  }
+                } catch (e) {
+                  toast.error((e as Error).message);
+                } finally {
+                  setCancelando(false);
+                }
+              }}
+            >
+              {cancelando ? <><Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> Cancelando…</> : <>Confirmar cancelamento</>}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
