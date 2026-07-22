@@ -4852,7 +4852,7 @@ function AgendaPage() {
           >
             <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
           </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(o) => { if (!o) fecharDialogoAgenda(); else setOpen(true); }}>
             {podeEscrever && (
               <DialogTrigger asChild>
                 <Button
