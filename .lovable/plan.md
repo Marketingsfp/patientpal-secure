@@ -1,59 +1,53 @@
-# Unificar telas de Médicos
 
-Hoje existem duas entradas em **Cadastros → Médicos** apontando para páginas diferentes que editam o **mesmo registro** via `MedicoFormDialog`:
+## Escopo confirmado (resposta anterior)
 
-- `/app/equipe` — lista com status ativo/inativo, especialidades, telefone e detecção de "cadastro pendente" (perfil médico sem CRM).
-- `/app/medicos` — lista simples com coluna **Repasse** (via RPC `medicos_repasse_lista`, restrita a gestor) e botão **Exportar Excel**.
+- Clínica-alvo: **todas as 3 clínicas** (cada uma já tem seu próprio "CONVÊNIO FUNCIONÁRIO", isolado por `clinica_id`).
+- Contratos antigos manuais: **mantidos como estão**, sem migração automática.
+- Cobrança: **gratuito** (sem mensalidade, sem taxa de inclusão).
+- Dependente: exige **grau de parentesco** e o paciente já precisa existir no cadastro de clientes.
 
-O financeiro **não depende de nenhuma das duas telas** — ele lê os campos de repasse direto da tabela `medicos` em `src/lib/repasse-calc.ts`. Portanto a unificação é puramente de UX.
+## O que muda para o usuário
 
-## O que será feito
+No menu **Recursos Humanos → Funcionário (editar)**, além de "Dados do contrato" e "Acesso ao sistema", passa a existir uma terceira aba **"Convênio"**:
 
-**Escopo:** aplicar em **todas as clínicas** (dedup técnica de tela, sem mudança de regra de negócio). Confirmar antes de executar.
+1. Toggle **"Habilitar Convênio Funcionário"**.
+   - Ao ligar: exige selecionar o **paciente titular** (o próprio funcionário no cadastro de clientes — busca por nome/CPF).
+   - Se o funcionário ainda não estiver como paciente, mostra atalho para cadastrá-lo antes.
+2. Lista de **Dependentes** (nome, parentesco, botão remover). Botão "Adicionar dependente" abre busca de paciente + campo parentesco obrigatório.
+3. Ao desligar o toggle: pergunta confirmação e encerra o vínculo (titular + dependentes ficam inativos).
 
-### 1. Consolidar tudo em `/app/equipe`
+Regra de negócio: benefícios do "CONVÊNIO FUNCIONARIO" (regras já cadastradas em `cb_convenio_regras`) valem tanto para o titular quanto para os dependentes — o motor de preços da Agenda já resolve isso hoje via `contratos_assinatura` + `contrato_dependentes`, então reusamos essa mesma estrutura.
 
-Na tabela de `src/routes/_authenticated/app.equipe.index.tsx`:
+## Como será construído (parte técnica)
 
-- Adicionar coluna **Repasse** (à direita de Especialidade), populada pela mesma RPC `medicos_repasse_lista` usada hoje em `/app/medicos`. A RPC já é restrita — quem não for gestor simplesmente vê "—" (comportamento atual da outra tela).
-- Adicionar botão **Exportar Excel** no topo (ao lado de "Novo médico"), reaproveitando `exportToExcel` de `src/lib/export-csv.ts` com as colunas: Nome, CRM, Especialidades, Telefone, Repasse, Status.
-- Linhas "cadastro pendente" continuam aparecendo com "—" nas colunas de CRM/Repasse (já é o padrão).
+1. **Reuso de tabelas existentes** — sem schema novo pesado:
+   - Criar/atualizar um `contratos_assinatura` "sombra" por funcionário habilitado:
+     - `paciente_id` = paciente titular escolhido,
+     - `convenio_id` = o CONVÊNIO FUNCIONARIO da `clinica_id` do funcionário,
+     - `valor_mensalidade = 0`, `carencia_dias = 0`, `carencia_isenta = true`, `origem = 'rh_funcionario'`, `status = 'ativo'`,
+     - **sem geração de mensalidades** (o gerador só roda quando `valor_mensalidade > 0` — a lógica atual já respeita isso; validar em `functions.sql`).
+   - Vínculo com o funcionário: coluna nova `hr_contratos.convenio_contrato_id uuid null references contratos_assinatura(id) on delete set null` (migração enxuta, só isso).
+   - Dependentes reaproveitam `contrato_dependentes` (o motor da Agenda já enxerga como "Associado — dependente").
 
-### 2. Aposentar `/app/medicos`
+2. **Migração SQL** (uma só):
+   - Adiciona `hr_contratos.convenio_contrato_id`.
+   - RPC `hr_toggle_convenio_funcionario(_contrato_hr uuid, _titular_paciente_id uuid, _habilitar bool)` — cria/ativa/desativa o `contratos_assinatura` sombra, escolhendo o `cb_convenios` do tipo "funcionário" da mesma `clinica_id`. Idempotente.
+   - RPC `hr_convenio_add_dependente(_contrato_hr uuid, _paciente_id uuid, _parentesco text)` e `hr_convenio_remove_dependente(_dep_id uuid)` — delegam para a lógica de `incluir/excluir dependente` já existente, mas **sem cobrar taxa de inclusão** (flag `taxa=null`).
+   - GRANTs para `authenticated` + `service_role`.
 
-- Trocar o corpo de `src/routes/_authenticated/app.medicos.tsx` por um `<Navigate to="/app/equipe" replace />` para não quebrar:
-  - links antigos salvos por usuários;
-  - `useUniversalSearch` (`/app/medicos?abrir=<id>` — trocar por `/app/equipe?abrir=<id>` e tratar o param na equipe para abrir o dialog);
-  - o atalho de "rateio/repasse" no `app-shell` (linha 337) — repontar para `/app/equipe`.
-- Manter o arquivo como redirect (não deletar a rota) por 1 ciclo, para não invalidar bookmarks.
+3. **UI** — nova aba em `src/routes/_authenticated/app.hr-contratos.$id.tsx`:
+   - Novo componente `FuncionarioConvenioTab.tsx` (~200 linhas): toggle, busca de titular (reusa `PatientSearchInput`), lista de dependentes (reusa padrão de `contratos-page`), badge de prontuário ao lado do nome.
+   - Chama as RPCs acima; mostra toasts amigáveis; bloqueia com mensagem clara se não existir CONVÊNIO FUNCIONARIO cadastrado na clínica.
 
-### 3. Atualizar navegação e permissões
+4. **Nada muda na tela de Contratos** — os contratos-sombra ficam ocultos da listagem padrão (filtro `origem <> 'rh_funcionario'` no `contratos-page`), para não poluir a operação. Aparecem só via aba Convênio do funcionário.
 
-- `src/components/app-shell.tsx`:
-  - Remover o item duplicado `{ to: "/app/medicos", label: "Médicos" }` do grupo Cadastros (linha 176).
-  - Repointar o atalho `"/app/medicos"` do bloco `/rateio|repasse/` (linha 337) para `/app/equipe`.
-- `src/components/list-shell/command-palette.tsx`: remover a entrada `mk("Médicos", "/app/medicos")` (linha 157), já existe a de `/app/equipe`.
-- `src/lib/permissoes-rotas.ts`: manter o mapeamento `"/app/medicos" → "medicos"` (para o redirect não perder permissão) e garantir que `/app/equipe` também mapeia para `"medicos"` (verificar; caso não, adicionar).
-- `src/hooks/use-universal-search.ts`: trocar `/app/medicos?abrir=…` por `/app/equipe?abrir=…`.
+## Fora do escopo
 
-### 4. Suporte a `?abrir=<id>` em `/app/equipe`
+- Migrar automaticamente funcionários que já têm contrato manual no Cartão Benefícios (o usuário pediu para manter).
+- Cobrança / mensalidade / taxa de inclusão para esse convênio.
+- Alteração das regras de preço já cadastradas em `cb_convenio_regras` do "CONVÊNIO FUNCIONARIO".
 
-Adicionar `validateSearch` para aceitar `abrir` (id do médico) e, no primeiro render, abrir o `MedicoFormDialog` correspondente — replicando o comportamento antigo de `/app/medicos?abrir=…` que a busca universal usa.
+## Validação após implementar
 
-## Fora de escopo
-
-- Nenhuma mudança em `MedicoFormDialog`, `repasse-calc.ts`, RPC `medicos_repasse_lista`, ou em qualquer cálculo/lançamento do financeiro.
-- Nenhuma mudança em `/app/medico/$medicoId` (detalhe/edição via página cheia — segue existindo e continua acessível pelo botão de editar).
-
-## Validação
-
-- Abrir `/app/equipe` como admin: coluna Repasse preenchida + botão Exportar Excel gera arquivo com as 6 colunas.
-- Abrir `/app/equipe` como perfil não-gestor: Repasse aparece "—" (RPC retorna vazio).
-- Acessar `/app/medicos`: redireciona para `/app/equipe`.
-- Buscar um médico na busca universal e clicar no resultado: abre o dialog dentro de `/app/equipe`.
-- Menu lateral em Cadastros: apenas **uma** entrada "Médicos".
-
-## Perguntas antes de executar
-
-1. Aplicar em **todas as clínicas** ou só em uma específica?
-2. Manter URL canônica em **`/app/equipe`** (com `/app/medicos` como redirect), ou prefere que a URL canônica seja `/app/medicos`?
+- Habilitar convênio para 1 funcionário de teste em cada clínica, adicionar 1 dependente, criar 1 agendamento e conferir se aparece "Associado — titular / dependente" e se o preço da regra do CONVÊNIO FUNCIONARIO é aplicado.
+- Desligar o toggle e conferir que titular/dependentes deixam de receber o benefício em novos agendamentos.
