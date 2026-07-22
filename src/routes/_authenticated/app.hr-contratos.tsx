@@ -216,7 +216,6 @@ function ContratosPage() {
           <h1 className="text-xl font-bold">Funcionários</h1>
           <p className="text-sm text-muted-foreground">Contratos de trabalho da clínica.</p>
         </div>
-        <Button asChild variant="outline"><a href="/app/equipe"><Users className="h-4 w-4 mr-1" /> Gerenciar em Equipe</a></Button>
       </div>
 
       <Card className="p-3">
