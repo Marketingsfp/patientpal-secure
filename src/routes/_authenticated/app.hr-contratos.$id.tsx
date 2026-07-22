@@ -179,14 +179,17 @@ function EditarFuncionarioPage() {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!form.clinica_id) { toast.error("Selecione a clínica"); return; }
     if (!form.funcionario_nome.trim()) { toast.error("Informe o nome"); return; }
-    if (form.criar_login && isNovo) {
+    // "Criar login" pode ser marcado tanto no cadastro novo quanto ao editar
+    // um contrato existente que ainda não tem login vinculado.
+    const criandoLogin = form.criar_login && (isNovo || !linkedUserId);
+    if (criandoLogin) {
       if (!form.email.trim()) { toast.error("Informe o e-mail do login"); return; }
       if (form.senha.length < 6) { toast.error("Senha deve ter pelo menos 6 caracteres"); return; }
     }
     setSaving(true);
 
     let userId: string | null = null;
-    if (isNovo && form.criar_login) {
+    if (criandoLogin) {
       try {
         const res = await cadastrarUsuarioFn({
           data: {
