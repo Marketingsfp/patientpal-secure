@@ -1,53 +1,49 @@
-## Objetivo
+## NFS-e agrupada por paciente (mesmo dia) — Agenda
 
-1. Trocar o checkbox **"Regerar 12 parcelas futuras com este valor e dia"** por um **botão** que já executa a regeneração ao clicar (sem depender de "Salvar valor e vencimento").
-2. Corrigir a regra de geração: a **1ª parcela** sempre deve cair no **mês da Data início** (com o dia de vencimento configurado), e a partir daí seguem as 11 seguintes, mês a mês.
-   - Exemplo: início 12/01/2026, vencimento dia 15 → parcelas em 15/01, 15/02, …, 15/12/2026.
+Aplicar nas **3 clínicas** (SFP, Menino Jesus, São Francisco). Escopo restrito ao **mesmo dia** já visualizado na Agenda.
 
-## Escopo (Regra 1.10 — clínica-alvo)
+### O que muda para o usuário
 
-Alteração puramente técnica/UX no fluxo do cartão de benefícios. Aplicar **global (todas as 3 clínicas)**, já que a lógica de mensalidade deve ser consistente. Se você quiser restringir a uma clínica só, me avisa antes que eu limito por `clinica_id`.
+Na Agenda (visões Card, Tabela e Grade por Médico) aparece uma **checkbox** ao lado de cada agendamento **pago e sem NFS-e emitida**.
 
-## Impacto (4 eixos)
+Ao marcar 2+ linhas do **mesmo paciente**, surge uma **barra flutuante**:
 
-- 💰 **Financeiro**: elimina risco de perder um mês de mensalidade quando o contrato inicia no meio do mês (hoje o sistema pula para o mês seguinte na regeração).
-- ⏱️ **Operacional**: 1 clique só (botão) em vez de marcar checkbox + salvar. Menos etapa, menos erro.
-- 😊 **Experiência**: mensalidade cai no mês que o cliente contratou — expectativa natural do paciente.
-- 🛡️ **Segurança**: sem mudança em RLS. Mantém a proteção atual de não apagar parcelas pagas (só `pendente` e futuras).
+> "3 serviços de FRANCINETE · Total R$ 240,00 — [Emitir NFS-e agrupada]"
 
-## O que muda (frontend)
+Ao clicar:
+1. Valida: mesmo paciente ✓, mesmo dia (a agenda já é do dia) ✓, todos pagos ✓, todos sem NFS-e ✓, todos mapeiam para o **mesmo emitente** (todos consulta OU todos exame; se misturar, bloqueia com toast explicativo — regra atual do backend força CNPJ diferente por tipo).
+2. Abre o **tomador** (mesmo diálogo `usePickTomador`) uma única vez, com o valor **total somado**.
+3. Abre a **descrição** já pré-preenchida: uma linha por serviço no formato
+   ```
+   Consulta Dermatologia — Paciente: X — Data: 22/07/2026
+   Retorno Cardiologia — Paciente: X — Data: 22/07/2026
+   ```
+4. Chama `emitirNfse` **uma única vez** com `valorServicos = soma` e `descricaoServicos = concatenação`.
+5. Após retorno OK: vincula o `nfse_id` a **todos** os `agendamentos` selecionados via `fin_notas_pacientes` / `nfse.agendamento_id` (registro múltiplo) e atualiza o `nfseMap` local — todas as linhas mostram o ícone de nota emitida.
 
-Arquivo: `src/components/pages/contratos-page.tsx`
+### Arquivos afetados
 
-1. **UI** (aba "Dados", bloco de valor/vencimento, ~linhas 4500-4517):
-   - Remover o `<label><input type="checkbox">…</label>` "Regerar 12 parcelas futuras".
-   - Manter o botão **"Salvar valor e vencimento"** (só salva valor + dia, sem regerar).
-   - Adicionar um novo botão **"Regerar 12 parcelas"** ao lado, com `variant="outline"`, que:
-     - Pede confirmação: *"Isso apaga as parcelas pendentes futuras e recria 12 parcelas a partir do mês da data de início. Continuar?"*
-     - Executa a lógica de regeração diretamente (usa valor mensal e dia de vencimento já salvos no contrato).
-   - Remover estado `regerarFuturas` e `setRegerarFuturas` (não é mais usado).
+- `src/routes/_authenticated/app.agenda.tsx` (único arquivo de UI):
+  - Novo estado `selecionadosNfse: Set<string>`.
+  - Checkbox nas 3 visões (Card / Tabela / Grade), condicionada a `pago && !nfseEmitida`.
+  - Barra flutuante fixa no rodapé quando `selecionadosNfse.size >= 1`.
+  - Nova função `emitirNfseAgrupada()` que reaproveita `pickTomadorNfse` + `pedirDescricaoNfse` + `emitirNfseFn`.
+  - Detecção "mesmo emitente" reusando o regex de exame/consulta que já existe no backend.
+- `src/lib/nfse.functions.ts`: adicionar campo opcional `agendamentoIds?: string[]` no `inputValidator` de `emitirNfse` e, após sucesso, gravar 1 linha extra em `nfse_agendamentos` (ou preencher `agendamento_id` na primeira e criar vínculos secundários — vou reaproveitar a coluna já existente e, para os demais, atualizar `fin_atendimentos.nfse_id`).
+- **Sem migração de schema nova**: os vínculos usam colunas que já existem (`nfse.agendamento_id` + `fin_atendimentos` já ligado ao agendamento).
 
-2. **Lógica de geração** (função `salvarDadosFinanceiros`, ~linhas 2601-2652): extrair para uma função nova `regerarParcelasFuturas()` chamada pelo novo botão, com esta regra de datas:
-   - Base = **mês da `data_inicio` do contrato** (não mais `new Date()`).
-   - Para `i = 0..11`: `ref = data_inicio_mes + i meses`; `dia = min(dia_vencimento, últimoDiaDoMês(ref))`.
-   - Ao contar quantas parcelas ainda faltam gerar, continuar respeitando parcelas já existentes (pagas ou pendentes antigas) — regenera só o que falta até completar 12.
-   - Mantém `numero_parcela > 0` (não toca taxa de adesão com número negativo).
-   - Continua apagando somente parcelas com `status = 'pendente'` e `vencimento > hoje`.
+### Não muda
 
-3. `salvarDadosFinanceiros` passa a fazer **apenas** o update de `valor_mensal` + `dia_vencimento` (sem bloco de regeração). Toast: "Dados salvos."
+- Fluxo "Pagar + NFS-e" individual continua igual.
+- Botão de NFS-e por linha continua igual.
+- Financeiro › NFS-e / Notas: sem alteração.
+- Nada muda no comportamento das clínicas — a feature nasce ativa nas 3.
 
-## Fora do escopo
+### Validação após implementar
 
-- Não muda RPCs de criação inicial do contrato nem contratos já existentes retroativamente. A regeração continua sendo ação manual do admin/gestor no botão. Se quiser que a regra "1ª parcela no mês da data início" valha também na criação inicial (novo contrato) e em renovações, me confirma e eu abro uma segunda frente tocando as funções em `supabase/migrations/*` (`_criar_contrato`, renovação, troca de convênio).
-- Não altera visual da aba Mensalidades nem a lógica de "Regerar com N parcelas pagas" do dialog retroativo.
+- Testar em 1 paciente com 2 consultas do mesmo dia (SFP, ambiente atual).
+- Confirmar que o `nfseMap` marca ambos como emitidos após 1 clique.
+- Confirmar bloqueio ao misturar consulta + exame (toast claro).
+- Confirmar que agendamento sem pagamento não aparece selecionável.
 
-## Validação
-
-- Testar com o contrato da imagem (ANDRE SOUZA FAGUNDES, data início 13/06/2026, dia 10): após clicar em "Regerar 12 parcelas", esperar parcelas em 10/06/2026, 10/07/2026, …, 10/05/2027.
-- Testar com contrato que tenha parcelas pagas: elas devem permanecer intactas; só as pendentes futuras são recriadas.
-- Testar com dia 31 caindo em Fevereiro: deve ajustar para 28/29.
-
-## Pendências para você confirmar
-
-1. Escopo de clínicas: aplicar global nas 3? (default sim)
-2. A regra "1ª parcela no mês da data início" deve valer **também na criação inicial do contrato e nas renovações**, ou por ora só nesse botão de regeração manual?
+Posso prosseguir?

@@ -1064,6 +1064,10 @@ function AgendaPage() {
   const [nfseMap, setNfseMap] = useState<
     Map<string, { id: string; status: string | null; url_pdf: string | null; numero: string | null }>
   >(new Map());
+  // Seleção múltipla para emissão agrupada de NFS-e (mesmo paciente / mesmo dia).
+  const [nfseSel, setNfseSel] = useState<Set<string>>(new Set());
+  const [emitindoNfseLote, setEmitindoNfseLote] = useState(false);
+  useEffect(() => { setNfseSel(new Set()); }, [dataRef]);
   const [nascMap, setNascMap] = useState<Map<string, string | null>>(new Map());
   const [convenioMap, setConvenioMap] = useState<Map<string, string>>(new Map());
   const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
@@ -1884,6 +1888,27 @@ function AgendaPage() {
             if (!r.agendamento_id) return;
             if (!nMap.has(r.agendamento_id)) {
               nMap.set(r.agendamento_id, { id: r.id, status: r.status, url_pdf: r.url_pdf, numero: r.numero });
+            }
+          });
+        }
+        // Complementa com vínculos N:1 (NFS-e agrupada). Uma mesma nota
+        // pode estar vinculada a vários agendamentos do mesmo paciente.
+        for (let i = 0; i < idsParaPagamento.length; i += CHUNK) {
+          const slice = idsParaPagamento.slice(i, i + CHUNK);
+          const { data: links } = await supabase
+            .from("nfse_agendamentos")
+            .select("agendamento_id, nfse:nfse_id(id, status, url_pdf, numero, created_at)")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .in("agendamento_id", slice);
+          ((links ?? []) as Array<{
+            agendamento_id: string;
+            nfse: { id: string; status: string | null; url_pdf: string | null; numero: string | null; created_at: string } | null;
+          }>).forEach((r) => {
+            if (!r.nfse) return;
+            if (!nMap.has(r.agendamento_id)) {
+              nMap.set(r.agendamento_id, {
+                id: r.nfse.id, status: r.nfse.status, url_pdf: r.nfse.url_pdf, numero: r.nfse.numero,
+              });
             }
           });
         }
@@ -4474,6 +4499,12 @@ function AgendaPage() {
   const verOuEmitirNota = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     const ex = nfseMap.get(a.id);
+    // Se o usuário já selecionou múltiplos para agrupamento, o clique no botão
+    // não deve emitir individual — direciona para a barra de emissão em lote.
+    if (nfseSel.size > 1 && nfseSel.has(a.id)) {
+      toast.info("Use o botão \"Emitir NFS-e agrupada\" na barra inferior para os itens selecionados.");
+      return;
+    }
     if (ex) {
       if (ex.url_pdf) {
         window.open(ex.url_pdf, "_blank", "noopener,noreferrer");
@@ -4570,6 +4601,110 @@ function AgendaPage() {
       }
     } catch (err) {
       mostrarErro(err, "falha ao emitir NFS-e");
+    }
+  };
+
+  /**
+   * Emite UMA única NFS-e agrupando vários agendamentos do MESMO paciente no
+   * MESMO dia. Regras:
+   *  - todos precisam estar pagos e sem NFS-e emitida;
+   *  - todos precisam ter o mesmo paciente;
+   *  - valores somados; descrição = "Proc1 + Proc2 + ...";
+   *  - a NFS-e resultante fica vinculada a todos os agendamentos via
+   *    `nfse_agendamentos`.
+   */
+  const emitirNfseAgrupada = async () => {
+    if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    const ids = Array.from(nfseSel);
+    if (ids.length < 2) { toast.error("Selecione ao menos 2 agendamentos."); return; }
+    const selAgs = items.filter((a) => ids.includes(a.id));
+    if (selAgs.length !== ids.length) { toast.error("Alguns agendamentos não foram encontrados na lista."); return; }
+    // Todos precisam ser do mesmo paciente
+    const pacIds = new Set(selAgs.map((a) => a.paciente_id).filter(Boolean) as string[]);
+    if (pacIds.size !== 1) { toast.error("Selecione serviços de um único paciente."); return; }
+    const pacienteId = Array.from(pacIds)[0];
+    // Todos precisam estar pagos e sem NFS-e emitida
+    for (const a of selAgs) {
+      if (!pagosSet.has(a.id)) { toast.error(`Agendamento das ${fmtHora(a.inicio)} ainda não foi pago.`); return; }
+      if (nfseMap.has(a.id)) { toast.error(`Agendamento das ${fmtHora(a.inicio)} já possui NFS-e.`); return; }
+    }
+    try {
+      setEmitindoNfseLote(true);
+      const emitenteIdEscolhido = await pickEmitenteNfse();
+      if (!emitenteIdEscolhido) { toast.error("Selecione a empresa emitente para emitir a NFS-e."); return; }
+      const { data: pac } = await supabase
+        .from("pacientes")
+        .select("id, nome, cpf, email, cep, logradouro, numero, bairro, cidade, estado")
+        .eq("id", pacienteId)
+        .maybeSingle();
+      if (!pac) { toast.error("Paciente não encontrado para emissão da NFS-e."); return; }
+      const valorTotal = selAgs.reduce((s, a) => s + Number(pagoInfoMap.get(a.id)?.valor ?? 0), 0);
+      const tomador = await pickTomadorNfse({
+        paciente: {
+          nome: pac.nome,
+          cpfCnpj: pac.cpf ?? undefined,
+          email: pac.email ?? undefined,
+          cep: pac.cep ?? undefined,
+          logradouro: pac.logradouro ?? undefined,
+          numero: pac.numero ?? undefined,
+          bairro: pac.bairro ?? undefined,
+          municipio: pac.cidade ?? undefined,
+          uf: pac.estado ?? undefined,
+        },
+        valorBase: valorTotal,
+      });
+      if (!tomador) { toast.error("Emissão cancelada."); return; }
+      const parcial = aplicarValorParcial(valorTotal, tomador);
+      const listaProc = selAgs
+        .map((a) => (a.procedimento ?? "").trim())
+        .filter(Boolean)
+        .join(" + ") || "Serviços prestados";
+      const descBase = listaProc;
+      const descComDep = tomador.dependenteAtendido ? `${descBase} — Atendido: ${tomador.dependenteAtendido}` : descBase;
+      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
+      const descFinal = await pedirDescricaoNfse(descSugerida);
+      if (!descFinal) { toast.error("Emissão cancelada."); return; }
+      const res = await emitirNfseFn({
+        data: {
+          emitenteId: emitenteIdEscolhido,
+          pacienteId: pac.id,
+          agendamentoId: selAgs[0].id,
+          agendamentoIds: selAgs.map((a) => a.id),
+          valorServicos: parcial.valor,
+          descricaoServicos: descFinal,
+          tomador,
+        },
+      });
+      const nfseId = (res as { id?: string })?.id;
+      if (nfseId) {
+        toast.success("NFS-e agrupada enviada. Consultando status...");
+        await new Promise((r) => setTimeout(r, 4000));
+        await consultarNfseFn({ data: { id: nfseId } });
+        const { data: nv } = await supabase
+          .from("nfse")
+          .select("id, status, url_pdf, numero")
+          .eq("id", nfseId)
+          .maybeSingle();
+        if (nv) {
+          setNfseMap((prev) => {
+            const n = new Map(prev);
+            for (const a of selAgs) {
+              n.set(a.id, { id: nv.id, status: nv.status, url_pdf: nv.url_pdf, numero: nv.numero });
+            }
+            return n;
+          });
+          if (nv.url_pdf) window.open(nv.url_pdf, "_blank", "noopener,noreferrer");
+        }
+        toast.success(`NFS-e emitida para ${selAgs.length} atendimentos.`);
+      } else {
+        toast.warning("NFS-e enviada — acompanhe o status em Financeiro › NFS-e.");
+      }
+      setNfseSel(new Set());
+    } catch (err) {
+      mostrarErro(err, "falha ao emitir NFS-e agrupada");
+    } finally {
+      setEmitindoNfseLote(false);
     }
   };
 
@@ -4718,6 +4853,39 @@ function AgendaPage() {
       {emitenteNfseDialog}
       {tomadorNfseDialog}
       {descricaoNfseDialog}
+      {nfseSel.size > 0 && (() => {
+        const selAgs = items.filter((a) => nfseSel.has(a.id));
+        const pacIds = new Set(selAgs.map((a) => a.paciente_id).filter(Boolean));
+        const mesmoPaciente = pacIds.size === 1;
+        const total = selAgs.reduce((s, a) => s + Number(pagoInfoMap.get(a.id)?.valor ?? 0), 0);
+        const pacNome = selAgs[0]?.paciente_nome ?? "";
+        return (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-white shadow-lg border-2 border-sky-400 rounded-lg px-4 py-3 flex items-center gap-4 max-w-[95vw]">
+            <div className="text-sm">
+              <div className="font-semibold text-sky-700">
+                {nfseSel.size} atendimento{nfseSel.size > 1 ? "s" : ""} selecionado{nfseSel.size > 1 ? "s" : ""}
+              </div>
+              <div className="text-xs text-slate-600">
+                {mesmoPaciente ? (
+                  <>Paciente: <b>{pacNome}</b> • Total: <b>{total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</b></>
+                ) : (
+                  <span className="text-rose-600">⚠ Selecione serviços de um único paciente</span>
+                )}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={emitirNfseAgrupada}
+              disabled={emitindoNfseLote || !mesmoPaciente || nfseSel.size < 2}
+            >
+              {emitindoNfseLote ? "Emitindo…" : "Emitir NFS-e agrupada"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setNfseSel(new Set())} disabled={emitindoNfseLote}>
+              Cancelar
+            </Button>
+          </div>
+        );
+      })()}
       {reagendandoAg && (
         <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
           <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -7318,18 +7486,35 @@ function AgendaPage() {
                               const podeEmitir = pagosSet.has(a.id);
                               if (!emitida && !podeEmitir) return null;
                               return (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  title={emitida ? `NFS-e ${nf?.numero ?? ""}` : "Emitir NFS-e"}
-                                  onClick={() => verOuEmitirNota(a)}
-                                  className={`h-7 w-7 rounded-md border-2 ${emitida
-                                    ? "border-sky-400 bg-sky-50 text-sky-600 hover:bg-sky-100"
-                                    : "border-sky-200 text-sky-400 hover:border-sky-400 hover:bg-sky-50"
-                                    }`}
-                                >
-                                  <FileText className="h-3.5 w-3.5" strokeWidth={emitida ? 3 : 2.5} />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  {!emitida && podeEmitir && a.paciente_id && (
+                                    <input
+                                      type="checkbox"
+                                      title="Selecionar para NFS-e agrupada"
+                                      className="h-3.5 w-3.5 cursor-pointer accent-sky-500"
+                                      checked={nfseSel.has(a.id)}
+                                      onChange={(e) => {
+                                        setNfseSel((prev) => {
+                                          const n = new Set(prev);
+                                          if (e.target.checked) n.add(a.id); else n.delete(a.id);
+                                          return n;
+                                        });
+                                      }}
+                                    />
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    title={emitida ? `NFS-e ${nf?.numero ?? ""}` : "Emitir NFS-e"}
+                                    onClick={() => verOuEmitirNota(a)}
+                                    className={`h-7 w-7 rounded-md border-2 ${emitida
+                                      ? "border-sky-400 bg-sky-50 text-sky-600 hover:bg-sky-100"
+                                      : "border-sky-200 text-sky-400 hover:border-sky-400 hover:bg-sky-50"
+                                      }`}
+                                  >
+                                    <FileText className="h-3.5 w-3.5" strokeWidth={emitida ? 3 : 2.5} />
+                                  </Button>
+                                </div>
                               );
                             })()}
 

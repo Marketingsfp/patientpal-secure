@@ -89,6 +89,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
       pacienteId: z.string().uuid().optional(),
       pagamentoId: z.string().uuid().optional(),
       agendamentoId: z.string().uuid().optional(),
+      agendamentoIds: z.array(z.string().uuid()).optional(),
       valorServicos: z.number().positive(),
       descricaoServicos: z.string().min(1).max(2000),
       tomador: z.object({
@@ -422,6 +423,25 @@ export const emitirNfse = createServerFn({ method: "POST" })
         payload_resposta: body,
       })
       .eq("id", nota.id);
+
+    // Vincula todos os agendamentos selecionados (agrupamento no mesmo dia).
+    // Inclui o agendamento principal para que a consulta por nfse_agendamentos
+    // retorne todos os IDs juntos.
+    const idsVinculo = Array.from(new Set([
+      ...(data.agendamentoId ? [data.agendamentoId] : []),
+      ...((data.agendamentoIds ?? []) as string[]),
+    ]));
+    if (idsVinculo.length > 0) {
+      await supabase
+        .from("nfse_agendamentos")
+        .insert(
+          idsVinculo.map((ag) => ({
+            nfse_id: nota.id,
+            agendamento_id: ag,
+            clinica_id: emitente.clinica_id,
+          })),
+        );
+    }
 
     return { ok: true, id: nota.id, ref: currentRef, focus: body, tentativas: attempts };
   });
