@@ -1,4 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, FileBarChart2, Moon, Sun, Pin, PinOff, Menu as MenuIcon } from "lucide-react";
 import { Tooth } from "@/components/icons/tooth";
@@ -241,6 +242,7 @@ export function AppShell() {
     }
     window.location.assign(href);
   };
+  const queryClient = useQueryClient();
   // Pré-carrega o código da rota ao passar o mouse no item do menu — quando o
   // clique acontece, o chunk JS já chegou. Só com a flag de UX ligada.
   const preCarregar = (href: string) => {
@@ -249,6 +251,41 @@ export function AppShell() {
     // Cast necessário: os paths do menu vêm de configuração em runtime
     // (string), não do union de rotas tipado do router.
     void router.preloadRoute({ to } as Parameters<typeof router.preloadRoute>[0]).catch(() => {});
+    // Além do código, pré-busca os DADOS da tela de Clientes (estado padrão:
+    // sem busca, primeira página) — mesmas chaves/consulta de
+    // app.clientes.index.tsx (`clientes-total`, `clientes-lista`). Assim, ao
+    // clicar, a tabela já renderiza com o cache quente, sem skeleton. Mantenha
+    // esta lógica em sincronia com aquele arquivo se a consulta mudar lá.
+    if (to === "/app/clientes" && clinicaAtual?.clinica_id) {
+      const clinicaId = clinicaAtual.clinica_id;
+      void queryClient.prefetchQuery({
+        queryKey: ["clientes-total", clinicaId],
+        staleTime: 60_000,
+        queryFn: async () => {
+          const { count, error } = await supabase
+            .from("pacientes")
+            .select("id", { count: "estimated", head: true })
+            .eq("clinica_id", clinicaId);
+          if (error) throw error;
+          return count ?? 0;
+        },
+      }).catch(() => {});
+      void queryClient.prefetchQuery({
+        queryKey: ["clientes-lista", clinicaId, "", 0],
+        staleTime: 60_000,
+        queryFn: async () => {
+          const { data, error } = await supabase.rpc("buscar_pacientes", {
+            _clinica_id: clinicaId,
+            _termo: "",
+            _limit: 500,
+            _offset: 0,
+          } as never);
+          if (error) throw error;
+          const rows = (data ?? []) as unknown[];
+          return { items: rows, atingiuTeto: rows.length >= 500 };
+        },
+      }).catch(() => {});
+    }
   };
   const lastArrowNavAtRef = useRef(0);
   const [collapsedManual, setCollapsedManual] = useState<boolean>(() => {
