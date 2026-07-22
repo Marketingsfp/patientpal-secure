@@ -591,27 +591,33 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
   const procNome = formatServicoLinha(procNomeBase, espNome);
 
-  // Ficha = POSIÇÃO da linha na fila geral da CLÍNICA no dia (mesma regra da
-  // lista da agenda — app.agenda.tsx > fichaPorId): conta TODOS os agendamentos
-  // da clínica no dia, de TODOS os profissionais, na ordem do horário, como uma
-  // senha única (não particiona por médico nem por agenda). O chamador (a
-  // agenda) passa o número já calculado em `fichaNumero` — assim a guia bate
-  // EXATAMENTE com a lista. Sem ele, recalcula aqui como fallback.
+  // Ficha = POSIÇÃO da linha na fila do PROFISSIONAL no dia (mesma regra da
+  // lista da agenda — app.agenda.tsx > fichaPorId): cada médico/agenda tem sua
+  // própria sequência 001, 002, 003… dentro do dia. O chamador (a agenda) passa
+  // o número já calculado em `fichaNumero` — assim a guia bate EXATAMENTE com a
+  // lista. Sem ele, recalcula aqui como fallback particionando por (dia,
+  // profissional, agenda).
   const inicioDt = new Date(a.inicio);
   const diaIni = new Date(inicioDt); diaIni.setHours(0, 0, 0, 0);
   const diaFim = new Date(inicioDt); diaFim.setHours(23, 59, 59, 999);
   let fichaNum = typeof fichaNumero === "number" && fichaNumero > 0 ? fichaNumero : 0;
   if (fichaNum === 0) {
     try {
-      const { data: lista } = await supabase
+      const q = supabase
         .from("agendamentos")
-        .select("id, inicio")
+        .select("id, inicio, paciente_nome, medico_id, agenda_id")
         .eq("clinica_id", clinicaId)
         .gte("inicio", diaIni.toISOString())
-        .lte("inicio", diaFim.toISOString())
-        .order("inicio", { ascending: true })
-        .order("id", { ascending: true });
-      const idx = (lista ?? []).findIndex((r: any) => r.id === a.id);
+        .lte("inicio", diaFim.toISOString());
+      if (a.medico_id) q.eq("medico_id", a.medico_id); else q.is("medico_id", null);
+      if (a.agenda_id) q.eq("agenda_id", a.agenda_id); else q.is("agenda_id", null);
+      const { data: lista } = await q;
+      const ordenados = [...(lista ?? [])].sort((x: any, y: any) => {
+        const t = String(x.inicio).localeCompare(String(y.inicio));
+        if (t !== 0) return t;
+        return String(x.paciente_nome ?? "").localeCompare(String(y.paciente_nome ?? ""), "pt-BR", { sensitivity: "base" });
+      });
+      const idx = ordenados.findIndex((r: any) => r.id === a.id);
       fichaNum = idx >= 0 ? idx + 1 : 0;
     } catch { fichaNum = 0; }
   }
