@@ -331,13 +331,6 @@ function buildCrownPath(
     return `L ${eR},${edgeY}`;
   }
 
-  const cornerL = superior
-    ? `Q ${cx0},${edgeY} ${eL},${edgeY}`
-    : `Q ${cx0},${edgeY} ${eL},${edgeY}`;
-  const cornerR = superior
-    ? `Q ${cx0 + cw},${edgeY} ${nxR},${neckY}`
-    : `Q ${cx0 + cw},${edgeY} ${nxR},${neckY}`;
-
   return [
     `M ${nxL},${neckY}`,
     `C ${bxL},${bulgeY} ${cx0},${edgeY} ${eL},${edgeY}`,
