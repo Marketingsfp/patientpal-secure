@@ -1,49 +1,34 @@
 ## Objetivo
+Refazer o desenho do odontograma na aba "Prontuário" de Odontologia para ficar **visualmente igual à foto de referência** enviada (dentes com contorno anatômico limpo, traço fino azul-acinzentado, coroa + raízes bem definidas, numeração FDI abaixo, arcadas separadas por linha pontilhada).
 
-Trocar o desenho atual dos dentes no odontograma clínico (retângulos com raiz genérica) por formatos anatômicos mais realistas, no estilo da foto 2 (contornos de coroa + raízes por tipo de dente), mantendo TODA a lógica clínica atual (5 faces clicáveis, cores por status, seleção, anel âmbar de "orçado", arcadas permanente/decídua/mista, legenda).
+## Escopo
+- Arquivo único: `src/components/odontologia/odontograma-clinico.tsx`
+- Trocar as formas SVG atuais (que ficaram "gordas" e simplificadas) por **desenhos anatômicos fiéis** à imagem de referência, dente por tipo:
+  - Incisivos centrais/laterais (11–13, 21–23, 31–33, 41–43): coroa retangular estreita com borda incisal reta + 1 raiz longa e afilada.
+  - Caninos (13, 23, 33, 43): coroa com ponta (cúspide) + 1 raiz longa robusta.
+  - Pré-molares (14–15, 24–25, 34–35, 44–45): coroa com 2 cúspides + 1–2 raízes.
+  - Molares (16–18, 26–28, 36–38, 46–48): coroa larga com 4 cúspides + 2 raízes (inferiores) ou 3 raízes (superiores), como no desenho.
+- Manter dentes superiores com raízes para cima e inferiores para baixo, seguindo o layout da referência (18→28 em cima, 48→38 embaixo).
+- Manter linha pontilhada horizontal separando as arcadas.
+- Numeração FDI abaixo de cada dente superior e acima de cada dente inferior, tipografia leve como na foto.
+- Paleta: contorno `slate-400/500`, fundo branco, sem preenchimento pesado.
 
-## Escopo (o que muda)
+## Preservado (não muda)
+- Lógica clínica existente: 5 faces clicáveis (V/M/D/L/O) via `clipPath` sobre a coroa.
+- Estados/cores por condição (cárie, restauração, ausente, etc.).
+- Seleção de dente, tooltip, integração com timeline e orçamento.
+- Numeração FDI e ordem dos quadrantes.
 
-Somente visual do componente `src/components/odontologia/odontograma-clinico.tsx` (usado dentro da aba "Prontuário" em `/app/odontologia`).
+## Como vou executar
+1. Reescrever `toothShape` (e helpers `toothType`) para gerar `path`s anatômicos por tipo de dente, espelhando a referência.
+2. Ajustar `viewBox`, espaçamento entre dentes e proporção coroa/raiz para bater com a foto.
+3. Reposicionar `clipPath` das faces sobre a nova coroa para manter cliques precisos.
+4. Refinar traço (`stroke-width` ~1, cor `#94a3b8`) e remover preenchimentos desnecessários.
+5. Validar visualmente na rota `/app/odontologia` aba Prontuário.
 
-Não muda:
-- Nada em `src/components/odontograma.tsx` (versão simples, usada em outros lugares — se o usuário quiser aplicar também lá, faço em seguida).
-- Nada em `src/lib/odonto.ts` (status, cores, faces).
-- Nada em orçamento/`DentePicker`/backend.
+## Fora do escopo
+- Aba Orçamento, timeline, evolução clínica, banco de dados, regras de negócio.
+- Nenhuma alteração em outras clínicas/flags — é ajuste puramente visual, global.
 
-## Clínica-alvo (Regra 1.10)
-
-Como é ajuste puramente visual do componente compartilhado (sem regra de negócio), a mudança valeria para as 3 clínicas por natureza. **Vou confirmar isso com você antes de aplicar** — se quiser restringir a uma clínica específica, coloco atrás de flag `odontograma_anatomico` por `clinica_id`.
-
-## Como vai ficar
-
-Para cada dente vou desenhar um SVG anatômico com **coroa + raízes** conforme o tipo (FDI):
-
-- **Incisivos (11–13, 21–23, 31–33, 41–43 e decíduos 51–53, 61–63, 71–73, 81–83)**: coroa retangular alta e afilada, 1 raiz longa e fina.
-- **Pré-molares (14–15, 24–25, 34–35, 44–45)**: coroa mais quadrada, 1 raiz (superiores podem ter leve bifurcação sugerida).
-- **Molares (16–18, 26–28, 36–38, 46–48 e decíduos 54–55, 64–65, 74–75, 84–85)**: coroa larga com sulco central, superiores com 3 raízes (2 vestibulares + 1 palatina), inferiores com 2 raízes (mesial + distal).
-- Superior x inferior: raízes viradas para cima nos superiores (quadrantes 1/2/5/6) e para baixo nos inferiores (3/4/7/8), como já é hoje.
-
-A coroa continua sendo o `clipPath` das 5 áreas de face clicáveis (V/M/D/L/O), então **click e coloração por face permanecem idênticos** — só o contorno do clipPath vira anatômico em vez de retangular.
-
-Estilo do traço: `stroke="hsl(var(--border))"`, `stroke-width` fino (~0.9), fill das faces pelas cores de status. Aparência limpa/linear, coerente com a foto 2 (contorno cinza-azulado, sem sombra, sem preenchimento decorativo).
-
-Layout: manter linhas superior/inferior, numeração FDI centralizada acima de cada dente, separador entre superior e inferior. Larguras diferentes por tipo (molar mais largo que incisivo) para casar com a proporção da foto 2.
-
-## Passos técnicos
-
-1. Criar helper `toothShape(dente)` retornando `{ crownPath, rootPath, width, height }` conforme tipo (incisivo/canino/pré-molar/molar) e arcada (sup/inf).
-2. Reescrever `DenteFaces` em `odontograma-clinico.tsx` para usar esses paths — recalcular os polígonos V/M/D/L/O dentro do `viewBox` da nova coroa (mesma divisão em 4 trapézios + retângulo central, agora recortados pelo `crownPath` anatômico).
-3. Ajustar `viewBox` e tamanho render (`h-16 w-*`) para variar por tipo de dente.
-4. Manter `title` (tooltip), anel âmbar de orçado, destaque de seleção, tratamento de decíduos e a `Legenda` inalterada.
-
-## Validação
-
-- Abrir `/app/odontologia` na aba Prontuário: conferir aparência nas 3 arcadas (permanente/decídua/mista).
-- Clicar em faces individuais: garantir que cor/estado ainda são gravados corretamente por face.
-- Conferir orçamento vinculado: dente marcado ainda mostra anel âmbar e ponto.
-
-## Perguntas antes de implementar
-
-1. Aplico nas **3 clínicas** (Menino Jesus, SFP, Sant Marché) ou só em uma? (visual, sem regra de negócio — default seria as 3)
-2. Aplico o mesmo desenho anatômico também no odontograma simples de `src/components/odontograma.tsx` (usado no `DentePicker` de orçamento) ou mantenho ele com o visual atual mais compacto?
+## Clínica-alvo
+Ajuste **visual/UI** sem regra de negócio. Confirma que aplico **para todas as 3 clínicas** (SFP, Menino Jesus e a terceira)? Se quiser restringir a uma, me diga qual.
