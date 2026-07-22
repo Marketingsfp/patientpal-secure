@@ -1963,6 +1963,10 @@ function DetalheContrato({
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const podeEscrever = usePodeEscrever(modulo);
+  // NFS-e é gerida por permissão própria: caixa/recepção normalmente têm
+  // "nfse: write" mesmo sem edição em contratos, e precisam conseguir emitir
+  // a nota a partir da parcela paga.
+  const podeEmitirNfse = usePodeEscrever("nfse");
   const DadosField = ({ label, value }: { label: string; value: ReactNode }) => (
     <div className="space-y-1">
       <div className="text-sm font-medium">{label}</div>
