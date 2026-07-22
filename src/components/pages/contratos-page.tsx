@@ -824,14 +824,6 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                 <TableCell>
                   <div className="flex items-center gap-2 whitespace-normal break-words">
                     <span>{c.paciente_nome}</span>
-                    {c.tabela_legada ? (
-                      <Badge
-                        variant="outline"
-                        className="text-amber-700 border-amber-400 bg-amber-50 dark:bg-amber-950/30"
-                      >
-                        Tabela antiga — migrar {c.migrar_apos ? `em ${fmtD(c.migrar_apos)}` : ""}
-                      </Badge>
-                    ) : null}
                     {c.sem_carencia ? (
                       <Badge
                         variant="outline"
