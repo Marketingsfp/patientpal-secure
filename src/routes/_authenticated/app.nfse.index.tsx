@@ -1,13 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2, AlertCircle, Eye } from "lucide-react";
+import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2, AlertCircle, Eye, Search, Ban } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { consultarNfse, reenviarNfse, extrairNfseDeImagem, baixarNfseArquivo, avancarRpsProximoNumero } from "@/lib/nfse.functions";
+import { consultarNfse, reenviarNfse, extrairNfseDeImagem, baixarNfseArquivo, avancarRpsProximoNumero, cancelarNfse } from "@/lib/nfse.functions";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -41,6 +42,7 @@ function NfsePage() {
   const reenviar = useServerFn(reenviarNfse);
   const extrair = useServerFn(extrairNfseDeImagem);
   const avancarRps = useServerFn(avancarRpsProximoNumero);
+  const cancelar = useServerFn(cancelarNfse);
   const [reenviando, setReenviando] = useState<string | null>(null);
   const [conferirOpen, setConferirOpen] = useState(false);
   const [conferirLoading, setConferirLoading] = useState(false);
@@ -49,6 +51,10 @@ function NfsePage() {
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
   const [filtroEmitente, setFiltroEmitente] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [busca, setBusca] = useState<string>("");
+  const [cancelarAlvo, setCancelarAlvo] = useState<Row | null>(null);
+  const [cancelarJustificativa, setCancelarJustificativa] = useState<string>("");
+  const [cancelando, setCancelando] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [erroDetalhe, setErroDetalhe] = useState<Row | null>(null);
@@ -129,8 +135,14 @@ function NfsePage() {
   const filtrados = useMemo(() => rows.filter((r) => {
     if (filtroEmitente !== "todos" && r.emitente_id !== filtroEmitente) return false;
     if (filtroStatus !== "todos" && r.status !== filtroStatus) return false;
+    const q = busca.trim().toLowerCase();
+    if (q) {
+      const alvo = `${r.numero ?? ""} ${r.tomador_nome ?? ""} ${r.emitente?.nome ?? ""} ${r.emitente?.cnpj ?? ""}`.toLowerCase();
+      const qDigits = q.replace(/\D/g, "");
+      if (!alvo.includes(q) && !(qDigits && alvo.replace(/\D/g, "").includes(qDigits))) return false;
+    }
     return true;
-  }), [rows, filtroEmitente, filtroStatus]);
+  }), [rows, filtroEmitente, filtroStatus, busca]);
 
   const onReenviar = async (id: string) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
