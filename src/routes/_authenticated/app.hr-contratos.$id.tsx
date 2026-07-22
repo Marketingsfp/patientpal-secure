@@ -4,7 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useServerFn } from "@tanstack/react-start";
-import { cadastrarUsuario } from "@/lib/equipe.functions";
+import {
+  cadastrarUsuario,
+  editarMembro,
+  getFuncionarioLogin,
+  definirSenhaFuncionario,
+} from "@/lib/equipe.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,12 +48,28 @@ function EditarFuncionarioPage() {
   const podeEscrever = usePodeEscrever("hr-contratos");
   const navigate = useNavigate();
   const cadastrarUsuarioFn = useServerFn(cadastrarUsuario);
+  const editarMembroFn = useServerFn(editarMembro);
+  const getLoginFn = useServerFn(getFuncionarioLogin);
+  const definirSenhaFn = useServerFn(definirSenhaFuncionario);
 
   const [cargos, setCargos] = useState<Ref[]>([]);
   const [setores, setSetores] = useState<Ref[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [prefillUserId, setPrefillUserId] = useState<string | null>(prefillFromSearch ?? null);
+  // Estado de "Acesso ao sistema" para edição (contrato já existente).
+  const [linkedUserId, setLinkedUserId] = useState<string | null>(null);
+  const [membershipId, setMembershipId] = useState<string | null>(null);
+  const [membershipRole, setMembershipRole] = useState<string>("recepcao");
+  const [membershipAtivo, setMembershipAtivo] = useState<boolean>(true);
+  const [loginEmail, setLoginEmail] = useState<string | null>(null);
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [savingSenha, setSavingSenha] = useState(false);
+  const [savingAcesso, setSavingAcesso] = useState(false);
+  // Vincular a um login existente (memberships sem contrato).
+  const [loginsDisponiveis, setLoginsDisponiveis] = useState<Array<{ user_id: string; nome: string; email: string | null }>>([]);
+  const [vincularUserId, setVincularUserId] = useState<string>("");
   const [form, setForm] = useState({
     clinica_id: "", funcionario_nome: "", cpf: "", cargo_id: "", setor_id: "", unidade_id: "",
     regime: "clt", carga_horaria_semanal: "44", salario: "0",
@@ -100,6 +121,54 @@ function EditarFuncionarioPage() {
             sexo: (c.sexo as string) ?? "nao_informar",
             criar_login: false, email: "", senha: "", perfil: "recepcao",
           });
+          const uid = (c.user_id as string | null) ?? null;
+          setLinkedUserId(uid);
+          if (uid) {
+            // Carrega membership + email do login vinculado.
+            const [mem, emailRes] = await Promise.all([
+              supabase
+                .from("clinica_memberships")
+                .select("id, role, ativo")
+                .eq("clinica_id", clinicaAtual.clinica_id)
+                .eq("user_id", uid)
+                .maybeSingle(),
+              getLoginFn({ data: { clinicaId: clinicaAtual.clinica_id, userId: uid } })
+                .catch(() => ({ email: null as string | null })),
+            ]);
+            setMembershipId((mem.data?.id as string | undefined) ?? null);
+            setMembershipRole(((mem.data?.role as string | undefined) ?? "recepcao"));
+            setMembershipAtivo(((mem.data?.ativo as boolean | undefined) ?? true));
+            setLoginEmail(((emailRes as { email?: string | null })?.email) ?? null);
+          } else {
+            // Contrato sem login: lista memberships que ainda não foram
+            // amarrados a nenhum hr_contratos para permitir "Vincular".
+            const [mems, ctos] = await Promise.all([
+              supabase.from("clinica_memberships").select("user_id, ativo").eq("clinica_id", clinicaAtual.clinica_id),
+              supabase.from("hr_contratos").select("user_id").eq("clinica_id", clinicaAtual.clinica_id).not("user_id", "is", null),
+            ]);
+            const usados = new Set((ctos.data ?? []).map((x) => x.user_id as string));
+            const livresIds = ((mems.data ?? []) as Array<{ user_id: string }>)
+              .map((x) => x.user_id)
+              .filter((uid) => !usados.has(uid));
+            if (livresIds.length) {
+              const { data: profs } = await supabase.from("profiles").select("id, nome").in("id", livresIds);
+              const nomeMap = new Map((profs ?? []).map((p: { id: string; nome: string }) => [p.id, p.nome]));
+              const emails = await Promise.all(livresIds.map(async (uid) => {
+                try {
+                  const r = await getLoginFn({ data: { clinicaId: clinicaAtual.clinica_id, userId: uid } });
+                  return [uid, ((r as { email?: string | null })?.email) ?? null] as const;
+                } catch { return [uid, null] as const; }
+              }));
+              const emailMap = new Map(emails);
+              setLoginsDisponiveis(livresIds.map((uid) => ({
+                user_id: uid,
+                nome: nomeMap.get(uid) ?? "(sem nome)",
+                email: emailMap.get(uid) ?? null,
+              })).sort((a, b) => a.nome.localeCompare(b.nome)));
+            } else {
+              setLoginsDisponiveis([]);
+            }
+          }
         }
       }
       setLoading(false);
@@ -164,6 +233,66 @@ function EditarFuncionarioPage() {
     void navigate({ to: "/app/hr-contratos" });
   }
 
+  async function salvarAcesso() {
+    if (!membershipId) return;
+    setSavingAcesso(true);
+    try {
+      await editarMembroFn({
+        data: {
+          clinicaId: form.clinica_id,
+          membershipId,
+          role: membershipRole as "recepcao",
+          ativo: membershipAtivo,
+        },
+      });
+      toast.success("Acesso atualizado");
+    } catch (e) {
+      mostrarErro(e as { message: string });
+    } finally {
+      setSavingAcesso(false);
+    }
+  }
+
+  async function salvarNovaSenha() {
+    if (!linkedUserId) return;
+    if (novaSenha.length < 6) { toast.error("Senha deve ter pelo menos 6 caracteres"); return; }
+    if (novaSenha !== confirmarSenha) { toast.error("As senhas não conferem"); return; }
+    setSavingSenha(true);
+    try {
+      await definirSenhaFn({ data: { clinicaId: form.clinica_id, userId: linkedUserId, novaSenha } });
+      toast.success("Senha atualizada");
+      setNovaSenha("");
+      setConfirmarSenha("");
+    } catch (e) {
+      mostrarErro(e as { message: string });
+    } finally {
+      setSavingSenha(false);
+    }
+  }
+
+  async function vincularLoginExistente() {
+    if (!vincularUserId || isNovo) return;
+    setSavingAcesso(true);
+    const { error } = await supabase
+      .from("hr_contratos")
+      .update({ user_id: vincularUserId })
+      .eq("id", id);
+    setSavingAcesso(false);
+    if (error) { mostrarErro(error); return; }
+    toast.success("Login vinculado ao funcionário");
+    // Recarrega dados do membership.
+    setLinkedUserId(vincularUserId);
+    if (!clinicaAtual) return;
+    const [mem, emailRes] = await Promise.all([
+      supabase.from("clinica_memberships").select("id, role, ativo").eq("clinica_id", clinicaAtual.clinica_id).eq("user_id", vincularUserId).maybeSingle(),
+      getLoginFn({ data: { clinicaId: clinicaAtual.clinica_id, userId: vincularUserId } }).catch(() => ({ email: null as string | null })),
+    ]);
+    setMembershipId((mem.data?.id as string | undefined) ?? null);
+    setMembershipRole(((mem.data?.role as string | undefined) ?? "recepcao"));
+    setMembershipAtivo(((mem.data?.ativo as boolean | undefined) ?? true));
+    setLoginEmail(((emailRes as { email?: string | null })?.email) ?? null);
+  }
+
   return (
     <div className="p-6 space-y-4 max-w-4xl mx-auto">
       <div className="flex items-center gap-3">
@@ -187,8 +316,8 @@ function EditarFuncionarioPage() {
         ) : (
         <Tabs defaultValue="dados" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="dados">Dados</TabsTrigger>
-            <TabsTrigger value="login">Login e perfil</TabsTrigger>
+            <TabsTrigger value="dados">Dados do contrato</TabsTrigger>
+            <TabsTrigger value="login">Acesso ao sistema</TabsTrigger>
           </TabsList>
           <TabsContent value="dados" className="space-y-3 pt-3">
             <div className="grid grid-cols-2 gap-3">
@@ -263,9 +392,109 @@ function EditarFuncionarioPage() {
           </TabsContent>
           <TabsContent value="login" className="space-y-3 pt-3">
             {!isNovo ? (
-              <p className="text-sm text-muted-foreground py-4">
-                O login não pode ser alterado por aqui após o cadastro do funcionário.
-              </p>
+              linkedUserId ? (
+                <div className="space-y-5">
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">E-mail de login: </span>
+                    <span className="font-medium">{loginEmail ?? "(indisponível)"}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Perfil de acesso *</Label>
+                      <Select value={membershipRole} onValueChange={setMembershipRole}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {PERFIS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Situação do acesso</Label>
+                      <Select value={membershipAtivo ? "ativo" : "inativo"} onValueChange={(v) => setMembershipAtivo(v === "ativo")}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ativo">Ativo (pode acessar o sistema)</SelectItem>
+                          <SelectItem value="inativo">Inativo (bloqueado)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {podeEscrever && (
+                    <div>
+                      <Button size="sm" onClick={salvarAcesso} disabled={savingAcesso || !membershipId}>
+                        {savingAcesso ? "Salvando…" : "Salvar perfil e situação"}
+                      </Button>
+                    </div>
+                  )}
+                  <div className="border-t pt-4 space-y-3">
+                    <div className="text-sm font-medium">Definir nova senha</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>Nova senha *</Label>
+                        <Input type="text" value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="Mín. 6 caracteres" />
+                      </div>
+                      <div>
+                        <Label>Confirmar senha *</Label>
+                        <Input type="text" value={confirmarSenha} onChange={(e) => setConfirmarSenha(e.target.value)} />
+                      </div>
+                    </div>
+                    {podeEscrever && (
+                      <Button size="sm" onClick={salvarNovaSenha} disabled={savingSenha}>
+                        {savingSenha ? "Salvando…" : "Salvar nova senha"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Este funcionário ainda não tem login de acesso. Você pode vincular um login já existente na clínica ou criar um novo abaixo.
+                  </p>
+                  {loginsDisponiveis.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Vincular a um login existente</Label>
+                      <div className="flex gap-2">
+                        <Select value={vincularUserId} onValueChange={setVincularUserId}>
+                          <SelectTrigger className="max-w-md"><SelectValue placeholder="Selecione um login sem funcionário" /></SelectTrigger>
+                          <SelectContent>
+                            {loginsDisponiveis.map((l) => (
+                              <SelectItem key={l.user_id} value={l.user_id}>
+                                {l.nome}{l.email ? ` — ${l.email}` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {podeEscrever && (
+                          <Button size="sm" onClick={vincularLoginExistente} disabled={!vincularUserId || savingAcesso}>
+                            {savingAcesso ? "Vinculando…" : "Vincular"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <div className="border-t pt-4 space-y-3">
+                    <div className="text-sm font-medium">Ou criar um novo login</div>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" className="h-4 w-4 accent-primary" checked={form.criar_login} onChange={(e) => setForm({ ...form, criar_login: e.target.checked })} />
+                      Criar login de acesso ao sistema
+                    </label>
+                    <fieldset disabled={!form.criar_login} className="grid grid-cols-2 gap-3 disabled:opacity-60">
+                      <div className="col-span-2">
+                        <Label>Perfil de acesso *</Label>
+                        <Select value={form.perfil} onValueChange={(v) => setForm({ ...form, perfil: v })} disabled={!form.criar_login}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>{PERFIS.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div><Label>E-mail (login) *</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled={!form.criar_login} /></div>
+                      <div><Label>Senha inicial *</Label><Input type="text" value={form.senha} onChange={(e) => setForm({ ...form, senha: e.target.value })} placeholder="Mín. 6 caracteres" disabled={!form.criar_login} /></div>
+                    </fieldset>
+                    <p className="text-xs text-muted-foreground">
+                      O novo login será criado e vinculado a este contrato ao clicar em "Salvar" no rodapé.
+                    </p>
+                  </div>
+                </div>
+              )
             ) : (
               <div className="space-y-3">
                 <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
