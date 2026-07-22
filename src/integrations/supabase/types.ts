@@ -2093,6 +2093,9 @@ export type Database = {
       }
       cb_convenios: {
         Row: {
+          acrescimo_cartao_modo: string | null
+          acrescimo_cartao_percentual: number
+          acrescimo_cartao_valor: number
           ativo: boolean
           beneficios: string | null
           clinica_id: string
@@ -2113,6 +2116,9 @@ export type Database = {
           vigencia_meses: number
         }
         Insert: {
+          acrescimo_cartao_modo?: string | null
+          acrescimo_cartao_percentual?: number
+          acrescimo_cartao_valor?: number
           ativo?: boolean
           beneficios?: string | null
           clinica_id: string
@@ -2133,6 +2139,9 @@ export type Database = {
           vigencia_meses?: number
         }
         Update: {
+          acrescimo_cartao_modo?: string | null
+          acrescimo_cartao_percentual?: number
+          acrescimo_cartao_valor?: number
           ativo?: boolean
           beneficios?: string | null
           clinica_id?: string
