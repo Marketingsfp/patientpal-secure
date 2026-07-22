@@ -1089,23 +1089,29 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     grupos.set(key, g);
   }
 
-  // Calcula a ficha (posição na fila geral da clínica no dia) para cada grupo —
-  // mesma regra de app.agenda.tsx > fichaPorId e da GR individual: senha única
-  // por dia/clínica, sem particionar por médico nem por agenda.
+  // Calcula a ficha (posição na fila do PROFISSIONAL no dia) para cada grupo —
+  // mesma regra de app.agenda.tsx > fichaPorId e da GR individual: cada
+  // (dia, profissional, agenda) tem sua própria sequência 001, 002, 003…
   const fichaByGrupo = new Map<string, number>();
   await Promise.all(Array.from(grupos.entries()).map(async ([key, g]) => {
     try {
       const dt = new Date(g.inicioRef);
       const ini = new Date(dt); ini.setHours(0,0,0,0);
       const fim = new Date(dt); fim.setHours(23,59,59,999);
-      const { data } = await supabase.from("agendamentos")
-        .select("id, inicio")
+      const q = supabase.from("agendamentos")
+        .select("id, inicio, paciente_nome, medico_id, agenda_id")
         .eq("clinica_id", clinicaId)
         .gte("inicio", ini.toISOString())
-        .lte("inicio", fim.toISOString())
-        .order("inicio", { ascending: true })
-        .order("id", { ascending: true });
-      const idx = (data ?? []).findIndex((r: any) => r.id === g.agIdRef);
+        .lte("inicio", fim.toISOString());
+      if (g.medicoId) q.eq("medico_id", g.medicoId); else q.is("medico_id", null);
+      if (g.agendaId) q.eq("agenda_id", g.agendaId); else q.is("agenda_id", null);
+      const { data } = await q;
+      const ordenados = [...(data ?? [])].sort((x: any, y: any) => {
+        const t = String(x.inicio).localeCompare(String(y.inicio));
+        if (t !== 0) return t;
+        return String(x.paciente_nome ?? "").localeCompare(String(y.paciente_nome ?? ""), "pt-BR", { sensitivity: "base" });
+      });
+      const idx = ordenados.findIndex((r: any) => r.id === g.agIdRef);
       fichaByGrupo.set(key, idx >= 0 ? idx + 1 : 0);
     } catch { fichaByGrupo.set(key, 0); }
   }));
