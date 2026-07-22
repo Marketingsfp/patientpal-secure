@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SectionTabs, RH_TABS, RH_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -19,7 +18,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { Plus, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/lms-admin")({
-  component: LMSAdminPageWithTabs,
+  component: LMSAdminPage,
 });
 
 type Curso = { id: string; titulo: string; descricao: string | null; carga_horaria_min: number; publicado: boolean };
@@ -219,13 +218,5 @@ function LMSAdminPage() {
         </Card>
       </div>
     </div>
-  );
-}
-function LMSAdminPageWithTabs() {
-  return (
-    <>
-      <SectionTabs title={RH_META.title} icon={RH_META.icon} tabs={RH_TABS} />
-      <LMSAdminPage />
-    </>
   );
 }

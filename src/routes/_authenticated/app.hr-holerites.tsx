@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SectionTabs, RH_TABS, RH_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -18,7 +17,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { formatDatePura } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/hr-holerites")({
-  component: HoleritesPageWithTabs,
+  component: HoleritesPage,
   head: () => ({ meta: [{ title: "Holerites — ClinicaOS" }] }),
 });
 
@@ -215,13 +214,5 @@ function HoleritesPage() {
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-function HoleritesPageWithTabs() {
-  return (
-    <>
-      <SectionTabs title={RH_META.title} icon={RH_META.icon} tabs={RH_TABS} />
-      <HoleritesPage />
-    </>
   );
 }

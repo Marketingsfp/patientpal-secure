@@ -1,15 +1,33 @@
 ## Objetivo
-Ao abrir qualquer contrato no Cartão Benefícios, iniciar já na aba **Dados** em vez de "Resumo".
 
-## Alteração
-Arquivo: `src/components/pages/contratos-page.tsx`
-- Trocar o default `initialTab = "resumo"` (linha ~1955) para `"dados"`.
-- Trocar o reset `setDetailInitialTab("resumo")` no `onBack` (linha 578) para `"dados"`.
-- Manter os demais casos que já forçam `"dados"` (fluxo de admin editar).
+Remover a barra de abas (`SectionTabs` com `RH_TABS`) das páginas do módulo **RH**, já que o menu lateral já lista os mesmos submenus — a duplicação polui a tela.
 
-## Escopo
-- Somente apresentação (aba inicial padrão). Nada de regra de negócio.
-- Aplicação global (todas as clínicas), por ser continuação da reorganização visual anterior. Me avise se preferir restringir.
+## Escopo (apenas RH)
+
+Arquivos afetados:
+
+- `src/routes/_authenticated/app.hr-ponto.tsx`
+- `src/routes/_authenticated/app.hr-ferias.tsx`
+- `src/routes/_authenticated/app.hr-holerites.tsx`
+- `src/routes/_authenticated/app.treinamentos.tsx`
+- `src/routes/_authenticated/app.lms-admin.tsx`
+- (Contratos do RH — hoje não usa `SectionTabs`, então nada a mudar)
+
+Em cada arquivo:
+
+1. Remover o import de `SectionTabs`, `RH_TABS`, `RH_META` de `@/components/section-tabs`.
+2. Remover o wrapper `*PageWithTabs` e apontar o `component:` da rota diretamente para o componente da página.
+3. Manter todo o restante da tela (título interno "Bater ponto", "Férias", etc.) intacto.
+
+## Fora do escopo
+
+- Não mexer em Marketing, Serviços, Segurança & Compliance ou outras seções que também usam `SectionTabs` — o pedido é só sobre o RH. Se quiser aplicar a mesma limpeza nessas outras seções, me avise depois.
+- Manter `RH_TABS`/`RH_META` exportados em `section-tabs.tsx` (ainda usados como referência de módulos e não custa nada manter), sem remover o export para evitar efeito colateral.
 
 ## Validação
-Abrir um contrato existente → aba "Dados" já vem selecionada.
+
+- Verificar visualmente `/app/hr-ponto`, `/app/hr-ferias`, `/app/hr-holerites`, `/app/treinamentos`, `/app/lms-admin` — a faixa de abas deve sumir, e o menu lateral continua sendo a navegação.
+
+## Clínica-alvo
+
+Ajuste é puramente de UI (frontend), sem regra por clínica — aplicar globalmente para todas as clínicas. Confirma?
