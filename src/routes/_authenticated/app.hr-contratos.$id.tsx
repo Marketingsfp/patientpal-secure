@@ -21,6 +21,9 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { DateInputBR } from "@/components/ui/date-input-br";
 import { ConvenioFuncionarioTab } from "@/components/funcionarios/ConvenioFuncionarioTab";
+import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
+import { UserPlus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/hr-contratos/$id")({
   component: EditarFuncionarioPage,
@@ -72,12 +75,14 @@ function EditarFuncionarioPage() {
   const [loginsDisponiveis, setLoginsDisponiveis] = useState<Array<{ user_id: string; nome: string; email: string | null }>>([]);
   const [vincularUserId, setVincularUserId] = useState<string>("");
   const [form, setForm] = useState({
-    clinica_id: "", funcionario_nome: "", cpf: "", cargo_id: "", setor_id: "", unidade_id: "",
+    clinica_id: "", paciente_id: "", funcionario_nome: "", cpf: "", cargo_id: "", setor_id: "", unidade_id: "",
     regime: "clt", carga_horaria_semanal: "44", salario: "0",
     data_admissao: new Date().toISOString().slice(0, 10), data_demissao: "", status: "ativo",
     sexo: "nao_informar",
     criar_login: false, email: "", senha: "", perfil: "recepcao",
   });
+  const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
+  const [quickOpen, setQuickOpen] = useState(false);
 
   useEffect(() => {
     if (!clinicaAtual) return;
@@ -108,6 +113,7 @@ function EditarFuncionarioPage() {
         if (c) {
           setForm({
             clinica_id: (c.clinica_id as string) ?? clinicaAtual.clinica_id,
+            paciente_id: ((c as { paciente_id?: string | null }).paciente_id as string | null) ?? "",
             funcionario_nome: (c.funcionario_nome as string) ?? "",
             cpf: (c.cpf as string) ?? "",
             cargo_id: (c.cargo_id as string) ?? "",
@@ -122,6 +128,15 @@ function EditarFuncionarioPage() {
             sexo: (c.sexo as string) ?? "nao_informar",
             criar_login: false, email: "", senha: "", perfil: "recepcao",
           });
+          const pid = ((c as { paciente_id?: string | null }).paciente_id as string | null) ?? null;
+          if (pid) {
+            const { data: p } = await supabase
+              .from("pacientes")
+              .select("id, nome, cpf, telefone, data_nascimento, clinica_id")
+              .eq("id", pid)
+              .maybeSingle();
+            if (p) setPacienteSel(p as unknown as PatientOption);
+          }
           const uid = (c.user_id as string | null) ?? null;
           setLinkedUserId(uid);
           if (uid) {
@@ -180,6 +195,7 @@ function EditarFuncionarioPage() {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!form.clinica_id) { toast.error("Selecione a clínica"); return; }
     if (!form.funcionario_nome.trim()) { toast.error("Informe o nome"); return; }
+    if (isNovo && !form.paciente_id) { toast.error("Selecione o cliente vinculado ao funcionário"); return; }
     // "Criar login" pode ser marcado tanto no cadastro novo quanto ao editar
     // um contrato existente que ainda não tem login vinculado.
     const criandoLogin = form.criar_login && (isNovo || !linkedUserId);
@@ -214,6 +230,7 @@ function EditarFuncionarioPage() {
 
     const payload = {
       clinica_id: form.clinica_id,
+      paciente_id: form.paciente_id || null,
       funcionario_nome: form.funcionario_nome.trim(),
       cpf: form.cpf.trim() || null,
       cargo_id: form.cargo_id || null,
