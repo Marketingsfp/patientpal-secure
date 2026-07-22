@@ -4498,6 +4498,12 @@ function AgendaPage() {
   const verOuEmitirNota = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     const ex = nfseMap.get(a.id);
+    // Se o usuário já selecionou múltiplos para agrupamento, o clique no botão
+    // não deve emitir individual — direciona para a barra de emissão em lote.
+    if (nfseSel.size > 1 && nfseSel.has(a.id)) {
+      toast.info("Use o botão \"Emitir NFS-e agrupada\" na barra inferior para os itens selecionados.");
+      return;
+    }
     if (ex) {
       if (ex.url_pdf) {
         window.open(ex.url_pdf, "_blank", "noopener,noreferrer");
