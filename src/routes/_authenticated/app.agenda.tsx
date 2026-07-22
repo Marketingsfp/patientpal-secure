@@ -1296,6 +1296,10 @@ function AgendaPage() {
   // Sinaliza que após o pagamento+impressão devemos abrir a emissão da NFS-e.
   const emitirNotaAposRef = useRef(false);
   const emitenteNotaAposRef = useRef<string | null>(null);
+  // Impressões de GR em andamento (por agendamento) — evita que cliques
+  // repetidos, enquanto a GR ainda está sendo montada, disparem várias
+  // impressões e registrem vias duplicadas.
+  const imprimindoGRRef = useRef<Set<string>>(new Set());
   const navigate = useNavigate();
   // ── Desconto aplicado ANTES de "Salvar e Pagar" (com autorização da supervisão).
   type DescontoPendente = { tipo: "valor" | "percentual"; input: string; autorizadoPor: string; motivo: string };
@@ -4525,6 +4529,10 @@ function AgendaPage() {
       toast.error("GR só pode ser impressa após o pagamento. Registre o pagamento antes.");
       return;
     }
+    // Trava contra clique repetido: se esta GR já está sendo montada, ignora.
+    if (imprimindoGRRef.current.has(a.id)) return;
+    imprimindoGRRef.current.add(a.id);
+    const toastId = toast.loading("Gerando GR para impressão…");
     try {
       // Reimpressão: carrega a forma/parcelas/bandeira reais do lançamento
       // confirmado deste agendamento para que a 2ª via mantenha exatamente
@@ -4577,8 +4585,12 @@ function AgendaPage() {
         pagamento: pagamentoInfo,
         fichaNumero,
       });
+      toast.success("GR enviada para impressão.", { id: toastId });
     } catch (err) {
+      toast.dismiss(toastId);
       mostrarErro(err);
+    } finally {
+      imprimindoGRRef.current.delete(a.id);
     }
   };
 

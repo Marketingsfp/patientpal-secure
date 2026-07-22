@@ -316,10 +316,6 @@ function imprimirViaIframe(html: string): void {
     try { document.body.removeChild(iframe); } catch { /* noop */ }
     throw new Error("Não foi possível inicializar a impressão.");
   }
-  const doc = cw.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
   const cleanup = () => { try { document.body.removeChild(iframe); } catch { /* noop */ } };
   let jaImprimiu = false;
   const dispararPrint = () => {
@@ -332,9 +328,29 @@ function imprimirViaIframe(html: string): void {
     // Remove o iframe depois que o diálogo deve ter sido tratado.
     setTimeout(cleanup, 4000);
   };
-  iframe.onload = () => setTimeout(dispararPrint, 80);
-  // Fallback se onload não disparar (alguns navegadores com document.write).
-  setTimeout(() => { if (iframe.isConnected) dispararPrint(); }, 600);
+  // Registramos o onload ANTES de escrever o documento — alguns navegadores
+  // disparam o load de forma síncrona no doc.close(); atribuir depois perdia o
+  // evento e a impressão só saía pelo fallback (atraso perceptível). Ao carregar,
+  // esperamos as imagens (ex.: logo da clínica) para não imprimir render incompleto.
+  iframe.onload = () => {
+    const imgs = Array.from(cw.document.images ?? []);
+    const pendentes = imgs.filter((im) => !im.complete);
+    if (pendentes.length === 0) { dispararPrint(); return; }
+    let restantes = pendentes.length;
+    const done = () => { restantes -= 1; if (restantes <= 0) dispararPrint(); };
+    pendentes.forEach((im) => {
+      im.addEventListener("load", done);
+      im.addEventListener("error", done);
+    });
+    // Teto de segurança: imprime mesmo se alguma imagem travar (ex.: logo offline).
+    setTimeout(dispararPrint, 2500);
+  };
+  const doc = cw.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+  // Fallback caso o onload não dispare (navegadores com document.write).
+  setTimeout(() => { if (iframe.isConnected) dispararPrint(); }, 1200);
 }
 
 export async function printGuiaAtendimento(input: PrintGRInput) {
