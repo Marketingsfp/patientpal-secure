@@ -2003,7 +2003,7 @@ function Page() {
           formas.set(label, f);
         }
       } else {
-        const label = bucket.toUpperCase();
+        const label = ((FORMA_LABEL[bucket as FormaBucket] ?? bucket) as string).toUpperCase();
         const f = formas.get(label) ?? { label, pagamento: 0, recebimento: 0 };
         if (sinal < 0) f.pagamento += v;
         else f.recebimento += v;
