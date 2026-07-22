@@ -439,20 +439,35 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         toast.error(`Soma das formas (${formatBRL(total)}) difere do valor (${formatBRL(valorNum)})`);
         setSaving(false); return;
       }
-      formaFinal = "misto";
-      obsExtra = "Pagamento misto: " + validIdx.map(({ p, i }) => {
+      // Se o modo misto tem só 1 linha válida, salva como aquela forma direta
+      // (evita marcar como "misto" quando na prática só houve uma forma).
+      if (validIdx.length === 1) {
+        const { p, i } = validIdx[0];
+        formaFinal = p.forma;
         const { pago, troco } = linhasCalc[i];
-        const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(pago)}`;
         if (p.forma === "dinheiro" && troco > 0) {
-          return `${base} (recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)})`;
-        }
-        if (p.forma === "cartao_credito") {
+          obsExtra = `Recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)}`;
+        } else if (p.forma === "cartao_credito") {
           const parc = Number(p.parcelas || 1) || 1;
           const band = (p.bandeira ?? "").toUpperCase();
-          return `${base} (${band} ${parc}x)`;
+          obsExtra = `Cartão Crédito ${band} ${parc}x — ${formatBRL(pago)}`;
         }
-        return base;
-      }).join("; ");
+      } else {
+        formaFinal = "misto";
+        obsExtra = "Pagamento misto: " + validIdx.map(({ p, i }) => {
+          const { pago, troco } = linhasCalc[i];
+          const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(pago)}`;
+          if (p.forma === "dinheiro" && troco > 0) {
+            return `${base} (recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)})`;
+          }
+          if (p.forma === "cartao_credito") {
+            const parc = Number(p.parcelas || 1) || 1;
+            const band = (p.bandeira ?? "").toUpperCase();
+            return `${base} (${band} ${parc}x)`;
+          }
+          return base;
+        }).join("; ");
+      }
     } else if (formaPagamento === "dinheiro" && recebidoNum > 0) {
       obsExtra = `Recebido ${formatBRL(recebidoNum)}, troco ${formatBRL(trocoDinheiro)}`;
     }
