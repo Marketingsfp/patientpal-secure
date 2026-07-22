@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { formatDatePura } from "@/lib/date-utils";
-export const Route = createFileRoute("/_authenticated/app/hr-contratos")({
+export const Route = createFileRoute("/_authenticated/app/hr-contratos/")({
   component: ContratosPage,
   head: () => ({ meta: [{ title: "Funcionários — ClinicaOS" }] }),
   validateSearch: (search: Record<string, unknown>) => ({
