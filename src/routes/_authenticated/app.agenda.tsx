@@ -122,6 +122,9 @@ type Agendamento = {
   atendimento_grupo_id?: string | null;
   ficha_numero?: number | null;
   forma_pagamento_prevista?: string | null;
+  edit_lock_by?: string | null;
+  edit_lock_by_nome?: string | null;
+  edit_lock_at?: string | null;
 };
 type Medico = {
   id: string;
