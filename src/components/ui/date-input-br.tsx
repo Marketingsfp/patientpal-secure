@@ -15,8 +15,10 @@ function isoToBr(iso: string): string {
 }
 
 // Converte "dd/mm/yyyy" ou "dd/mm/yy" -> "yyyy-mm-dd".
-// Ano curto: usa 19yy quando 20yy resultaria em data futura (típico para nascimento),
-// caso contrário usa 20yy. Assim "23/05/85" vira 1985 e "10/01/30" vira 2030.
+// Ano curto: usa um pivô ~20 anos à frente do ano atual. 20yy até
+// (ano atual + 20) fica em 2000+yy; acima disso volta a 1900+yy.
+// Assim "15/01/27" → 2027 (vencimento futuro), "23/05/85" → 1985
+// (nascimento) e "10/01/30" → 2030.
 function brToIso(br: string): string {
   const m = /^(\d{2})\/(\d{2})\/(\d{2}|\d{4})$/.exec(br);
   if (!m) return "";
@@ -25,7 +27,8 @@ function brToIso(br: string): string {
     const yy = Number(m[3]);
     const currentYear = new Date().getFullYear();
     const asTwentyK = 2000 + yy;
-    yearText = asTwentyK > currentYear ? String(1900 + yy) : String(asTwentyK);
+    const pivot = currentYear + 20;
+    yearText = asTwentyK <= pivot ? String(asTwentyK) : String(1900 + yy);
   } else {
     yearText = m[3];
   }
