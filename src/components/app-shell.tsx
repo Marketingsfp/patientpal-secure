@@ -164,7 +164,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   {
     label: "Cadastros",
     items: [
-    { to: "/app/equipe", label: "Equipe", icon: Users },
+    { to: "/app/equipe", label: "Médicos", icon: Users },
     { to: "/app/perfis", label: "Perfis", icon: KeyRound },
     { to: "/app/especialidades", label: "Serviços", icon: Stethoscope, aliases: ["/app/tipos-servico", "/app/procedimentos"] },
     { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
@@ -182,7 +182,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     label: "Recursos Humanos",
     items: [
     { to: "/app/hr-ponto", label: "Marcação de ponto", icon: GraduationCap },
-    { to: "/app/hr-contratos", label: "Contratos", icon: FileText },
+    { to: "/app/hr-contratos", label: "Funcionários", icon: FileText },
     { to: "/app/hr-ferias", label: "Férias", icon: Palmtree },
     { to: "/app/hr-holerites", label: "Holerites", icon: FileText },
     { to: "/app/treinamentos", label: "Treinamentos", icon: GraduationCap },
@@ -194,7 +194,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     items: [
     { to: "/app/cargos", label: "Cargos", icon: Briefcase },
     { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
-    { to: "/app/funcionarios", label: "Funcionários", icon: Contact },
     { to: "/app/configuracoes/nfse", label: "Configuração NFS-e", icon: FileText },
     { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
     { to: "/app/auditoria", label: "Segurança & Compliance", icon: ShieldCheck },
@@ -410,7 +409,7 @@ export function AppShell() {
       : navRows;
   const scopedNavRows = filteredByGroup.map((row) => {
     if (row.label !== "Gestão") return row;
-    const gestaoPessoasItems = new Set(["/app/funcionarios", "/app/cargos", "/app/setores"]);
+    const gestaoPessoasItems = new Set(["/app/cargos", "/app/setores"]);
     const items = !isRodrigoFullAccess && subsystem === "gestao-pessoas"
       ? row.items.filter((it) => !isParent(it) && gestaoPessoasItems.has(it.to))
       : row.items.filter((it) => isParent(it) || !gestaoPessoasItems.has(it.to));

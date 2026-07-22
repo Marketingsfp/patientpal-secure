@@ -63,7 +63,6 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
 
   // Cadastros
   "/app/equipe": "equipe",
-  "/app/funcionario": "equipe",
   "/app/medico": "medicos",
   "/app/especialidades": "especialidades",
   "/app/procedimentos": "procedimentos",
@@ -103,7 +102,6 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/financeiro/notas": "financeiro",
   "/app/financeiro/regras-ia": "financeiro",
   "/app/financeiro/relatorios": "financeiro",
-  "/app/funcionarios": "funcionarios",
   "/app/configuracoes/nfse": "nfse",
   "/app/configuracoes/painel-totem": "clinicas",
   "/app/nfse": "nfse",
