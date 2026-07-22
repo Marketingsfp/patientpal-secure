@@ -1980,12 +1980,35 @@ function Page() {
     for (const m of movs) {
       if (m.tipo === "abertura" || m.tipo === "fechamento" || m.tipo === "reabertura") continue;
       const bucket = normalizarForma(m.forma_pagamento) || "—";
-      const label = bucket.toUpperCase();
-      const f = formas.get(label) ?? { label, pagamento: 0, recebimento: 0 };
       const v = Number(m.valor || 0);
-      if (TIPO_SINAL[m.tipo] < 0) f.pagamento += v;
-      else if (TIPO_SINAL[m.tipo] > 0) f.recebimento += v;
-      formas.set(label, f);
+      const sinal = TIPO_SINAL[m.tipo];
+      if (sinal === 0) continue;
+      // Decompõe pagamentos mistos usando as observações do lançamento
+      // (mesma lógica exibida em tela) para que o "Resumo por tipo de moeda"
+      // some cada parte na forma real (Dinheiro, PIX, Crédito, etc.) em vez
+      // de agrupar tudo em "MISTO".
+      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+      const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+      const entradas = Object.entries(partes).filter(([, val]) => (val ?? 0) > 0) as Array<[FormaBucket, number]>;
+      const totalPartes = entradas.reduce((s, [, val]) => s + (val ?? 0), 0);
+      if (bucket === "misto" && entradas.length > 0 && totalPartes > 0) {
+        for (const [k, val] of entradas) {
+          const label = (FORMA_LABEL[k] ?? k).toUpperCase();
+          const f = formas.get(label) ?? { label, pagamento: 0, recebimento: 0 };
+          // Se o total decomposto não bater com o valor do movimento
+          // (arredondamento raro), rateia proporcionalmente.
+          const parte = totalPartes === v ? (val ?? 0) : ((val ?? 0) * v) / totalPartes;
+          if (sinal < 0) f.pagamento += parte;
+          else f.recebimento += parte;
+          formas.set(label, f);
+        }
+      } else {
+        const label = bucket.toUpperCase();
+        const f = formas.get(label) ?? { label, pagamento: 0, recebimento: 0 };
+        if (sinal < 0) f.pagamento += v;
+        else f.recebimento += v;
+        formas.set(label, f);
+      }
     }
     let accF = 0;
     const linhasForma = Array.from(formas.values()).map((f) => {
