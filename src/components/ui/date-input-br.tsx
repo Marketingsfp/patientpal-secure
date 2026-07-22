@@ -15,21 +15,33 @@ function isoToBr(iso: string): string {
 }
 
 // Converte "dd/mm/yyyy" ou "dd/mm/yy" -> "yyyy-mm-dd".
-// Ano curto é tratado como 20yy para cadastros/renovações operacionais.
+// Ano curto: usa 19yy quando 20yy resultaria em data futura (típico para nascimento),
+// caso contrário usa 20yy. Assim "23/05/85" vira 1985 e "10/01/30" vira 2030.
 function brToIso(br: string): string {
   const m = /^(\d{2})\/(\d{2})\/(\d{2}|\d{4})$/.exec(br);
   if (!m) return "";
-  const yearText = m[3].length === 2 ? `20${m[3]}` : m[3];
+  let yearText: string;
+  if (m[3].length === 2) {
+    const yy = Number(m[3]);
+    const currentYear = new Date().getFullYear();
+    const asTwentyK = 2000 + yy;
+    yearText = asTwentyK > currentYear ? String(1900 + yy) : String(asTwentyK);
+  } else {
+    yearText = m[3];
+  }
   const day = Number(m[1]), month = Number(m[2]), year = Number(yearText);
   if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900) return "";
   return `${yearText}-${m[2]}-${m[1]}`;
 }
 
-// Aplica máscara dd/mm/yyyy incrementalmente enquanto o usuário digita.
+// Aplica máscara dd/mm/yyyy incrementalmente. Insere "/" já ao completar 2 e 4 dígitos
+// para dar feedback visual imediato ("23" -> "23/", "2305" -> "23/05/").
 function applyMask(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 8);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  if (digits.length < 2) return digits;
+  if (digits.length === 2) return `${digits}/`;
+  if (digits.length < 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  if (digits.length === 4) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/`;
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
