@@ -86,6 +86,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtD = (s?: string | null) =>
   s ? new Date(s + (s.length === 10 ? "T00:00:00" : "")).toLocaleDateString("pt-BR") : "—";
+const fmtDcurto = (s?: string | null) => {
+  if (!s) return "—";
+  const d = new Date(s + (s.length === 10 ? "T00:00:00" : ""));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${String(d.getFullYear()).slice(-2)}`;
+};
 const MESES_PT = [
   "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
   "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
@@ -652,6 +658,9 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                   </span>
                 </button>
               </TableHead>
+              <TableHead className="font-bold uppercase tracking-wide text-xs text-primary">
+                PRONTUÁRIO
+              </TableHead>
               <TableHead>
                 <Select value={filtroConvenio} onValueChange={setFiltroConvenio}>
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
@@ -790,14 +799,14 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={12} className="text-center text-muted-foreground py-6">
                   Carregando…
                 </TableCell>
               </TableRow>
             ) : null}
             {!loading && filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={12} className="text-center text-muted-foreground py-6">
                   Nenhum contrato.
                 </TableCell>
               </TableRow>
@@ -806,12 +815,15 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
               const agg = parcAgg[c.id];
               const emDia = !agg || !agg.temAtrasada;
               return (
-              <TableRow key={c.id} className="cursor-pointer" onClick={() => setDetail(c)}>
+              <TableRow
+                key={c.id}
+                className={`cursor-pointer ${c.tabela_legada ? "bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50" : ""}`}
+                onClick={() => setDetail(c)}
+              >
                 <TableCell className="font-semibold">{c.numero}</TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 whitespace-normal break-words">
                     <span>{c.paciente_nome}</span>
-                    <ProntuarioBadge codigo={c.codigo_prontuario} />
                     {c.tabela_legada ? (
                       <Badge
                         variant="outline"
@@ -830,11 +842,14 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                     ) : null}
                   </div>
                 </TableCell>
+                <TableCell className="tabular-nums text-sm">
+                  {c.codigo_prontuario ?? <span className="text-muted-foreground/60">—</span>}
+                </TableCell>
                 <TableCell>
                   {convenios.find((cv) => cv.id === c.convenio_id)?.nome ?? "—"}
                 </TableCell>
-                <TableCell>{fmtD(c.data_inicio)}</TableCell>
-                <TableCell>{fmtD(c.data_fim ?? addUmAno(c.data_inicio))}</TableCell>
+                <TableCell className="tabular-nums">{fmtDcurto(c.data_inicio)}</TableCell>
+                <TableCell className="tabular-nums">{fmtDcurto(c.data_fim ?? addUmAno(c.data_inicio))}</TableCell>
                 <TableCell>{BRL(c.valor_mensal)}</TableCell>
                 <TableCell className="tabular-nums">
                   {agg ? `${agg.pagas} / ${agg.total}` : "—"}
@@ -904,6 +919,12 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                 </Button>
               </div>
             ) : null}
+          </div>
+        ) : null}
+        {filtered.some((c) => c.tabela_legada) ? (
+          <div className="flex items-center gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
+            <span className="inline-block h-3 w-3 rounded-sm bg-amber-100 border border-amber-300" aria-hidden />
+            Linhas em amarelo indicam contratos em <strong>tabela antiga</strong> — pendentes de migração.
           </div>
         ) : null}
       </div>
