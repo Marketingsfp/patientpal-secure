@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 
@@ -25,6 +26,7 @@ const emptyForm = (clinicaId: string) => ({
   regime: "clt", carga_horaria_semanal: "44", salario: "0",
   data_admissao: new Date().toISOString().slice(0, 10), data_demissao: "", status: "ativo",
   sexo: "nao_informar",
+  email: "", telefone: "", data_nascimento: "", observacoes: "",
 });
 
 export function FuncionarioDadosDialog({ open, onOpenChange, clinicaId, editingContratoId, onSaved }: Props) {
@@ -69,6 +71,10 @@ export function FuncionarioDadosDialog({ open, onOpenChange, clinicaId, editingC
           data_demissao: (contrato.data_demissao as string) ?? "",
           status: (contrato.status as string) ?? "ativo",
           sexo: (contrato.sexo as string) ?? "nao_informar",
+          email: ((contrato as any).email as string) ?? "",
+          telefone: ((contrato as any).telefone as string) ?? "",
+          data_nascimento: ((contrato as any).data_nascimento as string) ?? "",
+          observacoes: ((contrato as any).observacoes as string) ?? "",
         });
       }
       setLoading(false);
@@ -78,6 +84,11 @@ export function FuncionarioDadosDialog({ open, onOpenChange, clinicaId, editingC
   async function salvar() {
     if (!form.clinica_id) { toast.error("Clínica não definida"); return; }
     if (!form.funcionario_nome.trim()) { toast.error("Informe o nome"); return; }
+    if (!form.cpf.trim()) { toast.error("Informe o CPF"); return; }
+    if (!form.cargo_id) { toast.error("Selecione o cargo"); return; }
+    if (!form.regime) { toast.error("Selecione o regime"); return; }
+    if (form.salario === "" || isNaN(Number(form.salario))) { toast.error("Informe o salário"); return; }
+    if (!form.data_admissao) { toast.error("Informe a data de admissão"); return; }
     setSaving(true);
     const payload = {
       clinica_id: form.clinica_id,
@@ -92,7 +103,11 @@ export function FuncionarioDadosDialog({ open, onOpenChange, clinicaId, editingC
       data_demissao: form.data_demissao || null,
       status: form.status,
       sexo: form.sexo,
-    };
+      email: form.email.trim() || null,
+      telefone: form.telefone.trim() || null,
+      data_nascimento: form.data_nascimento || null,
+      observacoes: form.observacoes.trim() || null,
+    } as any;
     const { error } = editingContratoId
       ? await supabase.from("hr_contratos").update(payload).eq("id", editingContratoId)
       : await supabase.from("hr_contratos").insert(payload);
@@ -105,7 +120,7 @@ export function FuncionarioDadosDialog({ open, onOpenChange, clinicaId, editingC
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl rounded-2xl backdrop-blur-xl bg-background/95 border border-border/60">
         <DialogHeader>
           <DialogTitle>{editingContratoId ? "Editar funcionário" : "Novo funcionário"}</DialogTitle>
         </DialogHeader>
@@ -115,7 +130,7 @@ export function FuncionarioDadosDialog({ open, onOpenChange, clinicaId, editingC
           <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2"><Label>Nome do funcionário *</Label><Input value={form.funcionario_nome} onChange={e => setForm({ ...form, funcionario_nome: e.target.value })} /></div>
-              <div><Label>CPF</Label><Input value={form.cpf} onChange={e => setForm({ ...form, cpf: e.target.value })} /></div>
+              <div><Label>CPF *</Label><Input value={form.cpf} onChange={e => setForm({ ...form, cpf: e.target.value })} /></div>
               <div>
                 <Label>Sexo</Label>
                 <Select value={form.sexo} onValueChange={v => setForm({ ...form, sexo: v })}>
@@ -128,8 +143,11 @@ export function FuncionarioDadosDialog({ open, onOpenChange, clinicaId, editingC
                   </SelectContent>
                 </Select>
               </div>
+              <div><Label>E-mail</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
+              <div><Label>Telefone</Label><Input value={form.telefone} onChange={e => setForm({ ...form, telefone: e.target.value })} /></div>
+              <div><Label>Data de nascimento</Label><DateInputBR value={form.data_nascimento} onChange={e => setForm({ ...form, data_nascimento: e.target.value })} /></div>
               <div>
-                <Label>Regime</Label>
+                <Label>Regime *</Label>
                 <Select value={form.regime} onValueChange={v => setForm({ ...form, regime: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -141,7 +159,7 @@ export function FuncionarioDadosDialog({ open, onOpenChange, clinicaId, editingC
                 </Select>
               </div>
               <div>
-                <Label>Cargo</Label>
+                <Label>Cargo *</Label>
                 <Select value={form.cargo_id} onValueChange={v => setForm({ ...form, cargo_id: v })}>
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent>{cargos.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
@@ -155,27 +173,32 @@ export function FuncionarioDadosDialog({ open, onOpenChange, clinicaId, editingC
                 </Select>
               </div>
               <div><Label>Carga semanal (h)</Label><Input type="number" step="0.5" value={form.carga_horaria_semanal} onChange={e => setForm({ ...form, carga_horaria_semanal: e.target.value })} /></div>
-              <div><Label>Salário (R$)</Label><Input type="number" step="0.01" value={form.salario} onChange={e => setForm({ ...form, salario: e.target.value })} /></div>
-              <div><Label>Admissão</Label><DateInputBR value={form.data_admissao} onChange={e => setForm({ ...form, data_admissao: e.target.value })} /></div>
+              <div><Label>Salário (R$) *</Label><Input type="number" step="0.01" value={form.salario} onChange={e => setForm({ ...form, salario: e.target.value })} /></div>
+              <div><Label>Admissão *</Label><DateInputBR value={form.data_admissao} onChange={e => setForm({ ...form, data_admissao: e.target.value })} /></div>
               <div><Label>Demissão</Label><DateInputBR value={form.data_demissao} onChange={e => setForm({ ...form, data_demissao: e.target.value })} /></div>
               <div>
-                <Label>Status</Label>
+                <Label>Situação</Label>
                 <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ativo">Ativo</SelectItem>
+                    <SelectItem value="inativo">Inativo</SelectItem>
                     <SelectItem value="afastado">Afastado</SelectItem>
                     <SelectItem value="ferias">Em férias</SelectItem>
                     <SelectItem value="desligado">Desligado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              <div className="col-span-2">
+                <Label>Observações</Label>
+                <Textarea rows={3} value={form.observacoes} onChange={e => setForm({ ...form, observacoes: e.target.value })} />
+              </div>
             </div>
           </div>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={salvar} disabled={saving || loading}>{saving ? "Salvando…" : "Salvar"}</Button>
+          <Button onClick={salvar} disabled={saving || loading}>{saving ? "Salvando…" : (editingContratoId ? "Salvar alterações" : "Salvar")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
