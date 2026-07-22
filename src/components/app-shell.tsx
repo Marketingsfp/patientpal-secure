@@ -409,7 +409,7 @@ export function AppShell() {
       : navRows;
   const scopedNavRows = filteredByGroup.map((row) => {
     if (row.label !== "Gestão") return row;
-    const gestaoPessoasItems = new Set(["/app/funcionarios", "/app/cargos", "/app/setores"]);
+    const gestaoPessoasItems = new Set(["/app/cargos", "/app/setores"]);
     const items = !isRodrigoFullAccess && subsystem === "gestao-pessoas"
       ? row.items.filter((it) => !isParent(it) && gestaoPessoasItems.has(it.to))
       : row.items.filter((it) => isParent(it) || !gestaoPessoasItems.has(it.to));
