@@ -213,11 +213,11 @@ interface ToothShape {
 function toothShape(dente: number, superior: boolean): ToothShape {
   const type = toothType(dente);
   const vbW = 40;
-  const vbH = 92;
-  // Coroa mais compacta; raiz longa para anteriores/caninos, mais curta para molares.
-  const chByType: Record<ToothType, number> = { molar: 34, premolar: 30, canine: 30, incisor: 30 };
-  const rhByType: Record<ToothType, number> = { molar: 42, premolar: 50, canine: 56, incisor: 52 };
-  const cwByType: Record<ToothType, number> = { molar: 32, premolar: 26, canine: 22, incisor: 22 };
+  const vbH = 90;
+  // Coroa compacta; raiz longa para anteriores/caninos, mais curta para molares.
+  const chByType: Record<ToothType, number> = { molar: 36, premolar: 32, canine: 32, incisor: 32 };
+  const rhByType: Record<ToothType, number> = { molar: 40, premolar: 48, canine: 52, incisor: 48 };
+  const cwByType: Record<ToothType, number> = { molar: 34, premolar: 28, canine: 24, incisor: 24 };
   const ch = chByType[type];
   const rootH = rhByType[type];
   const cw = cwByType[type];
@@ -237,25 +237,25 @@ function toothShape(dente: number, superior: boolean): ToothShape {
   const single = (x: number, w: number, curve = 0) => singleRootPath(x, w, rootNeck, rootTip, superior, curve);
   if (type === "molar") {
     if (superior) {
-      // 3 raízes divergentes: 2 vestibulares (M/D) + 1 palatina central (mais atrás visualmente)
+      // 3 raízes: 2 vestibulares (M/D) + 1 palatina central. Divergência sutil.
       rootPath = [
-        single(cx0 + 6, 5.5, -2.5),
-        single(cx0 + cw - 6, 5.5, 2.5),
-        single(cx, 5),
+        single(cx0 + 7, 7, -1.5),
+        single(cx0 + cw - 7, 7, 1.5),
+        single(cx, 6.5),
       ].join(" ");
     } else {
-      // 2 raízes divergentes (mesial + distal)
+      // 2 raízes (mesial + distal) — divergência sutil, corpo cheio
       rootPath = [
-        single(cx0 + 8, 6, -1.8),
-        single(cx0 + cw - 8, 6, 1.8),
+        single(cx0 + 8.5, 8, -1.2),
+        single(cx0 + cw - 8.5, 8, 1.2),
       ].join(" ");
     }
   } else if (type === "premolar") {
-    rootPath = single(cx, 6.5);
+    rootPath = single(cx, 8.5);
   } else if (type === "canine") {
-    rootPath = single(cx, 6);
+    rootPath = single(cx, 8);
   } else {
-    rootPath = single(cx, 5.5);
+    rootPath = single(cx, 7.5);
   }
 
   return { crownPath, rootPath, cx0, crownY, cw, ch, vbW, vbH };
@@ -362,20 +362,20 @@ function singleRootPath(
   curveX = 0,
 ): string {
   const half = width / 2;
-  // Raiz afilando da base larga (colo) para uma ponta arredondada.
+  // Raiz afilando da base larga (colo) para uma ponta arredondada e cheia.
   // `curveX` desloca a ponta lateralmente para simular divergência (molares).
-  const tipHalf = Math.max(0.9, width * 0.22);
+  const tipHalf = Math.max(1.2, width * 0.38);
   const tipX = x + curveX;
   const midY = (neckY + tipY) / 2;
   const sign = superior ? 1 : -1; // sinal para "afastar a ponta do colo"
-  // Controle da curvatura da lateral: no meio, ligeiramente para fora; na ponta, converge.
-  const ctrl1YOut = midY - sign * 2; // próximo ao colo
-  const ctrl2YOut = tipY + sign * 4; // próximo à ponta
+  // Curvatura da lateral: converge suavemente até a ponta arredondada.
+  const ctrl1Y = midY - sign * 4;
+  const ctrl2Y = tipY + sign * 6;
   return [
     `M ${x - half},${neckY}`,
-    `C ${x - half - 0.5},${ctrl1YOut} ${tipX - tipHalf - 0.5},${ctrl2YOut} ${tipX - tipHalf},${tipY + sign * 1}`,
-    `Q ${tipX},${tipY - sign * 1.2} ${tipX + tipHalf},${tipY + sign * 1}`,
-    `C ${tipX + tipHalf + 0.5},${ctrl2YOut} ${x + half + 0.5},${ctrl1YOut} ${x + half},${neckY}`,
+    `C ${x - half},${ctrl1Y} ${tipX - tipHalf},${ctrl2Y} ${tipX - tipHalf},${tipY + sign * 2}`,
+    `Q ${tipX},${tipY - sign * 1.5} ${tipX + tipHalf},${tipY + sign * 2}`,
+    `C ${tipX + tipHalf},${ctrl2Y} ${x + half},${ctrl1Y} ${x + half},${neckY}`,
     `Z`,
   ].join(" ");
 }
