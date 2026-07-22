@@ -3503,18 +3503,38 @@ function Page() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {detalheMovs.map((m) => (
-                      <TableRow key={m.id}>
-                        <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
-                        <TableCell>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
-                        <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
-                        <TableCell>{m.descricao || "—"}</TableCell>
-                        <TableCell><FormaCellEditavel m={m} /></TableCell>
-                        <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
-                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {detalheMovs.flatMap((m) => {
+                      const bucket = bucketDeMov(m);
+                      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+                      const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+                      const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
+                      if (bucket === "misto" && entradas.length > 0) {
+                        return entradas.map(([k, v], idx) => (
+                          <TableRow key={`${m.id}-${k}`}>
+                            <TableCell className="whitespace-nowrap">{idx === 0 ? new Date(m.created_at).toLocaleDateString("pt-BR") : ""}</TableCell>
+                            <TableCell>{idx === 0 ? new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""}</TableCell>
+                            <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
+                            <TableCell>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
+                            <TableCell>{FORMA_LABEL[k] ?? k}</TableCell>
+                            <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
+                              {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
+                            </TableCell>
+                          </TableRow>
+                        ));
+                      }
+                      return [(
+                        <TableRow key={m.id}>
+                          <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
+                          <TableCell>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
+                          <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
+                          <TableCell>{m.descricao || "—"}</TableCell>
+                          <TableCell><FormaCellEditavel m={m} /></TableCell>
+                          <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
+                            {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+                          </TableCell>
+                        </TableRow>
+                      )];
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -3579,17 +3599,36 @@ function Page() {
                       if (caixaDrill === "saidas") return m.tipo === "sangria" || m.tipo === "despesa" || m.tipo === "estorno";
                       return true;
                     })
-                    .map((m) => (
-                      <TableRow key={m.id}>
-                        <TableCell className="whitespace-nowrap">{fmtDT(m.created_at)}</TableCell>
-                        <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
-                        <TableCell>{m.descricao ?? "—"}</TableCell>
-                        <TableCell><FormaCellEditavel m={m} /></TableCell>
-                        <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
-                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    .flatMap((m) => {
+                      const bucket = bucketDeMov(m);
+                      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+                      const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+                      const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
+                      if (bucket === "misto" && entradas.length > 0) {
+                        return entradas.map(([k, v], idx) => (
+                          <TableRow key={`${m.id}-${k}`}>
+                            <TableCell className="whitespace-nowrap">{idx === 0 ? fmtDT(m.created_at) : ""}</TableCell>
+                            <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
+                            <TableCell>{idx === 0 ? (m.descricao ?? "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
+                            <TableCell>{FORMA_LABEL[k] ?? k}</TableCell>
+                            <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
+                              {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
+                            </TableCell>
+                          </TableRow>
+                        ));
+                      }
+                      return [(
+                        <TableRow key={m.id}>
+                          <TableCell className="whitespace-nowrap">{fmtDT(m.created_at)}</TableCell>
+                          <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
+                          <TableCell>{m.descricao ?? "—"}</TableCell>
+                          <TableCell><FormaCellEditavel m={m} /></TableCell>
+                          <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
+                            {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+                          </TableCell>
+                        </TableRow>
+                      )];
+                    })}
                 </TableBody>
               </Table>
             </div>
