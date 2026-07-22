@@ -96,3 +96,50 @@ export function computeValor(
   }
   return null;
 }
+
+/**
+ * Acréscimo automático aplicado ao valor "outros" (não-dinheiro: PIX, débito,
+ * crédito) quando o paciente usa um benefício de um convênio do Cartão
+ * Benefícios. Cadastrado por convênio (tabela `cb_convenios`). Nunca vale
+ * para o Convênio Funcionário.
+ */
+export interface CbAcrescimoCartao {
+  modo: "percentual" | "valor_fixo" | null;
+  percentual: number;
+  valor: number;
+}
+
+/** True se o nome do convênio identifica o interno "FUNCIONARIO". */
+export function isConvenioFuncionarioNome(nome: string | null | undefined): boolean {
+  return (nome ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .includes("FUNCIONARIO");
+}
+
+/**
+ * Aplica o acréscimo de cartão sobre o valor "outros" (não-dinheiro).
+ * - Convênio Funcionário: nunca acresce.
+ * - `valorOutros <= 0` (ex.: gratuidade): não faz sentido acrescer sobre 0.
+ * - Sem acréscimo configurado (`modo` nulo): retorna o próprio valor.
+ */
+export function applyAcrescimoCartao(
+  valorOutros: number,
+  acr: CbAcrescimoCartao | null | undefined,
+  convenioNome?: string | null,
+): number {
+  if (!acr || !acr.modo) return valorOutros;
+  if (isConvenioFuncionarioNome(convenioNome)) return valorOutros;
+  if (!(valorOutros > 0)) return valorOutros;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  if (acr.modo === "percentual") {
+    const p = Number(acr.percentual) || 0;
+    return round2(valorOutros * (1 + p / 100));
+  }
+  if (acr.modo === "valor_fixo") {
+    const v = Number(acr.valor) || 0;
+    return round2(valorOutros + v);
+  }
+  return valorOutros;
+}

@@ -323,6 +323,12 @@ type ConvenioInfo = {
   emCarencia?: boolean;
   /** Dias restantes de tolerância na parcela vencida mais crítica. */
   diasCarenciaRestantes?: number | null;
+  /** Acréscimo configurado no convênio para pagamentos não-dinheiro. */
+  acrescimoCartao?: {
+    modo: "percentual" | "valor_fixo" | null;
+    percentual: number;
+    valor: number;
+  } | null;
 };
 
 function aplicarDesconto(valor: number, d: DescontoConvenio): number {
@@ -340,6 +346,25 @@ function aplicarDescontoPorForma(valor: number, forma: string, d: DescontoConven
     return Math.max(0, v || 0);
   }
   return aplicarDesconto(valor, d);
+}
+
+/**
+ * Aplica o acréscimo configurado no convênio quando a forma de pagamento
+ * NÃO é dinheiro (PIX, débito, crédito, etc.). Não afeta valores <= 0 nem
+ * o Convênio Funcionário (checagem já feita antes de setar `acrescimoCartao`).
+ */
+function aplicarAcrescimoCartaoAgenda(
+  valor: number,
+  forma: string,
+  acr: NonNullable<ConvenioInfo["acrescimoCartao"]> | null | undefined,
+): number {
+  if (!acr || !acr.modo) return valor;
+  if (forma === "dinheiro") return valor;
+  if (!(valor > 0)) return valor;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  if (acr.modo === "percentual") return round2(valor * (1 + (Number(acr.percentual) || 0) / 100));
+  if (acr.modo === "valor_fixo") return round2(valor + (Number(acr.valor) || 0));
+  return valor;
 }
 
 async function obterInfoConvenioPaciente(params: {
@@ -970,7 +995,28 @@ async function obterInfoConvenioPaciente(params: {
     }
   }
 
-  return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear, emCarencia, diasCarenciaRestantes };
+  // Carrega acréscimo de cartão do convênio (aplicado no fluxo de cobrança
+  // quando a forma de pagamento não é dinheiro). Convênio Funcionário nunca
+  // recebe acréscimo — o nome do convênio já é normalizado abaixo.
+  let acrescimoCartao: ConvenioInfo["acrescimoCartao"] = null;
+  const nomeUpper = (convenioNome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  if (!nomeUpper.includes("FUNCIONARIO") && contrato.convenio_id) {
+    const { data: convRow } = await supabase
+      .from("cb_convenios")
+      .select("acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor")
+      .eq("id", contrato.convenio_id)
+      .maybeSingle();
+    const row = convRow as { acrescimo_cartao_modo: string | null; acrescimo_cartao_percentual: number | null; acrescimo_cartao_valor: number | null } | null;
+    if (row?.acrescimo_cartao_modo) {
+      acrescimoCartao = {
+        modo: row.acrescimo_cartao_modo as "percentual" | "valor_fixo",
+        percentual: Number(row.acrescimo_cartao_percentual) || 0,
+        valor: Number(row.acrescimo_cartao_valor) || 0,
+      };
+    }
+  }
+
+  return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear, emCarencia, diasCarenciaRestantes, acrescimoCartao };
 }
 
 const toLocalInput = (iso: string) => {
@@ -3852,7 +3898,14 @@ function AgendaPage() {
           });
           descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
         } else if (info.desconto) {
-          opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
+          opcoes = opcoes.map((o) => ({
+            ...o,
+            valor: aplicarAcrescimoCartaoAgenda(
+              aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
+              o.forma,
+              info.acrescimoCartao,
+            ),
+          }));
           const rotulo =
             info.desconto.tipo === "gratuidade"
               ? "GRATUIDADE"
@@ -4194,7 +4247,14 @@ function AgendaPage() {
           });
           descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
         } else if (info.desconto) {
-          opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
+          opcoes = opcoes.map((o) => ({
+            ...o,
+            valor: aplicarAcrescimoCartaoAgenda(
+              aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
+              o.forma,
+              info.acrescimoCartao,
+            ),
+          }));
           const rotulo =
             info.desconto.tipo === "gratuidade"
               ? "GRATUIDADE"

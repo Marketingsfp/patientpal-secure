@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
+import { findRegra, computeValor, applyAcrescimoCartao, type CbRegra, type CbAcrescimoCartao } from "@/lib/cb-regras";
 
 type EspOpt = { id: string; nome: string };
 type ProcOpt = { id: string; nome: string; codigo: string | null; tipo: string | null };
@@ -79,8 +79,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
   const [novoOpen, setNovoOpen] = useState(false);
   const [editRegra, setEditRegra] = useState<CbRegra | null>(null);
-  const [apagarTodasOpen, setApagarTodasOpen] = useState(false);
-  const [apagandoTodas, setApagandoTodas] = useState(false);
   const [filtroGratuito, setFiltroGratuito] = useState<"todos" | "sim" | "nao">("todos");
   const [filtroCarencia, setFiltroCarencia] = useState<string>("todos");
   const [filtroLimite, setFiltroLimite] = useState<"todos" | "com" | "sem">("todos");
@@ -298,23 +296,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     setRegras(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const apagarTodas = async () => {
-    if (!convenioId) return;
-    setApagandoTodas(true);
-    try {
-      const { error } = await (supabase as any)
-        .from("cb_convenio_regras")
-        .delete()
-        .eq("convenio_id", convenioId);
-      if (error) { mostrarErro(error); return; }
-      setRegras([]);
-      toast.success("Todas as regras foram apagadas.");
-      setApagarTodasOpen(false);
-    } finally {
-      setApagandoTodas(false);
-    }
-  };
-
   const salvar = async () => {
     if (!convenioId) return;
     setLoading(true);
@@ -384,6 +365,21 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         if (page.length < PAGE) break;
       }
 
+      // 1.5) Carrega acréscimo de cartão do convênio (aplicado sobre valor_outros
+      // quando NÃO for Convênio Funcionário).
+      const { data: convRow } = await (supabase as any)
+        .from("cb_convenios")
+        .select("acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor")
+        .eq("id", convenioId)
+        .maybeSingle();
+      const acr: CbAcrescimoCartao | null = convRow?.acrescimo_cartao_modo
+        ? {
+            modo: convRow.acrescimo_cartao_modo,
+            percentual: Number(convRow.acrescimo_cartao_percentual) || 0,
+            valor: Number(convRow.acrescimo_cartao_valor) || 0,
+          }
+        : null;
+
       // 2) carrega vínculos N:N de especialidades
       const { data: vinc, error: errVinc } = await supabase
         .from("procedimento_especialidades")
@@ -432,12 +428,13 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           }
         }
         if (best) {
+          const outrosComAcr = applyAcrescimoCartao(best.outros, acr, convenioNome);
           upserts.push({
             clinica_id: clinicaId,
             procedimento_id: p.id,
             convenio_id: convenioId,
             valor_dinheiro: best.dinheiro,
-            valor_outros: best.outros,
+            valor_outros: outrosComAcr,
             origem: "regra",
           });
         }
@@ -548,17 +545,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
             <RefreshCw className={`h-4 w-4 mr-1 ${reapplying ? "animate-spin" : ""}`} />
             {reapplying ? (progress || "Aplicando…") : "Reaplicar a todos os serviços"}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive hover:text-destructive"
-            onClick={() => setApagarTodasOpen(true)}
-            disabled={regras.length === 0 || reapplying}
-          >
-            <Trash2 className="h-4 w-4 mr-1" /> Apagar todas as regras
-          </Button>
         </div>
       </div>
+
+      {convenioId && !isFuncionario && (
+        <AcrescimoCartaoBox convenioId={convenioId} />
+      )}
 
       <div className="flex items-center justify-end">
         <div className="text-xs text-muted-foreground">
@@ -886,28 +878,106 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         regra={editRegra}
         onSaved={async () => { setEditRegra(null); await load(); }}
       />
-      <AlertDialog open={apagarTodasOpen} onOpenChange={setApagarTodasOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Apagar todas as regras?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação vai remover permanentemente as <strong>{regras.length}</strong> regra(s) de preço do convênio
-              <strong> "{convenioNome}"</strong>. Os valores já aplicados aos serviços não serão alterados, mas nenhuma nova
-              regra ficará disponível até que você cadastre outras. Esta operação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={apagandoTodas}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); void apagarTodas(); }}
-              disabled={apagandoTodas}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {apagandoTodas ? "Apagando…" : "Sim, apagar tudo"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Acréscimo por cartão (convênio-level)
+// ---------------------------------------------------------------------------
+function AcrescimoCartaoBox({ convenioId }: { convenioId: string }) {
+  const [modo, setModo] = useState<"" | "percentual" | "valor_fixo">("");
+  const [percentual, setPercentual] = useState<string>("0");
+  const [valor, setValor] = useState<string>("0");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      setLoading(true);
+      const { data, error } = await (supabase as any)
+        .from("cb_convenios")
+        .select("acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor")
+        .eq("id", convenioId)
+        .maybeSingle();
+      setLoading(false);
+      if (cancel) return;
+      if (error) { mostrarErro(error); return; }
+      setModo((data?.acrescimo_cartao_modo as any) ?? "");
+      setPercentual(String(data?.acrescimo_cartao_percentual ?? 0));
+      setValor(String(data?.acrescimo_cartao_valor ?? 0));
+    })();
+    return () => { cancel = true; };
+  }, [convenioId]);
+
+  const salvar = async () => {
+    setSaving(true);
+    const payload = {
+      acrescimo_cartao_modo: modo || null,
+      acrescimo_cartao_percentual: modo === "percentual" ? Number(percentual) || 0 : 0,
+      acrescimo_cartao_valor: modo === "valor_fixo" ? Number(valor) || 0 : 0,
+    };
+    const { error } = await (supabase as any)
+      .from("cb_convenios")
+      .update(payload)
+      .eq("id", convenioId);
+    setSaving(false);
+    if (error) { mostrarErro(error); return; }
+    toast.success("Acréscimo de cartão salvo.");
+  };
+
+  return (
+    <div className="rounded-md border bg-muted/30 p-4 space-y-3">
+      <div>
+        <div className="font-medium">Valor de cartão com acréscimo de</div>
+        <p className="text-xs text-muted-foreground">
+          Quando o paciente usa o benefício e paga em uma forma diferente de dinheiro
+          (PIX, débito ou crédito), o valor recebe este acréscimo automaticamente.
+          Não se aplica ao Convênio Funcionário.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs">Tipo</Label>
+          <Select value={modo || "none"} onValueChange={(v) => setModo(v === "none" ? "" : (v as any))}>
+            <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Sem acréscimo</SelectItem>
+              <SelectItem value="percentual">Percentual (%)</SelectItem>
+              <SelectItem value="valor_fixo">Valor fixo (R$)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {modo === "percentual" && (
+          <div className="space-y-1">
+            <Label className="text-xs">Percentual</Label>
+            <div className="flex items-center gap-1">
+              <Input
+                type="number" min="0" step="0.01" className="w-[110px] h-9"
+                value={percentual}
+                onChange={(e) => setPercentual(e.target.value)}
+                disabled={loading}
+              />
+              <span className="text-sm text-muted-foreground">%</span>
+            </div>
+          </div>
+        )}
+        {modo === "valor_fixo" && (
+          <div className="space-y-1">
+            <Label className="text-xs">Valor</Label>
+            <CurrencyInput
+              value={valor}
+              onChange={(v) => setValor(v)}
+              className="w-[140px] h-9"
+              disabled={loading}
+            />
+          </div>
+        )}
+        <Button size="sm" onClick={salvar} disabled={saving || loading}>
+          {saving ? "Salvando…" : "Salvar acréscimo"}
+        </Button>
+      </div>
     </div>
   );
 }
