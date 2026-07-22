@@ -66,7 +66,7 @@ export const MARKETING_TABS: ReadonlyArray<SectionTab> = [
 
 export const RH_TABS: ReadonlyArray<SectionTab> = [
   { to: "/app/hr-ponto", label: "Ponto", icon: Clock, modulo: "hr-ponto" },
-  { to: "/app/hr-contratos", label: "Contratos", icon: FileSignature, modulo: "hr-contratos" },
+  { to: "/app/hr-contratos", label: "Funcionários", icon: FileSignature, modulo: "hr-contratos" },
   { to: "/app/hr-ferias", label: "Férias", icon: Palmtree, modulo: "hr-ferias" },
   { to: "/app/hr-holerites", label: "Holerites", icon: FileText, modulo: "hr-holerites" },
   { to: "/app/treinamentos", label: "Treinamentos", icon: GraduationCap, modulo: "treinamentos" },
