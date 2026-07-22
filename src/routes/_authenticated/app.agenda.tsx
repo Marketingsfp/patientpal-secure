@@ -7452,18 +7452,35 @@ function AgendaPage() {
                               const podeEmitir = pagosSet.has(a.id);
                               if (!emitida && !podeEmitir) return null;
                               return (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  title={emitida ? `NFS-e ${nf?.numero ?? ""}` : "Emitir NFS-e"}
-                                  onClick={() => verOuEmitirNota(a)}
-                                  className={`h-7 w-7 rounded-md border-2 ${emitida
-                                    ? "border-sky-400 bg-sky-50 text-sky-600 hover:bg-sky-100"
-                                    : "border-sky-200 text-sky-400 hover:border-sky-400 hover:bg-sky-50"
-                                    }`}
-                                >
-                                  <FileText className="h-3.5 w-3.5" strokeWidth={emitida ? 3 : 2.5} />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  {!emitida && podeEmitir && a.paciente_id && (
+                                    <input
+                                      type="checkbox"
+                                      title="Selecionar para NFS-e agrupada"
+                                      className="h-3.5 w-3.5 cursor-pointer accent-sky-500"
+                                      checked={nfseSel.has(a.id)}
+                                      onChange={(e) => {
+                                        setNfseSel((prev) => {
+                                          const n = new Set(prev);
+                                          if (e.target.checked) n.add(a.id); else n.delete(a.id);
+                                          return n;
+                                        });
+                                      }}
+                                    />
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    title={emitida ? `NFS-e ${nf?.numero ?? ""}` : "Emitir NFS-e"}
+                                    onClick={() => verOuEmitirNota(a)}
+                                    className={`h-7 w-7 rounded-md border-2 ${emitida
+                                      ? "border-sky-400 bg-sky-50 text-sky-600 hover:bg-sky-100"
+                                      : "border-sky-200 text-sky-400 hover:border-sky-400 hover:bg-sky-50"
+                                      }`}
+                                  >
+                                    <FileText className="h-3.5 w-3.5" strokeWidth={emitida ? 3 : 2.5} />
+                                  </Button>
+                                </div>
                               );
                             })()}
 
