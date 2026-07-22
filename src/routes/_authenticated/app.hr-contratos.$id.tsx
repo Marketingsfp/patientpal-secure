@@ -41,6 +41,7 @@ const PERFIS = [
   { value: "medico", label: "Médico" },
   { value: "enfermeiro", label: "Enfermeiro" },
   { value: "recepcao", label: "Recepção" },
+  { value: "caixa", label: "Caixa" },
   { value: "financeiro", label: "Financeiro" },
 ] as const;
 
