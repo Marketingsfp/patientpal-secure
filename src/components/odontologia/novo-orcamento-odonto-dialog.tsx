@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Search } from "lucide-react";
+import { Plus, Trash2, Search, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { printOrcamento } from "@/lib/print-orcamento";
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { DentePicker } from "./dente-picker";
 
 interface Procedimento {
@@ -72,6 +73,11 @@ export function NovoOrcamentoOdontoDialog({
   const [itens, setItens] = useState<Item[]>([]);
   const [saving, setSaving] = useState(false);
 
+  // Seleção corrente no odontograma (dentes que receberão o próximo serviço)
+  const [selecao, setSelecao] = useState<number[]>([]);
+  // Controla se o painel de busca está aberto (aparece após clicar em dente ou botão)
+  const [buscaAberta, setBuscaAberta] = useState(false);
+
   // IDs dos procedimentos vinculados à especialidade Odontologia (cache p/ busca)
   const [procIdsOdonto, setProcIdsOdonto] = useState<Set<string> | null>(null);
 
@@ -102,6 +108,7 @@ export function NovoOrcamentoOdontoDialog({
       setMedicoNome(""); setMedicoId(""); setFormasPagamento(["Dinheiro"]);
       setDesconto(0); setValidade(30); setObservacoes(""); setItens([]);
       setProcQuery(""); setProcResults([]);
+      setSelecao([]); setBuscaAberta(false);
     }
   }, [open]);
 
@@ -162,15 +169,41 @@ export function NovoOrcamentoOdontoDialog({
       quantidade: 1,
       valor_unitario: valorPorForma(p, formas[0]),
       procedimento_id: p.id,
-      dentes: [],
+      dentes: [...selecao].sort((a, b) => a - b),
       valores_formas: valores,
     }]);
     if (p.valor_variavel) toast.info(`${p.nome} tem valor variável — informe o valor cobrado.`);
     setProcQuery(""); setProcResults([]);
+    setSelecao([]); setBuscaAberta(false);
   };
 
   const adicionarManual = () => {
-    setItens((arr) => [...arr, { descricao: "", quantidade: 1, valor_unitario: 0, procedimento_id: null, dentes: [], valores_formas: null }]);
+    setItens((arr) => [...arr, {
+      descricao: "", quantidade: 1, valor_unitario: 0,
+      procedimento_id: null,
+      dentes: [...selecao].sort((a, b) => a - b),
+      valores_formas: null,
+    }]);
+    setSelecao([]); setBuscaAberta(false);
+  };
+
+  const abrirBuscaComDente = (d: number) => {
+    // Toggle: clicar de novo em um dente já selecionado remove ele
+    setSelecao((cur) => {
+      const set = new Set(cur);
+      if (set.has(d)) set.delete(d); else set.add(d);
+      const arr = Array.from(set).sort((a, b) => a - b);
+      if (arr.length > 0) setBuscaAberta(true);
+      else setBuscaAberta(false);
+      return arr;
+    });
+  };
+
+  const selecionarArcada = (tipo: "sup" | "inf") => {
+    const sup = [18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28];
+    const inf = [48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38];
+    setSelecao(tipo === "sup" ? sup : inf);
+    setBuscaAberta(true);
   };
 
   const atualizarItem = <K extends keyof Item>(idx: number, campo: K, valor: Item[K]) => {
@@ -259,16 +292,17 @@ export function NovoOrcamentoOdontoDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Novo orçamento — Odontologia</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Cabeçalho compacto */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-1"><Label>Paciente</Label><Input value={pacienteNome} disabled /></div>
             <div className="space-y-1"><Label>Telefone</Label><Input value={pacienteTelefone ?? ""} disabled /></div>
-            <div className="space-y-1 md:col-span-2">
+            <div className="space-y-1">
               <Label>Dentista</Label>
               <select
                 className="w-full border rounded-md px-3 py-2 text-sm bg-background"
@@ -293,78 +327,169 @@ export function NovoOrcamentoOdontoDialog({
             </div>
           </div>
 
-          <div className="border rounded-md p-3 space-y-3">
-            <Label className="text-sm">Adicionar procedimento (só especialidade Odontologia)</Label>
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                className="pl-8"
-                value={procQuery}
-                onChange={(e) => setProcQuery(e.target.value)}
-                placeholder="Digite pelo menos 2 letras — ex.: restauração, canal, extração…"
-              />
-              {procIdsOdonto && procIdsOdonto.size === 0 && (
-                <p className="text-xs text-amber-600 mt-1">
-                  Nenhum procedimento cadastrado com a especialidade Odontologia. Cadastre em Serviços.
+          {/* Odontograma — seleção de dentes */}
+          <div className="border rounded-md p-3 space-y-3 bg-muted/20">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <Label className="text-sm">Odontograma</Label>
+                <p className="text-xs text-muted-foreground">
+                  Clique nos dentes que receberão o serviço, ou selecione uma arcada inteira.
                 </p>
-              )}
-              {procResults.length > 0 && (
-                <div className="border rounded-md mt-1 max-h-64 overflow-auto bg-background shadow-sm">
-                  {procResults.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => adicionarProc(p)}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-muted border-b last:border-0"
-                    >
-                      <div className="font-medium">{p.nome}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {p.valor_padrao ? `Padrão R$ ${Number(p.valor_padrao).toFixed(2)}` : "Valor variável"}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {searchingProc && <p className="text-xs text-muted-foreground mt-1">Buscando…</p>}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => selecionarArcada("sup")}>
+                  Arcada superior
+                </Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => selecionarArcada("inf")}>
+                  Arcada inferior
+                </Button>
+                <Button
+                  type="button" size="sm" variant="ghost"
+                  onClick={() => { setSelecao([]); setBuscaAberta(false); }}
+                  disabled={selecao.length === 0}
+                >
+                  Limpar
+                </Button>
+              </div>
             </div>
-            <Button type="button" variant="ghost" size="sm" onClick={adicionarManual}>
-              <Plus className="h-4 w-4 mr-1" /> Adicionar item manual
-            </Button>
+            <div className="rounded-md bg-background p-2">
+              <DentePicker
+                inline
+                value={selecao}
+                onChange={(v) => { setSelecao(v); if (v.length > 0) setBuscaAberta(true); else setBuscaAberta(false); }}
+              />
+            </div>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-xs text-muted-foreground">
+                {selecao.length === 0 ? "Nenhum dente selecionado" : `${selecao.length} dente(s) selecionado(s): ${selecao.join(", ")}`}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  type="button" size="sm"
+                  onClick={() => setBuscaAberta(true)}
+                  disabled={selecao.length === 0}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Adicionar serviço aos dentes selecionados
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={adicionarManual}>
+                  Item manual
+                </Button>
+              </div>
+            </div>
+
+            {buscaAberta && (
+              <div className="border rounded-md p-3 bg-background space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Escolher procedimento (Odontologia)</Label>
+                  <button
+                    type="button"
+                    onClick={() => { setBuscaAberta(false); setProcQuery(""); setProcResults([]); }}
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label="Fechar busca"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    autoFocus
+                    className="pl-8"
+                    value={procQuery}
+                    onChange={(e) => setProcQuery(e.target.value)}
+                    placeholder="Digite ao menos 2 letras — ex.: restauração, canal, extração…"
+                  />
+                </div>
+                {procIdsOdonto && procIdsOdonto.size === 0 && (
+                  <p className="text-xs text-amber-600">
+                    Nenhum procedimento cadastrado na especialidade Odontologia. Cadastre em Serviços.
+                  </p>
+                )}
+                {procResults.length > 0 && (
+                  <div className="border rounded-md max-h-64 overflow-auto">
+                    {procResults.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => adicionarProc(p)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted border-b last:border-0"
+                      >
+                        <div className="font-medium">{p.nome}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {p.valor_padrao ? `Padrão R$ ${Number(p.valor_padrao).toFixed(2)}` : "Valor variável"}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {searchingProc && <p className="text-xs text-muted-foreground">Buscando…</p>}
+              </div>
+            )}
           </div>
 
+          {/* Lista de itens */}
           {itens.length > 0 && (
-            <div className="border rounded-md divide-y">
-              {itens.map((it, idx) => (
-                <div key={idx} className="p-3 space-y-2">
-                  <div className="flex items-start gap-2">
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_90px_140px] gap-2">
-                      <Input
-                        value={it.descricao}
-                        onChange={(e) => atualizarItem(idx, "descricao", e.target.value)}
-                        placeholder="Descrição"
-                      />
-                      <Input
-                        type="number" min={1} max={999}
-                        value={it.quantidade}
-                        onChange={(e) => atualizarItem(idx, "quantidade", Number(e.target.value))}
-                      />
-                      <CurrencyInput
-                        value={it.valor_unitario ? it.valor_unitario.toFixed(2) : ""}
-                        onChange={(v) => atualizarItem(idx, "valor_unitario", v === "" ? 0 : Number(v))}
-                      />
+            <div className="border rounded-md">
+              <div className="px-3 py-2 border-b bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Serviços incluídos ({itens.length})
+              </div>
+              <div className="divide-y">
+                {itens.map((it, idx) => {
+                  const valDin = Number(it.valores_formas?.["Dinheiro"] ?? it.valores_formas?.["PIX"] ?? it.valor_unitario ?? 0);
+                  const valCart = Number(it.valores_formas?.["Cartão de Crédito"] ?? it.valores_formas?.["Cartão de Débito"] ?? it.valor_unitario ?? 0);
+                  const sub = Number(it.quantidade || 0) * Number(it.valor_unitario || 0);
+                  return (
+                    <div key={idx} className="p-3 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-start gap-2 flex-wrap">
+                            <div className="flex flex-wrap gap-1 min-w-[120px]">
+                              {it.dentes.length === 0 ? (
+                                <span className="text-xs text-muted-foreground italic">sem dente</span>
+                              ) : (
+                                it.dentes.map((d) => (
+                                  <Badge key={d} variant="secondary" className="font-mono text-[11px]">{d}</Badge>
+                                ))
+                              )}
+                              <DentePicker value={it.dentes} onChange={(v) => atualizarItem(idx, "dentes", v)} />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-[1fr_70px_120px_120px_110px] gap-2 items-center">
+                            <Input
+                              value={it.descricao}
+                              onChange={(e) => atualizarItem(idx, "descricao", e.target.value)}
+                              placeholder="Descrição"
+                            />
+                            <Input
+                              type="number" min={1} max={999}
+                              value={it.quantidade}
+                              onChange={(e) => atualizarItem(idx, "quantidade", Number(e.target.value))}
+                            />
+                            <div className="space-y-0.5">
+                              <div className="text-[10px] text-muted-foreground">Dinheiro/PIX</div>
+                              <div className="text-sm tabular-nums">R$ {valDin.toFixed(2)}</div>
+                            </div>
+                            <div className="space-y-0.5">
+                              <div className="text-[10px] text-muted-foreground">Cartão</div>
+                              <div className="text-sm tabular-nums">R$ {valCart.toFixed(2)}</div>
+                            </div>
+                            <CurrencyInput
+                              value={it.valor_unitario ? it.valor_unitario.toFixed(2) : ""}
+                              onChange={(v) => atualizarItem(idx, "valor_unitario", v === "" ? 0 : Number(v))}
+                            />
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Subtotal deste item: <span className="font-medium text-foreground">R$ {sub.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        <Button type="button" variant="ghost" size="icon" onClick={() => remover(idx)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => remover(idx)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <DentePicker value={it.dentes} onChange={(v) => atualizarItem(idx, "dentes", v)} />
-                    <span className="text-xs text-muted-foreground">
-                      Subtotal: R$ {(Number(it.quantidade || 0) * Number(it.valor_unitario || 0)).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
           )}
 
