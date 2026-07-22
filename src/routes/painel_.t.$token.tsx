@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PainelPage } from "./painel";
+import { PainelPage } from "@/components/painel/painel-page";
 import { PublicClinicaProvider } from "@/components/public-clinica-provider";
 
 // Sufixo "_" no segmento pai des-aninha esta rota de /painel (que não
