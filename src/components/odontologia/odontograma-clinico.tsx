@@ -100,6 +100,10 @@ function DenteFaces({
   const c = (f: OdontoFace) => STATUS_COR[estados[`${dente}-${f}`] ?? estados[`${dente}-INTEIRO`] ?? "higido"];
   const s = (f: OdontoFace) => estados[`${dente}-${f}`] ?? estados[`${dente}-INTEIRO`] ?? "higido";
   const decidua = isDecidua(dente);
+  // Ausente: qualquer face (ou INTEIRO) marcada como "ausente" → X vermelho sobre o dente.
+  const ausente = (["INTEIRO", "O", "V", "L", "M", "D"] as OdontoFace[]).some(
+    (f) => estados[`${dente}-${f}`] === "ausente",
+  );
   // Superior (quadrantes 1,2,5,6) → raiz para cima; Inferior (3,4,7,8) → raiz para baixo.
   const quad = Math.floor(dente / 10);
   const superior = quad === 1 || quad === 2 || quad === 5 || quad === 6;
@@ -176,6 +180,12 @@ function DenteFaces({
         </g>
         {/* Contorno da coroa por cima — traço fino, cor referência */}
         <path d={crownPath} fill="none" stroke="#94a3b8" strokeWidth="1" strokeLinejoin="round" strokeLinecap="round" />
+        {ausente && (
+          <g pointerEvents="none">
+            <line x1={cx0 - 2} y1={crownY - 2} x2={cx0 + cw + 2} y2={crownY + ch + 2} stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" />
+            <line x1={cx0 + cw + 2} y1={crownY - 2} x2={cx0 - 2} y2={crownY + ch + 2} stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" />
+          </g>
+        )}
       </svg>
       <span className={`text-[10px] font-sans tracking-tight ${decidua ? "text-amber-700" : "text-slate-500"}`}>{dente}</span>
       {orcado && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />}
