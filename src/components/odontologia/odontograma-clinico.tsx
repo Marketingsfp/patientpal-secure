@@ -225,9 +225,10 @@ function toothShape(dente: number, superior: boolean): ToothShape {
   const vbW = 40;
   const vbH = 90;
   // Coroa compacta; raiz longa para anteriores/caninos, mais curta para molares.
-  const chByType: Record<ToothType, number> = { molar: 36, premolar: 32, canine: 32, incisor: 32 };
-  const rhByType: Record<ToothType, number> = { molar: 40, premolar: 48, canine: 52, incisor: 48 };
-  const cwByType: Record<ToothType, number> = { molar: 34, premolar: 28, canine: 24, incisor: 24 };
+  // Coroas mais retangulares (altas) e raízes afiladas — próximas ao diagrama de referência.
+  const chByType: Record<ToothType, number> = { molar: 34, premolar: 30, canine: 30, incisor: 30 };
+  const rhByType: Record<ToothType, number> = { molar: 42, premolar: 46, canine: 52, incisor: 44 };
+  const cwByType: Record<ToothType, number> = { molar: 34, premolar: 26, canine: 22, incisor: 22 };
   const ch = chByType[type];
   const rootH = rhByType[type];
   const cw = cwByType[type];
@@ -283,15 +284,16 @@ function buildCrownPath(
   const neckY = superior ? crownY : crownY + ch;
   const edgeY = superior ? crownY + ch : crownY;
   // No colo a coroa é ligeiramente mais estreita (formando o contorno cervical).
-  const neckShrink = type === "molar" ? 0.08 : type === "premolar" ? 0.12 : 0.18;
+  // Colo levemente mais estreito que a coroa (contorno cervical suave, sem afilar demais).
+  const neckShrink = type === "molar" ? 0.05 : type === "premolar" ? 0.08 : 0.10;
   const nxL = cx0 + cw * neckShrink;
   const nxR = cx0 + cw - cw * neckShrink;
-  // Bulge máximo na "altura do contorno" (~35% da coroa a partir do colo).
-  const bulgeY = superior ? neckY + ch * 0.35 : neckY - ch * 0.35;
-  const bxL = cx0 - 0.5;
-  const bxR = cx0 + cw + 0.5;
+  // Laterais quase retas — coroas mais retangulares como no diagrama de referência.
+  const bulgeY = superior ? neckY + ch * 0.45 : neckY - ch * 0.45;
+  const bxL = cx0 + 0.4;
+  const bxR = cx0 + cw - 0.4;
   // Cantos incisais/oclusais arredondados.
-  const rEdge = Math.max(2, cw * 0.12);
+  const rEdge = Math.max(2, cw * 0.14);
   const eL = cx0 + rEdge;
   const eR = cx0 + cw - rEdge;
   const cx = cx0 + cw / 2;
