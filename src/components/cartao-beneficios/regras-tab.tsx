@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
+import { findRegra, computeValor, applyAcrescimoCartao, type CbRegra, type CbAcrescimoCartao } from "@/lib/cb-regras";
 
 type EspOpt = { id: string; nome: string };
 type ProcOpt = { id: string; nome: string; codigo: string | null; tipo: string | null };
@@ -79,8 +79,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
   const [novoOpen, setNovoOpen] = useState(false);
   const [editRegra, setEditRegra] = useState<CbRegra | null>(null);
-  const [apagarTodasOpen, setApagarTodasOpen] = useState(false);
-  const [apagandoTodas, setApagandoTodas] = useState(false);
   const [filtroGratuito, setFiltroGratuito] = useState<"todos" | "sim" | "nao">("todos");
   const [filtroCarencia, setFiltroCarencia] = useState<string>("todos");
   const [filtroLimite, setFiltroLimite] = useState<"todos" | "com" | "sem">("todos");
