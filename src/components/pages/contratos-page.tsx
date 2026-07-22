@@ -575,7 +575,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
         modulo={modulo}
         onBack={() => {
           setDetail(null);
-          setDetailInitialTab("resumo");
+          setDetailInitialTab("dados");
           load();
         }}
       />
@@ -1952,7 +1952,7 @@ function NovoContratoForm({
 function DetalheContrato({
   contrato,
   onBack,
-  initialTab = "resumo",
+  initialTab = "dados",
   modulo = "contratos",
 }: {
   contrato: Contrato;
