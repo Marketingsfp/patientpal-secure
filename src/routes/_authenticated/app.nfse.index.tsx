@@ -391,6 +391,16 @@ function NfsePage() {
                         {reenviando === r.id ? "Reenviando…" : "Reenviar"}
                       </Button>
                     )}
+                    {r.status === "emitida" && podeEscrever && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title="Cancelar nota"
+                        onClick={() => { setCancelarAlvo(r); setCancelarJustificativa(""); }}
+                      >
+                        <Ban className="h-3.5 w-3.5 text-red-600" />
+                      </Button>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
