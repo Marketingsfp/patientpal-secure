@@ -173,7 +173,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/planos", label: "Planos / Convênios", icon: Gift },
     { to: "/app/modelos-documentos", label: "Modelos de Documentos", icon: FileText },
     { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
-    { to: "/app/medicos", label: "Médicos", icon: Stethoscope },
     { to: "/app/estoque", label: "Estoque", icon: LayoutGrid },
     { to: "/app/clientes/duplicados", label: "Duplicados / Merge", icon: Users },
     ],
@@ -334,7 +333,7 @@ export function AppShell() {
       /relat[óo]rio.*cart[ãa]o|cart[ãa]o.*relat[óo]rio/.test(t) ? "/app/cartao-beneficios/relatorios" :
       /financ|caixa|conta|boleto/.test(t) ? "/app/financeiro" :
       /cl[ií]nica/.test(t) ? "/app/unidades" :
-      /rateio|repasse/.test(t) ? "/app/medicos" :
+      /rateio|repasse/.test(t) ? "/app/equipe" :
       /equipe|usu[áa]rio|m[eé]dico|profissional|funcion[áa]rio/.test(t) ? "/app/equipe" :
       /prontu[áa]rio/.test(t) ? "/app/prontuarios" :
       /crm|lead|oportunidade/.test(t) ? "/app/crm" :

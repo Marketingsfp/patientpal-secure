@@ -37,7 +37,7 @@ const ROUTE_OF: Record<UBTipo, (r: UBRow) => string> = {
   nfse: (r) => `/app/nfse?abrir=${r.id}`,
   cartao_convenio: () => `/app/cartao-beneficios`,
   contrato_associado: (r) => `/app/cartao-beneficios/contratos?abrir=${r.id}`,
-  medico: (r) => `/app/medicos?abrir=${r.id}`,
+  medico: (r) => `/app/equipe?abrir=${r.id}`,
   procedimento: (r) => `/app/procedimentos?abrir=${r.id}`,
 };
 
