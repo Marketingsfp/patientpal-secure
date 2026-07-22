@@ -4519,23 +4519,27 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   />
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={regerarFuturas}
-                    onChange={(e) => setRegerarFuturas(e.target.checked)}
-                  />
-                  Regerar 12 parcelas futuras com este valor e dia
-                </label>
-                <Button
-                  size="sm"
-                  onClick={salvarDadosFinanceiros}
-                  disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
-                  className="ml-auto"
-                >
-                  {savingDados ? "Salvando…" : "Salvar valor e vencimento"}
-                </Button>
+              <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+                <span className="text-xs text-muted-foreground">
+                  A 1ª parcela é gerada no mês da data de início; as 11 seguintes seguem mês a mês.
+                </span>
+                <div className="ml-auto flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={regerarParcelasFuturas}
+                    disabled={(cancelado && !isAdmin) || regerando || savingDados || !podeEscrever}
+                  >
+                    {regerando ? "Regerando…" : "Regerar 12 parcelas"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={salvarDadosFinanceiros}
+                    disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
+                  >
+                    {savingDados ? "Salvando…" : "Salvar valor e vencimento"}
+                  </Button>
+                </div>
               </div>
               {isAdmin && podeEscrever ? (
                 <div className="space-y-1">
