@@ -13,7 +13,6 @@ import { Route as TotemRouteImport } from './routes/totem'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as PainelRouteImport } from './routes/painel'
 import { Route as MedicoRouteImport } from './routes/medico'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
@@ -159,11 +158,6 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PainelRoute = PainelRouteImport.update({
-  id: '/painel',
-  path: '/painel',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const MedicoRoute = MedicoRouteImport.update({
   id: '/medico',
   path: '/medico',
@@ -209,9 +203,9 @@ const TotemClinicaIdRoute = TotemClinicaIdRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const PainelClinicaIdRoute = PainelClinicaIdRouteImport.update({
-  id: '/$clinicaId',
-  path: '/$clinicaId',
-  getParentRoute: () => PainelRoute,
+  id: '/painel/$clinicaId',
+  path: '/painel/$clinicaId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PacientePerfilRoute = PacientePerfilRouteImport.update({
   id: '/paciente/perfil',
@@ -872,7 +866,6 @@ export interface FileRoutesByFullPath {
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
   '/medico': typeof MedicoRoute
-  '/painel': typeof PainelRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -1002,7 +995,6 @@ export interface FileRoutesByTo {
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
   '/medico': typeof MedicoRoute
-  '/painel': typeof PainelRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -1130,7 +1122,6 @@ export interface FileRoutesById {
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
   '/medico': typeof MedicoRoute
-  '/painel': typeof PainelRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -1262,7 +1253,6 @@ export interface FileRouteTypes {
     | '/diagnostico'
     | '/login'
     | '/medico'
-    | '/painel'
     | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
@@ -1392,7 +1382,6 @@ export interface FileRouteTypes {
     | '/diagnostico'
     | '/login'
     | '/medico'
-    | '/painel'
     | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
@@ -1519,7 +1508,6 @@ export interface FileRouteTypes {
     | '/diagnostico'
     | '/login'
     | '/medico'
-    | '/painel'
     | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
@@ -1651,7 +1639,6 @@ export interface RootRouteChildren {
   DiagnosticoRoute: typeof DiagnosticoRoute
   LoginRoute: typeof LoginRoute
   MedicoRoute: typeof MedicoRoute
-  PainelRoute: typeof PainelRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -1663,6 +1650,7 @@ export interface RootRouteChildren {
   PacienteConsultasRoute: typeof PacienteConsultasRoute
   PacienteFinanceiroRoute: typeof PacienteFinanceiroRoute
   PacientePerfilRoute: typeof PacientePerfilRoute
+  PainelClinicaIdRoute: typeof PainelClinicaIdRoute
   TotemClinicaIdRoute: typeof TotemClinicaIdRoute
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
@@ -1702,13 +1690,6 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/painel': {
-      id: '/painel'
-      path: '/painel'
-      fullPath: '/painel'
-      preLoaderRoute: typeof PainelRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/medico': {
@@ -1776,10 +1757,10 @@ declare module '@tanstack/react-router' {
     }
     '/painel/$clinicaId': {
       id: '/painel/$clinicaId'
-      path: '/$clinicaId'
+      path: '/painel/$clinicaId'
       fullPath: '/painel/$clinicaId'
       preLoaderRoute: typeof PainelClinicaIdRouteImport
-      parentRoute: typeof PainelRoute
+      parentRoute: typeof rootRouteImport
     }
     '/paciente/perfil': {
       id: '/paciente/perfil'
@@ -2887,17 +2868,6 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
-interface PainelRouteChildren {
-  PainelClinicaIdRoute: typeof PainelClinicaIdRoute
-}
-
-const PainelRouteChildren: PainelRouteChildren = {
-  PainelClinicaIdRoute: PainelClinicaIdRoute,
-}
-
-const PainelRouteWithChildren =
-  PainelRoute._addFileChildren(PainelRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
@@ -2905,7 +2875,6 @@ const rootRouteChildren: RootRouteChildren = {
   DiagnosticoRoute: DiagnosticoRoute,
   LoginRoute: LoginRoute,
   MedicoRoute: MedicoRoute,
-  PainelRoute: PainelRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
@@ -2917,6 +2886,7 @@ const rootRouteChildren: RootRouteChildren = {
   PacienteConsultasRoute: PacienteConsultasRoute,
   PacienteFinanceiroRoute: PacienteFinanceiroRoute,
   PacientePerfilRoute: PacientePerfilRoute,
+  PainelClinicaIdRoute: PainelClinicaIdRoute,
   TotemClinicaIdRoute: TotemClinicaIdRoute,
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
