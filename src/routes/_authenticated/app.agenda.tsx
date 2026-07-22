@@ -1887,6 +1887,27 @@ function AgendaPage() {
             }
           });
         }
+        // Complementa com vínculos N:1 (NFS-e agrupada). Uma mesma nota
+        // pode estar vinculada a vários agendamentos do mesmo paciente.
+        for (let i = 0; i < idsParaPagamento.length; i += CHUNK) {
+          const slice = idsParaPagamento.slice(i, i + CHUNK);
+          const { data: links } = await supabase
+            .from("nfse_agendamentos")
+            .select("agendamento_id, nfse:nfse_id(id, status, url_pdf, numero, created_at)")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .in("agendamento_id", slice);
+          ((links ?? []) as Array<{
+            agendamento_id: string;
+            nfse: { id: string; status: string | null; url_pdf: string | null; numero: string | null; created_at: string } | null;
+          }>).forEach((r) => {
+            if (!r.nfse) return;
+            if (!nMap.has(r.agendamento_id)) {
+              nMap.set(r.agendamento_id, {
+                id: r.nfse.id, status: r.nfse.status, url_pdf: r.nfse.url_pdf, numero: r.nfse.numero,
+              });
+            }
+          });
+        }
         setNfseMap(nMap);
       } catch {
         setNfseMap(new Map());
