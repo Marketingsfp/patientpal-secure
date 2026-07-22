@@ -111,6 +111,7 @@ import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/publi
 import { Route as AuthenticatedAppNfseTestarRouteImport } from './routes/_authenticated/app.nfse.testar'
 import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
 import { Route as AuthenticatedAppImprimirAgendamentoIdRouteImport } from './routes/_authenticated/app.imprimir.$agendamentoId'
+import { Route as AuthenticatedAppHrContratosIdRouteImport } from './routes/_authenticated/app.hr-contratos.$id'
 import { Route as AuthenticatedAppFuncionarioUserIdRouteImport } from './routes/_authenticated/app.funcionario.$userId'
 import { Route as AuthenticatedAppFinanceiroRelatoriosRouteImport } from './routes/_authenticated/app.financeiro.relatorios'
 import { Route as AuthenticatedAppFinanceiroRegrasIaRouteImport } from './routes/_authenticated/app.financeiro.regras-ia'
@@ -705,6 +706,12 @@ const AuthenticatedAppImprimirAgendamentoIdRoute =
     path: '/imprimir/$agendamentoId',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppHrContratosIdRoute =
+  AuthenticatedAppHrContratosIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedAppHrContratosRoute,
+  } as any)
 const AuthenticatedAppFuncionarioUserIdRoute =
   AuthenticatedAppFuncionarioUserIdRouteImport.update({
     id: '/funcionario/$userId',
@@ -936,7 +943,7 @@ export interface FileRoutesByFullPath {
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
-  '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
+  '/app/hr-contratos': typeof AuthenticatedAppHrContratosRouteWithChildren
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
@@ -996,6 +1003,7 @@ export interface FileRoutesByFullPath {
   '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
   '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
+  '/app/hr-contratos/$id': typeof AuthenticatedAppHrContratosIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
@@ -1064,7 +1072,7 @@ export interface FileRoutesByTo {
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
-  '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
+  '/app/hr-contratos': typeof AuthenticatedAppHrContratosRouteWithChildren
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
@@ -1124,6 +1132,7 @@ export interface FileRoutesByTo {
   '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
   '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
+  '/app/hr-contratos/$id': typeof AuthenticatedAppHrContratosIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
@@ -1198,7 +1207,7 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/_authenticated/app/fluxo': typeof AuthenticatedAppFluxoRoute
   '/_authenticated/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
-  '/_authenticated/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
+  '/_authenticated/app/hr-contratos': typeof AuthenticatedAppHrContratosRouteWithChildren
   '/_authenticated/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/_authenticated/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/_authenticated/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
@@ -1258,6 +1267,7 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/_authenticated/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
   '/_authenticated/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
+  '/_authenticated/app/hr-contratos/$id': typeof AuthenticatedAppHrContratosIdRoute
   '/_authenticated/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/_authenticated/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
@@ -1392,6 +1402,7 @@ export interface FileRouteTypes {
     | '/app/financeiro/regras-ia'
     | '/app/financeiro/relatorios'
     | '/app/funcionario/$userId'
+    | '/app/hr-contratos/$id'
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
@@ -1520,6 +1531,7 @@ export interface FileRouteTypes {
     | '/app/financeiro/regras-ia'
     | '/app/financeiro/relatorios'
     | '/app/funcionario/$userId'
+    | '/app/hr-contratos/$id'
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
@@ -1653,6 +1665,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/financeiro/regras-ia'
     | '/_authenticated/app/financeiro/relatorios'
     | '/_authenticated/app/funcionario/$userId'
+    | '/_authenticated/app/hr-contratos/$id'
     | '/_authenticated/app/imprimir/$agendamentoId'
     | '/_authenticated/app/medico/$medicoId'
     | '/_authenticated/app/nfse/testar'
@@ -2416,6 +2429,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppImprimirAgendamentoIdRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/hr-contratos/$id': {
+      id: '/_authenticated/app/hr-contratos/$id'
+      path: '/$id'
+      fullPath: '/app/hr-contratos/$id'
+      preLoaderRoute: typeof AuthenticatedAppHrContratosIdRouteImport
+      parentRoute: typeof AuthenticatedAppHrContratosRoute
+    }
     '/_authenticated/app/funcionario/$userId': {
       id: '/_authenticated/app/funcionario/$userId'
       path: '/funcionario/$userId'
@@ -2744,6 +2764,20 @@ const AuthenticatedAppFinanceiroRouteWithChildren =
     AuthenticatedAppFinanceiroRouteChildren,
   )
 
+interface AuthenticatedAppHrContratosRouteChildren {
+  AuthenticatedAppHrContratosIdRoute: typeof AuthenticatedAppHrContratosIdRoute
+}
+
+const AuthenticatedAppHrContratosRouteChildren: AuthenticatedAppHrContratosRouteChildren =
+  {
+    AuthenticatedAppHrContratosIdRoute: AuthenticatedAppHrContratosIdRoute,
+  }
+
+const AuthenticatedAppHrContratosRouteWithChildren =
+  AuthenticatedAppHrContratosRoute._addFileChildren(
+    AuthenticatedAppHrContratosRouteChildren,
+  )
+
 interface AuthenticatedAppRouteChildren {
   AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRoute
   AuthenticatedAppAgendaV2Route: typeof AuthenticatedAppAgendaV2Route
@@ -2778,7 +2812,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
   AuthenticatedAppFluxoRoute: typeof AuthenticatedAppFluxoRoute
   AuthenticatedAppFuncionariosRoute: typeof AuthenticatedAppFuncionariosRoute
-  AuthenticatedAppHrContratosRoute: typeof AuthenticatedAppHrContratosRoute
+  AuthenticatedAppHrContratosRoute: typeof AuthenticatedAppHrContratosRouteWithChildren
   AuthenticatedAppHrFeriasRoute: typeof AuthenticatedAppHrFeriasRoute
   AuthenticatedAppHrHoleritesRoute: typeof AuthenticatedAppHrHoleritesRoute
   AuthenticatedAppHrPontoRoute: typeof AuthenticatedAppHrPontoRoute
@@ -2862,7 +2896,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
   AuthenticatedAppFluxoRoute: AuthenticatedAppFluxoRoute,
   AuthenticatedAppFuncionariosRoute: AuthenticatedAppFuncionariosRoute,
-  AuthenticatedAppHrContratosRoute: AuthenticatedAppHrContratosRoute,
+  AuthenticatedAppHrContratosRoute:
+    AuthenticatedAppHrContratosRouteWithChildren,
   AuthenticatedAppHrFeriasRoute: AuthenticatedAppHrFeriasRoute,
   AuthenticatedAppHrHoleritesRoute: AuthenticatedAppHrHoleritesRoute,
   AuthenticatedAppHrPontoRoute: AuthenticatedAppHrPontoRoute,
