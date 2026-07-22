@@ -289,7 +289,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     return () => clearTimeout(t);
   }, [q]);
 
-  const load = async (termo = "") => {
+  const load = async (termo: string = qDebounced) => {
     if (!clinicaAtual) return;
     setLoading(true);
     let contratosQuery = supabase
