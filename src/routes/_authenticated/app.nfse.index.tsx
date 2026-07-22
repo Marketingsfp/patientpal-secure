@@ -281,6 +281,18 @@ function NfsePage() {
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-1 flex-1 min-w-[220px]">
+          <label className="text-xs text-muted-foreground">Buscar</label>
+          <div className="relative">
+            <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Nº da nota, tomador, emitente ou CNPJ"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+            />
+          </div>
+        </div>
 
         {totais.length > 0 && (
           <div className="ml-auto flex gap-2 text-xs">
