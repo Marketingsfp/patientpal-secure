@@ -7,13 +7,13 @@ import { Card } from "@/components/ui/card";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { Loader2, Trash2, UserPlus, ShieldCheck } from "lucide-react";
+import { Loader2, Trash2, UserPlus, ShieldCheck, AlertCircle } from "lucide-react";
 
 interface Props {
   hrContratoId: string;
   clinicaId: string;
-  funcionarioNome: string;
-  cpf: string;
+  pacienteId: string | null;
+  pacienteNome: string;
   podeEscrever: boolean;
 }
 
@@ -41,11 +41,10 @@ interface Dependente {
  * motor de preços da agenda já reconhecer titular e dependentes como
  * associados do convênio.
  */
-export function ConvenioFuncionarioTab({ hrContratoId, clinicaId, funcionarioNome, cpf, podeEscrever }: Props) {
+export function ConvenioFuncionarioTab({ hrContratoId, clinicaId, pacienteId, pacienteNome, podeEscrever }: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [contrato, setContrato] = useState<ConvenioContrato | null>(null);
-  const [titular, setTitular] = useState<PatientOption | null>(null);
   const [dependentes, setDependentes] = useState<Dependente[]>([]);
   const [novoDep, setNovoDep] = useState<PatientOption | null>(null);
   const [novoParentesco, setNovoParentesco] = useState("");
@@ -61,19 +60,6 @@ export function ConvenioFuncionarioTab({ hrContratoId, clinicaId, funcionarioNom
     if (!contratoId) {
       setContrato(null);
       setDependentes([]);
-      // Tenta pré-selecionar o paciente titular pelo CPF do funcionário.
-      if (cpf && funcionarioNome) {
-        const cpfDigits = cpf.replace(/\D/g, "");
-        if (cpfDigits.length === 11) {
-          const { data: p } = await supabase
-            .from("pacientes")
-            .select("id, nome, cpf, telefone, data_nascimento, clinica_id")
-            .eq("clinica_id", clinicaId)
-            .eq("cpf", cpfDigits)
-            .maybeSingle();
-          if (p) setTitular(p as unknown as PatientOption);
-        }
-      }
       setLoading(false);
       return;
     }
@@ -84,16 +70,16 @@ export function ConvenioFuncionarioTab({ hrContratoId, clinicaId, funcionarioNom
     setContrato((c as ConvenioContrato | null) ?? null);
     setDependentes(((deps ?? []) as Dependente[]));
     setLoading(false);
-  }, [hrContratoId, clinicaId, cpf, funcionarioNome]);
+  }, [hrContratoId]);
 
   useEffect(() => { void carregar(); }, [carregar]);
 
   async function habilitar() {
-    if (!titular) { toast.error("Selecione o paciente titular. O funcionário precisa estar cadastrado como cliente."); return; }
+    if (!pacienteId) { toast.error("Vincule o funcionário a um cliente na aba \"Dados do contrato\" antes de habilitar o convênio."); return; }
     setBusy(true);
     const { error } = await supabase.rpc("hr_toggle_convenio_funcionario", {
       _hr_contrato_id: hrContratoId,
-      _titular_paciente_id: titular.id,
+      _titular_paciente_id: pacienteId,
       _habilitar: true,
     });
     setBusy(false);
@@ -164,20 +150,21 @@ export function ConvenioFuncionarioTab({ hrContratoId, clinicaId, funcionarioNom
 
         {!habilitado ? (
           <div className="space-y-3">
-            <div>
-              <Label>Paciente titular (funcionário) *</Label>
-              <PatientSearchInput
-                value={titular}
-                onSelect={setTitular}
-                clinicaIdsOverride={[clinicaId]}
-                placeholder="Buscar o funcionário na lista de pacientes…"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                O funcionário precisa estar cadastrado como cliente. {cpf ? `Sugerimos buscar pelo CPF ${cpf}.` : ""}
-              </p>
-            </div>
+            {pacienteId ? (
+              <div className="text-sm rounded-md border p-2 bg-muted/30">
+                <span className="text-muted-foreground">Titular:</span>{" "}
+                <span className="font-medium">{pacienteNome || "(cliente selecionado)"}</span>
+              </div>
+            ) : (
+              <div className="text-sm rounded-md border border-dashed p-3 flex items-start gap-2 text-muted-foreground">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>
+                  Vincule o funcionário a um cliente na aba <b>Dados do contrato</b> para habilitar o convênio.
+                </span>
+              </div>
+            )}
             {podeEscrever && (
-              <Button onClick={habilitar} disabled={busy || !titular}>
+              <Button onClick={habilitar} disabled={busy || !pacienteId}>
                 {busy ? "Habilitando…" : "Habilitar Convênio Funcionário"}
               </Button>
             )}
