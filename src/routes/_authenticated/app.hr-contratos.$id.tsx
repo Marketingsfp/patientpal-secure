@@ -527,6 +527,17 @@ function EditarFuncionarioPage() {
               </div>
             )}
           </TabsContent>
+          {!isNovo && (
+            <TabsContent value="convenio" className="pt-3">
+              <ConvenioFuncionarioTab
+                hrContratoId={id}
+                clinicaId={form.clinica_id}
+                funcionarioNome={form.funcionario_nome}
+                cpf={form.cpf}
+                podeEscrever={podeEscrever}
+              />
+            </TabsContent>
+          )}
         </Tabs>
         )}
 
