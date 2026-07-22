@@ -503,7 +503,22 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     const pLancamento = {
       clinica_id: clinicaAtual.clinica_id,
       tipo,
-      descricao: descricao.trim(),
+      // Blindagem: quando o lançamento está vinculado a um agendamento,
+      // garantimos que o nome do paciente presente na descrição seja o
+      // do agendamento (evita herdar nome antigo do formulário).
+      descricao: (() => {
+        const desc = descricao.trim();
+        const nome = agPrefetch?.paciente_nome?.trim();
+        if (!nome) return desc;
+        const sep = " — ";
+        // Se já começa com o nome certo, mantém.
+        if (desc.toUpperCase().startsWith(nome.toUpperCase())) return desc;
+        // Se começa com outro nome (padrão "NOME — RESTO"), troca o prefixo.
+        const idx = desc.indexOf(sep);
+        if (idx > 0) return `${nome}${desc.slice(idx)}`;
+        // Caso contrário, prefixa o nome.
+        return desc ? `${nome}${sep}${desc}` : nome;
+      })(),
       valor: Number(valor),
       data,
       status: "confirmado",
