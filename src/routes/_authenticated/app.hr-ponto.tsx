@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SectionTabs, RH_TABS, RH_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -14,7 +13,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { formatDateTime, formatHora } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/hr-ponto")({
-  component: PontoPageWithTabs,
+  component: PontoPage,
   head: () => ({ meta: [{ title: "Bater ponto — ClinicaOS" }] }),
 });
 
@@ -182,13 +181,5 @@ function PontoPage() {
         </Table>
       </Card>
     </div>
-  );
-}
-function PontoPageWithTabs() {
-  return (
-    <>
-      <SectionTabs title={RH_META.title} icon={RH_META.icon} tabs={RH_TABS} />
-      <PontoPage />
-    </>
   );
 }
