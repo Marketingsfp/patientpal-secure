@@ -78,7 +78,7 @@ function ContratosPage() {
     if (!clinicaAtual) return;
     setLoading(true);
     const [c, cg, st] = await Promise.all([
-      supabase.from("hr_contratos").select("*").eq("clinica_id", clinicaAtual.clinica_id).order("numero", { ascending: false }),
+      supabase.from("hr_contratos").select("*").eq("clinica_id", clinicaAtual.clinica_id).order("funcionario_nome", { ascending: true }),
       supabase.from("cargos").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
       supabase.from("setores").select("id,nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
     ]);
@@ -232,7 +232,6 @@ function ContratosPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-16">Nº</TableHead>
               <TableHead>Funcionário</TableHead>
               <TableHead>Cargo</TableHead>
               <TableHead className="w-28">Regime</TableHead>
@@ -244,12 +243,11 @@ function ContratosPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-6 text-muted-foreground">Carregando…</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground">Carregando…</TableCell></TableRow>
             ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-6 text-muted-foreground">Nenhum funcionário cadastrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground">Nenhum funcionário cadastrado.</TableCell></TableRow>
             ) : filtered.map(r => (
               <TableRow key={r.id}>
-                <TableCell>#{r.numero}</TableCell>
                 <TableCell className="font-medium">{r.funcionario_nome}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{cargos.find(c => c.id === r.cargo_id)?.nome ?? "-"}</TableCell>
                 <TableCell className="text-sm uppercase">{r.regime}</TableCell>
