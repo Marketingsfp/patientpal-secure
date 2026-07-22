@@ -14,6 +14,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Users, Plus, Pencil, Search } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -253,7 +254,20 @@ function ContratosPage() {
                 <TableCell className="text-right">{Number(r.salario).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</TableCell>
                 <TableCell className="text-sm">{formatDatePura(r.data_admissao)}</TableCell>
                 <TableCell><Badge variant={r.status === "ativo" ? "default" : "secondary"}>{r.status}</Badge></TableCell>
-                <TableCell className="text-right text-xs text-muted-foreground">—</TableCell>
+                <TableCell className="text-right">
+                  {podeEscrever && (
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button size="icon" variant="ghost" onClick={() => openEdit(r)} aria-label="Editar funcionário">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Editar funcionário</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
