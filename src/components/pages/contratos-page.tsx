@@ -3730,7 +3730,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
           <Tabs defaultValue={initialTab}>
             <TabsList>
               <TabsTrigger value="dados">Dados</TabsTrigger>
-              <TabsTrigger value="resumo">Resumo</TabsTrigger>
+              <TabsTrigger value="resumo">Mensalidades</TabsTrigger>
               <TabsTrigger value="contrato">Contrato</TabsTrigger>
               <TabsTrigger value="historico">Histórico</TabsTrigger>
             </TabsList>
