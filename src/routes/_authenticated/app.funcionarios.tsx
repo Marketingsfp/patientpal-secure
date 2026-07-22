@@ -15,6 +15,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 export const Route = createFileRoute("/_authenticated/app/funcionarios")({
   component: FuncionariosPage,
   head: () => ({ meta: [{ title: "Funcionários — ClinicaOS" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    editUserId: typeof s.editUserId === "string" ? s.editUserId : undefined,
+  }),
 });
 
 interface Row {
@@ -29,6 +32,8 @@ interface Row {
 function FuncionariosPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("funcionarios");
+  const { editUserId } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [dialog, setDialog] = useState<{ open: boolean; id?: string | null }>({ open: false, id: null });
@@ -54,6 +59,11 @@ function FuncionariosPage() {
         }));
         setRows(list);
         setLoading(false);
+        if (editUserId) {
+          const match = list.find((r) => r.user_id === editUserId);
+          if (match) setDialog({ open: true, id: match.id });
+          void navigate({ search: {} as any, replace: true });
+        }
       });
   }, [clinicaAtual?.clinica_id, reloadKey]);
 
