@@ -4073,6 +4073,8 @@ export type Database = {
           created_at: string
           data_admissao: string
           data_demissao: string | null
+          data_nascimento: string | null
+          email: string | null
           funcionario_nome: string
           id: string
           numero: number
@@ -4082,6 +4084,7 @@ export type Database = {
           setor_id: string | null
           sexo: string
           status: string
+          telefone: string | null
           unidade_id: string | null
           updated_at: string
           user_id: string | null
@@ -4094,6 +4097,8 @@ export type Database = {
           created_at?: string
           data_admissao?: string
           data_demissao?: string | null
+          data_nascimento?: string | null
+          email?: string | null
           funcionario_nome: string
           id?: string
           numero?: number
@@ -4103,6 +4108,7 @@ export type Database = {
           setor_id?: string | null
           sexo?: string
           status?: string
+          telefone?: string | null
           unidade_id?: string | null
           updated_at?: string
           user_id?: string | null
@@ -4115,6 +4121,8 @@ export type Database = {
           created_at?: string
           data_admissao?: string
           data_demissao?: string | null
+          data_nascimento?: string | null
+          email?: string | null
           funcionario_nome?: string
           id?: string
           numero?: number
@@ -4124,6 +4132,7 @@ export type Database = {
           setor_id?: string | null
           sexo?: string
           status?: string
+          telefone?: string | null
           unidade_id?: string | null
           updated_at?: string
           user_id?: string | null
