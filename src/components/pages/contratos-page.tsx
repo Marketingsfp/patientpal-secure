@@ -658,6 +658,9 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
                   </span>
                 </button>
               </TableHead>
+              <TableHead className="font-bold uppercase tracking-wide text-xs text-primary">
+                PRONTUÁRIO
+              </TableHead>
               <TableHead>
                 <Select value={filtroConvenio} onValueChange={setFiltroConvenio}>
                   <SelectTrigger className="h-7 w-full border-0 bg-transparent p-0 font-bold uppercase tracking-wide text-xs text-primary shadow-none focus:ring-0 focus-visible:ring-0 focus:outline-none [&>svg]:opacity-60">
