@@ -603,6 +603,24 @@ function EditarFuncionarioPage() {
           )}
         </div>
       </Card>
+      {form.clinica_id && (
+        <QuickPatientDialog
+          open={quickOpen}
+          onOpenChange={setQuickOpen}
+          clinicaId={form.clinica_id}
+          nomeInicial={form.funcionario_nome}
+          onCreated={(p) => {
+            setPacienteSel(p);
+            setForm(f => ({
+              ...f,
+              paciente_id: p.id,
+              funcionario_nome: p.nome,
+              cpf: (p.cpf ?? "").toString(),
+            }));
+            setQuickOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }
