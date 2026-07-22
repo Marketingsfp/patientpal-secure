@@ -181,7 +181,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   {
     label: "RH",
     items: [
-    { to: "/app/hr-ponto", label: "RH", icon: GraduationCap },
+    { to: "/app/hr-ponto", label: "RH - Ponto", icon: GraduationCap },
     { to: "/app/hr-contratos", label: "RH · Contratos", icon: FileText },
     { to: "/app/hr-ferias", label: "RH · Férias", icon: Palmtree },
     { to: "/app/hr-holerites", label: "RH · Holerites", icon: FileText },
