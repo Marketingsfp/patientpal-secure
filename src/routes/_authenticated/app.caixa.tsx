@@ -2457,13 +2457,35 @@ function Page() {
                               : "Sem movimentos no período"}
                           </TableCell>
                         </TableRow>
-                      ) : minhasMovsFiltrados.map((m) => {
-                        const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
-                        const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
-                        const medico = enr?.medico ?? null;
-                        const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
-                        return (
-                        <TableRow key={m.id}>
+                      ) : minhasMovsFiltrados.flatMap((m) => {
+                         const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
+                         const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
+                         const medico = enr?.medico ?? null;
+                         const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
+                         const bucket = bucketDeMov(m);
+                         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+                         const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+                         const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
+                         if (bucket === "misto" && entradas.length > 0) {
+                           return entradas.map(([k, v], idx) => (
+                             <TableRow key={`${m.id}-${k}`}>
+                               <TableCell className="whitespace-nowrap">{idx === 0 ? new Date(m.created_at).toLocaleDateString("pt-BR") : ""}</TableCell>
+                               <TableCell className="whitespace-nowrap">{idx === 0 ? new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""}</TableCell>
+                               <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
+                               <TableCell className="text-xs uppercase font-medium max-w-[220px] truncate" title={paciente ?? undefined}>{idx === 0 ? (paciente || "—") : ""}</TableCell>
+                               <TableCell className="max-w-[320px] truncate" title={m.descricao ?? undefined}>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
+                               <TableCell className="text-xs">{idx === 0 ? (servico || "—") : ""}</TableCell>
+                               <TableCell className="text-xs">{idx === 0 ? (medico || "—") : ""}</TableCell>
+                               <TableCell className="text-xs">{FORMA_LABEL[k] ?? k}</TableCell>
+                               <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
+                                 {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
+                               </TableCell>
+                               <TableCell className="text-right"></TableCell>
+                             </TableRow>
+                           ));
+                         }
+                         return [(
+                         <TableRow key={m.id}>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
                           <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
@@ -2533,8 +2555,8 @@ function Page() {
                             )}
                           </TableCell>
                         </TableRow>
-                        );
-                      })}
+                         )];
+                       })}
                     </TableBody>
                   </Table>
                 </CardContent>
