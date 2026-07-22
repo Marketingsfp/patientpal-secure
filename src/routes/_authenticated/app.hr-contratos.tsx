@@ -406,6 +406,37 @@ function ContratosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!toDelete} onOpenChange={(o) => { if (!o) setToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir funcionário</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o contrato de <strong>{toDelete?.funcionario_nome}</strong>? Esta ação não pode ser desfeita. O login de acesso (se houver) não será removido.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!toDelete) return;
+                setDeleting(true);
+                const { error } = await supabase.from("hr_contratos").delete().eq("id", toDelete.id);
+                setDeleting(false);
+                if (error) { mostrarErro(error); return; }
+                toast.success("Funcionário excluído");
+                setToDelete(null);
+                void load();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Excluindo…" : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
