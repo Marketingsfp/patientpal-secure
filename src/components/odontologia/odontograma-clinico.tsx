@@ -213,38 +213,45 @@ interface ToothShape {
 function toothShape(dente: number, superior: boolean): ToothShape {
   const type = toothType(dente);
   const vbW = 40;
-  const vbH = 72;
-  const ch = 40; // altura da coroa
-  const rootH = 26;
-  // Largura da coroa por tipo
-  const cwByType: Record<ToothType, number> = { molar: 34, premolar: 30, canine: 26, incisor: 24 };
+  const vbH = 92;
+  // Coroa mais compacta; raiz longa para anteriores/caninos, mais curta para molares.
+  const chByType: Record<ToothType, number> = { molar: 34, premolar: 30, canine: 30, incisor: 30 };
+  const rhByType: Record<ToothType, number> = { molar: 42, premolar: 50, canine: 56, incisor: 52 };
+  const cwByType: Record<ToothType, number> = { molar: 32, premolar: 26, canine: 22, incisor: 22 };
+  const ch = chByType[type];
+  const rootH = rhByType[type];
   const cw = cwByType[type];
   const cx0 = (vbW - cw) / 2;
-  // Superior: raiz em cima (y=3..29), coroa embaixo (y=30..70)
-  // Inferior: coroa em cima (y=2..42), raiz embaixo (y=43..69)
-  const crownY = superior ? 3 + rootH + 1 : 2;
-  const rootNeck = superior ? crownY : crownY + ch; // linha do "colo" (junção coroa/raiz)
-  const rootTip = superior ? 3 : crownY + ch + rootH; // ponta oposta ao colo
+  // Superior: raiz em cima; coroa embaixo (perto da linha média).
+  // Inferior: coroa em cima (perto da linha média); raiz embaixo.
+  const topPad = 4;
+  const crownY = superior ? topPad + rootH : topPad;
+  const rootNeck = superior ? crownY : crownY + ch;
+  const rootTip = superior ? topPad : crownY + ch + rootH;
   const cx = cx0 + cw / 2;
-  const r = Math.min(6, cw / 3);
 
-  // Coroa: retângulo com cantos arredondados; incisivos/caninos ficam levemente
-  // mais afilados no lado do colo (raiz).
-  const crownPath = buildCrownPath(type, cx0, crownY, cw, ch, r, superior);
+  const crownPath = buildCrownPath(type, cx0, crownY, cw, ch, superior);
 
   // Raiz(es)
   let rootPath = "";
-  const single = (x: number, w: number) => singleRootPath(x, w, rootNeck, rootTip, superior);
+  const single = (x: number, w: number, curve = 0) => singleRootPath(x, w, rootNeck, rootTip, superior, curve);
   if (type === "molar") {
     if (superior) {
-      // 3 raízes (2 vestibulares + 1 palatina/central)
-      rootPath = [single(cx0 + 5, 4.5), single(cx0 + cw - 5, 4.5), single(cx, 5)].join(" ");
+      // 3 raízes divergentes: 2 vestibulares (M/D) + 1 palatina central (mais atrás visualmente)
+      rootPath = [
+        single(cx0 + 6, 5.5, -2.5),
+        single(cx0 + cw - 6, 5.5, 2.5),
+        single(cx, 5),
+      ].join(" ");
     } else {
-      // 2 raízes (mesial + distal)
-      rootPath = [single(cx0 + 7, 5.5), single(cx0 + cw - 7, 5.5)].join(" ");
+      // 2 raízes divergentes (mesial + distal)
+      rootPath = [
+        single(cx0 + 8, 6, -1.8),
+        single(cx0 + cw - 8, 6, 1.8),
+      ].join(" ");
     }
   } else if (type === "premolar") {
-    rootPath = single(cx, 7);
+    rootPath = single(cx, 6.5);
   } else if (type === "canine") {
     rootPath = single(cx, 6);
   } else {
@@ -260,48 +267,88 @@ function buildCrownPath(
   crownY: number,
   cw: number,
   ch: number,
-  r: number,
   superior: boolean,
 ): string {
-  const x1 = cx0;
-  const x2 = cx0 + cw;
-  const y1 = crownY;
-  const y2 = crownY + ch;
-  // Lado incisal/oclusal (oposto ao colo)
-  const incisalY = superior ? y2 : y1;
-  const neckY = superior ? y1 : y2;
-  // Molares: coroa mais quadrada, com leve estreitamento no colo (~6%)
-  // Incisivos/caninos: coroa mais afilada no colo (~15%)
-  const neckShrink = type === "molar" ? 0.06 : type === "premolar" ? 0.1 : 0.15;
-  const nx1 = x1 + cw * neckShrink;
-  const nx2 = x2 - cw * neckShrink;
-  // Cantos incisais arredondados; cantos no colo levemente arredondados também.
-  const rInc = r;
-  const rNeck = Math.max(2, r * 0.5);
+  // Coordenadas nomeadas pelo colo (neck) e pela borda incisal/oclusal (edge).
+  const neckY = superior ? crownY : crownY + ch;
+  const edgeY = superior ? crownY + ch : crownY;
+  // No colo a coroa é ligeiramente mais estreita (formando o contorno cervical).
+  const neckShrink = type === "molar" ? 0.08 : type === "premolar" ? 0.12 : 0.18;
+  const nxL = cx0 + cw * neckShrink;
+  const nxR = cx0 + cw - cw * neckShrink;
+  // Bulge máximo na "altura do contorno" (~35% da coroa a partir do colo).
+  const bulgeY = superior ? neckY + ch * 0.35 : neckY - ch * 0.35;
+  const bxL = cx0 - 0.5;
+  const bxR = cx0 + cw + 0.5;
+  // Cantos incisais/oclusais arredondados.
+  const rEdge = Math.max(2, cw * 0.12);
+  const eL = cx0 + rEdge;
+  const eR = cx0 + cw - rEdge;
+  const cx = cx0 + cw / 2;
+
+  // Constrói a borda incisal/oclusal com cúspides por tipo de dente.
+  // dir = +1 para superior (borda para baixo produz cúspides "descendo"),
+  //       -1 para inferior (cúspides "subindo").
+  const dir = superior ? 1 : -1;
+  const cuspDrop = type === "molar" ? 2.2 : type === "premolar" ? 2.6 : type === "canine" ? 3.5 : 1.2;
+  const valleyRise = type === "molar" ? 1.6 : type === "premolar" ? 1.4 : type === "canine" ? 0.6 : 0.4;
+
+  function occlusalEdge(): string {
+    // Percorre da esquerda (eL) até a direita (eR) na edgeY, produzindo bumps.
+    if (type === "molar") {
+      // 4 cúspides (bumps) com 3 vales
+      const seg = (eR - eL) / 4;
+      const parts: string[] = [];
+      for (let i = 0; i < 4; i++) {
+        const x0 = eL + seg * i;
+        const x1 = eL + seg * (i + 1);
+        const mid = (x0 + x1) / 2;
+        // topo da cúspide levemente projetado para fora (dir * cuspDrop)
+        parts.push(`Q ${mid},${edgeY + dir * cuspDrop} ${x1},${edgeY}`);
+        // vale entre cúspides (exceto a última)
+        if (i < 3) {
+          const vx = x1;
+          parts.push(`Q ${vx},${edgeY - dir * valleyRise} ${vx + 0.001},${edgeY}`);
+        }
+      }
+      return parts.join(" ");
+    }
+    if (type === "premolar") {
+      // 2 cúspides (V/L)
+      const mid = (eL + eR) / 2;
+      return [
+        `Q ${(eL + mid) / 2},${edgeY + dir * cuspDrop} ${mid},${edgeY}`,
+        `Q ${(mid + eR) / 2},${edgeY + dir * cuspDrop} ${eR},${edgeY}`,
+      ].join(" ");
+    }
+    if (type === "canine") {
+      // 1 cúspide central em ponta
+      return [
+        `Q ${(eL + cx) / 2},${edgeY + dir * cuspDrop * 0.5} ${cx},${edgeY + dir * cuspDrop}`,
+        `Q ${(cx + eR) / 2},${edgeY + dir * cuspDrop * 0.5} ${eR},${edgeY}`,
+      ].join(" ");
+    }
+    // Incisivo — borda reta com leve curvatura
+    return `Q ${cx},${edgeY + dir * cuspDrop} ${eR},${edgeY}`;
+  }
+
+  // Ordem do path: começa no colo esquerdo → desce pela lateral com bulge →
+  // canto incisal esquerdo (arredondado) → borda incisal com cúspides →
+  // canto incisal direito → sobe pela lateral direita com bulge → colo direito → fecha.
   if (superior) {
-    // Colo em y1 (topo), incisal em y2 (base)
     return [
-      `M ${nx1},${y1 + rNeck}`,
-      `Q ${nx1},${y1} ${nx1 + rNeck},${y1}`,
-      `L ${nx2 - rNeck},${y1}`,
-      `Q ${nx2},${y1} ${nx2},${y1 + rNeck}`,
-      `L ${x2},${y2 - rInc}`,
-      `Q ${x2},${y2} ${x2 - rInc},${y2}`,
-      `L ${x1 + rInc},${y2}`,
-      `Q ${x1},${y2} ${x1},${y2 - rInc}`,
+      `M ${nxL},${neckY}`,
+      `C ${bxL},${bulgeY} ${cx0},${edgeY - rEdge} ${eL},${edgeY}`,
+      occlusalEdge(),
+      `C ${cx0 + cw},${edgeY - rEdge} ${bxR},${bulgeY} ${nxR},${neckY}`,
       `Z`,
     ].join(" ");
   }
-  // Inferior: incisal em y1 (topo), colo em y2 (base)
   return [
-    `M ${x1},${y1 + rInc}`,
-    `Q ${x1},${y1} ${x1 + rInc},${y1}`,
-    `L ${x2 - rInc},${y1}`,
-    `Q ${x2},${y1} ${x2},${y1 + rInc}`,
-    `L ${nx2},${y2 - rNeck}`,
-    `Q ${nx2},${y2} ${nx2 - rNeck},${y2}`,
-    `L ${nx1 + rNeck},${y2}`,
-    `Q ${nx1},${y2} ${nx1},${y2 - rNeck}`,
+    `M ${nxL},${neckY}`,
+    `C ${bxL},${bulgeY} ${cx0},${edgeY + rEdge} ${eL},${edgeY}`,
+    occlusalEdge(),
+    `C ${cx0 + cw},${edgeY + rEdge} ${bxR},${bulgeY} ${nxR},${neckY}`,
     `Z`,
   ].join(" ");
 }
@@ -312,28 +359,23 @@ function singleRootPath(
   neckY: number,
   tipY: number,
   superior: boolean,
+  curveX = 0,
 ): string {
   const half = width / 2;
   // Raiz afilando da base larga (colo) para uma ponta arredondada.
-  const tipHalf = Math.max(1, width * 0.25);
-  if (superior) {
-    // tipY < neckY (raiz para cima)
-    const midY = (neckY + tipY) / 2;
-    return [
-      `M ${x - half},${neckY}`,
-      `C ${x - half},${midY} ${x - tipHalf - 0.5},${tipY + 3} ${x - tipHalf},${tipY + 1}`,
-      `Q ${x},${tipY - 1} ${x + tipHalf},${tipY + 1}`,
-      `C ${x + tipHalf + 0.5},${tipY + 3} ${x + half},${midY} ${x + half},${neckY}`,
-      `Z`,
-    ].join(" ");
-  }
-  // Inferior: tipY > neckY (raiz para baixo)
+  // `curveX` desloca a ponta lateralmente para simular divergência (molares).
+  const tipHalf = Math.max(0.9, width * 0.22);
+  const tipX = x + curveX;
   const midY = (neckY + tipY) / 2;
+  const sign = superior ? 1 : -1; // sinal para "afastar a ponta do colo"
+  // Controle da curvatura da lateral: no meio, ligeiramente para fora; na ponta, converge.
+  const ctrl1YOut = midY - sign * 2; // próximo ao colo
+  const ctrl2YOut = tipY + sign * 4; // próximo à ponta
   return [
     `M ${x - half},${neckY}`,
-    `C ${x - half},${midY} ${x - tipHalf - 0.5},${tipY - 3} ${x - tipHalf},${tipY - 1}`,
-    `Q ${x},${tipY + 1} ${x + tipHalf},${tipY - 1}`,
-    `C ${x + tipHalf + 0.5},${tipY - 3} ${x + half},${midY} ${x + half},${neckY}`,
+    `C ${x - half - 0.5},${ctrl1YOut} ${tipX - tipHalf - 0.5},${ctrl2YOut} ${tipX - tipHalf},${tipY + sign * 1}`,
+    `Q ${tipX},${tipY - sign * 1.2} ${tipX + tipHalf},${tipY + sign * 1}`,
+    `C ${tipX + tipHalf + 0.5},${ctrl2YOut} ${x + half + 0.5},${ctrl1YOut} ${x + half},${neckY}`,
     `Z`,
   ].join(" ");
 }
