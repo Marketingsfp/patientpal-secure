@@ -6799,11 +6799,15 @@ function AgendaPage() {
               const ehLivre = isSlotLivre(a.paciente_nome);
               const profLabel = medicoNomeAgendamento(a);
 
+              // Overlay translúcido (bg-{cor}-500/10) em vez de tom sólido -50:
+              // o sólido fica quase branco e, no modo escuro, o texto claro
+              // (--foreground) perde contraste sobre ele. O overlay se mistura
+              // com o fundo real da linha e funciona nos dois temas.
               let bgClass = "bg-card";
               let borderLeft = "border-l-4 border-transparent";
-              if (estornoPend) { bgClass = "bg-rose-50"; borderLeft = "border-l-4 border-rose-500"; }
-              else if (realizado) { bgClass = "bg-emerald-50"; borderLeft = "border-l-4 border-emerald-500"; }
-              else if (presente) { bgClass = "bg-blue-50"; borderLeft = "border-l-4 border-blue-400"; }
+              if (estornoPend) { bgClass = "bg-rose-500/10"; borderLeft = "border-l-4 border-rose-500"; }
+              else if (realizado) { bgClass = "bg-emerald-500/10"; borderLeft = "border-l-4 border-emerald-500"; }
+              else if (presente) { bgClass = "bg-blue-500/10"; borderLeft = "border-l-4 border-blue-400"; }
 
               const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
               const pendenteCheckin = ["aguardando_recepcao", "recepcao"].includes(etapa);
@@ -7038,17 +7042,21 @@ function AgendaPage() {
                   const ocultarPaciente = estornoPend && isMedicoOnly;
                   const ehLivre = isSlotLivre(a.paciente_nome);
 
-                  // Cor de fundo da linha
+                  // Cor de fundo da linha — overlay translúcido (bg-{cor}-500/N)
+                  // em vez de tom sólido -50/-100: o sólido fica quase branco e,
+                  // no modo escuro, o texto claro (--foreground) perde contraste
+                  // sobre ele. O overlay se mistura com o fundo real da linha e
+                  // funciona nos dois temas.
                   let bgClass = "";
                   let borderLeft = "";
                   if (estornoPend) {
-                    bgClass = "bg-rose-50 hover:bg-rose-100";
+                    bgClass = "bg-rose-500/10 hover:bg-rose-500/15";
                     borderLeft = "border-l-4 border-rose-500";
                   } else if (realizado) {
-                    bgClass = "bg-emerald-50 hover:bg-emerald-100";
+                    bgClass = "bg-emerald-500/10 hover:bg-emerald-500/15";
                     borderLeft = "border-l-4 border-emerald-500";
                   } else if (presente) {
-                    bgClass = "bg-blue-50 hover:bg-blue-100";
+                    bgClass = "bg-blue-500/10 hover:bg-blue-500/15";
                     borderLeft = "border-l-4 border-blue-400";
                   }
 
