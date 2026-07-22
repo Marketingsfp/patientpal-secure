@@ -354,8 +354,44 @@ function EditarFuncionarioPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="col-span-2"><Label>Nome do funcionário *</Label><Input value={form.funcionario_nome} onChange={e => setForm({ ...form, funcionario_nome: e.target.value })} /></div>
-              <div><Label>CPF</Label><Input value={form.cpf} onChange={e => setForm({ ...form, cpf: e.target.value })} /></div>
+              <div className="col-span-2">
+                <Label>Nome do funcionário *</Label>
+                <div className="flex gap-2 items-start">
+                  <div className="flex-1">
+                    <PatientSearchInput
+                      value={pacienteSel}
+                      onSelect={(p) => {
+                        setPacienteSel(p);
+                        setForm(f => ({
+                          ...f,
+                          paciente_id: p?.id ?? "",
+                          funcionario_nome: p?.nome ?? "",
+                          cpf: (p?.cpf ?? "").toString(),
+                        }));
+                      }}
+                      clinicaIdsOverride={form.clinica_id ? [form.clinica_id] : undefined}
+                      placeholder="Buscar cliente cadastrado…"
+                      onRequestCreate={() => setQuickOpen(true)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setQuickOpen(true)}
+                    disabled={!form.clinica_id}
+                    title="Cadastrar novo cliente"
+                  >
+                    <UserPlus className="h-4 w-4 mr-1" /> Cadastrar
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Escolha o cliente correspondente. Nome e CPF vêm do cadastro do paciente.
+                </p>
+              </div>
+              <div>
+                <Label>CPF</Label>
+                <Input value={form.cpf} readOnly placeholder="—" />
+              </div>
               <div>
                 <Label>Regime</Label>
                 <Select value={form.regime} onValueChange={v => setForm({ ...form, regime: v })}>
@@ -549,8 +585,8 @@ function EditarFuncionarioPage() {
               <ConvenioFuncionarioTab
                 hrContratoId={id}
                 clinicaId={form.clinica_id}
-                funcionarioNome={form.funcionario_nome}
-                cpf={form.cpf}
+                pacienteId={form.paciente_id || null}
+                pacienteNome={form.funcionario_nome}
                 podeEscrever={podeEscrever}
               />
             </TabsContent>
