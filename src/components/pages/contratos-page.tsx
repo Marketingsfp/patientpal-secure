@@ -2146,7 +2146,7 @@ function DetalheContrato({
   const [editValor, setEditValor] = useState<string>(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
   const [editDia, setEditDia] = useState<string>(String(contrato.dia_vencimento ?? 10));
   const [savingDados, setSavingDados] = useState(false);
-  const [regerarFuturas, setRegerarFuturas] = useState(true);
+  const [regerando, setRegerando] = useState(false);
   useEffect(() => {
     setEditValor(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
     setEditDia(String(contrato.dia_vencimento ?? 10));
@@ -2598,9 +2598,28 @@ function DetalheContrato({
     (contrato as any).dia_vencimento = dia;
     setValorMensalAtual(v);
 
-    if (regerarFuturas) {
+    setSavingDados(false);
+    toast.success("Dados salvos.");
+    await load();
+  };
+
+  // Regera as 12 parcelas do contrato usando valor_mensal e dia_vencimento já salvos.
+  // Regra: 1ª parcela SEMPRE cai no mês da data_inicio (com dia_vencimento),
+  // as 11 seguintes seguem mês a mês. Preserva parcelas já pagas/existentes
+  // (não apaga o que não é 'pendente' e não é futura).
+  const regerarParcelasFuturas = async () => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    const dataIni = (contrato as any).data_inicio as string | null;
+    if (!dataIni) { toast.error("Contrato sem data de início."); return; }
+    const dia = Math.max(1, Math.min(31, Number((contrato as any).dia_vencimento) || 0));
+    if (!dia) { toast.error("Contrato sem dia de vencimento válido."); return; }
+    const valor = Number((contrato as any).valor_mensal ?? 0);
+    if (!Number.isFinite(valor) || valor < 0) { toast.error("Valor mensal inválido."); return; }
+    if (!confirm("Isso apaga as parcelas pendentes futuras e recria 12 parcelas a partir do mês da data de início. Continuar?")) return;
+
+    setRegerando(true);
+    try {
       const hoje = new Date().toISOString().slice(0, 10);
-      // apaga parcelas pendentes futuras
       await supabase
         .from("contrato_mensalidades")
         .delete()
@@ -2608,8 +2627,7 @@ function DetalheContrato({
         .eq("status", "pendente")
         .gt("numero_parcela", 0)
         .gt("vencimento", hoje);
-      // Conta parcelas restantes (≠0) — geralmente pagas/atrasadas anteriores a hoje.
-      // Todo contrato deve ter no máximo 12 mensalidades: gera só o que falta.
+
       const { data: restantes } = await supabase
         .from("contrato_mensalidades")
         .select("numero_parcela")
@@ -2622,37 +2640,41 @@ function DetalheContrato({
         0,
       );
       const restantesParaGerar = Math.max(0, 12 - existentes.length);
-      let prox = maxExistente + 1;
-      const inicio = new Date();
-      inicio.setDate(1);
+      // Base = mês/ano da data_inicio. A parcela N (1..12) cai no
+      // (mês_inicio + N - 1). Só geramos as parcelas cujo número ainda
+      // não existe no contrato.
+      const [yy, mm] = dataIni.slice(0, 10).split("-").map((s) => Number(s));
+      const baseYear = yy;
+      const baseMonth = (mm || 1) - 1; // 0-index
       const rows: any[] = [];
-      for (let i = 1; i <= restantesParaGerar; i++) {
-        const ref = new Date(inicio.getFullYear(), inicio.getMonth() + i, 1);
+      let gerados = 0;
+      let prox = maxExistente + 1;
+      while (gerados < restantesParaGerar && prox <= 12) {
+        const offset = prox - 1;
+        const ref = new Date(baseYear, baseMonth + offset, 1);
         const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
         const d = Math.min(dia, lastDay);
         const venc = new Date(ref.getFullYear(), ref.getMonth(), d);
         rows.push({
           contrato_id: contrato.id,
           clinica_id: (contrato as any).clinica_id,
-          numero_parcela: prox++,
+          numero_parcela: prox,
           vencimento: venc.toISOString().slice(0, 10),
-          valor: v,
+          valor,
           status: "pendente",
         });
+        prox++;
+        gerados++;
       }
       if (rows.length > 0) {
         const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows);
-        if (insErr) {
-          setSavingDados(false);
-          mostrarErro(insErr, "dados salvos, mas falha ao gerar parcelas");
-          await load();
-          return;
-        }
+        if (insErr) { mostrarErro(insErr, "falha ao gerar parcelas"); return; }
       }
+      toast.success(`Parcelas regeradas (${rows.length} nova(s)).`);
+      await load();
+    } finally {
+      setRegerando(false);
     }
-    setSavingDados(false);
-    toast.success(regerarFuturas ? "Dados salvos e parcelas futuras atualizadas." : "Dados salvos.");
-    await load();
   };
 
   const confirmarCancelamento = async () => {
@@ -4308,7 +4330,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
               {isAdmin && podeEscrever ? (
                 <div className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-primary">
                   Modo administrador — você pode alterar todos os campos deste contrato. Alterações não regeram parcelas
-                  automaticamente; use a opção “Regerar 12 parcelas futuras” abaixo quando quiser propagar o novo valor.
+                  automaticamente; use o botão “Regerar 12 parcelas” abaixo quando quiser propagar o novo valor/dia.
                 </div>
               ) : null}
               {isAdmin && podeEscrever ? (
@@ -4497,23 +4519,27 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   />
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/30 px-3 py-2">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={regerarFuturas}
-                    onChange={(e) => setRegerarFuturas(e.target.checked)}
-                  />
-                  Regerar 12 parcelas futuras com este valor e dia
-                </label>
-                <Button
-                  size="sm"
-                  onClick={salvarDadosFinanceiros}
-                  disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
-                  className="ml-auto"
-                >
-                  {savingDados ? "Salvando…" : "Salvar valor e vencimento"}
-                </Button>
+              <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+                <span className="text-xs text-muted-foreground">
+                  A 1ª parcela é gerada no mês da data de início; as 11 seguintes seguem mês a mês.
+                </span>
+                <div className="ml-auto flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={regerarParcelasFuturas}
+                    disabled={(cancelado && !isAdmin) || regerando || savingDados || !podeEscrever}
+                  >
+                    {regerando ? "Regerando…" : "Regerar 12 parcelas"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={salvarDadosFinanceiros}
+                    disabled={(cancelado && !isAdmin) || savingDados || !podeEscrever}
+                  >
+                    {savingDados ? "Salvando…" : "Salvar valor e vencimento"}
+                  </Button>
+                </div>
               </div>
               {isAdmin && podeEscrever ? (
                 <div className="space-y-1">
