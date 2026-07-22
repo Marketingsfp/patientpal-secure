@@ -104,16 +104,13 @@ function DenteFaces({
   const quad = Math.floor(dente / 10);
   const superior = quad === 1 || quad === 2 || quad === 5 || quad === 6;
   const clipId = `tooth-crown-${dente}`;
-  const rootId = `tooth-root-${dente}`;
-  // Coroa ocupa y=16..56 (superior) ou y=0..40 (inferior); raiz no lado oposto.
-  const crownY = superior ? 16 : 0;
-  const rootPath = superior
-    ? `M8,16 C6,10 8,4 14,2 C18,0 22,0 26,2 C32,4 34,10 32,16 Z`
-    : `M8,40 C6,46 8,52 14,54 C18,56 22,56 26,54 C32,52 34,46 32,40 Z`;
-  // Coroa arredondada como clipPath para dar forma de dente às 5 faces.
-  const crownPath = `M4,${crownY + 4} C4,${crownY} 8,${crownY - 2} 12,${crownY - 2} L28,${crownY - 2} C32,${crownY - 2} 36,${crownY} 36,${crownY + 4} L36,${crownY + 32} C36,${crownY + 38} 30,${crownY + 40} 20,${crownY + 40} C10,${crownY + 40} 4,${crownY + 38} 4,${crownY + 32} Z`;
-  const cx0 = 4, cy0 = crownY, cw = 32, ch = 40;
-  const cIn = { x: cx0 + 10, y: cy0 + 12, w: cw - 20, h: ch - 24 }; // face oclusal (central)
+  const shape = toothShape(dente, superior);
+  const { crownPath, rootPath, cx0, crownY, cw, ch, vbW, vbH } = shape;
+  // Face oclusal (central) — margem proporcional à largura da coroa
+  const insetX = Math.max(5, cw * 0.28);
+  const insetY = Math.max(8, ch * 0.28);
+  const cIn = { x: cx0 + insetX, y: crownY + insetY, w: cw - insetX * 2, h: ch - insetY * 2 };
+  const cy0 = crownY;
   return (
     <div
       className={`flex flex-col items-center gap-0.5 rounded-md p-0.5 transition ${
@@ -122,14 +119,14 @@ function DenteFaces({
       title={`Dente ${dente}${orcado ? " · orçado" : ""}`}
     >
       <span className={`text-[10px] font-mono ${decidua ? "text-amber-700" : "text-foreground/70"}`}>{dente}</span>
-      <svg viewBox="0 0 40 56" className="h-14 w-10">
+      <svg viewBox={`0 0 ${vbW} ${vbH}`} className="h-16 w-10">
         <defs>
           <clipPath id={clipId}>
             <path d={crownPath} />
           </clipPath>
         </defs>
-        {/* Raiz (não clicável, apenas visual) */}
-        <path d={rootPath} fill="hsl(var(--muted))" stroke="hsl(var(--border))" strokeWidth="0.7" id={rootId} />
+        {/* Raiz(es) (não clicável, apenas visual) — anatomia por tipo de dente */}
+        <path d={rootPath} fill="hsl(var(--muted))" stroke="hsl(var(--border))" strokeWidth="0.8" fillRule="evenodd" />
         {/* Faces da coroa recortadas no formato de dente */}
         <g clipPath={`url(#${clipId})`}>
           {/* Vestibular (topo da coroa) */}
@@ -184,6 +181,161 @@ function DenteFaces({
       {orcado && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />}
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Anatomia dos dentes (FDI) — coroa arredondada + raízes por tipo de dente.
+// A coroa serve de clipPath para as 5 faces clicáveis (V/M/D/L/O), então o
+// clique e a coloração por face continuam funcionando; só o contorno muda.
+// ---------------------------------------------------------------------------
+
+type ToothType = "molar" | "premolar" | "canine" | "incisor";
+
+function toothType(d: number): ToothType {
+  const p = d % 10; // 1..8 (permanente) ou 1..5 (decíduo)
+  if (p >= 6) return "molar";
+  if (p >= 4) return isDecidua(d) ? "molar" : "premolar"; // decíduos 4,5 são molares
+  if (p === 3) return "canine";
+  return "incisor";
+}
+
+interface ToothShape {
+  crownPath: string;
+  rootPath: string;
+  cx0: number;
+  crownY: number;
+  cw: number;
+  ch: number;
+  vbW: number;
+  vbH: number;
+}
+
+function toothShape(dente: number, superior: boolean): ToothShape {
+  const type = toothType(dente);
+  const vbW = 40;
+  const vbH = 72;
+  const ch = 40; // altura da coroa
+  const rootH = 26;
+  // Largura da coroa por tipo
+  const cwByType: Record<ToothType, number> = { molar: 34, premolar: 30, canine: 26, incisor: 24 };
+  const cw = cwByType[type];
+  const cx0 = (vbW - cw) / 2;
+  // Superior: raiz em cima (y=3..29), coroa embaixo (y=30..70)
+  // Inferior: coroa em cima (y=2..42), raiz embaixo (y=43..69)
+  const crownY = superior ? 3 + rootH + 1 : 2;
+  const rootNeck = superior ? crownY : crownY + ch; // linha do "colo" (junção coroa/raiz)
+  const rootTip = superior ? 3 : crownY + ch + rootH; // ponta oposta ao colo
+  const cx = cx0 + cw / 2;
+  const r = Math.min(6, cw / 3);
+
+  // Coroa: retângulo com cantos arredondados; incisivos/caninos ficam levemente
+  // mais afilados no lado do colo (raiz).
+  const crownPath = buildCrownPath(type, cx0, crownY, cw, ch, r, superior);
+
+  // Raiz(es)
+  let rootPath = "";
+  const single = (x: number, w: number) => singleRootPath(x, w, rootNeck, rootTip, superior);
+  if (type === "molar") {
+    if (superior) {
+      // 3 raízes (2 vestibulares + 1 palatina/central)
+      rootPath = [single(cx0 + 5, 4.5), single(cx0 + cw - 5, 4.5), single(cx, 5)].join(" ");
+    } else {
+      // 2 raízes (mesial + distal)
+      rootPath = [single(cx0 + 7, 5.5), single(cx0 + cw - 7, 5.5)].join(" ");
+    }
+  } else if (type === "premolar") {
+    rootPath = single(cx, 7);
+  } else if (type === "canine") {
+    rootPath = single(cx, 6);
+  } else {
+    rootPath = single(cx, 5.5);
+  }
+
+  return { crownPath, rootPath, cx0, crownY, cw, ch, vbW, vbH };
+}
+
+function buildCrownPath(
+  type: ToothType,
+  cx0: number,
+  crownY: number,
+  cw: number,
+  ch: number,
+  r: number,
+  superior: boolean,
+): string {
+  const x1 = cx0;
+  const x2 = cx0 + cw;
+  const y1 = crownY;
+  const y2 = crownY + ch;
+  // Lado incisal/oclusal (oposto ao colo)
+  const incisalY = superior ? y2 : y1;
+  const neckY = superior ? y1 : y2;
+  // Molares: coroa mais quadrada, com leve estreitamento no colo (~6%)
+  // Incisivos/caninos: coroa mais afilada no colo (~15%)
+  const neckShrink = type === "molar" ? 0.06 : type === "premolar" ? 0.1 : 0.15;
+  const nx1 = x1 + cw * neckShrink;
+  const nx2 = x2 - cw * neckShrink;
+  // Cantos incisais arredondados; cantos no colo levemente arredondados também.
+  const rInc = r;
+  const rNeck = Math.max(2, r * 0.5);
+  if (superior) {
+    // Colo em y1 (topo), incisal em y2 (base)
+    return [
+      `M ${nx1},${y1 + rNeck}`,
+      `Q ${nx1},${y1} ${nx1 + rNeck},${y1}`,
+      `L ${nx2 - rNeck},${y1}`,
+      `Q ${nx2},${y1} ${nx2},${y1 + rNeck}`,
+      `L ${x2},${y2 - rInc}`,
+      `Q ${x2},${y2} ${x2 - rInc},${y2}`,
+      `L ${x1 + rInc},${y2}`,
+      `Q ${x1},${y2} ${x1},${y2 - rInc}`,
+      `Z`,
+    ].join(" ");
+  }
+  // Inferior: incisal em y1 (topo), colo em y2 (base)
+  return [
+    `M ${x1},${y1 + rInc}`,
+    `Q ${x1},${y1} ${x1 + rInc},${y1}`,
+    `L ${x2 - rInc},${y1}`,
+    `Q ${x2},${y1} ${x2},${y1 + rInc}`,
+    `L ${nx2},${y2 - rNeck}`,
+    `Q ${nx2},${y2} ${nx2 - rNeck},${y2}`,
+    `L ${nx1 + rNeck},${y2}`,
+    `Q ${nx1},${y2} ${nx1},${y2 - rNeck}`,
+    `Z`,
+  ].join(" ");
+}
+
+function singleRootPath(
+  x: number,
+  width: number,
+  neckY: number,
+  tipY: number,
+  superior: boolean,
+): string {
+  const half = width / 2;
+  // Raiz afilando da base larga (colo) para uma ponta arredondada.
+  const tipHalf = Math.max(1, width * 0.25);
+  if (superior) {
+    // tipY < neckY (raiz para cima)
+    const midY = (neckY + tipY) / 2;
+    return [
+      `M ${x - half},${neckY}`,
+      `C ${x - half},${midY} ${x - tipHalf - 0.5},${tipY + 3} ${x - tipHalf},${tipY + 1}`,
+      `Q ${x},${tipY - 1} ${x + tipHalf},${tipY + 1}`,
+      `C ${x + tipHalf + 0.5},${tipY + 3} ${x + half},${midY} ${x + half},${neckY}`,
+      `Z`,
+    ].join(" ");
+  }
+  // Inferior: tipY > neckY (raiz para baixo)
+  const midY = (neckY + tipY) / 2;
+  return [
+    `M ${x - half},${neckY}`,
+    `C ${x - half},${midY} ${x - tipHalf - 0.5},${tipY - 3} ${x - tipHalf},${tipY - 1}`,
+    `Q ${x},${tipY + 1} ${x + tipHalf},${tipY - 1}`,
+    `C ${x + tipHalf + 0.5},${tipY - 3} ${x + half},${midY} ${x + half},${neckY}`,
+    `Z`,
+  ].join(" ");
 }
 
 function Legenda() {
