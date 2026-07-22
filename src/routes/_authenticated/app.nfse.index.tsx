@@ -621,6 +621,65 @@ function NfsePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!cancelarAlvo} onOpenChange={(o) => { if (!o) { setCancelarAlvo(null); setCancelarJustificativa(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Ban className="h-4 w-4 text-red-600" /> Cancelar NFS-e</DialogTitle>
+          </DialogHeader>
+          {cancelarAlvo && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-md bg-muted p-3 space-y-1">
+                <div><span className="text-muted-foreground">Número:</span> <b>{cancelarAlvo.numero ?? "—"}</b></div>
+                <div><span className="text-muted-foreground">Tomador:</span> {cancelarAlvo.tomador_nome ?? "—"}</div>
+                <div><span className="text-muted-foreground">Valor:</span> {Number(cancelarAlvo.valor_servicos).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Justificativa (15 a 255 caracteres)</label>
+                <Textarea
+                  rows={4}
+                  value={cancelarJustificativa}
+                  onChange={(e) => setCancelarJustificativa(e.target.value)}
+                  placeholder="Ex.: Nota emitida em duplicidade para o mesmo atendimento."
+                  maxLength={255}
+                />
+                <div className="text-xs text-muted-foreground text-right">{cancelarJustificativa.length}/255</div>
+              </div>
+              <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                O cancelamento é enviado à Prefeitura/Ambiente Nacional e não pode ser desfeito.
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCancelarAlvo(null)} disabled={cancelando}>Voltar</Button>
+            <Button
+              variant="destructive"
+              disabled={cancelando || cancelarJustificativa.trim().length < 15}
+              onClick={async () => {
+                if (!cancelarAlvo) return;
+                setCancelando(true);
+                try {
+                  const r = await cancelar({ data: { id: cancelarAlvo.id, justificativa: cancelarJustificativa.trim() } });
+                  if (r.ok) {
+                    toast.success("Nota cancelada.");
+                    setCancelarAlvo(null);
+                    setCancelarJustificativa("");
+                    await load();
+                  } else {
+                    toast.error(r.error ?? "Falha ao cancelar.");
+                  }
+                } catch (e) {
+                  toast.error((e as Error).message);
+                } finally {
+                  setCancelando(false);
+                }
+              }}
+            >
+              {cancelando ? <><Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> Cancelando…</> : <>Confirmar cancelamento</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
