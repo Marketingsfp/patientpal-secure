@@ -1963,6 +1963,10 @@ function DetalheContrato({
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const podeEscrever = usePodeEscrever(modulo);
+  // NFS-e é gerida por permissão própria: caixa/recepção normalmente têm
+  // "nfse: write" mesmo sem edição em contratos, e precisam conseguir emitir
+  // a nota a partir da parcela paga.
+  const podeEmitirNfse = usePodeEscrever("nfse");
   const DadosField = ({ label, value }: { label: string; value: ReactNode }) => (
     <div className="space-y-1">
       <div className="text-sm font-medium">{label}</div>
@@ -4195,9 +4199,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1 justify-end">
-                              {podeEscrever && (m.status === "pago" ? (
+                              {m.status === "pago" ? (
                                 <>
-                                  {m.lancamento_id ? (
+                                  {podeEmitirNfse && m.lancamento_id ? (
                                     nfsePorLancamento[m.lancamento_id] ? (
                                       <a
                                         href={nfsePorLancamento[m.lancamento_id].pdf_url ?? "#"}
@@ -4225,14 +4229,16 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                         NFS-e
                                       </Button>
                                     )
-                                  ) : (
+                                  ) : podeEmitirNfse ? (
                                     <span className="text-xs text-muted-foreground" title="Parcela paga fora do sistema — não gera NFS-e">—</span>
+                                  ) : null}
+                                  {podeEscrever && (
+                                    <Button size="sm" variant="outline" onClick={() => reverterMensalidade(m)}>
+                                      Reverter
+                                    </Button>
                                   )}
-                                  <Button size="sm" variant="outline" onClick={() => reverterMensalidade(m)}>
-                                    Reverter
-                                  </Button>
                                 </>
-                              ) : (
+                              ) : podeEscrever ? (
                                 <>
                                   {isAdesao(m) && adesaoEmbutida ? (
                                     <span
@@ -4259,7 +4265,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                     </>
                                   )}
                                 </>
-                              ))}
+                              ) : null}
                               {isAdmin && podeEscrever ? (
                                 <Button
                                   size="sm"
