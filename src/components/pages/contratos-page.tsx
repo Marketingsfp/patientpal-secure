@@ -4330,7 +4330,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
               {isAdmin && podeEscrever ? (
                 <div className="rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs text-primary">
                   Modo administrador — você pode alterar todos os campos deste contrato. Alterações não regeram parcelas
-                  automaticamente; use a opção “Regerar 12 parcelas futuras” abaixo quando quiser propagar o novo valor.
+                  automaticamente; use o botão “Regerar 12 parcelas” abaixo quando quiser propagar o novo valor/dia.
                 </div>
               ) : null}
               {isAdmin && podeEscrever ? (
