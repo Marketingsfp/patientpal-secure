@@ -20,6 +20,7 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { ConvenioFuncionarioTab } from "@/components/funcionarios/ConvenioFuncionarioTab";
 
 export const Route = createFileRoute("/_authenticated/app/hr-contratos/$id")({
   component: EditarFuncionarioPage,
@@ -318,9 +319,10 @@ function EditarFuncionarioPage() {
           <div className="py-10 text-center text-sm text-muted-foreground">Carregando…</div>
         ) : (
         <Tabs defaultValue="dados" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className={`grid w-full ${isNovo ? "grid-cols-2" : "grid-cols-3"}`}>
             <TabsTrigger value="dados">Dados do contrato</TabsTrigger>
             <TabsTrigger value="login">Acesso ao sistema</TabsTrigger>
+            {!isNovo && <TabsTrigger value="convenio">Convênio</TabsTrigger>}
           </TabsList>
           <TabsContent value="dados" className="space-y-3 pt-3">
             <div className="grid grid-cols-2 gap-3">
