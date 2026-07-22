@@ -3468,7 +3468,25 @@ function AgendaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaAtual?.clinica_id]);
 
-  const openSlot = (a: Agendamento) => {
+  // Trava de edição do slot: quando o usuário abre o diálogo de agendar em um
+  // slot DISPONÍVEL, marcamos edit_lock_by/edit_lock_at no banco para impedir
+  // que outro recepcionista abra o mesmo horário em paralelo. A trava expira
+  // sozinha após 3 minutos, então nunca "prende" um slot se alguém fechar a
+  // aba sem salvar. Aplicação global (todas as clínicas).
+  const lockedSlotIdRef = useRef<string | null>(null);
+  const liberarLockSlot = async () => {
+    const id = lockedSlotIdRef.current;
+    if (!id) return;
+    lockedSlotIdRef.current = null;
+    try {
+      await supabase.rpc("agenda_slot_unlock", { _id: id } as never);
+    } catch { /* silencioso — a trava expira em 3 min de qualquer forma */ }
+  };
+  const fecharDialogoAgenda = () => {
+    void liberarLockSlot();
+    setOpen(false);
+  };
+  const openSlot = async (a: Agendamento) => {
     if (reagendandoAg) {
       void confirmarReagendamentoNoSlot(a);
       return;
@@ -3480,6 +3498,26 @@ function AgendaPage() {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
+    }
+    // Tenta travar o slot. Se outro usuário já travou nos últimos 3 min,
+    // avisa e não abre o diálogo — evita agendamento em dobro.
+    if (isSlotLivre(a.paciente_nome)) {
+      const { data, error } = await supabase.rpc("agenda_slot_lock", { _id: a.id } as never);
+      if (error) {
+        toast.error("Não foi possível reservar o slot. Tente novamente.");
+        return;
+      }
+      const res = (data ?? {}) as { ok?: boolean; reason?: string; by_nome?: string };
+      if (!res.ok) {
+        if (res.reason === "locked") {
+          toast.error(`Sendo agendado por ${res.by_nome ?? "outro usuário"} — tente novamente em instantes.`);
+        } else {
+          toast.error("Não foi possível reservar o slot.");
+        }
+        return;
+      }
+      lockedSlotIdRef.current = a.id;
+      void load();
     }
     setEditing(a);
     setForm({
