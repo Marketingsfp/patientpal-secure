@@ -89,9 +89,11 @@ function bucketDeMov(m: { tipo: string; forma_pagamento: string | null }): Forma
 function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaBucket, number>> {
   const out: Partial<Record<FormaBucket, number>> = {};
   if (!obs) return out;
-  const idx = obs.indexOf("Pagamento misto:");
-  if (idx < 0) return out;
-  const trecho = obs.slice(idx + "Pagamento misto:".length).split(" | ")[0];
+  const marker = obs.match(/pagamento\s+misto\s*:/i);
+  if (!marker || marker.index == null) return out;
+  const trecho = obs
+    .slice(marker.index + marker[0].length)
+    .split(/\s+\|\s+/)[0];
   const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
   const LABEL_TO_KEY: Array<[RegExp, FormaBucket]> = [
     [/^cart[ãa]o\s*cr[ée]dito/i, "credito"],
@@ -104,11 +106,12 @@ function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaB
     [/^conv[êe]nio/i, "convenio"],
     [/^transfer[êe]ncia/i, "transferencia"],
   ];
-  const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
+  const parseBRL = (s: string) =>
+    Number(s.replace(/[.\s\u00a0]/g, "").replace(",", ".")) || 0;
   for (const p of partes) {
     const match = LABEL_TO_KEY.find(([re]) => re.test(p));
     if (!match) continue;
-    const valMatch = p.match(/R\$\s*([\d.]+,\d{2})/);
+    const valMatch = p.match(/R\$[\s\u00a0]*([\d.\s\u00a0]+,\d{2})/i);
     if (!valMatch) continue;
     const v = parseBRL(valMatch[1]);
     out[match[1]] = (out[match[1]] ?? 0) + v;
@@ -120,7 +123,7 @@ function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaB
  * Rótulo bonito para exibir a forma de pagamento em tabelas. Para
  * `misto`, converte as parcelas decompostas em algo como
  * "Dinheiro R$ 60,00 · PIX R$ 100,00". Sem observações do lançamento
- * ainda em cache, retorna "Misto (dividido)".
+ * ainda em cache, retorna um aviso temporário sem usar o rótulo misto.
  */
 const FORMA_LABEL: Record<FormaBucket, string> = {
   dinheiro: "Dinheiro", pix: "PIX", debito: "Cartão débito", credito: "Cartão crédito",
@@ -136,7 +139,7 @@ function formatarFormaPagamento(
   const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
   const partes = obs ? decomporMistoObs(obs) : {};
   const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0);
-  if (entradas.length === 0) return "Misto (dividido)";
+  if (entradas.length === 0) return "Aguardando formas";
   return entradas
     .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k} ${(v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`)
     .join(" · ");
