@@ -3392,7 +3392,7 @@ function AgendaPage() {
           itens: itensRicos,
           inicioPadrao,
         });
-        setOpen(false); // fecha o modal de "novo agendamento" se estiver aberto
+        fecharDialogoAgenda(); // fecha o modal de "novo agendamento" se estiver aberto
         setDividirOpen(true);
         return;
       }
