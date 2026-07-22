@@ -122,6 +122,9 @@ type Agendamento = {
   atendimento_grupo_id?: string | null;
   ficha_numero?: number | null;
   forma_pagamento_prevista?: string | null;
+  edit_lock_by?: string | null;
+  edit_lock_by_nome?: string | null;
+  edit_lock_at?: string | null;
 };
 type Medico = {
   id: string;
@@ -1669,7 +1672,7 @@ function AgendaPage() {
     let q = supabase
       .from("agendamentos")
       .select(
-        "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never,
+        "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never,
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: apenasData ? false : true });
@@ -3389,7 +3392,7 @@ function AgendaPage() {
           itens: itensRicos,
           inicioPadrao,
         });
-        setOpen(false); // fecha o modal de "novo agendamento" se estiver aberto
+        fecharDialogoAgenda(); // fecha o modal de "novo agendamento" se estiver aberto
         setDividirOpen(true);
         return;
       }
@@ -3465,7 +3468,34 @@ function AgendaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaAtual?.clinica_id]);
 
-  const openSlot = (a: Agendamento) => {
+  // Trava de edição do slot: quando o usuário abre o diálogo de agendar em um
+  // slot DISPONÍVEL, marcamos edit_lock_by/edit_lock_at no banco para impedir
+  // que outro recepcionista abra o mesmo horário em paralelo. A trava expira
+  // sozinha após 3 minutos, então nunca "prende" um slot se alguém fechar a
+  // aba sem salvar. Aplicação global (todas as clínicas).
+  const lockedSlotIdRef = useRef<string | null>(null);
+  // Retorna o nome de quem está editando o slot (outro usuário) se a trava
+  // estiver ativa (≤ 3 min) e for de outra pessoa; caso contrário null.
+  const slotTravadoPorOutro = (a: Agendamento): string | null => {
+    if (!a.edit_lock_by || !a.edit_lock_at) return null;
+    if (a.edit_lock_by === user?.id) return null;
+    const at = Date.parse(a.edit_lock_at);
+    if (!Number.isFinite(at) || at < Date.now() - 3 * 60 * 1000) return null;
+    return a.edit_lock_by_nome || "outro usuário";
+  };
+  const liberarLockSlot = async () => {
+    const id = lockedSlotIdRef.current;
+    if (!id) return;
+    lockedSlotIdRef.current = null;
+    try {
+      await supabase.rpc("agenda_slot_unlock", { _id: id } as never);
+    } catch { /* silencioso — a trava expira em 3 min de qualquer forma */ }
+  };
+  const fecharDialogoAgenda = () => {
+    void liberarLockSlot();
+    setOpen(false);
+  };
+  const openSlot = async (a: Agendamento) => {
     if (reagendandoAg) {
       void confirmarReagendamentoNoSlot(a);
       return;
@@ -3477,6 +3507,26 @@ function AgendaPage() {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
+    }
+    // Tenta travar o slot. Se outro usuário já travou nos últimos 3 min,
+    // avisa e não abre o diálogo — evita agendamento em dobro.
+    if (isSlotLivre(a.paciente_nome)) {
+      const { data, error } = await supabase.rpc("agenda_slot_lock", { _id: a.id } as never);
+      if (error) {
+        toast.error("Não foi possível reservar o slot. Tente novamente.");
+        return;
+      }
+      const res = (data ?? {}) as { ok?: boolean; reason?: string; by_nome?: string };
+      if (!res.ok) {
+        if (res.reason === "locked") {
+          toast.error(`Sendo agendado por ${res.by_nome ?? "outro usuário"} — tente novamente em instantes.`);
+        } else {
+          toast.error("Não foi possível reservar o slot.");
+        }
+        return;
+      }
+      lockedSlotIdRef.current = a.id;
+      void load();
     }
     setEditing(a);
     setForm({
@@ -3707,7 +3757,7 @@ function AgendaPage() {
     setPendingOrcItemIds([]);
     setSaving(false);
     toast.success("Salvo");
-    setOpen(false);
+    fecharDialogoAgenda();
     await load();
     if (irParaPagamento && novoId) {
       let [lista, info] = await Promise.all([
@@ -4811,7 +4861,7 @@ function AgendaPage() {
           >
             <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
           </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(o) => { if (!o) fecharDialogoAgenda(); else setOpen(true); }}>
             {podeEscrever && (
               <DialogTrigger asChild>
                 <Button
@@ -5266,7 +5316,7 @@ function AgendaPage() {
                 </fieldset>
                 <DialogFooter className="sticky bottom-0 bg-white pt-3 pb-2 -mx-6 px-6 border-t border-slate-200 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] mt-4 flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
                   {editing && pagosSet.has(editing.id) ? (
-                    <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                    <Button type="button" variant="outline" onClick={fecharDialogoAgenda}>
                       Fechar
                     </Button>
                   ) : (
@@ -5297,7 +5347,7 @@ function AgendaPage() {
                           : "Desconto"}
                       </Button>
                       <div className="flex flex-nowrap gap-2 sm:justify-end">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+                        <Button type="button" variant="outline" onClick={fecharDialogoAgenda} disabled={saving}>
                           Cancelar
                         </Button>
                         <Button
@@ -6895,6 +6945,11 @@ function AgendaPage() {
                   {/* Linha 4: ações rápidas */}
                   <div className="flex items-center gap-1.5 pt-2 border-t">
                     {ehLivre ? (
+                      (() => { const lockNome = slotTravadoPorOutro(a); return lockNome ? (
+                      <div className="h-8 flex-1 flex items-center justify-center rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-[11px] px-2 truncate" title={`Em digitação por ${lockNome}`}>
+                        ⏳ Em digitação por {lockNome}
+                      </div>
+                      ) : (
                       <Button
                         variant="outline"
                         size="sm"
@@ -6904,6 +6959,7 @@ function AgendaPage() {
                         <UserPlus className="h-3.5 w-3.5 mr-1.5" />
                         Agendar
                       </Button>
+                      ); })()
                     ) : (
                       <>
                         {podeCheckin && (
@@ -7170,6 +7226,11 @@ function AgendaPage() {
                       {/* Situação */}
                       <TableCell className="py-2.5">
                         {ehLivre ? (
+                          (() => { const lockNome = slotTravadoPorOutro(a); return lockNome ? (
+                          <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[11px] font-medium truncate max-w-full" title={`Em digitação por ${lockNome}`}>
+                            ⏳ {lockNome}
+                          </Badge>
+                          ) : (
                           <Button
                             variant="outline"
                             size="sm"
@@ -7179,6 +7240,7 @@ function AgendaPage() {
                             <UserPlus className="h-3 w-3 mr-1.5" />
                             Agendar
                           </Button>
+                          ); })()
                         ) : estornoPend ? (
                           <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-xs">
                             Estorno solicitado
@@ -7866,6 +7928,12 @@ function FragmentDayCell({
   procedimentoFallback?: string;
 }) {
   const ehLivre = ag && isSlotLivre(ag.paciente_nome);
+  // Slot travado por alguém digitando (≤ 3 min). O próprio usuário que travou
+  // fica com o diálogo aberto; para todos os demais o slot vira "em digitação".
+  const lockNome = ag && ehLivre && ag.edit_lock_by && ag.edit_lock_at
+    && Date.parse(ag.edit_lock_at) > Date.now() - 3 * 60 * 1000
+    ? (ag.edit_lock_by_nome || "outro usuário")
+    : null;
   return (
     <>
       <td
@@ -7883,6 +7951,13 @@ function FragmentDayCell({
           >
             +
           </button>
+        ) : lockNome ? (
+          <div
+            className="w-full rounded-md px-2 py-1.5 text-[11px] leading-tight truncate bg-amber-100 text-amber-800 border border-amber-300"
+            title={`Em digitação por ${lockNome}`}
+          >
+            ⏳ {lockNome}
+          </div>
         ) : (
           <button
             type="button"

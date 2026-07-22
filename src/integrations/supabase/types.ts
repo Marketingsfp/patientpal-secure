@@ -354,6 +354,9 @@ export type Database = {
           created_at: string
           criado_por: string | null
           data_pagamento: string | null
+          edit_lock_at: string | null
+          edit_lock_by: string | null
+          edit_lock_by_nome: string | null
           especialidade_id: string | null
           executado_em: string | null
           executado_por: string | null
@@ -387,6 +390,9 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           data_pagamento?: string | null
+          edit_lock_at?: string | null
+          edit_lock_by?: string | null
+          edit_lock_by_nome?: string | null
           especialidade_id?: string | null
           executado_em?: string | null
           executado_por?: string | null
@@ -420,6 +426,9 @@ export type Database = {
           created_at?: string
           criado_por?: string | null
           data_pagamento?: string | null
+          edit_lock_at?: string | null
+          edit_lock_by?: string | null
+          edit_lock_by_nome?: string | null
           especialidade_id?: string | null
           executado_em?: string | null
           executado_por?: string | null
@@ -8371,6 +8380,8 @@ export type Database = {
       _mj_null_all: { Args: never; Returns: number }
       _mj_set_batch: { Args: { _limit?: number }; Returns: number }
       _mj_tmp_batch: { Args: { _limit?: number }; Returns: number }
+      agenda_slot_lock: { Args: { _id: string }; Returns: Json }
+      agenda_slot_unlock: { Args: { _id: string }; Returns: undefined }
       assinar_contrato_publico: {
         Args: { _assinatura_svg: string; _ip: string; _token: string }
         Returns: string
