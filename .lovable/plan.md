@@ -1,67 +1,49 @@
-# Ajustes nas Regras dos Convênios (Cartão Benefícios)
+## Objetivo
 
-## Análise (governança — 4 eixos)
+Trocar o desenho atual dos dentes no odontograma clínico (retângulos com raiz genérica) por formatos anatômicos mais realistas, no estilo da foto 2 (contornos de coroa + raízes por tipo de dente), mantendo TODA a lógica clínica atual (5 faces clicáveis, cores por status, seleção, anel âmbar de "orçado", arcadas permanente/decídua/mista, legenda).
 
-- 💰 **Financeiro**: elimina risco de aplicar desconto de benefício sem repassar o custo real do cartão (taxas de máquina) → protege margem em pagamentos não-dinheiro.
-- ⏱️ **Operacional**: uma única configuração por convênio substitui ter que cadastrar dois valores diferentes (dinheiro/outros) em cada regra.
-- 😊 **Paciente**: valor apresentado no atendimento e no orçamento passa a refletir corretamente o preço final por forma de pagamento — sem surpresa no caixa.
-- 🛡️ **Segurança**: mudança usa campos novos com default 0 (nenhum convênio existente muda de comportamento até o admin configurar).
+## Escopo (o que muda)
 
-## O que vai mudar
+Somente visual do componente `src/components/odontologia/odontograma-clinico.tsx` (usado dentro da aba "Prontuário" em `/app/odontologia`).
 
-### 1. Remover botão "Apagar todas as regras"
-Na aba **Benefícios → Regras** do convênio, o botão vermelho "Apagar todas as regras" (e o diálogo de confirmação) some. Excluir regra segue sendo possível linha a linha.
+Não muda:
+- Nada em `src/components/odontograma.tsx` (versão simples, usada em outros lugares — se o usuário quiser aplicar também lá, faço em seguida).
+- Nada em `src/lib/odonto.ts` (status, cores, faces).
+- Nada em orçamento/`DentePicker`/backend.
 
-### 2. Novo acréscimo por convênio: "Valor de cartão com acréscimo de"
-Um novo bloco aparece **logo abaixo do painel "Regras de preços automáticas"**, para **todos os cartões benefícios EXCETO o Convênio Funcionário** (mesma detecção já existente `isConvenioFuncionario`).
+## Clínica-alvo (Regra 1.10)
 
-Campos:
-- Tipo: **Percentual (%)** ou **Valor fixo (R$)** — mesmo padrão de switch usado nas outras regras.
-- Valor: número (`%` ou `R$`, conforme o tipo).
-- Botão **Salvar acréscimo**.
+Como é ajuste puramente visual do componente compartilhado (sem regra de negócio), a mudança valeria para as 3 clínicas por natureza. **Vou confirmar isso com você antes de aplicar** — se quiser restringir a uma clínica específica, coloco atrás de flag `odontograma_anatomico` por `clinica_id`.
 
-Comportamento:
-- Toda vez que o benefício for aplicado e a forma de pagamento **não for dinheiro** (ou seja: PIX, débito, crédito ou qualquer outra), o sistema soma o acréscimo sobre o valor do benefício já calculado.
-- Se a forma for **dinheiro**, o valor do benefício segue igual, sem acréscimo.
-- Convênio Funcionário nunca aplica esse acréscimo (regra explícita do usuário).
+## Como vai ficar
 
-Onde o acréscimo entra em ação (todos os pontos que já usam `computeValor`/`findRegra`):
-- **Agenda** (`app.agenda.tsx`) — cálculo do valor no momento de agendar/pagar.
-- **Catálogo de Procedimentos** (`app.procedimentos.tsx`) — pré-visualização e "Reaplicar regras a todos os serviços", gravando o acréscimo dentro de `procedimento_cb_convenio_valores.valor_outros`.
-- Segunda via / comprovantes e demais telas que leem `valor_outros` continuam corretas porque o acréscimo é embutido no próprio `valor_outros`.
+Para cada dente vou desenhar um SVG anatômico com **coroa + raízes** conforme o tipo (FDI):
 
-## Detalhes técnicos
+- **Incisivos (11–13, 21–23, 31–33, 41–43 e decíduos 51–53, 61–63, 71–73, 81–83)**: coroa retangular alta e afilada, 1 raiz longa e fina.
+- **Pré-molares (14–15, 24–25, 34–35, 44–45)**: coroa mais quadrada, 1 raiz (superiores podem ter leve bifurcação sugerida).
+- **Molares (16–18, 26–28, 36–38, 46–48 e decíduos 54–55, 64–65, 74–75, 84–85)**: coroa larga com sulco central, superiores com 3 raízes (2 vestibulares + 1 palatina), inferiores com 2 raízes (mesial + distal).
+- Superior x inferior: raízes viradas para cima nos superiores (quadrantes 1/2/5/6) e para baixo nos inferiores (3/4/7/8), como já é hoje.
 
-### Banco (migration)
-Adicionar em `public.cb_convenios`:
-- `acrescimo_cartao_modo text` — `'percentual'` | `'valor_fixo'` | `null` (default `null` = desativado).
-- `acrescimo_cartao_percentual numeric(10,2)` default `0`.
-- `acrescimo_cartao_valor numeric(10,2)` default `0`.
+A coroa continua sendo o `clipPath` das 5 áreas de face clicáveis (V/M/D/L/O), então **click e coloração por face permanecem idênticos** — só o contorno do clipPath vira anatômico em vez de retangular.
 
-Sem alteração de RLS/GRANT (tabela já configurada).
+Estilo do traço: `stroke="hsl(var(--border))"`, `stroke-width` fino (~0.9), fill das faces pelas cores de status. Aparência limpa/linear, coerente com a foto 2 (contorno cinza-azulado, sem sombra, sem preenchimento decorativo).
 
-### Helper `src/lib/cb-regras.ts`
-Adicionar tipo `CbAcrescimoCartao` e função utilitária:
-```ts
-applyAcrescimoCartao(valorOutros: number, acr: CbAcrescimoCartao | null): number
-```
-Retorna o próprio `valorOutros` quando `acr` é nulo ou o convênio é Funcionário. Uso em `computeValor` (nova assinatura opcional) e nos pontos que consomem `{ dinheiro, outros }`.
+Layout: manter linhas superior/inferior, numeração FDI centralizada acima de cada dente, separador entre superior e inferior. Larguras diferentes por tipo (molar mais largo que incisivo) para casar com a proporção da foto 2.
 
-### UI `src/components/cartao-beneficios/regras-tab.tsx`
-- Remover: `apagarTodasOpen`, `apagandoTodas`, função `apagarTodas`, botão (linha 558) e `<AlertDialog>` (linha 889).
-- Novo componente `AcrescimoCartaoBox` renderizado após o cabeçalho de "Regras de preços automáticas" — só monta quando `!isConvenioFuncionario(convenioNome)`.
-- Carrega/salva os 3 campos em `cb_convenios` (update simples pelo `convenioId`).
+## Passos técnicos
 
-### Aplicação do acréscimo
-- Nos cálculos que já resolvem `computeValor(...)`, encadear `applyAcrescimoCartao(out.outros, acr)`.
-- Em `reaplicar()` (regras-tab): buscar `acr` do convênio uma vez e aplicar no `valor_outros` antes do upsert.
+1. Criar helper `toothShape(dente)` retornando `{ crownPath, rootPath, width, height }` conforme tipo (incisivo/canino/pré-molar/molar) e arcada (sup/inf).
+2. Reescrever `DenteFaces` em `odontograma-clinico.tsx` para usar esses paths — recalcular os polígonos V/M/D/L/O dentro do `viewBox` da nova coroa (mesma divisão em 4 trapézios + retângulo central, agora recortados pelo `crownPath` anatômico).
+3. Ajustar `viewBox` e tamanho render (`h-16 w-*`) para variar por tipo de dente.
+4. Manter `title` (tooltip), anel âmbar de orçado, destaque de seleção, tratamento de decíduos e a `Legenda` inalterada.
 
-### Escopo
-- Puramente **UI + regra de cálculo**; nenhuma mudança em fluxo financeiro (parcelas, repasse, NFS-e, caixa).
-- Nenhum convênio existente sofre mudança até que o admin configure o acréscimo (default 0/null).
+## Validação
 
-## Pontos que precisam da sua confirmação (regra 1.10 do AGENTS.md)
+- Abrir `/app/odontologia` na aba Prontuário: conferir aparência nas 3 arcadas (permanente/decídua/mista).
+- Clicar em faces individuais: garantir que cor/estado ainda são gravados corretamente por face.
+- Conferir orçamento vinculado: dente marcado ainda mostra anel âmbar e ponto.
 
-1. **Clínicas alvo**: a capacidade nasce disponível para as 3 clínicas (é código compartilhado), mas o valor do acréscimo é configurado por convênio. Confirmar: liberar o campo nas 3 clínicas (Menino Jesus, SFP e Sant Marché)? Sim/Não.
-2. **Formas equivalentes a "não dinheiro"**: tratar **PIX, débito e crédito** todos como "cartão" para efeito do acréscimo? (Padrão do sistema já agrupa como `valor_outros`.) Sim/Não.
-3. **Acréscimo em regras "Gratuito"**: se o benefício é cortesia (valor 0), o acréscimo do cartão fica **zerado também** (não cobrar acréscimo sobre 0). Concorda?
+## Perguntas antes de implementar
+
+1. Aplico nas **3 clínicas** (Menino Jesus, SFP, Sant Marché) ou só em uma? (visual, sem regra de negócio — default seria as 3)
+2. Aplico o mesmo desenho anatômico também no odontograma simples de `src/components/odontograma.tsx` (usado no `DentePicker` de orçamento) ou mantenho ele com o visual atual mais compacto?
