@@ -3474,6 +3474,15 @@ function AgendaPage() {
   // sozinha após 3 minutos, então nunca "prende" um slot se alguém fechar a
   // aba sem salvar. Aplicação global (todas as clínicas).
   const lockedSlotIdRef = useRef<string | null>(null);
+  // Retorna o nome de quem está editando o slot (outro usuário) se a trava
+  // estiver ativa (≤ 3 min) e for de outra pessoa; caso contrário null.
+  const slotTravadoPorOutro = (a: Agendamento): string | null => {
+    if (!a.edit_lock_by || !a.edit_lock_at) return null;
+    if (a.edit_lock_by === user?.id) return null;
+    const at = Date.parse(a.edit_lock_at);
+    if (!Number.isFinite(at) || at < Date.now() - 3 * 60 * 1000) return null;
+    return a.edit_lock_by_nome || "outro usuário";
+  };
   const liberarLockSlot = async () => {
     const id = lockedSlotIdRef.current;
     if (!id) return;
