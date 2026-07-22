@@ -113,20 +113,19 @@ function DenteFaces({
   const cy0 = crownY;
   return (
     <div
-      className={`flex flex-col items-center gap-0.5 rounded-md p-0.5 transition ${
+      className={`flex ${superior ? "flex-col" : "flex-col-reverse"} items-center gap-0.5 rounded-md p-0.5 transition ${
         selecionado ? "ring-2 ring-primary" : orcado ? "ring-2 ring-amber-400/60" : ""
       }`}
       title={`Dente ${dente}${orcado ? " · orçado" : ""}`}
     >
-      <span className={`text-[10px] font-mono ${decidua ? "text-amber-700" : "text-foreground/70"}`}>{dente}</span>
-      <svg viewBox={`0 0 ${vbW} ${vbH}`} className="h-16 w-10">
+      <svg viewBox={`0 0 ${vbW} ${vbH}`} className="h-20 w-9">
         <defs>
           <clipPath id={clipId}>
             <path d={crownPath} />
           </clipPath>
         </defs>
-        {/* Raiz(es) (não clicável, apenas visual) — anatomia por tipo de dente */}
-        <path d={rootPath} fill="hsl(var(--muted))" stroke="hsl(var(--border))" strokeWidth="0.8" fillRule="evenodd" />
+        {/* Raiz(es) — traço fino como no diagrama de referência */}
+        <path d={rootPath} fill="#ffffff" stroke="#94a3b8" strokeWidth="1" strokeLinejoin="round" strokeLinecap="round" fillRule="evenodd" />
         {/* Faces da coroa recortadas no formato de dente */}
         <g clipPath={`url(#${clipId})`}>
           {/* Vestibular (topo da coroa) */}
@@ -175,9 +174,10 @@ function DenteFaces({
             <title>{`${dente} · Oclusal/Incisal · ${STATUS_LABEL[s("O")]}`}</title>
           </rect>
         </g>
-        {/* Contorno da coroa por cima */}
-        <path d={crownPath} fill="none" stroke="hsl(var(--border))" strokeWidth="0.9" />
+        {/* Contorno da coroa por cima — traço fino, cor referência */}
+        <path d={crownPath} fill="none" stroke="#94a3b8" strokeWidth="1" strokeLinejoin="round" strokeLinecap="round" />
       </svg>
+      <span className={`text-[10px] font-sans tracking-tight ${decidua ? "text-amber-700" : "text-slate-500"}`}>{dente}</span>
       {orcado && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />}
     </div>
   );
