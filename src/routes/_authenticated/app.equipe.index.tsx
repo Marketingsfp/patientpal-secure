@@ -1,9 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Stethoscope } from "lucide-react";
+import { Plus, Pencil, Stethoscope, Download } from "lucide-react";
+import { toast } from "sonner";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { supabase } from "@/integrations/supabase/client";
+import { exportToExcel } from "@/lib/export-csv";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,10 @@ import { MedicoFormDialog } from "@/components/medicos/MedicoFormDialog";
 export const Route = createFileRoute("/_authenticated/app/equipe/")({
   component: EquipePage,
   head: () => ({ meta: [{ title: "Médicos — ClinicaOS" }] }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    abrir: typeof search.abrir === "string" && search.abrir.length > 0 ? search.abrir : undefined,
+    new: search.new === "1" || search.new === 1 ? "1" : undefined,
+  }),
 });
 
 interface Medico {
@@ -26,6 +32,12 @@ interface Medico {
   telefone: string | null;
   ativo: boolean;
   especialidades?: string[];
+  // Repasse padrão do médico — só populado quando a RPC restrita
+  // `medicos_repasse_lista` responde (perfis de gestão). Para os demais,
+  // fica null e a coluna exibe "—".
+  tipo_repasse?: "percentual" | "valor" | null;
+  percentual_repasse_padrao?: number | null;
+  valor_repasse_padrao?: number | null;
   // Perfil de acesso já é "Médico" (clinica_memberships), mas ainda não existe
   // registro em `medicos` (falta CRM). Aparece aqui, na aba Médicos, com um
   // aviso — nunca deve sumir do sistema. `id` sintético = "pending-<user_id>".
@@ -39,6 +51,8 @@ const limparPrefixoMedico = (nome: string) =>
 function EquipePage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("equipe");
+  const { abrir: autoAbrir, new: autoNew } = Route.useSearch();
+  const navigate = useNavigate();
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [loading, setLoading] = useState(false);
   const [busca, setBusca] = useState("");
@@ -112,13 +126,82 @@ function EquipePage() {
           espMap.set(v.medico_id, arr);
         }
       }
+      // Repasse só é retornado pela RPC para perfis de gestão. Se o usuário
+      // não tiver acesso, `rep` vem vazio e a coluna aparece como "—".
+      const { data: rep } = await supabase.rpc("medicos_repasse_lista", {
+        _clinica_id: clinicaAtual.clinica_id,
+      });
+      const repMap = new Map<string, {
+        tipo_repasse: string | null;
+        percentual_repasse_padrao: number | null;
+        valor_repasse_padrao: number | null;
+      }>();
+      for (const r of (rep as any[] | null) ?? []) repMap.set(r.id, r);
       setMedicos([
-        ...medicosBase.map((md) => ({ ...md, especialidades: espMap.get(md.id) ?? [] })),
+        ...medicosBase.map((md) => {
+          const r = repMap.get(md.id);
+          return {
+            ...md,
+            especialidades: espMap.get(md.id) ?? [],
+            tipo_repasse: (r?.tipo_repasse as Medico["tipo_repasse"]) ?? null,
+            percentual_repasse_padrao: r?.percentual_repasse_padrao ?? null,
+            valor_repasse_padrao: r?.valor_repasse_padrao ?? null,
+          };
+        }),
         ...medicosPendentes,
       ]);
       setLoading(false);
     });
   }, [clinicaAtual?.clinica_id, reloadKey]);
+
+  // Abrir dialog automaticamente via ?abrir=<id> (busca universal) ou ?new=1.
+  useEffect(() => {
+    if (autoNew === "1") {
+      if (podeEscrever) {
+        setMedicoPrefillNome(undefined);
+        setMedicoPrefillUserId(undefined);
+        setMedicoDialog({ open: true, id: null });
+      }
+      void navigate({ to: "/app/equipe", search: {}, replace: true });
+    } else if (autoAbrir) {
+      if (podeEscrever) setMedicoDialog({ open: true, id: autoAbrir });
+      void navigate({ to: "/app/equipe", search: {}, replace: true });
+    }
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [autoAbrir, autoNew, podeEscrever]);
+
+  const fmtRepasse = (m: Medico) => {
+    if (m.pending || m.tipo_repasse == null) return "—";
+    return m.tipo_repasse === "valor"
+      ? `R$ ${Number(m.valor_repasse_padrao ?? 0).toFixed(2)}`
+      : `${m.percentual_repasse_padrao ?? 0}%`;
+  };
+
+  const handleExport = () => {
+    if (medicos.length === 0) {
+      toast.info("Sem dados para exportar.");
+      return;
+    }
+    exportToExcel(
+      medicos.map((m) => ({
+        nome: m.nome,
+        crm: m.crm ? `${m.crm}/${m.crm_uf ?? ""}` : "",
+        especialidades: (m.especialidades ?? []).join(", "),
+        telefone: m.telefone ?? "",
+        repasse: fmtRepasse(m),
+        status: m.pending ? "Cadastro pendente" : m.ativo ? "Ativo" : "Inativo",
+      })),
+      `medicos-${new Date().toISOString().slice(0, 10)}`,
+      [
+        { key: "nome", label: "Nome" },
+        { key: "crm", label: "CRM" },
+        { key: "especialidades", label: "Especialidades" },
+        { key: "telefone", label: "Telefone" },
+        { key: "repasse", label: "Repasse" },
+        { key: "status", label: "Status" },
+      ],
+    );
+  };
 
   const novoMedico = () => {
     setMedicoPrefillNome(undefined);
@@ -147,11 +230,16 @@ function EquipePage() {
             Funcionários administrativos ficam em <Link to="/app/hr-contratos" className="underline">Recursos Humanos → Funcionários</Link>.
           </p>
         </div>
-        {podeEscrever && (
-          <Button onClick={novoMedico}>
-            <Plus className="h-4 w-4 mr-2" /> Novo médico
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="h-4 w-4 mr-2" /> Exportar Excel
           </Button>
-        )}
+          {podeEscrever && (
+            <Button onClick={novoMedico}>
+              <Plus className="h-4 w-4 mr-2" /> Novo médico
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -189,6 +277,7 @@ function EquipePage() {
                   <TableHead>CRM</TableHead>
                   <TableHead>Especialidade</TableHead>
                   <TableHead>Telefone</TableHead>
+                  <TableHead className="text-right">Repasse</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-16 text-right">Ações</TableHead>
                 </TableRow></TableHeader>
@@ -209,6 +298,7 @@ function EquipePage() {
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{m.telefone ?? "—"}</TableCell>
+                      <TableCell className="text-right text-sm">{fmtRepasse(m)}</TableCell>
                       <TableCell>
                         {m.pending ? (
                           <Badge variant="destructive">Cadastro pendente (falta CRM)</Badge>
