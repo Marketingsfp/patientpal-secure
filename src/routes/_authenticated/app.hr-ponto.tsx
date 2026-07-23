@@ -50,6 +50,16 @@ function PontoPage() {
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [loading, setLoading] = useState(true);
   const [marcando, setMarcando] = useState(false);
+  const [agora, setAgora] = useState(new Date()); // <- Estado para o relógio
+
+  // 🔥 Atualiza o relógio a cada segundo
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAgora(new Date());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   async function load() {
     if (!clinicaAtual) return;
@@ -117,8 +127,6 @@ function PontoPage() {
     void load();
   }
 
-  const agora = new Date();
-
   return (
     <div className="p-6 space-y-4 max-w-3xl mx-auto">
       <div className="flex items-center gap-3">
@@ -131,16 +139,22 @@ function PontoPage() {
 
       <Card className="p-6 text-center">
         <div className="text-5xl font-bold tabular-nums">
-          {agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+          {agora.toLocaleTimeString("pt-BR", { 
+            hour: "2-digit", 
+            minute: "2-digit", 
+            second: "2-digit" 
+          })}
         </div>
-        <div className="text-sm text-muted-foreground mt-1">{formatDateTime(agora).split(" ")[0]}</div>
+        <div className="text-sm text-muted-foreground mt-1">
+          {formatDateTime(agora).split(" ")[0]}
+        </div>
         {podeEscrever && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-6">
-            <Button onClick={() => bater("entrada")} disabled={marcando}><LogIn className="h-4 w-4 mr-1" /> Entrada</Button>
-            <Button variant="outline" onClick={() => bater("intervalo_inicio")} disabled={marcando}><Coffee className="h-4 w-4 mr-1" /> Início intervalo</Button>
-            <Button variant="outline" onClick={() => bater("intervalo_fim")} disabled={marcando}><Coffee className="h-4 w-4 mr-1" /> Fim intervalo</Button>
-            <Button variant="destructive" onClick={() => bater("saida")} disabled={marcando}><LogOut className="h-4 w-4 mr-1" /> Saída</Button>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-6">
+          <Button onClick={() => bater("entrada")} disabled={marcando}><LogIn className="h-4 w-4 mr-1" /> Entrada</Button>
+          <Button variant="outline" onClick={() => bater("intervalo_inicio")} disabled={marcando}><Coffee className="h-4 w-4 mr-1" /> Início intervalo</Button>
+          <Button variant="outline" onClick={() => bater("intervalo_fim")} disabled={marcando}><Coffee className="h-4 w-4 mr-1" /> Fim intervalo</Button>
+          <Button variant="destructive" onClick={() => bater("saida")} disabled={marcando}><LogOut className="h-4 w-4 mr-1" /> Saída</Button>
+        </div>
         )}
         {unidades.length === 0 && (
           <p className="text-xs text-muted-foreground mt-3">Cadastre unidades com geolocalização para validar a presença.</p>
