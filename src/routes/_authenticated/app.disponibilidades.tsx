@@ -80,6 +80,10 @@ function Page() {
   const [gerar, setGerar] = useState({ medico_id: "all", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "", hora_inicio: "", hora_fim: "", intervalo_min: "" });
   const [gerarDias, setGerarDias] = useState<number[]>([1, 2, 3, 4, 5, 6]);
   const [gerando, setGerando] = useState(false);
+  // Piso por (medico|agenda|data-local) → maior `fim` (HH:MM local) já
+  // existente naquela data. Usado para acrescentar novos slots ABAIXO dos
+  // já criados, preservando a numeração de fichas.
+  const [pisos, setPisos] = useState<Map<string, string>>(new Map());
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
   const [dispEditando, setDispEditando] = useState<string | null>(null);
   const [editRow, setEditRow] = useState<{ dia_semana: string; hora_inicio: string; hora_fim: string; limite_pacientes: string; intervalo_min: string; vigencia_inicio: string; vigencia_fim: string } | null>(null);
