@@ -3862,6 +3862,10 @@ function AgendaPage() {
         return;
       }
     }
+    if (form.orcamento_id && orcamentoLaboratorio && form.medico_id && !medicoEhLaboratorista(form.medico_id)) {
+      toast.error("Orçamentos de Laboratório só podem ser agendados com médicos da especialidade Laboratório.");
+      return;
+    }
     const multiPermitido =
       !!form.medico_id &&
       (medicoEhLaboratorioFormulario(form.medico_id) ||
