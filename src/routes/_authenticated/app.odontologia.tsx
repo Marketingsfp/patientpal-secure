@@ -541,6 +541,7 @@ function OdontologiaPage() {
                 <PatientSearchInput
                   value={pacienteSelOrc}
                   onSelect={(p) => { setPacienteSelOrc(p); setPacienteIdOrc(p?.id ?? null); }}
+                  onRequestCreate={(q) => { setQuickInitial(q); setQuickOpen(true); }}
                 />
               </CardContent>
             </Card>
@@ -557,6 +558,19 @@ function OdontologiaPage() {
                 />
               </CardContent>
             </Card>
+            )}
+            {clinicaAtual && (
+              <QuickPatientDialog
+                open={quickOpen}
+                onOpenChange={setQuickOpen}
+                clinicaId={clinicaAtual.clinica_id}
+                nomeInicial={quickInitial}
+                onCreated={(p) => {
+                  setPacienteSelOrc(p);
+                  setPacienteIdOrc(p.id);
+                  setQuickOpen(false);
+                }}
+              />
             )}
           </TabsContent>
         </Tabs>
