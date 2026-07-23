@@ -1,78 +1,39 @@
-## Diagnóstico (confirmado)
+## Objetivo
+Ao clicar em **Editar** dentro do popup **"Informações do cliente"** da Agenda, abrir a edição do paciente em um **dialog na própria aba**, em vez de navegar para `/app/clientes/:id/editar`. O usuário permanece na Agenda, salva, e o dialog fecha.
 
-A regra no banco está correta:
-- Convênio **CARTÃO CONSULTA + SEGUROS** • **OFTALMOLOGIA** • consulta • valor_fixo
-- `valor` = **R$ 80,00** (dinheiro) • `valor_cartao` = **R$ 95,00** (cartão/PIX)
+## Análise (4 eixos)
+- **Financeiro:** neutro.
+- **Operacional:** elimina troca de aba/rota e o "voltar" — recepção economiza cliques em toda edição feita a partir da Agenda.
+- **Experiência:** contexto da Agenda preservado (filtros, data, agendamento aberto).
+- **Segurança:** nenhuma mudança de permissão — o `ClienteForm` já respeita `usePodeEscrever("clientes")` internamente e RLS de `pacientes` continua igual.
 
-O erro está **só no frontend da Agenda** (`src/routes/_authenticated/app.agenda.tsx`), na função `obterInfoConvenioPaciente`:
-
-1. A query `cb_convenio_regras.select(...)` **não pede** as colunas `valor_cartao` nem `percentual_cartao` — então elas nunca chegam do banco.
-2. Ao montar o objeto `desconto`, o código faz:
-   ```ts
-   const v = Number(regraMatch.valor) || 0;
-   desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };   // ← usa o mesmo valor nos dois
-   ```
-   Resultado: o diálogo "Forma de pagamento" mostra **R$ 80 dinheiro / R$ 80 outros**, mesmo com R$ 95 cadastrado para cartão.
-
-O helper `computeValor` em `src/lib/cb-regras.ts` já sabe tratar `valor_cartao`/`percentual_cartao` — a tela da Agenda simplesmente não passa por ele nesse caminho.
+## Clínica-alvo
+Confirmar antes de implementar: aplicar em **todas as 3 clínicas** (é ajuste puramente de UI da Agenda, sem regra de negócio)? Assumo que sim salvo indicação contrária.
 
 ## Escopo
+Um único arquivo: `src/routes/_authenticated/app.agenda.tsx`.
 
-- **Frontend only**, um único arquivo: `src/routes/_authenticated/app.agenda.tsx`.
-- **Sem** alteração de banco, RLS, RPC ou schema.
-- **Sem** mexer em outras telas (Orçamento, Odonto, Financeiro já usam `computeValor` corretamente ou já respeitam o campo — se você quiser, posso auditar depois em plano separado).
-- **Global (as 3 clínicas)** — é correção técnica de bug de leitura, sem regra de negócio nova.
+Alteração pontual no bloco do `Dialog` "Informações do cliente" (linhas ~7981-8046):
 
-## O que muda
+1. Trocar o `onClick` do botão **Editar** (hoje faz `window.location.href = /app/clientes/${id}/editar`) por abrir um novo estado `editarPacienteOpen`.
+2. Renderizar, logo abaixo do dialog atual, um novo `<Dialog>` com o componente já existente `ClienteForm` (de `@/components/clientes/cliente-form`), passando:
+   - `clinicaId={clinicaAtual.clinica_id}`
+   - `paciente={pacInfo}` (já carregado)
+   - `readOnly={!podeEscreverClientes}` — usar `usePodeEscrever("clientes")`, mesmo hook usado na página dedicada
+   - `onCancel` → fecha o dialog
+   - `onSaved` → fecha o dialog, fecha o popup "Informações do cliente" e recarrega os dados do paciente/agenda (invalidar a query de agendamentos do dia para refletir nome/telefone se mudarem)
 
-### 1. Query — adicionar as colunas que faltam
-```ts
-.select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,valor_cartao,percentual,percentual_cartao,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,grupo_gratuidade")
-```
+## Fora do escopo
+- Não alterar `ClienteForm`, rotas de clientes, permissões nem regra de negócio.
+- Não mexer nas outras entradas de edição (menu Clientes continua funcionando igual, com página dedicada).
+- Não tocar em outras clínicas de forma diferenciada (usa a mesma UI global).
 
-### 2. Tipo `DescontoConvenio` — permitir percentual diferente no cartão
-Adicionar `percentualOutros?: number` na variante `percentual`, mantendo compatibilidade (fallback = mesmo valor de `valor`).
+## Riscos
+- Baixo. O `ClienteForm` é o mesmo usado em `app.clientes.$pacienteId.editar.tsx`, então o comportamento de salvar/validar é idêntico.
+- Possível "dialog dentro de dialog": será encadeado (fechar o de edição volta para o de informações), padrão já usado em outros pontos do sistema.
 
-### 3. Montagem do `desconto` a partir da regra
-- **valor_fixo** (regra principal e fallback `regra_padrao_convenio`):
-  ```ts
-  const v  = Number(regraMatch.valor) || 0;
-  const vC = regraMatch.valor_cartao != null ? Number(regraMatch.valor_cartao) : v;
-  desconto = { tipo: "valor_fixo", valor: v, valorOutros: vC };
-  ```
-- **percentual_desconto**:
-  ```ts
-  const p  = Number(regraMatch.percentual) || 0;
-  const pC = regraMatch.percentual_cartao != null ? Number(regraMatch.percentual_cartao) : p;
-  desconto = { tipo: "percentual", valor: p, percentualOutros: pC };
-  ```
-
-### 4. `aplicarDescontoPorForma` — usar o percentual do cartão quando aplicável
-```ts
-if (d.tipo === "percentual") {
-  const ehDinheiro = forma === "dinheiro";
-  const pct = ehDinheiro ? d.valor : (d.percentualOutros ?? d.valor);
-  return Math.max(0, valor * (1 - Number(pct) / 100));
-}
-```
-
-**Não altera** nada quando a regra é gratuidade, quando o excedente cai em "particular/bloquear/valor_fixo", nem o acréscimo de cartão configurado por convênio.
-
-## Antes / Depois
-
-- **Antes:** consulta OFTALMO desta paciente sai R$ 80 no cartão de crédito (deveria ser R$ 95). Perda de R$ 15 por atendimento nesse convênio + risco em toda regra com `valor_cartao`/`percentual_cartao` diferente.
-- **Depois:** o diálogo mostra `R$ 80,00 dinheiro / R$ 95,00 outros`, e ao escolher Pix/Débito/Crédito o lançamento vai com R$ 95,00.
-
-## Validação (produção, com cautela)
-
-1. Reabrir o mesmo agendamento da MARIA HELENA (contrato 20261923) → clicar em pagar → conferir que o card mostra "R$ 80,00 dinheiro / R$ 95,00 outros" e que Cartão de Crédito exibe R$ 95,00. **Não confirmar o pagamento** nesse teste — só checar o valor apresentado.
-2. Agendamento particular (sem convênio) continua igual: sem regra, sem diferença dinheiro/cartão.
-3. Um convênio com regra percentual (ex.: 10% dinheiro / 5% cartão, se houver) — conferir cálculo. Se não houver regra assim ainda cadastrada, esse ramo continua funcionando pelo fallback `percentualOutros ?? valor` (comportamento igual ao de hoje).
-
-## Risco
-
-Baixo. Mudança isolada a uma função de leitura + um helper puro. Nenhum caminho de escrita foi tocado. Se algum campo `valor_cartao`/`percentual_cartao` estiver nulo (regra antiga), o comportamento é idêntico ao atual — o fallback preserva o valor de dinheiro.
-
-## Pendências / decisões
-
-- O ramo `excedente_modo === "valor_fixo"` (linha 907) usa o mesmo valor para dinheiro e cartão porque hoje o cadastro só tem um campo (`excedente_valor`). **Fora do escopo desta correção** — se quiser diferenciar excedente por forma de pagamento, precisa de nova coluna no banco; abro plano separado se for útil.
+## Validação
+- Abrir agendamento → clicar no nome do paciente → **Editar**: o formulário abre no mesmo dialog, sem trocar de rota.
+- Salvar: toast de sucesso, dialog fecha, permanece na Agenda com filtros preservados.
+- Cancelar: fecha sem alterar nada.
+- Usuário sem permissão em "clientes": campos ficam em modo leitura (mesmo comportamento da página dedicada).
