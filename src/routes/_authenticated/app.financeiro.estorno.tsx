@@ -36,6 +36,7 @@ interface Solic {
   resposta: string | null;
   lancamento_id: string | null;
   agendamento_id: string | null;
+  caixa_movimento_id: string | null;
   tipo: "erro_caixa" | "devolucao" | null;
   data_pagamento_original: string | null;
   data_estorno: string | null;
@@ -93,7 +94,7 @@ function Page() {
     const { data, error } = await supabase
       .from("estorno_solicitacoes")
       .select(
-        "id, paciente_nome, descricao, valor, motivo, status, solicitado_em, solicitado_por, resolvido_por, resolvido_em, resposta, lancamento_id, agendamento_id, tipo, data_pagamento_original, data_estorno",
+        "id, paciente_nome, descricao, valor, motivo, status, solicitado_em, solicitado_por, resolvido_por, resolvido_em, resposta, lancamento_id, agendamento_id, caixa_movimento_id, tipo, data_pagamento_original, data_estorno",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("solicitado_em", { ascending: false })
@@ -202,6 +203,29 @@ function Page() {
   const executarEstorno = async (
     s: Solic,
   ): Promise<{ executado: boolean; resposta: string } | null> => {
+    // Sangria — chama RPC dedicada; não passa por fin_lancamentos.
+    if (s.caixa_movimento_id) {
+      const { data, error } = await supabase.rpc("estornar_sangria", {
+        _movimento_id: s.caixa_movimento_id,
+        _clinica_id: clinicaAtual?.clinica_id ?? null,
+      } as never);
+      if (error) {
+        mostrarErro(error, "Falha ao estornar sangria");
+        return null;
+      }
+      const r = (data ?? {}) as { ok: boolean; mensagem?: string; aviso?: string | null };
+      if (!r.ok) {
+        toast.error(r.mensagem ?? "Não foi possível estornar esta sangria.");
+        return null;
+      }
+      return {
+        executado: true,
+        resposta:
+          r.aviso === "lancado_em_sessao_atual"
+            ? "Sangria estornada — compensação lançada no caixa aberto atual (sessão original já fechada)."
+            : "Sangria estornada — compensação lançada na mesma sessão de caixa.",
+      };
+    }
     if (!s.lancamento_id) {
       return { executado: false, resposta: "Aprovado manualmente (sem lançamento vinculado)" };
     }
