@@ -1008,6 +1008,13 @@ function Page() {
                             ) : null}
                           </div>
                         )}
+                        {l.origem === "caixa" && l.caixaTipo === "sangria" && podeEstornar && (
+                          <div className="flex items-center gap-1 pt-1 -ml-2">
+                            <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setEstornoSangria(l)}>
+                              <Undo2 className="h-3.5 w-3.5 text-amber-600 mr-1" /> Solicitar estorno
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
