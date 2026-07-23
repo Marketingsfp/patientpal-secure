@@ -364,7 +364,9 @@ function Page() {
           ? agendasDoMedico
           : [{ id: null }];
         for (const ag of agendasAlvo) {
-          const diaIso = d.toISOString().slice(0, 10);
+          const diaIso = fmtDateLocal.format(d);
+          const pisoKey = `${m.id}|${ag.id ?? ""}|${diaIso}`;
+          const piso = pisos.get(pisoKey) ?? "";
           const ds = disps.filter((x) =>
             x.medico_id === m.id && (ag.id === null || x.agenda_id === ag.id) && x.dia_semana === dow
             && (!x.vigencia_inicio || x.vigencia_inicio <= diaIso)
@@ -392,11 +394,14 @@ function Page() {
                 vigencia_fim: null,
               } as DispRow];
           // Aplica filtros/overrides de horário e intervalo do formulário
-          const dsEfetivo = baseDs.map((x) => ({
-            ...x,
-            hora_inicio: overrideIni ? (overrideIni > x.hora_inicio ? overrideIni : x.hora_inicio) : x.hora_inicio,
-            hora_fim: overrideFim ? (overrideFim < x.hora_fim ? overrideFim : x.hora_fim) : x.hora_fim,
-          })).filter((x) => x.hora_inicio < x.hora_fim);
+          const dsEfetivo = baseDs.map((x) => {
+            const hiOverride = overrideIni ? (overrideIni > x.hora_inicio ? overrideIni : x.hora_inicio) : x.hora_inicio;
+            // Se já existem slots criados nessa data para esse médico/agenda,
+            // a nova geração começa DEPOIS do último `fim` existente.
+            const hiComPiso = piso && piso > hiOverride ? piso : hiOverride;
+            const hf = overrideFim ? (overrideFim < x.hora_fim ? overrideFim : x.hora_fim) : x.hora_fim;
+            return { ...x, hora_inicio: hiComPiso, hora_fim: hf };
+          }).filter((x) => x.hora_inicio < x.hora_fim);
           const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
           const overrideIntervalo = gerar.intervalo_min ? parseInt(gerar.intervalo_min) : 0;
           let limiteDia: number;
@@ -428,7 +433,7 @@ function Page() {
       }
     }
     return out;
-  }, [gerar, gerarDias, medicos, disps, agendas]);
+  }, [gerar, gerarDias, medicos, disps, agendas, pisos]);
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
 
