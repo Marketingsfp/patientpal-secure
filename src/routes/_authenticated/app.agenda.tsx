@@ -1149,6 +1149,10 @@ function AgendaPage() {
   // Orçamento vinculado ao form atual pertence à especialidade Odontologia?
   // Quando true, só é permitido agendar com médicos da especialidade Odontologia.
   const [orcamentoOdonto, setOrcamentoOdonto] = useState(false);
+  // Sincroniza a flag "orçamento é odonto" quando o vínculo é limpo.
+  useEffect(() => {
+    if (!form.orcamento_id) setOrcamentoOdonto(false);
+  }, [form.orcamento_id]);
   // Dialog de divisão de orçamento (vários grupos de procedimentos → vários agendamentos vinculados)
   const [dividirOpen, setDividirOpen] = useState(false);
   const [dividirCtx, setDividirCtx] = useState<{
