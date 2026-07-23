@@ -152,12 +152,13 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
 
     <div class="sep"></div>
     <table>
-      <tr><td>SUBTOTAL</td><td class="right">${fmtBRL(subtotal)}</td></tr>
-      ${desconto > 0 ? `<tr><td>DESCONTO</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
       ${temSplit
-        ? `<tr class="bold"><td>TOTAL DINHEIRO/PIX</td><td class="right">${fmtBRL(totalDinheiro)}</td></tr>
-           <tr class="bold"><td>TOTAL CARTÃO</td><td class="right">${fmtBRL(totalCartao)}</td></tr>`
-        : `<tr class="bold lg"><td>TOTAL</td><td class="right">${fmtBRL(total)}</td></tr>`}
+        ? `${desconto > 0 ? `<tr><td>DESCONTO</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
+           <tr class="bold lg"><td>DINHEIRO/PIX</td><td class="right">${fmtBRL(totalDinheiro)}</td></tr>
+           <tr class="bold lg"><td>CARTÃO</td><td class="right">${fmtBRL(totalCartao)}</td></tr>`
+        : `<tr><td>SUBTOTAL</td><td class="right">${fmtBRL(subtotal)}</td></tr>
+           ${desconto > 0 ? `<tr><td>DESCONTO</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
+           <tr class="bold lg"><td>TOTAL</td><td class="right">${fmtBRL(total)}</td></tr>`}
     </table>
 
     ${o.forma_pagamento ? (() => {
