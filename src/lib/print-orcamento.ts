@@ -136,7 +136,23 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
           <div>${Number(i.quantidade)} x ${fmtBRL(Number(i.valor_unitario))}</div>
           <div class="bold">${fmtBRL(Number(i.valor_total))}</div>
         </div>
-        ${formasList.length > 1 ? `
+        ${(() => {
+          const sp = splitFormas(i);
+          if (sp) {
+            const qtd = Number(i.quantidade) || 1;
+            return `
+          <div class="sm" style="margin-top:2px; padding-left:4px">
+            <div style="display:flex; justify-content:space-between">
+              <span>DINHEIRO</span>
+              <span>${fmtBRL(qtd * sp.din)}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between">
+              <span>CARTÃO/PIX</span>
+              <span>${fmtBRL(qtd * sp.cart)}</span>
+            </div>
+          </div>`;
+          }
+          return formasList.length > 1 ? `
           <div class="sm" style="margin-top:2px; padding-left:4px">
             ${formasList.map((f: string) => {
               const vu = Number((i.valores_formas as Record<string, number>)?.[f] ?? i.valor_unitario ?? 0);
@@ -147,7 +163,8 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
               </div>`;
             }).join("")}
           </div>
-        ` : ""}
+        ` : "";
+        })()}
       </div>
     `).join("")}
 
