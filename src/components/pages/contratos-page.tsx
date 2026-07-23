@@ -34,6 +34,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const MOTIVOS_CANCELAMENTO: ReadonlyArray<{ value: string; label: string; pedeObs: boolean }> = [
+  { value: "troca_endereco", label: "Troca de endereço", pedeObs: false },
+  { value: "plano_saude", label: "Fez plano de saúde", pedeObs: false },
+  { value: "falecimento", label: "Falecimento", pedeObs: false },
+  { value: "sem_condicoes", label: "Sem condições financeiras", pedeObs: false },
+  { value: "nao_usa", label: "Não usa o convênio", pedeObs: false },
+  { value: "insatisfacao", label: "Insatisfação com o convênio", pedeObs: true },
+  { value: "outros", label: "Outros", pedeObs: true },
+];
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
