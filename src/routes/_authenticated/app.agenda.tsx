@@ -2726,7 +2726,7 @@ function AgendaPage() {
 
   const filtrados = useMemo(() => {
     return items.filter((a) => {
-      if ((!mostrarLivres || apenasData) && isSlotLivre(a.paciente_nome)) return false;
+      if (!mostrarLivres && isSlotLivre(a.paciente_nome)) return false;
       if (filtroMedico !== "todos" && a.medico_id !== filtroMedico) return false;
       const ehLivre = isSlotLivre(a.paciente_nome);
       if (filtroStatus === "livres") {

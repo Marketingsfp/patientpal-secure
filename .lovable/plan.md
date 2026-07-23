@@ -1,42 +1,23 @@
-## Escopo
+## Objetivo
+Ajustar o comportamento do toggle **"Exibir apenas a data selecionada"** na Agenda para que ele altere **apenas** o escopo de data (mostrando somente o dia selecionado, em vez do intervalo semanal/período), preservando todos os demais filtros ativos (Profissional, Tipo, Situação, Especialidade, Cliente etc.).
 
-Aplicar em **Odontologia** (nas 3 clínicas, regra global) duas mudanças no vínculo orçamento ↔ agendamento na Agenda.
+## Comportamento
+- **Antes:** proposta anterior (descartada) iria ignorar todos os outros filtros quando o toggle estivesse ativo.
+- **Depois:** o toggle limita a consulta e a filtragem em memória a `data = data_selecionada`. Os outros filtros continuam sendo aplicados normalmente, como já ocorre quando o toggle está desligado.
 
-## Como está hoje (confirmado por leitura)
+## Clínica-alvo
+Confirmar antes de aplicar: a mudança vale para as **3 clínicas** (SFP, Menino Jesus e a terceira) ou apenas uma específica? Como é um ajuste puramente de UX/filtro sem regra de negócio por clínica, o padrão sugerido é aplicar global (nas 3), mas aguardo confirmação.
 
-- `orcamento_itens` já tem `status_financeiro` (`pendente`/`pago`/…) e `pago_em`.
-- `agendamento_orcamento_itens` guarda o vínculo item×agendamento.
-- Na Agenda (`app.agenda.tsx`, linhas ~3410-3428), um item é considerado "consumido" **se existir link para qualquer agendamento não cancelado** — mesmo que ninguém tenha pago. Ou seja, um item marcado como agendado só volta a ficar disponível se o agendamento for **cancelado** (status = `cancelado`).
-- Não há hoje nenhum aviso quando o mesmo item é agendado uma segunda vez (o unique é por `agendamento_id + orcamento_item_id`, então o mesmo item pode ser vinculado a agendamentos diferentes sem trava).
-
-## Regra 1 — Item só é "consumido" quando pago
-
-Reescrever o filtro de itens consumidos no seletor de orçamento da Agenda para considerar consumido **apenas quando o item foi pago**. Pago =
-- `orcamento_itens.status_financeiro = 'pago'` **ou**
-- o agendamento vinculado tem `fin_lancamentos` de receita confirmado (mesma regra do `pagamento-status.ts`, que já é a definição usada em toda a plataforma).
-
-Efeito: se o agendamento for desmarcado, remarcado, marcado como faltou, ou simplesmente estiver pendente de pagamento, o item volta a aparecer disponível para novo agendamento. Somente itens efetivamente pagos deixam de aparecer.
-
-## Regra 2 — Aviso ao reagendar item ainda não pago
-
-Antes de salvar um novo agendamento que vincula itens de um orçamento, verificar se cada item já tem outro agendamento ativo (não cancelado) e ainda não pago. Se sim, exibir um **AlertDialog** com a lista:
-
-> "Este paciente já está agendado para **[serviço]** com **Dr(a). [nome]** em **dd/mm/aaaa às HH:MM** (ficha nº **[N]**) e ainda não pagou. Deseja mesmo criar um novo agendamento?"
-
-Botões: "Cancelar" e "Agendar mesmo assim". Se confirmar, segue o fluxo normal (novo vínculo, o item passa a ter dois agendamentos ativos até que um seja cancelado ou pago).
-
-Ao editar um agendamento existente, o próprio agendamento é ignorado da checagem (não avisa contra si mesmo).
-
-## Arquivos afetados
-
-- `src/routes/_authenticated/app.agenda.tsx` — trocar o filtro de consumidos (juntar `agendamento_orcamento_itens` + `orcamento_itens.status_financeiro` + `fin_lancamentos`) e adicionar o AlertDialog de duplicidade no `handleSalvar`.
-
-## Fora do escopo
-
-- Orçamentos de Laboratório / Consultas / outros — a regra fica restrita ao fluxo de Odontologia (é onde o vínculo item×agendamento é usado hoje na prática); pode ser estendida depois se pedirem.
-- Nenhuma mudança de schema/RLS/migração; só ajuste de leitura na Agenda.
+## Detalhes técnicos
+- Arquivo: `src/routes/_authenticated/app.agenda.tsx`.
+- Localizar o bloco que consome o estado do toggle "Exibir apenas a data selecionada" e ajustar somente o predicado de data (query ao servidor + filtro em memória) para `dia === dataSelecionada`.
+- **Não alterar** os demais predicados de filtro; eles permanecem no pipeline como hoje.
+- Sem mudanças de schema, RPC ou regra de negócio.
 
 ## Validação
+- Ativar o toggle com data X e verificar que apenas agendamentos do dia X aparecem.
+- Combinar com filtro de Profissional / Situação / Cliente e confirmar que a interseção é respeitada.
+- Desativar o toggle e confirmar que a Agenda volta ao comportamento de período normal.
 
-- Typecheck (`tsgo`).
-- Teste manual no preview: agendar item de orçamento odonto → cancelar agendamento → confirmar que o item volta a aparecer; agendar de novo sem pagar → confirmar que o aviso aparece com médico/data/hora/ficha; pagar → confirmar que some do seletor.
+## Pendências
+- Confirmar clínica-alvo (todas as 3 ou uma específica) antes de aplicar.
