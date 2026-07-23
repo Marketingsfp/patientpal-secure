@@ -5336,7 +5336,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
         open={cancelOpen}
         onOpenChange={(v) => {
           setCancelOpen(v);
-          if (!v) setCancelMotivo("");
+          if (!v) {
+            setCancelMotivoOpcao("");
+            setCancelObs("");
+          }
         }}
       >
         <DialogContent className="max-w-md">
@@ -5346,16 +5349,32 @@ h1, h2, h3 { margin: 0 0 6mm; }
               Esta ação cancela o plano e todos os benefícios deste contrato. Informe o motivo do cancelamento.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="cancel-motivo">Motivo</Label>
-            <Textarea
-              id="cancel-motivo"
-              rows={4}
-              placeholder="Ex.: solicitado pelo titular, inadimplência, mudança de plano…"
-              value={cancelMotivo}
-              onChange={(e) => setCancelMotivo(e.target.value)}
-              autoFocus
-            />
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="cancel-motivo">Motivo</Label>
+              <Select value={cancelMotivoOpcao} onValueChange={setCancelMotivoOpcao}>
+                <SelectTrigger id="cancel-motivo">
+                  <SelectValue placeholder="Selecione o motivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MOTIVOS_CANCELAMENTO.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {MOTIVOS_CANCELAMENTO.find((m) => m.value === cancelMotivoOpcao)?.pedeObs ? (
+              <div className="space-y-2">
+                <Label htmlFor="cancel-obs">Observações (opcional)</Label>
+                <Textarea
+                  id="cancel-obs"
+                  rows={3}
+                  placeholder="Detalhe o motivo, se quiser…"
+                  value={cancelObs}
+                  onChange={(e) => setCancelObs(e.target.value)}
+                />
+              </div>
+            ) : null}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setCancelOpen(false)} disabled={cancelSaving}>
@@ -5364,7 +5383,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
             <Button
               variant="destructive"
               onClick={confirmarCancelamento}
-              disabled={cancelSaving || !cancelMotivo.trim() || !podeEscrever}
+              disabled={cancelSaving || !cancelMotivoOpcao || !podeEscrever}
             >
               {cancelSaving ? "Cancelando…" : "Confirmar cancelamento"}
             </Button>
