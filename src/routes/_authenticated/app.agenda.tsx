@@ -5453,8 +5453,15 @@ function AgendaPage() {
                       searchPlaceholder="Buscar médico ou exame..."
                       options={[
                         { value: "none", label: "— Sem médico —" },
-                        ...medicos.map((m) => ({ value: m.id, label: `👨‍⚕️ ${m.nome}` })),
-                        ...exames.map((e) => ({ value: `exame:${e.nome}`, label: `🧪 ${e.nome}` })),
+                        ...medicos
+                          .filter((m) =>
+                            !(form.orcamento_id && orcamentoOdonto)
+                              || medicoEspec.get(m.id)?.has(ODONTO_ESPECIALIDADE_ID),
+                          )
+                          .map((m) => ({ value: m.id, label: `👨‍⚕️ ${m.nome}` })),
+                        ...(form.orcamento_id && orcamentoOdonto
+                          ? []
+                          : exames.map((e) => ({ value: `exame:${e.nome}`, label: `🧪 ${e.nome}` }))),
                       ]}
                     />
                   </div>
