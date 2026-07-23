@@ -167,23 +167,22 @@ export function NovoOrcamentoOdontoDialog({
       }
     }
     if (novos.length === 0) return;
-    setItens((arr) => [...arr, ...novos]);
+    // Novos itens ficam no topo da lista (mais recente primeiro)
+    setItens((arr) => [...novos.reverse(), ...arr]);
     if (algumVariavel) toast.info("Algum procedimento tem valor variável — revise no fechamento.");
     setProcsSelecionados([]);
     setSelecao([]); setBuscaAberta(false);
   };
 
   const adicionarManual = () => {
-    // 1 item manual por dente selecionado (ou 1 sem dente).
-    const dentes = selecao.length > 0 ? [...selecao].sort((a, b) => a - b) : [null as number | null];
-    const novos: Item[] = dentes.map((d) => ({
+    // Item manual: sempre 1 linha, sem dente. Preserva seleção atual do odontograma.
+    const novo: Item = {
       descricao: "", quantidade: 1, valor_unitario: 0,
       procedimento_id: null,
-      dentes: d != null ? [d] : [],
+      dentes: [],
       valores_formas: null,
-    }));
-    setItens((arr) => [...arr, ...novos]);
-    setSelecao([]); setBuscaAberta(false);
+    };
+    setItens((arr) => [novo, ...arr]);
   };
 
   const abrirBuscaComDente = (d: number) => {
@@ -359,9 +358,7 @@ export function NovoOrcamentoOdontoDialog({
               />
             </div>
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <span className="text-xs text-muted-foreground">
-                {selecao.length === 0 ? "Nenhum dente selecionado" : `${selecao.length} dente(s) selecionado(s): ${selecao.join(", ")}`}
-              </span>
+              <div />
               <div className="flex gap-2">
                 <Button
                   type="button" size="sm"
@@ -457,14 +454,26 @@ export function NovoOrcamentoOdontoDialog({
                               value={it.quantidade}
                               onChange={(e) => atualizarItem(idx, "quantidade", Number(e.target.value))}
                             />
-                            <div className="space-y-0.5">
-                              <div className="text-[10px] text-muted-foreground">Dinheiro/PIX</div>
-                              <div className="text-sm tabular-nums">R$ {valDin.toFixed(2)}</div>
-                            </div>
-                            <div className="space-y-0.5">
-                              <div className="text-[10px] text-muted-foreground">Cartão</div>
-                              <div className="text-sm tabular-nums">R$ {valCart.toFixed(2)}</div>
-                            </div>
+                            {it.procedimento_id == null ? (
+                              <div className="space-y-0.5 md:col-span-2">
+                                <div className="text-[10px] text-muted-foreground">Valor unitário</div>
+                                <CurrencyInput
+                                  value={it.valor_unitario ? it.valor_unitario.toFixed(2) : ""}
+                                  onChange={(v) => atualizarItem(idx, "valor_unitario", v === "" ? 0 : Number(v))}
+                                />
+                              </div>
+                            ) : (
+                              <>
+                                <div className="space-y-0.5">
+                                  <div className="text-[10px] text-muted-foreground">Dinheiro/PIX</div>
+                                  <div className="text-sm tabular-nums">R$ {valDin.toFixed(2)}</div>
+                                </div>
+                                <div className="space-y-0.5">
+                                  <div className="text-[10px] text-muted-foreground">Cartão</div>
+                                  <div className="text-sm tabular-nums">R$ {valCart.toFixed(2)}</div>
+                                </div>
+                              </>
+                            )}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Subtotal deste item: <span className="font-medium text-foreground">R$ {sub.toFixed(2)}</span>
