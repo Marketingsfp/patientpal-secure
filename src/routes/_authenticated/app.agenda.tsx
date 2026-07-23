@@ -3753,8 +3753,12 @@ function AgendaPage() {
         .eq("id", a.orcamento_id)
         .maybeSingle();
       setOrcamentoOdonto((orcRow?.especialidade_id ?? null) === ODONTO_ESPECIALIDADE_ID);
+      setOrcamentoLaboratorio(
+        !!orcRow?.especialidade_id && labEspecialidadeIds.has(orcRow.especialidade_id),
+      );
     } else {
       setOrcamentoOdonto(false);
+      setOrcamentoLaboratorio(false);
     }
     // Se o agendamento veio sem paciente_id (ex.: criado a partir de um
     // orçamento que também não tinha o vínculo), tenta resolver pelo nome
