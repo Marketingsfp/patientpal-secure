@@ -34,6 +34,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const MOTIVOS_CANCELAMENTO: ReadonlyArray<{ value: string; label: string; pedeObs: boolean }> = [
+  { value: "troca_endereco", label: "Troca de endereço", pedeObs: false },
+  { value: "plano_saude", label: "Fez plano de saúde", pedeObs: false },
+  { value: "falecimento", label: "Falecimento", pedeObs: false },
+  { value: "sem_condicoes", label: "Sem condições financeiras", pedeObs: false },
+  { value: "nao_usa", label: "Não usa o convênio", pedeObs: false },
+  { value: "insatisfacao", label: "Insatisfação com o convênio", pedeObs: true },
+  { value: "outros", label: "Outros", pedeObs: true },
+];
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -2124,7 +2134,8 @@ function DetalheContrato({
 
   // Cancelamento do contrato
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [cancelMotivo, setCancelMotivo] = useState("");
+  const [cancelMotivoOpcao, setCancelMotivoOpcao] = useState<string>("");
+  const [cancelObs, setCancelObs] = useState("");
   const [cancelSaving, setCancelSaving] = useState(false);
   const [canceladoEm, setCanceladoEm] = useState<string | null>(contrato.cancelado_em ?? null);
   const [cancelMotivoAtual, setCancelMotivoAtual] = useState<string | null>(contrato.cancelamento_motivo ?? null);
@@ -2692,11 +2703,13 @@ function DetalheContrato({
 
   const confirmarCancelamento = async () => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    const motivo = cancelMotivo.trim();
-    if (!motivo) {
-      toast.error("Informe o motivo do cancelamento");
+    const opcao = MOTIVOS_CANCELAMENTO.find((m) => m.value === cancelMotivoOpcao);
+    if (!opcao) {
+      toast.error("Selecione o motivo do cancelamento");
       return;
     }
+    const obs = cancelObs.trim();
+    const motivo = obs ? `${opcao.label} — ${obs}` : opcao.label;
     setCancelSaving(true);
     const agora = new Date().toISOString();
     const { error } = await supabase
@@ -2716,7 +2729,8 @@ function DetalheContrato({
     setCanceladoEm(agora);
     setCancelMotivoAtual(motivo);
     setCancelOpen(false);
-    setCancelMotivo("");
+    setCancelMotivoOpcao("");
+    setCancelObs("");
   };
 
   // Diálogo de forma de pagamento (espelha o da agenda)
@@ -5322,7 +5336,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
         open={cancelOpen}
         onOpenChange={(v) => {
           setCancelOpen(v);
-          if (!v) setCancelMotivo("");
+          if (!v) {
+            setCancelMotivoOpcao("");
+            setCancelObs("");
+          }
         }}
       >
         <DialogContent className="max-w-md">
@@ -5332,16 +5349,32 @@ h1, h2, h3 { margin: 0 0 6mm; }
               Esta ação cancela o plano e todos os benefícios deste contrato. Informe o motivo do cancelamento.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="cancel-motivo">Motivo</Label>
-            <Textarea
-              id="cancel-motivo"
-              rows={4}
-              placeholder="Ex.: solicitado pelo titular, inadimplência, mudança de plano…"
-              value={cancelMotivo}
-              onChange={(e) => setCancelMotivo(e.target.value)}
-              autoFocus
-            />
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="cancel-motivo">Motivo</Label>
+              <Select value={cancelMotivoOpcao} onValueChange={setCancelMotivoOpcao}>
+                <SelectTrigger id="cancel-motivo">
+                  <SelectValue placeholder="Selecione o motivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MOTIVOS_CANCELAMENTO.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {MOTIVOS_CANCELAMENTO.find((m) => m.value === cancelMotivoOpcao)?.pedeObs ? (
+              <div className="space-y-2">
+                <Label htmlFor="cancel-obs">Observações (opcional)</Label>
+                <Textarea
+                  id="cancel-obs"
+                  rows={3}
+                  placeholder="Detalhe o motivo, se quiser…"
+                  value={cancelObs}
+                  onChange={(e) => setCancelObs(e.target.value)}
+                />
+              </div>
+            ) : null}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setCancelOpen(false)} disabled={cancelSaving}>
@@ -5350,7 +5383,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
             <Button
               variant="destructive"
               onClick={confirmarCancelamento}
-              disabled={cancelSaving || !cancelMotivo.trim() || !podeEscrever}
+              disabled={cancelSaving || !cancelMotivoOpcao || !podeEscrever}
             >
               {cancelSaving ? "Cancelando…" : "Confirmar cancelamento"}
             </Button>
