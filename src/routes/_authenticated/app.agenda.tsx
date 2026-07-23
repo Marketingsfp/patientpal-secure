@@ -174,6 +174,10 @@ const STATUS_COR: Record<Status, string> = {
 const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const PAGE_SIZE = 100;
 
+// ID fixo da especialidade "Odontologia" no cadastro de especialidades.
+// Usado para restringir orçamentos odonto a médicos odontologistas.
+const ODONTO_ESPECIALIDADE_ID = "f0cfaa0a-2a67-4176-97de-a7072c37077c";
+
 const normalizar = (s: string) =>
   (s ?? "")
     .normalize("NFD")
