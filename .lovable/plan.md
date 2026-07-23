@@ -1,45 +1,30 @@
-## O que muda
+## Causa
 
-Diálogo **"Cancelar contrato"** (Cartão Benefícios → Vendas → contrato aberto) passa a exigir a escolha de um motivo em lista suspensa. Aplica-se às **3 clínicas** (é o mesmo código).
+A renovação do contrato do paciente **RODRIGO SABADIM SANTANA DA SILVA** falhou porque foi acionado o fluxo de **Renovar contrato atual** (extensão, mesmo convênio), que chama a função `renovar_contrato_extensao` no banco. Essa função tenta gravar o histórico da renovação usando nomes de coluna que **não existem** na tabela `contrato_renovacoes`.
 
-### Novas opções da lista (nessa ordem)
-1. Troca de endereço
-2. Fez plano de saúde
-3. Falecimento
-4. Sem condições financeiras
-5. Não usa o convênio
-6. Insatisfação com o convênio
-7. Outros
+Colunas reais da tabela: `contrato_id`, `contrato_novo_id`, `tipo`, `convenio_anterior_id`, `convenio_novo_id`, `valor_anterior`, `valor_novo`, `parcelas_geradas`, `periodo_inicio`, `periodo_fim`, `usuario_id`, `observacao`, `dependentes_incluidos`.
 
-### Campo "Observações"
-- Aparece **somente** quando o motivo escolhido for **"Insatisfação com o convênio"** ou **"Outros"**.
-- Preenchimento **opcional**.
-- Para os demais 5 motivos o campo fica oculto.
+A função está tentando inserir em: `contrato_original_id`, `contrato_novo_id`, `tipo`, `periodo_inicio`, `periodo_fim`, `valor_mensal`, `num_parcelas`, `observacao`, `criado_por` — daí o erro `column "contrato_original_id" of relation "contrato_renovacoes" does not exist`.
 
-### Regra de gravação
-- Botão "Confirmar cancelamento" habilita assim que um motivo é escolhido (independe de observações).
-- No banco, o campo `cancelamento_motivo` já existente em `contratos_assinatura` recebe:
-  - Sem observação: `"<Motivo escolhido>"` (ex.: `"Falecimento"`).
-  - Com observação: `"<Motivo escolhido> — <texto da observação>"`.
-- Assim o motivo continua aparecendo no cabeçalho do contrato ("Motivo: …") e no **Histórico** (aba já existente, que lê a mesma coluna) sem precisar de migração.
+Como a função roda numa única transação, o rollback desfez tudo (não gerou mensalidades, não atualizou `data_fim`), o número do contrato continua o mesmo (o fluxo de extensão nem cria contrato novo — apenas prorroga o atual, exatamente como você quer).
 
-### Compatibilidade retroativa
-- Contratos já cancelados continuam mostrando o texto livre antigo no cabeçalho e na aba Histórico — nada é reescrito.
+O fluxo de "Troca de convênio" (`renovar_contrato_troca_plano`) já usa os nomes corretos e não é afetado.
 
-## Detalhes técnicos
+## Correção proposta
 
-Arquivo único: `src/components/pages/contratos-page.tsx`.
+Uma única migração ajustando **apenas o INSERT final** da função `renovar_contrato_extensao` para usar as colunas corretas:
 
-1. Substituir os states `cancelMotivo` (string livre) por dois: `cancelMotivoOpcao` (enum das 7 opções) e `cancelObs` (string). Resetar ambos ao fechar o diálogo.
-2. Trocar o `<Textarea>` do diálogo (linhas ~5335-5345) por um `<Select>` (shadcn) com as 7 opções + `<Textarea>` "Observações (opcional)" renderizado condicionalmente quando a opção for `insatisfacao` ou `outros`.
-3. Ajustar `confirmarCancelamento` (linhas 2693-2720):
-   - Validar que `cancelMotivoOpcao` foi escolhido (`toast.error("Selecione o motivo do cancelamento")`).
-   - Montar `motivo` = label da opção + (observação truncada/trim, se houver): `` `${label} — ${obs}` `` quando `obs.trim()` existir, caso contrário só `label`.
-   - Enviar para `cancelamento_motivo` como já é feito hoje.
-4. Ajustar o `disabled` do botão para `!cancelMotivoOpcao` (não depende mais do textarea).
-5. Nenhuma alteração em RPC, RLS, migração ou em `contrato-historico-tab.tsx` — a aba Histórico já lê `cancelamento_motivo` e vai exibir a nova string formatada automaticamente.
+- `contrato_original_id` → `contrato_id`
+- `valor_mensal` → `valor_novo` (e preencher também `valor_anterior` com `v_contrato.valor_mensal`)
+- `num_parcelas` → `parcelas_geradas`
+- `criado_por` → `usuario_id`
+- Incluir `clinica_id` (obrigatório na tabela) e `convenio_anterior_id` / `convenio_novo_id` iguais (é o mesmo convênio, é uma extensão)
 
-## Fora do escopo
-- Não altera fluxo de cancelamento automático (renovação/troca de convênio).
-- Não cria nova coluna estruturada para "categoria de motivo" (mantém texto único conforme já usado hoje).
-- Não muda permissões nem quem pode cancelar.
+Nenhuma outra lógica da função é alterada: continua prorrogando o mesmo contrato, mantendo o **mesmo número**, gerando novas 12 parcelas a partir do dia de vencimento, tratando dependentes e taxa de inclusão exatamente como hoje.
+
+Aplica em todas as 3 clínicas (é correção puramente técnica de coluna; sem regra de negócio nova). Após aplicar, refaço a renovação do contrato do RODRIGO para validar.
+
+## Escopo
+
+- Dentro: migração corrigindo o `INSERT INTO contrato_renovacoes` dentro de `renovar_contrato_extensao`.
+- Fora: nada de frontend, nada em `renovar_contrato_troca_plano`, nada na estrutura da tabela `contrato_renovacoes`.
