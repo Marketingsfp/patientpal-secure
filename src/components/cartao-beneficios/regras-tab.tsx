@@ -1172,7 +1172,7 @@ function NovaRegraDialog({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t pt-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t pt-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Modo</Label>
               <Select value={r.modo} onValueChange={(v) => upd({ modo: v })}>
@@ -1184,7 +1184,20 @@ function NovaRegraDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">{r.modo === "valor_fixo" ? "Valor (R$)" : "Percentual (%)"}</Label>
+              <Label className="text-xs">Prioridade</Label>
+              <Input
+                type="number" min="1" max="100"
+                value={r.prioridade}
+                onChange={(e) => upd({ prioridade: parseInt(e.target.value) || 1 })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">
+                {r.modo === "valor_fixo" ? "Valor dinheiro (R$)" : "% desconto dinheiro"}
+              </Label>
               {r.modo === "valor_fixo" ? (
                 <CurrencyInput
                   value={r.valor !== null ? Number(r.valor).toFixed(2) : ""}
@@ -1199,12 +1212,24 @@ function NovaRegraDialog({
               )}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Prioridade</Label>
-              <Input
-                type="number" min="1" max="100"
-                value={r.prioridade}
-                onChange={(e) => upd({ prioridade: parseInt(e.target.value) || 1 })}
-              />
+              <Label className="text-xs">
+                {r.modo === "valor_fixo" ? "Valor cartão/PIX (R$)" : "% desconto cartão/PIX"}
+              </Label>
+              {r.modo === "valor_fixo" ? (
+                <CurrencyInput
+                  value={r.valor_cartao != null ? Number(r.valor_cartao).toFixed(2) : ""}
+                  onChange={(v) => upd({ valor_cartao: v ? parseFloat(v) : 0 })}
+                />
+              ) : (
+                <Input
+                  type="number" min="0" max="100" step="0.01"
+                  value={r.percentual_cartao ?? ""}
+                  onChange={(e) => upd({ percentual_cartao: e.target.value ? parseFloat(e.target.value) : 0 })}
+                />
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Usado quando o pagamento é em PIX, débito ou crédito.
+              </p>
             </div>
           </div>
 
