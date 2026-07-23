@@ -1981,6 +1981,10 @@ function AgendaPage() {
             }>
           ).forEach((r) => {
             if (!r.agendamento_id) return;
+            // Notas canceladas ou com erro não devem bloquear reemissão
+            // — o usuário precisa poder emitir uma nova NFS-e depois.
+            const st = (r.status ?? "").toLowerCase();
+            if (st === "cancelada" || st === "erro") return;
             if (!nMap.has(r.agendamento_id)) {
               nMap.set(r.agendamento_id, { id: r.id, status: r.status, url_pdf: r.url_pdf, numero: r.numero });
             }
@@ -2000,6 +2004,8 @@ function AgendaPage() {
             nfse: { id: string; status: string | null; url_pdf: string | null; numero: string | null; created_at: string } | null;
           }>).forEach((r) => {
             if (!r.nfse) return;
+            const st = (r.nfse.status ?? "").toLowerCase();
+            if (st === "cancelada" || st === "erro") return;
             if (!nMap.has(r.agendamento_id)) {
               nMap.set(r.agendamento_id, {
                 id: r.nfse.id, status: r.nfse.status, url_pdf: r.nfse.url_pdf, numero: r.nfse.numero,
