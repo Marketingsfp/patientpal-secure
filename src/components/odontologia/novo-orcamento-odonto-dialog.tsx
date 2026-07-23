@@ -155,6 +155,11 @@ export function NovoOrcamentoOdontoDialog({
         if (!p) continue;
         const valores: Record<string, number> = {};
         for (const f of formas) valores[f] = valorPorForma(p, f);
+        // Grava SEMPRE Dinheiro e Cartão de Crédito baseados na tabela do procedimento,
+        // independente das formas escolhidas no cabeçalho — assim o drawer e a impressão
+        // conseguem exibir os totais separados de Dinheiro/PIX vs Cartão.
+        if (valores["Dinheiro"] == null) valores["Dinheiro"] = valorPorForma(p, "Dinheiro");
+        if (valores["Cartão de Crédito"] == null) valores["Cartão de Crédito"] = valorPorForma(p, "Cartão de Crédito");
         novos.push({
           descricao: p.nome,
           quantidade: 1,
