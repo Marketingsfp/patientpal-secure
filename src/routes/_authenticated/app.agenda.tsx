@@ -5498,11 +5498,13 @@ function AgendaPage() {
                         { value: "none", label: "— Sem médico —" },
                         ...medicos
                           .filter((m) =>
-                            !(form.orcamento_id && orcamentoOdonto)
-                              || medicoEspec.get(m.id)?.has(ODONTO_ESPECIALIDADE_ID),
+                            (!(form.orcamento_id && orcamentoOdonto)
+                              || medicoEspec.get(m.id)?.has(ODONTO_ESPECIALIDADE_ID))
+                            && (!(form.orcamento_id && orcamentoLaboratorio)
+                              || medicoEhLaboratorista(m.id)),
                           )
                           .map((m) => ({ value: m.id, label: `👨‍⚕️ ${m.nome}` })),
-                        ...(form.orcamento_id && orcamentoOdonto
+                        ...((form.orcamento_id && orcamentoOdonto)
                           ? []
                           : exames.map((e) => ({ value: `exame:${e.nome}`, label: `🧪 ${e.nome}` }))),
                       ]}
