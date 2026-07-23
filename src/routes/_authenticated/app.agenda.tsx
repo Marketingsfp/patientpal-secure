@@ -3929,6 +3929,64 @@ function AgendaPage() {
       toast.error("Não é permitido alterar o nome do paciente em agendamento já pago.");
       return;
     }
+    // Regra (2026-07-23): avisa quando o(s) item(ns) de orçamento sendo
+    // agendado(s) já têm outro agendamento ativo (não cancelado) e ainda não
+    // pago. Permite ao usuário confirmar e criar mesmo assim.
+    if (pendingOrcItemIds.length > 0) {
+      const { data: dupLinks } = await supabase
+        .from("agendamento_orcamento_itens")
+        .select(
+          "orcamento_item_id, agendamento_id, agendamentos!inner(id,status,inicio,medico_id,ficha_numero,procedimento)",
+        )
+        .in("orcamento_item_id", pendingOrcItemIds);
+      type DupRow = {
+        orcamento_item_id: string;
+        agendamento_id: string;
+        agendamentos: {
+          id: string;
+          status: string;
+          inicio: string;
+          medico_id: string | null;
+          ficha_numero: number | null;
+          procedimento: string | null;
+        } | null;
+      };
+      const candidatos = ((dupLinks ?? []) as DupRow[])
+        .filter((r) => r.agendamentos && r.agendamentos.status !== "cancelado")
+        .filter((r) => !editing?.id || r.agendamento_id !== editing.id);
+      if (candidatos.length > 0) {
+        const agIds = Array.from(new Set(candidatos.map((r) => r.agendamento_id)));
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("agendamento_id")
+          .eq("tipo", "receita")
+          .eq("status", "confirmado")
+          .in("agendamento_id", agIds);
+        const pagos = new Set(
+          ((lancs ?? []) as Array<{ agendamento_id: string | null }>)
+            .map((r) => r.agendamento_id)
+            .filter((x): x is string => !!x),
+        );
+        const naoPagos = candidatos.filter((r) => !pagos.has(r.agendamento_id));
+        if (naoPagos.length > 0) {
+          const linhas = naoPagos.map((r) => {
+            const ag = r.agendamentos!;
+            const dt = new Date(ag.inicio);
+            const dia = dt.toLocaleDateString("pt-BR");
+            const hora = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+            const medNome = medicoNomePorId.get(ag.medico_id ?? "") ?? "sem médico";
+            const ficha = ag.ficha_numero != null ? `nº ${ag.ficha_numero}` : "s/ ficha";
+            const serv = ag.procedimento ?? "serviço";
+            return `• ${serv} — Dr(a). ${medNome} em ${dia} às ${hora} (ficha ${ficha})`;
+          });
+          const msg =
+            `Este paciente já está agendado para o(s) mesmo(s) serviço(s) e ainda não pagou:\n\n${linhas.join("\n")}\n\nDeseja criar um novo agendamento mesmo assim?`;
+          if (!window.confirm(msg)) {
+            return;
+          }
+        }
+      }
+    }
     setSaving(true);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
