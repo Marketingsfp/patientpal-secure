@@ -130,15 +130,17 @@ function PontoPage() {
       </div>
 
       <Card className="p-6 text-center">
-        <div className="text-5xl font-bold tabular-nums">{formatHora(agora)}</div>
+        <div className="text-5xl font-bold tabular-nums">
+          {agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+        </div>
         <div className="text-sm text-muted-foreground mt-1">{formatDateTime(agora).split(" ")[0]}</div>
         {podeEscrever && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-6">
-          <Button onClick={() => bater("entrada")} disabled={marcando}><LogIn className="h-4 w-4 mr-1" /> Entrada</Button>
-          <Button variant="outline" onClick={() => bater("intervalo_inicio")} disabled={marcando}><Coffee className="h-4 w-4 mr-1" /> Início intervalo</Button>
-          <Button variant="outline" onClick={() => bater("intervalo_fim")} disabled={marcando}><Coffee className="h-4 w-4 mr-1" /> Fim intervalo</Button>
-          <Button variant="destructive" onClick={() => bater("saida")} disabled={marcando}><LogOut className="h-4 w-4 mr-1" /> Saída</Button>
-        </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-6">
+            <Button onClick={() => bater("entrada")} disabled={marcando}><LogIn className="h-4 w-4 mr-1" /> Entrada</Button>
+            <Button variant="outline" onClick={() => bater("intervalo_inicio")} disabled={marcando}><Coffee className="h-4 w-4 mr-1" /> Início intervalo</Button>
+            <Button variant="outline" onClick={() => bater("intervalo_fim")} disabled={marcando}><Coffee className="h-4 w-4 mr-1" /> Fim intervalo</Button>
+            <Button variant="destructive" onClick={() => bater("saida")} disabled={marcando}><LogOut className="h-4 w-4 mr-1" /> Saída</Button>
+          </div>
         )}
         {unidades.length === 0 && (
           <p className="text-xs text-muted-foreground mt-3">Cadastre unidades com geolocalização para validar a presença.</p>
