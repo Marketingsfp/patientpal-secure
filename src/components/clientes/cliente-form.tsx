@@ -891,7 +891,34 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               </div>
             </div>
             <div className="space-y-1"><Label>Nome *</Label><InputVoz {...fieldProps("nome")} required maxLength={120} /></div>
-            <div className="space-y-1"><Label>Número de serviço</Label><InputVoz {...fieldProps("numero_pasta")} placeholder="Ex.: 1234" /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>
+                  Número de prontuário
+                  {!isAdmin && <span className="ml-2 text-xs text-muted-foreground">(somente admin)</span>}
+                </Label>
+                <Input
+                  value={form.codigo_prontuario}
+                  onChange={(e) => setForm(f => ({ ...f, codigo_prontuario: e.target.value }))}
+                  placeholder="Ex.: 000123"
+                  disabled={!isAdmin}
+                  readOnly={!isAdmin}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>
+                  Número de serviço / pasta
+                  {!isAdmin && <span className="ml-2 text-xs text-muted-foreground">(somente admin)</span>}
+                </Label>
+                <Input
+                  value={form.numero_pasta}
+                  onChange={(e) => setForm(f => ({ ...f, numero_pasta: e.target.value }))}
+                  placeholder="Ex.: 1234"
+                  disabled={!isAdmin}
+                  readOnly={!isAdmin}
+                />
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label>CPF</Label><InputVoz {...fieldProps("cpf")} /></div>
               <div className="space-y-1"><Label>Telefone *</Label><InputVoz {...fieldProps("telefone")} /></div>
