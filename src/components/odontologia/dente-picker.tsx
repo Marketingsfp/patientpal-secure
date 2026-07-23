@@ -43,7 +43,10 @@ export function DentePicker({ value, onChange, disabled, inline, grade }: Props)
 
   const gradeQuadrados = (
     <div className="flex flex-col gap-2 select-none">
-      {[[...SUP_DIR, ...SUP_ESQ], [...INF_DIR, ...INF_ESQ]].map((linha, idx) => (
+      {[
+        [...SUP_DIR, ...SUP_ESQ],
+        [...INF_DIR, ...INF_ESQ],
+      ].map((linha, idx) => (
         <div key={idx} className="flex justify-center gap-1 flex-wrap">
           {linha.map((d) => {
             const on = selected.has(d);
@@ -68,7 +71,9 @@ export function DentePicker({ value, onChange, disabled, inline, grade }: Props)
         </div>
       ))}
       <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
-        <span>{selected.size === 0 ? "Nenhum dente selecionado" : `${selected.size} dente(s)`}</span>
+        <span>
+          {selected.size === 0 ? "Nenhum dente selecionado" : `${selected.size} dente(s)`}
+        </span>
         {!disabled && selected.size > 0 && (
           <button type="button" onClick={limpar} className="text-primary hover:underline">
             Limpar
