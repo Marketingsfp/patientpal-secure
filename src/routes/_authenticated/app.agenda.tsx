@@ -3465,7 +3465,7 @@ function AgendaPage() {
       // único agendamento, abre um pop-up para o usuário escolher quais
       // itens usar agora. O restante fica disponível para agendar depois.
       const isOdonto = orc.especialidade_id === "f0cfaa0a-2a67-4176-97de-a7072c37077c";
-      if (isOdonto && its.length > 1) {
+      if (isOdonto) {
         setSelecItensCtx({
           orcamento: {
             id: orc.id,
