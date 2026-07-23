@@ -175,14 +175,9 @@ export function NovoOrcamentoOdontoDialog({
   };
 
   const adicionarManual = () => {
-    // Item manual: sempre 1 linha, sem dente. Preserva seleção atual do odontograma.
-    const novo: Item = {
-      descricao: "", quantidade: 1, valor_unitario: 0,
-      procedimento_id: null,
-      dentes: [],
-      valores_formas: null,
-    };
-    setItens((arr) => [novo, ...arr]);
+    // Item sem dente: seleciona serviço(s) da lista de Odontologia, mas não vincula a dentes.
+    setSelecao([]);
+    setBuscaAberta(true);
   };
 
   const abrirBuscaComDente = (d: number) => {
