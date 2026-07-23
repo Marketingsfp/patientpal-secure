@@ -3708,6 +3708,14 @@ function AgendaPage() {
         .eq("orcamento_id", a.orcamento_id)
         .order("ordem");
       itensOrc = ((its ?? []) as { descricao: string }[]).map((x) => x.descricao);
+      const { data: orcRow } = await supabase
+        .from("orcamentos")
+        .select("especialidade_id")
+        .eq("id", a.orcamento_id)
+        .maybeSingle();
+      setOrcamentoOdonto((orcRow?.especialidade_id ?? null) === ODONTO_ESPECIALIDADE_ID);
+    } else {
+      setOrcamentoOdonto(false);
     }
     // Se o agendamento veio sem paciente_id (ex.: criado a partir de um
     // orçamento que também não tinha o vínculo), tenta resolver pelo nome
