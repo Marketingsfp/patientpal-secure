@@ -1,54 +1,42 @@
-## Objetivo
-Refazer o layout do pop-up "Novo orçamento — Odontologia" (`src/components/odontologia/novo-orcamento-odonto-dialog.tsx`) para que o **odontograma seja o elemento principal**: o profissional clica nos dentes para incluir o serviço, e os itens vão sendo listados na parte de baixo já com os valores por forma de pagamento.
 
-Aplica-se às **3 clínicas** (mudança de UI, sem regra de negócio nova).
+## Escopo
 
-## Como vai ficar o pop-up (de cima para baixo)
+Ajustes no diálogo `src/components/odontologia/novo-orcamento-odonto-dialog.tsx` (aplicado nas 3 clínicas — o componente é único e compartilhado).
 
-1. **Cabeçalho compacto** — Paciente / Telefone / **Dentista** (mantidos).
-2. **Odontograma interativo** (novo — ocupa o topo do modal)
-   - Reusa `OdontogramaClinico` em modo "seleção" (todas as faces neutras).
-   - Clicar em um dente **alterna a seleção** (destaque azul, sem alterar estado clínico).
-   - Botões acima: `Selecionar arcada superior` · `Selecionar inferior` · `Limpar seleção`.
-   - Contador: "3 dentes selecionados".
-   - Ao lado, botão primário **"+ Adicionar serviço aos dentes selecionados"** (habilita quando ≥ 1 dente marcado) → abre a busca de procedimento.
-3. **Busca de procedimento** (aparece inline quando acionada, dois caminhos)
-   - **Caminho A — clique único no dente:** clicar num dente que ainda não tem serviço abre direto o campo de busca já com aquele dente pré-selecionado (1 serviço para aquele dente).
-   - **Caminho B — múltiplos dentes:** seleciona vários dentes primeiro e depois usa o botão "+ Adicionar serviço" (1 item com todos os dentes).
-   - Busca continua restrita à especialidade Odontologia (lógica atual de `procedimento_especialidades` preservada).
-   - Também mantém o botão discreto "adicionar item manual" (para itens sem procedimento cadastrado).
-4. **Lista de itens incluídos** (parte de baixo, formato de tabela enxuta)
-   - Colunas: **Dentes** (chips FDI) · **Serviço** · **Qtd** · **Dinheiro/PIX** · **Cartão** · **Subtotal** · remover.
-   - Se o paciente tiver cartão benefício com regra para o serviço, aparece uma linha extra abaixo do item com o valor do convênio (só quando aplicável — silencioso se não houver).
-   - Cada item mostra os dentes vinculados; pode editar/remover dentes clicando em um chip.
-5. **Rodapé de totais e finais** (mantido, reorganizado em uma linha)
-   - **Desconto** · **Validade (dias)** · **Total** (calculado).
-   - Bloco **Observações** (mantido).
-6. **Rodapé do dialog**: `Cancelar` · `Salvar orçamento` (mantido).
+## Confirmação necessária
 
-## Preservado
-- Estrutura da tabela `orcamentos` / `orcamento_itens` (coluna `dentes` já existe).
-- Cálculo de totais por forma, integração com `printOrcamento`, `especialidade_id`, `medico_id`.
-- `DentePicker` continua disponível como fallback de edição inline no item.
-- Regras de validação (máx 32 dentes por item, desconto ≤ subtotal, etc.).
-- Lógica de acréscimo de cartão (`applyAcrescimoCartao`) para convênios que exibam preço.
+- **Clínica-alvo**: presumo aplicar nas **3 clínicas** (Menino Jesus, SFP e Policlínica). Confirmar antes de executar. Se for só uma, envolvo tudo em feature flag por `clinica_id`.
 
-## Como vou executar
-1. Extrair o odontograma em um sub-componente `OdontogramaSelecao` reutilizando `OdontogramaClinico` com modo `readOnly` (sem menu de status; clique = toggle de seleção).
-2. Reescrever o layout de `NovoOrcamentoOdontoDialog`:
-   - Mover o cabeçalho/dentista para o topo compacto.
-   - Inserir o odontograma logo abaixo com barra de ações.
-   - Substituir o bloco atual "Adicionar procedimento" pelo fluxo guiado por seleção (caminhos A/B).
-   - Trocar a lista atual de itens pelo formato tabela enxuta com preços por forma.
-3. Manter a busca/hooks já existentes (`procIdsOdonto`, `adicionarProc`, `valorPorForma`) — mudança é de UX/layout, não de dados.
-4. Testar rapidamente na rota `/app/odontologia` → **Prontuário** → paciente com contrato → **Novo orçamento**.
+## Mudanças
 
-## Fora do escopo
-- Prontuário / faces clínicas / evolução / anamnese.
-- Estrutura do banco.
-- Impressão de orçamento (mantida como está).
+### 1. Filtro de dentistas (foto 1)
+No `useEffect` de carregamento, hoje traz todos os `medicos` da clínica. Passar a filtrar apenas os que atendem em **Odontologia**, consultando `medico_especialidades` (ou equivalente) por `especialidade_id = especialidadeOdontoId`. Se um médico não tiver vínculo com Odontologia, some da lista.
+
+### 2. Seleção de procedimentos por lista suspensa com múltipla escolha (foto 2)
+Substituir o campo de busca por digitação por um **combobox multi-select** (padrão shadcn `Command` + `Popover`, igual outros pickers do sistema), listando todos os procedimentos vinculados à Odontologia (`procedimento_especialidades`).
+- Permite marcar vários serviços de uma só vez.
+- Ao confirmar, todos os selecionados são adicionados aos dentes atualmente selecionados no odontograma, cada um como um item próprio (mesmo comportamento atual do `adicionarProc`, em loop).
+- Mantém filtro por texto opcional dentro do combobox para clínicas com muitos procedimentos, mas sem exigir digitação.
+
+### 3. Remover campo de valor editável (foto 3)
+Remover a coluna do `CurrencyInput` de `valor_unitario` em cada linha de item. Manter apenas as duas colunas de exibição: **Dinheiro/PIX** e **Cartão**.
+- `valor_unitario` continua existindo no state (usado para subtotal, total e salvamento), mas fica fixo com o valor do procedimento — sem edição manual.
+- Para procedimentos com `valor_variavel`, manter comportamento atual (toast) mas ainda sem campo editável aqui — se necessário editar, será no fechamento; confirmar essa parte se preferir manter editável só nesses casos.
+
+### 4. Um item por dente (foto 4)
+Hoje, ao adicionar um serviço com N dentes selecionados, cria **1 item** com array `dentes: [11, 28]`. Mudar para criar **N itens**, um por dente, cada um com `dentes: [d]`.
+- Assim, na listagem "Serviços incluídos", cada dente vira sua própria linha, com seu procedimento, quantidade, valores e subtotal independentes.
+- Aplica-se tanto na seleção múltipla de procedimentos quanto quando o usuário adiciona um único procedimento em vários dentes.
+- Item manual segue igual (sem dente ou com os selecionados; se múltiplos, também vira 1 item por dente para consistência).
+
+## Fora de escopo
+
+- Nenhuma mudança em schema, RLS, RPCs ou lógica de salvamento/impressão. `orcamento_itens.dentes` continua aceitando array; apenas o formato passa a ser sempre `[um_dente]` quando vindo do odontograma.
+- Sem mexer no odontograma em si, cabeçalho, desconto, validade, total, observações ou botão salvar.
 
 ## Detalhes técnicos
-- Arquivo principal alterado: `src/components/odontologia/novo-orcamento-odonto-dialog.tsx`.
-- Possível novo sub-componente inline `SeletorDentes` (não precisa arquivo novo).
-- `OdontogramaClinico` já aceita `denteSelecionado` e `onClickFace`; para o modo seleção múltipla vou passar um `estados` fixo neutro e usar `onClickFace` como toggle no set local, ignorando a face.
+
+- Arquivo único: `src/components/odontologia/novo-orcamento-odonto-dialog.tsx`.
+- Novo componente inline ou reutilizar `Command`/`Popover` já usados em outros pickers (verificar `patient-search-input.tsx` / `cid10-picker.tsx` como referência de padrão do projeto).
+- Query de médicos: `medicos` join `medico_especialidades` por `especialidade_id = especialidadeOdontoId` e `clinica_id`. Confirmar nome exato da tabela de vínculo médico↔especialidade na primeira leitura em build mode.
+- Query de procedimentos: já existe cache `procIdsOdonto` — usar para popular a lista completa (buscar `nome` de todos os IDs, sem depender de texto digitado).

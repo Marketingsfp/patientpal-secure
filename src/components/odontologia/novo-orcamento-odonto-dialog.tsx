@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Search, X } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { printOrcamento } from "@/lib/print-orcamento";
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
 import { DentePicker } from "./dente-picker";
 
 interface Procedimento {
@@ -78,27 +79,41 @@ export function NovoOrcamentoOdontoDialog({
   // Controla se o painel de busca está aberto (aparece após clicar em dente ou botão)
   const [buscaAberta, setBuscaAberta] = useState(false);
 
-  // IDs dos procedimentos vinculados à especialidade Odontologia (cache p/ busca)
-  const [procIdsOdonto, setProcIdsOdonto] = useState<Set<string> | null>(null);
-
-  // busca
-  const [procQuery, setProcQuery] = useState("");
-  const [procResults, setProcResults] = useState<Procedimento[]>([]);
-  const [searchingProc, setSearchingProc] = useState(false);
+  // Todos os procedimentos da especialidade Odontologia (para o combobox multi-select)
+  const [procsOdonto, setProcsOdonto] = useState<Procedimento[]>([]);
+  // Seleção corrente do combobox (procedimentos marcados, ainda não adicionados)
+  const [procsSelecionados, setProcsSelecionados] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) return;
     void (async () => {
-      const [{ data: medRows }, { data: peRows }] = await Promise.all([
-        supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaId).order("nome").limit(500),
-        supabase.from("procedimento_especialidades")
-          .select("procedimento_id")
-          .eq("clinica_id", clinicaId)
-          .eq("especialidade_id", especialidadeOdontoId),
-      ]);
-      setMedicos((medRows ?? []) as { id: string; nome: string }[]);
-      const ids = new Set(((peRows ?? []) as { procedimento_id: string }[]).map((r) => r.procedimento_id));
-      setProcIdsOdonto(ids);
+      // Médicos que atendem Odontologia (join via medico_especialidades)
+      const { data: medRows } = await supabase
+        .from("medicos")
+        .select("id, nome, medico_especialidades!inner(especialidade_id)")
+        .eq("clinica_id", clinicaId)
+        .eq("medico_especialidades.especialidade_id", especialidadeOdontoId)
+        .order("nome")
+        .limit(500);
+      setMedicos(((medRows ?? []) as { id: string; nome: string }[]).map((m) => ({ id: m.id, nome: m.nome })));
+
+      // Procedimentos vinculados à especialidade Odontologia — carrega todos para lista suspensa
+      const { data: peRows } = await supabase
+        .from("procedimento_especialidades")
+        .select("procedimento_id")
+        .eq("clinica_id", clinicaId)
+        .eq("especialidade_id", especialidadeOdontoId);
+      const ids = ((peRows ?? []) as { procedimento_id: string }[]).map((r) => r.procedimento_id);
+      if (ids.length === 0) { setProcsOdonto([]); return; }
+      const { data: procRows } = await supabase
+        .from("procedimentos")
+        .select("id, nome, valor_padrao, valor_dinheiro, valor_pix, valor_dinheiro_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, preparo, valor_variavel")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .in("id", ids)
+        .order("nome")
+        .limit(1000);
+      setProcsOdonto((procRows ?? []) as Procedimento[]);
     })();
   }, [open, clinicaId, especialidadeOdontoId]);
 
@@ -107,41 +122,10 @@ export function NovoOrcamentoOdontoDialog({
       // reset ao fechar
       setMedicoNome(""); setMedicoId(""); setFormasPagamento(["Dinheiro"]);
       setDesconto(0); setValidade(30); setObservacoes(""); setItens([]);
-      setProcQuery(""); setProcResults([]);
+      setProcsSelecionados([]);
       setSelecao([]); setBuscaAberta(false);
     }
   }, [open]);
-
-  useEffect(() => {
-    let cancel = false;
-    if (!open || procQuery.trim().length < 2 || !procIdsOdonto) { setProcResults([]); return; }
-    if (procIdsOdonto.size === 0) { setProcResults([]); return; }
-    setSearchingProc(true);
-    const t = setTimeout(async () => {
-      const norm = procQuery.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      const ids = Array.from(procIdsOdonto);
-      // PostgREST aceita listas grandes por vírgula; 180 IDs é seguro.
-      const { sanitizePostgrestSearch } = await import("@/lib/sanitize-search");
-      const safeQ = sanitizePostgrestSearch(procQuery);
-      const safeNorm = sanitizePostgrestSearch(norm);
-      let q = supabase
-        .from("procedimentos")
-        .select("id, nome, valor_padrao, valor_dinheiro, valor_pix, valor_dinheiro_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, preparo, valor_variavel")
-        .eq("clinica_id", clinicaId)
-        .eq("ativo", true)
-        .in("id", ids);
-      if (safeQ.length > 0 || safeNorm.length > 0) {
-        const parts: string[] = [];
-        if (safeQ.length > 0) parts.push(`nome.ilike.%${safeQ}%`);
-        if (safeNorm.length > 0 && safeNorm !== safeQ)
-          parts.push(`nome.ilike.%${safeNorm}%`);
-        q = q.or(parts.join(","));
-      }
-      const { data } = await q.limit(20);
-      if (!cancel) { setProcResults((data ?? []) as Procedimento[]); setSearchingProc(false); }
-    }, 250);
-    return () => { cancel = true; clearTimeout(t); };
-  }, [procQuery, clinicaId, open, procIdsOdonto]);
 
   const selecionarMedico = (id: string) => {
     setMedicoId(id);
@@ -157,33 +141,48 @@ export function NovoOrcamentoOdontoDialog({
     });
   };
 
-  const adicionarProc = (p: Procedimento) => {
-    if (itens.some((it) => it.procedimento_id === p.id)) {
-      toast.warning(`${p.nome} já foi adicionado`); setProcQuery(""); setProcResults([]); return;
-    }
+  // Adiciona os procedimentos selecionados no combobox — 1 item por dente x procedimento.
+  // Ex.: 3 procedimentos em 2 dentes = 6 linhas independentes.
+  const adicionarProcsSelecionados = () => {
+    if (procsSelecionados.length === 0) { toast.info("Selecione ao menos um procedimento"); return; }
+    const dentes = selecao.length > 0 ? [...selecao].sort((a, b) => a - b) : [null as number | null];
     const formas = formasPagamento.length ? formasPagamento : ["Dinheiro"];
-    const valores: Record<string, number> = {};
-    for (const f of formas) valores[f] = valorPorForma(p, f);
-    setItens((arr) => [...arr, {
-      descricao: p.nome,
-      quantidade: 1,
-      valor_unitario: valorPorForma(p, formas[0]),
-      procedimento_id: p.id,
-      dentes: [...selecao].sort((a, b) => a - b),
-      valores_formas: valores,
-    }]);
-    if (p.valor_variavel) toast.info(`${p.nome} tem valor variável — informe o valor cobrado.`);
-    setProcQuery(""); setProcResults([]);
+    const novos: Item[] = [];
+    let algumVariavel = false;
+    for (const d of dentes) {
+      for (const pid of procsSelecionados) {
+        const p = procsOdonto.find((x) => x.id === pid);
+        if (!p) continue;
+        const valores: Record<string, number> = {};
+        for (const f of formas) valores[f] = valorPorForma(p, f);
+        novos.push({
+          descricao: p.nome,
+          quantidade: 1,
+          valor_unitario: valorPorForma(p, formas[0]),
+          procedimento_id: p.id,
+          dentes: d != null ? [d] : [],
+          valores_formas: valores,
+        });
+        if (p.valor_variavel) algumVariavel = true;
+      }
+    }
+    if (novos.length === 0) return;
+    setItens((arr) => [...arr, ...novos]);
+    if (algumVariavel) toast.info("Algum procedimento tem valor variável — revise no fechamento.");
+    setProcsSelecionados([]);
     setSelecao([]); setBuscaAberta(false);
   };
 
   const adicionarManual = () => {
-    setItens((arr) => [...arr, {
+    // 1 item manual por dente selecionado (ou 1 sem dente).
+    const dentes = selecao.length > 0 ? [...selecao].sort((a, b) => a - b) : [null as number | null];
+    const novos: Item[] = dentes.map((d) => ({
       descricao: "", quantidade: 1, valor_unitario: 0,
       procedimento_id: null,
-      dentes: [...selecao].sort((a, b) => a - b),
+      dentes: d != null ? [d] : [],
       valores_formas: null,
-    }]);
+    }));
+    setItens((arr) => [...arr, ...novos]);
     setSelecao([]); setBuscaAberta(false);
   };
 
@@ -237,7 +236,7 @@ export function NovoOrcamentoOdontoDialog({
       const qtd = Number(it.quantidade);
       if (!Number.isFinite(qtd) || qtd < 1 || qtd > 999) return toast.error(`Item ${i + 1}: quantidade 1..999`);
       const vu = Number(it.valor_unitario);
-      if (!Number.isFinite(vu) || vu <= 0) return toast.error(`Item ${i + 1}: valor deve ser > 0`);
+      if (!Number.isFinite(vu) || vu <= 0) return toast.error(`Item ${i + 1}: valor deve ser > 0 (procedimento sem valor cadastrado)`);
       if (it.dentes.length > 32) return toast.error(`Item ${i + 1}: máximo 32 dentes`);
     }
     if (Number(desconto) < 0) return toast.error("Desconto não pode ser negativo");
@@ -380,49 +379,42 @@ export function NovoOrcamentoOdontoDialog({
             {buscaAberta && (
               <div className="border rounded-md p-3 bg-background space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm">Escolher procedimento (Odontologia)</Label>
+                  <Label className="text-sm">Escolher procedimento(s) — Odontologia</Label>
                   <button
                     type="button"
-                    onClick={() => { setBuscaAberta(false); setProcQuery(""); setProcResults([]); }}
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label="Fechar busca"
+                    onClick={() => { setBuscaAberta(false); setProcsSelecionados([]); }}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    aria-label="Fechar"
                   >
-                    <X className="h-4 w-4" />
+                    Fechar
                   </button>
                 </div>
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    autoFocus
-                    className="pl-8"
-                    value={procQuery}
-                    onChange={(e) => setProcQuery(e.target.value)}
-                    placeholder="Digite ao menos 2 letras — ex.: restauração, canal, extração…"
-                  />
-                </div>
-                {procIdsOdonto && procIdsOdonto.size === 0 && (
+                {procsOdonto.length === 0 ? (
                   <p className="text-xs text-amber-600">
                     Nenhum procedimento cadastrado na especialidade Odontologia. Cadastre em Serviços.
                   </p>
-                )}
-                {procResults.length > 0 && (
-                  <div className="border rounded-md max-h-64 overflow-auto">
-                    {procResults.map((p) => (
-                      <button
-                        key={p.id}
+                ) : (
+                  <>
+                    <SearchableMultiSelect
+                      options={procsOdonto.map((p) => ({ value: p.id, label: p.nome }))}
+                      value={procsSelecionados}
+                      onChange={setProcsSelecionados}
+                      placeholder="Selecione um ou mais procedimentos…"
+                      searchPlaceholder="Filtrar por nome…"
+                    />
+                    <div className="flex justify-end">
+                      <Button
                         type="button"
-                        onClick={() => adicionarProc(p)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted border-b last:border-0"
+                        size="sm"
+                        onClick={adicionarProcsSelecionados}
+                        disabled={procsSelecionados.length === 0}
                       >
-                        <div className="font-medium">{p.nome}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {p.valor_padrao ? `Padrão R$ ${Number(p.valor_padrao).toFixed(2)}` : "Valor variável"}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                        <Plus className="h-4 w-4 mr-1" />
+                        Adicionar {procsSelecionados.length > 0 ? `(${procsSelecionados.length})` : ""}
+                      </Button>
+                    </div>
+                  </>
                 )}
-                {searchingProc && <p className="text-xs text-muted-foreground">Buscando…</p>}
               </div>
             )}
           </div>
@@ -454,7 +446,7 @@ export function NovoOrcamentoOdontoDialog({
                               <DentePicker value={it.dentes} onChange={(v) => atualizarItem(idx, "dentes", v)} />
                             </div>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-[1fr_70px_120px_120px_110px] gap-2 items-center">
+                          <div className="grid grid-cols-1 md:grid-cols-[1fr_70px_120px_120px] gap-2 items-center">
                             <Input
                               value={it.descricao}
                               onChange={(e) => atualizarItem(idx, "descricao", e.target.value)}
@@ -473,10 +465,6 @@ export function NovoOrcamentoOdontoDialog({
                               <div className="text-[10px] text-muted-foreground">Cartão</div>
                               <div className="text-sm tabular-nums">R$ {valCart.toFixed(2)}</div>
                             </div>
-                            <CurrencyInput
-                              value={it.valor_unitario ? it.valor_unitario.toFixed(2) : ""}
-                              onChange={(v) => atualizarItem(idx, "valor_unitario", v === "" ? 0 : Number(v))}
-                            />
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Subtotal deste item: <span className="font-medium text-foreground">R$ {sub.toFixed(2)}</span>
