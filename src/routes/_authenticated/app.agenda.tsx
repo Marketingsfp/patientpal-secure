@@ -1625,7 +1625,7 @@ function AgendaPage() {
     }
     setPacInfoLoading(false);
   };
-  type FormaOpcao = { forma: string; label: string; valor: number };
+  type FormaOpcao = { forma: string; label: string; valor: number; memoria?: string };
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [formaPagOpcoes, setFormaPagOpcoes] = useState<FormaOpcao[]>([]);
   const [formaPagCtx, setFormaPagCtx] = useState<{
