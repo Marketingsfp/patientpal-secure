@@ -312,7 +312,7 @@ const fetchProcedimentosAgenda = getProcedimentosAgenda;
 const fetchMedicoProcedimentosAgenda = getMedicoProcedimentosAgenda;
 
 type DescontoConvenio =
-  | { tipo: "percentual"; valor: number }
+  | { tipo: "percentual"; valor: number; percentualOutros?: number }
   | { tipo: "valor"; valor: number }
   | { tipo: "gratuidade"; valor: 0 }
   | { tipo: "valor_fixo"; valor: number; valorOutros: number };
@@ -349,6 +349,11 @@ function aplicarDescontoPorForma(valor: number, forma: string, d: DescontoConven
     const ehDinheiro = forma === "dinheiro";
     const v = ehDinheiro ? Number(d.valor) : Number(d.valorOutros);
     return Math.max(0, v || 0);
+  }
+  if (d.tipo === "percentual") {
+    const ehDinheiro = forma === "dinheiro";
+    const pct = ehDinheiro ? Number(d.valor) : Number(d.percentualOutros ?? d.valor);
+    return Math.max(0, valor * (1 - (pct || 0) / 100));
   }
   return aplicarDesconto(valor, d);
 }
