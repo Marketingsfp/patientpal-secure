@@ -290,6 +290,7 @@ function Page() {
         criado_por: m.user_id,
         origem: "caixa" as const,
         transferSentido: m.tipo === "suprimento" ? "entrada" : "saida",
+        caixaTipo: m.tipo,
       }));
     }
     // Merge ordenado por data + hora desc (mais recente primeiro)
