@@ -424,7 +424,7 @@ function Page() {
               const inicio = `${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`;
               const fimMin = cur + dur;
               const fim = `${String(Math.floor(fimMin / 60)).padStart(2, "0")}:${String(fimMin % 60).padStart(2, "0")}`;
-              out.push({ data: d.toISOString().slice(0, 10), medico_id: m.id, agenda_id: ag.id ?? "", inicio, fim });
+              out.push({ data: fmtDateLocal.format(d), medico_id: m.id, agenda_id: ag.id ?? "", inicio, fim });
               cur += dur;
               criadosNoDia += 1;
             }
@@ -455,28 +455,12 @@ function Page() {
     setGerando(true);
     try {
       const medicoById = new Map(medicos.map((m) => [m.id, m]));
-      // A-2: limpar slots "DISPONÍVEL" pré-existentes no intervalo/médico/agenda antes de regerar,
-      // evitando duplicatas ao clicar em "Gerar" mais de uma vez.
-      const iniIso = new Date(`${gerar.data_inicio}T00:00:00`).toISOString();
-      const fimIso = new Date(`${gerar.data_fim}T23:59:59`).toISOString();
-      const medicoIdsSet = new Set(slotsPreview.map((s) => s.medico_id));
-      if (medicoIdsSet.size > 0) {
-        // Limpa TODOS os slots livres (sem paciente) no intervalo/médicos —
-        // o unique index uq_agend_slot_vazio bate em (clinica, medico, agenda, inicio)
-        // WHERE paciente_id IS NULL AND status='agendado', então filtrar apenas
-        // por paciente_nome='DISPONÍVEL' deixa slots antigos com outro rótulo
-        // (ex.: "BLOQUEIO", vazio, etc.) causando colisão ao regerar.
-        const { error: delErr } = await supabase
-          .from("agendamentos")
-          .delete()
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .is("paciente_id", null)
-          .eq("status", "agendado")
-          .in("medico_id", Array.from(medicoIdsSet))
-          .gte("inicio", iniIso)
-          .lte("inicio", fimIso);
-        if (delErr) throw delErr;
-      }
+      // Regra: novos slots são ACRESCENTADOS abaixo dos já existentes na
+      // data. Não apagamos mais os slots livres do intervalo — o `piso`
+      // (computado no useEffect acima) já garante que a geração começa
+      // depois do último `fim` existente por (médico, agenda, data). Se
+      // ainda houver colisão pontual com o unique index uq_agend_slot_vazio,
+      // tratamos por lote/linha abaixo.
       const rowsRaw = slotsPreview.map((s) => {
         const inicio = new Date(`${s.data}T${s.inicio}:00`);
         const fim = new Date(`${s.data}T${s.fim}:00`);
@@ -502,12 +486,27 @@ function Page() {
         rowsMap.set(`${r.medico_id}|${r.agenda_id ?? ""}|${r.inicio}`, r);
       }
       const rows = Array.from(rowsMap.values());
-      // Inserir em lotes de 500
+      // Inserir em lotes de 500 tolerando colisões pontuais com o unique
+      // index (23505): se o lote falhar, tenta linha a linha e apenas
+      // contabiliza as ignoradas — não interrompe a geração.
+      let inseridos = 0;
+      let ignorados = 0;
       for (let i = 0; i < rows.length; i += 500) {
-        const { error } = await supabase.from("agendamentos").insert(rows.slice(i, i + 500));
-        if (error) throw error;
+        const lote = rows.slice(i, i + 500);
+        const { error } = await supabase.from("agendamentos").insert(lote);
+        if (!error) { inseridos += lote.length; continue; }
+        // fallback linha a linha
+        for (const r of lote) {
+          const { error: e2 } = await supabase.from("agendamentos").insert(r);
+          if (!e2) inseridos += 1;
+          else if ((e2 as any).code === "23505") ignorados += 1;
+          else throw e2;
+        }
       }
-      toast.success(`${rows.length} horários criados`);
+      if (ignorados > 0) toast.success(`${inseridos} horários criados (${ignorados} já existiam e foram ignorados)`);
+      else toast.success(`${inseridos} horários criados`);
+      // Recarrega o piso para refletir os novos slots imediatamente na preview.
+      setGerar((g) => ({ ...g }));
     } catch (e: any) {
       mostrarErro(e);
     } finally {
