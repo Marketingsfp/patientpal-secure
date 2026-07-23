@@ -431,18 +431,20 @@ export function NovoOrcamentoOdontoDialog({
                     <div key={idx} className="p-3 space-y-2">
                       <div className="flex items-start gap-2">
                         <div className="flex-1 space-y-2">
-                          <div className="flex items-start gap-2 flex-wrap">
-                            <div className="flex flex-wrap gap-1 min-w-[120px]">
-                              {it.dentes.length === 0 ? (
-                                <span className="text-xs text-muted-foreground italic">sem dente</span>
-                              ) : (
-                                it.dentes.map((d) => (
-                                  <Badge key={d} variant="secondary" className="font-mono text-[11px]">{d}</Badge>
-                                ))
-                              )}
-                              <DentePicker value={it.dentes} onChange={(v) => atualizarItem(idx, "dentes", v)} />
+                          {it.procedimento_id != null && (
+                            <div className="flex items-start gap-2 flex-wrap">
+                              <div className="flex flex-wrap gap-1 min-w-[120px]">
+                                {it.dentes.length === 0 ? (
+                                  <span className="text-xs text-muted-foreground italic">sem dente</span>
+                                ) : (
+                                  it.dentes.map((d) => (
+                                    <Badge key={d} variant="secondary" className="font-mono text-[11px]">{d}</Badge>
+                                  ))
+                                )}
+                                <DentePicker value={it.dentes} onChange={(v) => atualizarItem(idx, "dentes", v)} />
+                              </div>
                             </div>
-                          </div>
+                          )}
                           <div className="grid grid-cols-1 md:grid-cols-[1fr_70px_120px_120px] gap-2 items-center">
                             <Input
                               value={it.descricao}
