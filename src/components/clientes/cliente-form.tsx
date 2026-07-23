@@ -781,11 +781,11 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     }
     let pacienteId: string | undefined = editing?.id;
     if (editing) {
-      const { error } = await supabase.from("pacientes").update(payload).eq("id", editing.id);
+      const { error } = await supabase.from("pacientes").update(payload as any).eq("id", editing.id);
       if (error) { setSaving(false); mostrarErro(error); return; }
     } else {
       const { data: novo, error } = await supabase
-        .from("pacientes").insert(payload).select("id").single();
+        .from("pacientes").insert(payload as any).select("id").single();
       if (error) { setSaving(false); mostrarErro(error); return; }
       pacienteId = novo?.id;
     }
