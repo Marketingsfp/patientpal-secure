@@ -4318,11 +4318,8 @@ function AgendaPage() {
         } else if (info.desconto) {
           opcoes = opcoes.map((o) => ({
             ...o,
-            valor: aplicarAcrescimoCartaoAgenda(
-              aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
-              o.forma,
-              info.acrescimoCartao,
-            ),
+            valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
+            memoria: memoriaDescontoPorForma(o.valor, o.forma, info.desconto!),
           }));
           const rotulo =
             info.desconto.tipo === "gratuidade"
