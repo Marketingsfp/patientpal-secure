@@ -4382,7 +4382,7 @@ function AgendaPage() {
     const { data: livreExistente } = await supabase
       .from("agendamentos")
       .select("id")
-      .eq("clinica_id", a.clinica_id)
+      .eq("clinica_id", clinicaAtual!.clinica_id)
       .eq("medico_id", a.medico_id as never)
       .eq("agenda_id", a.agenda_id as never)
       .eq("inicio", a.inicio)
