@@ -753,7 +753,6 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     const payload = {
       nome: form.nome.trim(),
       cpf: form.cpf.trim() ? somenteDigitos(form.cpf) : null,
-      numero_pasta: form.numero_pasta.trim() || null,
       telefone: form.telefone.trim() || null,
       telefone2: form.telefone2.trim() || null,
       email: form.email.trim() || null,
@@ -774,7 +773,12 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       responsavel_telefone: form.responsavel_telefone.trim() || null,
       responsavel_parentesco: form.responsavel_parentesco.trim() || null,
       clinica_id: clinicaId,
-    };
+    } as Record<string, unknown>;
+    // Número de prontuário / pasta: só admin pode alterar.
+    if (isAdmin) {
+      payload.numero_pasta = form.numero_pasta.trim() || null;
+      payload.codigo_prontuario = form.codigo_prontuario.trim() || null;
+    }
     let pacienteId: string | undefined = editing?.id;
     if (editing) {
       const { error } = await supabase.from("pacientes").update(payload).eq("id", editing.id);
