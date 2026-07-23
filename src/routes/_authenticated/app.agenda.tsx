@@ -1153,6 +1153,31 @@ function AgendaPage() {
   useEffect(() => {
     if (!form.orcamento_id) setOrcamentoOdonto(false);
   }, [form.orcamento_id]);
+  // Orçamento vinculado ao form atual pertence à especialidade Laboratório?
+  // Quando true, só é permitido agendar com médicos da especialidade Laboratório.
+  const [orcamentoLaboratorio, setOrcamentoLaboratorio] = useState(false);
+  useEffect(() => {
+    if (!form.orcamento_id) setOrcamentoLaboratorio(false);
+  }, [form.orcamento_id]);
+  // IDs de especialidades cujo nome contém "laborat" (mesma heurística já
+  // usada em outros pontos do arquivo). Usado para restringir orçamentos
+  // de Laboratório a médicos laboratoristas.
+  const labEspecialidadeIds = useMemo(
+    () =>
+      new Set(
+        especialidades
+          .filter((e) => normalizar(e.nome ?? "").includes("laborat"))
+          .map((e) => e.id),
+      ),
+    [especialidades],
+  );
+  const medicoEhLaboratorista = (medicoId: string | null | undefined) => {
+    if (!medicoId) return false;
+    const set = medicoEspec.get(medicoId);
+    if (!set) return false;
+    for (const id of set) if (labEspecialidadeIds.has(id)) return true;
+    return false;
+  };
   // Dialog de divisão de orçamento (vários grupos de procedimentos → vários agendamentos vinculados)
   const [dividirOpen, setDividirOpen] = useState(false);
   const [dividirCtx, setDividirCtx] = useState<{
