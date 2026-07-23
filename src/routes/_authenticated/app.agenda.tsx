@@ -3323,7 +3323,7 @@ function AgendaPage() {
     try {
       const { data: orc, error } = await supabase
         .from("orcamentos")
-        .select("id, numero, paciente_id, paciente_nome, status")
+        .select("id, numero, paciente_id, paciente_nome, status, especialidade_id, validade_dias, created_at")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("numero", num)
         .maybeSingle();
@@ -3339,16 +3339,34 @@ function AgendaPage() {
         toast.error("Orçamento cancelado.");
         return;
       }
+      // Validade: se `validade_dias` estiver definido, o orçamento expira
+      // em created_at + validade_dias. Passou disso, bloqueia.
+      if (orc.validade_dias && orc.created_at) {
+        const validoAte = new Date(orc.created_at);
+        validoAte.setDate(validoAte.getDate() + Number(orc.validade_dias));
+        if (validoAte.getTime() < Date.now()) {
+          toast.error(
+            `Orçamento expirado em ${validoAte.toLocaleDateString("pt-BR")}. Gere um novo orçamento.`,
+          );
+          return;
+        }
+      }
       const { data: itens, error: e2 } = await supabase
         .from("orcamento_itens")
-        .select("id, descricao, procedimento_id")
+        .select("id, descricao, procedimento_id, valor_total, dentes")
         .eq("orcamento_id", orc.id)
         .order("ordem");
       if (e2) {
         mostrarErro(e2);
         return;
       }
-      const itsAll = (itens ?? []) as { id: string; descricao: string; procedimento_id: string | null }[];
+      const itsAll = (itens ?? []) as {
+        id: string;
+        descricao: string;
+        procedimento_id: string | null;
+        valor_total: number | null;
+        dentes: string[] | null;
+      }[];
       if (itsAll.length === 0) {
         toast.error("Orçamento sem itens.");
         return;
@@ -3442,6 +3460,31 @@ function AgendaPage() {
           pacId = pac[0].id;
           pacNome = pac[0].nome;
         }
+      }
+      // Odontologia: em vez de auto-juntar todos os itens restantes num
+      // único agendamento, abre um pop-up para o usuário escolher quais
+      // itens usar agora. O restante fica disponível para agendar depois.
+      const isOdonto = orc.especialidade_id === "f0cfaa0a-2a67-4176-97de-a7072c37077c";
+      if (isOdonto && its.length > 1) {
+        setSelecItensCtx({
+          orcamento: {
+            id: orc.id,
+            numero: orc.numero,
+            paciente_id: pacId,
+            paciente_nome: pacNome,
+          },
+          itensRestantes: its.map((i) => ({
+            id: i.id,
+            descricao: i.descricao,
+            valor_total: i.valor_total,
+            dentes: i.dentes,
+          })),
+          totalItens: itsAll.length,
+          itensRaw: its.map((i) => ({ id: i.id, descricao: i.descricao, procedimento_id: i.procedimento_id })),
+          todosLab,
+        });
+        setSelecItensOpen(true);
+        return;
       }
       // Agrupa por "grupo" (mais específico) ou tipo. Se houver mais de um grupo
       // distinto, abre o painel de divisão em vez de criar um único agendamento.
