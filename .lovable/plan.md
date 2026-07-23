@@ -1,44 +1,23 @@
-## O que muda
+## Objetivo
+Reagrupar as formas de pagamento no orçamento de Odontologia nas 3 clínicas: **PIX passa a valer o mesmo que Cartão** (grupo "Cartão/PIX"), e **Dinheiro fica sozinho**. Hoje o sistema está agrupando PIX junto com Dinheiro, o que gera o valor errado no drawer, na lista de itens e no cupom impresso.
 
-Hoje, quando você informa o nº de um orçamento na tela de agendamento, o sistema pega **todos os itens que ainda não foram agendados** e junta num único agendamento (foi por isso que apareceu "Marcando 2 exames em uma única ficha" com BLOCO DE CERAMICA + COROA EM PORCELANA).
-
-Vamos passar a abrir um **pop-up de seleção de itens** sempre que o orçamento for da especialidade **Odontologia**. O usuário marca com checkbox quais itens quer usar naquele agendamento. Os itens não marcados permanecem disponíveis e o mesmo orçamento pode ser usado várias vezes até esgotar os itens ou até o orçamento expirar/ser cancelado.
-
-Aplicação: **as 3 clínicas** (SFP, Menino Jesus, Policlínica).
-
-## Fluxo novo (Odontologia)
-
-1. Usuário digita o nº do orçamento e clica em buscar.
-2. Sistema carrega os itens restantes (já filtra o que foi consumido por agendamentos ativos, como hoje).
-3. Se o orçamento for de Odontologia e tiver mais de 1 item restante → abre pop-up **"Escolher itens do orçamento"** com:
-   - Cabeçalho: nº orçamento, paciente, quantos itens já foram agendados (ex: "2 de 5 já agendados").
-   - Lista de itens restantes com checkbox, descrição, dente(s) FDI (quando houver) e valor.
-   - Botões "Marcar todos" / "Limpar".
-   - Rodapé com contagem e "Confirmar seleção".
-4. Ao confirmar, o agendamento é preenchido só com os itens marcados e vincula apenas eles em `agendamento_orcamento_itens`.
-5. Se sobrar 1 item apenas ou o usuário marcar tudo, o comportamento final é o mesmo de hoje.
-
-Nada muda para orçamentos de outras especialidades (laboratório, imagem, consulta, misto entre grupos etc.) — o fluxo atual segue igual.
-
-## Regra de expiração / esgotamento
-
-- Orçamento cancelado ou expirado (`status = 'cancelado'` ou `validade < hoje`) → bloqueia com mensagem clara, como já faz para cancelado hoje. Passa a checar validade também.
-- Todos os itens já agendados → mensagem "Todos os itens deste orçamento já foram agendados" (comportamento atual mantido).
-
-## Onde mexer (técnico)
-
-- `src/routes/_authenticated/app.agenda.tsx` — função `buscarOrcamento`: detectar se o orçamento é de Odontologia (via `procedimentos.grupo`/`especialidade` dos itens ou `orcamentos.especialidade_id`) e, se sim, abrir o novo dialog em vez de auto-vincular tudo.
-- Novo componente `src/components/agenda/selecionar-itens-orcamento-dialog.tsx` — pop-up com checkbox, semelhante em estilo ao `DividirOrcamentoDialog` existente.
-- Ao confirmar, reutiliza o caminho existente: `setPendingOrcItemIds(idsSelecionados)` + preenche `form.procedimento`, `orcamento_id`, `orcamento_numero` com base só nos itens marcados. Nenhuma mudança de schema.
-- Validação de `validade` do orçamento adicionada no `buscarOrcamento` (a coluna `validade`/`data_validade` já existe em `orcamentos`; confirmo no momento da implementação).
-
-## Antes x Depois
-
-- **Antes:** informar o nº do orçamento na agenda enfia todos os itens pendentes numa única ficha, sem opção de escolher.
-- **Depois:** para Odontologia, você escolhe no pop-up quais itens entram naquele agendamento e reutiliza o mesmo orçamento em vários agendamentos até esgotar.
+## Escopo (apenas apresentação/gravação de valores em Odontologia)
+- Criação do orçamento: `src/components/orcamentos-v2/novo-orcamento-odonto-dialog.tsx` e `src/components/orcamentos-v2/add-to-orcamento-dialog.tsx` → gravar `valores_formas` com `Dinheiro = preço à vista` e `PIX = Cartão de Crédito = Cartão de Débito = preço com acréscimo`.
+- Visualização no drawer: `src/components/orcamentos-v2/orcamento-drawer.tsx` → função `splitFormas` passa a considerar PIX no lado do Cartão; rótulos viram "Dinheiro" e "Cartão/PIX".
+- Impressão: `src/lib/print-orcamento.ts` → mesma mudança em `splitFormas` e nos rótulos ("DINHEIRO" e "CARTÃO/PIX").
+- Backfill SQL nos orçamentos de Odontologia já existentes nas 3 clínicas: recalcular `valores_formas` dos itens (Dinheiro à vista; PIX/Cartão com acréscimo) para que orçamentos antigos passem a exibir o agrupamento correto.
 
 ## Fora do escopo
+- Regras de negócio de acréscimo, conversão, agendamento, cobrança, splits de pagamento no caixa e permissões — nada muda.
+- Outros módulos (orçamentos não-odontológicos continuam com o comportamento atual).
 
-- Fluxo de outras especialidades.
-- Mudança na conversão do orçamento pelo drawer da Odontologia (`ConversaoOrcamentoDialog`) — continua como está.
-- Alterações no odontograma ou na impressão do orçamento.
+## Antes → Depois (exemplo do print enviado)
+- Antes: `DINHEIRO/PIX 1.620,00` · `CARTÃO 1.782,00`.
+- Depois: `DINHEIRO 1.620,00` · `CARTÃO/PIX 1.782,00`. Mesmos totais no drawer e nos itens (BLOCO DE CERAMICA e COROA EM PORCELANA).
+
+## Validação
+- Reabrir o orçamento #202600084 (Menino Jesus) e conferir drawer + reimpressão.
+- Amostra 1 orçamento por clínica após o backfill.
+
+## Riscos
+- Baixo: mudança é de apresentação e de rotulagem/gravação de `valores_formas`. Não altera `valor_total`, conversão nem lançamentos financeiros já feitos.
