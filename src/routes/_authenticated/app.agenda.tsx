@@ -94,6 +94,7 @@ import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { IdadeIcon } from "@/components/idade-icon";
+import { ClienteForm, type Paciente as PacienteFull } from "@/components/clientes/cliente-form";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/agenda")({
@@ -1448,6 +1449,28 @@ function AgendaPage() {
   const [pacInfoOpen, setPacInfoOpen] = useState(false);
   const [pacInfoLoading, setPacInfoLoading] = useState(false);
   const [pacInfo, setPacInfo] = useState<Record<string, any> | null>(null);
+  const [editarPacienteOpen, setEditarPacienteOpen] = useState(false);
+  const [editarPacienteData, setEditarPacienteData] = useState<PacienteFull | null>(null);
+  const [editarPacienteLoading, setEditarPacienteLoading] = useState(false);
+  const podeEditarCliente = usePodeEscrever("clientes");
+  const abrirEditarPacienteInline = async (pacienteId: string) => {
+    setEditarPacienteLoading(true);
+    setEditarPacienteOpen(true);
+    try {
+      const { data, error } = await supabase
+        .from("pacientes")
+        .select("*")
+        .eq("id", pacienteId)
+        .single();
+      if (error) throw error;
+      setEditarPacienteData(data as PacienteFull);
+    } catch (e) {
+      mostrarErro(e);
+      setEditarPacienteOpen(false);
+    } finally {
+      setEditarPacienteLoading(false);
+    }
+  };
 
   const abrirInfoPaciente = async (pacienteId: string | null | undefined, nomeFallback: string) => {
     setPacInfoOpen(true);
@@ -8033,7 +8056,7 @@ function AgendaPage() {
                   <Button
                     size="sm"
                     onClick={() => {
-                      window.location.href = `/app/clientes/${pacInfo.id}/editar`;
+                      void abrirEditarPacienteInline(pacInfo.id);
                     }}
                   >
                     Editar
@@ -8042,6 +8065,43 @@ function AgendaPage() {
               )}
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={editarPacienteOpen}
+        onOpenChange={(v) => {
+          setEditarPacienteOpen(v);
+          if (!v) setEditarPacienteData(null);
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar cliente</DialogTitle>
+          </DialogHeader>
+          {editarPacienteLoading || !editarPacienteData ? (
+            <p className="text-sm text-muted-foreground py-6">Carregando…</p>
+          ) : clinicaAtual ? (
+            <ClienteForm
+              clinicaId={clinicaAtual.clinica_id}
+              paciente={editarPacienteData}
+              readOnly={!podeEditarCliente}
+              stickyFooter
+              onCancel={() => {
+                setEditarPacienteOpen(false);
+                setEditarPacienteData(null);
+              }}
+              onSaved={async () => {
+                const id = editarPacienteData.id;
+                setEditarPacienteOpen(false);
+                setEditarPacienteData(null);
+                if (id && pacInfoOpen) {
+                  await abrirInfoPaciente(id, pacInfo?.nome ?? "");
+                }
+              }}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground py-6">Selecione uma clínica.</p>
+          )}
         </DialogContent>
       </Dialog>
       {dividirCtx && (
