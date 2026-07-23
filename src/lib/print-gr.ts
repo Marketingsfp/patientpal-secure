@@ -374,7 +374,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  const usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
+  const usuarioFinalNome = usuarioNome ?? primeiraVia?.impresso_por_nome;
 
   // Busca dados em paralelo
   const [ag, cli] = await Promise.all([
@@ -939,7 +939,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  const usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
+  const usuarioFinalNome = usuarioNome ?? primeiraVia?.impresso_por_nome;
 
   // Busca agendamentos + clínica + tabela de procedimentos da clínica
   const [agsRes, cliRes, procsRes, lancsRes] = await Promise.all([
@@ -1326,7 +1326,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  const usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
+  const usuarioFinalNome = usuarioNome ?? primeiraVia?.impresso_por_nome;
 
   const [mensRes, cliRes] = await Promise.all([
     supabase
@@ -1528,7 +1528,7 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  const usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
+  const usuarioFinalNome = usuarioNome ?? primeiraVia?.impresso_por_nome;
 
   const [mensRes, cliRes] = await Promise.all([
     supabase
