@@ -1,69 +1,80 @@
+
 ## Objetivo
 
-No cadastro de benefícios (regras de preço) dos convênios do Cartão Benefícios, cada regra passa a ter **dois valores**: um para pagamento em **dinheiro** e outro para **cartão/Pix**. O valor já existente vira o "dinheiro" e o novo campo "cartão/Pix" é preenchido manualmente pelo time. O acréscimo automático de cartão configurado no convênio é removido (foi criado errado).
+Hoje o fluxo "Solicitar estorno" só funciona para **recebimentos** (linhas de `caixa_movimentos` com `lancamento_id` em `fin_lancamentos`). Sangria não tem lançamento financeiro — é apenas um movimento negativo de caixa (`caixa_movimentos.tipo = 'sangria'`), então nunca há botão de estorno na linha. Este plano estende o fluxo existente para permitir solicitar (e o financeiro aprovar) o estorno de uma sangria, reutilizando exatamente a mesma UI/tabela/notificação/lista.
 
-Aplica-se às **3 clínicas** (arquivo/tabela única, sem feature flag).
+## Pergunta de escopo (regra 1.10 — clínica-alvo)
 
-## Escopo
+Precisa confirmar antes de codar: aplicar em **todas as 3 clínicas** (Menino Jesus, SFP, POLICLINICA SAO FRANCISCO DE PAULA) ou apenas em uma? A alteração é técnica (não é regra nova de negócio), então o padrão sugerido é **global**, mas confirmo antes de executar.
 
-Dentro:
-- Tabela `cb_convenio_regras`: novas colunas para o segundo valor.
-- Formulário de edição de regra em `src/components/cartao-beneficios/regras-tab.tsx`.
-- Motor de preços da agenda que consome a regra (usa `computeValor` em `src/lib/cb-regras.ts`).
-- Remoção do acréscimo automático de cartão do convênio (campos em `cb_convenios` e sua aplicação em `applyAcrescimoCartao`).
+## Análise (4 eixos)
 
-Fora:
-- Convênio Funcionário (não usa cartão benefícios).
-- Regras "gratuito" (permanecem 0 em ambos).
-- Histórico de lançamentos já feitos.
+- **Financeiro:** fecha lacuna — hoje sangria errada só é corrigida por lançamento manual "avulso" sem rastro; passa a ter aprovação, motivo e histórico como qualquer estorno.
+- **Operacional:** mesmo fluxo já conhecido (botão na linha → sino do financeiro → aprovar/recusar). Zero curva de aprendizado.
+- **Experiência:** recepção deixa de ficar dependente de aviso por WhatsApp/verbal para o financeiro consertar sangria trocada de valor/destinatário.
+- **Segurança/Auditoria:** solicitação, aprovação e reversão gravadas em `estorno_solicitacoes` + `audit_log`, com usuário/hora.
 
-## Comportamento
+## Como será feito
 
-### Cadastro da regra
-- Campo atual "Valor (R$)" é renomeado para **"Valor dinheiro (R$)"**.
-- Novo campo ao lado: **"Valor cartão/Pix (R$)"**.
-- Quando o modo é "Percentual de desconto", o mesmo desdobramento vale: **"% desconto dinheiro"** e **"% desconto cartão/Pix"**.
-- Para regras já existentes, o segundo campo é pré-preenchido com o valor atual (mesma coisa que dinheiro) e o time ajusta manualmente quando precisar.
+### 1. Banco (migração)
 
-### Aplicação na agenda
-- Base "dinheiro" da consulta usa `valor`/`percentual` (dinheiro).
-- Base "outros" (PIX, débito, crédito) usa os novos `valor_cartao`/`percentual_cartao`.
-- Nenhum acréscimo automático é somado por cima.
+- `estorno_solicitacoes`: adicionar coluna `caixa_movimento_id uuid` (nullable, FK opcional lógica para `caixa_movimentos.id`).
+- Índice único parcial `uq_estorno_solicitacoes_movimento_pendente` em `(caixa_movimento_id)` onde `status = 'pendente'` — mesma trava que já existe para `lancamento_id`.
+- Ampliar CHECK do campo `tipo` (se existir) para aceitar `estorno_sangria`, ou simplesmente reutilizar `erro_caixa` — o discriminador real passa a ser `caixa_movimento_id IS NOT NULL`.
+- Nova função `public.estornar_sangria(_movimento_id uuid, _clinica_id uuid) returns jsonb` (SECURITY DEFINER, mesma assinatura de retorno da `estornar_lancamento_receita`):
+  - valida que o movimento existe, é da clínica, tipo `sangria` e ainda não estornado;
+  - insere um `caixa_movimentos` de compensação com `tipo = 'suprimento'`, mesmo valor, descrição `"[Estorno de sangria] <descrição original>"`, referenciando o movimento origem;
+  - se a sessão original ainda está `aberto`, lança na mesma sessão; se fechada, lança na sessão aberta atual do usuário aprovador (retorna aviso `"lancado_em_sessao_atual"`);
+  - marca o movimento original com metadata (`observacoes` acrescido de `[ESTORNADO em ... por ...]`) para o histórico não sumir.
+- GRANT execute para `authenticated`; revoke de `public`/`anon`.
 
-### Acréscimo automático (remoção)
-- Deixa de ser aplicado em qualquer fluxo.
-- Os campos ficam no banco por segurança de dados históricos, mas a UI de configuração do convênio deixa de exibi-los e a função `applyAcrescimoCartao` passa a retornar o valor sem alteração (no-op).
+### 2. Front — `SolicitarEstornoDialog`
 
-## Detalhes técnicos
+- Novo prop opcional `caixaMovimentoId?: string | null`.
+- Se `caixaMovimentoId` presente:
+  - checa duplicidade contra `estorno_solicitacoes.caixa_movimento_id`;
+  - grava no insert `caixa_movimento_id` e `tipo = 'erro_caixa'` (sangria só faz sentido como erro de caixa);
+  - esconde o bloco "devolução ao paciente" (não se aplica).
 
-### Banco (migration)
-```sql
-ALTER TABLE public.cb_convenio_regras
-  ADD COLUMN valor_cartao numeric,
-  ADD COLUMN percentual_cartao numeric;
+### 3. Front — `app.caixa.tsx` (linhas de movimento)
 
--- backfill: card = dinheiro
-UPDATE public.cb_convenio_regras
-   SET valor_cartao = valor,
-       percentual_cartao = percentual
- WHERE valor_cartao IS NULL AND percentual_cartao IS NULL;
-```
+- No mapa `estornosPorLanc`, criar `estornosPorMov` (Map por `caixa_movimento_id`).
+- Na célula `Ação` da tabela, adicionar bloco espelho do atual `m.tipo === "recebimento"` para `m.tipo === "sangria" && podeEscrever`:
+  - "Aguardando aprovação" quando pendente;
+  - "Estornada" quando aprovado;
+  - "Solicitar estorno" chamando `setEstornoFor(m)` com o mesmo dialog, passando `caixaMovimentoId={m.id}`.
+- Ajustar o `<SolicitarEstornoDialog>` no rodapé para passar `caixaMovimentoId` quando `estornoFor?.tipo === 'sangria'`.
 
-### Frontend
-- `src/lib/cb-regras.ts`
-  - `CbRegra`: adicionar `valor_cartao?: number | null`, `percentual_cartao?: number | null`.
-  - `computeValor`: passar a usar `valor_cartao`/`percentual_cartao` para o retorno `outros` (fallback no dinheiro se nulo, garantindo compatibilidade).
-  - `applyAcrescimoCartao`: transformar em no-op (retorna `valorOutros`), preservando assinatura para não quebrar chamadas.
-- `src/components/cartao-beneficios/regras-tab.tsx`
-  - Renomear label do campo atual e adicionar o novo campo (valor OU percentual, conforme modo).
-  - Persistir os novos campos no insert/update.
-- Remover a seção de "Acréscimo cartão" do formulário de convênio (mantendo colunas no banco, sem uso).
+### 4. Front — `app.financeiro.estorno.tsx` (aprovação)
 
-### Verificação
-- Editar uma regra existente: os dois campos aparecem iguais; alterar só o de cartão/Pix e salvar.
-- Simular na agenda: valor em dinheiro e valor em cartão saem diferentes conforme regra; acréscimo automático não incide mais.
+- `Solic` ganha `caixa_movimento_id: string | null`.
+- `executarEstorno`: se `s.caixa_movimento_id`, chama `supabase.rpc("estornar_sangria", ...)`; senão mantém `estornarLancamentoReceita`.
+- Coluna "Descrição" mostra badge "Sangria" quando aplicável, para o financeiro reconhecer.
+
+### 5. Sino de notificações (`EstornosBell.tsx`)
+
+- Sem mudança de código — a listagem é `status = 'pendente'` na mesma tabela; o toast já aparece automaticamente.
+
+### 6. Auditoria
+
+- `estornar_sangria` grava `audit_log` (tabela `caixa_movimentos`, action `ESTORNO`, dados_antes/depois com valor e destinatário).
 
 ## Antes / Depois
 
-- **Antes:** uma regra tinha um único valor; para diferenciar cartão, dependia de um acréscimo global por convênio.
-- **Depois:** cada regra carrega explicitamente o valor de dinheiro e o valor de cartão/Pix; o acréscimo automático some.
+- **Antes:** linhas de sangria em `Meus movimentos` não têm ação; correção precisa ser feita por lançamento manual sem aprovação.
+- **Depois:** operador clica "Solicitar estorno" na sangria, financeiro recebe no sino (mesma fila), aprova → sistema cria movimento de suprimento equivalente e marca a sangria como estornada, mantendo os dois registros no histórico.
+
+## Validação
+
+- Criar sangria de R$ 1,00 em ambiente de teste da clínica indicada, solicitar estorno, aprovar pelo financeiro, conferir: (a) suprimento de compensação criado na mesma sessão, (b) saldo do caixa restaurado, (c) `estorno_solicitacoes` com status `aprovado` e `caixa_movimento_id` preenchido, (d) `audit_log` com o registro, (e) botão da linha vira "Estornada".
+- Testar tentativa de segunda solicitação (deve ser barrada pelo índice único).
+- Testar aprovação quando a sessão original está fechada — deve lançar na sessão aberta com aviso.
+
+## Fora de escopo
+
+- Devolução ao paciente para sangria (não faz sentido; sangria não é pagamento).
+- Estorno de suprimento/despesa — pode virar próximo passo, se o time pedir.
+
+## Risco
+
+Baixo. Reaproveita 100% da UI/tabela existente; apenas adiciona uma coluna, uma RPC e um bloco de botão espelhando o já testado para recebimentos.
