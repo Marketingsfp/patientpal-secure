@@ -167,23 +167,22 @@ export function NovoOrcamentoOdontoDialog({
       }
     }
     if (novos.length === 0) return;
-    setItens((arr) => [...arr, ...novos]);
+    // Novos itens ficam no topo da lista (mais recente primeiro)
+    setItens((arr) => [...novos.reverse(), ...arr]);
     if (algumVariavel) toast.info("Algum procedimento tem valor variável — revise no fechamento.");
     setProcsSelecionados([]);
     setSelecao([]); setBuscaAberta(false);
   };
 
   const adicionarManual = () => {
-    // 1 item manual por dente selecionado (ou 1 sem dente).
-    const dentes = selecao.length > 0 ? [...selecao].sort((a, b) => a - b) : [null as number | null];
-    const novos: Item[] = dentes.map((d) => ({
+    // Item manual: sempre 1 linha, sem dente. Preserva seleção atual do odontograma.
+    const novo: Item = {
       descricao: "", quantidade: 1, valor_unitario: 0,
       procedimento_id: null,
-      dentes: d != null ? [d] : [],
+      dentes: [],
       valores_formas: null,
-    }));
-    setItens((arr) => [...arr, ...novos]);
-    setSelecao([]); setBuscaAberta(false);
+    };
+    setItens((arr) => [novo, ...arr]);
   };
 
   const abrirBuscaComDente = (d: number) => {

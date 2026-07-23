@@ -1,42 +1,40 @@
-
 ## Escopo
 
-Ajustes no diálogo `src/components/odontologia/novo-orcamento-odonto-dialog.tsx` (aplicado nas 3 clínicas — o componente é único e compartilhado).
+Ajustes visuais/UX em `src/components/odontologia/novo-orcamento-odonto-dialog.tsx` (componente único, vale para as 3 clínicas). Sem mudança de banco, RLS ou lógica de salvamento.
 
-## Confirmação necessária
+## Confirmação
 
-- **Clínica-alvo**: presumo aplicar nas **3 clínicas** (Menino Jesus, SFP e Policlínica). Confirmar antes de executar. Se for só uma, envolvo tudo em feature flag por `clinica_id`.
+Presumo aplicar nas 3 clínicas (código compartilhado). Confirmar se deve valer só para uma.
 
 ## Mudanças
 
-### 1. Filtro de dentistas (foto 1)
-No `useEffect` de carregamento, hoje traz todos os `medicos` da clínica. Passar a filtrar apenas os que atendem em **Odontologia**, consultando `medico_especialidades` (ou equivalente) por `especialidade_id = especialidadeOdontoId`. Se um médico não tiver vínculo com Odontologia, some da lista.
+### 1. Mensagem duplicada de "Nenhum dente selecionado"
+Hoje aparece duas vezes:
+- uma dentro do próprio `DentePicker` (inline, `dente-picker.tsx` linha 64);
+- outra no rodapé do bloco Odontograma no diálogo (linha 363).
 
-### 2. Seleção de procedimentos por lista suspensa com múltipla escolha (foto 2)
-Substituir o campo de busca por digitação por um **combobox multi-select** (padrão shadcn `Command` + `Popover`, igual outros pickers do sistema), listando todos os procedimentos vinculados à Odontologia (`procedimento_especialidades`).
-- Permite marcar vários serviços de uma só vez.
-- Ao confirmar, todos os selecionados são adicionados aos dentes atualmente selecionados no odontograma, cada um como um item próprio (mesmo comportamento atual do `adicionarProc`, em loop).
-- Mantém filtro por texto opcional dentro do combobox para clínicas com muitos procedimentos, mas sem exigir digitação.
+Remover o texto do rodapé no diálogo (linha 362-364) — manter só o do `DentePicker`, que já mostra "Nenhum dente selecionado" / "N dente(s)". Assim a informação aparece uma única vez, junto do próprio odontograma.
 
-### 3. Remover campo de valor editável (foto 3)
-Remover a coluna do `CurrencyInput` de `valor_unitario` em cada linha de item. Manter apenas as duas colunas de exibição: **Dinheiro/PIX** e **Cartão**.
-- `valor_unitario` continua existindo no state (usado para subtotal, total e salvamento), mas fica fixo com o valor do procedimento — sem edição manual.
-- Para procedimentos com `valor_variavel`, manter comportamento atual (toast) mas ainda sem campo editável aqui — se necessário editar, será no fechamento; confirmar essa parte se preferir manter editável só nesses casos.
+### 2. Novo item no topo da lista
+Hoje `setItens((arr) => [...arr, ...novos])` empurra novos itens no final. Trocar para `setItens((arr) => [...novos, ...arr])` em `adicionarProcsSelecionados` e `adicionarManual`, para que o item mais recente apareça no topo de "Serviços incluídos".
 
-### 4. Um item por dente (foto 4)
-Hoje, ao adicionar um serviço com N dentes selecionados, cria **1 item** com array `dentes: [11, 28]`. Mudar para criar **N itens**, um por dente, cada um com `dentes: [d]`.
-- Assim, na listagem "Serviços incluídos", cada dente vira sua própria linha, com seu procedimento, quantidade, valores e subtotal independentes.
-- Aplica-se tanto na seleção múltipla de procedimentos quanto quando o usuário adiciona um único procedimento em vários dentes.
-- Item manual segue igual (sem dente ou com os selecionados; se múltiplos, também vira 1 item por dente para consistência).
+Ajustar também o campo `ordem` no `salvar()` para continuar refletindo a ordem visual (índice atual do array), sem inversão — o que já acontece naturalmente com `.map((_, idx) => ({ ordem: idx }))`.
+
+### 3. Item manual sem exigir dente
+Hoje `adicionarManual` só cria linhas para dentes selecionados (ou 1 sem dente se nada estiver selecionado), e o botão fica junto do bloco de dentes. Ajustes:
+- O botão "Item manual" passa a **sempre criar uma única linha sem dente**, ignorando a seleção atual do odontograma (a seleção continua preservada para o próximo "Adicionar serviço").
+- Manter o botão onde está (ao lado de "Adicionar serviço aos dentes selecionados") — só muda o comportamento.
+- A linha manual criada continua editável (descrição, quantidade); como não tem `valores_formas`, as colunas Dinheiro/PIX e Cartão mostram o `valor_unitario` (0 até o usuário editar). Para permitir digitar valor no item manual, reintroduzir um pequeno `CurrencyInput` de `valor_unitario` **apenas quando `procedimento_id` for null** (item manual). Itens vindos de procedimento seguem sem campo editável, como pediu antes.
 
 ## Fora de escopo
 
-- Nenhuma mudança em schema, RLS, RPCs ou lógica de salvamento/impressão. `orcamento_itens.dentes` continua aceitando array; apenas o formato passa a ser sempre `[um_dente]` quando vindo do odontograma.
-- Sem mexer no odontograma em si, cabeçalho, desconto, validade, total, observações ou botão salvar.
+- Odontograma em si, cabeçalho, formas de pagamento, desconto, validade, total, observações, salvamento e impressão.
+- Nenhum ajuste em `dente-picker.tsx` além do que já mostra.
 
 ## Detalhes técnicos
 
 - Arquivo único: `src/components/odontologia/novo-orcamento-odonto-dialog.tsx`.
-- Novo componente inline ou reutilizar `Command`/`Popover` já usados em outros pickers (verificar `patient-search-input.tsx` / `cid10-picker.tsx` como referência de padrão do projeto).
-- Query de médicos: `medicos` join `medico_especialidades` por `especialidade_id = especialidadeOdontoId` e `clinica_id`. Confirmar nome exato da tabela de vínculo médico↔especialidade na primeira leitura em build mode.
-- Query de procedimentos: já existe cache `procIdsOdonto` — usar para popular a lista completa (buscar `nome` de todos os IDs, sem depender de texto digitado).
+- Remover o `<span>` de "Nenhum dente selecionado" no rodapé do bloco odontograma (linhas 361-364), mantendo os botões à direita.
+- `adicionarProcsSelecionados` / `adicionarManual`: prepend em vez de append.
+- `adicionarManual`: forçar `dentes = [null]` (1 item sem dente), não usar `selecao`.
+- No render da lista de itens, quando `it.procedimento_id == null`, mostrar `CurrencyInput` no lugar dos dois blocos fixos Dinheiro/PIX e Cartão (ou como coluna extra) para permitir preço manual.
