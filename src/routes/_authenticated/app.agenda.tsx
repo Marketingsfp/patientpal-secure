@@ -94,6 +94,7 @@ import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { IdadeIcon } from "@/components/idade-icon";
+import { ClienteForm, type Paciente as PacienteFull } from "@/components/clientes/cliente-form";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/agenda")({
