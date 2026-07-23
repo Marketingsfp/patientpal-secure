@@ -1077,6 +1077,12 @@ function NovaRegraDialog({
       modo: r.modo,
       valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
       percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
+      valor_cartao: r.modo === "valor_fixo"
+        ? (r.valor_cartao != null ? Number(r.valor_cartao) || 0 : Number(r.valor) || 0)
+        : null,
+      percentual_cartao: r.modo === "percentual_desconto"
+        ? (r.percentual_cartao != null ? Number(r.percentual_cartao) || 0 : Number(r.percentual) || 0)
+        : null,
       prioridade: Number(r.prioridade) || 1,
       ativo: r.ativo !== false,
       limite_qtd: hasLimit ? Number(r.limite_qtd) : null,
