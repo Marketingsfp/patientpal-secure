@@ -4375,19 +4375,41 @@ function AgendaPage() {
       !confirm(`Liberar este horário? O cliente ${a.paciente_nome} será removido, mas a ficha continuará disponível.`)
     )
       return;
-    const { error } = await supabase
+    // Existe um índice único parcial (uq_agend_slot_vazio) que impede dois slots
+    // livres no mesmo (clínica, médico, agenda, início). Se já houver um slot
+    // livre neste horário, apagamos esta linha (o horário já está disponível
+    // pelo outro registro). Caso contrário, liberamos esta linha normalmente.
+    const { data: livreExistente } = await supabase
       .from("agendamentos")
-      .update({
-        paciente_id: null,
-        paciente_nome: "DISPONÍVEL",
-        procedimento: null,
-        observacoes: null,
-        status: "agendado",
-        data_pagamento: null,
-        orcamento_id: null,
-      } as never)
-      .eq("id", a.id);
-    if (error) mostrarErro(error);
+      .select("id")
+      .eq("clinica_id", a.clinica_id)
+      .eq("medico_id", a.medico_id as never)
+      .eq("agenda_id", a.agenda_id as never)
+      .eq("inicio", a.inicio)
+      .is("paciente_id", null)
+      .eq("status", "agendado")
+      .neq("id", a.id)
+      .maybeSingle();
+    let error: unknown = null;
+    if (livreExistente) {
+      const res = await supabase.from("agendamentos").delete().eq("id", a.id);
+      error = res.error;
+    } else {
+      const res = await supabase
+        .from("agendamentos")
+        .update({
+          paciente_id: null,
+          paciente_nome: "DISPONÍVEL",
+          procedimento: null,
+          observacoes: null,
+          status: "agendado",
+          data_pagamento: null,
+          orcamento_id: null,
+        } as never)
+        .eq("id", a.id);
+      error = res.error;
+    }
+    if (error) mostrarErro(error as never);
     else {
       toast.success("Horário liberado.");
       await load();
