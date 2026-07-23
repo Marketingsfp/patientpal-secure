@@ -1458,6 +1458,7 @@ function AgendaPage() {
     data_nascimento: string;
     telefone: string;
     email: string;
+    cep: string;
     logradouro: string;
     numero: string;
     bairro: string;
@@ -1469,6 +1470,7 @@ function AgendaPage() {
     data_nascimento: "",
     telefone: "",
     email: "",
+    cep: "",
     logradouro: "",
     numero: "",
     bairro: "",
@@ -1484,6 +1486,7 @@ function AgendaPage() {
         data_nascimento: pacInfo.data_nascimento ?? "",
         telefone: pacInfo.telefone ?? "",
         email: pacInfo.email ?? "",
+        cep: pacInfo.cep ?? "",
         logradouro: pacInfo.logradouro ?? "",
         numero: pacInfo.numero ?? "",
         bairro: pacInfo.bairro ?? "",
@@ -1502,6 +1505,7 @@ function AgendaPage() {
       data_nascimento: pacInfo.data_nascimento ?? "",
       telefone: pacInfo.telefone ?? "",
       email: pacInfo.email ?? "",
+      cep: pacInfo.cep ?? "",
       logradouro: pacInfo.logradouro ?? "",
       numero: pacInfo.numero ?? "",
       bairro: pacInfo.bairro ?? "",
@@ -1521,6 +1525,7 @@ function AgendaPage() {
         data_nascimento: pacEdit.data_nascimento.trim() || null,
         telefone: pacEdit.telefone.trim() || null,
         email: pacEdit.email.trim() || null,
+        cep: pacEdit.cep.replace(/\D/g, "").slice(0, 8) || null,
         logradouro: pacEdit.logradouro.trim() || null,
         numero: pacEdit.numero.trim() || null,
         bairro: pacEdit.bairro.trim() || null,
