@@ -1152,6 +1152,17 @@ function AgendaPage() {
   // IDs dos itens do orçamento que serão consumidos pelo agendamento atual
   // (fluxo de 1 grupo). Gravados em `agendamento_orcamento_itens` após o save.
   const [pendingOrcItemIds, setPendingOrcItemIds] = useState<string[]>([]);
+  // Dialog de seleção de itens (Odontologia: usuário escolhe quais itens
+  // do orçamento entram neste agendamento; o restante fica disponível).
+  const [selecItensOpen, setSelecItensOpen] = useState(false);
+  const [selecItensCtx, setSelecItensCtx] = useState<{
+    orcamento: { id: string; numero: number; paciente_id: string | null; paciente_nome: string | null };
+    itensRestantes: SelectItemOrc[];
+    totalItens: number;
+    // Metadados para consumar o vínculo depois que o usuário confirmar
+    itensRaw: { id: string; descricao: string; procedimento_id: string | null }[];
+    todosLab: boolean;
+  } | null>(null);
   // Modo Turbo: sheet "Completar cadastro" acionado pela PacienteResumoBar
   const [quickCompleteOpen, setQuickCompleteOpen] = useState(false);
   // Informações do contrato ativo de cartão benefícios do paciente selecionado no modal.
