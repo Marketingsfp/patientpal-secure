@@ -1453,6 +1453,90 @@ function AgendaPage() {
   const [editarPacienteData, setEditarPacienteData] = useState<PacienteFull | null>(null);
   const [editarPacienteLoading, setEditarPacienteLoading] = useState(false);
   const podeEditarCliente = usePodeEscrever("clientes");
+  type PacInfoEdit = {
+    cpf: string;
+    data_nascimento: string;
+    telefone: string;
+    email: string;
+    logradouro: string;
+    numero: string;
+    bairro: string;
+    cidade: string;
+    estado: string;
+  };
+  const emptyPacEdit: PacInfoEdit = {
+    cpf: "",
+    data_nascimento: "",
+    telefone: "",
+    email: "",
+    logradouro: "",
+    numero: "",
+    bairro: "",
+    cidade: "",
+    estado: "",
+  };
+  const [pacEdit, setPacEdit] = useState<PacInfoEdit>(emptyPacEdit);
+  const [pacEditSaving, setPacEditSaving] = useState(false);
+  useEffect(() => {
+    if (pacInfo) {
+      setPacEdit({
+        cpf: pacInfo.cpf ?? "",
+        data_nascimento: pacInfo.data_nascimento ?? "",
+        telefone: pacInfo.telefone ?? "",
+        email: pacInfo.email ?? "",
+        logradouro: pacInfo.logradouro ?? "",
+        numero: pacInfo.numero ?? "",
+        bairro: pacInfo.bairro ?? "",
+        cidade: pacInfo.cidade ?? "",
+        estado: pacInfo.estado ?? "",
+      });
+    } else {
+      setPacEdit(emptyPacEdit);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pacInfo]);
+  const pacEditDirty = useMemo(() => {
+    if (!pacInfo) return false;
+    const orig: PacInfoEdit = {
+      cpf: pacInfo.cpf ?? "",
+      data_nascimento: pacInfo.data_nascimento ?? "",
+      telefone: pacInfo.telefone ?? "",
+      email: pacInfo.email ?? "",
+      logradouro: pacInfo.logradouro ?? "",
+      numero: pacInfo.numero ?? "",
+      bairro: pacInfo.bairro ?? "",
+      cidade: pacInfo.cidade ?? "",
+      estado: pacInfo.estado ?? "",
+    };
+    return (Object.keys(orig) as (keyof PacInfoEdit)[]).some(
+      (k) => (pacEdit[k] ?? "").trim() !== (orig[k] ?? "").trim(),
+    );
+  }, [pacInfo, pacEdit]);
+  const salvarPacEditRapido = async () => {
+    if (!pacInfo?.id || !pacEditDirty) return;
+    setPacEditSaving(true);
+    try {
+      const patch = {
+        cpf: pacEdit.cpf.trim() || null,
+        data_nascimento: pacEdit.data_nascimento.trim() || null,
+        telefone: pacEdit.telefone.trim() || null,
+        email: pacEdit.email.trim() || null,
+        logradouro: pacEdit.logradouro.trim() || null,
+        numero: pacEdit.numero.trim() || null,
+        bairro: pacEdit.bairro.trim() || null,
+        cidade: pacEdit.cidade.trim() || null,
+        estado: pacEdit.estado.trim().toUpperCase().slice(0, 2) || null,
+      } as const;
+      const { error } = await supabase.from("pacientes").update(patch).eq("id", pacInfo.id);
+      if (error) throw error;
+      setPacInfo({ ...pacInfo, ...patch });
+      toast.success("Dados atualizados.");
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setPacEditSaving(false);
+    }
+  };
   const abrirEditarPacienteInline = async (pacienteId: string) => {
     setEditarPacienteLoading(true);
     setEditarPacienteOpen(true);
@@ -8025,43 +8109,120 @@ function AgendaPage() {
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t">
-                <div>
-                  <span className="text-muted-foreground">CPF: </span>
-                  {pacInfo.cpf || "—"}
+              <fieldset
+                disabled={!podeEditarCliente || pacEditSaving}
+                className="grid grid-cols-2 gap-x-3 gap-y-2 pt-2 border-t disabled:opacity-70"
+              >
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">CPF</Label>
+                  <Input
+                    value={pacEdit.cpf}
+                    onChange={(e) => setPacEdit((s) => ({ ...s, cpf: e.target.value }))}
+                    className="h-8"
+                  />
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Nasc.: </span>
-                  {pacInfo.data_nascimento
-                    ? new Date(pacInfo.data_nascimento + "T00:00:00").toLocaleDateString("pt-BR")
-                    : "—"}
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Nascimento</Label>
+                  <Input
+                    type="date"
+                    value={pacEdit.data_nascimento}
+                    onChange={(e) => setPacEdit((s) => ({ ...s, data_nascimento: e.target.value }))}
+                    className="h-8"
+                  />
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Telefone: </span>
-                  {pacInfo.telefone || "—"}
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Telefone</Label>
+                  <Input
+                    value={pacEdit.telefone}
+                    onChange={(e) => setPacEdit((s) => ({ ...s, telefone: e.target.value }))}
+                    className="h-8"
+                  />
                 </div>
-                <div className="truncate">
-                  <span className="text-muted-foreground">Email: </span>
-                  {pacInfo.email || "—"}
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Email</Label>
+                  <Input
+                    type="email"
+                    value={pacEdit.email}
+                    onChange={(e) => setPacEdit((s) => ({ ...s, email: e.target.value }))}
+                    className="h-8"
+                  />
                 </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Endereço: </span>
-                  {[pacInfo.logradouro, pacInfo.numero, pacInfo.bairro, pacInfo.cidade, pacInfo.estado]
-                    .filter(Boolean)
-                    .join(", ") || "—"}
+                <div className="col-span-2 pt-1 text-xs font-medium text-muted-foreground">
+                  Endereço
                 </div>
-              </div>
+                <div className="col-span-2 grid grid-cols-[1fr_90px] gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Logradouro</Label>
+                    <Input
+                      value={pacEdit.logradouro}
+                      onChange={(e) => setPacEdit((s) => ({ ...s, logradouro: e.target.value }))}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Nº</Label>
+                    <Input
+                      value={pacEdit.numero}
+                      onChange={(e) => setPacEdit((s) => ({ ...s, numero: e.target.value }))}
+                      className="h-8"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Bairro</Label>
+                  <Input
+                    value={pacEdit.bairro}
+                    onChange={(e) => setPacEdit((s) => ({ ...s, bairro: e.target.value }))}
+                    className="h-8"
+                  />
+                </div>
+                <div className="grid grid-cols-[1fr_60px] gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Cidade</Label>
+                    <Input
+                      value={pacEdit.cidade}
+                      onChange={(e) => setPacEdit((s) => ({ ...s, cidade: e.target.value }))}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">UF</Label>
+                    <Input
+                      value={pacEdit.estado}
+                      maxLength={2}
+                      onChange={(e) =>
+                        setPacEdit((s) => ({ ...s, estado: e.target.value.toUpperCase() }))
+                      }
+                      className="h-8"
+                    />
+                  </div>
+                </div>
+              </fieldset>
               {pacInfo.id && (
-                <div className="pt-2">
+                <div className="pt-3 flex flex-wrap items-center justify-between gap-2 border-t">
                   <Button
                     size="sm"
+                    variant="outline"
                     onClick={() => {
                       void abrirEditarPacienteInline(pacInfo.id);
                     }}
+                    title="Abrir cadastro completo (responsável, convênio, biometria…)"
                   >
-                    Editar
+                    Editar cadastro completo
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => void salvarPacEditRapido()}
+                    disabled={!podeEditarCliente || !pacEditDirty || pacEditSaving}
+                  >
+                    {pacEditSaving ? "Salvando…" : "Salvar alterações"}
                   </Button>
                 </div>
+              )}
+              {!podeEditarCliente && (
+                <p className="text-xs text-muted-foreground">
+                  Você tem acesso somente leitura no módulo Clientes.
+                </p>
               )}
             </div>
           ) : null}
