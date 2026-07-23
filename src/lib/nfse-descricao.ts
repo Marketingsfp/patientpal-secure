@@ -6,7 +6,7 @@
  *
  * Chamado por todos os pontos de emissão (Agenda, Financeiro › Atendimentos,
  * Financeiro › Notas). Se o `dependenteAtendido` estiver preenchido no
- * tomador, o call site adiciona o sufixo "— Atendido: X" após montar a base.
+ * tomador, o call site adiciona o sufixo "— Dependente do pagador: X" após montar a base.
  */
 export interface DiscriminacaoInput {
   procedimento?: string | null;

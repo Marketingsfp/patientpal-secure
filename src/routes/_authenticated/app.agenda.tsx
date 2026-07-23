@@ -4677,7 +4677,7 @@ function AgendaPage() {
       }
       const parcial = aplicarValorParcial(Number(valor) || 0, tomador);
       const descBase = a.procedimento || "Serviços prestados";
-      const descComDep = tomador.dependenteAtendido ? `${descBase} — Atendido: ${tomador.dependenteAtendido}` : descBase;
+      const descComDep = tomador.dependenteAtendido ? `${descBase} — Dependente do pagador: ${tomador.dependenteAtendido}` : descBase;
       const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
       const descFinal = await pedirDescricaoNfse(descSugerida);
       if (!descFinal) { toast.error("Emissão cancelada."); return; }
@@ -4776,7 +4776,7 @@ function AgendaPage() {
         .filter(Boolean)
         .join(" + ") || "Serviços prestados";
       const descBase = listaProc;
-      const descComDep = tomador.dependenteAtendido ? `${descBase} — Atendido: ${tomador.dependenteAtendido}` : descBase;
+      const descComDep = tomador.dependenteAtendido ? `${descBase} — Dependente do pagador: ${tomador.dependenteAtendido}` : descBase;
       const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
       const descFinal = await pedirDescricaoNfse(descSugerida);
       if (!descFinal) { toast.error("Emissão cancelada."); return; }
@@ -6005,7 +6005,7 @@ function AgendaPage() {
                     const parcial = aplicarValorParcial(Number(dados.valor) || 0, tomador);
                     const descBase = ag.procedimento || pagamentoDesc || "Serviços prestados";
                     const descComDep = tomador.dependenteAtendido
-                      ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
+                      ? `${descBase} — Dependente do pagador: ${tomador.dependenteAtendido}`
                       : descBase;
                     const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
                     const descFinal = await pedirDescricaoNfse(descSugerida);

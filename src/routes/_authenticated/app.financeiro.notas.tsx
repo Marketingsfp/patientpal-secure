@@ -178,7 +178,7 @@ function Page() {
             dataReferencia: n.data_emissao,
           });
       const descComDep = tomador.dependenteAtendido
-        ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
+        ? `${descBase} — Dependente do pagador: ${tomador.dependenteAtendido}`
         : descBase;
       const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
       const descFinal = await pedirDescricaoNfse(descSugerida);
