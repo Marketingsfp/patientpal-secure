@@ -3974,7 +3974,8 @@ function AgendaPage() {
             const dt = new Date(ag.inicio);
             const dia = dt.toLocaleDateString("pt-BR");
             const hora = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-            const medNome = medicoNomePorId.get(ag.medico_id ?? "") ?? "sem médico";
+            const medObj = medicos.find((m) => m.id === ag.medico_id);
+            const medNome = medObj?.nome ?? "sem médico";
             const ficha = ag.ficha_numero != null ? `nº ${ag.ficha_numero}` : "s/ ficha";
             const serv = ag.procedimento ?? "serviço";
             return `• ${serv} — Dr(a). ${medNome} em ${dia} às ${hora} (ficha ${ficha})`;
