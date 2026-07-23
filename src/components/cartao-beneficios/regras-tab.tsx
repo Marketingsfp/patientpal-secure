@@ -1300,7 +1300,7 @@ function NovaRegraDialog({
               {r.modo === "valor_fixo" ? (
                 <CurrencyInput
                   value={r.valor_cartao != null ? Number(r.valor_cartao).toFixed(2) : ""}
-                  onChange={(v) => upd({ valor_cartao: v ? parseFloat(v) : 0 })}
+                  onChange={(v) => { setValorCartaoTocado(true); upd({ valor_cartao: v ? parseFloat(v) : 0 }); }}
                 />
               ) : (
                 <Input
@@ -1312,6 +1312,16 @@ function NovaRegraDialog({
               <p className="text-[11px] text-muted-foreground">
                 Usado quando o pagamento é em PIX, débito ou crédito.
               </p>
+              {r.procedimento_id && regraBase && r.modo === "valor_fixo" && (
+                <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                  Regra do convênio para <b>{regraBase.especialidade_nome}</b>:{" "}
+                  R$ {(regraBase.valor ?? 0).toFixed(2)} dinheiro
+                  {regraBase.valor_cartao != null && (
+                    <> / R$ {regraBase.valor_cartao.toFixed(2)} cartão·PIX</>
+                  )}
+                  . Esta regra por serviço <b>substitui</b> esses valores.
+                </p>
+              )}
             </div>
           </div>
 
