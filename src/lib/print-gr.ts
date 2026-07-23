@@ -155,6 +155,58 @@ async function resolveConvLabel(
   return "CONVÊNIO";
 }
 
+/**
+ * Verifica se o paciente tem contrato ativo do cartão de benefícios/convênio
+ * na clínica atual — como titular ou dependente — independente do
+ * `tipo_atendimento` do agendamento. Usado para imprimir na GR o plano/
+ * vínculo mesmo quando o pagamento foi feito no particular.
+ */
+async function resolveVinculoConvenio(
+  pacienteId: string | null | undefined,
+  clinicaId: string,
+): Promise<{ convenioNome: string; vinculo: "titular" | "dependente"; titularNome?: string } | null> {
+  if (!pacienteId) return null;
+  try {
+    const { data: titular } = await supabase
+      .from("contratos_assinatura")
+      .select("id, cb_convenios(nome)")
+      .eq("clinica_id", clinicaId)
+      .eq("status", "ativo")
+      .eq("paciente_id", pacienteId)
+      .limit(1);
+    const t0 = ((titular ?? []) as any[])[0];
+    const nomeT = t0?.cb_convenios?.nome;
+    if (nomeT) return { convenioNome: String(nomeT).toUpperCase(), vinculo: "titular" };
+
+    const { data: deps } = await supabase
+      .from("contrato_dependentes")
+      .select("contratos_assinatura!inner(id,clinica_id,status,paciente_nome,cb_convenios(nome))")
+      .eq("paciente_id", pacienteId)
+      .eq("ativo", true)
+      .limit(5);
+    const cand = ((deps ?? []) as any[])
+      .map((d) => d.contratos_assinatura)
+      .find((c: any) => c && c.clinica_id === clinicaId && c.status === "ativo");
+    const nomeD = cand?.cb_convenios?.nome;
+    if (nomeD) {
+      return {
+        convenioNome: String(nomeD).toUpperCase(),
+        vinculo: "dependente",
+        titularNome: cand?.paciente_nome ? String(cand.paciente_nome).toUpperCase() : undefined,
+      };
+    }
+  } catch { /* ignora e retorna null */ }
+  return null;
+}
+
+function renderLinhaVinculo(v: { convenioNome: string; vinculo: "titular" | "dependente"; titularNome?: string } | null): string {
+  if (!v) return "";
+  const suf = v.vinculo === "titular"
+    ? "(TITULAR)"
+    : v.titularNome ? `(DEPENDENTE DE ${esc(v.titularNome)})` : "(DEPENDENTE)";
+  return `<div class="center sm">PLANO: <span class="v">${esc(v.convenioNome)}</span> ${suf}</div>`;
+}
+
 // Duplica o HTML de um ou mais tickets para emitir N vias com quebra de
 // página entre elas e um rótulo identificando a via.
 function multiplicarVias(ticketsHtml: string, nVias: number): string {
@@ -189,30 +241,58 @@ const BASE_CSS = `
   @page { size: 80mm auto; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+  /* Zera espaço extra que o Chrome/driver da térmica reserva no fim da
+     página. Sem isso a bobina saía com ~8–10 cm em branco após a linha
+     "DATA IMPRESSÃO", só desperdiçando papel antes do corte. */
+  html, body { height: auto; }
   body {
-    font-family: "Courier New", "Consolas", monospace;
-    font-size: 11pt;
-    line-height: 1.3;
-    font-weight: 700;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.35;
+    font-weight: 500;
     word-break: break-word;
     overflow-wrap: anywhere;
+    -webkit-font-smoothing: antialiased;
   }
-  .ticket { width: 76mm; max-width: 100%; padding: 3mm 2mm 6mm; }
+  .ticket { width: 76mm; max-width: 100%; padding: 4mm 3mm 3mm; }
+  .ticket:last-child { padding-bottom: 1mm; }
   .center { text-align: center; }
   .right  { text-align: right; }
   .bold   { font-weight: 700; }
-  .sm     { font-size: 9pt; font-weight: 700; }
-  .lg     { font-size: 14pt; font-weight: 700; }
-  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
+  .sm     { font-size: 8.5pt; font-weight: 500; letter-spacing: 0.02em; }
+  .lg     {
+    font-size: 13pt;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 2px 0;
+  }
+  .sep    { border-top: 1px solid #000; margin: 7px 0; }
+  .sep.thin { border-top-width: 1px; opacity: 0.35; margin: 5px 0; }
   .row    { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; align-items: baseline; }
   .row > * { min-width: 0; }
   .row .right { justify-self: end; }
   table   { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  td      { padding: 1px 0; vertical-align: top; word-break: break-word; overflow-wrap: anywhere; }
-  .label  { color: #000; font-weight: 700; }
+  td      { padding: 2px 0; vertical-align: top; word-break: break-word; overflow-wrap: anywhere; }
+  .label  {
+    color: #000;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 8.5pt;
+  }
   .v      { font-weight: 700; }
   .qtd    { width: 10mm; }
   h1, h2, h3 { margin: 0; }
+  /* Cabeçalho da clínica — nome grande, endereço/contatos discretos. */
+  .clinica-nome {
+    font-size: 13pt;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 2px 0 4px;
+  }
   ${VIA_CSS}
 `;
 
@@ -236,10 +316,6 @@ function imprimirViaIframe(html: string): void {
     try { document.body.removeChild(iframe); } catch { /* noop */ }
     throw new Error("Não foi possível inicializar a impressão.");
   }
-  const doc = cw.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
   const cleanup = () => { try { document.body.removeChild(iframe); } catch { /* noop */ } };
   let jaImprimiu = false;
   const dispararPrint = () => {
@@ -252,9 +328,29 @@ function imprimirViaIframe(html: string): void {
     // Remove o iframe depois que o diálogo deve ter sido tratado.
     setTimeout(cleanup, 4000);
   };
-  iframe.onload = () => setTimeout(dispararPrint, 80);
-  // Fallback se onload não disparar (alguns navegadores com document.write).
-  setTimeout(() => { if (iframe.isConnected) dispararPrint(); }, 600);
+  // Registramos o onload ANTES de escrever o documento — alguns navegadores
+  // disparam o load de forma síncrona no doc.close(); atribuir depois perdia o
+  // evento e a impressão só saía pelo fallback (atraso perceptível). Ao carregar,
+  // esperamos as imagens (ex.: logo da clínica) para não imprimir render incompleto.
+  iframe.onload = () => {
+    const imgs = Array.from(cw.document.images ?? []);
+    const pendentes = imgs.filter((im) => !im.complete);
+    if (pendentes.length === 0) { dispararPrint(); return; }
+    let restantes = pendentes.length;
+    const done = () => { restantes -= 1; if (restantes <= 0) dispararPrint(); };
+    pendentes.forEach((im) => {
+      im.addEventListener("load", done);
+      im.addEventListener("error", done);
+    });
+    // Teto de segurança: imprime mesmo se alguma imagem travar (ex.: logo offline).
+    setTimeout(dispararPrint, 2500);
+  };
+  const doc = cw.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+  // Fallback caso o onload não dispare (navegadores com document.write).
+  setTimeout(() => { if (iframe.isConnected) dispararPrint(); }, 1200);
 }
 
 export async function printGuiaAtendimento(input: PrintGRInput) {
@@ -511,27 +607,33 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const procNomeBase = (a.procedimento || procData?.nome || "CONSULTA").toUpperCase();
   const procNome = formatServicoLinha(procNomeBase, espNome);
 
-  // Ficha = POSIÇÃO da linha na fila geral da CLÍNICA no dia (mesma regra da
-  // lista da agenda — app.agenda.tsx > fichaPorId): conta TODOS os agendamentos
-  // da clínica no dia, de TODOS os profissionais, na ordem do horário, como uma
-  // senha única (não particiona por médico nem por agenda). O chamador (a
-  // agenda) passa o número já calculado em `fichaNumero` — assim a guia bate
-  // EXATAMENTE com a lista. Sem ele, recalcula aqui como fallback.
+  // Ficha = POSIÇÃO da linha na fila do PROFISSIONAL no dia (mesma regra da
+  // lista da agenda — app.agenda.tsx > fichaPorId): cada médico/agenda tem sua
+  // própria sequência 001, 002, 003… dentro do dia. O chamador (a agenda) passa
+  // o número já calculado em `fichaNumero` — assim a guia bate EXATAMENTE com a
+  // lista. Sem ele, recalcula aqui como fallback particionando por (dia,
+  // profissional, agenda).
   const inicioDt = new Date(a.inicio);
   const diaIni = new Date(inicioDt); diaIni.setHours(0, 0, 0, 0);
   const diaFim = new Date(inicioDt); diaFim.setHours(23, 59, 59, 999);
   let fichaNum = typeof fichaNumero === "number" && fichaNumero > 0 ? fichaNumero : 0;
   if (fichaNum === 0) {
     try {
-      const { data: lista } = await supabase
+      const q = supabase
         .from("agendamentos")
-        .select("id, inicio")
+        .select("id, inicio, paciente_nome, medico_id, agenda_id")
         .eq("clinica_id", clinicaId)
         .gte("inicio", diaIni.toISOString())
-        .lte("inicio", diaFim.toISOString())
-        .order("inicio", { ascending: true })
-        .order("id", { ascending: true });
-      const idx = (lista ?? []).findIndex((r: any) => r.id === a.id);
+        .lte("inicio", diaFim.toISOString());
+      if (a.medico_id) q.eq("medico_id", a.medico_id); else q.is("medico_id", null);
+      if (a.agenda_id) q.eq("agenda_id", a.agenda_id); else q.is("agenda_id", null);
+      const { data: lista } = await q;
+      const ordenados = [...(lista ?? [])].sort((x: any, y: any) => {
+        const t = String(x.inicio).localeCompare(String(y.inicio));
+        if (t !== 0) return t;
+        return String(x.paciente_nome ?? "").localeCompare(String(y.paciente_nome ?? ""), "pt-BR", { sensitivity: "base" });
+      });
+      const idx = ordenados.findIndex((r: any) => r.id === a.id);
       fichaNum = idx >= 0 ? idx + 1 : 0;
     } catch { fichaNum = 0; }
   }
@@ -656,10 +758,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     a.paciente_id ?? null,
     clinicaId,
   );
+  const vinculoConv = await resolveVinculoConvenio(a.paciente_id ?? null, clinicaId);
 
   const ticketHtml = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -674,6 +777,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
     ${convLabel ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabel)}</span></div>` : ""}
+    ${renderLinhaVinculo(vinculoConv)}
 
     <div class="sep"></div>
 
@@ -725,7 +829,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
     <div class="sep"></div>
     <div class="row sm">
-      <div>DATA IMPRESSAO</div>
+      <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
   </div>`;
@@ -1001,23 +1105,29 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     grupos.set(key, g);
   }
 
-  // Calcula a ficha (posição na fila geral da clínica no dia) para cada grupo —
-  // mesma regra de app.agenda.tsx > fichaPorId e da GR individual: senha única
-  // por dia/clínica, sem particionar por médico nem por agenda.
+  // Calcula a ficha (posição na fila do PROFISSIONAL no dia) para cada grupo —
+  // mesma regra de app.agenda.tsx > fichaPorId e da GR individual: cada
+  // (dia, profissional, agenda) tem sua própria sequência 001, 002, 003…
   const fichaByGrupo = new Map<string, number>();
   await Promise.all(Array.from(grupos.entries()).map(async ([key, g]) => {
     try {
       const dt = new Date(g.inicioRef);
       const ini = new Date(dt); ini.setHours(0,0,0,0);
       const fim = new Date(dt); fim.setHours(23,59,59,999);
-      const { data } = await supabase.from("agendamentos")
-        .select("id, inicio")
+      const q = supabase.from("agendamentos")
+        .select("id, inicio, paciente_nome, medico_id, agenda_id")
         .eq("clinica_id", clinicaId)
         .gte("inicio", ini.toISOString())
-        .lte("inicio", fim.toISOString())
-        .order("inicio", { ascending: true })
-        .order("id", { ascending: true });
-      const idx = (data ?? []).findIndex((r: any) => r.id === g.agIdRef);
+        .lte("inicio", fim.toISOString());
+      if (g.medicoId) q.eq("medico_id", g.medicoId); else q.is("medico_id", null);
+      if (g.agendaId) q.eq("agenda_id", g.agendaId); else q.is("agenda_id", null);
+      const { data } = await q;
+      const ordenados = [...(data ?? [])].sort((x: any, y: any) => {
+        const t = String(x.inicio).localeCompare(String(y.inicio));
+        if (t !== 0) return t;
+        return String(x.paciente_nome ?? "").localeCompare(String(y.paciente_nome ?? ""), "pt-BR", { sensitivity: "base" });
+      });
+      const idx = ordenados.findIndex((r: any) => r.id === g.agIdRef);
       fichaByGrupo.set(key, idx >= 0 ? idx + 1 : 0);
     } catch { fichaByGrupo.set(key, 0); }
   }));
@@ -1045,10 +1155,11 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     pacIdRef ?? null,
     clinicaId,
   );
+  const vinculoConvAgrupada = await resolveVinculoConvenio(pacIdRef ?? null, clinicaId);
 
   // Cabeçalho da clínica (reutilizado em cada GR)
   const headerClinica = `
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1060,6 +1171,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
     ${convLabelAgrupada ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabelAgrupada)}</span></div>` : ""}
+    ${renderLinhaVinculo(vinculoConvAgrupada)}
   `;
 
   const gruposArr = Array.from(grupos.values());
@@ -1128,7 +1240,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         ` : ""}
         <div class="sep"></div>
         <div class="row sm">
-          <div>DATA IMPRESSAO</div>
+          <div>DATA</div>
           <div>${dataImpressao}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
         </div>
       </div>
@@ -1282,7 +1394,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
 
   const ticketHtml = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1338,7 +1450,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
 
     <div class="sep"></div>
     <div class="row sm">
-      <div>DATA IMPRESSÃO</div>
+      <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
   </div>`;
@@ -1477,7 +1589,7 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
 
   const ticketHtml = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1532,7 +1644,7 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
 
     <div class="sep"></div>
     <div class="row sm">
-      <div>DATA IMPRESSÃO</div>
+      <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
   </div>`;
@@ -1672,7 +1784,7 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
   const viaTextoMens = `IMPRESSÃO Nº ${viaNumeroMens}`;
   const ticketMens = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1728,7 +1840,7 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
 
     <div class="sep"></div>
     <div class="row sm">
-      <div>DATA IMPRESSÃO</div>
+      <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumeroMens >= 2 ? ` — ${viaTextoMens}` : ""}</div>
     </div>
   </div>`;
@@ -1740,7 +1852,7 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
   const viaTextoTaxa = `IMPRESSÃO Nº ${viaNumeroTaxa}`;
   const ticketTaxa = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     <div class="center sm">${endereco}</div>
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -1795,7 +1907,7 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
 
     <div class="sep"></div>
     <div class="row sm">
-      <div>DATA IMPRESSÃO</div>
+      <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumeroTaxa >= 2 ? ` — ${viaTextoTaxa}` : ""}</div>
     </div>
   </div>`;

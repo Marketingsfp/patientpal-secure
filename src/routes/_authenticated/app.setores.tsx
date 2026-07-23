@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Button } from "@/components/ui/button";
@@ -25,27 +26,31 @@ interface Setor { id: string; nome: string; descricao: string | null; ativo: boo
 function SetoresPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("setores");
-  const [rows, setRows] = useState<Setor[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Setor | null>(null);
   const [form, setForm] = useState({ nome: "", descricao: "", ativo: true });
   const [saving, setSaving] = useState(false);
 
-  async function load() {
-    if (!clinicaAtual) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("setores")
-      .select("id,nome,descricao,ativo")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("nome");
-    if (error) mostrarErro(error);
-    else setRows((data ?? []) as Setor[]);
-    setLoading(false);
-  }
-  useEffect(() => { void load(); }, [clinicaAtual?.clinica_id]);
+  const clinicaId = clinicaAtual?.clinica_id;
+  // Catálogo de baixo risco (raramente muda) — cache de 5min via React Query.
+  const { data: rows = [], isLoading: loading, error } = useQuery({
+    queryKey: ["setores", clinicaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("setores")
+        .select("id,nome,descricao,ativo")
+        .eq("clinica_id", clinicaId!)
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Setor[];
+    },
+    enabled: !!clinicaId,
+    staleTime: 5 * 60_000,
+  });
+  useEffect(() => { if (error) mostrarErro(error); }, [error]);
+  const load = () => queryClient.invalidateQueries({ queryKey: ["setores", clinicaId] });
 
   function openNew() { setEditing(null); setForm({ nome: "", descricao: "", ativo: true }); setOpen(true); }
   function openEdit(s: Setor) { setEditing(s); setForm({ nome: s.nome, descricao: s.descricao ?? "", ativo: s.ativo }); setOpen(true); }

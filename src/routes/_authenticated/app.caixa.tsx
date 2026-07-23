@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
-  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight, Undo2, Printer, CalendarIcon, X, Search,
+  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, Undo2, Printer, CalendarIcon, X, Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -35,6 +34,7 @@ import { cn } from "@/lib/utils";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
 import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
@@ -89,9 +89,11 @@ function bucketDeMov(m: { tipo: string; forma_pagamento: string | null }): Forma
 function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaBucket, number>> {
   const out: Partial<Record<FormaBucket, number>> = {};
   if (!obs) return out;
-  const idx = obs.indexOf("Pagamento misto:");
-  if (idx < 0) return out;
-  const trecho = obs.slice(idx + "Pagamento misto:".length).split(" | ")[0];
+  const marker = obs.match(/pagamento\s+misto\s*:/i);
+  if (!marker || marker.index == null) return out;
+  const trecho = obs
+    .slice(marker.index + marker[0].length)
+    .split(/\s+\|\s+/)[0];
   const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
   const LABEL_TO_KEY: Array<[RegExp, FormaBucket]> = [
     [/^cart[ãa]o\s*cr[ée]dito/i, "credito"],
@@ -104,11 +106,12 @@ function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaB
     [/^conv[êe]nio/i, "convenio"],
     [/^transfer[êe]ncia/i, "transferencia"],
   ];
-  const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
+  const parseBRL = (s: string) =>
+    Number(s.replace(/[.\s\u00a0]/g, "").replace(",", ".")) || 0;
   for (const p of partes) {
     const match = LABEL_TO_KEY.find(([re]) => re.test(p));
     if (!match) continue;
-    const valMatch = p.match(/R\$\s*([\d.]+,\d{2})/);
+    const valMatch = p.match(/R\$[\s\u00a0]*([\d.\s\u00a0]+,\d{2})/i);
     if (!valMatch) continue;
     const v = parseBRL(valMatch[1]);
     out[match[1]] = (out[match[1]] ?? 0) + v;
@@ -120,7 +123,7 @@ function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaB
  * Rótulo bonito para exibir a forma de pagamento em tabelas. Para
  * `misto`, converte as parcelas decompostas em algo como
  * "Dinheiro R$ 60,00 · PIX R$ 100,00". Sem observações do lançamento
- * ainda em cache, retorna "Misto (dividido)".
+ * ainda em cache, retorna um aviso temporário sem usar o rótulo misto.
  */
 const FORMA_LABEL: Record<FormaBucket, string> = {
   dinheiro: "Dinheiro", pix: "PIX", debito: "Cartão débito", credito: "Cartão crédito",
@@ -136,7 +139,7 @@ function formatarFormaPagamento(
   const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
   const partes = obs ? decomporMistoObs(obs) : {};
   const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0);
-  if (entradas.length === 0) return "Misto (dividido)";
+  if (entradas.length === 0) return "Aguardando formas";
   return entradas
     .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k} ${(v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`)
     .join(" · ");
@@ -487,6 +490,180 @@ function Page() {
   type LinhaPag = { forma: string; valor: string; bandeira: string; parcelas: string };
   const linhaVazia = (): LinhaPag => ({ forma: "dinheiro", valor: "0", bandeira: "", parcelas: "1" });
   const [cobrancaLinhas, setCobrancaLinhas] = useState<LinhaPag[]>([linhaVazia()]);
+
+  // Edição inline da "Forma" nas tabelas de Movimentos. Só liberada para
+  // quem tem permissão de escrita no módulo caixa e apenas para movimentos
+  // simples (não-mistos), em tipos que fazem sentido (recebimento, despesa,
+  // estorno). Atualiza tanto `caixa_movimentos.forma_pagamento` quanto o
+  // `fin_lancamentos.forma_pagamento` associado (quando existir), para que
+  // relatórios financeiros e resumos por moeda fiquem coerentes.
+  const FORMAS_EDITAVEIS: Array<{ value: string; label: string }> = [
+    { value: "dinheiro", label: "Dinheiro" },
+    { value: "pix", label: "PIX" },
+    { value: "cartao_debito", label: "Cartão débito" },
+    { value: "cartao_credito", label: "Cartão crédito" },
+    { value: "boleto", label: "Boleto" },
+    { value: "transferencia", label: "Transferência" },
+    { value: "convenio", label: "Convênio" },
+  ];
+  const TIPOS_FORMA_EDITAVEL = new Set<MovTipo>(["recebimento", "despesa", "estorno"]);
+  const [salvandoFormaId, setSalvandoFormaId] = useState<string | null>(null);
+
+  // Diálogo de detalhes do cartão (crédito/débito) na edição inline da Forma.
+  type CartaoDetalhes = {
+    bandeira: string;
+    parcelas: string;
+    data: string;
+    autorizacao: string;
+    valorLiquido: string;
+  };
+  const [cartaoEditFor, setCartaoEditFor] = useState<{ mov: Mov; forma: "cartao_credito" | "cartao_debito" } | null>(null);
+  const [cartaoEdit, setCartaoEdit] = useState<CartaoDetalhes>({
+    bandeira: "", parcelas: "1", data: "", autorizacao: "", valorLiquido: "",
+  });
+  const [salvandoCartao, setSalvandoCartao] = useState(false);
+
+  async function alterarFormaMov(m: Mov, nova: string) {
+    if (!m || !nova || nova === (m.forma_pagamento ?? "")) return;
+    // Cartão exige coleta de dados adicionais → abre o diálogo em vez de gravar direto.
+    if (nova === "cartao_credito" || nova === "cartao_debito") {
+      // Pré-carrega valores existentes do lançamento (se houver) para permitir edição.
+      let prefill: Partial<CartaoDetalhes> = {};
+      if (m.lancamento_id) {
+        const { data } = await supabase
+          .from("fin_lancamentos")
+          .select("bandeira_cartao, parcelas, data_cartao, autorizacao_cartao, valor_liquido_cartao, valor")
+          .eq("id", m.lancamento_id)
+          .maybeSingle();
+        const row = (data ?? null) as
+          | { bandeira_cartao: string | null; parcelas: number | null; data_cartao: string | null; autorizacao_cartao: string | null; valor_liquido_cartao: number | null; valor: number | null }
+          | null;
+        if (row) {
+          prefill = {
+            bandeira: row.bandeira_cartao ?? "",
+            parcelas: String(row.parcelas ?? 1),
+            data: row.data_cartao ?? "",
+            autorizacao: row.autorizacao_cartao ?? "",
+            valorLiquido: row.valor_liquido_cartao != null ? String(row.valor_liquido_cartao) : String(row.valor ?? m.valor ?? ""),
+          };
+        }
+      }
+      setCartaoEdit({
+        bandeira: prefill.bandeira ?? "",
+        parcelas: prefill.parcelas ?? "1",
+        data: prefill.data ?? new Date().toISOString().slice(0, 10),
+        autorizacao: prefill.autorizacao ?? "",
+        valorLiquido: prefill.valorLiquido ?? String(m.valor ?? ""),
+      });
+      setCartaoEditFor({ mov: m, forma: nova });
+      return;
+    }
+    setSalvandoFormaId(m.id);
+    try {
+      const { error: eMov } = await supabase
+        .from("caixa_movimentos")
+        .update({ forma_pagamento: nova })
+        .eq("id", m.id);
+      if (eMov) throw eMov;
+      if (m.lancamento_id) {
+        const { error: eLanc } = await supabase
+          .from("fin_lancamentos")
+          .update({ forma_pagamento: nova })
+          .eq("id", m.lancamento_id);
+        if (eLanc) throw eLanc;
+      }
+      const patchLista = (lista: Mov[]) =>
+        lista.map((x) => (x.id === m.id ? { ...x, forma_pagamento: nova } : x));
+      setMinhasMovs((prev) => patchLista(prev));
+      setMinhasMovsHist((prev) => patchLista(prev));
+      setTodosMovs((prev) => patchLista(prev));
+      setDetalheMovs((prev) => patchLista(prev));
+      toast.success("Forma de pagamento atualizada.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha ao atualizar";
+      toast.error(msg);
+    } finally {
+      setSalvandoFormaId(null);
+    }
+  }
+
+  async function confirmarCartaoEdit() {
+    if (!cartaoEditFor) return;
+    const { mov: m, forma: nova } = cartaoEditFor;
+    if (!cartaoEdit.bandeira) {
+      toast.error("Selecione a bandeira do cartão.");
+      return;
+    }
+    const parcelasNum = nova === "cartao_credito" ? Math.max(1, Number(cartaoEdit.parcelas) || 1) : 1;
+    const liquidoNum = cartaoEdit.valorLiquido ? Number(String(cartaoEdit.valorLiquido).replace(",", ".")) : null;
+    setSalvandoCartao(true);
+    try {
+      const { error: eMov } = await supabase
+        .from("caixa_movimentos")
+        .update({ forma_pagamento: nova })
+        .eq("id", m.id);
+      if (eMov) throw eMov;
+      if (m.lancamento_id) {
+        const patchLanc: Record<string, unknown> = {
+          forma_pagamento: nova,
+          bandeira_cartao: cartaoEdit.bandeira,
+          parcelas: parcelasNum,
+          data_cartao: cartaoEdit.data || null,
+          autorizacao_cartao: cartaoEdit.autorizacao || null,
+          valor_liquido_cartao: liquidoNum,
+        };
+        const { error: eLanc } = await supabase
+          .from("fin_lancamentos")
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .update(patchLanc as any)
+          .eq("id", m.lancamento_id);
+        if (eLanc) throw eLanc;
+      }
+      const patchLista = (lista: Mov[]) =>
+        lista.map((x) => (x.id === m.id ? { ...x, forma_pagamento: nova } : x));
+      setMinhasMovs((prev) => patchLista(prev));
+      setMinhasMovsHist((prev) => patchLista(prev));
+      setTodosMovs((prev) => patchLista(prev));
+      setDetalheMovs((prev) => patchLista(prev));
+      toast.success("Forma de pagamento atualizada.");
+      setCartaoEditFor(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Falha ao atualizar";
+      toast.error(msg);
+    } finally {
+      setSalvandoCartao(false);
+    }
+  }
+
+  function FormaCellEditavel({ m }: { m: Mov }) {
+    const bucket = normalizarForma(m.forma_pagamento);
+    const editavel =
+      podeEscrever && bucket !== "misto" && TIPOS_FORMA_EDITAVEL.has(m.tipo);
+    if (!editavel) {
+      return <span className="text-xs">{formatarFormaPagamento(m, mistoObs)}</span>;
+    }
+    const atual = (m.forma_pagamento ?? "").trim();
+    const known = FORMAS_EDITAVEIS.some((f) => f.value === atual);
+    return (
+      <Select
+        value={known ? atual : ""}
+        onValueChange={(v) => { void alterarFormaMov(m, v); }}
+        disabled={salvandoFormaId === m.id}
+      >
+        <SelectTrigger className="h-7 text-xs w-[150px]">
+          <SelectValue placeholder={atual || "Selecione"} />
+        </SelectTrigger>
+        <SelectContent>
+          {FORMAS_EDITAVEIS.map((f) => (
+            <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+          ))}
+          {atual && !known && (
+            <SelectItem value={atual}>{atual}</SelectItem>
+          )}
+        </SelectContent>
+      </Select>
+    );
+  }
 
   // Formularios
   const [valorAbertura, setValorAbertura] = useState("0");
@@ -1803,12 +1980,35 @@ function Page() {
     for (const m of movs) {
       if (m.tipo === "abertura" || m.tipo === "fechamento" || m.tipo === "reabertura") continue;
       const bucket = normalizarForma(m.forma_pagamento) || "—";
-      const label = bucket.toUpperCase();
-      const f = formas.get(label) ?? { label, pagamento: 0, recebimento: 0 };
       const v = Number(m.valor || 0);
-      if (TIPO_SINAL[m.tipo] < 0) f.pagamento += v;
-      else if (TIPO_SINAL[m.tipo] > 0) f.recebimento += v;
-      formas.set(label, f);
+      const sinal = TIPO_SINAL[m.tipo];
+      if (sinal === 0) continue;
+      // Decompõe pagamentos mistos usando as observações do lançamento
+      // (mesma lógica exibida em tela) para que o "Resumo por tipo de moeda"
+      // some cada parte na forma real (Dinheiro, PIX, Crédito, etc.) em vez
+      // de agrupar tudo em "MISTO".
+      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+      const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+      const entradas = Object.entries(partes).filter(([, val]) => (val ?? 0) > 0) as Array<[FormaBucket, number]>;
+      const totalPartes = entradas.reduce((s, [, val]) => s + (val ?? 0), 0);
+      if (bucket === "misto" && entradas.length > 0 && totalPartes > 0) {
+        for (const [k, val] of entradas) {
+          const label = (FORMA_LABEL[k] ?? k).toUpperCase();
+          const f = formas.get(label) ?? { label, pagamento: 0, recebimento: 0 };
+          // Se o total decomposto não bater com o valor do movimento
+          // (arredondamento raro), rateia proporcionalmente.
+          const parte = totalPartes === v ? (val ?? 0) : ((val ?? 0) * v) / totalPartes;
+          if (sinal < 0) f.pagamento += parte;
+          else f.recebimento += parte;
+          formas.set(label, f);
+        }
+      } else {
+        const label = ((FORMA_LABEL[bucket as FormaBucket] ?? bucket) as string).toUpperCase();
+        const f = formas.get(label) ?? { label, pagamento: 0, recebimento: 0 };
+        if (sinal < 0) f.pagamento += v;
+        else f.recebimento += v;
+        formas.set(label, f);
+      }
     }
     let accF = 0;
     const linhasForma = Array.from(formas.values()).map((f) => {
@@ -1940,7 +2140,7 @@ function Page() {
 
         {/* ===================== MEU CAIXA ===================== */}
         <TabsContent value="meu" className="space-y-4 pt-4">
-          {loading && <p className="text-sm text-muted-foreground">Carregando…</p>}
+          {loading && <ListSkeleton rows={4} fallback={<p className="text-sm text-muted-foreground">Carregando…</p>} />}
 
           {!loading && (
             <Tabs defaultValue="saldo" className="w-full">
@@ -2283,13 +2483,35 @@ function Page() {
                               : "Sem movimentos no período"}
                           </TableCell>
                         </TableRow>
-                      ) : minhasMovsFiltrados.map((m) => {
-                        const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
-                        const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
-                        const medico = enr?.medico ?? null;
-                        const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
-                        return (
-                        <TableRow key={m.id}>
+                      ) : minhasMovsFiltrados.flatMap((m) => {
+                         const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
+                         const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
+                         const medico = enr?.medico ?? null;
+                         const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
+                         const bucket = bucketDeMov(m);
+                         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+                         const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+                         const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
+                         if (bucket === "misto" && entradas.length > 0) {
+                           return entradas.map(([k, v], idx) => (
+                             <TableRow key={`${m.id}-${k}`}>
+                               <TableCell className="whitespace-nowrap">{idx === 0 ? new Date(m.created_at).toLocaleDateString("pt-BR") : ""}</TableCell>
+                               <TableCell className="whitespace-nowrap">{idx === 0 ? new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""}</TableCell>
+                               <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
+                               <TableCell className="text-xs uppercase font-medium max-w-[220px] truncate" title={paciente ?? undefined}>{idx === 0 ? (paciente || "—") : ""}</TableCell>
+                               <TableCell className="max-w-[320px] truncate" title={m.descricao ?? undefined}>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
+                               <TableCell className="text-xs">{idx === 0 ? (servico || "—") : ""}</TableCell>
+                               <TableCell className="text-xs">{idx === 0 ? (medico || "—") : ""}</TableCell>
+                               <TableCell className="text-xs">{FORMA_LABEL[k] ?? k}</TableCell>
+                               <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
+                                 {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
+                               </TableCell>
+                               <TableCell className="text-right"></TableCell>
+                             </TableRow>
+                           ));
+                         }
+                         return [(
+                         <TableRow key={m.id}>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
                           <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
@@ -2307,7 +2529,7 @@ function Page() {
                           </TableCell>
                           <TableCell className="text-xs">{servico || "—"}</TableCell>
                           <TableCell className="text-xs">{medico || "—"}</TableCell>
-                          <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
+                          <TableCell><FormaCellEditavel m={m} /></TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                           </TableCell>
@@ -2359,8 +2581,8 @@ function Page() {
                             )}
                           </TableCell>
                         </TableRow>
-                        );
-                      })}
+                         )];
+                       })}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -2663,13 +2885,6 @@ function Page() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button asChild size="lg" className="bg-emerald-600 hover:bg-emerald-700">
-                  <Link to="/app/financeiro/atendimentos">
-                    <HandCoins className="h-4 w-4 mr-2" />
-                    Abrir tela completa de Repasse
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Link>
-                </Button>
                 <Button variant="outline" onClick={() => void loadRepasseHoje()}>
                   Atualizar resumo
                 </Button>
@@ -3336,18 +3551,38 @@ function Page() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {detalheMovs.map((m) => (
-                      <TableRow key={m.id}>
-                        <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
-                        <TableCell>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
-                        <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
-                        <TableCell>{m.descricao || "—"}</TableCell>
-                        <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
-                        <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
-                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {detalheMovs.flatMap((m) => {
+                      const bucket = bucketDeMov(m);
+                      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+                      const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+                      const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
+                      if (bucket === "misto" && entradas.length > 0) {
+                        return entradas.map(([k, v], idx) => (
+                          <TableRow key={`${m.id}-${k}`}>
+                            <TableCell className="whitespace-nowrap">{idx === 0 ? new Date(m.created_at).toLocaleDateString("pt-BR") : ""}</TableCell>
+                            <TableCell>{idx === 0 ? new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""}</TableCell>
+                            <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
+                            <TableCell>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
+                            <TableCell>{FORMA_LABEL[k] ?? k}</TableCell>
+                            <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
+                              {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
+                            </TableCell>
+                          </TableRow>
+                        ));
+                      }
+                      return [(
+                        <TableRow key={m.id}>
+                          <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
+                          <TableCell>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
+                          <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
+                          <TableCell>{m.descricao || "—"}</TableCell>
+                          <TableCell><FormaCellEditavel m={m} /></TableCell>
+                          <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
+                            {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+                          </TableCell>
+                        </TableRow>
+                      )];
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -3412,21 +3647,117 @@ function Page() {
                       if (caixaDrill === "saidas") return m.tipo === "sangria" || m.tipo === "despesa" || m.tipo === "estorno";
                       return true;
                     })
-                    .map((m) => (
-                      <TableRow key={m.id}>
-                        <TableCell className="whitespace-nowrap">{fmtDT(m.created_at)}</TableCell>
-                        <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
-                        <TableCell>{m.descricao ?? "—"}</TableCell>
-                        <TableCell className="text-xs">{formatarFormaPagamento(m, mistoObs)}</TableCell>
-                        <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
-                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    .flatMap((m) => {
+                      const bucket = bucketDeMov(m);
+                      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
+                      const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+                      const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
+                      if (bucket === "misto" && entradas.length > 0) {
+                        return entradas.map(([k, v], idx) => (
+                          <TableRow key={`${m.id}-${k}`}>
+                            <TableCell className="whitespace-nowrap">{idx === 0 ? fmtDT(m.created_at) : ""}</TableCell>
+                            <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
+                            <TableCell>{idx === 0 ? (m.descricao ?? "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
+                            <TableCell>{FORMA_LABEL[k] ?? k}</TableCell>
+                            <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
+                              {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
+                            </TableCell>
+                          </TableRow>
+                        ));
+                      }
+                      return [(
+                        <TableRow key={m.id}>
+                          <TableCell className="whitespace-nowrap">{fmtDT(m.created_at)}</TableCell>
+                          <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
+                          <TableCell>{m.descricao ?? "—"}</TableCell>
+                          <TableCell><FormaCellEditavel m={m} /></TableCell>
+                          <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
+                            {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+                          </TableCell>
+                        </TableRow>
+                      )];
+                    })}
                 </TableBody>
               </Table>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo para dados do cartão (crédito/débito) ao editar a Forma inline. */}
+      <Dialog open={!!cartaoEditFor} onOpenChange={(v) => { if (!v) setCartaoEditFor(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {cartaoEditFor?.forma === "cartao_credito" ? "Dados do cartão de crédito" : "Dados do cartão de débito"}
+            </DialogTitle>
+            <DialogDescription>
+              Informe os dados da transação no cartão. Eles ficam vinculados ao lançamento financeiro.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="grid gap-1.5">
+              <Label>Bandeira</Label>
+              <Select
+                value={cartaoEdit.bandeira}
+                onValueChange={(v) => setCartaoEdit((s) => ({ ...s, bandeira: v }))}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione a bandeira" /></SelectTrigger>
+                <SelectContent>
+                  {BANDEIRAS_CARTAO.map((b) => (
+                    <SelectItem key={b} value={b}>{b}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {cartaoEditFor?.forma === "cartao_credito" && (
+              <div className="grid gap-1.5">
+                <Label>Parcelamento</Label>
+                <Select
+                  value={cartaoEdit.parcelas}
+                  onValueChange={(v) => setCartaoEdit((s) => ({ ...s, parcelas: v }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                      <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="grid gap-1.5">
+              <Label>Data da transação</Label>
+              <Input
+                type="date"
+                value={cartaoEdit.data}
+                onChange={(e) => setCartaoEdit((s) => ({ ...s, data: e.target.value }))}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Número de autorização</Label>
+              <Input
+                value={cartaoEdit.autorizacao}
+                onChange={(e) => setCartaoEdit((s) => ({ ...s, autorizacao: e.target.value }))}
+                placeholder="Ex.: 123456"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Valor total líquido (R$)</Label>
+              <CurrencyInput
+                value={cartaoEdit.valorLiquido}
+                onChange={(v) => setCartaoEdit((s) => ({ ...s, valorLiquido: v }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCartaoEditFor(null)} disabled={salvandoCartao}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void confirmarCartaoEdit()} disabled={salvandoCartao}>
+              {salvandoCartao ? "Salvando…" : "Salvar"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

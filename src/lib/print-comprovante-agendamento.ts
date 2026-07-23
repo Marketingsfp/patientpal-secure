@@ -66,7 +66,7 @@ export async function printComprovanteAgendamento(
     a.paciente_id
       ? supabase
           .from("pacientes")
-          .select("nome, cpf, telefone, data_nascimento")
+          .select("nome, cpf, telefone, data_nascimento, codigo_prontuario")
           .eq("id", a.paciente_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -79,7 +79,13 @@ export async function printComprovanteAgendamento(
       : Promise.resolve({ data: null }),
   ]);
 
-  const paciente = pac.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null } | null;
+  const paciente = pac.data as {
+    nome: string;
+    cpf: string | null;
+    telefone: string | null;
+    data_nascimento: string | null;
+    codigo_prontuario: string | null;
+  } | null;
   const medicoBasic = med.data as { nome: string; especialidade: { nome: string } | null } | null;
   const medicoNome = medicoBasic?.nome ?? "—";
   let espNome = medicoBasic?.especialidade?.nome?.toUpperCase() ?? "";
@@ -110,25 +116,46 @@ export async function printComprovanteAgendamento(
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #fff; color: #000; }
   body {
-    font-family: "Courier New", "Consolas", monospace;
-    font-size: 11pt; line-height: 1.35; font-weight: 700;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 10.5pt; line-height: 1.35; font-weight: 500;
     word-break: break-word; overflow-wrap: anywhere;
+    -webkit-font-smoothing: antialiased;
   }
-  .ticket { width: 76mm; max-width: 100%; padding: 3mm 2mm 6mm; }
+  .ticket { width: 76mm; max-width: 100%; padding: 4mm 3mm 3mm; }
   .center { text-align: center; }
-  .sm { font-size: 9pt; }
-  .lg { font-size: 14pt; }
-  .xl { font-size: 16pt; }
-  .sep { border-top: 1px dashed #000; margin: 6px 0; }
+  .sm { font-size: 8.5pt; font-weight: 500; letter-spacing: 0.02em; }
+  .lg {
+    font-size: 13pt;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 2px 0;
+  }
+  .xl { font-size: 15pt; font-weight: 800; letter-spacing: 0.06em; }
+  .sep { border-top: 1px solid #000; margin: 7px 0; }
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   td { padding: 2px 0; vertical-align: top; word-break: break-word; overflow-wrap: anywhere; }
-  .label { text-transform: uppercase; }
+  .label {
+    color: #000;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 8.5pt;
+  }
+  .clinica-nome {
+    font-size: 13pt;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 2px 0 4px;
+  }
   ul.orient { margin: 4px 0 0 0; padding-left: 14px; }
   ul.orient li { margin-bottom: 3px; }
 </style></head>
 <body>
   <div class="ticket">
-    <div class="center lg">${esc(c?.nome ?? "")}</div>
+    <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
     ${endereco ? `<div class="center sm">${endereco}</div>` : ""}
     ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
@@ -137,7 +164,8 @@ export async function printComprovanteAgendamento(
     <div class="center lg">COMPROVANTE DE AGENDAMENTO</div>
     <div class="sep"></div>
 
-    <div class="center" style="font-size:12pt">${esc(paciente?.nome ?? a.paciente_nome)}</div>
+    <div class="center" style="font-size:12pt; font-weight:700">${esc(paciente?.nome ?? a.paciente_nome)}</div>
+    ${paciente?.codigo_prontuario ? `<div class="center sm">PRONTUÁRIO: ${esc(paciente.codigo_prontuario)}</div>` : ""}
     ${paciente?.cpf ? `<div class="center sm">CPF: ${esc(paciente.cpf)}</div>` : ""}
     ${paciente?.telefone ? `<div class="center sm">FONE: ${esc(paciente.telefone)}</div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: ${fmtDataSimples(paciente.data_nascimento)}</div>` : ""}
@@ -200,7 +228,10 @@ function imprimirViaIframe(html: string): void {
   doc.write(html);
   doc.close();
   const cleanup = () => { try { document.body.removeChild(iframe); } catch { /* noop */ } };
+  let jaImprimiu = false;
   const dispararPrint = () => {
+    if (jaImprimiu) return;
+    jaImprimiu = true;
     try { cw.focus(); cw.print(); } catch { /* noop */ }
     setTimeout(cleanup, 4000);
   };

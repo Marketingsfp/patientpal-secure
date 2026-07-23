@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -54,6 +55,7 @@ function DuplicadosPage() {
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [loading, setLoading] = useState(false);
   const [tipo, setTipo] = useState<"" | Grupo["tipo"]>("");
+  const [filtroNome, setFiltroNome] = useState("");
   const [sel, setSel] = useState<Record<string, Set<string>>>({});
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   const [merging, setMerging] = useState(false);
@@ -77,6 +79,16 @@ function DuplicadosPage() {
   useEffect(reload, [clinicaIds, tipo]);
 
   const groupKey = (g: Grupo, i: number) => `${g.tipo}-${g.chave}-${i}`;
+
+  const norm = (s: string) =>
+    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const gruposFiltrados = (() => {
+    const q = norm(filtroNome);
+    if (!q) return grupos;
+    return grupos.filter((g) =>
+      g.pacientes.some((p) => norm(p.nome ?? "").includes(q)),
+    );
+  })();
 
   const toggle = (gk: string, id: string) => {
     setSel((prev) => {
@@ -139,23 +151,31 @@ function DuplicadosPage() {
             para conferir e ajustar manualmente.
           </p>
         </div>
-        <select
-          className="border rounded px-2 py-1 text-sm bg-background"
-          value={tipo}
-          onChange={(e) => setTipo(e.target.value as "" | Grupo["tipo"])}
-        >
-          <option value="">Todos</option>
-          <option value="cpf">Mesmo CPF</option>
-          <option value="telefone">Mesmo telefone</option>
-          <option value="nome_dn">Mesmo nome + nascimento</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <Input
+            value={filtroNome}
+            onChange={(e) => setFiltroNome(e.target.value)}
+            placeholder="Filtrar por nome…"
+            className="h-9 w-64"
+          />
+          <select
+            className="border rounded px-2 py-1 text-sm bg-background"
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value as "" | Grupo["tipo"])}
+          >
+            <option value="">Todos</option>
+            <option value="cpf">Mesmo CPF</option>
+            <option value="telefone">Mesmo telefone</option>
+            <option value="nome_dn">Mesmo nome + nascimento</option>
+          </select>
+        </div>
       </div>
       {loading && <p className="text-sm text-muted-foreground">Carregando…</p>}
-      {!loading && grupos.length === 0 && (
+      {!loading && gruposFiltrados.length === 0 && (
         <p className="text-sm text-muted-foreground">Nenhum grupo suspeito encontrado.</p>
       )}
       <div className="grid gap-3">
-        {grupos.map((g, i) => (
+        {gruposFiltrados.map((g, i) => (
           <Card key={groupKey(g, i)}>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between gap-2 flex-wrap">

@@ -78,12 +78,6 @@ export function KeyboardShortcuts() {
           if (clickByAttr("data-turbo-proximo")) e.preventDefault();
           return;
         }
-        // F7 → Agenda Express
-        if (e.key === "F7") {
-          e.preventDefault();
-          navigate({ to: "/app/agenda/express" });
-          return;
-        }
         // F8 → Agenda
         if (e.key === "F8") {
           e.preventDefault();

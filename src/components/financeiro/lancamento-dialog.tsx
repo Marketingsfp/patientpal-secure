@@ -44,6 +44,9 @@ export interface LancamentoSavedData {
   parcelas: number | null;
   bandeira_cartao: string | null;
   emitir_nfse: boolean;
+  /** Data (YYYY-MM-DD) escolhida no diálogo — permite que quem chama repasse
+   *  a mesma data retroativa para `pago_em` da mensalidade, etc. */
+  data: string;
   pagamentos_detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
 }
 
@@ -353,7 +356,12 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // H2 — Roda jaPago + agendamento em paralelo. Antes eram duas queries
     // seriais (jaPago aqui, agendamento mais abaixo) e ainda uma 3ª query
     // duplicada para procedimento dentro do bloco de splits.
-    type AgPrefetch = { medico_id: string | null; paciente_id: string | null; procedimento: string | null };
+    type AgPrefetch = {
+      medico_id: string | null;
+      paciente_id: string | null;
+      procedimento: string | null;
+      paciente_nome: string | null;
+    };
     let agPrefetch: AgPrefetch | null = null;
     if (agendamentoId) {
       const [jaPagoRes, agRes] = await Promise.all([
@@ -369,7 +377,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           : Promise.resolve({ data: null }),
         supabase
           .from("agendamentos")
-          .select("medico_id, paciente_id, procedimento")
+          .select("medico_id, paciente_id, procedimento, pacientes:paciente_id(nome)")
           .eq("id", agendamentoId)
           .maybeSingle(),
       ]);
@@ -379,7 +387,15 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         onOpenChange(false);
         return;
       }
-      agPrefetch = (agRes.data as AgPrefetch | null) ?? null;
+      const raw = agRes.data as any;
+      agPrefetch = raw
+        ? {
+            medico_id: raw.medico_id ?? null,
+            paciente_id: raw.paciente_id ?? null,
+            procedimento: raw.procedimento ?? null,
+            paciente_nome: raw.pacientes?.nome ?? null,
+          }
+        : null;
     }
     const isCredito = formaPagamento === "cartao_credito";
     if (isCredito && !bandeiraCartao) {
@@ -423,20 +439,35 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         toast.error(`Soma das formas (${formatBRL(total)}) difere do valor (${formatBRL(valorNum)})`);
         setSaving(false); return;
       }
-      formaFinal = "misto";
-      obsExtra = "Pagamento misto: " + validIdx.map(({ p, i }) => {
+      // Se o modo misto tem só 1 linha válida, salva como aquela forma direta
+      // (evita marcar como "misto" quando na prática só houve uma forma).
+      if (validIdx.length === 1) {
+        const { p, i } = validIdx[0];
+        formaFinal = p.forma;
         const { pago, troco } = linhasCalc[i];
-        const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(pago)}`;
         if (p.forma === "dinheiro" && troco > 0) {
-          return `${base} (recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)})`;
-        }
-        if (p.forma === "cartao_credito") {
+          obsExtra = `Recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)}`;
+        } else if (p.forma === "cartao_credito") {
           const parc = Number(p.parcelas || 1) || 1;
           const band = (p.bandeira ?? "").toUpperCase();
-          return `${base} (${band} ${parc}x)`;
+          obsExtra = `Cartão Crédito ${band} ${parc}x — ${formatBRL(pago)}`;
         }
-        return base;
-      }).join("; ");
+      } else {
+        formaFinal = "misto";
+        obsExtra = "Pagamento misto: " + validIdx.map(({ p, i }) => {
+          const { pago, troco } = linhasCalc[i];
+          const base = `${FORMAS_LABEL[p.forma] ?? p.forma} ${formatBRL(pago)}`;
+          if (p.forma === "dinheiro" && troco > 0) {
+            return `${base} (recebido ${formatBRL(Number(p.recebido))}, troco ${formatBRL(troco)})`;
+          }
+          if (p.forma === "cartao_credito") {
+            const parc = Number(p.parcelas || 1) || 1;
+            const band = (p.bandeira ?? "").toUpperCase();
+            return `${base} (${band} ${parc}x)`;
+          }
+          return base;
+        }).join("; ");
+      }
     } else if (formaPagamento === "dinheiro" && recebidoNum > 0) {
       obsExtra = `Recebido ${formatBRL(recebidoNum)}, troco ${formatBRL(trocoDinheiro)}`;
     }
@@ -487,7 +518,22 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     const pLancamento = {
       clinica_id: clinicaAtual.clinica_id,
       tipo,
-      descricao: descricao.trim(),
+      // Blindagem: quando o lançamento está vinculado a um agendamento,
+      // garantimos que o nome do paciente presente na descrição seja o
+      // do agendamento (evita herdar nome antigo do formulário).
+      descricao: (() => {
+        const desc = descricao.trim();
+        const nome = agPrefetch?.paciente_nome?.trim();
+        if (!nome) return desc;
+        const sep = " — ";
+        // Se já começa com o nome certo, mantém.
+        if (desc.toUpperCase().startsWith(nome.toUpperCase())) return desc;
+        // Se começa com outro nome (padrão "NOME — RESTO"), troca o prefixo.
+        const idx = desc.indexOf(sep);
+        if (idx > 0) return `${nome}${desc.slice(idx)}`;
+        // Caso contrário, prefixa o nome.
+        return desc ? `${nome}${sep}${desc}` : nome;
+      })(),
       valor: Number(valor),
       data,
       status: "confirmado",
@@ -683,6 +729,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       parcelas: parcelasFinal,
       bandeira_cartao: bandeiraFinal,
       emitir_nfse: emitirNfse,
+      data,
       pagamentos_detalhe: pagamentoMisto
         ? pagamentos
             .map((p, i) => ({

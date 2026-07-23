@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
 import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
@@ -59,6 +60,15 @@ const carenciaShort = (n: number | null | undefined) => {
   return v === 0 ? "Imediato" : `Após ${v}ª`;
 };
 
+// Detecta o convênio interno de funcionários (nome pode variar entre clínicas:
+// "FUNCIONARIO", "CONVÊNIO FUNCIONARIO" etc.). Normaliza acentos e casing.
+const isConvenioFuncionario = (nome: string) =>
+  (nome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .includes("FUNCIONARIO");
+
 export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props) {
   const [regras, setRegras] = useState<CbRegra[]>([]);
   const [especialidades, setEspecialidades] = useState<EspOpt[]>([]);
@@ -69,8 +79,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
   const [novoOpen, setNovoOpen] = useState(false);
   const [editRegra, setEditRegra] = useState<CbRegra | null>(null);
-  const [apagarTodasOpen, setApagarTodasOpen] = useState(false);
-  const [apagandoTodas, setApagandoTodas] = useState(false);
   const [filtroGratuito, setFiltroGratuito] = useState<"todos" | "sim" | "nao">("todos");
   const [filtroCarencia, setFiltroCarencia] = useState<string>("todos");
   const [filtroLimite, setFiltroLimite] = useState<"todos" | "com" | "sem">("todos");
@@ -86,7 +94,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     const [{ data: r, error: e1 }, { data: e, error: e2 }] = await Promise.all([
       (supabase as any)
         .from("cb_convenio_regras")
-        .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito,grupo_gratuidade")
+        .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,valor_cartao,percentual_cartao,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito,grupo_gratuidade")
         .eq("convenio_id", convenioId)
         .order("prioridade", { ascending: false }),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
@@ -148,12 +156,84 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     return m;
   }, [especialidades]);
 
+  // ---- Exceções (apenas convênio FUNCIONARIO) ---------------------------
+  // Uma exceção é um procedimento que NÃO recebe desconto neste convênio.
+  // Gravamos como regra específica por procedimento com percentual = 0 e
+  // prioridade alta — o motor (cb-regras.ts) já dá preferência a regras
+  // com procedimento_id, então a exceção vence sobre regras por categoria.
+  const isFuncionario = isConvenioFuncionario(convenioNome);
+  const [excSel, setExcSel] = useState<string[]>([]);
+  const [excSaving, setExcSaving] = useState(false);
+  const excecoes = useMemo(
+    () => regras.filter(r =>
+      r.procedimento_id &&
+      r.modo === "percentual_desconto" &&
+      Number(r.percentual) === 0 &&
+      !r.gratuito &&
+      !r.limite_qtd
+    ),
+    [regras],
+  );
+  const excecoesProcIds = useMemo(
+    () => new Set(excecoes.map(e => e.procedimento_id as string)),
+    [excecoes],
+  );
+  const addExcecao = async () => {
+    if (!convenioId || excSel.length === 0) return;
+    const novos = excSel.filter(id => !excecoesProcIds.has(id));
+    const jaExistiam = excSel.length - novos.length;
+    if (novos.length === 0) {
+      toast.info("Todos os serviços selecionados já estão nas exceções.");
+      return;
+    }
+    setExcSaving(true);
+    const payload = novos.map(procedimento_id => ({
+      convenio_id: convenioId,
+      clinica_id: clinicaId,
+      procedimento_id,
+      especialidade_id: null,
+      tipo: null,
+      modo: "percentual_desconto",
+      valor: null,
+      percentual: 0,
+      prioridade: 999,
+      ativo: true,
+      gratuito: false,
+      carencia_mensalidades: 0,
+    }));
+    const { error } = await (supabase as any).from("cb_convenio_regras").insert(payload);
+    setExcSaving(false);
+    if (error) { mostrarErro(error); return; }
+    toast.success(
+      jaExistiam > 0
+        ? `${novos.length} exceção(ões) adicionada(s). ${jaExistiam} já existia(m).`
+        : `${novos.length} exceção(ões) adicionada(s).`,
+    );
+    setExcSel([]);
+    await load();
+  };
+  const removeExcecao = async (id: string) => {
+    const { error } = await (supabase as any).from("cb_convenio_regras").delete().eq("id", id);
+    if (error) { mostrarErro(error); return; }
+    toast.success("Exceção removida.");
+    await load();
+  };
+
   const regrasFiltradas = useMemo(() => {
     const HIGH = "\uffff";
     const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const items = regras
       .map((r, idx) => ({ r, idx }))
       .filter(({ r }) => {
+        // Exceções do convênio FUNCIONARIO ficam apenas no bloco próprio.
+        if (
+          isFuncionario &&
+          r.procedimento_id &&
+          r.modo === "percentual_desconto" &&
+          Number(r.percentual) === 0 &&
+          !r.gratuito &&
+          !r.limite_qtd
+        ) return false;
         if (filtroGratuito === "sim" && !r.gratuito) return false;
         if (filtroGratuito === "nao" && r.gratuito) return false;
         if (filtroCarencia !== "todos" && Number(r.carencia_mensalidades ?? 0) !== Number(filtroCarencia)) return false;
@@ -189,7 +269,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       return 0;
     });
     return items;
-  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, filtroEspecialidade, filtroTipo, filtroProcedimento, filtroModo, filtroPrioridade, procById, espById]);
+  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, filtroEspecialidade, filtroTipo, filtroProcedimento, filtroModo, filtroPrioridade, procById, espById, isFuncionario]);
 
   const prioridadesUsadas = useMemo(() => {
     const s = new Set<number>();
@@ -216,23 +296,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     setRegras(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const apagarTodas = async () => {
-    if (!convenioId) return;
-    setApagandoTodas(true);
-    try {
-      const { error } = await (supabase as any)
-        .from("cb_convenio_regras")
-        .delete()
-        .eq("convenio_id", convenioId);
-      if (error) { mostrarErro(error); return; }
-      setRegras([]);
-      toast.success("Todas as regras foram apagadas.");
-      setApagarTodasOpen(false);
-    } finally {
-      setApagandoTodas(false);
-    }
-  };
-
   const salvar = async () => {
     if (!convenioId) return;
     setLoading(true);
@@ -248,6 +311,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         modo: r.modo,
         valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
         percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
+        valor_cartao: r.modo === "valor_fixo"
+          ? (r.valor_cartao != null ? Number(r.valor_cartao) || 0 : Number(r.valor) || 0)
+          : null,
+        percentual_cartao: r.modo === "percentual_desconto"
+          ? (r.percentual_cartao != null ? Number(r.percentual_cartao) || 0 : Number(r.percentual) || 0)
+          : null,
         prioridade: Number(r.prioridade) || 1,
         ativo: r.ativo !== false,
         limite_qtd: r.limite_qtd != null ? Number(r.limite_qtd) : null,
@@ -403,6 +472,54 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
 
   return (
     <div className="space-y-3">
+      {isFuncionario && (
+        <div className="border rounded-md p-3 bg-muted/30 space-y-3">
+          <div>
+            <div className="font-medium">Exceções (sem desconto)</div>
+            <p className="text-xs text-muted-foreground">
+              Serviços listados aqui são cobrados como <strong>particular</strong> para este convênio, ignorando qualquer regra por categoria ou especialidade.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <Label className="text-xs">Serviço</Label>
+              <SearchableMultiSelect
+                options={procOpts.filter(o => o.value !== "__any__").map(o => ({ value: o.value, label: o.label }))}
+                value={excSel}
+                onChange={setExcSel}
+                placeholder="Selecione um ou mais serviços"
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={addExcecao}
+              disabled={excSel.length === 0 || excSaving}
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              {excSel.length > 1 ? `Adicionar exceções (${excSel.length})` : "Adicionar exceção"}
+            </Button>
+          </div>
+          {excecoes.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">Nenhuma exceção cadastrada.</p>
+          ) : (
+            <ul className="divide-y border rounded-md bg-background">
+              {excecoes.map(e => (
+                <li key={e.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                  <span className="truncate">{procById.get(e.procedimento_id as string) ?? "(serviço removido)"}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => removeExcecao(e.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="font-medium">Regras de preço automáticas</div>
@@ -417,15 +534,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           <Button variant="outline" size="sm" onClick={reaplicar} disabled={reapplying || regras.length === 0}>
             <RefreshCw className={`h-4 w-4 mr-1 ${reapplying ? "animate-spin" : ""}`} />
             {reapplying ? (progress || "Aplicando…") : "Reaplicar a todos os serviços"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive hover:text-destructive"
-            onClick={() => setApagarTodasOpen(true)}
-            disabled={regras.length === 0 || reapplying}
-          >
-            <Trash2 className="h-4 w-4 mr-1" /> Apagar todas as regras
           </Button>
         </div>
       </div>
@@ -756,28 +864,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         regra={editRegra}
         onSaved={async () => { setEditRegra(null); await load(); }}
       />
-      <AlertDialog open={apagarTodasOpen} onOpenChange={setApagarTodasOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Apagar todas as regras?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação vai remover permanentemente as <strong>{regras.length}</strong> regra(s) de preço do convênio
-              <strong> "{convenioNome}"</strong>. Os valores já aplicados aos serviços não serão alterados, mas nenhuma nova
-              regra ficará disponível até que você cadastre outras. Esta operação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={apagandoTodas}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); void apagarTodas(); }}
-              disabled={apagandoTodas}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {apagandoTodas ? "Apagando…" : "Sim, apagar tudo"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
@@ -940,6 +1026,8 @@ function NovaRegraDialog({
     modo: "valor_fixo",
     valor: 0,
     percentual: null,
+    valor_cartao: 0,
+    percentual_cartao: null,
     prioridade: 10,
     ativo: true,
     limite_qtd: null,
@@ -989,6 +1077,12 @@ function NovaRegraDialog({
       modo: r.modo,
       valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
       percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
+      valor_cartao: r.modo === "valor_fixo"
+        ? (r.valor_cartao != null ? Number(r.valor_cartao) || 0 : Number(r.valor) || 0)
+        : null,
+      percentual_cartao: r.modo === "percentual_desconto"
+        ? (r.percentual_cartao != null ? Number(r.percentual_cartao) || 0 : Number(r.percentual) || 0)
+        : null,
       prioridade: Number(r.prioridade) || 1,
       ativo: r.ativo !== false,
       limite_qtd: hasLimit ? Number(r.limite_qtd) : null,
@@ -1078,7 +1172,7 @@ function NovaRegraDialog({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t pt-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t pt-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Modo</Label>
               <Select value={r.modo} onValueChange={(v) => upd({ modo: v })}>
@@ -1090,7 +1184,20 @@ function NovaRegraDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">{r.modo === "valor_fixo" ? "Valor (R$)" : "Percentual (%)"}</Label>
+              <Label className="text-xs">Prioridade</Label>
+              <Input
+                type="number" min="1" max="100"
+                value={r.prioridade}
+                onChange={(e) => upd({ prioridade: parseInt(e.target.value) || 1 })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">
+                {r.modo === "valor_fixo" ? "Valor dinheiro (R$)" : "% desconto dinheiro"}
+              </Label>
               {r.modo === "valor_fixo" ? (
                 <CurrencyInput
                   value={r.valor !== null ? Number(r.valor).toFixed(2) : ""}
@@ -1105,12 +1212,24 @@ function NovaRegraDialog({
               )}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Prioridade</Label>
-              <Input
-                type="number" min="1" max="100"
-                value={r.prioridade}
-                onChange={(e) => upd({ prioridade: parseInt(e.target.value) || 1 })}
-              />
+              <Label className="text-xs">
+                {r.modo === "valor_fixo" ? "Valor cartão/PIX (R$)" : "% desconto cartão/PIX"}
+              </Label>
+              {r.modo === "valor_fixo" ? (
+                <CurrencyInput
+                  value={r.valor_cartao != null ? Number(r.valor_cartao).toFixed(2) : ""}
+                  onChange={(v) => upd({ valor_cartao: v ? parseFloat(v) : 0 })}
+                />
+              ) : (
+                <Input
+                  type="number" min="0" max="100" step="0.01"
+                  value={r.percentual_cartao ?? ""}
+                  onChange={(e) => upd({ percentual_cartao: e.target.value ? parseFloat(e.target.value) : 0 })}
+                />
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Usado quando o pagamento é em PIX, débito ou crédito.
+              </p>
             </div>
           </div>
 
@@ -1137,7 +1256,7 @@ function NovaRegraDialog({
                   onCheckedChange={(v) => {
                     const on = v === true;
                     upd(on
-                      ? { gratuito: true, modo: "valor_fixo", valor: 0, percentual: null }
+                      ? { gratuito: true, modo: "valor_fixo", valor: 0, percentual: null, valor_cartao: 0, percentual_cartao: null }
                       : { gratuito: false });
                   }}
                 />

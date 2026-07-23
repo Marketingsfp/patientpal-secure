@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SectionTabs, RH_TABS, RH_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -14,7 +13,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { formatDateTime, formatHora } from "@/lib/date-utils";
 
 export const Route = createFileRoute("/_authenticated/app/hr-ponto")({
-  component: PontoPageWithTabs,
+  component: PontoPage,
   head: () => ({ meta: [{ title: "Bater ponto — ClinicaOS" }] }),
 });
 
@@ -51,6 +50,16 @@ function PontoPage() {
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [loading, setLoading] = useState(true);
   const [marcando, setMarcando] = useState(false);
+  const [agora, setAgora] = useState(new Date()); // <- Estado para o relógio
+
+  // 🔥 Atualiza o relógio a cada segundo
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAgora(new Date());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   async function load() {
     if (!clinicaAtual) return;
@@ -118,8 +127,6 @@ function PontoPage() {
     void load();
   }
 
-  const agora = new Date();
-
   return (
     <div className="p-6 space-y-4 max-w-3xl mx-auto">
       <div className="flex items-center gap-3">
@@ -131,8 +138,16 @@ function PontoPage() {
       </div>
 
       <Card className="p-6 text-center">
-        <div className="text-5xl font-bold tabular-nums">{formatHora(agora)}</div>
-        <div className="text-sm text-muted-foreground mt-1">{formatDateTime(agora).split(" ")[0]}</div>
+        <div className="text-5xl font-bold tabular-nums">
+          {agora.toLocaleTimeString("pt-BR", { 
+            hour: "2-digit", 
+            minute: "2-digit", 
+            second: "2-digit" 
+          })}
+        </div>
+        <div className="text-sm text-muted-foreground mt-1">
+          {formatDateTime(agora).split(" ")[0]}
+        </div>
         {podeEscrever && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-6">
           <Button onClick={() => bater("entrada")} disabled={marcando}><LogIn className="h-4 w-4 mr-1" /> Entrada</Button>
@@ -182,13 +197,5 @@ function PontoPage() {
         </Table>
       </Card>
     </div>
-  );
-}
-function PontoPageWithTabs() {
-  return (
-    <>
-      <SectionTabs title={RH_META.title} icon={RH_META.icon} tabs={RH_TABS} />
-      <PontoPage />
-    </>
   );
 }

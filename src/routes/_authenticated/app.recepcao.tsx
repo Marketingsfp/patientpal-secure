@@ -204,11 +204,8 @@ function RecepcaoPage() {
             <Bell className="h-4 w-4 mr-2" /> Chamar próxima
             <kbd className="ml-2 hidden md:inline-flex h-5 min-w-5 items-center justify-center rounded border bg-background/20 px-1 text-[10px] font-mono">C</kbd>
           </Button>
-          <Button variant="outline" asChild>
-            <a href="/totem" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-2" /> Totem</a>
-          </Button>
-          <Button variant="outline" asChild>
-            <a href="/painel" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-2" /> Painel</a>
+          <Button variant="outline" asChild title="Links, QR Codes e rotação de token do Painel e Totem">
+            <a href="/app/configuracoes/painel-totem"><ExternalLink className="h-4 w-4 mr-2" /> Painel & Totem</a>
           </Button>
         </div>
       </div>

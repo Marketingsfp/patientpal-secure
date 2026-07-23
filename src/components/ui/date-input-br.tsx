@@ -14,20 +14,37 @@ function isoToBr(iso: string): string {
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
-// Converte "dd/mm/yyyy" -> "yyyy-mm-dd". Retorna "" quando incompleto/inválido.
+// Converte "dd/mm/yyyy" ou "dd/mm/yy" -> "yyyy-mm-dd".
+// Ano curto: usa um pivô ~20 anos à frente do ano atual. 20yy até
+// (ano atual + 20) fica em 2000+yy; acima disso volta a 1900+yy.
+// Assim "15/01/27" → 2027 (vencimento futuro), "23/05/85" → 1985
+// (nascimento) e "10/01/30" → 2030.
 function brToIso(br: string): string {
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(br);
+  const m = /^(\d{2})\/(\d{2})\/(\d{2}|\d{4})$/.exec(br);
   if (!m) return "";
-  const day = Number(m[1]), month = Number(m[2]), year = Number(m[3]);
+  let yearText: string;
+  if (m[3].length === 2) {
+    const yy = Number(m[3]);
+    const currentYear = new Date().getFullYear();
+    const asTwentyK = 2000 + yy;
+    const pivot = currentYear + 20;
+    yearText = asTwentyK <= pivot ? String(asTwentyK) : String(1900 + yy);
+  } else {
+    yearText = m[3];
+  }
+  const day = Number(m[1]), month = Number(m[2]), year = Number(yearText);
   if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900) return "";
-  return `${m[3]}-${m[2]}-${m[1]}`;
+  return `${yearText}-${m[2]}-${m[1]}`;
 }
 
-// Aplica máscara dd/mm/yyyy incrementalmente enquanto o usuário digita.
+// Aplica máscara dd/mm/yyyy incrementalmente. Insere "/" já ao completar 2 e 4 dígitos
+// para dar feedback visual imediato ("23" -> "23/", "2305" -> "23/05/").
 function applyMask(raw: string): string {
   const digits = raw.replace(/\D/g, "").slice(0, 8);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  if (digits.length < 2) return digits;
+  if (digits.length === 2) return `${digits}/`;
+  if (digits.length < 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  if (digits.length === 4) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/`;
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 

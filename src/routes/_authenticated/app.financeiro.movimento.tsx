@@ -6,6 +6,8 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { logAction } from "@/hooks/use-crud";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
@@ -58,6 +60,11 @@ function Page() {
   // não mais uma lista fixa de papéis — qualquer perfil com "Financeiro: edição"
   // pode estornar.
   const podeEstornar = podeEscrever;
+  // Visão em cartões no celular para a tabela de lançamentos (9 colunas) —
+  // piloto São Francisco de Paula (flag ux_melhorias).
+  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
+  const isMobile = useIsMobile();
+  const modoMobile = uxMelhorias && isMobile;
   const [estornando, setEstornando] = useState<string | null>(null);
   const [items, setItems] = useState<Lanc[]>([]);
   const [cats, setCats] = useState<Opt[]>([]);
@@ -281,8 +288,14 @@ function Page() {
         transferSentido: m.tipo === "suprimento" ? "entrada" : "saida",
       }));
     }
-    // Merge ordenado por data desc
-    let merged = [...finList, ...caixaList].sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0));
+    // Merge ordenado por data + hora desc (mais recente primeiro)
+    let merged = [...finList, ...caixaList].sort((a, b) => {
+      if (a.data !== b.data) return a.data < b.data ? 1 : -1;
+      const ha = a.hora ?? "";
+      const hb = b.hora ?? "";
+      if (ha !== hb) return ha < hb ? 1 : -1;
+      return 0;
+    });
     // Filtros client-side: valor exato e nº da ficha (referência).
     const vNum = filterValorDebounced ? Number(filterValorDebounced.replace(",", ".")) : NaN;
     if (Number.isFinite(vNum)) {
@@ -934,68 +947,133 @@ function Page() {
               </div>
             );
           })()}
-          <Table>
-            <TableHeader><TableRow>
-              <TableHead className="w-10"></TableHead>
-              <TableHead>Data</TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead>Médico</TableHead>
-              <TableHead className="text-right">Ficha</TableHead>
-              <TableHead>Usuário</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-              <TableHead className="w-32 text-right">Ações</TableHead>
-            </TableRow></TableHeader>
-            <TableBody>{items.slice((Math.min(page, Math.max(1, Math.ceil(items.length / PAGE_SIZE))) - 1) * PAGE_SIZE, Math.min(page, Math.max(1, Math.ceil(items.length / PAGE_SIZE))) * PAGE_SIZE).map((l) => {
+          {(() => {
+            const totalPages2 = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+            const currentPage2 = Math.min(page, totalPages2);
+            const paginaAtual = items.slice((currentPage2 - 1) * PAGE_SIZE, currentPage2 * PAGE_SIZE);
+            // Visão em cartões no celular (piloto SFP) — mesmos dados e ações
+            // da tabela, só em layout vertical com alvos de toque maiores.
+            if (modoMobile) {
               const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
               return (
-              <TableRow key={`${l.origem ?? "fin"}:${l.id}`}>
-                <TableCell>{
-                  l.tipo === "transferencia"
-                    ? <ArrowLeftRight className={`h-4 w-4 ${l.transferSentido === "entrada" ? "text-blue-600" : "text-amber-600"}`} />
-                    : l.tipo === "receita"
-                      ? <ArrowUpCircle className="h-4 w-4 text-green-600" />
-                      : <ArrowDownCircle className="h-4 w-4 text-red-600" />
-                }</TableCell>
-                <TableCell className="text-sm">{(l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) + (l.hora ? " " + l.hora : "") : "")}</TableCell>
-                <TableCell>{l.descricao}</TableCell>
-                <TableCell className="text-sm whitespace-nowrap">{l.medico_nome || "—"}</TableCell>
-                <TableCell className="text-sm text-right tabular-nums">{typeof l.ficha_numero === "number" ? String(l.ficha_numero).padStart(3, "0") : "—"}</TableCell>
-                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{l.criado_por ? userMap.get(l.criado_por) ?? "—" : "—"}</TableCell>
-                <TableCell><Badge variant={l.status === "confirmado" ? "default" : "secondary"}>{l.status}</Badge></TableCell>
-                <TableCell className={`text-right font-medium ${
-                  l.tipo === "transferencia"
-                    ? (l.transferSentido === "entrada" ? "text-blue-600" : "text-amber-600")
-                    : l.tipo === "receita" ? "text-green-600" : "text-red-600"
-                }`}>
-                  {l.tipo === "transferencia"
-                    ? (l.transferSentido === "entrada" ? "↑" : "↓")
-                    : (l.tipo === "receita" ? "+" : "-")} {fmt(Number(l.valor))}</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-0.5">
-                    {podeEstornar && l.origem !== "caixa" && l.tipo !== "transferencia" && l.status !== "cancelado" ? (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Estornar lançamento — mantém o registro no histórico com status 'cancelado' e desvincula o laudo (recomendado para repasses)."
-                        disabled={estornando === l.id}
-                        onClick={() => estornar(l)}
-                      >
-                        <Undo2 className="h-3.5 w-3.5 text-amber-600" />
-                      </Button>
-                    ) : null}
-                    {podeEscrever && l.origem !== "caixa" ? (
-                      <>
-                        <Button variant="ghost" size="icon" title="Editar lançamento — alterar descrição, valor, categoria, conta ou forma de pagamento." onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
-                        <Button variant="ghost" size="icon" title="Excluir lançamento — remove definitivamente do banco (sem histórico). Use apenas para lançamentos criados por engano; para repasses prefira Estornar." onClick={() => remove(l)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                      </>
-                    ) : null}
-                  </div>
-                </TableCell>
-              </TableRow>);
-            })}
-            </TableBody>
-          </Table>
+                <div>
+                  {paginaAtual.map((l) => (
+                    <div key={`${l.origem ?? "fin"}:${l.id}`} className="flex items-start gap-3 p-3 border-b last:border-b-0">
+                      <div className="pt-0.5 shrink-0">
+                        {l.tipo === "transferencia"
+                          ? <ArrowLeftRight className={`h-4 w-4 ${l.transferSentido === "entrada" ? "text-blue-600" : "text-amber-600"}`} />
+                          : l.tipo === "receita"
+                            ? <ArrowUpCircle className="h-4 w-4 text-green-600" />
+                            : <ArrowDownCircle className="h-4 w-4 text-red-600" />}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-medium truncate">{l.descricao}</p>
+                          <span className={`text-sm font-medium whitespace-nowrap shrink-0 ${
+                            l.tipo === "transferencia"
+                              ? (l.transferSentido === "entrada" ? "text-blue-600" : "text-amber-600")
+                              : l.tipo === "receita" ? "text-green-600" : "text-red-600"
+                          }`}>
+                            {l.tipo === "transferencia" ? (l.transferSentido === "entrada" ? "↑" : "↓") : (l.tipo === "receita" ? "+" : "-")} {fmt(Number(l.valor))}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          <span>{(l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) + (l.hora ? " " + l.hora : "") : "")}</span>
+                          {l.medico_nome && <span className="whitespace-nowrap">{l.medico_nome}</span>}
+                          {typeof l.ficha_numero === "number" && <span>Ficha {String(l.ficha_numero).padStart(3, "0")}</span>}
+                          {l.criado_por && <span className="whitespace-nowrap">{userMap.get(l.criado_por) ?? "—"}</span>}
+                          <Badge variant={l.status === "confirmado" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">{l.status}</Badge>
+                        </div>
+                        {l.origem !== "caixa" && (podeEstornar || podeEscrever) && (
+                          <div className="flex items-center gap-1 pt-1 -ml-2">
+                            {podeEstornar && l.tipo !== "transferencia" && l.status !== "cancelado" ? (
+                              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" disabled={estornando === l.id} onClick={() => estornar(l)}>
+                                <Undo2 className="h-3.5 w-3.5 text-amber-600 mr-1" /> Estornar
+                              </Button>
+                            ) : null}
+                            {podeEscrever ? (
+                              <>
+                                <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openEdit(l)}>
+                                  <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => remove(l)}>
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive mr-1" /> Excluir
+                                </Button>
+                              </>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+            return (
+              <Table>
+                <TableHeader><TableRow>
+                  <TableHead className="w-10"></TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Médico</TableHead>
+                  <TableHead className="text-right">Ficha</TableHead>
+                  <TableHead>Usuário</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="w-32 text-right">Ações</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>{paginaAtual.map((l) => {
+                  const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
+                  return (
+                  <TableRow key={`${l.origem ?? "fin"}:${l.id}`}>
+                    <TableCell>{
+                      l.tipo === "transferencia"
+                        ? <ArrowLeftRight className={`h-4 w-4 ${l.transferSentido === "entrada" ? "text-blue-600" : "text-amber-600"}`} />
+                        : l.tipo === "receita"
+                          ? <ArrowUpCircle className="h-4 w-4 text-green-600" />
+                          : <ArrowDownCircle className="h-4 w-4 text-red-600" />
+                    }</TableCell>
+                    <TableCell className="text-sm">{(l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) + (l.hora ? " " + l.hora : "") : "")}</TableCell>
+                    <TableCell>{l.descricao}</TableCell>
+                    <TableCell className="text-sm whitespace-nowrap">{l.medico_nome || "—"}</TableCell>
+                    <TableCell className="text-sm text-right tabular-nums">{typeof l.ficha_numero === "number" ? String(l.ficha_numero).padStart(3, "0") : "—"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{l.criado_por ? userMap.get(l.criado_por) ?? "—" : "—"}</TableCell>
+                    <TableCell><Badge variant={l.status === "confirmado" ? "default" : "secondary"}>{l.status}</Badge></TableCell>
+                    <TableCell className={`text-right font-medium ${
+                      l.tipo === "transferencia"
+                        ? (l.transferSentido === "entrada" ? "text-blue-600" : "text-amber-600")
+                        : l.tipo === "receita" ? "text-green-600" : "text-red-600"
+                    }`}>
+                      {l.tipo === "transferencia"
+                        ? (l.transferSentido === "entrada" ? "↑" : "↓")
+                        : (l.tipo === "receita" ? "+" : "-")} {fmt(Number(l.valor))}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-0.5">
+                        {podeEstornar && l.origem !== "caixa" && l.tipo !== "transferencia" && l.status !== "cancelado" ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Estornar lançamento — mantém o registro no histórico com status 'cancelado' e desvincula o laudo (recomendado para repasses)."
+                            disabled={estornando === l.id}
+                            onClick={() => estornar(l)}
+                          >
+                            <Undo2 className="h-3.5 w-3.5 text-amber-600" />
+                          </Button>
+                        ) : null}
+                        {podeEscrever && l.origem !== "caixa" ? (
+                          <>
+                            <Button variant="ghost" size="icon" title="Editar lançamento — alterar descrição, valor, categoria, conta ou forma de pagamento." onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
+                            <Button variant="ghost" size="icon" title="Excluir lançamento — remove definitivamente do banco (sem histórico). Use apenas para lançamentos criados por engano; para repasses prefira Estornar." onClick={() => remove(l)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                          </>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                  </TableRow>);
+                })}
+                </TableBody>
+              </Table>
+            );
+          })()}
           {items.length > PAGE_SIZE ? (() => {
             const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
             const currentPage = Math.min(page, totalPages);

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SectionTabs, RH_TABS, RH_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -19,7 +19,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { Plus, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/lms-admin")({
-  component: LMSAdminPageWithTabs,
+  component: LMSAdminPage,
 });
 
 type Curso = { id: string; titulo: string; descricao: string | null; carga_horaria_min: number; publicado: boolean };
@@ -32,7 +32,7 @@ function LMSAdminPage() {
   const podeEscrever = usePodeEscrever("lms-admin");
   const clinicaId = clinicaAtual?.clinica_id;
 
-  const [cursos, setCursos] = useState<Curso[]>([]);
+  const queryClient = useQueryClient();
   const [cursoSel, setCursoSel] = useState<string | null>(null);
   const [modulos, setModulos] = useState<Modulo[]>([]);
   const [licoes, setLicoes] = useState<Licao[]>([]);
@@ -40,16 +40,22 @@ function LMSAdminPage() {
   const [openCurso, setOpenCurso] = useState(false);
   const [novoCurso, setNovoCurso] = useState({ titulo: "", descricao: "", carga: 60 });
 
-  async function loadCursos() {
-    if (!clinicaId) return;
-    const { data } = await supabase
-      .from("lms_cursos")
-      .select("id, titulo, descricao, carga_horaria_min, publicado")
-      .eq("clinica_id", clinicaId)
-      .order("created_at", { ascending: false });
-    setCursos((data ?? []) as Curso[]);
-  }
-  useEffect(() => { void loadCursos(); }, [clinicaId]);
+  // Catálogo de cursos — baixo risco (raramente muda), cache de 5min.
+  const { data: cursos = [] } = useQuery({
+    queryKey: ["lms-cursos-admin", clinicaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lms_cursos")
+        .select("id, titulo, descricao, carga_horaria_min, publicado")
+        .eq("clinica_id", clinicaId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as Curso[];
+    },
+    enabled: !!clinicaId,
+    staleTime: 5 * 60_000,
+  });
+  const loadCursos = () => queryClient.invalidateQueries({ queryKey: ["lms-cursos-admin", clinicaId] });
 
   useEffect(() => {
     if (!cursoSel) { setModulos([]); setLicoes([]); return; }
@@ -219,13 +225,5 @@ function LMSAdminPage() {
         </Card>
       </div>
     </div>
-  );
-}
-function LMSAdminPageWithTabs() {
-  return (
-    <>
-      <SectionTabs title={RH_META.title} icon={RH_META.icon} tabs={RH_TABS} />
-      <LMSAdminPage />
-    </>
   );
 }

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Plus, Search, Pencil, Users, Download, Eye } from "lucide-react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus, Search, Pencil, Users, Download, Eye, IdCard } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +20,9 @@ import { ClienteForm } from "@/components/clientes/cliente-form";
 import { IdadeIcon, calcIdadeAnos } from "@/components/idade-icon";
 import { ClientesShellV2 } from "@/components/clientes-v2/clientes-shell";
 import { useClientesV2Flag } from "@/hooks/use-clientes-v2-flag";
+import { TableSkeletonRows } from "@/components/ui/table-skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useClinica as useClinicaGate } from "@/hooks/use-clinica";
 
 export const Route = createFileRoute("/_authenticated/app/clientes/")({
@@ -122,78 +126,227 @@ interface Paciente {
 function ClientesPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("clientes");
-  const [items, setItems] = useState<Paciente[]>([]);
-  const [totalPacientes, setTotalPacientes] = useState<number | null>(null);
+  // Cache de dados (React Query) — só São Francisco de Paula. Desligada,
+  // segue 100% no caminho manual abaixo (idêntico ao comportamento anterior).
+  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
+  const [itemsManual, setItemsManual] = useState<Paciente[]>([]);
+  const [totalPacientesManual, setTotalPacientesManual] = useState<number | null>(null);
+  const [atingiuTetoManual, setAtingiuTetoManual] = useState(false);
   const [busca, setBusca] = useState(() => {
     if (typeof window === "undefined") return "";
     const params = new URLSearchParams(window.location.search);
     return params.get("q") ?? "";
   });
-  const [loading, setLoading] = useState(false);
+  const [loadingManual, setLoadingManual] = useState(false);
   const [openNovo, setOpenNovo] = useState(false);
   const loadSeq = useRef(0);
 
   const [fotoSigned, setFotoSigned] = useState<Record<string, string>>({});
 
-  const load = async (termo: string = "") => {
+  const LIMITE_BUSCA = 500;
+  const LIMITE_LISTA = 500;
+
+  const loadManual = async (termo: string = "") => {
     if (!clinicaAtual) return;
     const requestId = ++loadSeq.current;
-    setLoading(true);
+    setLoadingManual(true);
     const q = termo.trim();
     if (q && q.length < 3 && q.replace(/\D/g, "").length < 3) {
-      setItems([]);
-      setLoading(false);
+      setItemsManual([]);
+      setLoadingManual(false);
       return;
     }
     try {
       const dataRequest = supabase.rpc("buscar_pacientes", {
         _clinica_id: clinicaAtual.clinica_id,
         _termo: q,
-        _limit: q ? 80 : 120,
+        _limit: q ? LIMITE_BUSCA : LIMITE_LISTA,
       });
       const countRequest = q
-        ? Promise.resolve({ count: totalPacientes, error: null })
+        ? Promise.resolve({ count: totalPacientesManual, error: null })
         : supabase
           .from("pacientes")
           .select("id", { count: "estimated", head: true })
           .eq("clinica_id", clinicaAtual.clinica_id);
       const [{ data, error }, { count, error: countError }] = await Promise.all([dataRequest, countRequest]);
       if (requestId !== loadSeq.current) return;
-      setLoading(false);
+      setLoadingManual(false);
       if (error) { toast.error("Não foi possível concluir esta busca. Tente novamente com mais letras do nome."); return; }
-      if (countError) { mostrarErro(countError); } else { setTotalPacientes(count ?? 0); }
-      setItems((data ?? []) as any);
+      if (countError) { mostrarErro(countError); } else { setTotalPacientesManual(count ?? 0); }
+      const rows = (data ?? []) as any[];
+      setItemsManual(rows as any);
+      setAtingiuTetoManual(rows.length >= (q ? LIMITE_BUSCA : LIMITE_LISTA));
     } catch {
       if (requestId !== loadSeq.current) return;
-      setLoading(false);
+      setLoadingManual(false);
       toast.error("Não foi possível concluir esta busca. Tente novamente com mais letras do nome.");
     }
   };
 
-  // Debounced server-side search
+  // Debounce único da busca, usado pelos dois caminhos (manual e cache).
+  const [debouncedBusca, setDebouncedBusca] = useState(busca);
   useEffect(() => {
-    if (!clinicaAtual) return;
-    const t = setTimeout(() => { void load(busca); }, 300);
+    const t = setTimeout(() => setDebouncedBusca(busca), 300);
     return () => clearTimeout(t);
-    /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [busca, clinicaAtual?.clinica_id]);
+  }, [busca]);
 
+  // Página atual (paginação de 500 em 500) — apenas usada no caminho
+  // com cache (São Francisco de Paula via flag `ux_melhorias`) e somente
+  // quando não há termo de busca. Ao buscar por nome/CPF/telefone o
+  // filtro roda no banco todo em uma página só.
+  const [pagina, setPagina] = useState(0);
+  useEffect(() => { setPagina(0); }, [debouncedBusca]);
+
+  // Caminho manual (sem a flag): idêntico ao comportamento anterior.
   useEffect(() => {
-    const paths = items.filter(p => p.foto_url).map(p => p.foto_url as string);
-    if (paths.length === 0) { setFotoSigned({}); return; }
+    if (!clinicaAtual || uxMelhorias) return;
+    void loadManual(debouncedBusca);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [debouncedBusca, clinicaAtual?.clinica_id, uxMelhorias]);
+
+  // Caminho com cache (só São Francisco): staleTime de 60s — revisitar a
+  // tela com o mesmo termo mostra os dados na hora e revalida em segundo
+  // plano, sem piscar o skeleton de novo.
+  const clinicaId = clinicaAtual?.clinica_id;
+  const totalQuery = useQuery({
+    queryKey: ["clientes-total", clinicaId],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("pacientes")
+        .select("id", { count: "estimated", head: true })
+        .eq("clinica_id", clinicaId!);
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: uxMelhorias && !!clinicaId,
+    staleTime: 60_000,
+  });
+  const listaQuery = useQuery({
+    queryKey: ["clientes-lista", clinicaId, debouncedBusca, pagina],
+    queryFn: async () => {
+      const q = debouncedBusca.trim();
+      if (q && q.length < 3 && q.replace(/\D/g, "").length < 3) {
+        return { items: [] as Paciente[], atingiuTeto: false };
+      }
+      const { data, error } = await supabase.rpc("buscar_pacientes", {
+        _clinica_id: clinicaId!,
+        _termo: q,
+        _limit: q ? LIMITE_BUSCA : LIMITE_LISTA,
+        _offset: q ? 0 : pagina * LIMITE_LISTA,
+      } as any);
+      if (error) throw error;
+      const rows = (data ?? []) as Paciente[];
+      return { items: rows, atingiuTeto: rows.length >= (q ? LIMITE_BUSCA : LIMITE_LISTA) };
+    },
+    enabled: uxMelhorias && !!clinicaId,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+  });
+  useEffect(() => {
+    if (listaQuery.error) toast.error("Não foi possível concluir esta busca. Tente novamente com mais letras do nome.");
+  }, [listaQuery.error]);
+  useEffect(() => {
+    if (totalQuery.error) mostrarErro(totalQuery.error);
+  }, [totalQuery.error]);
+
+  const items = uxMelhorias ? (listaQuery.data?.items ?? []) : itemsManual;
+  const totalPacientes = uxMelhorias ? (totalQuery.data ?? null) : totalPacientesManual;
+  const atingiuTeto = uxMelhorias ? (listaQuery.data?.atingiuTeto ?? false) : atingiuTetoManual;
+  const loading = uxMelhorias ? listaQuery.isLoading : loadingManual;
+
+  const queryClient = useQueryClient();
+  const refrescar = () => {
+    if (uxMelhorias) {
+      void queryClient.invalidateQueries({ queryKey: ["clientes-lista", clinicaId] });
+      void queryClient.invalidateQueries({ queryKey: ["clientes-total", clinicaId] });
+    } else {
+      void loadManual(busca);
+    }
+  };
+
+  // Chave estável baseada apenas em foto_url (não em items completo).
+  // Evita re-executar createSignedUrls a cada re-render/digitação, o que
+  // travava a rolagem quando havia muitas fotos.
+  const fotoPathsKey = items
+    .map((p) => (p.foto_url ? `${p.id}::${p.foto_url}` : ""))
+    .filter(Boolean)
+    .join("|");
+  useEffect(() => {
+    if (!fotoPathsKey) { setFotoSigned({}); return; }
+    const entries = fotoPathsKey.split("|").map((s) => {
+      const [id, ...rest] = s.split("::");
+      return { id, path: rest.join("::") };
+    });
+    const paths = entries.map((e) => e.path);
+    let cancelled = false;
     (async () => {
       const { data } = await supabase.storage.from("pacientes-fotos").createSignedUrls(paths, 3600);
+      if (cancelled) return;
       const map: Record<string, string> = {};
-      items.forEach((p) => {
-        if (!p.foto_url) return;
-        const found = data?.find(d => d.path === p.foto_url);
-        if (found?.signedUrl) map[p.id] = found.signedUrl;
+      entries.forEach((e) => {
+        const found = data?.find((d) => d.path === e.path);
+        if (found?.signedUrl) map[e.id] = found.signedUrl;
       });
       setFotoSigned(map);
     })();
-  }, [items]);
+    return () => { cancelled = true; };
+  }, [fotoPathsKey]);
 
   const filtrados = items;
+
+  // Convênios ativos dos pacientes visíveis (Cartão Benefícios).
+  // Exibimos um badge ao lado do nome, no mesmo padrão da busca da agenda.
+  const idsKey = filtrados.map(p => p.id).sort().join(",");
+  const conveniosQuery = useQuery({
+    queryKey: ["clientes-convenios", clinicaId, idsKey],
+    enabled: !!clinicaId && filtrados.length > 0,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const ids = filtrados.map(p => p.id);
+      const map = new Map<string, { tipo: "titular" | "dependente"; convenio: string }>();
+      const [titRes, depRes] = await Promise.all([
+        supabase
+          .from("contratos_assinatura")
+          .select("paciente_id, plano_id")
+          .eq("clinica_id", clinicaId!)
+          .eq("status", "ativo")
+          .in("paciente_id", ids),
+        supabase
+          .from("contrato_dependentes")
+          .select("paciente_id, contrato:contratos_assinatura!inner(plano_id, status, clinica_id)")
+          .eq("ativo", true)
+          .eq("contrato.status", "ativo")
+          .eq("contrato.clinica_id", clinicaId!)
+          .in("paciente_id", ids),
+      ]);
+      const planoIds = new Set<string>();
+      (titRes.data ?? []).forEach((r: any) => { if (r.plano_id) planoIds.add(r.plano_id); });
+      (depRes.data ?? []).forEach((r: any) => { if (r.contrato?.plano_id) planoIds.add(r.contrato.plano_id); });
+      const planos = new Map<string, string>();
+      if (planoIds.size > 0) {
+        const { data: pls } = await supabase
+          .from("planos_assinatura")
+          .select("id, nome")
+          .in("id", Array.from(planoIds));
+        (pls ?? []).forEach((p: any) => planos.set(p.id, p.nome));
+      }
+      // Dependentes primeiro; titular sobrescreve (prioridade).
+      (depRes.data ?? []).forEach((r: any) => {
+        if (!r.paciente_id) return;
+        const nome = r.contrato?.plano_id ? planos.get(r.contrato.plano_id) : undefined;
+        if (!nome) return;
+        map.set(r.paciente_id, { tipo: "dependente", convenio: nome });
+      });
+      (titRes.data ?? []).forEach((r: any) => {
+        if (!r.paciente_id) return;
+        const nome = r.plano_id ? planos.get(r.plano_id) : undefined;
+        if (!nome) return;
+        map.set(r.paciente_id, { tipo: "titular", convenio: nome });
+      });
+      return map;
+    },
+  });
+  const convenios = conveniosQuery.data;
 
   return (
     <div className="space-y-6">
@@ -214,15 +367,34 @@ function ClientesPage() {
             variant="outline"
             onClick={async () => {
               if (!clinicaAtual) return;
-              const { data, error } = await supabase
-                .from("pacientes")
-                .select("nome,cpf,telefone,email,data_nascimento,cidade,estado,bairro,logradouro,numero,cep,ativo")
-                .eq("clinica_id", clinicaAtual.clinica_id)
-                .order("nome");
-              if (error) { mostrarErro(error); return; }
-              if (!data?.length) { toast.info("Sem dados para exportar."); return; }
+              const PAGE = 1000;
+              const all: any[] = [];
+              const toastId = toast.loading("Exportando clientes…");
+              try {
+                for (let from = 0; ; from += PAGE) {
+                  const { data, error } = await supabase
+                    .from("pacientes")
+                    .select("nome,cpf,telefone,email,data_nascimento,cidade,estado,bairro,logradouro,numero,cep,ativo,codigo_prontuario,numero_pasta")
+                    .eq("clinica_id", clinicaAtual.clinica_id)
+                    .order("nome")
+                    .range(from, from + PAGE - 1);
+                  if (error) { toast.dismiss(toastId); mostrarErro(error); return; }
+                  const rows = data ?? [];
+                  all.push(...rows);
+                  toast.loading(`Exportando clientes… (${all.length})`, { id: toastId });
+                  if (rows.length < PAGE) break;
+                }
+              } catch (e) {
+                toast.dismiss(toastId);
+                toast.error("Falha ao exportar clientes.");
+                return;
+              }
+              toast.dismiss(toastId);
+              if (!all.length) { toast.info("Sem dados para exportar."); return; }
               exportToExcel(
-                data.map((p: any) => ({
+                all.map((p: any) => ({
+                  prontuario: p.codigo_prontuario ?? "",
+                  pasta: p.numero_pasta ?? "",
                   nome: p.nome,
                   cpf: p.cpf ?? "",
                   telefone: p.telefone ?? "",
@@ -236,6 +408,8 @@ function ClientesPage() {
                 })),
                 `clientes-${new Date().toISOString().slice(0, 10)}`,
                 [
+                  { key: "prontuario", label: "Prontuário" },
+                  { key: "pasta", label: "Nº Serviço" },
                   { key: "nome", label: "Nome" },
                   { key: "cpf", label: "CPF" },
                   { key: "telefone", label: "Telefone" },
@@ -248,6 +422,7 @@ function ClientesPage() {
                   { key: "ativo", label: "Ativo" },
                 ],
               );
+              toast.success(`${all.length} clientes exportados.`);
             }}
           >
             <Download className="h-4 w-4 mr-2" /> Exportar Excel
@@ -270,6 +445,11 @@ function ClientesPage() {
         </div>
       </div>
 
+      {atingiuTeto && !(uxMelhorias && !debouncedBusca.trim()) && (
+        <div className="rounded-md border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+          Mostrando os primeiros {LIMITE_BUSCA.toLocaleString("pt-BR")} resultados. Refine a busca (nome completo, CPF ou telefone) para ver mais.
+        </div>
+      )}
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
           <TableHeader className="sticky top-0 z-20">
@@ -286,11 +466,28 @@ function ClientesPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>
+              <TableSkeletonRows
+                cols={8}
+                fallback={<TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando…</TableCell></TableRow>}
+              />
             ) : !clinicaAtual ? (
               <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Selecione uma clínica.</TableCell></TableRow>
             ) : filtrados.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={8} className="p-0">
+                  <EmptyState
+                    icon={<Users className="h-10 w-10" />}
+                    titulo="Nenhum cliente encontrado."
+                    descricao={busca.trim() ? "Tente refinar a busca — nome completo, CPF ou telefone." : "Cadastre o primeiro cliente desta clínica."}
+                    acao={podeEscrever && !busca.trim() ? (
+                      <Button size="sm" onClick={() => setOpenNovo(true)}>
+                        <Plus className="h-4 w-4 mr-1" /> Novo cliente
+                      </Button>
+                    ) : undefined}
+                    fallback={<div className="text-center py-8 text-muted-foreground">Nenhum cliente encontrado.</div>}
+                  />
+                </TableCell>
+              </TableRow>
             ) : filtrados.map(p => (
               <TableRow key={p.id}>
                 <TableCell className="font-mono text-xs text-muted-foreground">{p.codigo_prontuario ?? "—"}</TableCell>
@@ -298,12 +495,20 @@ function ClientesPage() {
                   <div className="flex items-center gap-2">
                     <div className="h-8 w-8 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
                       {fotoSigned[p.id] ? (
-                        <img src={fotoSigned[p.id]} alt={p.nome} className="h-full w-full object-cover" />
+                        <img src={fotoSigned[p.id]} alt={p.nome} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                       ) : (
                         <Users className="h-4 w-4 text-muted-foreground" />
                       )}
                     </div>
                     <span>{p.nome}</span>
+                    {convenios?.get(p.id) && (
+                      <IdCard
+                        className="h-4 w-4 text-emerald-600 shrink-0"
+                        aria-label={`Associado - ${convenios.get(p.id)!.tipo} — ${convenios.get(p.id)!.convenio}`}
+                      >
+                        <title>{`Associado - ${convenios.get(p.id)!.tipo} — ${convenios.get(p.id)!.convenio}`}</title>
+                      </IdCard>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{p.cpf ?? "—"}</TableCell>
@@ -337,6 +542,35 @@ function ClientesPage() {
         </Table>
       </div>
 
+      {uxMelhorias && !debouncedBusca.trim() && totalPacientes !== null && totalPacientes > LIMITE_LISTA && (
+        <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
+          <div className="text-muted-foreground">
+            Página <span className="font-medium text-foreground">{pagina + 1}</span> de{" "}
+            <span className="font-medium text-foreground">{Math.max(1, Math.ceil(totalPacientes / LIMITE_LISTA))}</span>
+            {" · "}Mostrando {pagina * LIMITE_LISTA + 1}–{pagina * LIMITE_LISTA + filtrados.length} de{" "}
+            {totalPacientes.toLocaleString("pt-BR")}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pagina === 0 || loading}
+              onClick={() => setPagina((p) => Math.max(0, p - 1))}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={loading || (pagina + 1) * LIMITE_LISTA >= totalPacientes || filtrados.length < LIMITE_LISTA}
+              onClick={() => setPagina((p) => p + 1)}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Novo cliente */}
       <Dialog open={openNovo} onOpenChange={setOpenNovo}>
         <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
@@ -352,7 +586,7 @@ function ClientesPage() {
               paciente={null}
               stickyFooter
               onCancel={() => setOpenNovo(false)}
-              onSaved={() => { setOpenNovo(false); void load(busca); }}
+              onSaved={() => { setOpenNovo(false); refrescar(); }}
             />
           )}
         </DialogContent>

@@ -22,6 +22,7 @@ import {
   euclidean,
   FACE_MATCH_THRESHOLD,
 } from "@/lib/face-recognition";
+import { TecladoNumerico, formatarCpfParcial } from "@/components/totem/teclado-numerico";
 
 export const Route = createFileRoute("/autoatendimento")({
   component: AutoatendimentoRoute,
@@ -390,16 +391,19 @@ function AutoatendimentoPage() {
     const esp = especialidades.find((e) => e.id === especialidadeId);
     const nomeEsp = esp?.nome ?? "";
     // Procura procedimento por nome da especialidade ou "consulta"
-    const { data } = await supabase
+    const { sanitizePostgrestSearch } = await import("@/lib/sanitize-search");
+    const safeEsp = sanitizePostgrestSearch(nomeEsp);
+    let q = supabase
       .from("procedimentos")
       .select(
         "id, nome, valor_padrao, valor_dinheiro, valor_pix, valor_cartao_credito, valor_cartao_debito, duracao_minutos",
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("ativo", true)
-      .or(`nome.ilike.%${nomeEsp}%,nome.ilike.%consulta%`)
-      .order("nome")
-      .limit(20);
+      .eq("ativo", true);
+    const parts: string[] = ["nome.ilike.%consulta%"];
+    if (safeEsp.length > 0) parts.unshift(`nome.ilike.%${safeEsp}%`);
+    q = q.or(parts.join(","));
+    const { data } = await q.order("nome").limit(20);
     const list = data ?? [];
     // Prioriza match por nome exato da especialidade
     const exato = list.find((p: any) =>
@@ -494,8 +498,10 @@ function AutoatendimentoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/40 flex flex-col">
-      <header className="px-8 py-6 flex items-center justify-between">
+    // h-[100dvh] + overflow-hidden: modo quiosque, sem scroll — cada tela
+    // precisa caber inteira na viewport do totem.
+    <div className="h-[100dvh] overflow-hidden bg-gradient-to-br from-background via-background to-muted/40 flex flex-col">
+      <header className="px-6 py-3 flex items-center justify-between shrink-0">
         <div>
           <div className="text-xs uppercase tracking-widest text-muted-foreground">Bem-vindo a</div>
           <h1 className="text-2xl font-bold">{clinicaAtual.clinica.nome}</h1>
@@ -510,14 +516,14 @@ function AutoatendimentoPage() {
         </div>
       </header>
 
-      <main className="flex-1 flex items-center justify-center px-6 pb-12">
+      <main className="flex-1 min-h-0 flex items-center justify-center px-6 py-2 overflow-hidden">
         {step === "home" && (
           <div className="w-full max-w-6xl space-y-10">
             <div className="text-center space-y-2">
               <h2 className="text-5xl font-bold tracking-tight">Como podemos ajudar?</h2>
               <p className="text-xl text-muted-foreground">Toque em uma das opções</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <TileGrande
                 onClick={() => navigate({ to: "/totem" })}
                 cor="from-primary/90 to-primary"
@@ -528,23 +534,15 @@ function AutoatendimentoPage() {
               <TileGrande
                 onClick={() => {
                   setStep("checkin");
-                  setIdentMode(null);
+                // Entra direto no CPF; o paciente pode alternar para
+                // reconhecimento facial pelo botão dentro da tela.
+                  setIdentMode("cpf");
+                  setCpf("");
                 }}
                 cor="from-emerald-600 to-emerald-700"
                 Icon={BadgeCheck}
                 titulo="Fazer check-in"
                 sub="Confirme presença na sua consulta de hoje"
-              />
-              <TileGrande
-                onClick={() => {
-                  setStep("agendar");
-                  setIdentMode(null);
-                  void carregarEspecialidades();
-                }}
-                cor="from-indigo-600 to-indigo-700"
-                Icon={CalendarPlus}
-                titulo="Solicitar atendimento"
-                sub="Escolha a especialidade e seja chamado"
               />
             </div>
             <p className="text-center text-xs text-muted-foreground pt-4">
@@ -554,24 +552,30 @@ function AutoatendimentoPage() {
         )}
 
         {(step === "checkin" || step === "agendar") && (
-          <div className="w-full max-w-3xl bg-card border rounded-3xl p-10 shadow-xl relative">
+          <div className="w-full max-w-xl bg-card border rounded-3xl p-6 shadow-xl relative my-auto max-h-full flex flex-col">
             <button
               onClick={reset}
-              className="absolute top-6 left-6 text-muted-foreground hover:text-foreground flex items-center gap-1"
+              className="absolute top-4 left-4 text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm"
             >
-              <ArrowLeft className="h-5 w-5" /> Início
+              <ArrowLeft className="h-4 w-4" /> Início
             </button>
 
-            <div className="text-center space-y-2 mb-8">
-              <h2 className="text-3xl font-bold">
-                {step === "checkin" ? "Identifique-se para check-in" : "Identifique-se"}
+            <div className="text-center space-y-1 mb-4 mt-2">
+              <h2 className="text-2xl font-bold">
+                {step === "checkin" ? "Check-in" : "Identifique-se"}
               </h2>
-              <p className="text-muted-foreground">Escolha como deseja se identificar</p>
+              <p className="text-sm text-muted-foreground">
+                {identMode === "facial"
+                  ? "Posicione seu rosto na câmera"
+                  : "Digite seu CPF no teclado abaixo"}
+              </p>
             </div>
 
-            {/* Escolha do modo */}
+            {/* Escolha do modo — mantido apenas como fallback (o check-in já
+                entra direto no CPF; o botão de reconhecimento facial foi
+                removido a pedido da gestão). */}
             {identMode === null && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <button
                   onClick={() => setIdentMode("cpf")}
                   className="h-32 rounded-2xl border-2 hover:border-primary hover:bg-primary/5 transition flex flex-col items-center justify-center gap-2"
@@ -579,39 +583,45 @@ function AutoatendimentoPage() {
                   <ShieldCheck className="h-8 w-8 text-primary" />
                   <div className="text-lg font-semibold">Digitar CPF</div>
                 </button>
-                <button
-                  onClick={() => {
-                    setIdentMode("facial");
-                    void iniciarFacial((p) => {
-                      if (step === "checkin") void fazerCheckin(p);
-                    });
-                  }}
-                  className="h-32 rounded-2xl border-2 hover:border-primary hover:bg-primary/5 transition flex flex-col items-center justify-center gap-2"
-                >
-                  <Camera className="h-8 w-8 text-primary" />
-                  <div className="text-lg font-semibold">Reconhecimento facial</div>
-                </button>
               </div>
             )}
 
-            {/* CPF */}
+            {/* CPF — input somente leitura + teclado na tela (totem touch,
+                sem teclado físico; inputMode none evita o teclado do SO). */}
             {identMode === "cpf" && (
-              <div className="space-y-5">
+              <div className="space-y-3">
                 <input
-                  autoFocus
-                  inputMode="numeric"
-                  placeholder="Digite seu CPF (apenas números)"
-                  value={cpf}
-                  onChange={(e) => setCpf(e.target.value.replace(/\D/g, "").slice(0, 11))}
-                  className="w-full h-20 px-6 text-3xl tracking-widest rounded-xl border bg-background text-center"
+                  readOnly
+                  inputMode="none"
+                  placeholder="000.000.000-00"
+                  value={formatarCpfParcial(cpf)}
+                  className="w-full h-14 px-4 text-2xl tracking-widest rounded-xl border bg-background text-center tabular-nums"
                 />
-                <div className="grid grid-cols-2 gap-3">
-                  <Button variant="outline" size="lg" className="h-14" onClick={() => setIdentMode(null)}>
+                <TecladoNumerico
+                  disabled={busy}
+                  onDigit={(d) => setCpf((v) => (v + d).slice(0, 11))}
+                  onBackspace={() => setCpf((v) => v.slice(0, -1))}
+                  onClear={() => setCpf("")}
+                />
+                <Button
+                  variant="outline"
+                  className="w-full h-11"
+                  disabled={busy}
+                  onClick={() => {
+                    setIdentMode("facial");
+                    void iniciarFacial(async (p) => {
+                      if (step === "checkin") await fazerCheckin(p);
+                    });
+                  }}
+                >
+                  <Camera className="h-4 w-4 mr-2" /> Usar reconhecimento facial
+                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" className="h-11" onClick={reset}>
                     Voltar
                   </Button>
                   <Button
-                    size="lg"
-                    className="h-14"
+                    className="h-11"
                     disabled={busy || cpf.length !== 11}
                     onClick={async () => {
                       const p = await identificarPorCpf();
@@ -628,26 +638,39 @@ function AutoatendimentoPage() {
 
             {/* Facial */}
             {identMode === "facial" && (
-              <div className="text-center space-y-4">
-                <div className="relative mx-auto w-[420px] h-[320px] rounded-2xl overflow-hidden border-4 border-primary/40 bg-black">
+              <div className="text-center space-y-3">
+                <div className="relative mx-auto w-full max-w-[360px] aspect-[4/3] rounded-2xl overflow-hidden border-4 border-primary/40 bg-black">
                   <video
                     ref={videoRef}
                     className="w-full h-full object-cover scale-x-[-1]"
                     playsInline
                     muted
                   />
-                  <div className="absolute inset-8 border-2 border-white/60 rounded-full pointer-events-none" />
+                  <div className="absolute inset-6 border-2 border-white/60 rounded-full pointer-events-none" />
                 </div>
-                <p className="text-lg">{scanMsg}</p>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    stopCamera();
-                    setIdentMode(null);
-                  }}
-                >
-                  <X className="h-4 w-4 mr-2" /> Cancelar
-                </Button>
+                <p className="text-base">{scanMsg}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    className="h-11"
+                    onClick={() => {
+                      stopCamera();
+                      setIdentMode("cpf");
+                    }}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Digitar CPF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-11"
+                    onClick={() => {
+                      stopCamera();
+                      reset();
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-2" /> Cancelar
+                  </Button>
+                </div>
               </div>
             )}
 

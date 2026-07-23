@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2, ShieldCheck, Layers, Lightbulb, ArrowLeft, FileText, Info, Printer, Gift, FileSignature, Stethoscope, Scale } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -36,12 +37,25 @@ const BENEFICIOS_MAX = 2000;
 const stripHtml = (v: string) =>
   DOMPurify.sanitize(v, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
 
+// Detecta o convênio interno de funcionários (nome pode variar entre clínicas:
+// "FUNCIONARIO", "CONVÊNIO FUNCIONARIO" etc.). Normaliza acentos e casing.
+const isConvenioFuncionario = (nome: string) =>
+  (nome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .includes("FUNCIONARIO");
+
 const convenioSchema = z
   .object({
     nome: z.string().trim().min(2, "Nome deve ter ao menos 2 caracteres").max(NOME_MAX, `Nome pode ter no máximo ${NOME_MAX} caracteres`),
     descricao: z.string().trim().max(DESCRICAO_MAX, `Descrição pode ter no máximo ${DESCRICAO_MAX} caracteres`).optional(),
     beneficios: z.string().trim().max(BENEFICIOS_MAX, `Benefícios pode ter no máximo ${BENEFICIOS_MAX} caracteres`).optional(),
     taxa_adesao: z.number().min(0, "Taxa não pode ser negativa").max(100000, "Taxa acima do permitido"),
+    taxa_inclusao_dependente: z
+      .number()
+      .min(0, "Taxa não pode ser negativa")
+      .max(100000, "Taxa acima do permitido"),
     num_parcelas: z.number().int().min(1, "Nº de parcelas deve ser ≥ 1").max(60, "Máximo de 60 parcelas"),
     max_dependentes: z.number().int().min(0).max(50, "Máximo de 50 dependentes"),
     fidelidade_meses: z.number().int().min(0).max(120),
@@ -100,6 +114,7 @@ type Convenio = {
   ativo: boolean;
   valor_mensal: number;
   taxa_adesao: number;
+  taxa_inclusao_dependente: number;
   num_parcelas: number;
   max_dependentes: number;
   fidelidade_meses: number;
@@ -140,14 +155,14 @@ type EspOpt = { id: string; nome: string };
 function ConveniosPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("cartao-beneficios");
-  const [rows, setRows] = useState<Convenio[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [view, setView] = useState<"list" | "form">("list");
   const [editing, setEditing] = useState<Convenio | null>(null);
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
   const [ativo, setAtivo] = useState(true);
   const [taxaAdesao, setTaxaAdesao] = useState<number>(0);
+  const [taxaInclusaoDep, setTaxaInclusaoDep] = useState<number>(0);
   const [numParcelas, setNumParcelas] = useState<number>(12);
   const [maxDependentes, setMaxDependentes] = useState<number>(0);
   const [fidelidadeMeses, setFidelidadeMeses] = useState<number>(0);
@@ -157,7 +172,6 @@ function ConveniosPage() {
   const [informativoHtml, setInformativoHtml] = useState("");
   const [termoInclusaoHtml, setTermoInclusaoHtml] = useState("");
   const [faixas, setFaixas] = useState<Faixa[]>([{ vidas_de: 1, vidas_ate: null, valor_mensal: 0 }]);
-  const [valoresMin, setValoresMin] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState(false);
   const [toDelete, setToDelete] = useState<Convenio | null>(null);
 
@@ -246,18 +260,21 @@ function ConveniosPage() {
     setEscopoDialogOpen(false);
   };
 
-  const load = async () => {
-    if (!clinicaAtual) return;
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("cb_convenios")
-      .select("*")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("nome");
-    if (error) mostrarErro(error);
-    const list = (data ?? []) as Convenio[];
-    setRows(list);
-    if (list.length) {
+  const clinicaId = clinicaAtual?.clinica_id;
+  // Lista de convênios oferecidos — catálogo de baixo risco, cache de 5min.
+  // A edição/detalhe (benefícios, faixas no form, catálogos) continua sob
+  // demanda, sem cache — só a listagem principal se beneficia aqui.
+  const { data: listData, isLoading: loading, error: loadError } = useQuery({
+    queryKey: ["cb-convenios", clinicaId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cb_convenios")
+        .select("*")
+        .eq("clinica_id", clinicaId!)
+        .order("nome");
+      if (error) throw error;
+      const list = (data ?? []) as Convenio[];
+      if (!list.length) return { rows: list, valoresMin: {} as Record<string, number> };
       const { data: vs } = await supabase
         .from("cb_convenio_faixas")
         .select("convenio_id, valor_mensal")
@@ -269,21 +286,22 @@ function ConveniosPage() {
           minMap[v.convenio_id] = val;
         }
       });
-      setValoresMin(minMap);
-    } else {
-      setValoresMin({});
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id]);
+      return { rows: list, valoresMin: minMap };
+    },
+    enabled: !!clinicaId,
+    staleTime: 5 * 60_000,
+  });
+  useEffect(() => { if (loadError) mostrarErro(loadError); }, [loadError]);
+  const rows = listData?.rows ?? [];
+  const valoresMin = listData?.valoresMin ?? {};
+  const load = () => queryClient.invalidateQueries({ queryKey: ["cb-convenios", clinicaId] });
 
   const openNew = () => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setEditing(null);
     setEditingBenIdx(null);
     setNome(""); setDescricao(""); setAtivo(true);
-    setTaxaAdesao(0); setNumParcelas(12);
+    setTaxaAdesao(0); setTaxaInclusaoDep(0); setNumParcelas(12);
     setMaxDependentes(0); setFidelidadeMeses(0); setVigenciaMeses(12);
     setBeneficiosTxt(""); setModeloContrato("");
     setInformativoHtml("");
@@ -302,6 +320,7 @@ function ConveniosPage() {
     setDescricao(c.descricao ?? "");
     setAtivo(c.ativo);
     setTaxaAdesao(Number(c.taxa_adesao ?? 0));
+    setTaxaInclusaoDep(Number((c as unknown as { taxa_inclusao_dependente?: number }).taxa_inclusao_dependente ?? 0));
     setNumParcelas(c.num_parcelas ?? 12);
     setMaxDependentes(c.max_dependentes ?? 0);
     setFidelidadeMeses(c.fidelidade_meses ?? 0);
@@ -346,6 +365,7 @@ function ConveniosPage() {
       descricao: descClean || undefined,
       beneficios: benefClean || undefined,
       taxa_adesao: taxaAdesao,
+      taxa_inclusao_dependente: taxaInclusaoDep,
       num_parcelas: numParcelas,
       max_dependentes: maxDependentes,
       fidelidade_meses: fidelidadeMeses,
@@ -356,16 +376,25 @@ function ConveniosPage() {
       toast.error(first?.message ?? "Dados inválidos.");
       return;
     }
-    // 3) Faixas: exigir pelo menos 1, valor > 0 e sem vidas_de duplicado
-    if (!faixas.length) { toast.error("Adicione pelo menos uma faixa de preço."); return; }
+    // 3) Faixas: exigir pelo menos 1, valor >= 0 e sem vidas_de duplicado
+    //    (convênio FUNCIONARIO não usa faixas — pulamos a validação e garantimos
+    //     uma faixa mínima automática de 1 vida com valor R$ 0)
+    const isFuncionario = isConvenioFuncionario(nomeClean || editing?.nome || "");
+    let faixasParaSalvar = faixas;
+    if (isFuncionario && !faixasParaSalvar.length) {
+      faixasParaSalvar = [{ vidas_de: 1, vidas_ate: 1, valor_mensal: 0 }];
+      setFaixas(faixasParaSalvar);
+    }
+    if (!isFuncionario && !faixasParaSalvar.length) { toast.error("Adicione pelo menos uma faixa de preço."); return; }
     const vistas = new Set<number>();
-    for (const f of faixas) {
+    for (const f of faixasParaSalvar) {
+      if (isFuncionario) break;
       if (!f.vidas_de || f.vidas_de < 1) { toast.error("Campo 'De' inválido em uma faixa."); return; }
       if (f.vidas_ate !== null && f.vidas_ate < f.vidas_de) {
         toast.error("Campo 'Até' deve ser maior ou igual a 'De'."); return;
       }
-      if (!(Number(f.valor_mensal) > 0)) {
-        toast.error(`Valor mensal da faixa de ${f.vidas_de} pessoa(s) deve ser maior que zero.`); return;
+      if (!(Number(f.valor_mensal) >= 0)) {
+        toast.error(`Valor mensal da faixa de ${f.vidas_de} pessoa(s) é inválido.`); return;
       }
       if (vistas.has(f.vidas_de)) {
         toast.error(`Faixa duplicada para ${f.vidas_de} pessoa(s). Remova a repetição.`); return;
@@ -373,7 +402,7 @@ function ConveniosPage() {
       vistas.add(f.vidas_de);
     }
     setSaving(true);
-    const valorMin = faixas.reduce((m, f) => Math.min(m, Number(f.valor_mensal) || 0), Number(faixas[0].valor_mensal) || 0);
+    const valorMin = faixasParaSalvar.reduce((m, f) => Math.min(m, Number(f.valor_mensal) || 0), Number(faixasParaSalvar[0].valor_mensal) || 0);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       nome: nomeClean,
@@ -381,6 +410,7 @@ function ConveniosPage() {
       ativo,
       valor_mensal: valorMin,
       taxa_adesao: taxaAdesao,
+      taxa_inclusao_dependente: taxaInclusaoDep,
       num_parcelas: numParcelas,
       max_dependentes: maxDependentes,
       fidelidade_meses: fidelidadeMeses,
@@ -401,7 +431,7 @@ function ConveniosPage() {
     }
     // Substitui faixas de preço
     await supabase.from("cb_convenio_faixas").delete().eq("convenio_id", convenioId!);
-    const rowsToInsert = faixas.map((f) => ({
+    const rowsToInsert = faixasParaSalvar.map((f) => ({
       convenio_id: convenioId!,
       vidas_de: Number(f.vidas_de),
       vidas_ate: f.vidas_ate === null ? null : Number(f.vidas_ate),
@@ -540,11 +570,17 @@ function ConveniosPage() {
             <Tabs defaultValue="info" className="w-full">
             <TabsList>
               <TabsTrigger value="info">Informações</TabsTrigger>
-              <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
+              {!isConvenioFuncionario(nome || editing?.nome || "") && (
+                <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
+              )}
               <TabsTrigger value="regras"><Gift className="h-4 w-4 mr-1" />Benefícios</TabsTrigger>
-              <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
-              <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
-              <TabsTrigger value="termo"><FileSignature className="h-4 w-4 mr-1" />Termo de Inclusão</TabsTrigger>
+              {!isConvenioFuncionario(nome || editing?.nome || "") && (
+                <>
+                  <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
+                  <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
+                  <TabsTrigger value="termo"><FileSignature className="h-4 w-4 mr-1" />Termo de Inclusão</TabsTrigger>
+                </>
+              )}
             </TabsList>
             <TabsContent value="info" className="space-y-3 mt-3">
               <div>
@@ -559,12 +595,19 @@ function ConveniosPage() {
                   {nome.trim().length} / {NOME_MAX}
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
                   <Label>Taxa de adesão (R$)</Label>
                   <CurrencyInput
                     value={taxaAdesao ? taxaAdesao.toFixed(2) : ""}
                     onChange={(v) => setTaxaAdesao(v ? parseFloat(v) : 0)}
+                  />
+                </div>
+                <div>
+                  <Label>Taxa de inclusão de dependente (R$)</Label>
+                  <CurrencyInput
+                    value={taxaInclusaoDep ? taxaInclusaoDep.toFixed(2) : ""}
+                    onChange={(v) => setTaxaInclusaoDep(v ? parseFloat(v) : 0)}
                   />
                 </div>
                 <div>

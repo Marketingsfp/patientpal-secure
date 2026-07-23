@@ -6,6 +6,7 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { EncerrarExpedienteButton } from "@/components/medicos/EncerrarExpedienteButton";
 import { isCPFValido, somenteDigitos } from "@/lib/cpf";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,9 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ListSkeleton } from "@/components/ui/list-skeleton";
+import { TableSkeletonRows } from "@/components/ui/table-skeleton";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
@@ -32,11 +36,14 @@ import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { ProcedimentoCell } from "@/components/agenda/procedimento-cell";
 import { PatientSearchInput } from "@/components/patient-search-input";
 import { PacienteQuickActions } from "@/components/agenda/paciente-quick-actions";
+import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { FichaEmUsoAlert } from "@/components/agenda/ficha-em-uso-alert";
 import { PacienteResumoBar } from "@/components/agenda/paciente-resumo-bar";
 import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-sheet";
 import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
+import { useTurboDisabled } from "@/hooks/use-turbo-disabled";
 import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/dividir-orcamento-dialog";
+import { SelecionarItensOrcamentoDialog, type SelectItemOrc } from "@/components/agenda/selecionar-itens-orcamento-dialog";
 import { calcularAvisoLimitePendentes } from "@/lib/agenda/aviso-limite-pendentes";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
@@ -66,13 +73,15 @@ import {
   Undo2,
   CheckCircle2,
   User,
+  Camera,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
 import { usePickEmitente } from "@/components/nfse/use-pick-emitente";
-import { usePickTomador } from "@/components/nfse/use-pick-tomador";
+import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
+import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 import { useAuth } from "@/hooks/use-auth";
 import {
   getProcedimentosAgenda,
@@ -114,6 +123,9 @@ type Agendamento = {
   atendimento_grupo_id?: string | null;
   ficha_numero?: number | null;
   forma_pagamento_prevista?: string | null;
+  edit_lock_by?: string | null;
+  edit_lock_by_nome?: string | null;
+  edit_lock_at?: string | null;
 };
 type Medico = {
   id: string;
@@ -126,7 +138,6 @@ type Medico = {
   procedimento_padrao_nome?: string | null;
   especialidade_nome?: string | null;
 };
-type RecursoEnf = { id: string; nome: string };
 type Especialidade = { id: string; nome: string };
 type Paciente = { id: string; nome: string };
 type ProcedimentoRef = {
@@ -163,11 +174,21 @@ const STATUS_COR: Record<Status, string> = {
 const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const PAGE_SIZE = 100;
 
+// ID fixo da especialidade "Odontologia" no cadastro de especialidades.
+// Usado para restringir orçamentos odonto a médicos odontologistas.
+const ODONTO_ESPECIALIDADE_ID = "f0cfaa0a-2a67-4176-97de-a7072c37077c";
+
 const normalizar = (s: string) =>
   (s ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+
+const chaveNomeAgenda = (s: string) =>
+  normalizar(s)
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
 const isSlotLivre = (pacienteNome: string | null | undefined) => {
   const nome = normalizar(pacienteNome ?? "").trim();
@@ -303,6 +324,16 @@ type ConvenioInfo = {
   desconto: DescontoConvenio | null;
   avisoLimite?: string;
   bloquear?: boolean;
+  /** Contrato com parcela(s) vencida(s) dentro da tolerância de 5 dias. */
+  emCarencia?: boolean;
+  /** Dias restantes de tolerância na parcela vencida mais crítica. */
+  diasCarenciaRestantes?: number | null;
+  /** Acréscimo configurado no convênio para pagamentos não-dinheiro. */
+  acrescimoCartao?: {
+    modo: "percentual" | "valor_fixo" | null;
+    percentual: number;
+    valor: number;
+  } | null;
 };
 
 function aplicarDesconto(valor: number, d: DescontoConvenio): number {
@@ -322,6 +353,25 @@ function aplicarDescontoPorForma(valor: number, forma: string, d: DescontoConven
   return aplicarDesconto(valor, d);
 }
 
+/**
+ * Aplica o acréscimo configurado no convênio quando a forma de pagamento
+ * NÃO é dinheiro (PIX, débito, crédito, etc.). Não afeta valores <= 0 nem
+ * o Convênio Funcionário (checagem já feita antes de setar `acrescimoCartao`).
+ */
+function aplicarAcrescimoCartaoAgenda(
+  valor: number,
+  forma: string,
+  acr: NonNullable<ConvenioInfo["acrescimoCartao"]> | null | undefined,
+): number {
+  if (!acr || !acr.modo) return valor;
+  if (forma === "dinheiro") return valor;
+  if (!(valor > 0)) return valor;
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  if (acr.modo === "percentual") return round2(valor * (1 + (Number(acr.percentual) || 0) / 100));
+  if (acr.modo === "valor_fixo") return round2(valor + (Number(acr.valor) || 0));
+  return valor;
+}
+
 async function obterInfoConvenioPaciente(params: {
   clinicaId: string;
   pacienteId: string | null | undefined;
@@ -336,18 +386,18 @@ async function obterInfoConvenioPaciente(params: {
   // 1) Contrato ativo: paciente como titular OU dependente ativo
   const { data: titularContratos } = await supabase
     .from("contratos_assinatura")
-    .select("id,convenio_id,cb_convenios(nome)")
+    .select("id,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,cb_convenios(nome)")
     .eq("clinica_id", clinicaId)
     .eq("status", "ativo")
     .eq("paciente_id", pacienteId)
     .limit(5);
-  let contrato: { id: string; convenio_id: string | null; cb_convenios: { nome: string } | null } | null =
+  let contrato: { id: string; convenio_id: string | null; contrato_origem_id?: string | null; numero_renovacoes?: number | null; sem_carencia?: boolean | null; cb_convenios: { nome: string } | null } | null =
     ((titularContratos ?? [])[0] as any) ?? null;
 
   if (!contrato) {
     const { data: deps } = await supabase
       .from("contrato_dependentes")
-      .select("contrato_id,ativo,contratos_assinatura!inner(id,clinica_id,status,convenio_id,cb_convenios(nome))")
+      .select("contrato_id,ativo,contratos_assinatura!inner(id,clinica_id,status,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,cb_convenios(nome))")
       .eq("paciente_id", pacienteId)
       .eq("ativo", true)
       .limit(5);
@@ -360,7 +410,11 @@ async function obterInfoConvenioPaciente(params: {
 
   const convenioNome = contrato.cb_convenios?.nome ?? "Convênio";
 
-  // 2) Verifica mensalidades em atraso do contrato
+  // 2) Verifica mensalidades em atraso do contrato.
+  //    Regra de negócio: tolerância de 5 dias corridos após o vencimento.
+  //    - 0..5 dias de atraso → contrato "em carência" (uso do convênio
+  //      restrito a consultas ≤ R$ 9,99, sem exames).
+  //    - > 5 dias → parcela conta como atrasada e o convênio é bloqueado.
   const hojeStr = new Date().toISOString().slice(0, 10);
   const { data: mens } = await supabase
     .from("contrato_mensalidades")
@@ -368,8 +422,21 @@ async function obterInfoConvenioPaciente(params: {
     .eq("contrato_id", contrato.id)
     .in("status", ["pendente", "aberto", "atrasado"])
     .lte("vencimento", hojeStr);
-  const parcelasAtrasadas = (mens ?? []).length;
-  const emDia = parcelasAtrasadas === 0;
+  const DIAS_TOLERANCIA = 5;
+  const hojeMs = new Date(hojeStr + "T00:00:00").getTime();
+  const diasAtrasoLista = (mens ?? []).map((m: any) => {
+    const v = new Date(String(m.vencimento) + "T00:00:00").getTime();
+    return Math.max(0, Math.floor((hojeMs - v) / 86400000));
+  });
+  const parcelasAtrasadas = diasAtrasoLista.filter((d) => d > DIAS_TOLERANCIA).length;
+  const parcelasEmCarencia = diasAtrasoLista.filter((d) => d >= 0 && d <= DIAS_TOLERANCIA).length;
+  const emDia = parcelasAtrasadas === 0 && parcelasEmCarencia === 0;
+  const emCarencia = parcelasAtrasadas === 0 && parcelasEmCarencia > 0;
+  const diasCarenciaRestantes = emCarencia
+    ? Math.min(
+        ...diasAtrasoLista.filter((d) => d <= DIAS_TOLERANCIA).map((d) => DIAS_TOLERANCIA - d),
+      )
+    : null;
 
   // 2b) Conta mensalidades pagas do contrato (para checagem de carência).
   const { count: pagasCount } = await supabase
@@ -390,28 +457,49 @@ async function obterInfoConvenioPaciente(params: {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
-  const { data: procs } = await supabase
-    .from("procedimentos")
-    .select("id,nome,tipo")
-    .eq("clinica_id", clinicaId)
-    .eq("ativo", true)
-    .limit(5000);
-  const procRow =
-    (procs ?? []).find(
-      (p: any) =>
-        (p.nome ?? "")
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toLowerCase()
-          .trim() === procNorm,
-    ) ??
-    (procs ?? []).find((p: any) =>
-      (p.nome ?? "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .includes(procNorm),
-    );
+  // Busca direto por nome (case-insensitive) — antes puxávamos todos os
+  // procedimentos da clínica com .limit(5000), mas o PostgREST corta em
+  // 1000 por default. Em clínicas com >1000 procedimentos ativos, o item
+  // procurado podia ficar fora do lote e procedimentoId caía como null,
+  // o que fazia o cálculo de desconto do convênio pegar a especialidade
+  // errada do médico placeholder (ex.: Mamografia 10% em vez de
+  // Tomografia 5%).
+  let procRow: { id: string; nome: string; tipo: string | null } | null = null;
+  if (procNomeBase) {
+    const { data: exact } = await supabase
+      .from("procedimentos")
+      .select("id,nome,tipo")
+      .eq("clinica_id", clinicaId)
+      .eq("ativo", true)
+      .ilike("nome", procNomeBase)
+      .limit(5);
+    procRow =
+      ((exact ?? []) as any[]).find(
+        (p) =>
+          (p.nome ?? "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim() === procNorm,
+      ) ?? ((exact ?? [])[0] as any) ?? null;
+    if (!procRow) {
+      const { data: fuzzy } = await supabase
+        .from("procedimentos")
+        .select("id,nome,tipo")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .ilike("nome", `%${procNomeBase}%`)
+        .limit(10);
+      procRow =
+        ((fuzzy ?? []) as any[]).find((p) =>
+          (p.nome ?? "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .includes(procNorm),
+        ) ?? null;
+    }
+  }
   const procedimentoId = (procRow as any)?.id ?? null;
   const procedimentoTipo = ((procRow as any)?.tipo ?? "").toString().toLowerCase() || null;
 
@@ -439,6 +527,22 @@ async function obterInfoConvenioPaciente(params: {
     if (!especialidadeId && extras[0]) especialidadeId = extras[0];
   }
 
+  // Especialidades do PROCEDIMENTO (fonte de verdade quando o médico é
+  // um "placeholder" com N especialidades — sem isso, a busca pegava a
+  // primeira especialidade do médico que casasse com QUALQUER regra do
+  // convênio, aplicando o desconto errado, ex.: 10% de Mamografia em
+  // vez dos 5% da Tomografia.
+  let especialidadesProcedimento: string[] = [];
+  if (procedimentoId) {
+    const { data: procEsps } = await (supabase as any)
+      .from("procedimento_especialidades")
+      .select("especialidade_id")
+      .eq("procedimento_id", procedimentoId);
+    especialidadesProcedimento = ((procEsps ?? []) as Array<{ especialidade_id: string | null }>)
+      .map((r) => r.especialidade_id)
+      .filter((x): x is string => !!x);
+  }
+
   // 4) Fonte única de regras de desconto: cb_convenio_regras (aba Regras de Preço).
   //    A Agenda passou a ler exatamente as mesmas regras que o Caixa usa —
   //    a aba antiga "Benefícios (regras)" (cb_beneficios) foi removida.
@@ -452,14 +556,66 @@ async function obterInfoConvenioPaciente(params: {
   const regrasCb = (regrasRaw ?? []) as any[];
   const { findRegra, carenciaCumprida } = await import("@/lib/cb-regras");
 
-  // Escolhe a regra mais específica dentre as especialidades possíveis do médico.
-  const espsTentativa: (string | null)[] = especialidadesMedico.length ? [...especialidadesMedico, null] : [null];
+  // Ordem de tentativa: especialidade do procedimento primeiro (mais
+  // específica ao serviço), depois especialidades do médico, por fim null.
+  // Coleta TODAS as regras candidatas e escolhe a de maior score
+  // (procedimento_id > especialidade_id > tipo > prioridade) para não
+  // parar na primeira que casar por coincidência.
+  // Especialidade explicitamente indicada no nome do serviço (sufixo
+  // "(DERMATOLOGIA)"). É a fonte mais forte de desambiguação quando o
+  // procedimento base ("CONSULTA") está vinculado a várias especialidades
+  // via procedimento_especialidades — sem isso, a regra de menor valor
+  // encontrada primeiro (ex.: NUTRICAO R$60) vencia a regra correta
+  // (DERMATOLOGIA R$9,99) por empate de score.
+  const sufixoMatch = (procedimentoNome ?? "").match(/\(([^()]+)\)\s*$/);
+  const sufixoEsp = sufixoMatch ? sufixoMatch[1].trim() : "";
+  let especialidadeSufixoId: string | null = null;
+  if (sufixoEsp) {
+    const sufixoNorm = sufixoEsp
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+    const { data: espData } = await supabase
+      .from("especialidades")
+      .select("id,nome")
+      .ilike("nome", sufixoEsp)
+      .limit(5);
+    const acha =
+      ((espData ?? []) as Array<{ id: string; nome: string }>).find(
+        (e) =>
+          (e.nome ?? "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim() === sufixoNorm,
+      ) ?? ((espData ?? [])[0] as any);
+    especialidadeSufixoId = (acha as any)?.id ?? null;
+  }
+  // Se o sufixo casou com uma especialidade do médico, usa APENAS ela —
+  // o operador foi explícito sobre qual especialidade da consulta.
+  const sufixoBateComMedico =
+    !!especialidadeSufixoId && especialidadesMedico.includes(especialidadeSufixoId);
+  const espsTentativa: (string | null)[] = sufixoBateComMedico
+    ? [especialidadeSufixoId]
+    : Array.from(
+        new Set<string | null>([
+          ...(especialidadeSufixoId ? [especialidadeSufixoId] : []),
+          ...especialidadesMedico,
+          ...especialidadesProcedimento,
+          null,
+        ]),
+      );
+  const scoreRegra = (r: any) =>
+    (r.procedimento_id ? 100 : 0)
+    + (r.especialidade_id ? 10 : 0)
+    + (r.tipo ? 5 : 0)
+    + (Number(r.prioridade) || 0) * 0.01;
   let regraMatch: any = null;
   for (const eid of espsTentativa) {
     const r = findRegra(regrasCb as any, eid, procedimentoTipo, procedimentoId);
-    if (r) {
+    if (r && (!regraMatch || scoreRegra(r) > scoreRegra(regraMatch))) {
       regraMatch = r;
-      break;
     }
   }
 
@@ -486,7 +642,15 @@ async function obterInfoConvenioPaciente(params: {
   //     (paga particular). Já era feito antes, agora fica junto com o resto.
   let avisoLimite: string | undefined;
   let bloquear = false;
-  if (regraMatch && !carenciaCumprida(regraMatch, mensalidadesPagas)) {
+  // Contratos oriundos de renovação (extensão do mesmo contrato ou troca de
+  // plano gerando novo contrato) não têm carência — o paciente já é cliente
+  // do convênio há pelo menos um ciclo. Considera renovação quando o contrato
+  // já foi renovado ao menos uma vez ou tem contrato de origem.
+  const isRenovacao =
+    Number((contrato as any)?.numero_renovacoes ?? 0) > 0 ||
+    !!(contrato as any)?.contrato_origem_id ||
+    !!(contrato as any)?.sem_carencia;
+  if (regraMatch && !isRenovacao && !carenciaCumprida(regraMatch, mensalidadesPagas)) {
     const n = Number(regraMatch.carencia_mensalidades) || 0;
     desconto = null;
     beneficioEscolhido = null;
@@ -759,9 +923,8 @@ async function obterInfoConvenioPaciente(params: {
           let fallback: any = null;
           for (const eid of espsTentativa) {
             const r = findRegra(regrasCb as any, eid, procedimentoTipo, procedimentoId, { excludeGratuito: true });
-            if (r) {
+            if (r && (!fallback || scoreRegra(r) > scoreRegra(fallback))) {
               fallback = r;
-              break;
             }
           }
           if (fallback) {
@@ -804,7 +967,61 @@ async function obterInfoConvenioPaciente(params: {
     }
   }
 
-  return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear };
+  // 6) Trava de tolerância (5 dias corridos após vencimento).
+  //    Dentro da carência o convênio libera APENAS consultas cujo valor com
+  //    o benefício fique ≤ R$ 9,99. Exames e demais procedimentos ficam sem
+  //    o benefício (paga particular) até a mensalidade ser quitada.
+  if (emCarencia) {
+    const LIMITE_CONSULTA = 9.99;
+    const tipoLower = (procedimentoTipo ?? "").toLowerCase();
+    const nomeLower = (procedimentoNome ?? "").toLowerCase();
+    const ehExame = tipoLower.includes("exame") || nomeLower.includes("exame");
+    const ehConsulta = tipoLower.includes("consulta") || nomeLower.includes("consulta");
+    let valorFinalConvenio: number | null = null;
+    if (desconto?.tipo === "gratuidade") valorFinalConvenio = 0;
+    else if (desconto?.tipo === "valor_fixo") valorFinalConvenio = Number(desconto.valor) || 0;
+    // percentual/valor: não conseguimos garantir ≤ R$ 9,99 sem base — reprova.
+    const elegivelCarencia =
+      !ehExame && ehConsulta && valorFinalConvenio !== null && valorFinalConvenio <= LIMITE_CONSULTA;
+    const diasAtraso = DIAS_TOLERANCIA - (diasCarenciaRestantes ?? 0);
+    const suffix = ` Mensalidade em atraso há ${diasAtraso} dia(s) — dentro da tolerância de ${DIAS_TOLERANCIA} dias apenas consultas até R$ ${LIMITE_CONSULTA.toFixed(2)} são cobertas pelo convênio.`;
+    if (!elegivelCarencia) {
+      desconto = null;
+      const motivo = ehExame
+        ? "Convênio suspenso para exames enquanto a mensalidade não for quitada."
+        : ehConsulta && valorFinalConvenio !== null && valorFinalConvenio > LIMITE_CONSULTA
+          ? `Convênio suspenso: benefício desta consulta (R$ ${valorFinalConvenio.toFixed(2)}) está acima do teto de R$ ${LIMITE_CONSULTA.toFixed(2)} permitido na tolerância.`
+          : "Convênio suspenso: procedimento fora da tolerância — cobrando valor particular.";
+      avisoLimite = `${motivo}${suffix}`;
+    } else {
+      // Consulta permitida: informa mas não bloqueia.
+      const info = `Contrato em carência — parcela vence sem juros por mais ${diasCarenciaRestantes ?? 0} dia(s). Consulta liberada por estar dentro do teto de R$ ${LIMITE_CONSULTA.toFixed(2)}.`;
+      avisoLimite = avisoLimite ? `${info} ${avisoLimite}` : info;
+    }
+  }
+
+  // Carrega acréscimo de cartão do convênio (aplicado no fluxo de cobrança
+  // quando a forma de pagamento não é dinheiro). Convênio Funcionário nunca
+  // recebe acréscimo — o nome do convênio já é normalizado abaixo.
+  let acrescimoCartao: ConvenioInfo["acrescimoCartao"] = null;
+  const nomeUpper = (convenioNome ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  if (!nomeUpper.includes("FUNCIONARIO") && contrato.convenio_id) {
+    const { data: convRow } = await supabase
+      .from("cb_convenios")
+      .select("acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor")
+      .eq("id", contrato.convenio_id)
+      .maybeSingle();
+    const row = convRow as { acrescimo_cartao_modo: string | null; acrescimo_cartao_percentual: number | null; acrescimo_cartao_valor: number | null } | null;
+    if (row?.acrescimo_cartao_modo) {
+      acrescimoCartao = {
+        modo: row.acrescimo_cartao_modo as "percentual" | "valor_fixo",
+        percentual: Number(row.acrescimo_cartao_percentual) || 0,
+        valor: Number(row.acrescimo_cartao_valor) || 0,
+      };
+    }
+  }
+
+  return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear, emCarencia, diasCarenciaRestantes, acrescimoCartao };
 }
 
 const toLocalInput = (iso: string) => {
@@ -833,6 +1050,9 @@ const EMPTY = {
 
 function AgendaPage() {
   const { clinicaAtual } = useClinica();
+  // Undo em exclusões em lote — só São Francisco de Paula (flag ux_melhorias).
+  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
+  const turboDisabled = useTurboDisabled();
   const podeEscrever = usePodeEscrever("agenda");
   const { medicoId: medicoLogadoId, isMedicoOnly } = useMedicoContext();
   const [usuarioEhMedico, setUsuarioEhMedico] = useState(false);
@@ -847,6 +1067,7 @@ function AgendaPage() {
   const { user } = useAuth();
   const { pick: pickEmitenteNfse, dialog: emitenteNfseDialog } = usePickEmitente();
   const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
+  const { prompt: pedirDescricaoNfse, dialog: descricaoNfseDialog } = usePromptDescricaoNfse();
   const [dataRef, setDataRef] = useState(() => {
     const d = new Date();
     // se hoje for sáb/dom, avança para o próximo dia útil (funcionamento)
@@ -854,12 +1075,27 @@ function AgendaPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
   const [dataFim, setDataFim] = useState<string | null>(null);
-  const [apenasData, setApenasData] = useState(true);
+  // Padrão: filtro de data é "a partir de" — traz o dia selecionado em
+  // diante, para que a recepção veja os próximos agendamentos do paciente
+  // sem precisar ampliar a janela manualmente. Marcando o checkbox
+  // "Exibir apenas a data selecionada" o filtro passa a trazer só o dia
+  // escolhido (comportamento antigo).
+  const [apenasData, setApenasData] = useState(false);
   const [mostrarLivres, setMostrarLivres] = useState(true);
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
   const [filtroAgenda, setFiltroAgenda] = useState<string>("todos");
   const [agendasPorMedico, setAgendasPorMedico] = useState<Map<string, { id: string; nome: string }[]>>(new Map());
+  // Lookup id-da-agenda → nome, usado pelo filtro "Tipo de agenda" quando
+  // agrupa por NOME (evita duplicidades quando vários médicos têm agendas
+  // homônimas, ex.: "AGENDA", "CONSULTAS").
+  const agendaNomePorId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const arr of agendasPorMedico.values()) {
+      for (const a of arr) m.set(a.id, a.nome);
+    }
+    return m;
+  }, [agendasPorMedico]);
   const [procIdsPorAgenda, setProcIdsPorAgenda] = useState<Map<string, Set<string>>>(new Map());
   // Solicitações de estorno pendentes por agendamento — a linha correspondente
   // fica em vermelho e, para o médico, o paciente é ocultado até o financeiro
@@ -879,6 +1115,10 @@ function AgendaPage() {
   const [nfseMap, setNfseMap] = useState<
     Map<string, { id: string; status: string | null; url_pdf: string | null; numero: string | null }>
   >(new Map());
+  // Seleção múltipla para emissão agrupada de NFS-e (mesmo paciente / mesmo dia).
+  const [nfseSel, setNfseSel] = useState<Set<string>>(new Set());
+  const [emitindoNfseLote, setEmitindoNfseLote] = useState(false);
+  useEffect(() => { setNfseSel(new Set()); }, [dataRef]);
   const [nascMap, setNascMap] = useState<Map<string, string | null>>(new Map());
   const [convenioMap, setConvenioMap] = useState<Map<string, string>>(new Map());
   const [etapaMap, setEtapaMap] = useState<Map<string, string>>(new Map());
@@ -906,6 +1146,38 @@ function AgendaPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [buscandoOrc, setBuscandoOrc] = useState(false);
+  // Orçamento vinculado ao form atual pertence à especialidade Odontologia?
+  // Quando true, só é permitido agendar com médicos da especialidade Odontologia.
+  const [orcamentoOdonto, setOrcamentoOdonto] = useState(false);
+  // Sincroniza a flag "orçamento é odonto" quando o vínculo é limpo.
+  useEffect(() => {
+    if (!form.orcamento_id) setOrcamentoOdonto(false);
+  }, [form.orcamento_id]);
+  // Orçamento vinculado ao form atual pertence à especialidade Laboratório?
+  // Quando true, só é permitido agendar com médicos da especialidade Laboratório.
+  const [orcamentoLaboratorio, setOrcamentoLaboratorio] = useState(false);
+  useEffect(() => {
+    if (!form.orcamento_id) setOrcamentoLaboratorio(false);
+  }, [form.orcamento_id]);
+  // IDs de especialidades cujo nome contém "laborat" (mesma heurística já
+  // usada em outros pontos do arquivo). Usado para restringir orçamentos
+  // de Laboratório a médicos laboratoristas.
+  const labEspecialidadeIds = useMemo(
+    () =>
+      new Set(
+        especialidades
+          .filter((e) => normalizar(e.nome ?? "").includes("laborat"))
+          .map((e) => e.id),
+      ),
+    [especialidades],
+  );
+  const medicoEhLaboratorista = (medicoId: string | null | undefined) => {
+    if (!medicoId) return false;
+    const set = medicoEspec.get(medicoId);
+    if (!set) return false;
+    for (const id of set) if (labEspecialidadeIds.has(id)) return true;
+    return false;
+  };
   // Dialog de divisão de orçamento (vários grupos de procedimentos → vários agendamentos vinculados)
   const [dividirOpen, setDividirOpen] = useState(false);
   const [dividirCtx, setDividirCtx] = useState<{
@@ -916,6 +1188,17 @@ function AgendaPage() {
   // IDs dos itens do orçamento que serão consumidos pelo agendamento atual
   // (fluxo de 1 grupo). Gravados em `agendamento_orcamento_itens` após o save.
   const [pendingOrcItemIds, setPendingOrcItemIds] = useState<string[]>([]);
+  // Dialog de seleção de itens (Odontologia: usuário escolhe quais itens
+  // do orçamento entram neste agendamento; o restante fica disponível).
+  const [selecItensOpen, setSelecItensOpen] = useState(false);
+  const [selecItensCtx, setSelecItensCtx] = useState<{
+    orcamento: { id: string; numero: number; paciente_id: string | null; paciente_nome: string | null };
+    itensRestantes: SelectItemOrc[];
+    totalItens: number;
+    // Metadados para consumar o vínculo depois que o usuário confirmar
+    itensRaw: { id: string; descricao: string; procedimento_id: string | null }[];
+    todosLab: boolean;
+  } | null>(null);
   // Modo Turbo: sheet "Completar cadastro" acionado pela PacienteResumoBar
   const [quickCompleteOpen, setQuickCompleteOpen] = useState(false);
   // Informações do contrato ativo de cartão benefícios do paciente selecionado no modal.
@@ -1114,6 +1397,10 @@ function AgendaPage() {
   // Sinaliza que após o pagamento+impressão devemos abrir a emissão da NFS-e.
   const emitirNotaAposRef = useRef(false);
   const emitenteNotaAposRef = useRef<string | null>(null);
+  // Impressões de GR em andamento (por agendamento) — evita que cliques
+  // repetidos, enquanto a GR ainda está sendo montada, disparem várias
+  // impressões e registrem vias duplicadas.
+  const imprimindoGRRef = useRef<Set<string>>(new Set());
   const navigate = useNavigate();
   // ── Desconto aplicado ANTES de "Salvar e Pagar" (com autorização da supervisão).
   type DescontoPendente = { tipo: "valor" | "percentual"; input: string; autorizadoPor: string; motivo: string };
@@ -1238,6 +1525,8 @@ function AgendaPage() {
     new Promise((resolve) => setGratuidadePrompt({ convenioNome, resolve }));
   const [novoPacOpen, setNovoPacOpen] = useState(false);
   const [novoPac, setNovoPac] = useState({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
+  const [faceOpen, setFaceOpen] = useState(false);
+  const [descritorFace, setDescritorFace] = useState<number[] | null>(null);
   const [savingPac, setSavingPac] = useState(false);
   const [equipeList, setEquipeList] = useState<
     Array<{ nome: string | null; email: string | null; user_id: string | null; role: string | null }>
@@ -1449,7 +1738,19 @@ function AgendaPage() {
     }
     setPacientes((prev) => [...prev, { id: data.id, nome: data.nome }].sort((a, b) => a.nome.localeCompare(b.nome)));
     setForm((f) => ({ ...f, paciente_nome: data.nome, paciente_id: data.id }));
+    if (descritorFace) {
+      const { error: bioErr } = await supabase.from("paciente_biometria").insert({
+        paciente_id: data.id,
+        clinica_id: clinicaAtual.clinica_id,
+        descriptor: descritorFace as unknown as number[],
+      } as never);
+      if (bioErr) {
+        console.error("Erro ao salvar biometria:", bioErr);
+        toast.warning(`Paciente salvo, mas a foto não foi registrada: ${bioErr.message}`);
+      }
+    }
     setNovoPac({ nome: "", cpf: "", telefone: "", data_nascimento: "", email: "" });
+    setDescritorFace(null);
     setNovoPacOpen(false);
     toast.success("Paciente cadastrado");
   };
@@ -1460,7 +1761,7 @@ function AgendaPage() {
   const loadReqId = useRef(0);
   // Aponta sempre para o `load` mais recente — usado pelo handler realtime
   // para não cair em stale closure (ver comentário na assinatura realtime).
-  const loadFnRef = useRef<() => void>(() => {});
+  const loadFnRef = useRef<() => void>(() => { });
 
   const load = async () => {
     if (!clinicaAtual) return;
@@ -1469,10 +1770,10 @@ function AgendaPage() {
     let q = supabase
       .from("agendamentos")
       .select(
-        "id,paciente_nome,paciente_id,medico_id,enfermagem_recurso_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never,
+        "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never,
       )
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("inicio", { ascending: false });
+      .order("inicio", { ascending: apenasData ? false : true });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
     // então não restringe por status no servidor — filtra em memória.
     const statusEspecifico =
@@ -1485,7 +1786,7 @@ function AgendaPage() {
     // linhas do PostgREST e descartar os agendamentos do profissional/dia
     // selecionado.
     if (filtroMedico !== "todos") {
-      q = q.or(`medico_id.eq.${filtroMedico},enfermagem_recurso_id.eq.${filtroMedico}`);
+      q = q.eq("medico_id", filtroMedico);
     }
     // Empurra a busca por nome de cliente para o servidor — sem isso a
     // janela de 30 dias pode trazer mais que o limite do PostgREST e
@@ -1519,24 +1820,24 @@ function AgendaPage() {
       q = q.ilike("paciente_nome", `%${termo}%`);
     }
     if (apenasData) {
+      // "Exibir apenas a data selecionada" — restringe estritamente ao dia
+      // escolhido em `dataRef`, IGNORANDO qualquer `dataFim` do picker de
+      // intervalo. Os demais filtros (profissional, status, cliente etc.)
+      // seguem sendo aplicados normalmente.
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
-      const fimDia = dataFim ?? dataRef;
-      const fim = new Date(`${fimDia}T23:59:59`).toISOString();
+      const fim = new Date(`${dataRef}T23:59:59`).toISOString();
       q = q.gte("inicio", inicio).lte("inicio", fim);
     } else if (!statusEspecifico) {
+      // Padrão "a partir de": mostra tudo do dia selecionado em diante.
+      // Se o usuário definiu uma data final no picker de intervalo,
+      // respeita o intervalo; caso contrário, não aplica limite superior.
+      // O `.range(0, 9999)` do PostgREST já protege contra volume excessivo.
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
-      const f = new Date(`${dataFim ?? dataRef}T00:00:00`);
-      if (!dataFim) {
-        // Quando há busca por cliente, ampliamos a janela (o ILIKE no
-        // servidor já reduz o volume). Sem filtro, mantemos 30 dias.
-        // Janela padrão reduzida para 7 dias para abrir a agenda
-        // muito mais rápido. Quem precisa de janela maior pode
-        // selecionar uma data final no filtro.
-        f.setDate(f.getDate() + (termoCli.length >= 2 ? 365 : 7));
-      } else {
-        f.setHours(23, 59, 59);
+      q = q.gte("inicio", inicio);
+      if (dataFim) {
+        const f = new Date(`${dataFim}T23:59:59`).toISOString();
+        q = q.lte("inicio", f);
       }
-      q = q.gte("inicio", inicio).lte("inicio", f.toISOString());
     }
     if (!statusEspecifico) {
       q = q.range(0, 9999);
@@ -1549,12 +1850,9 @@ function AgendaPage() {
       mostrarErro(error);
       return;
     }
-    // Recursos de enfermagem aparecem como "médicos virtuais": mapeamos o
-    // enfermagem_recurso_id no campo medico_id para reuso de toda a UI.
     const mapped = (
       (data ?? []) as unknown as Array<
         Agendamento & {
-          enfermagem_recurso_id?: string | null;
           medico?: { nome: string | null; sexo: string | null } | null;
           orcamento?: { numero: number | null } | null;
         }
@@ -1562,7 +1860,7 @@ function AgendaPage() {
     ).map((a) => ({
       ...a,
       paciente_nome: isSlotLivre(a.paciente_nome) ? "DISPONÍVEL" : a.paciente_nome,
-      medico_id: a.medico_id ?? a.enfermagem_recurso_id ?? null,
+      medico_id: a.medico_id ?? null,
       medico_nome: a.medico_nome ?? a.medico?.nome ?? null,
       medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
       orcamento_numero: a.orcamento_numero ?? a.orcamento?.numero ?? null,
@@ -1683,8 +1981,35 @@ function AgendaPage() {
             }>
           ).forEach((r) => {
             if (!r.agendamento_id) return;
+            // Notas canceladas ou com erro não devem bloquear reemissão
+            // — o usuário precisa poder emitir uma nova NFS-e depois.
+            const st = (r.status ?? "").toLowerCase();
+            if (st === "cancelada" || st === "erro") return;
             if (!nMap.has(r.agendamento_id)) {
               nMap.set(r.agendamento_id, { id: r.id, status: r.status, url_pdf: r.url_pdf, numero: r.numero });
+            }
+          });
+        }
+        // Complementa com vínculos N:1 (NFS-e agrupada). Uma mesma nota
+        // pode estar vinculada a vários agendamentos do mesmo paciente.
+        for (let i = 0; i < idsParaPagamento.length; i += CHUNK) {
+          const slice = idsParaPagamento.slice(i, i + CHUNK);
+          const { data: links } = await supabase
+            .from("nfse_agendamentos")
+            .select("agendamento_id, nfse:nfse_id(id, status, url_pdf, numero, created_at)")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .in("agendamento_id", slice);
+          ((links ?? []) as Array<{
+            agendamento_id: string;
+            nfse: { id: string; status: string | null; url_pdf: string | null; numero: string | null; created_at: string } | null;
+          }>).forEach((r) => {
+            if (!r.nfse) return;
+            const st = (r.nfse.status ?? "").toLowerCase();
+            if (st === "cancelada" || st === "erro") return;
+            if (!nMap.has(r.agendamento_id)) {
+              nMap.set(r.agendamento_id, {
+                id: r.nfse.id, status: r.nfse.status, url_pdf: r.nfse.url_pdf, numero: r.nfse.numero,
+              });
             }
           });
         }
@@ -1701,7 +2026,7 @@ function AgendaPage() {
 
   const loadRef = async () => {
     if (!clinicaAtual) return;
-    const [m, e, me, pr, sr, mcRows, mp, er, erp, agendasRes] = await Promise.all([
+    const [m, e, me, pr, sr, mcRows, mp, agendasRes] = await Promise.all([
       supabase
         .from("medicos")
         .select("id,nome,sexo,usa_sistema,especialidade_id,procedimento_padrao_id,procedimento_padrao_em_branco")
@@ -1721,16 +2046,6 @@ function AgendaPage() {
         .not("medico_id", "is", null),
       getMedicoConveniosAgenda(clinicaAtual.clinica_id),
       fetchMedicoProcedimentosAgenda(clinicaAtual.clinica_id),
-      supabase
-        .from("enfermagem_recursos")
-        .select("id,nome")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true)
-        .order("nome"),
-      supabase
-        .from("enfermagem_recurso_procedimentos")
-        .select("recurso_id,procedimento_id,enfermagem_recursos!inner(clinica_id)")
-        .eq("enfermagem_recursos.clinica_id", clinicaAtual.clinica_id),
       supabase
         .from("medico_agendas")
         .select("id,nome,medico_id,ativo,ordem")
@@ -1774,24 +2089,8 @@ function AgendaPage() {
       especialidade_nome: x.especialidade_id ? (especialidadesPorId.get(x.especialidade_id) ?? null) : null,
       __recurso: false,
     }));
-    let recursosArr = (er.data ?? []) as RecursoEnf[];
-    // Se o usuário logado é enfermeiro, restringe agendas àquelas em que foi liberado
-    if (clinicaAtual.role === "enfermeiro" && user?.id) {
-      const { data: vinc } = await supabase
-        .from("enfermagem_recurso_atendentes")
-        .select("recurso_id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("user_id", user.id);
-      const allowed = new Set(((vinc ?? []) as Array<{ recurso_id: string }>).map((r) => r.recurso_id));
-      recursosArr = recursosArr.filter((r) => allowed.has(r.id));
-    }
-    const recursosComoMedicos: Medico[] = recursosArr.map((r) => ({
-      id: r.id,
-      nome: `🩺 ${r.nome}`,
-      sexo: null,
-    }));
-    setRecursoIds(new Set(recursosArr.map((r) => r.id)));
-    setMedicos([...medicosBase, ...recursosComoMedicos] as Medico[]);
+    setRecursoIds(new Set());
+    setMedicos(medicosBase as Medico[]);
     // Pacientes não são mais carregados em massa aqui: a seleção usa busca
     // server-side em PatientSearchInput. Isso evita travar a agenda em bases grandes.
     setPacientes([]);
@@ -1866,23 +2165,6 @@ function AgendaPage() {
       procOpcoesMap.get(r.medico_id)!.push({ id: proc.id, nome: decorado });
     }
     setProcPorMedico(pm);
-    // Vínculos de procedimentos por recurso de enfermagem
-    const recursoProcsValidos = ((erp.data ?? []) as Array<{ recurso_id: string; procedimento_id: string }>).filter(
-      (r) => new Set(recursosArr.map((x) => x.id)).has(r.recurso_id),
-    );
-    for (const r of recursoProcsValidos) {
-      if (!pm.has(r.recurso_id)) pm.set(r.recurso_id, new Set());
-      pm.get(r.recurso_id)!.add(r.procedimento_id);
-      const proc = procedimentosPorId.get(r.procedimento_id);
-      if (!proc) continue;
-      if (!procOpcoesMap.has(r.recurso_id)) procOpcoesMap.set(r.recurso_id, []);
-      if (!procOpcoesVistos.has(r.recurso_id)) procOpcoesVistos.set(r.recurso_id, new Set());
-      const vistos = procOpcoesVistos.get(r.recurso_id)!;
-      const chave = normalizar(proc.nome);
-      if (vistos.has(chave)) continue;
-      vistos.add(chave);
-      procOpcoesMap.get(r.recurso_id)!.push(proc);
-    }
     setProcOpcoesPorMedico(procOpcoesMap);
     const medicosIds = new Set(((m.data ?? []) as unknown as Medico[]).map((x) => x.id));
     const nm = new Map<string, Set<string>>();
@@ -2207,7 +2489,7 @@ function AgendaPage() {
       // mantém o valor para não perder o serviço no submit.
       const opts = opcoesProcedimentoMedico(
         medicoId ?? null,
-        editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
+        editing?.agenda_id ?? (filtroAgenda !== "todos" && !filtroAgenda.startsWith("nome:") ? filtroAgenda : null),
       );
       const alvo = normalizar(atual);
       const ehProcedimentoReal =
@@ -2230,19 +2512,11 @@ function AgendaPage() {
   const medicoEhLaboratorioFormulario = (medicoId: string | null | undefined) => {
     if (!medicoId) return false;
     const med = medicos.find((m) => m.id === medicoId);
-    // Preferência: se qualquer procedimento configurado para o médico é
-    // laboratório (`tipo_procedimento='laboratorio'`), assume lab.
-    const opts = opcoesProcedimentoMedico(
-      medicoId,
-      editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
-    );
-    if (
-      opts.some((o) => {
-        const p = procedimentosList.find((pp) => pp.id === o.id);
-        return (p?.tipo_procedimento ?? "").toLowerCase() === "laboratorio";
-      })
-    )
-      return true;
+    // Regra (2026-07-16): médico só é tratado como "de laboratório" quando
+    // a especialidade dele contém "Laborat". Procedimentos avulsos com
+    // `tipo_procedimento='laboratorio'` cadastrados em médicos de outras
+    // especialidades (ex.: dermato/clínico com uma cobrança de análise)
+    // NÃO reclassificam o médico como laboratório.
     if (normalizar(med?.especialidade_nome ?? "").includes("laborat")) return true;
     const espIds = medicoEspec.get(medicoId);
     if (!espIds || espIds.size === 0) return false;
@@ -2283,7 +2557,7 @@ function AgendaPage() {
     if (!form.medico_id) return base;
     const opts = opcoesProcedimentoMedico(
       form.medico_id,
-      editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
+      editing?.agenda_id ?? (filtroAgenda !== "todos" && !filtroAgenda.startsWith("nome:") ? filtroAgenda : null),
     ).map((p) => ({ value: p.nome, label: p.nome }));
     const padrao = procedimentoPadraoDoMedico(form.medico_id);
     if (padrao && !opts.some((o) => normalizar(o.value) === normalizar(padrao))) {
@@ -2437,7 +2711,13 @@ function AgendaPage() {
       return (a.paciente_nome ?? "").localeCompare(b.paciente_nome ?? "", "pt-BR", { sensitivity: "base" });
     });
     ordenados.forEach((a) => {
-      const dia = a.inicio.slice(0, 10);
+      // Usa a data LOCAL (America/Sao_Paulo), não UTC. Antes usávamos
+      // a.inicio.slice(0,10), que pega o dia em UTC — slots que ocorrem
+      // depois das 21:00 locais caem no dia UTC seguinte, o que reiniciava
+      // a numeração da ficha no meio da agenda do mesmo dia.
+      const dia = new Date(a.inicio).toLocaleDateString("en-CA", {
+        timeZone: "America/Sao_Paulo",
+      });
       // Chave por profissional: usa medico_id (que já engloba recursos de
       // enfermagem, mapeados como "médicos virtuais" no load()). Slots sem
       // profissional atribuído são numerados em um bucket próprio por dia.
@@ -2491,7 +2771,15 @@ function AgendaPage() {
         // Agendamentos criados via "Atendimento Múltiplo" não são vinculados a
         // uma agenda específica (podem envolver médicos/recursos diferentes),
         // então não os escondemos quando o usuário filtra por agenda.
-        if (a.agenda_id !== filtroAgenda && !a.atendimento_grupo_id) return false;
+        if (filtroAgenda.startsWith("nome:")) {
+          // Filtro por NOME da agenda (dedupe entre múltiplos médicos):
+          // aplicado quando o usuário está com "TODOS" os profissionais.
+          const alvo = filtroAgenda.slice(5);
+          const nomeAg = (a.agenda_id ? agendaNomePorId.get(a.agenda_id) : "") ?? "";
+          if (chaveNomeAgenda(nomeAg) !== alvo && !a.atendimento_grupo_id) return false;
+        } else {
+          if (a.agenda_id !== filtroAgenda && !a.atendimento_grupo_id) return false;
+        }
       }
       if (filtroApenasMultiplo && !a.atendimento_grupo_id) return false;
       return true;
@@ -2499,6 +2787,7 @@ function AgendaPage() {
   }, [
     items,
     mostrarLivres,
+    apenasData,
     filtroMedico,
     filtroStatus,
     filtroCliente,
@@ -2507,6 +2796,7 @@ function AgendaPage() {
     filtroEspecialidade,
     filtroAgenda,
     filtroApenasMultiplo,
+    agendaNomePorId,
     medicoEspec,
     fichaPorId,
   ]);
@@ -2818,15 +3108,33 @@ function AgendaPage() {
       );
       return;
     }
-    if (!confirm(`Excluir ${ids.length} horário(s)? Esta ação não pode ser desfeita.`)) return;
-    const { error } = await supabase.from("agendamentos").delete().in("id", ids);
-    if (error) {
-      mostrarErro(error);
+    const apagarNoBanco = async () => {
+      const { error } = await supabase.from("agendamentos").delete().in("id", ids);
+      if (error) { mostrarErro(error); await load(); return; }
+      await load();
+    };
+
+    if (!uxMelhorias) {
+      if (!confirm(`Excluir ${ids.length} horário(s)? Esta ação não pode ser desfeita.`)) return;
+      await apagarNoBanco();
+      toast.success(`${ids.length} horário(s) excluído(s).`);
+      setSelecionados(new Set());
       return;
     }
-    toast.success(`${ids.length} horário(s) excluído(s).`);
+
+    // Piloto São Francisco: some da tela na hora, mas só apaga do banco
+    // depois de alguns segundos — dá tempo do usuário desfazer, sem confirm().
     setSelecionados(new Set());
-    await load();
+    setItems((prev) => prev.filter((a) => !ids.includes(a.id)));
+    let desfeito = false;
+    const timer = setTimeout(() => { if (!desfeito) void apagarNoBanco(); }, 5000);
+    toast(`${ids.length} horário(s) excluído(s).`, {
+      duration: 5000,
+      action: {
+        label: "Desfazer",
+        onClick: () => { desfeito = true; clearTimeout(timer); void load(); },
+      },
+    });
   };
 
   // === Reagendamento em lote: move vários agendamentos para outra agenda já aberta ===
@@ -2949,7 +3257,7 @@ function AgendaPage() {
     if (livres.length < fontes.length) {
       toast.error(
         `Não há horários livres suficientes a partir da ficha ${String(fichaInicial).padStart(3, "0")} ` +
-          `(precisa de ${fontes.length}, encontrou ${livres.length}).`,
+        `(precisa de ${fontes.length}, encontrou ${livres.length}).`,
       );
       return;
     }
@@ -3064,7 +3372,7 @@ function AgendaPage() {
     try {
       const { data: orc, error } = await supabase
         .from("orcamentos")
-        .select("id, numero, paciente_id, paciente_nome, status")
+        .select("id, numero, paciente_id, paciente_nome, status, especialidade_id, validade_dias, created_at")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("numero", num)
         .maybeSingle();
@@ -3080,46 +3388,93 @@ function AgendaPage() {
         toast.error("Orçamento cancelado.");
         return;
       }
+      // Validade: se `validade_dias` estiver definido, o orçamento expira
+      // em created_at + validade_dias. Passou disso, bloqueia.
+      if (orc.validade_dias && orc.created_at) {
+        const validoAte = new Date(orc.created_at);
+        validoAte.setDate(validoAte.getDate() + Number(orc.validade_dias));
+        if (validoAte.getTime() < Date.now()) {
+          toast.error(
+            `Orçamento expirado em ${validoAte.toLocaleDateString("pt-BR")}. Gere um novo orçamento.`,
+          );
+          return;
+        }
+      }
       const { data: itens, error: e2 } = await supabase
         .from("orcamento_itens")
-        .select("id, descricao, procedimento_id")
+        .select("id, descricao, procedimento_id, valor_total, dentes, status_financeiro")
         .eq("orcamento_id", orc.id)
         .order("ordem");
       if (e2) {
         mostrarErro(e2);
         return;
       }
-      const itsAll = (itens ?? []) as { id: string; descricao: string; procedimento_id: string | null }[];
+      const itsAll = (itens ?? []) as {
+        id: string;
+        descricao: string;
+        procedimento_id: string | null;
+        valor_total: number | null;
+        dentes: string[] | null;
+        status_financeiro: string | null;
+      }[];
       if (itsAll.length === 0) {
         toast.error("Orçamento sem itens.");
         return;
       }
-      // Filtra itens já consumidos por agendamentos ativos. Permite agendar
-      // o restante quando o orçamento foi aproveitado em partes.
+      // Regra (2026-07-23): um item só é considerado "consumido" — e portanto
+      // some do seletor — quando estiver PAGO. Se o agendamento vinculado for
+      // desmarcado, remarcado, marcado como faltou ou simplesmente ainda não
+      // pago, o item volta a ficar disponível para novo agendamento.
+      // Pago = orcamento_itens.status_financeiro='pago' OU agendamento vinculado
+      // com fin_lancamentos de receita confirmado (mesma definição usada em
+      // pagamento-status.ts).
       const { data: consumidosRows } = await supabase
         .from("agendamento_orcamento_itens")
         .select("orcamento_item_id, agendamento_id, agendamentos!inner(status)")
         .eq("orcamento_id", orc.id);
-      const consumidos = new Set<string>(
-        ((consumidosRows ?? []) as Array<{ orcamento_item_id: string; agendamentos: { status: string } | null }>)
-          .filter((r) => r.agendamentos?.status !== "cancelado")
-          .map((r) => r.orcamento_item_id),
-      );
+      const linkRows = ((consumidosRows ?? []) as Array<{
+        orcamento_item_id: string;
+        agendamento_id: string;
+        agendamentos: { status: string } | null;
+      }>).filter((r) => r.agendamentos?.status !== "cancelado");
+      const agendaIds = Array.from(new Set(linkRows.map((r) => r.agendamento_id)));
+      let pagosAgendaSet = new Set<string>();
+      if (agendaIds.length) {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("agendamento_id")
+          .eq("tipo", "receita")
+          .eq("status", "confirmado")
+          .in("agendamento_id", agendaIds);
+        pagosAgendaSet = new Set(
+          ((lancs ?? []) as Array<{ agendamento_id: string | null }>)
+            .map((r) => r.agendamento_id)
+            .filter((x): x is string => !!x),
+        );
+      }
+      const itensPorId = new Map(itsAll.map((i) => [i.id, i]));
+      const consumidos = new Set<string>();
+      for (const r of linkRows) {
+        const it = itensPorId.get(r.orcamento_item_id);
+        const pagoItem = it?.status_financeiro === "pago";
+        const pagoAgenda = pagosAgendaSet.has(r.agendamento_id);
+        if (pagoItem || pagoAgenda) consumidos.add(r.orcamento_item_id);
+      }
       const editingItemIdsLiberar = editing?.id
         ? new Set<string>(
-          ((consumidosRows ?? []) as Array<{ orcamento_item_id: string; agendamento_id: string }>)
+          linkRows
             .filter((r) => r.agendamento_id === editing.id)
             .map((r) => r.orcamento_item_id),
         )
         : new Set<string>();
       const its = itsAll.filter((i) => !consumidos.has(i.id) || editingItemIdsLiberar.has(i.id));
       if (its.length === 0) {
-        toast.error(`Todos os ${itsAll.length} itens deste orçamento já foram agendados.`);
+        toast.error(`Todos os ${itsAll.length} itens deste orçamento já foram pagos.`);
         return;
       }
       const totalConsumidos = itsAll.length - its.length;
       if (totalConsumidos > 0) {
-        toast.info(`${totalConsumidos} de ${itsAll.length} itens já agendados. Restam ${its.length} para agendar.`);
+        toast.info(`${totalConsumidos} de ${itsAll.length} itens já pagos. Restam ${its.length} para agendar.`);
       }
       const procIds = Array.from(new Set(its.map((i) => i.procedimento_id).filter((x): x is string => !!x)));
       let procs: { id: string; grupo: string | null; tipo: string | null }[] = [];
@@ -3184,6 +3539,42 @@ function AgendaPage() {
           pacNome = pac[0].nome;
         }
       }
+      // Odontologia: em vez de auto-juntar todos os itens restantes num
+      // único agendamento, abre um pop-up para o usuário escolher quais
+      // itens usar agora. O restante fica disponível para agendar depois.
+      const isOdonto = orc.especialidade_id === ODONTO_ESPECIALIDADE_ID;
+      setOrcamentoOdonto(isOdonto);
+      if (isOdonto && form.medico_id && !medicoEspec.get(form.medico_id)?.has(ODONTO_ESPECIALIDADE_ID)) {
+        setForm((f) => ({ ...f, medico_id: "" }));
+        toast.info("Selecione um médico da especialidade Odontologia para este orçamento.");
+      }
+      const orcEhLab = !!orc.especialidade_id && labEspecialidadeIds.has(orc.especialidade_id);
+      setOrcamentoLaboratorio(orcEhLab);
+      if (orcEhLab && form.medico_id && !medicoEhLaboratorista(form.medico_id)) {
+        setForm((f) => ({ ...f, medico_id: "" }));
+        toast.info("Selecione um médico da especialidade Laboratório para este orçamento.");
+      }
+      if (isOdonto) {
+        setSelecItensCtx({
+          orcamento: {
+            id: orc.id,
+            numero: orc.numero,
+            paciente_id: pacId,
+            paciente_nome: pacNome,
+          },
+          itensRestantes: its.map((i) => ({
+            id: i.id,
+            descricao: i.descricao,
+            valor_total: i.valor_total,
+            dentes: i.dentes,
+          })),
+          totalItens: itsAll.length,
+          itensRaw: its.map((i) => ({ id: i.id, descricao: i.descricao, procedimento_id: i.procedimento_id })),
+          todosLab,
+        });
+        setSelecItensOpen(true);
+        return;
+      }
       // Agrupa por "grupo" (mais específico) ou tipo. Se houver mais de um grupo
       // distinto, abre o painel de divisão em vez de criar um único agendamento.
       const grupoDe = (pid: string | null): string => {
@@ -3216,7 +3607,7 @@ function AgendaPage() {
           itens: itensRicos,
           inicioPadrao,
         });
-        setOpen(false); // fecha o modal de "novo agendamento" se estiver aberto
+        fecharDialogoAgenda(); // fecha o modal de "novo agendamento" se estiver aberto
         setDividirOpen(true);
         return;
       }
@@ -3242,6 +3633,7 @@ function AgendaPage() {
   const limparOrcamento = () => {
     setForm((f) => ({ ...f, orcamento_id: "", orcamento_numero: "", orcamento_itens: [] }));
     setPendingOrcItemIds([]);
+    setOrcamentoOdonto(false);
   };
 
   // Abre o diálogo de novo agendamento já com o nº de orçamento preenchido
@@ -3292,7 +3684,34 @@ function AgendaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clinicaAtual?.clinica_id]);
 
-  const openSlot = (a: Agendamento) => {
+  // Trava de edição do slot: quando o usuário abre o diálogo de agendar em um
+  // slot DISPONÍVEL, marcamos edit_lock_by/edit_lock_at no banco para impedir
+  // que outro recepcionista abra o mesmo horário em paralelo. A trava expira
+  // sozinha após 3 minutos, então nunca "prende" um slot se alguém fechar a
+  // aba sem salvar. Aplicação global (todas as clínicas).
+  const lockedSlotIdRef = useRef<string | null>(null);
+  // Retorna o nome de quem está editando o slot (outro usuário) se a trava
+  // estiver ativa (≤ 3 min) e for de outra pessoa; caso contrário null.
+  const slotTravadoPorOutro = (a: Agendamento): string | null => {
+    if (!a.edit_lock_by || !a.edit_lock_at) return null;
+    if (a.edit_lock_by === user?.id) return null;
+    const at = Date.parse(a.edit_lock_at);
+    if (!Number.isFinite(at) || at < Date.now() - 3 * 60 * 1000) return null;
+    return a.edit_lock_by_nome || "outro usuário";
+  };
+  const liberarLockSlot = async () => {
+    const id = lockedSlotIdRef.current;
+    if (!id) return;
+    lockedSlotIdRef.current = null;
+    try {
+      await supabase.rpc("agenda_slot_unlock", { _id: id } as never);
+    } catch { /* silencioso — a trava expira em 3 min de qualquer forma */ }
+  };
+  const fecharDialogoAgenda = () => {
+    void liberarLockSlot();
+    setOpen(false);
+  };
+  const openSlot = async (a: Agendamento) => {
     if (reagendandoAg) {
       void confirmarReagendamentoNoSlot(a);
       return;
@@ -3304,6 +3723,26 @@ function AgendaPage() {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
+    }
+    // Tenta travar o slot. Se outro usuário já travou nos últimos 3 min,
+    // avisa e não abre o diálogo — evita agendamento em dobro.
+    if (isSlotLivre(a.paciente_nome)) {
+      const { data, error } = await supabase.rpc("agenda_slot_lock", { _id: a.id } as never);
+      if (error) {
+        toast.error("Não foi possível reservar o slot. Tente novamente.");
+        return;
+      }
+      const res = (data ?? {}) as { ok?: boolean; reason?: string; by_nome?: string };
+      if (!res.ok) {
+        if (res.reason === "locked") {
+          toast.error(`Sendo agendado por ${res.by_nome ?? "outro usuário"} — tente novamente em instantes.`);
+        } else {
+          toast.error("Não foi possível reservar o slot.");
+        }
+        return;
+      }
+      lockedSlotIdRef.current = a.id;
+      void load();
     }
     setEditing(a);
     setForm({
@@ -3350,6 +3789,18 @@ function AgendaPage() {
         .eq("orcamento_id", a.orcamento_id)
         .order("ordem");
       itensOrc = ((its ?? []) as { descricao: string }[]).map((x) => x.descricao);
+      const { data: orcRow } = await supabase
+        .from("orcamentos")
+        .select("especialidade_id")
+        .eq("id", a.orcamento_id)
+        .maybeSingle();
+      setOrcamentoOdonto((orcRow?.especialidade_id ?? null) === ODONTO_ESPECIALIDADE_ID);
+      setOrcamentoLaboratorio(
+        !!orcRow?.especialidade_id && labEspecialidadeIds.has(orcRow.especialidade_id),
+      );
+    } else {
+      setOrcamentoOdonto(false);
+      setOrcamentoLaboratorio(false);
     }
     // Se o agendamento veio sem paciente_id (ex.: criado a partir de um
     // orçamento que também não tinha o vínculo), tenta resolver pelo nome
@@ -3446,6 +3897,17 @@ function AgendaPage() {
       toast.error("O horário final deve ser após o inicial");
       return;
     }
+    if (form.orcamento_id && orcamentoOdonto && form.medico_id) {
+      const espSet = medicoEspec.get(form.medico_id);
+      if (!espSet || !espSet.has(ODONTO_ESPECIALIDADE_ID)) {
+        toast.error("Orçamentos de Odontologia só podem ser agendados com médicos da especialidade Odontologia.");
+        return;
+      }
+    }
+    if (form.orcamento_id && orcamentoLaboratorio && form.medico_id && !medicoEhLaboratorista(form.medico_id)) {
+      toast.error("Orçamentos de Laboratório só podem ser agendados com médicos da especialidade Laboratório.");
+      return;
+    }
     const multiPermitido =
       !!form.medico_id &&
       (medicoEhLaboratorioFormulario(form.medico_id) ||
@@ -3457,9 +3919,14 @@ function AgendaPage() {
           .filter(Boolean),
       ),
     );
-    // Serviço é opcional — quando não informado, o agendamento é salvo sem
-    // procedimento e a cobrança pode ser feita via "Valor manual".
+    // Regra (2026-07-16): procedimento passou a ser OBRIGATÓRIO em todo
+    // agendamento de paciente. Elimina o rótulo de fallback ("CONSULTA" /
+    // "EXAMES LABORATORIAIS") aparecer em cima de campo vazio.
     const procedimentoTexto = procedimentosParaSalvar.join(" + ");
+    if (!procedimentoTexto.trim()) {
+      toast.error("Selecione o procedimento antes de salvar.");
+      return;
+    }
     const multiExamesModo =
       procedimentosParaSalvar.length > 1
         ? medicoEhLaboratorioFormulario(form.medico_id)
@@ -3475,14 +3942,71 @@ function AgendaPage() {
       toast.error("Não é permitido alterar o nome do paciente em agendamento já pago.");
       return;
     }
+    // Regra (2026-07-23): avisa quando o(s) item(ns) de orçamento sendo
+    // agendado(s) já têm outro agendamento ativo (não cancelado) e ainda não
+    // pago. Permite ao usuário confirmar e criar mesmo assim.
+    if (pendingOrcItemIds.length > 0) {
+      const { data: dupLinks } = await supabase
+        .from("agendamento_orcamento_itens")
+        .select(
+          "orcamento_item_id, agendamento_id, agendamentos!inner(id,status,inicio,medico_id,ficha_numero,procedimento)",
+        )
+        .in("orcamento_item_id", pendingOrcItemIds);
+      type DupRow = {
+        orcamento_item_id: string;
+        agendamento_id: string;
+        agendamentos: {
+          id: string;
+          status: string;
+          inicio: string;
+          medico_id: string | null;
+          ficha_numero: number | null;
+          procedimento: string | null;
+        } | null;
+      };
+      const candidatos = ((dupLinks ?? []) as DupRow[])
+        .filter((r) => r.agendamentos && r.agendamentos.status !== "cancelado")
+        .filter((r) => !editing?.id || r.agendamento_id !== editing.id);
+      if (candidatos.length > 0) {
+        const agIds = Array.from(new Set(candidatos.map((r) => r.agendamento_id)));
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("agendamento_id")
+          .eq("tipo", "receita")
+          .eq("status", "confirmado")
+          .in("agendamento_id", agIds);
+        const pagos = new Set(
+          ((lancs ?? []) as Array<{ agendamento_id: string | null }>)
+            .map((r) => r.agendamento_id)
+            .filter((x): x is string => !!x),
+        );
+        const naoPagos = candidatos.filter((r) => !pagos.has(r.agendamento_id));
+        if (naoPagos.length > 0) {
+          const linhas = naoPagos.map((r) => {
+            const ag = r.agendamentos!;
+            const dt = new Date(ag.inicio);
+            const dia = dt.toLocaleDateString("pt-BR");
+            const hora = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+            const medObj = medicos.find((m) => m.id === ag.medico_id);
+            const medNome = medObj?.nome ?? "sem médico";
+            const ficha = ag.ficha_numero != null ? `nº ${ag.ficha_numero}` : "s/ ficha";
+            const serv = ag.procedimento ?? "serviço";
+            return `• ${serv} — Dr(a). ${medNome} em ${dia} às ${hora} (ficha ${ficha})`;
+          });
+          const msg =
+            `Este paciente já está agendado para o(s) mesmo(s) serviço(s) e ainda não pagou:\n\n${linhas.join("\n")}\n\nDeseja criar um novo agendamento mesmo assim?`;
+          if (!window.confirm(msg)) {
+            return;
+          }
+        }
+      }
+    }
     setSaving(true);
-    const ehRecurso = !!form.medico_id && recursoIds.has(form.medico_id);
     const payload = {
       clinica_id: clinicaAtual.clinica_id,
       paciente_nome: form.paciente_nome.trim(),
       paciente_id: form.paciente_id || null,
-      medico_id: ehRecurso ? null : form.medico_id || null,
-      enfermagem_recurso_id: ehRecurso ? form.medico_id : null,
+      medico_id: form.medico_id || null,
       inicio: new Date(form.inicio).toISOString(),
       fim: new Date(form.fim).toISOString(),
       procedimento: procedimentoTexto || null,
@@ -3531,7 +4055,7 @@ function AgendaPage() {
     setPendingOrcItemIds([]);
     setSaving(false);
     toast.success("Salvo");
-    setOpen(false);
+    fecharDialogoAgenda();
     await load();
     if (irParaPagamento && novoId) {
       let [lista, info] = await Promise.all([
@@ -3601,7 +4125,14 @@ function AgendaPage() {
           });
           descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
         } else if (info.desconto) {
-          opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
+          opcoes = opcoes.map((o) => ({
+            ...o,
+            valor: aplicarAcrescimoCartaoAgenda(
+              aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
+              o.forma,
+              info.acrescimoCartao,
+            ),
+          }));
           const rotulo =
             info.desconto.tipo === "gratuidade"
               ? "GRATUIDADE"
@@ -3737,6 +4268,18 @@ function AgendaPage() {
       toast.error("Você não tem permissão de edição neste módulo.");
       return;
     }
+    const inicio = new Date(a.inicio);
+    const hojeFim = new Date();
+    hojeFim.setHours(23, 59, 59, 999);
+    if (inicio.getTime() > hojeFim.getTime()) {
+      toast.error("Não é possível dar baixa em um atendimento de data futura.");
+      return;
+    }
+    if (a.status === "realizado") {
+      toast.info("Este atendimento já foi baixado.");
+      return;
+    }
+    if (!confirm(`Dar baixa como Realizado no atendimento de ${a.paciente_nome}?`)) return;
     const uid = (await supabase.auth.getUser()).data.user?.id;
     if (!uid) {
       toast.error("Sessão expirada");
@@ -3754,7 +4297,7 @@ function AgendaPage() {
       mostrarErro(error);
       return;
     }
-    toast.success("Atendimento iniciado e registrado");
+    toast.success("Baixa registrada — executor e horário gravados.");
     await load();
   };
 
@@ -3859,13 +4402,13 @@ function AgendaPage() {
         a.tipo_atendimento === "particular"
           ? Promise.resolve(null)
           : obterInfoConvenioPaciente({
-              clinicaId: clinicaAtual.clinica_id,
-              pacienteId: a.paciente_id,
-              medicoId: a.medico_id,
-              procedimentoNome: a.procedimento ?? "",
-              agendamentoId: a.id,
-              dataRef: a.inicio ?? null,
-            }),
+            clinicaId: clinicaAtual.clinica_id,
+            pacienteId: a.paciente_id,
+            medicoId: a.medico_id,
+            procedimentoNome: a.procedimento ?? "",
+            agendamentoId: a.id,
+            dataRef: a.inicio ?? null,
+          }),
       ]);
       if ((jaPagos ?? []).length > 0) {
         toast.info("Este agendamento já foi pago.");
@@ -3931,7 +4474,14 @@ function AgendaPage() {
           });
           descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
         } else if (info.desconto) {
-          opcoes = opcoes.map((o) => ({ ...o, valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!) }));
+          opcoes = opcoes.map((o) => ({
+            ...o,
+            valor: aplicarAcrescimoCartaoAgenda(
+              aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
+              o.forma,
+              info.acrescimoCartao,
+            ),
+          }));
           const rotulo =
             info.desconto.tipo === "gratuidade"
               ? "GRATUIDADE"
@@ -3999,13 +4549,13 @@ function AgendaPage() {
           },
           p_movimento: user?.id
             ? {
-                user_id: user.id,
-                user_nome: nomeUsuario,
-                tipo: "recebimento",
-                valor: 0,
-                descricao: desc,
-                forma_pagamento: isGrat ? "convenio_gratuidade" : "sem_cobranca",
-              }
+              user_id: user.id,
+              user_nome: nomeUsuario,
+              tipo: "recebimento",
+              valor: 0,
+              descricao: desc,
+              forma_pagamento: isGrat ? "convenio_gratuidade" : "sem_cobranca",
+            }
             : null,
         });
         if (errRpc) {
@@ -4236,6 +4786,12 @@ function AgendaPage() {
   const verOuEmitirNota = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     const ex = nfseMap.get(a.id);
+    // Se o usuário já selecionou múltiplos para agrupamento, o clique no botão
+    // não deve emitir individual — direciona para a barra de emissão em lote.
+    if (nfseSel.size > 1 && nfseSel.has(a.id)) {
+      toast.info("Use o botão \"Emitir NFS-e agrupada\" na barra inferior para os itens selecionados.");
+      return;
+    }
     if (ex) {
       if (ex.url_pdf) {
         window.open(ex.url_pdf, "_blank", "noopener,noreferrer");
@@ -4285,19 +4841,24 @@ function AgendaPage() {
           municipio: pac.cidade ?? undefined,
           uf: pac.estado ?? undefined,
         },
+        valorBase: Number(valor) || 0,
       });
       if (!tomador) {
         toast.error("Emissão cancelada.");
         return;
       }
+      const parcial = aplicarValorParcial(Number(valor) || 0, tomador);
       const descBase = a.procedimento || "Serviços prestados";
-      const descFinal = tomador.dependenteAtendido ? `${descBase} — Atendido: ${tomador.dependenteAtendido}` : descBase;
+      const descComDep = tomador.dependenteAtendido ? `${descBase} — Dependente do pagador: ${tomador.dependenteAtendido}` : descBase;
+      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
+      const descFinal = await pedirDescricaoNfse(descSugerida);
+      if (!descFinal) { toast.error("Emissão cancelada."); return; }
       const res = await emitirNfseFn({
         data: {
           emitenteId: emitenteIdEscolhido,
           pacienteId: pac.id,
           agendamentoId: a.id,
-          valorServicos: Number(valor) || 0,
+          valorServicos: parcial.valor,
           descricaoServicos: descFinal,
           tomador,
         },
@@ -4330,12 +4891,120 @@ function AgendaPage() {
     }
   };
 
+  /**
+   * Emite UMA única NFS-e agrupando vários agendamentos do MESMO paciente no
+   * MESMO dia. Regras:
+   *  - todos precisam estar pagos e sem NFS-e emitida;
+   *  - todos precisam ter o mesmo paciente;
+   *  - valores somados; descrição = "Proc1 + Proc2 + ...";
+   *  - a NFS-e resultante fica vinculada a todos os agendamentos via
+   *    `nfse_agendamentos`.
+   */
+  const emitirNfseAgrupada = async () => {
+    if (!clinicaAtual) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    const ids = Array.from(nfseSel);
+    if (ids.length < 2) { toast.error("Selecione ao menos 2 agendamentos."); return; }
+    const selAgs = items.filter((a) => ids.includes(a.id));
+    if (selAgs.length !== ids.length) { toast.error("Alguns agendamentos não foram encontrados na lista."); return; }
+    // Todos precisam ser do mesmo paciente
+    const pacIds = new Set(selAgs.map((a) => a.paciente_id).filter(Boolean) as string[]);
+    if (pacIds.size !== 1) { toast.error("Selecione serviços de um único paciente."); return; }
+    const pacienteId = Array.from(pacIds)[0];
+    // Todos precisam estar pagos e sem NFS-e emitida
+    for (const a of selAgs) {
+      if (!pagosSet.has(a.id)) { toast.error(`Agendamento das ${fmtHora(a.inicio)} ainda não foi pago.`); return; }
+      if (nfseMap.has(a.id)) { toast.error(`Agendamento das ${fmtHora(a.inicio)} já possui NFS-e.`); return; }
+    }
+    try {
+      setEmitindoNfseLote(true);
+      const emitenteIdEscolhido = await pickEmitenteNfse();
+      if (!emitenteIdEscolhido) { toast.error("Selecione a empresa emitente para emitir a NFS-e."); return; }
+      const { data: pac } = await supabase
+        .from("pacientes")
+        .select("id, nome, cpf, email, cep, logradouro, numero, bairro, cidade, estado")
+        .eq("id", pacienteId)
+        .maybeSingle();
+      if (!pac) { toast.error("Paciente não encontrado para emissão da NFS-e."); return; }
+      const valorTotal = selAgs.reduce((s, a) => s + Number(pagoInfoMap.get(a.id)?.valor ?? 0), 0);
+      const tomador = await pickTomadorNfse({
+        paciente: {
+          nome: pac.nome,
+          cpfCnpj: pac.cpf ?? undefined,
+          email: pac.email ?? undefined,
+          cep: pac.cep ?? undefined,
+          logradouro: pac.logradouro ?? undefined,
+          numero: pac.numero ?? undefined,
+          bairro: pac.bairro ?? undefined,
+          municipio: pac.cidade ?? undefined,
+          uf: pac.estado ?? undefined,
+        },
+        valorBase: valorTotal,
+      });
+      if (!tomador) { toast.error("Emissão cancelada."); return; }
+      const parcial = aplicarValorParcial(valorTotal, tomador);
+      const listaProc = selAgs
+        .map((a) => (a.procedimento ?? "").trim())
+        .filter(Boolean)
+        .join(" + ") || "Serviços prestados";
+      const descBase = listaProc;
+      const descComDep = tomador.dependenteAtendido ? `${descBase} — Dependente do pagador: ${tomador.dependenteAtendido}` : descBase;
+      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
+      const descFinal = await pedirDescricaoNfse(descSugerida);
+      if (!descFinal) { toast.error("Emissão cancelada."); return; }
+      const res = await emitirNfseFn({
+        data: {
+          emitenteId: emitenteIdEscolhido,
+          pacienteId: pac.id,
+          agendamentoId: selAgs[0].id,
+          agendamentoIds: selAgs.map((a) => a.id),
+          valorServicos: parcial.valor,
+          descricaoServicos: descFinal,
+          tomador,
+        },
+      });
+      const nfseId = (res as { id?: string })?.id;
+      if (nfseId) {
+        toast.success("NFS-e agrupada enviada. Consultando status...");
+        await new Promise((r) => setTimeout(r, 4000));
+        await consultarNfseFn({ data: { id: nfseId } });
+        const { data: nv } = await supabase
+          .from("nfse")
+          .select("id, status, url_pdf, numero")
+          .eq("id", nfseId)
+          .maybeSingle();
+        if (nv) {
+          setNfseMap((prev) => {
+            const n = new Map(prev);
+            for (const a of selAgs) {
+              n.set(a.id, { id: nv.id, status: nv.status, url_pdf: nv.url_pdf, numero: nv.numero });
+            }
+            return n;
+          });
+          if (nv.url_pdf) window.open(nv.url_pdf, "_blank", "noopener,noreferrer");
+        }
+        toast.success(`NFS-e emitida para ${selAgs.length} atendimentos.`);
+      } else {
+        toast.warning("NFS-e enviada — acompanhe o status em Financeiro › NFS-e.");
+      }
+      setNfseSel(new Set());
+    } catch (err) {
+      mostrarErro(err, "falha ao emitir NFS-e agrupada");
+    } finally {
+      setEmitindoNfseLote(false);
+    }
+  };
+
   const imprimirGR = async (a: Agendamento) => {
     if (!clinicaAtual) return;
     if (!pagosSet.has(a.id)) {
       toast.error("GR só pode ser impressa após o pagamento. Registre o pagamento antes.");
       return;
     }
+    // Trava contra clique repetido: se esta GR já está sendo montada, ignora.
+    if (imprimindoGRRef.current.has(a.id)) return;
+    imprimindoGRRef.current.add(a.id);
+    const toastId = toast.loading("Gerando GR para impressão…");
     try {
       // Reimpressão: carrega a forma/parcelas/bandeira reais do lançamento
       // confirmado deste agendamento para que a 2ª via mantenha exatamente
@@ -4343,11 +5012,11 @@ function AgendaPage() {
       // quando o lançamento não tem forma preenchida).
       let pagamentoInfo:
         | {
-            valor: number;
-            forma_pagamento: string | null;
-            parcelas: number | null;
-            bandeira_cartao: string | null;
-          }
+          valor: number;
+          forma_pagamento: string | null;
+          parcelas: number | null;
+          bandeira_cartao: string | null;
+        }
         | undefined;
       try {
         const { data: lancs } = await supabase
@@ -4388,8 +5057,12 @@ function AgendaPage() {
         pagamento: pagamentoInfo,
         fichaNumero,
       });
+      toast.success("GR enviada para impressão.", { id: toastId });
     } catch (err) {
+      toast.dismiss(toastId);
       mostrarErro(err);
+    } finally {
+      imprimindoGRRef.current.delete(a.id);
     }
   };
 
@@ -4466,6 +5139,40 @@ function AgendaPage() {
     <div className="space-y-3">
       {emitenteNfseDialog}
       {tomadorNfseDialog}
+      {descricaoNfseDialog}
+      {nfseSel.size > 0 && (() => {
+        const selAgs = items.filter((a) => nfseSel.has(a.id));
+        const pacIds = new Set(selAgs.map((a) => a.paciente_id).filter(Boolean));
+        const mesmoPaciente = pacIds.size === 1;
+        const total = selAgs.reduce((s, a) => s + Number(pagoInfoMap.get(a.id)?.valor ?? 0), 0);
+        const pacNome = selAgs[0]?.paciente_nome ?? "";
+        return (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-white shadow-lg border-2 border-sky-400 rounded-lg px-4 py-3 flex items-center gap-4 max-w-[95vw]">
+            <div className="text-sm">
+              <div className="font-semibold text-sky-700">
+                {nfseSel.size} atendimento{nfseSel.size > 1 ? "s" : ""} selecionado{nfseSel.size > 1 ? "s" : ""}
+              </div>
+              <div className="text-xs text-slate-600">
+                {mesmoPaciente ? (
+                  <>Paciente: <b>{pacNome}</b> • Total: <b>{total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</b></>
+                ) : (
+                  <span className="text-rose-600">⚠ Selecione serviços de um único paciente</span>
+                )}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={emitirNfseAgrupada}
+              disabled={emitindoNfseLote || !mesmoPaciente || nfseSel.size < 2}
+            >
+              {emitindoNfseLote ? "Emitindo…" : "Emitir NFS-e agrupada"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setNfseSel(new Set())} disabled={emitindoNfseLote}>
+              Cancelar
+            </Button>
+          </div>
+        );
+      })()}
       {reagendandoAg && (
         <div className="sticky top-0 z-30 -mx-4 px-4 py-2 border-b bg-primary text-primary-foreground shadow-sm">
           <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -4505,16 +5212,16 @@ function AgendaPage() {
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm">
-            <CalendarDays className="h-6 w-6" />
+          <div className="flex h-10 w-10 xl:h-12 xl:w-12 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm">
+            <CalendarDays className="h-5 w-5 xl:h-6 xl:w-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-foreground">Agendas</h1>
-            <p className="text-xs text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
+            <h1 className="text-xl xl:text-2xl font-bold tracking-tight text-slate-900 dark:text-foreground">Agendas</h1>
+            <p className="hidden xl:block text-xs text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <TurboModeToggle />
+          {!turboDisabled && <TurboModeToggle />}
           <div className="inline-flex rounded-full border bg-card p-0.5">
             <button
               type="button"
@@ -4532,17 +5239,6 @@ function AgendaPage() {
             </button>
           </div>
           <EncerrarExpedienteButton />
-          <Button
-            asChild
-            variant="default"
-            size="sm"
-            className="h-7 text-[11px] px-2"
-            title="Agendamento rápido em 4 passos"
-          >
-            <Link to="/app/agenda/express">
-              <Clock className="h-3 w-3 mr-1.5" /> Agenda Express
-            </Link>
-          </Button>
           <Button
             asChild
             variant="outline"
@@ -4620,7 +5316,7 @@ function AgendaPage() {
           >
             <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
           </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(o) => { if (!o) fecharDialogoAgenda(); else setOpen(true); }}>
             {podeEscrever && (
               <DialogTrigger asChild>
                 <Button
@@ -4730,22 +5426,22 @@ function AgendaPage() {
                           value={
                             form.paciente_id
                               ? {
-                                  id: form.paciente_id,
+                                id: form.paciente_id,
+                                nome: form.paciente_nome,
+                                cpf: null,
+                                telefone: null,
+                                data_nascimento: null,
+                                clinica_id: clinicaAtual?.clinica_id ?? "",
+                              }
+                              : form.paciente_nome
+                                ? {
+                                  id: "__pendente__",
                                   nome: form.paciente_nome,
                                   cpf: null,
                                   telefone: null,
                                   data_nascimento: null,
                                   clinica_id: clinicaAtual?.clinica_id ?? "",
                                 }
-                              : form.paciente_nome
-                                ? {
-                                    id: "__pendente__",
-                                    nome: form.paciente_nome,
-                                    cpf: null,
-                                    telefone: null,
-                                    data_nascimento: null,
-                                    clinica_id: clinicaAtual?.clinica_id ?? "",
-                                  }
                                 : null
                           }
                           onSelect={(p) => {
@@ -4901,8 +5597,17 @@ function AgendaPage() {
                       searchPlaceholder="Buscar médico ou exame..."
                       options={[
                         { value: "none", label: "— Sem médico —" },
-                        ...medicos.map((m) => ({ value: m.id, label: `👨‍⚕️ ${m.nome}` })),
-                        ...exames.map((e) => ({ value: `exame:${e.nome}`, label: `🧪 ${e.nome}` })),
+                        ...medicos
+                          .filter((m) =>
+                            (!(form.orcamento_id && orcamentoOdonto)
+                              || medicoEspec.get(m.id)?.has(ODONTO_ESPECIALIDADE_ID))
+                            && (!(form.orcamento_id && orcamentoLaboratorio)
+                              || medicoEhLaboratorista(m.id)),
+                          )
+                          .map((m) => ({ value: m.id, label: `👨‍⚕️ ${m.nome}` })),
+                        ...((form.orcamento_id && orcamentoOdonto)
+                          ? []
+                          : exames.map((e) => ({ value: `exame:${e.nome}`, label: `🧪 ${e.nome}` }))),
                       ]}
                     />
                   </div>
@@ -4949,8 +5654,8 @@ function AgendaPage() {
                     <Label className="text-xs font-semibold text-slate-700">Serviço</Label>
                     {form.medico_id ? (
                       procOpcoesPorMedico.get(form.medico_id)?.length ||
-                      procPorMedico.get(form.medico_id)?.size ||
-                      procNomesPorMedico.get(form.medico_id)?.size ? (
+                        procPorMedico.get(form.medico_id)?.size ||
+                        procNomesPorMedico.get(form.medico_id)?.size ? (
                         <p className="text-[11px] text-slate-500">
                           Mostrando apenas serviços configurados para este médico.
                         </p>
@@ -5075,7 +5780,7 @@ function AgendaPage() {
                 </fieldset>
                 <DialogFooter className="sticky bottom-0 bg-white pt-3 pb-2 -mx-6 px-6 border-t border-slate-200 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] mt-4 flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
                   {editing && pagosSet.has(editing.id) ? (
-                    <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                    <Button type="button" variant="outline" onClick={fecharDialogoAgenda}>
                       Fechar
                     </Button>
                   ) : (
@@ -5106,7 +5811,7 @@ function AgendaPage() {
                           : "Desconto"}
                       </Button>
                       <div className="flex flex-nowrap gap-2 sm:justify-end">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+                        <Button type="button" variant="outline" onClick={fecharDialogoAgenda} disabled={saving}>
                           Cancelar
                         </Button>
                         <Button
@@ -5472,21 +6177,26 @@ function AgendaPage() {
                         municipio: pac.cidade ?? undefined,
                         uf: pac.estado ?? undefined,
                       },
+                      valorBase: Number(dados.valor) || 0,
                     });
                     if (!tomador) {
                       toast.error("Emissão cancelada.");
                       return;
                     }
+                    const parcial = aplicarValorParcial(Number(dados.valor) || 0, tomador);
                     const descBase = ag.procedimento || pagamentoDesc || "Serviços prestados";
-                    const descFinal = tomador.dependenteAtendido
-                      ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
+                    const descComDep = tomador.dependenteAtendido
+                      ? `${descBase} — Dependente do pagador: ${tomador.dependenteAtendido}`
                       : descBase;
+                    const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
+                    const descFinal = await pedirDescricaoNfse(descSugerida);
+                    if (!descFinal) { toast.error("Emissão cancelada."); return; }
                     const res = await emitirNfseFn({
                       data: {
                         emitenteId: emitenteIdEscolhido,
                         pacienteId: pac.id,
                         agendamentoId: agId,
-                        valorServicos: Number(dados.valor) || 0,
+                        valorServicos: parcial.valor,
                         descricaoServicos: descFinal,
                         tomador,
                       },
@@ -5498,14 +6208,14 @@ function AgendaPage() {
                       await consultarNfseFn({ data: { id: nfseId } });
                       toast.success("NFS-e emitida com sucesso.");
                     } else {
-                      toast.warning("NFS-e enviada — acompanhe o status em Financeiro › Atendimentos.");
+                      toast.warning("NFS-e enviada — acompanhe o status em Financeiro › NFS-e.");
                     }
                   }
                 }
               }
             } catch (err) {
               mostrarErro(err, "falha ao emitir NFS-e");
-              navigate({ to: "/app/financeiro/atendimentos" });
+              navigate({ to: "/app/nfse" });
             }
           }
         }}
@@ -5802,6 +6512,33 @@ function AgendaPage() {
                 onChange={(e) => setNovoPac((p) => ({ ...p, email: e.target.value }))}
               />
             </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                type="button"
+                variant={descritorFace ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setFaceOpen(true)}
+              >
+                {descritorFace ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-1 text-green-600" /> Foto capturada — refazer
+                  </>
+                ) : (
+                  <>
+                    <Camera className="h-4 w-4 mr-1" /> Tirar foto (reconhecimento facial)
+                  </>
+                )}
+              </Button>
+              {descritorFace && (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground underline"
+                  onClick={() => setDescritorFace(null)}
+                >
+                  remover
+                </button>
+              )}
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setNovoPacOpen(false)}>
                 Cancelar
@@ -5811,6 +6548,15 @@ function AgendaPage() {
               </Button>
             </DialogFooter>
           </form>
+          <FaceCaptureDialog
+            open={faceOpen}
+            onClose={() => setFaceOpen(false)}
+            onCaptured={(desc) => {
+              setDescritorFace(desc);
+              toast.success("Foto capturada. Será vinculada ao cadastrar.");
+            }}
+            titulo="Cadastrar rosto do paciente"
+          />
         </DialogContent>
       </Dialog>
 
@@ -5983,7 +6729,6 @@ function AgendaPage() {
                   paciente_nome: "Paciente",
                   paciente_id: "Paciente (id)",
                   medico_id: "Profissional",
-                  enfermagem_recurso_id: "Recurso de enfermagem",
                   inicio: "Início",
                   fim: "Fim",
                   status: "Status",
@@ -6349,12 +7094,27 @@ function AgendaPage() {
                 // Notas manuais
                 for (const n of notasHist) {
                   const quem = n.user_nome || quemPorEmail(n.user_email);
+                  const origemAuto =
+                    !n.user_email &&
+                    (n.user_nome === "Totem" || n.user_nome === "Autoatendimento");
                   items.push({
                     id: `nota-${n.id}`,
                     when: n.created_at,
                     quem,
-                    kind: "nota",
-                    body: <span className="whitespace-pre-wrap">{n.texto}</span>,
+                    kind: origemAuto ? "checkin" : "nota",
+                    body: (
+                      <div className="flex items-start gap-2 flex-wrap">
+                        {origemAuto ? (
+                          <Badge
+                            variant="outline"
+                            className="bg-indigo-100 text-indigo-700 border-indigo-200 shrink-0"
+                          >
+                            {n.user_nome === "Totem" ? "Totem" : "Autoatendimento"}
+                          </Badge>
+                        ) : null}
+                        <span className="whitespace-pre-wrap">{n.texto}</span>
+                      </div>
+                    ),
                   });
                 }
                 items.sort((x, y) => (x.when < y.when ? 1 : -1));
@@ -6413,181 +7173,341 @@ function AgendaPage() {
 
       {/* 🔥 FILTROS AGRUPADOS EM LINHAS LÓGICAS */}
       <div
-        className="rounded-2xl border bg-card p-3 shadow-sm mb-10 [&_input]:h-8 [&_input]:text-xs [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:text-xs"
+        className="rounded-2xl border bg-card p-2 xl:p-3 shadow-sm mb-6 [&_input]:h-8 [&_input]:text-xs [&_button[role=combobox]]:h-8 [&_button[role=combobox]]:text-xs"
         style={{ ["--clinic" as never]: corClinica }}
       >
         {/* Linha 1: Filtros principais */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-1 xl:gap-1.5">
+
           {/* Profissional */}
-          <div className="space-y-0">
+          <div className="space-y-0 lg:col-span-2">
             <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
               value={filtroMedico}
-              onChange={(v) => {
-                if (!isMedicoOnly) {
-                  setFiltroMedico(v);
-                  setFiltroAgenda("todos");
-                }
-              }}
+              onChange={(v) => { if (!isMedicoOnly) { setFiltroMedico(v); setFiltroAgenda("todos"); } }}
               disabled={isMedicoOnly}
               onlyMedicoId={isMedicoOnly ? medicoLogadoId : null}
               compact
             />
           </div>
 
-          {/* Agenda */}
-          <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Tipo</Label>
-            {(() => {
-              let ags: { id: string; nome: string }[];
-              if (filtroMedico !== "todos") {
-                ags = agendasPorMedico.get(filtroMedico) ?? [];
-              } else {
-                const seen = new Set<string>();
-                ags = [];
-                for (const lista of agendasPorMedico.values()) {
-                  for (const a of lista) {
-                    if (!seen.has(a.id)) {
-                      seen.add(a.id);
-                      ags.push(a);
-                    }
+          {/* Tipo de Agenda */}
+          <div className="space-y-0 lg:col-span-1">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Tipo de agenda</Label>
+            <Select value={filtroAgenda} onValueChange={setFiltroAgenda}>
+              <SelectTrigger className="h-8 text-xs w-full">
+                <SelectValue placeholder="TODAS" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">TODAS</SelectItem>
+                {(() => {
+                  // Quando um médico específico está selecionado, listamos
+                  // as agendas dele por id (permite distinguir turnos/salas).
+                  // Quando é "TODOS", agrupamos por NOME (ex.: "AGENDA",
+                  // "CONSULTAS") para não repetir a mesma opção uma vez
+                  // por médico.
+                  const agendasFiltro =
+                    filtroMedico !== "todos"
+                      ? (agendasPorMedico.get(filtroMedico) ?? [])
+                      : Array.from(agendasPorMedico.values()).flat();
+                  const seen = new Set<string>();
+                  const out: { key: string; nome: string }[] = [];
+                  for (const a of agendasFiltro) {
+                    const k = chaveNomeAgenda(a.nome ?? "");
+                    if (!k || seen.has(k)) continue;
+                    seen.add(k);
+                    out.push({ key: k, nome: (a.nome ?? "").trim() });
                   }
-                }
-                ags.sort((a, b) => a.nome.localeCompare(b.nome));
-              }
-              const unica = ags.length <= 1;
-              const semProfissional = filtroMedico === "todos";
-              return (
-                <Select value={filtroAgenda} onValueChange={setFiltroAgenda} disabled={unica || semProfissional}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder={semProfissional ? "Selecione" : (ags[0]?.nome ?? "—")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">TODAS</SelectItem>
-                    {ags.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              );
-            })()}
-          </div>
-
-          {/* Data */}
-          <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Data</Label>
-            <DataRefField
-              dataRef={dataRef}
-              dataFim={dataFim}
-              setDataRef={setDataRef}
-              setDataFim={setDataFim}
-              shiftData={shiftData}
-              compact
-            />
-          </div>
-
-          {/* Cliente */}
-          <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Cliente</Label>
-            <div className="flex gap-1">
-              <Input
-                data-quick-search
-                value={filtroCliente}
-                onChange={(e) => setFiltroCliente(e.target.value)}
-                placeholder="Nome ou CPF…"
-                className="h-8 text-xs flex-1"
-              />
-              {podeEscrever && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  title="Cadastrar paciente rápido"
-                  onClick={() => {
-                    setNovoPac({ nome: filtroCliente.trim(), cpf: "", telefone: "", data_nascimento: "", email: "" });
-                    setNovoPacOpen(true);
-                  }}
-                  className="h-8 w-8 shrink-0"
-                >
-                  <UserPlus className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Nº Ficha */}
-          <div className="space-y-0">
-            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Nº Ficha</Label>
-            <Input
-              value={filtroFicha}
-              onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))}
-              placeholder="001"
-              inputMode="numeric"
-              className="h-8 text-xs"
-            />
+                  return out.map((o) => (
+                    <SelectItem key={`nome:${o.key}`} value={`nome:${o.key}`}>{o.nome}</SelectItem>
+                  ));
+                })()}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Situação */}
-          <div className="space-y-0">
+          <div className="space-y-0 lg:col-span-1">
             <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
+              <SelectTrigger className="h-8 text-xs w-full">
+                <SelectValue placeholder="TODOS" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">TODOS</SelectItem>
                 <SelectItem value="livres">Livres</SelectItem>
                 <SelectItem value="pago">Pago</SelectItem>
                 {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {STATUS_LABEL[s]}
-                  </SelectItem>
+                  <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Data */}
+          <div className="space-y-0 lg:col-span-1">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Data</Label>
+            <DataRefField
+              dataRef={dataRef}
+              dataFim={dataFim}
+              setDataRef={setDataRef}
+              setDataFim={setDataFim}
+              compact
+            />
+            {/* Toggle "apenas a data selecionada" — ao lado do seletor de data, pois depende dele */}
+            <label className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer select-none w-fit hover:text-slate-900 transition-colors">
+              <Checkbox
+                checked={apenasData}
+                onCheckedChange={(v) => setApenasData(v === true)}
+                className="h-3.5 w-3.5 rounded border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+              />
+              Exibir apenas a data selecionada
+            </label>
           </div>
 
           {/* Especialidade */}
-          <div className="space-y-0">
+          <div className="space-y-0 lg:col-span-1">
             <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
+              <SelectTrigger className="h-8 text-xs w-full">
+                <SelectValue placeholder="TODOS" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">TODOS</SelectItem>
-                {especialidades.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.nome}
-                  </SelectItem>
-                ))}
+                {especialidades.map(e => <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Ações rápidas */}
-          <div className="space-y-0 flex items-end gap-1">
-            <Button size="sm" onClick={load} className="h-8 text-xs flex-1 bg-primary hover:bg-primary/90">
-              <Search className="h-3 w-3 mr-1" /> Exibir
-            </Button>
-            <Button variant="outline" size="sm" onClick={limparFiltros} className="h-8 text-xs">
-              <X className="h-3 w-3" />
-            </Button>
+          {/* Cliente + Ações rápidas juntos */}
+          <div className="space-y-0 lg:col-span-2">
+            <Label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold">Cliente</Label>
+            <div className="flex items-center gap-1">
+              <Input
+                value={filtroCliente}
+                onChange={(e) => setFiltroCliente(e.target.value)}
+                placeholder="Nome ou CPF..."
+                className="h-8 text-xs flex-1 min-w-0"
+              />
+              <Button size="sm" onClick={load} className="h-8 px-2.5 bg-primary hover:bg-primary/90 shrink-0">
+                <Search className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={limparFiltros} className="h-8 w-8 p-0 shrink-0">
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
         {/* KPIs REMOVIDOS */}
         {/* ESPAÇAMENTO ENTRE FILTROS E TABELA */}
-        <div className="h-8"></div> {/* ← ADICIONE ESTA LINHA */}
-        {/* Tabela - Com botões de ação na linha */}
+        <div className="h-4 xl:h-8"></div>
+        {/* ============ LISTA MOBILE / TABLET (cards empilhados) ============ */}
+        <div className="lg:hidden space-y-2">
+          {loading ? (
+            <ListSkeleton rows={6} fallback={<div className="text-center py-8 text-muted-foreground text-sm">Carregando…</div>} />
+          ) : !clinicaAtual ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">Selecione uma clínica.</div>
+          ) : paginados.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">Nenhum agendamento encontrado.</div>
+          ) : (
+            paginados.map((a) => {
+              const fichaNum = fichaPorId.get(a.id) ?? "";
+              const realizado = a.status === "realizado";
+              const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
+              const hojeIsoLocal = new Date().toISOString().slice(0, 10);
+              const ehHoje = (a.inicio ?? "").slice(0, 10) === hojeIsoLocal;
+              const pagoHoje = pagosSet.has(a.id) && ehHoje;
+              const presente =
+                !realizado && (pagoHoje || !["aguardando_recepcao", "finalizado", "cancelado"].includes(etapaRow));
+              const estornoPend = estornoPendAgs.has(a.id);
+              const ocultarPaciente = estornoPend && isMedicoOnly;
+              const ehLivre = isSlotLivre(a.paciente_nome);
+              const profLabel = medicoNomeAgendamento(a);
+
+              // Overlay translúcido (bg-{cor}-500/10) em vez de tom sólido -50:
+              // o sólido fica quase branco e, no modo escuro, o texto claro
+              // (--foreground) perde contraste sobre ele. O overlay se mistura
+              // com o fundo real da linha e funciona nos dois temas.
+              let bgClass = "bg-card";
+              let borderLeft = "border-l-4 border-transparent";
+              if (estornoPend) { bgClass = "bg-rose-500/10"; borderLeft = "border-l-4 border-rose-500"; }
+              else if (realizado) { bgClass = "bg-emerald-500/10"; borderLeft = "border-l-4 border-emerald-500"; }
+              else if (presente) { bgClass = "bg-blue-500/10"; borderLeft = "border-l-4 border-blue-400"; }
+
+              const etapa = etapaMap.get(a.id) ?? "aguardando_recepcao";
+              const pendenteCheckin = ["aguardando_recepcao", "recepcao"].includes(etapa);
+              const podeCheckin = !ehLivre && !realizado && pagosSet.has(a.id) && pendenteCheckin && podeEscrever;
+
+              return (
+                <div
+                  key={a.id}
+                  className={`rounded-lg border ${bgClass} ${borderLeft} p-3 shadow-sm`}
+                >
+                  {/* Linha 1: horário + ficha + situação */}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-sm font-semibold text-emerald-700 whitespace-nowrap">
+                        {fmtHora(a.inicio)}–{fmtHora(a.fim)}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                        {fmtData(a.inicio)}
+                      </span>
+                      {fichaNum && (
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-foreground/70">
+                          #{fichaNum}
+                        </span>
+                      )}
+                    </div>
+                    {ehLivre ? (
+                      <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-300 shrink-0">Livre</Badge>
+                    ) : estornoPend ? (
+                      <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-[10px] shrink-0">Estorno</Badge>
+                    ) : (
+                      <Badge className={`${STATUS_COR[a.status]} text-[10px] shrink-0`}>{STATUS_LABEL[a.status]}</Badge>
+                    )}
+                  </div>
+
+                  {/* Linha 2: paciente */}
+                  <div className="mb-1.5">
+                    {ocultarPaciente ? (
+                      <span className="text-xs italic text-rose-600">— aguardando estorno —</span>
+                    ) : ehLivre ? (
+                      <span className="text-sm text-muted-foreground italic">Horário livre</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
+                        className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary text-left w-full min-w-0"
+                      >
+                        {a.status === "confirmado" && (
+                          <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
+                        )}
+                        {a.paciente_id && convenioMap.has(a.paciente_id) && (
+                          <IdCard className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        )}
+                        <span className="truncate">{a.paciente_nome}</span>
+                        {a.orcamento_numero && (
+                          <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1 py-0.5 rounded border border-amber-200">
+                            ORÇ
+                          </span>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Linha 3: profissional + serviço */}
+                  <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground mb-2 min-w-0">
+                    <span className="truncate" title={profLabel}>
+                      👤 {profLabel}
+                    </span>
+                    <span className="truncate max-w-[45%] text-right" title={procedimentoEfetivo(a.medico_id, a.procedimento) || ""}>
+                      {procedimentoEfetivo(a.medico_id, a.procedimento) || "—"}
+                    </span>
+                  </div>
+
+                  {/* Linha 4: ações rápidas */}
+                  <div className="flex items-center gap-1.5 pt-2 border-t">
+                    {ehLivre ? (
+                      (() => { const lockNome = slotTravadoPorOutro(a); return lockNome ? (
+                      <div className="h-8 flex-1 flex items-center justify-center rounded-md border border-amber-300 bg-amber-50 text-amber-800 text-[11px] px-2 truncate" title={`Em digitação por ${lockNome}`}>
+                        ⏳ Em digitação por {lockNome}
+                      </div>
+                      ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openSlot(a)}
+                        className="h-8 flex-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs"
+                      >
+                        <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                        Agendar
+                      </Button>
+                      ); })()
+                    ) : (
+                      <>
+                        {podeCheckin && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => confirmarPresenca(a)}
+                            className="h-8 flex-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-xs"
+                            title="Check-in"
+                          >
+                            <BadgeCheck className="h-3.5 w-3.5 mr-1" /> Check-in
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => cobrarAgendamento(a)}
+                          className={`h-8 flex-1 text-xs ${pagosSet.has(a.id)
+                            ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                            : "border-rose-200 text-rose-600 hover:bg-rose-50"}`}
+                          title={pagosSet.has(a.id) ? "Pago" : "Cobrar"}
+                        >
+                          <DollarSign className="h-3.5 w-3.5 mr-1" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
+                          {pagosSet.has(a.id) ? "Pago" : "Cobrar"}
+                        </Button>
+                        {podeEscrever && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEdit(a)}
+                            className="h-8 px-2 text-xs"
+                            title="Editar"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-8 px-2">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            {podeEscrever && (
+                              <DropdownMenuItem onClick={() => iniciarReagendamento(a)} disabled={a.status === "realizado"}>
+                                <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={() => imprimirGR(a)} disabled={!pagosSet.has(a.id)}>
+                              <Printer className="h-4 w-4 mr-2" /> Imprimir GR
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
+                              <Printer className="h-4 w-4 mr-2" /> Comprovante
+                            </DropdownMenuItem>
+                            {podeEscrever && !ehLivre && a.status !== "realizado" && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => remove(a)} className="text-amber-600">
+                                  <UserMinus className="h-4 w-4 mr-2" /> Desmarcar paciente
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
+                              <ShieldCheck className="h-4 w-4 mr-2" /> Histórico
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* ============ TABELA DESKTOP (lg+) ============ */}
         {/* Sem overflow-hidden aqui: um ancestral com overflow != visible vira
             o contexto de scroll do sticky, e como este div nunca rola
             internamente (quem rola é o <main> do app-shell), o cabeçalho
             "sticky top-0" parava de acompanhar o scroll da página. */}
-        <div className="rounded-lg border border-border bg-card">
-          <Table className="max-lg:table max-lg:overflow-visible">
+        <div className="hidden lg:block rounded-lg border border-border bg-card overflow-x-auto">
+          <Table className="min-w-[820px] xl:min-w-[900px]">
             <TableHeader className="sticky top-0 z-20">
               <TableRow className="bg-muted">
                 <TableHead className="w-8 rounded-tl-lg" title="Selecione para ações em lote">
@@ -6601,13 +7521,13 @@ function AgendaPage() {
                 </TableHead>
                 <TableHead className="w-20 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
                 <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
-                <TableHead className="min-w-[130px] font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="min-w-[110px] xl:min-w-[130px] font-semibold text-xs uppercase text-muted-foreground">
                   Profissional
                 </TableHead>
-                <TableHead className="min-w-[150px] font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="min-w-[130px] xl:min-w-[150px] font-semibold text-xs uppercase text-muted-foreground">
                   Cliente
                 </TableHead>
-                <TableHead className="min-w-[110px] font-semibold text-xs uppercase text-muted-foreground">
+                <TableHead className="min-w-[100px] xl:min-w-[110px] font-semibold text-xs uppercase text-muted-foreground">
                   Serviço
                 </TableHead>
                 <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Situação</TableHead>
@@ -6618,11 +7538,16 @@ function AgendaPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                    Carregando…
-                  </TableCell>
-                </TableRow>
+                <TableSkeletonRows
+                  cols={9}
+                  fallback={
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        Carregando…
+                      </TableCell>
+                    </TableRow>
+                  }
+                />
               ) : !clinicaAtual ? (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
@@ -6649,17 +7574,21 @@ function AgendaPage() {
                   const ocultarPaciente = estornoPend && isMedicoOnly;
                   const ehLivre = isSlotLivre(a.paciente_nome);
 
-                  // Cor de fundo da linha
+                  // Cor de fundo da linha — overlay translúcido (bg-{cor}-500/N)
+                  // em vez de tom sólido -50/-100: o sólido fica quase branco e,
+                  // no modo escuro, o texto claro (--foreground) perde contraste
+                  // sobre ele. O overlay se mistura com o fundo real da linha e
+                  // funciona nos dois temas.
                   let bgClass = "";
                   let borderLeft = "";
                   if (estornoPend) {
-                    bgClass = "bg-rose-50 hover:bg-rose-100";
+                    bgClass = "bg-rose-500/10 hover:bg-rose-500/15";
                     borderLeft = "border-l-4 border-rose-500";
                   } else if (realizado) {
-                    bgClass = "bg-emerald-50 hover:bg-emerald-100";
+                    bgClass = "bg-emerald-500/10 hover:bg-emerald-500/15";
                     borderLeft = "border-l-4 border-emerald-500";
                   } else if (presente) {
-                    bgClass = "bg-blue-50 hover:bg-blue-100";
+                    bgClass = "bg-blue-500/10 hover:bg-blue-500/15";
                     borderLeft = "border-l-4 border-blue-400";
                   }
 
@@ -6725,6 +7654,14 @@ function AgendaPage() {
                               <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />
                             )}
                             {a.paciente_id && <IdadeIcon nascimento={nascMap.get(a.paciente_id) ?? null} size={25} />}
+                            {a.paciente_id && convenioMap.has(a.paciente_id) && (
+                              <span
+                                title={`Cartão ${convenioMap.get(a.paciente_id)}`}
+                                className="shrink-0 inline-flex"
+                              >
+                                <IdCard className="h-3.5 w-3.5 text-emerald-600" />
+                              </span>
+                            )}
                             <span className="truncate max-w-[300px]">{a.paciente_nome}</span>
                             {a.orcamento_numero && (
                               <span className="shrink-0 text-[9px] font-semibold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200">
@@ -6753,6 +7690,11 @@ function AgendaPage() {
                       {/* Situação */}
                       <TableCell className="py-2.5">
                         {ehLivre ? (
+                          (() => { const lockNome = slotTravadoPorOutro(a); return lockNome ? (
+                          <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[11px] font-medium truncate max-w-full" title={`Em digitação por ${lockNome}`}>
+                            ⏳ {lockNome}
+                          </Badge>
+                          ) : (
                           <Button
                             variant="outline"
                             size="sm"
@@ -6762,6 +7704,7 @@ function AgendaPage() {
                             <UserPlus className="h-3 w-3 mr-1.5" />
                             Agendar
                           </Button>
+                          ); })()
                         ) : estornoPend ? (
                           <Badge className="bg-rose-100 text-rose-700 border-rose-200 text-xs">
                             Estorno solicitado
@@ -6822,11 +7765,10 @@ function AgendaPage() {
                                 return `Pago • ${v}`;
                               })()}
                               onClick={() => cobrarAgendamento(a)}
-                              className={`h-7 w-7 rounded-md border-2 ${
-                                pagosSet.has(a.id)
-                                  ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                                  : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
-                              }`}
+                              className={`h-7 w-7 rounded-md border-2 ${pagosSet.has(a.id)
+                                ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
+                                }`}
                             >
                               <DollarSign className="h-3.5 w-3.5" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
                             </Button>
@@ -6840,19 +7782,35 @@ function AgendaPage() {
                               const podeEmitir = pagosSet.has(a.id);
                               if (!emitida && !podeEmitir) return null;
                               return (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  title={emitida ? `NFS-e ${nf?.numero ?? ""}` : "Emitir NFS-e"}
-                                  onClick={() => verOuEmitirNota(a)}
-                                  className={`h-7 w-7 rounded-md border-2 ${
-                                    emitida
+                                <div className="flex items-center gap-1">
+                                  {!emitida && podeEmitir && a.paciente_id && (
+                                    <input
+                                      type="checkbox"
+                                      title="Selecionar para NFS-e agrupada"
+                                      className="h-3.5 w-3.5 cursor-pointer accent-sky-500"
+                                      checked={nfseSel.has(a.id)}
+                                      onChange={(e) => {
+                                        setNfseSel((prev) => {
+                                          const n = new Set(prev);
+                                          if (e.target.checked) n.add(a.id); else n.delete(a.id);
+                                          return n;
+                                        });
+                                      }}
+                                    />
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    title={emitida ? `NFS-e ${nf?.numero ?? ""}` : "Emitir NFS-e"}
+                                    onClick={() => verOuEmitirNota(a)}
+                                    className={`h-7 w-7 rounded-md border-2 ${emitida
                                       ? "border-sky-400 bg-sky-50 text-sky-600 hover:bg-sky-100"
                                       : "border-sky-200 text-sky-400 hover:border-sky-400 hover:bg-sky-50"
-                                  }`}
-                                >
-                                  <FileText className="h-3.5 w-3.5" strokeWidth={emitida ? 3 : 2.5} />
-                                </Button>
+                                      }`}
+                                  >
+                                    <FileText className="h-3.5 w-3.5" strokeWidth={emitida ? 3 : 2.5} />
+                                  </Button>
+                                </div>
                               );
                             })()}
 
@@ -6965,7 +7923,7 @@ function AgendaPage() {
         </div>
         <div className="rounded-lg border bg-muted/30 p-4">
           <h3 className="text-center font-semibold mb-3">Legenda</h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { cor: "#cfe3fb", borda: "#9fc3f3", label: "Confirmado pelo cliente" },
               { cor: "#a8c8ed", borda: "#7aa9d8", label: "Presente na clínica" },
@@ -7090,6 +8048,46 @@ function AgendaPage() {
           medicos={[...medicos.map((m) => ({ id: m.id, nome: m.nome, isRecurso: recursoIds.has(m.id) }))]}
           onCreated={() => {
             void load();
+          }}
+        />
+      )}
+      {selecItensCtx && (
+        <SelecionarItensOrcamentoDialog
+          open={selecItensOpen}
+          onOpenChange={(v) => {
+            setSelecItensOpen(v);
+            if (!v) setSelecItensCtx(null);
+          }}
+          numero={selecItensCtx.orcamento.numero}
+          pacienteNome={selecItensCtx.orcamento.paciente_nome}
+          totalItens={selecItensCtx.totalItens}
+          itensRestantes={selecItensCtx.itensRestantes}
+          onConfirm={(ids) => {
+            const ctx = selecItensCtx;
+            const selecionados = ctx.itensRaw.filter((i) => ids.includes(i.id));
+            if (selecionados.length === 0) return;
+            const nomes = selecionados.map((i) => i.descricao);
+            const procStr = ctx.todosLab
+              ? `LABORATÓRIO (${nomes.length} EXAMES): ${nomes.join(", ")}`
+              : nomes.length === 1
+                ? nomes[0]
+                : `${nomes.length} ITENS: ${nomes.join(", ")}`;
+            setPendingOrcItemIds(selecionados.map((i) => i.id));
+            setForm((f) => ({
+              ...f,
+              orcamento_id: ctx.orcamento.id,
+              orcamento_numero: String(ctx.orcamento.numero),
+              orcamento_itens: nomes,
+              paciente_id: ctx.orcamento.paciente_id ?? f.paciente_id,
+              paciente_nome: ctx.orcamento.paciente_nome ?? f.paciente_nome,
+              procedimento: procStr,
+              procedimentos: procStr ? [procStr] : [],
+            }));
+            setSelecItensOpen(false);
+            setSelecItensCtx(null);
+            toast.success(
+              `${selecionados.length} ${selecionados.length === 1 ? "item vinculado" : "itens vinculados"} do orçamento #${String(ctx.orcamento.numero).padStart(5, "0")}.`,
+            );
           }}
         />
       )}
@@ -7451,6 +8449,12 @@ function FragmentDayCell({
   procedimentoFallback?: string;
 }) {
   const ehLivre = ag && isSlotLivre(ag.paciente_nome);
+  // Slot travado por alguém digitando (≤ 3 min). O próprio usuário que travou
+  // fica com o diálogo aberto; para todos os demais o slot vira "em digitação".
+  const lockNome = ag && ehLivre && ag.edit_lock_by && ag.edit_lock_at
+    && Date.parse(ag.edit_lock_at) > Date.now() - 3 * 60 * 1000
+    ? (ag.edit_lock_by_nome || "outro usuário")
+    : null;
   return (
     <>
       <td
@@ -7468,14 +8472,20 @@ function FragmentDayCell({
           >
             +
           </button>
+        ) : lockNome ? (
+          <div
+            className="w-full rounded-md px-2 py-1.5 text-[11px] leading-tight truncate bg-amber-100 text-amber-800 border border-amber-300"
+            title={`Em digitação por ${lockNome}`}
+          >
+            ⏳ {lockNome}
+          </div>
         ) : (
           <button
             type="button"
             onClick={() => (ehLivre ? onSlotClick(ag) : ocultarPaciente ? undefined : onAgClick(ag))}
             disabled={ocultarPaciente}
-            className={`w-full text-left rounded-md px-2 py-1.5 text-xs leading-tight truncate hover:brightness-95 transition ${
-              estornoPend ? "bg-rose-100 text-rose-800 border border-rose-300" : corStatus(ag.status)
-            } ${ocultarPaciente ? "cursor-not-allowed opacity-90" : ""}`}
+            className={`w-full text-left rounded-md px-2 py-1.5 text-xs leading-tight truncate hover:brightness-95 transition ${estornoPend ? "bg-rose-100 text-rose-800 border border-rose-300" : corStatus(ag.status)
+              } ${ocultarPaciente ? "cursor-not-allowed opacity-90" : ""}`}
             title={
               estornoPend
                 ? "Estorno solicitado — aguardando decisão do financeiro"
@@ -7495,14 +8505,12 @@ function DataRefField({
   dataFim,
   setDataRef,
   setDataFim,
-  shiftData,
   compact,
 }: {
   dataRef: string;
   dataFim: string | null;
   setDataRef: (v: string) => void;
   setDataFim: (v: string | null) => void;
-  shiftData: (delta: number) => void;
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -7515,6 +8523,8 @@ function DataRefField({
     while (d.getDay() === 0) d.setDate(d.getDate() + 1);
     return d;
   };
+
+  // 🔥 AGORA SEMPRE MOSTRA O ANO
   const fmt = (s: string) => {
     const d = new Date(`${s}T12:00:00`);
     return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
@@ -7524,25 +8534,44 @@ function DataRefField({
 
   return (
     <div className="flex gap-1">
-      {/* SETAS REMOVIDAS */}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" className="flex-1 justify-start font-normal h-8 text-xs">
-            <CalendarDays className="h-3.5 w-3.5 mr-1.5" /> {label}
+          <Button
+            variant="outline"
+            className={cn(
+              "font-normal transition-all",
+              compact
+                ? "h-7 text-[13px] px-2 min-w-[130px] w-full justify-center border border-slate-300/60 hover:border-slate-400 hover:bg-slate-50/50"
+                : "h-8 text-xs flex-1 justify-start border-slate-200 hover:border-slate-300 hover:bg-slate-50/50"
+            )}
+          >
+            <CalendarDays className={cn("h-3.5 w-3.5", compact ? "mr-1" : "mr-1.5")} />
+            {label}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <div className="flex items-center gap-1 p-2 border-b">
-            <Button size="sm" variant={mode === "single" ? "default" : "outline"} onClick={() => setMode("single")}>
+            <Button
+              size="sm"
+              variant={mode === "single" ? "default" : "outline"}
+              onClick={() => setMode("single")}
+              className={compact ? "h-7 text-xs" : ""}
+            >
               Dia
             </Button>
-            <Button size="sm" variant={mode === "range" ? "default" : "outline"} onClick={() => setMode("range")}>
+            <Button
+              size="sm"
+              variant={mode === "range" ? "default" : "outline"}
+              onClick={() => setMode("range")}
+              className={compact ? "h-7 text-xs" : ""}
+            >
               Período
             </Button>
             <span className="flex-1" />
             <Button
               size="sm"
               variant="ghost"
+              className={compact ? "h-7 text-xs" : ""}
               onClick={() => {
                 setDataRef(toIso(proxDiaUtil()));
                 setDataFim(null);
@@ -7555,6 +8584,7 @@ function DataRefField({
             <Button
               size="sm"
               variant="ghost"
+              className={compact ? "h-7 text-xs" : ""}
               onClick={() => {
                 setDataRef(toIso(proxDiaUtil()));
                 setDataFim(null);
@@ -7574,7 +8604,7 @@ function DataRefField({
                 setDataFim(null);
                 setOpen(false);
               }}
-              className="p-3 pointer-events-auto"
+              className={cn("pointer-events-auto", compact ? "p-2" : "p-3")}
             />
           ) : (
             <Calendar
@@ -7588,8 +8618,8 @@ function DataRefField({
                 setDataRef(toIso(r.from));
                 setDataFim(r.to ? toIso(r.to) : null);
               }}
-              numberOfMonths={2}
-              className="p-3 pointer-events-auto"
+              numberOfMonths={compact ? 1 : 2}
+              className={cn("pointer-events-auto", compact ? "p-2" : "p-3")}
             />
           )}
         </PopoverContent>

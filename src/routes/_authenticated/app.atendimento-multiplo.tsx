@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { criarAtendimentoMultiplo } from "@/lib/atendimento-multiplo/criar.functions";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
+import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
 
 export const Route = createFileRoute("/_authenticated/app/atendimento-multiplo")({
   component: AtendimentoMultiploPage,
@@ -105,6 +106,16 @@ function AtendimentoMultiploPage() {
   const podeEscrever = usePodeEscrever("atendimento-multiplo");
   const criarMultiplo = useServerFn(criarAtendimentoMultiplo);
 
+  // Clínicas que optaram por não oferecer "Atendimento Múltiplo" (feature
+  // flag `atendimento_multiplo_disabled`) redirecionam silenciosamente para
+  // a Agenda. Mantém o código no repositório para as demais clínicas.
+  const { disabled: multiploDisabled, loading: flagLoading } = useAtendimentoMultiploDisabled();
+  useEffect(() => {
+    if (!flagLoading && multiploDisabled) {
+      navigate({ to: "/app/agenda", replace: true });
+    }
+  }, [flagLoading, multiploDisabled, navigate]);
+
   const dataInicial = useMemo(() => {
     const d = new Date();
     d.setMinutes(0, 0, 0);
@@ -134,13 +145,12 @@ function AtendimentoMultiploPage() {
     if (!clinicaId) return;
     let cancel = false;
     void (async () => {
-      const [med, rec] = await Promise.all([
+      const [med] = await Promise.all([
         supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaId).order("nome"),
-        supabase.from("enfermagem_recursos").select("id, nome").eq("clinica_id", clinicaId).order("nome"),
       ]);
       if (cancel) return;
       setMedicos((med.data ?? []) as Medico[]);
-      setRecursos((rec.data ?? []) as Recurso[]);
+      setRecursos([] as Recurso[]);
     })();
     return () => { cancel = true; };
   }, [clinicaId]);
@@ -278,7 +288,6 @@ function AtendimentoMultiploPage() {
           itens: itens.map((it) => ({
             procedimento: it.procedimento_nome,
             medico_id: it.executor_kind === "medico" ? it.medico_id : null,
-            enfermagem_recurso_id: it.executor_kind === "recurso" ? it.recurso_id : null,
             inicio: toIso(it.inicio),
             fim: addMinutes(it.inicio, it.duracao || 30),
             tipo_atendimento: it.tipo_atendimento,
@@ -296,6 +305,10 @@ function AtendimentoMultiploPage() {
     } finally {
       setSalvando(false);
     }
+  }
+
+  if (flagLoading || multiploDisabled) {
+    return null;
   }
 
   return (

@@ -340,7 +340,6 @@ export function NovoAgendamentoWizard({
             paciente_nome: paciente.nome.trim(),
             paciente_id: paciente.id,
             medico_id: medico.id,
-            enfermagem_recurso_id: null,
             inicio: new Date(slot.inicio).toISOString(),
             fim: new Date(slot.fim).toISOString(),
             procedimento: procedimento.nome || null,

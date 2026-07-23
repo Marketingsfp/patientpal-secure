@@ -1,0 +1,2 @@
+ALTER TABLE public.hr_contratos ADD COLUMN IF NOT EXISTS paciente_id uuid REFERENCES public.pacientes(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_hr_contratos_paciente_id ON public.hr_contratos(paciente_id);

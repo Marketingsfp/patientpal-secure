@@ -19,6 +19,8 @@ export interface PatientOption {
   email?: string | null;
   /** Preenchido quando o paciente tem contrato ativo de convênio. */
   associado_convenio?: string | null;
+  /** 'titular' | 'dependente' — quando associado_convenio está preenchido. */
+  associado_tipo?: "titular" | "dependente" | null;
   ultima_consulta?: string | null;
   cadastro_incompleto?: boolean;
   match_score?: number;
@@ -270,7 +272,7 @@ export function PatientSearchInput({
                   )}
                   {p.associado_convenio ? (
                     <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
-                      Associado — {p.associado_convenio}
+                      Associado - {p.associado_tipo === "dependente" ? "dependente" : "titular"} — {p.associado_convenio}
                     </span>
                   ) : (
                     <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">

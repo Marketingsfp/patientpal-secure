@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Camera, ChevronDown, CreditCard, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, UserCheck, Upload, X, Check } from "lucide-react";
+import { Camera, ChevronDown, CreditCard, ExternalLink, FileHeart, History, Loader2, MapPin, Mic, MicOff, ScanFace, Search, UserCheck, Upload, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -15,6 +15,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
+import { descriptorDaFoto, registrarBiometriaPaciente } from "@/lib/biometria";
+import { useClinica } from "@/hooks/use-clinica";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export interface Paciente {
@@ -22,6 +24,7 @@ export interface Paciente {
   nome: string;
   cpf: string | null;
   numero_pasta: string | null;
+  codigo_prontuario?: string | null;
   telefone: string | null;
   telefone2: string | null;
   email: string | null;
@@ -43,7 +46,8 @@ export interface Paciente {
 }
 
 type FormState = {
-  nome: string; cpf: string; numero_pasta: string; telefone: string; telefone2: string; email: string;
+  nome: string; cpf: string; numero_pasta: string; codigo_prontuario: string;
+  telefone: string; telefone2: string; email: string;
   data_nascimento: string; sexo: string; ativo: boolean;
   cep: string; logradouro: string; numero: string; complemento: string;
   bairro: string; cidade: string; estado: string;
@@ -52,7 +56,8 @@ type FormState = {
 };
 
 const EMPTY: FormState = {
-  nome: "", cpf: "", numero_pasta: "", telefone: "", telefone2: "", email: "",
+  nome: "", cpf: "", numero_pasta: "", codigo_prontuario: "",
+  telefone: "", telefone2: "", email: "",
   data_nascimento: "", sexo: "nao_informar", ativo: true,
   cep: "", logradouro: "", numero: "", complemento: "",
   bairro: "", cidade: "", estado: "",
@@ -129,6 +134,8 @@ interface ClienteFormProps {
 
 export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFooter, readOnly = false }: ClienteFormProps) {
   const editing = paciente;
+  const { clinicaAtual } = useClinica();
+  const isAdmin = clinicaAtual?.role === "admin";
   const [form, setForm] = useState<FormState>(EMPTY);
   const [tab, setTab] = useState("dados");
   const [saving, setSaving] = useState(false);
@@ -237,10 +244,14 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     setForm({
       nome: editing.nome,
       cpf: editing.cpf ?? "", numero_pasta: editing.numero_pasta ?? "",
+      codigo_prontuario: (editing as any).codigo_prontuario ?? "",
       telefone: editing.telefone ?? "", telefone2: editing.telefone2 ?? "",
       email: editing.email ?? "",
       data_nascimento: editing.data_nascimento ?? "",
-      sexo: editing.sexo ?? "nao_informar", ativo: editing.ativo,
+      sexo: (["masculino","feminino","outro","nao_informar"].includes((editing.sexo ?? "") as string)
+        ? (editing.sexo as string)
+        : "nao_informar"),
+      ativo: editing.ativo,
       cep: editing.cep ?? "", logradouro: editing.logradouro ?? "",
       numero: editing.numero ?? "", complemento: editing.complemento ?? "",
       bairro: editing.bairro ?? "", cidade: editing.cidade ?? "",
@@ -652,17 +663,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
   async function salvarBiometria(descriptor: number[]) {
     if (!editing) return;
     setBioLoading(true);
-    await supabase.from("paciente_biometria")
-      .update({ revogado_em: new Date().toISOString() })
-      .eq("paciente_id", editing.id)
-      .eq("clinica_id", clinicaId)
-      .is("revogado_em", null);
-    const { error } = await supabase.from("paciente_biometria").insert({
-      paciente_id: editing.id,
-      clinica_id: clinicaId,
-      descriptor: descriptor as any,
-      consentimento_em: new Date().toISOString(),
-    });
+    const error = await registrarBiometriaPaciente(editing.id, clinicaId, descriptor);
     setBioLoading(false);
     if (error) { mostrarErro(error); return; }
     setHasBiometria(true);
@@ -752,12 +753,13 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     const payload = {
       nome: form.nome.trim(),
       cpf: form.cpf.trim() ? somenteDigitos(form.cpf) : null,
-      numero_pasta: form.numero_pasta.trim() || null,
       telefone: form.telefone.trim() || null,
       telefone2: form.telefone2.trim() || null,
       email: form.email.trim() || null,
       data_nascimento: form.data_nascimento || null,
-      sexo: form.sexo,
+      sexo: (["masculino","feminino","outro","nao_informar"].includes(form.sexo)
+        ? form.sexo
+        : "nao_informar"),
       ativo: form.ativo,
       cep: form.cep.trim() || null,
       logradouro: form.logradouro.trim() || null,
@@ -771,14 +773,19 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       responsavel_telefone: form.responsavel_telefone.trim() || null,
       responsavel_parentesco: form.responsavel_parentesco.trim() || null,
       clinica_id: clinicaId,
-    };
+    } as Record<string, unknown>;
+    // Número de prontuário / pasta: só admin pode alterar.
+    if (isAdmin) {
+      payload.numero_pasta = form.numero_pasta.trim() || null;
+      payload.codigo_prontuario = form.codigo_prontuario.trim() || null;
+    }
     let pacienteId: string | undefined = editing?.id;
     if (editing) {
-      const { error } = await supabase.from("pacientes").update(payload).eq("id", editing.id);
+      const { error } = await supabase.from("pacientes").update(payload as any).eq("id", editing.id);
       if (error) { setSaving(false); mostrarErro(error); return; }
     } else {
       const { data: novo, error } = await supabase
-        .from("pacientes").insert(payload).select("id").single();
+        .from("pacientes").insert(payload as any).select("id").single();
       if (error) { setSaving(false); mostrarErro(error); return; }
       pacienteId = novo?.id;
     }
@@ -797,6 +804,21 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       await supabase.from("pacientes")
         .update({ foto_url: path, foto_atualizado_em: new Date().toISOString() })
         .eq("id", pacienteId);
+
+      // A foto do cadastro é a fonte da biometria usada no reconhecimento do totem
+      const descriptor = await descriptorDaFoto(fotoFile);
+      if (descriptor) {
+        const bioErr = await registrarBiometriaPaciente(pacienteId, clinicaId, descriptor);
+        if (bioErr) {
+          mostrarErro(bioErr, "foto salva, mas a biometria facial falhou");
+        } else {
+          setHasBiometria(true);
+        }
+      } else {
+        toast.warning(
+          "Foto salva, mas nenhum rosto foi detectado nela — o totem não vai reconhecer o paciente com esta foto. Tire uma foto de frente, com boa iluminação, ou use a aba Biometria.",
+        );
+      }
     }
 
     setSaving(false);
@@ -869,7 +891,34 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               </div>
             </div>
             <div className="space-y-1"><Label>Nome *</Label><InputVoz {...fieldProps("nome")} required maxLength={120} /></div>
-            <div className="space-y-1"><Label>Número de serviço</Label><InputVoz {...fieldProps("numero_pasta")} placeholder="Ex.: 1234" /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>
+                  Número de prontuário
+                  {!isAdmin && <span className="ml-2 text-xs text-muted-foreground">(somente admin)</span>}
+                </Label>
+                <Input
+                  value={form.codigo_prontuario}
+                  onChange={(e) => setForm(f => ({ ...f, codigo_prontuario: e.target.value }))}
+                  placeholder="Ex.: 000123"
+                  disabled={!isAdmin}
+                  readOnly={!isAdmin}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>
+                  Número de serviço / pasta
+                  {!isAdmin && <span className="ml-2 text-xs text-muted-foreground">(somente admin)</span>}
+                </Label>
+                <Input
+                  value={form.numero_pasta}
+                  onChange={(e) => setForm(f => ({ ...f, numero_pasta: e.target.value }))}
+                  placeholder="Ex.: 1234"
+                  disabled={!isAdmin}
+                  readOnly={!isAdmin}
+                />
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label>CPF</Label><InputVoz {...fieldProps("cpf")} /></div>
               <div className="space-y-1"><Label>Telefone *</Label><InputVoz {...fieldProps("telefone")} /></div>
@@ -1372,55 +1421,18 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                         </div>
                       </div>
 
-                      <div className="border-t overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted/30">
-                            <tr className="text-left">
-                              <th className="px-3 py-2 w-12">Nº</th>
-                              <th className="px-3 py-2">Vencimento</th>
-                              <th className="px-3 py-2">Valor</th>
-                              <th className="px-3 py-2">Status</th>
-                              <th className="px-3 py-2">Pago em</th>
-                              <th className="px-3 py-2">Valor pago</th>
-                              <th className="px-3 py-2 w-28"></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {c.parcelas.length === 0 ? (
-                              <tr><td colSpan={7} className="px-3 py-4 text-center text-muted-foreground">Sem parcelas registradas.</td></tr>
-                            ) : c.parcelas.map((p) => {
-                              const paga = isPaga(p);
-                              const atras = isAtraso(p);
-                              const cls = paga ? "bg-green-50/50" : atras ? "bg-red-50/60" : "";
-                              const label = paga ? "Paga" : atras ? "Em atraso" : "Pendente";
-                              const labelCls = paga ? "text-green-700" : atras ? "text-red-700" : "text-foreground";
-                              return (
-                                <tr key={p.id} className={`border-t ${cls}`}>
-                                  <td className="px-3 py-2 tabular-nums">{p.numero_parcela}</td>
-                                  <td className="px-3 py-2 tabular-nums">{fmtData(p.vencimento)}</td>
-                                  <td className="px-3 py-2 tabular-nums">{fmtBRL(p.valor)}</td>
-                                  <td className={`px-3 py-2 font-medium ${labelCls}`}>{label}</td>
-                                  <td className="px-3 py-2 tabular-nums">{fmtData(p.pago_em)}</td>
-                                  <td className="px-3 py-2 tabular-nums">{p.valor_pago != null ? fmtBRL(p.valor_pago) : "—"}</td>
-                                  <td className="px-3 py-2 text-right">
-                                    {paga ? (
-                                      <span className="text-xs text-muted-foreground">—</span>
-                                    ) : (
-                                      <Link
-                                        to="/app/cartao-beneficios/contratos"
-                                        search={{ contratoId: c.id }}
-                                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
-                                        title="Abrir contrato no Cartão Benefícios para registrar pagamento"
-                                      >
-                                        <Check className="h-3.5 w-3.5" /> Pagar
-                                      </Link>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                      <div className="border-t px-4 py-3 flex flex-wrap items-center justify-between gap-2 bg-muted/10">
+                        <div className="text-xs text-muted-foreground">
+                          Mensalidades e pagamentos são gerenciados na tela do contrato.
+                        </div>
+                        <Link
+                          to="/app/cartao-beneficios/contratos"
+                          search={{ contratoId: c.id }}
+                          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
+                          title="Abrir contrato no Cartão Benefícios"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" /> Abrir contrato
+                        </Link>
                       </div>
                     </div>
                   );

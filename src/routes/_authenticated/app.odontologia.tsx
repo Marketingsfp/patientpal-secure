@@ -1,21 +1,29 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Smile, Save } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Smile, Save, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
-import { Odontograma } from "@/components/odontograma";
+import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
+import { OdontogramaClinico, type FacesEstado } from "@/components/odontologia/odontograma-clinico";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { type OdontoStatus, STATUS_LABEL } from "@/lib/odonto";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { type OdontoStatus, type OdontoFace, STATUS_LABEL, FACE_LABEL } from "@/lib/odonto";
 import { formatDatePura } from "@/lib/date-utils";
+import { OrcamentoTab } from "@/components/odontologia/orcamento-tab";
+import { AnamneseOdontoTab } from "@/components/odontologia/anamnese-odonto-tab";
+import { EvolucaoOdontoTab } from "@/components/odontologia/evolucao-odonto-tab";
+import { AddToOrcamentoDialog } from "@/components/odontologia/add-to-orcamento-dialog";
+import { GaleriaOdontoTab } from "@/components/odontologia/galeria-odonto-tab";
 
 export const Route = createFileRoute("/_authenticated/app/odontologia")({
   component: OdontologiaPage,
@@ -23,7 +31,7 @@ export const Route = createFileRoute("/_authenticated/app/odontologia")({
 });
 
 interface DenteRow {
-  id: string; dente: number; status: OdontoStatus; procedimento: string | null;
+  id: string; dente: number; face: OdontoFace; status: OdontoStatus; procedimento: string | null;
   observacoes: string | null; data: string;
 }
 interface ProntuarioOdonto {
@@ -33,15 +41,39 @@ interface ProntuarioOdonto {
 
 function OdontologiaPage() {
   const { clinicaAtual } = useClinica();
+  const { user } = useAuth();
   const podeEscrever = usePodeEscrever("odontologia");
   const [pacienteId, setPacienteId] = useState<string | null>(null);
   const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
+  const [pacienteIdOrc, setPacienteIdOrc] = useState<string | null>(null);
+  const [pacienteSelOrc, setPacienteSelOrc] = useState<PatientOption | null>(null);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickInitial, setQuickInitial] = useState("");
   const [dentes, setDentes] = useState<DenteRow[]>([]);
   const [prontuario, setProntuario] = useState<ProntuarioOdonto | null>(null);
   const [selecionado, setSelecionado] = useState<number | null>(null);
+  const [faceSelecionada, setFaceSelecionada] = useState<OdontoFace>("INTEIRO");
   const [statusNovo, setStatusNovo] = useState<OdontoStatus>("cariado");
   const [procNovo, setProcNovo] = useState("");
   const [obsNovo, setObsNovo] = useState("");
+  const [orcadoSet, setOrcadoSet] = useState<Set<number>>(new Set());
+  const [itensPorDente, setItensPorDente] = useState<Array<{
+    id: string; descricao: string; valor_total: number; orcamento_id: string;
+    orcamento_numero: number | null; dentes: number[];
+  }>>([]);
+  const [especialidadeOdontoId, setEspecialidadeOdontoId] = useState<string | null>(null);
+  const [addOrcOpen, setAddOrcOpen] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase
+        .from("especialidades")
+        .select("id")
+        .ilike("nome", "odontologia")
+        .maybeSingle();
+      setEspecialidadeOdontoId(data?.id ?? null);
+    })();
+  }, []);
 
   useEffect(() => {
     if (!pacienteId || !clinicaAtual) { setDentes([]); setProntuario(null); return; }
@@ -51,20 +83,93 @@ function OdontologiaPage() {
 
   async function carregar() {
     if (!pacienteId || !clinicaAtual) return;
-    const [{ data: d }, { data: p }] = await Promise.all([
-      supabase.from("odonto_dentes").select("id,dente,status,procedimento,observacoes,data")
+    const [{ data: d }, { data: p }, { data: orcs }] = await Promise.all([
+      supabase.from("odonto_dentes").select("id,dente,face,status,procedimento,observacoes,data")
         .eq("paciente_id", pacienteId).eq("clinica_id", clinicaAtual.clinica_id)
         .order("data", { ascending: false }),
       supabase.from("odonto_prontuarios").select("id,queixa_principal,historia_dental,plano_tratamento,observacoes")
         .eq("paciente_id", pacienteId).eq("clinica_id", clinicaAtual.clinica_id).maybeSingle(),
+      supabase.from("orcamentos")
+        .select("id, numero, status")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("paciente_id", pacienteId)
+        .eq("status", "aberto"),
     ]);
-    setDentes((d as DenteRow[]) ?? []);
+    setDentes(((d as unknown) as DenteRow[]) ?? []);
     setProntuario((p as ProntuarioOdonto) ?? null);
+    const orcIds = ((orcs ?? []) as { id: string; numero: number }[]).map((o) => o.id);
+    if (orcIds.length === 0) { setOrcadoSet(new Set()); setItensPorDente([]); return; }
+    const numeroById = new Map<string, number>(
+      ((orcs ?? []) as { id: string; numero: number }[]).map((o) => [o.id, o.numero]),
+    );
+    const { data: itensAbertos } = await supabase
+      .from("orcamento_itens")
+      .select("id, descricao, valor_total, orcamento_id, dentes")
+      .in("orcamento_id", orcIds)
+      .not("dentes", "is", null);
+    const rows = ((itensAbertos ?? []) as Array<{
+      id: string; descricao: string; valor_total: number; orcamento_id: string; dentes: number[] | null;
+    }>).map((r) => ({
+      id: r.id,
+      descricao: r.descricao,
+      valor_total: Number(r.valor_total),
+      orcamento_id: r.orcamento_id,
+      orcamento_numero: numeroById.get(r.orcamento_id) ?? null,
+      dentes: r.dentes ?? [],
+    }));
+    setItensPorDente(rows);
+    const s = new Set<number>();
+    for (const r of rows) for (const d of r.dentes) s.add(d);
+    setOrcadoSet(s);
   }
 
-  // Pega o estado mais recente de cada dente
-  const estados: Record<number, OdontoStatus> = {};
-  for (const r of [...dentes].reverse()) estados[r.dente] = r.status;
+  // Estado mais recente por (dente, face). `dentes` já vem ordenado desc por data,
+  // então preservamos apenas o primeiro por chave.
+  const estados: FacesEstado = useMemo(() => {
+    const m: FacesEstado = {};
+    for (const r of [...dentes].reverse()) {
+      const face = (r.face ?? "INTEIRO") as OdontoFace;
+      m[`${r.dente}-${face}`] = r.status;
+    }
+    return m;
+  }, [dentes]);
+
+  const itensDoDenteSelecionado = useMemo(
+    () => (selecionado ? itensPorDente.filter((it) => it.dentes.includes(selecionado)) : []),
+    [selecionado, itensPorDente],
+  );
+
+  const historicoDenteSelecionado = useMemo(
+    () => (selecionado ? dentes.filter((r) => r.dente === selecionado) : []),
+    [selecionado, dentes],
+  );
+
+  // Plano de tratamento: itens de orçamentos abertos agrupados por dente.
+  const planoPorDente = useMemo(() => {
+    const map = new Map<number, typeof itensPorDente>();
+    for (const it of itensPorDente) {
+      for (const d of it.dentes) {
+        const arr = map.get(d) ?? [];
+        arr.push(it);
+        map.set(d, arr);
+      }
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a - b);
+  }, [itensPorDente]);
+
+  async function removerDenteDoItem(itemId: string, dente: number) {
+    if (!podeEscrever) { toast.error("Sem permissão de edição."); return; }
+    const it = itensPorDente.find((x) => x.id === itemId);
+    if (!it) return;
+    const novos = it.dentes.filter((d) => d !== dente);
+    const { error } = await supabase
+      .from("orcamento_itens")
+      .update({ dentes: novos.length ? novos : null })
+      .eq("id", itemId);
+    if (error) { mostrarErro(error); return; }
+    toast.success(`Dente ${dente} removido do item`);
+    void carregar();
+  }
 
   async function salvarDente() {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
@@ -73,15 +178,23 @@ function OdontologiaPage() {
       clinica_id: clinicaAtual.clinica_id,
       paciente_id: pacienteId,
       dente: selecionado,
-      face: "O",
+      face: faceSelecionada,
       status: statusNovo,
       procedimento: procNovo || null,
       observacoes: obsNovo || null,
     });
     if (error) { mostrarErro(error); return; }
-    toast.success(`Dente ${selecionado} atualizado`);
+    toast.success(`Dente ${selecionado} · ${FACE_LABEL[faceSelecionada]} atualizado`);
     setProcNovo(""); setObsNovo("");
     void carregar();
+  }
+
+  function selecionarFace(dente: number, face: OdontoFace) {
+    setSelecionado(dente);
+    setFaceSelecionada(face);
+    // Sugere o status atual da face para facilitar edição
+    const atual = estados[`${dente}-${face}`] ?? estados[`${dente}-INTEIRO`];
+    if (atual) setStatusNovo(atual);
   }
 
   type CampoProntuario = "queixa_principal" | "historia_dental" | "plano_tratamento" | "observacoes";
@@ -115,26 +228,100 @@ function OdontologiaPage() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="pt-6 space-y-3">
-          <Label>Paciente</Label>
-          <PatientSearchInput
-            value={pacienteSel}
-            onSelect={(p) => { setPacienteSel(p); setPacienteId(p?.id ?? null); }}
-          />
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="prontuario" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="prontuario">Prontuário</TabsTrigger>
+            <TabsTrigger value="orcamento">Orçamento</TabsTrigger>
+          </TabsList>
 
-      {pacienteId && (
-        <>
+          <TabsContent value="prontuario" className="space-y-6">
+          <Card>
+            <CardContent className="pt-6 space-y-3">
+              <Label>Paciente</Label>
+              <PatientSearchInput
+                value={pacienteSel}
+                onSelect={(p) => { setPacienteSel(p); setPacienteId(p?.id ?? null); }}
+              />
+            </CardContent>
+          </Card>
+
+          {!pacienteId ? (
+            <p className="text-sm text-muted-foreground">Selecione um paciente para começar.</p>
+          ) : (
+          <>
+          <Tabs defaultValue="odontograma" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="odontograma">Odontograma</TabsTrigger>
+              <TabsTrigger value="anamnese">Anamnese</TabsTrigger>
+              <TabsTrigger value="evolucao">Evolução</TabsTrigger>
+              <TabsTrigger value="galeria">Galeria</TabsTrigger>
+              <TabsTrigger value="notas">Notas clínicas</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="odontograma" className="space-y-4">
           <Card>
             <CardHeader><CardTitle>Odontograma</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <Odontograma estados={estados} onClickDente={setSelecionado} selecionado={selecionado} />
+              <OdontogramaClinico
+                estados={estados}
+                onClickFace={selecionarFace}
+                orcadoSet={orcadoSet}
+                denteSelecionado={selecionado}
+              />
+              {selecionado && itensDoDenteSelecionado.length > 0 && (
+                <div className="border rounded-md p-3 bg-amber-50/60 border-amber-200 space-y-1">
+                  <p className="text-sm font-medium text-amber-900">
+                    Itens de orçamento aberto neste dente ({itensDoDenteSelecionado.length})
+                  </p>
+                  <ul className="text-xs text-amber-900/90 space-y-0.5">
+                    {itensDoDenteSelecionado.map((it) => (
+                      <li key={it.id} className="flex items-center justify-between gap-2">
+                        <span>
+                          Orç. {it.orcamento_numero ?? "—"} · {it.descricao} · R$ {Number(it.valor_total).toFixed(2)}
+                        </span>
+                        {podeEscrever && (
+                          <button
+                            type="button"
+                            onClick={() => void removerDenteDoItem(it.id, selecionado)}
+                            className="text-amber-900/70 hover:text-destructive"
+                            title={`Remover dente ${selecionado} deste item`}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {selecionado && podeEscrever && (
                 <div className="border rounded-md p-4 space-y-3">
-                  <p className="font-medium">Dente {selecionado}</p>
-                  <div className="grid md:grid-cols-3 gap-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="font-medium">
+                      Dente {selecionado} · <span className="text-primary">{FACE_LABEL[faceSelecionada]}</span>
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setAddOrcOpen(true)}
+                      disabled={!especialidadeOdontoId || !pacienteSel}
+                      className="border-amber-400 text-amber-700 hover:bg-amber-50"
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Incluir em orçamento
+                    </Button>
+                  </div>
+                  <div className="grid md:grid-cols-4 gap-3">
+                    <div>
+                      <Label>Face</Label>
+                      <Select value={faceSelecionada} onValueChange={(v) => setFaceSelecionada(v as OdontoFace)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(FACE_LABEL) as OdontoFace[]).map((f) => (
+                            <SelectItem key={f} value={f}>{FACE_LABEL[f]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div>
                       <Label>Status</Label>
                       <Select value={statusNovo} onValueChange={(v) => setStatusNovo(v as OdontoStatus)}>
@@ -158,9 +345,123 @@ function OdontologiaPage() {
                   <Button onClick={salvarDente}><Save className="h-4 w-4 mr-1" />Registrar</Button>
                 </div>
               )}
+              {selecionado && historicoDenteSelecionado.length > 0 && (
+                <div className="border rounded-md p-3 space-y-2">
+                  <p className="text-sm font-medium">Histórico do dente {selecionado}</p>
+                  <Table>
+                    <TableHeader><TableRow>
+                      <TableHead className="w-24">Data</TableHead>
+                      <TableHead className="w-20">Face</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Procedimento</TableHead>
+                      <TableHead>Observações</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>{historicoDenteSelecionado.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell>{formatDatePura(r.data)}</TableCell>
+                        <TableCell className="font-mono">{r.face ?? "INTEIRO"}</TableCell>
+                        <TableCell>{STATUS_LABEL[r.status]}</TableCell>
+                        <TableCell>{r.procedimento ?? "—"}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{r.observacoes ?? "—"}</TableCell>
+                      </TableRow>
+                    ))}</TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                Plano de tratamento
+                {planoPorDente.length > 0 && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    · {planoPorDente.length} dente(s) com item aberto
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {planoPorDente.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum item em orçamento aberto vinculado a dentes. Selecione um dente no odontograma e clique em "Incluir em orçamento".
+                </p>
+              ) : (
+                <ul className="divide-y">
+                  {planoPorDente.map(([d, items]) => (
+                    <li key={d} className="py-2 flex items-start gap-3">
+                      <button
+                        type="button"
+                        onClick={() => { setSelecionado(d); setFaceSelecionada("INTEIRO"); }}
+                        className={`shrink-0 h-9 w-10 rounded-md border-2 text-sm font-mono transition ${
+                          selecionado === d
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-amber-300 bg-amber-50 text-amber-800 hover:border-primary/60"
+                        }`}
+                        title={`Selecionar dente ${d} no odontograma`}
+                      >
+                        {d}
+                      </button>
+                      <ul className="flex-1 space-y-1 text-sm">
+                        {items.map((it) => (
+                          <li key={`${d}-${it.id}`} className="flex items-center justify-between gap-2">
+                            <span>
+                              <span className="text-xs text-muted-foreground mr-1">Orç. {it.orcamento_numero ?? "—"}</span>
+                              {it.descricao}
+                              <span className="text-xs text-muted-foreground ml-1">
+                                · R$ {Number(it.valor_total).toFixed(2)}
+                              </span>
+                            </span>
+                            {podeEscrever && (
+                              <button
+                                type="button"
+                                onClick={() => void removerDenteDoItem(it.id, d)}
+                                className="text-muted-foreground hover:text-destructive"
+                                title={`Remover dente ${d} deste item`}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+            </TabsContent>
+
+            <TabsContent value="anamnese">
+              <Card><CardContent className="pt-6">
+                <AnamneseOdontoTab pacienteId={pacienteId} readOnly={!podeEscrever} />
+              </CardContent></Card>
+            </TabsContent>
+
+            <TabsContent value="evolucao">
+              <Card><CardContent className="pt-6">
+                <EvolucaoOdontoTab pacienteId={pacienteId} readOnly={!podeEscrever} />
+              </CardContent></Card>
+            </TabsContent>
+
+            <TabsContent value="galeria">
+              <Card><CardContent className="pt-6">
+                {clinicaAtual && (
+                  <GaleriaOdontoTab
+                    clinicaId={clinicaAtual.clinica_id}
+                    pacienteId={pacienteId}
+                    criadoPor={user?.id ?? null}
+                    readOnly={!podeEscrever}
+                    denteFiltro={selecionado}
+                    onDenteFiltroChange={(d) => setSelecionado(d)}
+                  />
+                )}
+              </CardContent></Card>
+            </TabsContent>
+
+            <TabsContent value="notas" className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <Card>
               <CardHeader><CardTitle>Queixa principal</CardTitle></CardHeader>
@@ -217,7 +518,7 @@ function OdontologiaPage() {
                   <TableBody>{dentes.map((d) => (
                     <TableRow key={d.id}>
                       <TableCell>{formatDatePura(d.data)}</TableCell>
-                      <TableCell className="font-mono">{d.dente}</TableCell>
+                      <TableCell className="font-mono">{d.dente}{d.face && d.face !== "INTEIRO" ? `·${d.face}` : ""}</TableCell>
                       <TableCell>{STATUS_LABEL[d.status]}</TableCell>
                       <TableCell>{d.procedimento ?? "—"}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">{d.observacoes ?? "—"}</TableCell>
@@ -227,7 +528,66 @@ function OdontologiaPage() {
               )}
             </CardContent>
           </Card>
-        </>
+            </TabsContent>
+          </Tabs>
+          </>
+          )}
+          </TabsContent>
+
+          <TabsContent value="orcamento">
+            <Card>
+              <CardContent className="pt-6 space-y-3">
+                <Label>Paciente</Label>
+                <PatientSearchInput
+                  value={pacienteSelOrc}
+                  onSelect={(p) => { setPacienteSelOrc(p); setPacienteIdOrc(p?.id ?? null); }}
+                  onRequestCreate={(q) => { setQuickInitial(q); setQuickOpen(true); }}
+                />
+              </CardContent>
+            </Card>
+            {!pacienteIdOrc ? (
+              <p className="text-sm text-muted-foreground mt-4">Selecione um paciente para começar.</p>
+            ) : (
+            <Card>
+              <CardContent className="pt-6 mt-4">
+                <OrcamentoTab
+                  pacienteId={pacienteIdOrc}
+                  pacienteNome={pacienteSelOrc?.nome ?? ""}
+                  pacienteTelefone={pacienteSelOrc?.telefone ?? null}
+                  especialidadeOdontoId={especialidadeOdontoId}
+                />
+              </CardContent>
+            </Card>
+            )}
+            {clinicaAtual && (
+              <QuickPatientDialog
+                open={quickOpen}
+                onOpenChange={setQuickOpen}
+                clinicaId={clinicaAtual.clinica_id}
+                nomeInicial={quickInitial}
+                onCreated={(p) => {
+                  setPacienteSelOrc(p);
+                  setPacienteIdOrc(p.id);
+                  setQuickOpen(false);
+                }}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
+
+      {clinicaAtual && pacienteId && selecionado && (
+        <AddToOrcamentoDialog
+          open={addOrcOpen}
+          onClose={() => setAddOrcOpen(false)}
+          clinicaId={clinicaAtual.clinica_id}
+          pacienteId={pacienteId}
+          pacienteNome={pacienteSel?.nome ?? ""}
+          pacienteTelefone={pacienteSel?.telefone ?? null}
+          especialidadeOdontoId={especialidadeOdontoId}
+          userId={user?.id ?? null}
+          dente={selecionado}
+          onCreated={() => void carregar()}
+        />
       )}
     </div>
   );

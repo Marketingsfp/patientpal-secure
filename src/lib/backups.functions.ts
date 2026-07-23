@@ -97,11 +97,15 @@ export const dispararBackupAgora = createServerFn({ method: "POST" })
     }
     const projectId = process.env.SUPABASE_PROJECT_ID!;
     const url = `https://project--${projectId}.lovable.app/api/public/hooks/backup-diario`;
+    const backupToken = process.env.BACKUP_WEBHOOK_TOKEN;
+    if (!backupToken) {
+      throw new Error("BACKUP_WEBHOOK_TOKEN não configurado no servidor");
+    }
     const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        apikey: process.env.SUPABASE_PUBLISHABLE_KEY!,
+        "x-backup-token": backupToken,
       },
       body: "{}",
     });

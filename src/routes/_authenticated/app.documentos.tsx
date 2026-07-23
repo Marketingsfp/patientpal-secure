@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { FileSignature } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -26,17 +27,29 @@ interface Form { titulo: string; tipo: Tipo; conteudo: string; assinado: boolean
 function DocumentosPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("documentos");
-  const [medicos, setMedicos] = useState<{ id: string; nome: string }[]>([]);
-  const [modelos, setModelos] = useState<{ id: string; nome: string; tipo: Tipo; conteudo: string }[]>([]);
+  const clinicaId = clinicaAtual?.clinica_id;
   const [pacienteSel, setPacienteSel] = useState<PatientOption | null>(null);
-  useEffect(() => { (async () => {
-    if (!clinicaAtual) return;
-    const [m, md] = await Promise.all([
-      supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-      supabase.from("modelos_documentos").select("id, nome, tipo, conteudo").eq("clinica_id", clinicaAtual.clinica_id).eq("ativo", true).order("nome"),
-    ]);
-    setMedicos(m.data ?? []); setModelos((md.data ?? []) as never);
-  })(); }, [clinicaAtual?.clinica_id]);
+  // Catálogo de baixo risco (médicos ativos, modelos de documento) — cache de 5min.
+  const { data: medicos = [] } = useQuery({
+    queryKey: ["documentos-medicos", clinicaId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaId!).eq("ativo", true).order("nome");
+      if (error) throw error;
+      return data as { id: string; nome: string }[];
+    },
+    enabled: !!clinicaId,
+    staleTime: 5 * 60_000,
+  });
+  const { data: modelos = [] } = useQuery({
+    queryKey: ["documentos-modelos", clinicaId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("modelos_documentos").select("id, nome, tipo, conteudo").eq("clinica_id", clinicaId!).eq("ativo", true).order("nome");
+      if (error) throw error;
+      return (data ?? []) as { id: string; nome: string; tipo: Tipo; conteudo: string }[];
+    },
+    enabled: !!clinicaId,
+    staleTime: 5 * 60_000,
+  });
 
   return (
     <SimpleCrud<Row, Form>

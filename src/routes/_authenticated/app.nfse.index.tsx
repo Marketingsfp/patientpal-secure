@@ -1,17 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2, AlertCircle, Eye } from "lucide-react";
+import { Receipt, ExternalLink, FilePlus2, RefreshCw, Send, ScanLine, Check, X, Loader2, AlertCircle, Eye, Search, Ban } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { consultarNfse, reenviarNfse, extrairNfseDeImagem, baixarNfseArquivo } from "@/lib/nfse.functions";
+import { consultarNfse, reenviarNfse, extrairNfseDeImagem, baixarNfseArquivo, avancarRpsProximoNumero, cancelarNfse } from "@/lib/nfse.functions";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/_authenticated/app/nfse/")({
   component: NfsePage,
@@ -36,9 +38,18 @@ interface Row {
 function NfsePage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("nfse");
+  // Na São Francisco de Paula esta aba é SOMENTE VISUALIZAÇÃO: não exibe os
+  // botões "Emitir NFS-e" nem "Conferir por imagem" (a emissão, quando houver,
+  // ocorre por outro fluxo). Identificação por nome, mesmo padrão do app-shell
+  // e da agenda para esta clínica.
+  const nomeClinica = (clinicaAtual?.clinica.nome ?? "").toLowerCase();
+  const ehSaoFrancisco =
+    nomeClinica.includes("são francisco") || nomeClinica.includes("sao francisco");
   const consulta = useServerFn(consultarNfse);
   const reenviar = useServerFn(reenviarNfse);
   const extrair = useServerFn(extrairNfseDeImagem);
+  const avancarRps = useServerFn(avancarRpsProximoNumero);
+  const cancelar = useServerFn(cancelarNfse);
   const [reenviando, setReenviando] = useState<string | null>(null);
   const [conferirOpen, setConferirOpen] = useState(false);
   const [conferirLoading, setConferirLoading] = useState(false);
@@ -47,17 +58,24 @@ function NfsePage() {
   const [emitentes, setEmitentes] = useState<Emitente[]>([]);
   const [filtroEmitente, setFiltroEmitente] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [busca, setBusca] = useState<string>("");
+  const [cancelarAlvo, setCancelarAlvo] = useState<Row | null>(null);
+  const [cancelarJustificativa, setCancelarJustificativa] = useState<string>("");
+  const [cancelando, setCancelando] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [erroDetalhe, setErroDetalhe] = useState<Row | null>(null);
   const [pdfVisualizando, setPdfVisualizando] = useState<Row | null>(null);
+  const [rpsAtual, setRpsAtual] = useState<number | null>(null);
+  const [rpsNovoInput, setRpsNovoInput] = useState<string>("");
+  const [avancandoRps, setAvancandoRps] = useState(false);
   const baixarArquivo = useServerFn(baixarNfseArquivo);
 
   useEffect(() => {
     if (!clinicaAtual) return;
     void (async () => {
       const { data } = await supabase
-        .from("nfse_emitentes")
+        .from("nfse_emitentes_publico")
         .select("id, nome, cnpj")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .order("nome");
@@ -70,15 +88,21 @@ function NfsePage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("nfse")
-      .select("id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, emitente_id, erro_mensagem, payload_resposta, emitente:nfse_emitentes(nome, cnpj)")
+      .select("id, numero, data_emissao, valor_servicos, status, url_pdf, tomador_nome, emitente_id, erro_mensagem, payload_resposta")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("data_emissao", { ascending: false })
       .limit(500);
     setLoading(false);
     if (error) { mostrarErro(error); return; }
-    setRows((data ?? []) as unknown as Row[]);
+    // Enriquece cliente-side com nome/CNPJ do emitente a partir do state,
+    // já que a view pública nfse_emitentes_publico não expõe FK para embed.
+    const map = new Map(emitentes.map((e) => [e.id, e]));
+    setRows(((data ?? []) as unknown as Row[]).map((r) => ({
+      ...r,
+      emitente: r.emitente_id ? (map.get(r.emitente_id) ? { nome: map.get(r.emitente_id)!.nome, cnpj: map.get(r.emitente_id)!.cnpj } : null) : null,
+    })));
   };
-  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id]);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [clinicaAtual?.clinica_id, emitentes]);
 
   // Auto-polling: a cada 15s consulta o Focus para notas em "processando"
   // (webhook do Focus pode falhar/não estar configurado).
@@ -99,11 +123,33 @@ function NfsePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows.map((r) => `${r.id}:${r.status}`).join("|")]);
 
+  // Ao abrir o diálogo de erro, carrega o "Próx. nº RPS" atual do emitente
+  // para permitir avançar o contador rapidamente (útil no erro E0014).
+  useEffect(() => {
+    if (!erroDetalhe?.emitente_id) { setRpsAtual(null); setRpsNovoInput(""); return; }
+    void (async () => {
+      const { data } = await supabase
+        .from("nfse_emitentes_publico")
+        .select("rps_proximo_numero")
+        .eq("id", erroDetalhe.emitente_id!)
+        .maybeSingle();
+      const atual = Number(data?.rps_proximo_numero ?? 1);
+      setRpsAtual(atual);
+      setRpsNovoInput(String(atual + 30));
+    })();
+  }, [erroDetalhe?.id, erroDetalhe?.emitente_id]);
+
   const filtrados = useMemo(() => rows.filter((r) => {
     if (filtroEmitente !== "todos" && r.emitente_id !== filtroEmitente) return false;
     if (filtroStatus !== "todos" && r.status !== filtroStatus) return false;
+    const q = busca.trim().toLowerCase();
+    if (q) {
+      const alvo = `${r.numero ?? ""} ${r.tomador_nome ?? ""} ${r.emitente?.nome ?? ""} ${r.emitente?.cnpj ?? ""}`.toLowerCase();
+      const qDigits = q.replace(/\D/g, "");
+      if (!alvo.includes(q) && !(qDigits && alvo.replace(/\D/g, "").includes(qDigits))) return false;
+    }
     return true;
-  }), [rows, filtroEmitente, filtroStatus]);
+  }), [rows, filtroEmitente, filtroStatus, busca]);
 
   const onReenviar = async (id: string) => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
@@ -117,6 +163,37 @@ function NfsePage() {
       toast.error((e as Error).message);
     } finally {
       setReenviando(null);
+    }
+  };
+
+  const onAvancarRps = async (reenviarDepois: boolean) => {
+    if (!erroDetalhe?.emitente_id) return;
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    const novo = Number(rpsNovoInput);
+    if (!Number.isFinite(novo) || novo < 1) { toast.error("Informe um número válido."); return; }
+    if (rpsAtual != null && novo <= rpsAtual) {
+      toast.error(`O novo número deve ser maior que o atual (${rpsAtual}).`);
+      return;
+    }
+    setAvancandoRps(true);
+    try {
+      // Usa server fn para contornar RLS silenciosa: só managers da clínica
+      // podem UPDATE direto em nfse_emitentes, então o update client-side
+      // retornava 0 linhas sem erro e o usuário achava que tinha avançado.
+      const r = await avancarRps({ data: { emitente_id: erroDetalhe.emitente_id, novo_numero: novo } });
+      if (!r.ok) {
+        toast.error(r.motivo ?? "Não foi possível avançar o contador.");
+        return;
+      }
+      setRpsAtual(r.novo_numero);
+      toast.success(`Próx. nº RPS do emitente atualizado para ${r.novo_numero}.`);
+      if (reenviarDepois) {
+        const notaId = erroDetalhe.id;
+        setErroDetalhe(null);
+        await onReenviar(notaId);
+      }
+    } finally {
+      setAvancandoRps(false);
     }
   };
 
@@ -175,14 +252,16 @@ function NfsePage() {
           <h1 className="text-2xl font-semibold flex items-center gap-2"><Receipt className="h-6 w-6 text-primary" /> Notas Fiscais (NFS-e)</h1>
           <p className="text-sm text-muted-foreground">Emissão e controle de notas fiscais de serviço.</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { setConferirOpen(true); setConferirExtraido(null); setConferirPreview(null); }}>
-            <ScanLine className="h-4 w-4 mr-2" /> Conferir por imagem
-          </Button>
-          {podeEscrever && (
-            <Button asChild><Link to="/app/nfse/testar"><FilePlus2 className="h-4 w-4 mr-2" /> Emitir NFS-e</Link></Button>
-          )}
-        </div>
+        {!ehSaoFrancisco && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => { setConferirOpen(true); setConferirExtraido(null); setConferirPreview(null); }}>
+              <ScanLine className="h-4 w-4 mr-2" /> Conferir por imagem
+            </Button>
+            {podeEscrever && (
+              <Button asChild><Link to="/app/nfse/testar"><FilePlus2 className="h-4 w-4 mr-2" /> Emitir NFS-e</Link></Button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="rounded-lg border bg-card p-4 flex flex-wrap gap-3 items-end">
@@ -210,6 +289,18 @@ function NfsePage() {
               <SelectItem value="erro">Erro</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        <div className="space-y-1 flex-1 min-w-[220px]">
+          <label className="text-xs text-muted-foreground">Buscar</label>
+          <div className="relative">
+            <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Nº da nota, tomador, emitente ou CNPJ"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+            />
+          </div>
         </div>
 
         {totais.length > 0 && (
@@ -307,6 +398,16 @@ function NfsePage() {
                       >
                         <Send className="h-3.5 w-3.5 mr-1" />
                         {reenviando === r.id ? "Reenviando…" : "Reenviar"}
+                      </Button>
+                    )}
+                    {r.status === "emitida" && podeEscrever && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title="Cancelar nota"
+                        onClick={() => { setCancelarAlvo(r); setCancelarJustificativa(""); }}
+                      >
+                        <Ban className="h-3.5 w-3.5 text-red-600" />
                       </Button>
                     )}
                   </div>
@@ -407,12 +508,61 @@ function NfsePage() {
               | null
               | undefined;
             const erros = Array.isArray(body?.erros) ? body!.erros! : [];
+            const isE0014 =
+              erros.some((e) => (e?.codigo ?? "").toUpperCase() === "E0014") ||
+              /j[áa]\s+existe/i.test(erroDetalhe.erro_mensagem ?? "");
             return (
               <div className="space-y-3 text-sm max-h-[60vh] overflow-auto">
                 {erroDetalhe.erro_mensagem && (
                   <div className="rounded-md border border-red-200 bg-red-50 p-3 text-red-900">
                     <div className="text-xs font-medium uppercase tracking-wide text-red-700">Mensagem</div>
                     <div className="mt-1 whitespace-pre-wrap break-words">{erroDetalhe.erro_mensagem}</div>
+                  </div>
+                )}
+                {isE0014 && erroDetalhe.emitente_id && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2 text-amber-900">
+                    <div className="text-xs font-semibold uppercase tracking-wide">Ação recomendada</div>
+                    <p className="text-sm">
+                      A prefeitura recusou porque o nº do RPS já foi usado. Avance o
+                      <strong> Próx. nº RPS</strong> do emitente para pular a faixa
+                      já consumida e tente reenviar.
+                    </p>
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Atual</label>
+                        <div className="h-9 px-2 rounded-md border bg-white text-sm flex items-center min-w-[80px]">
+                          {rpsAtual ?? "…"}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Novo</label>
+                        <Input
+                          className="h-9 w-28 bg-white"
+                          value={rpsNovoInput}
+                          onChange={(e) => setRpsNovoInput(e.target.value.replace(/\D/g, ""))}
+                          inputMode="numeric"
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={avancandoRps || !podeEscrever}
+                        onClick={() => void onAvancarRps(false)}
+                      >
+                        Só atualizar
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={avancandoRps || !podeEscrever}
+                        onClick={() => void onAvancarRps(true)}
+                      >
+                        {avancandoRps ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                        Avançar e reenviar
+                      </Button>
+                    </div>
+                    <p className="text-xs text-amber-800">
+                      Sugestão: pular ~30 números. Se cair novamente em E0014, aumente o salto.
+                    </p>
                   </div>
                 )}
                 {(body?.status || body?.codigo) && (
@@ -477,6 +627,65 @@ function NfsePage() {
               </a>
             )}
             <Button variant="ghost" onClick={() => setPdfVisualizando(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!cancelarAlvo} onOpenChange={(o) => { if (!o) { setCancelarAlvo(null); setCancelarJustificativa(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Ban className="h-4 w-4 text-red-600" /> Cancelar NFS-e</DialogTitle>
+          </DialogHeader>
+          {cancelarAlvo && (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-md bg-muted p-3 space-y-1">
+                <div><span className="text-muted-foreground">Número:</span> <b>{cancelarAlvo.numero ?? "—"}</b></div>
+                <div><span className="text-muted-foreground">Tomador:</span> {cancelarAlvo.tomador_nome ?? "—"}</div>
+                <div><span className="text-muted-foreground">Valor:</span> {Number(cancelarAlvo.valor_servicos).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Justificativa (15 a 255 caracteres)</label>
+                <Textarea
+                  rows={4}
+                  value={cancelarJustificativa}
+                  onChange={(e) => setCancelarJustificativa(e.target.value)}
+                  placeholder="Ex.: Nota emitida em duplicidade para o mesmo atendimento."
+                  maxLength={255}
+                />
+                <div className="text-xs text-muted-foreground text-right">{cancelarJustificativa.length}/255</div>
+              </div>
+              <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                O cancelamento é enviado à Prefeitura/Ambiente Nacional e não pode ser desfeito.
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCancelarAlvo(null)} disabled={cancelando}>Voltar</Button>
+            <Button
+              variant="destructive"
+              disabled={cancelando || cancelarJustificativa.trim().length < 15}
+              onClick={async () => {
+                if (!cancelarAlvo) return;
+                setCancelando(true);
+                try {
+                  const r = await cancelar({ data: { id: cancelarAlvo.id, justificativa: cancelarJustificativa.trim() } });
+                  if (r.ok) {
+                    toast.success("Nota cancelada.");
+                    setCancelarAlvo(null);
+                    setCancelarJustificativa("");
+                    await load();
+                  } else {
+                    toast.error(r.error ?? "Falha ao cancelar.");
+                  }
+                } catch (e) {
+                  toast.error((e as Error).message);
+                } finally {
+                  setCancelando(false);
+                }
+              }}
+            >
+              {cancelando ? <><Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> Cancelando…</> : <>Confirmar cancelamento</>}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

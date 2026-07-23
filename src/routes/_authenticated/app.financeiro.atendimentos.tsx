@@ -33,7 +33,8 @@ import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { useMedicoContext } from "@/hooks/use-medico-context";
 import { useServerFn } from "@tanstack/react-start";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
-import { usePickTomador } from "@/components/nfse/use-pick-tomador";
+import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
+import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,7 @@ import { ptBR } from "date-fns/locale";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -411,18 +413,18 @@ function AtendimentosPage() {
               padding: 2.4mm;
               margin-bottom: 2.5mm;
             }
-            table { width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8.2pt; }
+            table { width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 8pt; }
             thead { display: table-header-group; }
             tfoot { display: table-footer-group; }
             tr { break-inside: avoid; page-break-inside: avoid; }
-            th, td { padding: 1.4mm 1.2mm; border-bottom: 1px solid #d7d7d7; vertical-align: top; overflow-wrap: anywhere; word-break: normal; }
+            th, td { padding: 1.4mm 1mm; border-bottom: 1px solid #d7d7d7; vertical-align: top; overflow-wrap: break-word; word-break: normal; }
             th { text-align: left; font-weight: 700; background: #f4f4f5; }
-            th:nth-child(1), td:nth-child(1) { width: 18mm; white-space: nowrap; }
-            th:nth-child(2), td:nth-child(2) { width: 31mm; white-space: nowrap; }
-            th:nth-child(3), td:nth-child(3) { width: 32mm; }
-            th:nth-child(4), td:nth-child(4) { width: 38mm; }
-            th:nth-child(5), td:nth-child(5) { width: auto; }
-            th:nth-child(6), td:nth-child(6) { width: 24mm; text-align: right; white-space: nowrap; }
+            th:nth-child(1), td:nth-child(1) { width: 9%; white-space: nowrap; }
+            th:nth-child(2), td:nth-child(2) { width: 15%; }
+            th:nth-child(3), td:nth-child(3) { width: 18%; }
+            th:nth-child(4), td:nth-child(4) { width: 20%; }
+            th:nth-child(5), td:nth-child(5) { width: 26%; }
+            th:nth-child(6), td:nth-child(6) { width: 12%; text-align: right; white-space: nowrap; }
             body.print-resumo-only .print-area .comprovante-bloco > *:not(.comprovante-resumo) { display: none !important; }
             body.print-resumo-only .print-area .comprovante-resumo { margin-top: 0 !important; }
           </style>
@@ -589,6 +591,7 @@ function AtendimentosPage() {
   const emitirNfseFn = useServerFn(emitirNfse);
   const consultarNfseFn = useServerFn(consultarNfse);
   const { pick: pickTomadorNfse, dialog: tomadorNfseDialog } = usePickTomador();
+  const { prompt: pedirDescricaoNfse, dialog: descricaoNfseDialog } = usePromptDescricaoNfse();
 
   useEffect(() => {
     if (!clinicaAtual) {
@@ -596,7 +599,7 @@ function AtendimentosPage() {
       return;
     }
     void supabase
-      .from("nfse_emitentes")
+      .from("nfse_emitentes_publico")
       .select("id, nome, codigo_municipio")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("ativo", true)
@@ -649,8 +652,10 @@ function AtendimentosPage() {
           municipio: p.cidade ?? undefined,
           uf: p.estado ?? undefined,
         },
+        valorBase: valor,
       });
       if (!tomador) { setNfseEmitting(false); toast.error("Emissão cancelada."); return; }
+      const parcial = aplicarValorParcial(valor, tomador);
       // Sempre compõe a discriminação com procedimento + paciente + data de
       // referência, mesmo se o usuário deixou o campo do diálogo em branco.
       const dataRef = a.agendamento_inicio ?? a.data;
@@ -661,16 +666,19 @@ function AtendimentosPage() {
             pacienteNome: p.nome,
             dataReferencia: dataRef,
           });
-      const descFinal = tomador.dependenteAtendido
-        ? `${descBase} — Atendido: ${tomador.dependenteAtendido}`
+      const descComDep = tomador.dependenteAtendido
+        ? `${descBase} — Dependente do pagador: ${tomador.dependenteAtendido}`
         : descBase;
+      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
+      const descFinal = await pedirDescricaoNfse(descSugerida);
+      if (!descFinal) { setNfseEmitting(false); toast.error("Emissão cancelada."); return; }
       const res = await emitirNfseFn({
         data: {
           emitenteId,
           pacienteId: p.id,
           agendamentoId: a.agendamento_id ?? undefined,
           pagamentoId: a.id ?? undefined,
-          valorServicos: valor,
+          valorServicos: parcial.valor,
           descricaoServicos: descFinal,
           tomador,
         },
@@ -806,6 +814,35 @@ function AtendimentosPage() {
     }
     setLaudoOpen(false);
     setLaudoTarget(null);
+    await load();
+  };
+
+  const desvincularLaudo = async (a: Atend) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (
+      !confirm(
+        "Desvincular o médico laudador deste atendimento?\n\n" +
+          "• O laudo voltará ao status 'Pendente'.\n" +
+          "• O repasse do laudador deixará de ser devido por este atendimento.\n" +
+          "• Você poderá vincular outro médico depois clicando em 'Vincular'.",
+      )
+    )
+      return;
+    const tabela = a.origem === "agenda" ? "fin_lancamentos" : "fin_atendimentos";
+    const { error } = await supabase
+      .from(tabela)
+      .update({
+        medico_laudador_id: null,
+        valor_laudo: 0,
+        laudo_status: null,
+        laudo_emitido_em: null,
+      } as never)
+      .eq("id", a.id);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    toast.success("Laudador desvinculado");
     await load();
   };
 
@@ -1066,46 +1103,66 @@ function AtendimentosPage() {
     // não a data em que o paciente pagou no caixa. Assim pagamento antecipado não
     // libera repasse antes do dia do atendimento/reagendamento.
     const agendaFimDia = `${fFim}T23:59:59.999`;
-    let qManual = supabase
-      .from("fin_atendimentos")
-      .select(
-        "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, laudo_status, medico_laudador_id, valor_laudo, lancamento_id",
-      )
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .gte("data", fIni)
-      .lte("data", fFim);
-    let qAgenda = supabase
-      .from("fin_lancamentos")
-      .select(
-        "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos!inner(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
-      )
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("tipo", "receita")
-      .eq("status", "confirmado")
-      .not("agendamento_id", "is", null)
-      .gte("agendamento.inicio", `${fIni}T00:00:00`)
-      .lte("agendamento.inicio", agendaFimDia);
-    const qReceitasSemAgenda = supabase
-      .from("fin_lancamentos")
-      .select(
-        "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
-      )
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .eq("tipo", "receita")
-      .eq("status", "confirmado")
-      .is("agendamento_id", null)
-      .gte("data", fIni)
-      .lte("data", fFim);
-    if (fMedico !== "todos") {
-      qManual = qManual.eq("medico_id", fMedico);
-      // Para agenda: não filtramos no servidor porque o lançamento pode estar
-      // com medico_id nulo (médico vem do agendamento). Filtramos client-side
-      // logo após o mapeamento abaixo.
-    }
+    // PostgREST corta em 1.000 linhas por padrão. Em clínicas movimentadas
+    // (ex.: Menino Jesus com ~3.000 lançamentos no mês), registros ficam de
+    // fora silenciosamente. Paginamos em blocos de 1.000 até esgotar.
+    const PAGE_SIZE = 1000;
+    const buildManual = () => {
+      let q = supabase
+        .from("fin_atendimentos")
+        .select(
+          "id, data, procedimento, valor_total, valor_medico, valor_clinica, status, forma_pagamento, medico_id, paciente_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, laudo_status, medico_laudador_id, valor_laudo, lancamento_id",
+        )
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .gte("data", fIni)
+        .lte("data", fFim);
+      if (fMedico !== "todos") q = q.eq("medico_id", fMedico);
+      return q;
+    };
+    const buildAgenda = () =>
+      supabase
+        .from("fin_lancamentos")
+        .select(
+          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos!inner(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+        )
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .not("agendamento_id", "is", null)
+        .gte("agendamento.inicio", `${fIni}T00:00:00`)
+        .lte("agendamento.inicio", agendaFimDia);
+    const buildSemAgenda = () =>
+      supabase
+        .from("fin_lancamentos")
+        .select(
+          "id, data, descricao, valor, valor_medico_override, forma_pagamento, medico_id, paciente_id, agendamento_id, repasse_pago, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, laudo_status, medico_laudador_id, valor_laudo, agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio, status)",
+        )
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .is("agendamento_id", null)
+        .gte("data", fIni)
+        .lte("data", fFim);
+    const fetchAllPaged = async <T,>(
+      builder: () => { order: (col: string, opts: { ascending: boolean }) => { range: (from: number, to: number) => Promise<{ data: T[] | null; error: unknown }> } },
+    ): Promise<{ data: T[]; error: unknown }> => {
+      const acc: T[] = [];
+      for (let offset = 0; ; offset += PAGE_SIZE) {
+        const res = await builder()
+          .order("data", { ascending: false })
+          .range(offset, offset + PAGE_SIZE - 1);
+        if (res.error) return { data: acc, error: res.error };
+        const rows = res.data ?? [];
+        acc.push(...rows);
+        if (rows.length < PAGE_SIZE) break;
+        if (offset > 100_000) break; // guard-rail
+      }
+      return { data: acc, error: null };
+    };
     const [mr, ar, sr] = await Promise.all([
-      qManual.order("data", { ascending: false }),
-      qAgenda.order("data", { ascending: false }),
-      qReceitasSemAgenda.order("data", { ascending: false }),
+      fetchAllPaged<any>(buildManual as any),
+      fetchAllPaged<any>(buildAgenda as any),
+      fetchAllPaged<any>(buildSemAgenda as any),
     ]);
     if (mr.error) {
       mostrarErro(mr.error);
@@ -2417,7 +2474,7 @@ function AtendimentosPage() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="py-12 text-center text-muted-foreground">Carregando...</div>
+            <ListSkeleton rows={7} fallback={<div className="py-12 text-center text-muted-foreground">Carregando...</div>} />
           ) : filteredItems.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
               <Stethoscope className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />
@@ -2552,15 +2609,55 @@ function AtendimentosPage() {
                         {(() => {
                           const procKey = a.procedimento ? norm(a.procedimento) : "";
                           const exigeLaudo = procKey && procLaudo.get(procKey);
+                          const laudadorNome = a.medico_laudador_id
+                            ? medMap.get(a.medico_laudador_id) ?? null
+                            : null;
                           if (a.laudo_status === "emitido")
                             return (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
-                              >
-                                <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
-                                Vinculado
-                              </Badge>
+                              podeEscrever ? (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-6 text-[10px] px-2 bg-sky-500/10 text-sky-700 border-sky-500/30 hover:bg-sky-500/20"
+                                    title={
+                                      laudadorNome
+                                        ? `Laudador: ${laudadorNome}. Clique para desvincular.`
+                                        : "Laudo vinculado a um médico laudador. Clique para desvincular e reabrir para nova vinculação."
+                                    }
+                                    onClick={() => desvincularLaudo(a)}
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 mr-0.5" />
+                                    Vinculado
+                                  </Button>
+                                  {laudadorNome && (
+                                    <span
+                                      className="text-[9px] leading-tight text-muted-foreground max-w-[110px] truncate"
+                                      title={laudadorNome}
+                                    >
+                                      {laudadorNome}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] bg-sky-500/10 text-sky-700 border-sky-500/30 whitespace-nowrap px-1.5 py-0"
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 mr-0.5 inline" />
+                                    Vinculado
+                                  </Badge>
+                                  {laudadorNome && (
+                                    <span
+                                      className="text-[9px] leading-tight text-muted-foreground max-w-[110px] truncate"
+                                      title={laudadorNome}
+                                    >
+                                      {laudadorNome}
+                                    </span>
+                                  )}
+                                </div>
+                              )
                             );
                           if (!exigeLaudo) return <span className="text-muted-foreground text-[10px]">—</span>;
                           if (!podeEstornar || !podeEscrever) return <span className="text-amber-600 text-[10px]">Pendente</span>;
@@ -2669,7 +2766,7 @@ function AtendimentosPage() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7"
-                                  title="Excluir"
+                                  title="Excluir este atendimento do financeiro. Remove o lançamento e o repasse vinculado. Não apaga o agendamento na agenda — use apenas para lançamentos criados por engano."
                                   onClick={() => remove(a)}
                                 >
                                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -2768,7 +2865,13 @@ function AtendimentosPage() {
                                 </Button>
                               )}
                               {podeEscrever && (
-                                <Button variant="ghost" size="icon" className="h-7 w-7" title="Excluir" onClick={() => remove(a)}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  title="Excluir este atendimento manual do financeiro. Remove o lançamento e o repasse médico. Use apenas para lançamentos criados por engano."
+                                  onClick={() => remove(a)}
+                                >
                                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
                                 </Button>
                               )}
@@ -3329,6 +3432,7 @@ function AtendimentosPage() {
         </DialogContent>
       </Dialog>
       {tomadorNfseDialog}
+      {descricaoNfseDialog}
 
       {/* Edição pontual do repasse médico de um atendimento */}
       <Dialog

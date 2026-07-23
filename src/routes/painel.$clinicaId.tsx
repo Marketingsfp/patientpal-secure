@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PainelPage } from "./painel";
+import { PainelPage } from "@/components/painel/painel-page";
 import { PublicClinicaProvider } from "@/components/public-clinica-provider";
 
 export const Route = createFileRoute("/painel/$clinicaId")({

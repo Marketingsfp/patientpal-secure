@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.buscar_pacientes(uuid, text, integer);

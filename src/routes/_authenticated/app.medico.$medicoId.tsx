@@ -92,7 +92,7 @@ function PerfilMedicoPage() {
     return (
       <div className="p-6 text-center space-y-4">
         <p className="text-muted-foreground">Médico não encontrado.</p>
-        <Button asChild variant="outline"><Link to="/app/medicos"><ArrowLeft className="h-4 w-4 mr-2" />Voltar</Link></Button>
+        <Button asChild variant="outline"><Link to="/app/equipe"><ArrowLeft className="h-4 w-4 mr-2" />Voltar</Link></Button>
       </div>
     );
   }
@@ -105,7 +105,7 @@ function PerfilMedicoPage() {
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="sm"><Link to="/app/medicos"><ArrowLeft className="h-4 w-4 mr-1" />Médicos</Link></Button>
+        <Button asChild variant="ghost" size="sm"><Link to="/app/equipe"><ArrowLeft className="h-4 w-4 mr-1" />Médicos</Link></Button>
       </div>
 
       <Card>

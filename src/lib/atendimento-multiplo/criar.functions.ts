@@ -11,7 +11,6 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export type ItemAtendimentoMultiplo = {
   procedimento: string;
   medico_id: string | null;
-  enfermagem_recurso_id: string | null;
   inicio: string; // ISO
   fim: string;    // ISO
   tipo_atendimento: "particular" | "convenio";
@@ -121,7 +120,6 @@ export const criarAtendimentoMultiplo = createServerFn({ method: "POST" })
       paciente_id,
       paciente_nome,
       medico_id: it.medico_id,
-      enfermagem_recurso_id: it.enfermagem_recurso_id,
       inicio: it.inicio,
       fim: it.fim,
       procedimento: it.procedimento,

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SectionTabs, SERVICOS_TABS, SERVICOS_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
@@ -34,8 +35,7 @@ interface Esp { id: string; nome: string; descricao: string | null; ativo: boole
 
 function EspecialidadesPage() {
   const podeEscrever = usePodeEscrever("especialidades");
-  const [rows, setRows] = useState<Esp[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [q, setQ] = useState("");
   const [qInput, setQInput] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<"todos" | "ativo" | "inativo">("todos");
@@ -46,17 +46,21 @@ function EspecialidadesPage() {
   const [toDelete, setToDelete] = useState<Esp | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  async function load() {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("especialidades")
-      .select("id,nome,descricao,ativo")
-      .order("nome");
-    if (error) mostrarErro(error);
-    else setRows((data ?? []) as Esp[]);
-    setLoading(false);
-  }
-  useEffect(() => { void load(); }, []);
+  // Catálogo global de baixo risco (raramente muda) — cache de 5min.
+  const { data: rows = [], isLoading: loading, error } = useQuery({
+    queryKey: ["especialidades"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("especialidades")
+        .select("id,nome,descricao,ativo")
+        .order("nome");
+      if (error) throw error;
+      return (data ?? []) as Esp[];
+    },
+    staleTime: 5 * 60_000,
+  });
+  useEffect(() => { if (error) mostrarErro(error); }, [error]);
+  const load = () => queryClient.invalidateQueries({ queryKey: ["especialidades"] });
 
   function openNew() {
     setEditing(null);
