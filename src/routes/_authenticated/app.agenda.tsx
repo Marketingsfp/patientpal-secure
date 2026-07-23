@@ -312,7 +312,7 @@ const fetchProcedimentosAgenda = getProcedimentosAgenda;
 const fetchMedicoProcedimentosAgenda = getMedicoProcedimentosAgenda;
 
 type DescontoConvenio =
-  | { tipo: "percentual"; valor: number }
+  | { tipo: "percentual"; valor: number; percentualOutros?: number }
   | { tipo: "valor"; valor: number }
   | { tipo: "gratuidade"; valor: 0 }
   | { tipo: "valor_fixo"; valor: number; valorOutros: number };
@@ -349,6 +349,11 @@ function aplicarDescontoPorForma(valor: number, forma: string, d: DescontoConven
     const ehDinheiro = forma === "dinheiro";
     const v = ehDinheiro ? Number(d.valor) : Number(d.valorOutros);
     return Math.max(0, v || 0);
+  }
+  if (d.tipo === "percentual") {
+    const ehDinheiro = forma === "dinheiro";
+    const pct = ehDinheiro ? Number(d.valor) : Number(d.percentualOutros ?? d.valor);
+    return Math.max(0, valor * (1 - (pct || 0) / 100));
   }
   return aplicarDesconto(valor, d);
 }
@@ -549,7 +554,7 @@ async function obterInfoConvenioPaciente(params: {
   const { data: regrasRaw } = await (supabase as any)
     .from("cb_convenio_regras")
     .select(
-      "id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,grupo_gratuidade",
+      "id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,valor_cartao,percentual,percentual_cartao,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,grupo_gratuidade",
     )
     .eq("convenio_id", contrato.convenio_id)
     .eq("ativo", true);
@@ -632,9 +637,12 @@ async function obterInfoConvenioPaciente(params: {
       desconto = { tipo: "gratuidade", valor: 0 };
     } else if (regraMatch.modo === "valor_fixo") {
       const v = Number(regraMatch.valor) || 0;
-      desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };
+      const vC = regraMatch.valor_cartao != null ? (Number(regraMatch.valor_cartao) || 0) : v;
+      desconto = { tipo: "valor_fixo", valor: v, valorOutros: vC };
     } else if (regraMatch.modo === "percentual_desconto") {
-      desconto = { tipo: "percentual", valor: Number(regraMatch.percentual) || 0 };
+      const p = Number(regraMatch.percentual) || 0;
+      const pC = regraMatch.percentual_cartao != null ? (Number(regraMatch.percentual_cartao) || 0) : p;
+      desconto = { tipo: "percentual", valor: p, percentualOutros: pC };
     }
   }
 
@@ -930,13 +938,15 @@ async function obterInfoConvenioPaciente(params: {
           if (fallback) {
             if (fallback.modo === "valor_fixo") {
               const v = Number(fallback.valor) || 0;
-              desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };
+              const vC = fallback.valor_cartao != null ? (Number(fallback.valor_cartao) || 0) : v;
+              desconto = { tipo: "valor_fixo", valor: v, valorOutros: vC };
               avisoLimite = consumidorTxt
                 ? `${consumidorTxt}Aplicando o desconto padrão do convênio (R$ ${v.toFixed(2)}).`
                 : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — aplicando desconto padrão do convênio (R$ ${v.toFixed(2)}).`;
             } else if (fallback.modo === "percentual_desconto") {
               const p = Number(fallback.percentual) || 0;
-              desconto = { tipo: "percentual", valor: p };
+              const pC = fallback.percentual_cartao != null ? (Number(fallback.percentual_cartao) || 0) : p;
+              desconto = { tipo: "percentual", valor: p, percentualOutros: pC };
               avisoLimite = consumidorTxt
                 ? `${consumidorTxt}Aplicando o desconto padrão do convênio (${p}% off).`
                 : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — aplicando desconto padrão do convênio (${p}% off).`;

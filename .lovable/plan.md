@@ -1,80 +1,78 @@
+## Diagnóstico (confirmado)
 
-## Objetivo
+A regra no banco está correta:
+- Convênio **CARTÃO CONSULTA + SEGUROS** • **OFTALMOLOGIA** • consulta • valor_fixo
+- `valor` = **R$ 80,00** (dinheiro) • `valor_cartao` = **R$ 95,00** (cartão/PIX)
 
-Hoje o fluxo "Solicitar estorno" só funciona para **recebimentos** (linhas de `caixa_movimentos` com `lancamento_id` em `fin_lancamentos`). Sangria não tem lançamento financeiro — é apenas um movimento negativo de caixa (`caixa_movimentos.tipo = 'sangria'`), então nunca há botão de estorno na linha. Este plano estende o fluxo existente para permitir solicitar (e o financeiro aprovar) o estorno de uma sangria, reutilizando exatamente a mesma UI/tabela/notificação/lista.
+O erro está **só no frontend da Agenda** (`src/routes/_authenticated/app.agenda.tsx`), na função `obterInfoConvenioPaciente`:
 
-## Pergunta de escopo (regra 1.10 — clínica-alvo)
+1. A query `cb_convenio_regras.select(...)` **não pede** as colunas `valor_cartao` nem `percentual_cartao` — então elas nunca chegam do banco.
+2. Ao montar o objeto `desconto`, o código faz:
+   ```ts
+   const v = Number(regraMatch.valor) || 0;
+   desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };   // ← usa o mesmo valor nos dois
+   ```
+   Resultado: o diálogo "Forma de pagamento" mostra **R$ 80 dinheiro / R$ 80 outros**, mesmo com R$ 95 cadastrado para cartão.
 
-Precisa confirmar antes de codar: aplicar em **todas as 3 clínicas** (Menino Jesus, SFP, POLICLINICA SAO FRANCISCO DE PAULA) ou apenas em uma? A alteração é técnica (não é regra nova de negócio), então o padrão sugerido é **global**, mas confirmo antes de executar.
+O helper `computeValor` em `src/lib/cb-regras.ts` já sabe tratar `valor_cartao`/`percentual_cartao` — a tela da Agenda simplesmente não passa por ele nesse caminho.
 
-## Análise (4 eixos)
+## Escopo
 
-- **Financeiro:** fecha lacuna — hoje sangria errada só é corrigida por lançamento manual "avulso" sem rastro; passa a ter aprovação, motivo e histórico como qualquer estorno.
-- **Operacional:** mesmo fluxo já conhecido (botão na linha → sino do financeiro → aprovar/recusar). Zero curva de aprendizado.
-- **Experiência:** recepção deixa de ficar dependente de aviso por WhatsApp/verbal para o financeiro consertar sangria trocada de valor/destinatário.
-- **Segurança/Auditoria:** solicitação, aprovação e reversão gravadas em `estorno_solicitacoes` + `audit_log`, com usuário/hora.
+- **Frontend only**, um único arquivo: `src/routes/_authenticated/app.agenda.tsx`.
+- **Sem** alteração de banco, RLS, RPC ou schema.
+- **Sem** mexer em outras telas (Orçamento, Odonto, Financeiro já usam `computeValor` corretamente ou já respeitam o campo — se você quiser, posso auditar depois em plano separado).
+- **Global (as 3 clínicas)** — é correção técnica de bug de leitura, sem regra de negócio nova.
 
-## Como será feito
+## O que muda
 
-### 1. Banco (migração)
+### 1. Query — adicionar as colunas que faltam
+```ts
+.select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,valor_cartao,percentual,percentual_cartao,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,grupo_gratuidade")
+```
 
-- `estorno_solicitacoes`: adicionar coluna `caixa_movimento_id uuid` (nullable, FK opcional lógica para `caixa_movimentos.id`).
-- Índice único parcial `uq_estorno_solicitacoes_movimento_pendente` em `(caixa_movimento_id)` onde `status = 'pendente'` — mesma trava que já existe para `lancamento_id`.
-- Ampliar CHECK do campo `tipo` (se existir) para aceitar `estorno_sangria`, ou simplesmente reutilizar `erro_caixa` — o discriminador real passa a ser `caixa_movimento_id IS NOT NULL`.
-- Nova função `public.estornar_sangria(_movimento_id uuid, _clinica_id uuid) returns jsonb` (SECURITY DEFINER, mesma assinatura de retorno da `estornar_lancamento_receita`):
-  - valida que o movimento existe, é da clínica, tipo `sangria` e ainda não estornado;
-  - insere um `caixa_movimentos` de compensação com `tipo = 'suprimento'`, mesmo valor, descrição `"[Estorno de sangria] <descrição original>"`, referenciando o movimento origem;
-  - se a sessão original ainda está `aberto`, lança na mesma sessão; se fechada, lança na sessão aberta atual do usuário aprovador (retorna aviso `"lancado_em_sessao_atual"`);
-  - marca o movimento original com metadata (`observacoes` acrescido de `[ESTORNADO em ... por ...]`) para o histórico não sumir.
-- GRANT execute para `authenticated`; revoke de `public`/`anon`.
+### 2. Tipo `DescontoConvenio` — permitir percentual diferente no cartão
+Adicionar `percentualOutros?: number` na variante `percentual`, mantendo compatibilidade (fallback = mesmo valor de `valor`).
 
-### 2. Front — `SolicitarEstornoDialog`
+### 3. Montagem do `desconto` a partir da regra
+- **valor_fixo** (regra principal e fallback `regra_padrao_convenio`):
+  ```ts
+  const v  = Number(regraMatch.valor) || 0;
+  const vC = regraMatch.valor_cartao != null ? Number(regraMatch.valor_cartao) : v;
+  desconto = { tipo: "valor_fixo", valor: v, valorOutros: vC };
+  ```
+- **percentual_desconto**:
+  ```ts
+  const p  = Number(regraMatch.percentual) || 0;
+  const pC = regraMatch.percentual_cartao != null ? Number(regraMatch.percentual_cartao) : p;
+  desconto = { tipo: "percentual", valor: p, percentualOutros: pC };
+  ```
 
-- Novo prop opcional `caixaMovimentoId?: string | null`.
-- Se `caixaMovimentoId` presente:
-  - checa duplicidade contra `estorno_solicitacoes.caixa_movimento_id`;
-  - grava no insert `caixa_movimento_id` e `tipo = 'erro_caixa'` (sangria só faz sentido como erro de caixa);
-  - esconde o bloco "devolução ao paciente" (não se aplica).
+### 4. `aplicarDescontoPorForma` — usar o percentual do cartão quando aplicável
+```ts
+if (d.tipo === "percentual") {
+  const ehDinheiro = forma === "dinheiro";
+  const pct = ehDinheiro ? d.valor : (d.percentualOutros ?? d.valor);
+  return Math.max(0, valor * (1 - Number(pct) / 100));
+}
+```
 
-### 3. Front — `app.caixa.tsx` (linhas de movimento)
-
-- No mapa `estornosPorLanc`, criar `estornosPorMov` (Map por `caixa_movimento_id`).
-- Na célula `Ação` da tabela, adicionar bloco espelho do atual `m.tipo === "recebimento"` para `m.tipo === "sangria" && podeEscrever`:
-  - "Aguardando aprovação" quando pendente;
-  - "Estornada" quando aprovado;
-  - "Solicitar estorno" chamando `setEstornoFor(m)` com o mesmo dialog, passando `caixaMovimentoId={m.id}`.
-- Ajustar o `<SolicitarEstornoDialog>` no rodapé para passar `caixaMovimentoId` quando `estornoFor?.tipo === 'sangria'`.
-
-### 4. Front — `app.financeiro.estorno.tsx` (aprovação)
-
-- `Solic` ganha `caixa_movimento_id: string | null`.
-- `executarEstorno`: se `s.caixa_movimento_id`, chama `supabase.rpc("estornar_sangria", ...)`; senão mantém `estornarLancamentoReceita`.
-- Coluna "Descrição" mostra badge "Sangria" quando aplicável, para o financeiro reconhecer.
-
-### 5. Sino de notificações (`EstornosBell.tsx`)
-
-- Sem mudança de código — a listagem é `status = 'pendente'` na mesma tabela; o toast já aparece automaticamente.
-
-### 6. Auditoria
-
-- `estornar_sangria` grava `audit_log` (tabela `caixa_movimentos`, action `ESTORNO`, dados_antes/depois com valor e destinatário).
+**Não altera** nada quando a regra é gratuidade, quando o excedente cai em "particular/bloquear/valor_fixo", nem o acréscimo de cartão configurado por convênio.
 
 ## Antes / Depois
 
-- **Antes:** linhas de sangria em `Meus movimentos` não têm ação; correção precisa ser feita por lançamento manual sem aprovação.
-- **Depois:** operador clica "Solicitar estorno" na sangria, financeiro recebe no sino (mesma fila), aprova → sistema cria movimento de suprimento equivalente e marca a sangria como estornada, mantendo os dois registros no histórico.
+- **Antes:** consulta OFTALMO desta paciente sai R$ 80 no cartão de crédito (deveria ser R$ 95). Perda de R$ 15 por atendimento nesse convênio + risco em toda regra com `valor_cartao`/`percentual_cartao` diferente.
+- **Depois:** o diálogo mostra `R$ 80,00 dinheiro / R$ 95,00 outros`, e ao escolher Pix/Débito/Crédito o lançamento vai com R$ 95,00.
 
-## Validação
+## Validação (produção, com cautela)
 
-- Criar sangria de R$ 1,00 em ambiente de teste da clínica indicada, solicitar estorno, aprovar pelo financeiro, conferir: (a) suprimento de compensação criado na mesma sessão, (b) saldo do caixa restaurado, (c) `estorno_solicitacoes` com status `aprovado` e `caixa_movimento_id` preenchido, (d) `audit_log` com o registro, (e) botão da linha vira "Estornada".
-- Testar tentativa de segunda solicitação (deve ser barrada pelo índice único).
-- Testar aprovação quando a sessão original está fechada — deve lançar na sessão aberta com aviso.
-
-## Fora de escopo
-
-- Devolução ao paciente para sangria (não faz sentido; sangria não é pagamento).
-- Estorno de suprimento/despesa — pode virar próximo passo, se o time pedir.
+1. Reabrir o mesmo agendamento da MARIA HELENA (contrato 20261923) → clicar em pagar → conferir que o card mostra "R$ 80,00 dinheiro / R$ 95,00 outros" e que Cartão de Crédito exibe R$ 95,00. **Não confirmar o pagamento** nesse teste — só checar o valor apresentado.
+2. Agendamento particular (sem convênio) continua igual: sem regra, sem diferença dinheiro/cartão.
+3. Um convênio com regra percentual (ex.: 10% dinheiro / 5% cartão, se houver) — conferir cálculo. Se não houver regra assim ainda cadastrada, esse ramo continua funcionando pelo fallback `percentualOutros ?? valor` (comportamento igual ao de hoje).
 
 ## Risco
 
-Baixo. Reaproveita 100% da UI/tabela existente; apenas adiciona uma coluna, uma RPC e um bloco de botão espelhando o já testado para recebimentos.
+Baixo. Mudança isolada a uma função de leitura + um helper puro. Nenhum caminho de escrita foi tocado. Se algum campo `valor_cartao`/`percentual_cartao` estiver nulo (regra antiga), o comportamento é idêntico ao atual — o fallback preserva o valor de dinheiro.
+
+## Pendências / decisões
+
+- O ramo `excedente_modo === "valor_fixo"` (linha 907) usa o mesmo valor para dinheiro e cartão porque hoje o cadastro só tem um campo (`excedente_valor`). **Fora do escopo desta correção** — se quiser diferenciar excedente por forma de pagamento, precisa de nova coluna no banco; abro plano separado se for útil.
