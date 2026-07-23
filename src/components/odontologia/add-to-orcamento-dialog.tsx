@@ -255,6 +255,7 @@ export function AddToOrcamentoDialog({
     if (!procSel) return toast.error("Selecione um serviço odontológico");
     const valor = Number(procSel.valor_dinheiro_pix ?? procSel.valor_padrao) || 0;
     if (!(valor > 0)) return toast.error("Este serviço não possui valor cadastrado");
+    const valorCartao = Number(procSel.valor_padrao ?? procSel.valor_dinheiro_pix) || 0;
     if (!especialidadeOdontoId) return toast.error("Especialidade Odontologia não configurada");
     setSaving(true);
     try {
@@ -298,6 +299,11 @@ export function AddToOrcamentoDialog({
         valor_total: valor,
         ordem,
         dentes: [dente],
+        // Grava Dinheiro/PIX e Cartão para o drawer/impressão exibirem totais separados.
+        valores_formas: {
+          Dinheiro: valor,
+          "Cartão de Crédito": valorCartao,
+        },
       });
       if (e2) throw e2;
       if (alvo !== "novo") {
