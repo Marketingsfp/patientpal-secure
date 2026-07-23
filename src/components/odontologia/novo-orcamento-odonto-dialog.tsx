@@ -358,9 +358,7 @@ export function NovoOrcamentoOdontoDialog({
               />
             </div>
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <span className="text-xs text-muted-foreground">
-                {selecao.length === 0 ? "Nenhum dente selecionado" : `${selecao.length} dente(s) selecionado(s): ${selecao.join(", ")}`}
-              </span>
+              <div />
               <div className="flex gap-2">
                 <Button
                   type="button" size="sm"
