@@ -2603,6 +2603,43 @@ function Page() {
                                 );
                               })()
                             )}
+                            {m.tipo === "sangria" && podeEscrever && (
+                              (() => {
+                                const st = estornosPorMov.get(m.id);
+                                if (st === "pendente") {
+                                  return (
+                                    <Button
+                                      type="button" size="sm" variant="outline" disabled
+                                      className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
+                                      title="Solicitação de estorno enviada — aguardando decisão do financeiro"
+                                    >
+                                      <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
+                                    </Button>
+                                  );
+                                }
+                                if (st === "aprovado") {
+                                  return (
+                                    <Button
+                                      type="button" size="sm" variant="outline" disabled
+                                      className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
+                                      title="Esta sangria já foi estornada"
+                                    >
+                                      <Undo2 className="h-3 w-3 mr-1" /> Estornada
+                                    </Button>
+                                  );
+                                }
+                                return (
+                                  <Button
+                                    type="button" size="sm" variant="outline"
+                                    className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+                                    title="Solicitar estorno da sangria ao financeiro"
+                                    onClick={() => setEstornoFor(m)}
+                                  >
+                                    <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
+                                  </Button>
+                                );
+                              })()
+                            )}
                           </TableCell>
                         </TableRow>
                          )];
