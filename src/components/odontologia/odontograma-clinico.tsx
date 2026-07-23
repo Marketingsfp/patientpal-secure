@@ -78,12 +78,22 @@ function arcadaLinhas(a: Arcada): number[][] {
   }
   // Mista: permanente posterior + decíduos anteriores
   return [
-    [...DENTES_PERMANENTES.supDir.slice(0, 5), ...DENTES_DECIDUOS.supDir.slice(-3), ...DENTES_DECIDUOS.supEsq.slice(0, 3), ...DENTES_PERMANENTES.supEsq.slice(-5)],
-    [...DENTES_PERMANENTES.infDir.slice(0, 5), ...DENTES_DECIDUOS.infDir.slice(-3), ...DENTES_DECIDUOS.infEsq.slice(0, 3), ...DENTES_PERMANENTES.infEsq.slice(-5)],
+    [
+      ...DENTES_PERMANENTES.supDir.slice(0, 5),
+      ...DENTES_DECIDUOS.supDir.slice(-3),
+      ...DENTES_DECIDUOS.supEsq.slice(0, 3),
+      ...DENTES_PERMANENTES.supEsq.slice(-5),
+    ],
+    [
+      ...DENTES_PERMANENTES.infDir.slice(0, 5),
+      ...DENTES_DECIDUOS.infDir.slice(-3),
+      ...DENTES_DECIDUOS.infEsq.slice(0, 3),
+      ...DENTES_PERMANENTES.infEsq.slice(-5),
+    ],
   ];
 }
 
-/** SVG do dente com 5 faces clicáveis (O centro, V topo, L base, M direita, D esquerda no lado direito da boca). */
+/** SVG do dente em vista oclusal (topo), com 5 faces clicáveis (O centro, V topo, L base, M direita, D esquerda no lado direito da boca). */
 function DenteFaces({
   dente,
   estados,
@@ -97,7 +107,8 @@ function DenteFaces({
   orcado: boolean;
   selecionado: boolean;
 }) {
-  const c = (f: OdontoFace) => STATUS_COR[estados[`${dente}-${f}`] ?? estados[`${dente}-INTEIRO`] ?? "higido"];
+  const c = (f: OdontoFace) =>
+    STATUS_COR[estados[`${dente}-${f}`] ?? estados[`${dente}-INTEIRO`] ?? "higido"];
   const s = (f: OdontoFace) => estados[`${dente}-${f}`] ?? estados[`${dente}-INTEIRO`] ?? "higido";
   const decidua = isDecidua(dente);
   const higidoAll = (["V", "M", "D", "L", "O"] as OdontoFace[]).every(
@@ -107,96 +118,145 @@ function DenteFaces({
   const ausente = (["INTEIRO", "O", "V", "L", "M", "D"] as OdontoFace[]).some(
     (f) => estados[`${dente}-${f}`] === "ausente",
   );
-  // Superior (quadrantes 1,2,5,6) → raiz para cima; Inferior (3,4,7,8) → raiz para baixo.
-  const quad = Math.floor(dente / 10);
-  const superior = quad === 1 || quad === 2 || quad === 5 || quad === 6;
+  const type = toothType(dente);
   const clipId = `tooth-crown-${dente}`;
-  const shape = toothShape(dente, superior);
-  const { crownPath, rootPath, cx0, crownY, cw, ch, vbW, vbH } = shape;
+  const shape = toothShape(dente);
+  const { crownPath, cw, ch, vbW, vbH } = shape;
   const faceFill = (f: OdontoFace) => (higidoAll ? "transparent" : c(f));
+  const halfW = cw / 2;
+  const halfH = ch / 2;
   // Face oclusal (central) — margem proporcional à largura da coroa
-  const insetX = Math.max(5, cw * 0.28);
-  const insetY = Math.max(8, ch * 0.28);
-  const cIn = { x: cx0 + insetX, y: crownY + insetY, w: cw - insetX * 2, h: ch - insetY * 2 };
-  const cy0 = crownY;
+  const insetX = Math.max(4, cw * 0.26);
+  const insetY = Math.max(4, ch * 0.26);
+  const cIn = { x: -halfW + insetX, y: -halfH + insetY, w: cw - insetX * 2, h: ch - insetY * 2 };
   return (
     <div
-      className={`flex ${superior ? "flex-col" : "flex-col-reverse"} items-center gap-0.5 rounded-md p-0.5 transition ${
+      className={`flex flex-col items-center gap-0.5 rounded-md p-0.5 transition ${
         selecionado ? "ring-2 ring-primary" : orcado ? "ring-2 ring-amber-400/60" : ""
       }`}
       title={`Dente ${dente}${orcado ? " · orçado" : ""}`}
     >
-      <svg viewBox={`0 0 ${vbW} ${vbH}`} className="h-20 w-9">
+      <svg viewBox={`0 0 ${vbW} ${vbH}`} className="h-12 w-12">
         <defs>
           <clipPath id={clipId}>
             <path d={crownPath} />
           </clipPath>
         </defs>
-        {/* Raiz(es) — somente contorno, fiel ao diagrama de referência */}
-        <path d={rootPath} fill="none" stroke="#64748b" strokeWidth="1" strokeLinejoin="round" strokeLinecap="round" fillRule="evenodd" />
-        {/* Faces da coroa recortadas no formato de dente */}
-        <g clipPath={`url(#${clipId})`}>
-          {/* Vestibular (topo da coroa) */}
-          <polygon
-            points={`${cx0},${cy0} ${cx0 + cw},${cy0} ${cIn.x + cIn.w},${cIn.y} ${cIn.x},${cIn.y}`}
-            fill={faceFill("V")}
-            className="cursor-pointer hover:opacity-80"
-            onClick={(e) => { e.stopPropagation(); onClickFace(dente, "V"); }}
-          >
-            <title>{`${dente} · Vestibular · ${STATUS_LABEL[s("V")]}`}</title>
-          </polygon>
-          <polygon
-            points={`${cx0 + cw},${cy0} ${cx0 + cw},${cy0 + ch} ${cIn.x + cIn.w},${cIn.y + cIn.h} ${cIn.x + cIn.w},${cIn.y}`}
-            fill={faceFill("M")}
-            className="cursor-pointer hover:opacity-80"
-            onClick={(e) => { e.stopPropagation(); onClickFace(dente, "M"); }}
-          >
-            <title>{`${dente} · Mesial · ${STATUS_LABEL[s("M")]}`}</title>
-          </polygon>
-          <polygon
-            points={`${cx0},${cy0 + ch} ${cx0 + cw},${cy0 + ch} ${cIn.x + cIn.w},${cIn.y + cIn.h} ${cIn.x},${cIn.y + cIn.h}`}
-            fill={faceFill("L")}
-            className="cursor-pointer hover:opacity-80"
-            onClick={(e) => { e.stopPropagation(); onClickFace(dente, "L"); }}
-          >
-            <title>{`${dente} · Lingual/Palatina · ${STATUS_LABEL[s("L")]}`}</title>
-          </polygon>
-          <polygon
-            points={`${cx0},${cy0} ${cx0},${cy0 + ch} ${cIn.x},${cIn.y + cIn.h} ${cIn.x},${cIn.y}`}
-            fill={faceFill("D")}
-            className="cursor-pointer hover:opacity-80"
-            onClick={(e) => { e.stopPropagation(); onClickFace(dente, "D"); }}
-          >
-            <title>{`${dente} · Distal · ${STATUS_LABEL[s("D")]}`}</title>
-          </polygon>
-          <rect
-            x={cIn.x} y={cIn.y} width={cIn.w} height={cIn.h}
-            fill={faceFill("O")}
-            className="cursor-pointer hover:opacity-80"
-            onClick={(e) => { e.stopPropagation(); onClickFace(dente, "O"); }}
-          >
-            <title>{`${dente} · Oclusal/Incisal · ${STATUS_LABEL[s("O")]}`}</title>
-          </rect>
-        </g>
-        {/* Contorno da coroa por cima — traço fino, cor referência */}
-        <path d={crownPath} fill="none" stroke="#64748b" strokeWidth="1" strokeLinejoin="round" strokeLinecap="round" />
-        {ausente && (
-          <g pointerEvents="none">
-            <line x1={cx0 - 2} y1={crownY - 2} x2={cx0 + cw + 2} y2={crownY + ch + 2} stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" />
-            <line x1={cx0 + cw + 2} y1={crownY - 2} x2={cx0 - 2} y2={crownY + ch + 2} stroke="#dc2626" strokeWidth="2.2" strokeLinecap="round" />
+        <g transform={`translate(${vbW / 2} ${vbH / 2})`}>
+          {/* Faces recortadas no formato oclusal do dente */}
+          <g clipPath={`url(#${clipId})`}>
+            {/* Vestibular (topo) */}
+            <polygon
+              points={`${-halfW},${-halfH} ${halfW},${-halfH} ${cIn.x + cIn.w},${cIn.y} ${cIn.x},${cIn.y}`}
+              fill={faceFill("V")}
+              className="cursor-pointer hover:opacity-80"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClickFace(dente, "V");
+              }}
+            >
+              <title>{`${dente} · Vestibular · ${STATUS_LABEL[s("V")]}`}</title>
+            </polygon>
+            <polygon
+              points={`${halfW},${-halfH} ${halfW},${halfH} ${cIn.x + cIn.w},${cIn.y + cIn.h} ${cIn.x + cIn.w},${cIn.y}`}
+              fill={faceFill("M")}
+              className="cursor-pointer hover:opacity-80"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClickFace(dente, "M");
+              }}
+            >
+              <title>{`${dente} · Mesial · ${STATUS_LABEL[s("M")]}`}</title>
+            </polygon>
+            <polygon
+              points={`${-halfW},${halfH} ${halfW},${halfH} ${cIn.x + cIn.w},${cIn.y + cIn.h} ${cIn.x},${cIn.y + cIn.h}`}
+              fill={faceFill("L")}
+              className="cursor-pointer hover:opacity-80"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClickFace(dente, "L");
+              }}
+            >
+              <title>{`${dente} · Lingual/Palatina · ${STATUS_LABEL[s("L")]}`}</title>
+            </polygon>
+            <polygon
+              points={`${-halfW},${-halfH} ${-halfW},${halfH} ${cIn.x},${cIn.y + cIn.h} ${cIn.x},${cIn.y}`}
+              fill={faceFill("D")}
+              className="cursor-pointer hover:opacity-80"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClickFace(dente, "D");
+              }}
+            >
+              <title>{`${dente} · Distal · ${STATUS_LABEL[s("D")]}`}</title>
+            </polygon>
+            <rect
+              x={cIn.x}
+              y={cIn.y}
+              width={cIn.w}
+              height={cIn.h}
+              fill={faceFill("O")}
+              className="cursor-pointer hover:opacity-80"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClickFace(dente, "O");
+              }}
+            >
+              <title>{`${dente} · Oclusal/Incisal · ${STATUS_LABEL[s("O")]}`}</title>
+            </rect>
+            {ocluSulcos(type, cw, ch).map((d, i) => (
+              <path
+                key={i}
+                d={d}
+                fill="none"
+                stroke="#64748b"
+                strokeWidth="0.8"
+                strokeLinecap="round"
+                pointerEvents="none"
+              />
+            ))}
           </g>
-        )}
+          {/* Contorno da coroa por cima — traço fino, cor referência */}
+          <path d={crownPath} fill="none" stroke="#64748b" strokeWidth="1" strokeLinejoin="round" />
+          {ausente && (
+            <g pointerEvents="none">
+              <line
+                x1={-halfW - 1}
+                y1={-halfH - 1}
+                x2={halfW + 1}
+                y2={halfH + 1}
+                stroke="#dc2626"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+              />
+              <line
+                x1={halfW + 1}
+                y1={-halfH - 1}
+                x2={-halfW - 1}
+                y2={halfH + 1}
+                stroke="#dc2626"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+              />
+            </g>
+          )}
+        </g>
       </svg>
-      <span className={`text-[10px] font-sans tracking-tight ${decidua ? "text-amber-700" : "text-slate-500"}`}>{dente}</span>
+      <span
+        className={`text-[10px] font-sans tracking-tight ${decidua ? "text-amber-700" : "text-slate-500"}`}
+      >
+        {dente}
+      </span>
       {orcado && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Anatomia dos dentes (FDI) — coroa arredondada + raízes por tipo de dente.
-// A coroa serve de clipPath para as 5 faces clicáveis (V/M/D/L/O), então o
-// clique e a coloração por face continuam funcionando; só o contorno muda.
+// Anatomia dos dentes (FDI) — contorno oclusal (vista de cima) por tipo de
+// dente. A coroa serve de clipPath para as 5 faces clicáveis (V/M/D/L/O),
+// então o clique e a coloração por face continuam funcionando; só o
+// contorno muda (sem raiz, sem elevação frontal).
 // ---------------------------------------------------------------------------
 
 type ToothType = "molar" | "premolar" | "canine" | "incisor";
@@ -211,166 +271,95 @@ function toothType(d: number): ToothType {
 
 interface ToothShape {
   crownPath: string;
-  rootPath: string;
-  cx0: number;
-  crownY: number;
   cw: number;
   ch: number;
   vbW: number;
   vbH: number;
 }
 
-function toothShape(dente: number, superior: boolean): ToothShape {
+const OCLU_SIZE: Record<ToothType, { w: number; h: number }> = {
+  incisor: { w: 20, h: 24 },
+  canine: { w: 21, h: 26 },
+  premolar: { w: 25, h: 27 },
+  molar: { w: 31, h: 31 },
+};
+
+function toothShape(dente: number): ToothShape {
   const type = toothType(dente);
+  const { w: cw, h: ch } = OCLU_SIZE[type];
   const vbW = 40;
-  const vbH = 90;
-  // Coroa e raízes com proporções fiéis ao diagrama anatômico de referência:
-  // coroa retangular alta com cúspides sutis, raízes retas e afiladas.
-  const chByType: Record<ToothType, number> = { molar: 26, premolar: 26, canine: 30, incisor: 28 };
-  const rhByType: Record<ToothType, number> = { molar: 40, premolar: 44, canine: 50, incisor: 42 };
-  const cwByType: Record<ToothType, number> = { molar: 30, premolar: 22, canine: 19, incisor: 18 };
-  const ch = chByType[type];
-  const rootH = rhByType[type];
-  const cw = cwByType[type];
-  const cx0 = (vbW - cw) / 2;
-  const topPad = 6;
-  const crownY = superior ? topPad + rootH : topPad;
-  const rootNeck = superior ? crownY : crownY + ch;
-  const rootTip = superior ? topPad : crownY + ch + rootH;
-  const cx = cx0 + cw / 2;
-
-  const crownPath = buildCrownPath(type, cx0, crownY, cw, ch, superior);
-
-  let rootPath = "";
-  const single = (x: number, w: number, curve = 0) => singleRootPath(x, w, rootNeck, rootTip, superior, curve);
-  if (type === "molar") {
-    if (superior) {
-      // 3 raízes: 2 vestibulares (M/D) divergindo + 1 palatina central reta.
-      rootPath = [
-        single(cx0 + 5, 6, -3),
-        single(cx0 + cw - 5, 6, 3),
-        single(cx, 5.5, 0),
-      ].join(" ");
-    } else {
-      // 2 raízes (mesial + distal), divergência clara.
-      rootPath = [
-        single(cx0 + 7, 7, -3),
-        single(cx0 + cw - 7, 7, 3),
-      ].join(" ");
-    }
-  } else if (type === "premolar") {
-    rootPath = single(cx, 7.5);
-  } else if (type === "canine") {
-    rootPath = single(cx, 7);
-  } else {
-    rootPath = single(cx, 6.5);
-  }
-
-  return { crownPath, rootPath, cx0, crownY, cw, ch, vbW, vbH };
+  const vbH = 40;
+  const crownPath = ocluContorno(type, cw, ch);
+  return { crownPath, cw, ch, vbW, vbH };
 }
 
-function buildCrownPath(
-  type: ToothType,
-  cx0: number,
-  crownY: number,
-  cw: number,
-  ch: number,
-  superior: boolean,
-): string {
-  // Coroa retangular limpa: colo levemente estreito, laterais retas com leve
-  // bojo, cantos incisais arredondados e cúspides sutis por tipo.
-  const neckY = superior ? crownY : crownY + ch;
-  const edgeY = superior ? crownY + ch : crownY;
-  const dir = superior ? 1 : -1; // cúspides projetam para fora da coroa
-  const neckShrink = type === "molar" ? 0.06 : type === "premolar" ? 0.08 : 0.10;
-  const nxL = cx0 + cw * neckShrink;
-  const nxR = cx0 + cw - cw * neckShrink;
-  const rEdge = type === "molar" ? 2.5 : type === "premolar" ? 2.5 : type === "canine" ? 2.5 : 2;
-  const eL = cx0 + rEdge;
-  const eR = cx0 + cw - rEdge;
-  const cx = cx0 + cw / 2;
-  // Bojo lateral muito discreto — quase reto.
-  const bulgeShift = 0.6;
-  const bulgeY = superior ? neckY + ch * 0.55 : neckY - ch * 0.55;
-  const bxL = cx0 - bulgeShift;
-  const bxR = cx0 + cw + bulgeShift;
-
-  function edge(): string {
-    if (type === "molar") {
-      // 4 cúspides suaves
-      const seg = (eR - eL) / 4;
-      const cusp = 1.4;
-      const valley = 0.9;
-      const parts: string[] = [];
-      for (let i = 0; i < 4; i++) {
-        const x0 = eL + seg * i;
-        const x1 = eL + seg * (i + 1);
-        const mid = (x0 + x1) / 2;
-        parts.push(`Q ${mid},${edgeY + dir * cusp} ${x1},${edgeY}`);
-        if (i < 3) parts.push(`Q ${x1},${edgeY - dir * valley} ${x1 + 0.01},${edgeY}`);
-      }
-      return parts.join(" ");
-    }
-    if (type === "premolar") {
-      const cusp = 1.8;
-      const mid = (eL + eR) / 2;
-      return [
-        `Q ${(eL + mid) / 2},${edgeY + dir * cusp} ${mid},${edgeY}`,
-        `Q ${(mid + eR) / 2},${edgeY + dir * cusp} ${eR},${edgeY}`,
-      ].join(" ");
-    }
-    if (type === "canine") {
-      // Ponta central marcada
-      const tip = 4;
-      return [
-        `L ${cx},${edgeY + dir * tip}`,
-        `L ${eR},${edgeY}`,
-      ].join(" ");
-    }
-    // Incisivo — borda reta
-    return `L ${eR},${edgeY}`;
+/** Contorno da coroa em vista oclusal (centrado em 0,0), conforme o tipo do dente. */
+function ocluContorno(type: ToothType, w: number, h: number): string {
+  if (type === "incisor") {
+    // incisivos: vestibular plano, lingual côncavo
+    return `M ${-w / 2} ${-h * 0.12} Q ${-w / 2} ${-h / 2} 0 ${-h / 2} Q ${w / 2} ${-h / 2} ${w / 2} ${-h * 0.12} Q ${
+      w * 0.34
+    } ${h / 2} 0 ${h * 0.46} Q ${-w * 0.34} ${h / 2} ${-w / 2} ${-h * 0.12} Z`;
   }
-
-  return [
-    `M ${nxL},${neckY}`,
-    `C ${bxL},${bulgeY} ${cx0},${edgeY} ${eL},${edgeY}`,
-    edge(),
-    `C ${cx0 + cw},${edgeY} ${bxR},${bulgeY} ${nxR},${neckY}`,
-    `Z`,
-  ].join(" ");
+  if (type === "canine") {
+    // canino: cúspide única voltada para vestibular
+    return `M 0 ${-h / 2} Q ${w * 0.46} ${-h * 0.24} ${w * 0.42} ${h * 0.16} Q ${w * 0.24} ${h * 0.5} 0 ${h * 0.44} Q ${
+      -w * 0.24
+    } ${h * 0.5} ${-w * 0.42} ${h * 0.16} Q ${-w * 0.46} ${-h * 0.24} 0 ${-h / 2} Z`;
+  }
+  if (type === "premolar") {
+    // pré-molares: oval com duas cúspides
+    return ocluRrect(w, h, Math.min(w, h) * 0.4);
+  }
+  // molares: quadrangular arredondado
+  return ocluRrect(w, h, Math.min(w, h) * 0.26);
 }
 
-function singleRootPath(
-  x: number,
-  width: number,
-  neckY: number,
-  tipY: number,
-  superior: boolean,
-  curveX = 0,
-): string {
-  const half = width / 2;
-  // Raiz reta afilando para uma ponta arredondada. Fiel ao diagrama de
-  // referência: laterais quase retas com leve convergência, sem bojo.
-  const tipHalf = 1.0;
-  const tipX = x + curveX;
-  const sign = superior ? 1 : -1;
-  const shoulderY = neckY - sign * 2; // pequena curvatura no colo
-  const preTipY = tipY + sign * 3;
+function ocluRrect(w: number, h: number, r: number) {
+  const x = -w / 2;
+  const y = -h / 2;
+  return `M ${x + r} ${y} H ${x + w - r} Q ${x + w} ${y} ${x + w} ${y + r} V ${y + h - r} Q ${x + w} ${y + h} ${
+    x + w - r
+  } ${y + h} H ${x + r} Q ${x} ${y + h} ${x} ${y + h - r} V ${y + r} Q ${x} ${y} ${x + r} ${y} Z`;
+}
+
+/** Sulcos/cristas internas — dão o aspecto anatômico (apenas decorativo). */
+function ocluSulcos(type: ToothType, w: number, h: number): string[] {
+  if (type === "incisor")
+    return [`M ${-w * 0.36} ${-h * 0.02} Q 0 ${-h * 0.2} ${w * 0.36} ${-h * 0.02}`];
+  if (type === "canine")
+    return [
+      `M 0 ${-h * 0.4} L 0 ${h * 0.18}`,
+      `M 0 ${-h * 0.4} L ${-w * 0.26} ${h * 0.1}`,
+      `M 0 ${-h * 0.4} L ${w * 0.26} ${h * 0.1}`,
+    ];
+  if (type === "premolar") return [`M ${-w * 0.3} 0 Q 0 ${h * 0.1} ${w * 0.3} 0`];
   return [
-    `M ${x - half},${shoulderY}`,
-    `L ${tipX - tipHalf},${preTipY}`,
-    `Q ${tipX},${tipY} ${tipX + tipHalf},${preTipY}`,
-    `L ${x + half},${shoulderY}`,
-    `Q ${x},${neckY + sign * 0.5} ${x - half},${shoulderY}`,
-    `Z`,
-  ].join(" ");
+    `M ${-w * 0.34} 0 Q 0 ${h * 0.06} ${w * 0.34} 0`,
+    `M ${-w * 0.1} ${-h * 0.02} L ${-w * 0.13} ${-h * 0.32}`,
+    `M ${w * 0.06} ${h * 0.02} L ${w * 0.09} ${h * 0.32}`,
+    `M ${w * 0.2} ${-h * 0.02} L ${w * 0.23} ${-h * 0.3}`,
+  ];
 }
 
 function Legenda() {
   const status: OdontoStatus[] = [
-    "higido", "cariado", "restaurado", "selante", "ausente", "extracao_indicada",
-    "tratamento_canal", "coroa", "implante", "protese", "fratura",
-    "sangramento", "mobilidade", "tartaro", "aparelho", "faceta",
+    "higido",
+    "cariado",
+    "restaurado",
+    "selante",
+    "ausente",
+    "extracao_indicada",
+    "tratamento_canal",
+    "coroa",
+    "implante",
+    "protese",
+    "fratura",
+    "sangramento",
+    "mobilidade",
+    "tartaro",
+    "aparelho",
+    "faceta",
   ];
   const faces: OdontoFace[] = ["O", "M", "D", "V", "L"];
   return (
@@ -378,7 +367,10 @@ function Legenda() {
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
         {status.map((s) => (
           <div key={s} className="flex items-center gap-1.5">
-            <span className="inline-block h-3 w-3 rounded-sm border border-border" style={{ background: STATUS_COR[s] }} />
+            <span
+              className="inline-block h-3 w-3 rounded-sm border border-border"
+              style={{ background: STATUS_COR[s] }}
+            />
             <span className="text-muted-foreground">{STATUS_LABEL[s]}</span>
           </div>
         ))}
@@ -386,7 +378,9 @@ function Legenda() {
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         <span className="font-medium text-foreground/70">Faces:</span>
         {faces.map((f) => (
-          <span key={f}><span className="font-mono">{f}</span> {FACE_LABEL[f].split(" ")[0]}</span>
+          <span key={f}>
+            <span className="font-mono">{f}</span> {FACE_LABEL[f].split(" ")[0]}
+          </span>
         ))}
       </div>
     </div>
