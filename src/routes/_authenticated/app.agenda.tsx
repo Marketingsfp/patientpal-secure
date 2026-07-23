@@ -3506,9 +3506,9 @@ function AgendaPage() {
         setForm((f) => ({ ...f, medico_id: "" }));
         toast.info("Selecione um médico da especialidade Odontologia para este orçamento.");
       }
-      const isLab = !!orc.especialidade_id && labEspecialidadeIds.has(orc.especialidade_id);
-      setOrcamentoLaboratorio(isLab);
-      if (isLab && form.medico_id && !medicoEhLaboratorista(form.medico_id)) {
+      const orcEhLab = !!orc.especialidade_id && labEspecialidadeIds.has(orc.especialidade_id);
+      setOrcamentoLaboratorio(orcEhLab);
+      if (orcEhLab && form.medico_id && !medicoEhLaboratorista(form.medico_id)) {
         setForm((f) => ({ ...f, medico_id: "" }));
         toast.info("Selecione um médico da especialidade Laboratório para este orçamento.");
       }
