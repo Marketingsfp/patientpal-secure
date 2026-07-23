@@ -1449,6 +1449,28 @@ function AgendaPage() {
   const [pacInfoOpen, setPacInfoOpen] = useState(false);
   const [pacInfoLoading, setPacInfoLoading] = useState(false);
   const [pacInfo, setPacInfo] = useState<Record<string, any> | null>(null);
+  const [editarPacienteOpen, setEditarPacienteOpen] = useState(false);
+  const [editarPacienteData, setEditarPacienteData] = useState<PacienteFull | null>(null);
+  const [editarPacienteLoading, setEditarPacienteLoading] = useState(false);
+  const podeEditarCliente = usePodeEscrever("clientes");
+  const abrirEditarPacienteInline = async (pacienteId: string) => {
+    setEditarPacienteLoading(true);
+    setEditarPacienteOpen(true);
+    try {
+      const { data, error } = await supabase
+        .from("pacientes")
+        .select("*")
+        .eq("id", pacienteId)
+        .single();
+      if (error) throw error;
+      setEditarPacienteData(data as PacienteFull);
+    } catch (e) {
+      mostrarErro(e);
+      setEditarPacienteOpen(false);
+    } finally {
+      setEditarPacienteLoading(false);
+    }
+  };
 
   const abrirInfoPaciente = async (pacienteId: string | null | undefined, nomeFallback: string) => {
     setPacInfoOpen(true);
