@@ -42,6 +42,7 @@ const MOTIVOS_CANCELAMENTO: ReadonlyArray<{ value: string; label: string; pedeOb
   { value: "sem_condicoes", label: "Sem condições financeiras", pedeObs: false },
   { value: "nao_usa", label: "Não usa o convênio", pedeObs: false },
   { value: "insatisfacao", label: "Insatisfação com o convênio", pedeObs: true },
+  { value: "duplicidade_bd", label: "Duplicidade - Banco de dados", pedeObs: true },
   { value: "outros", label: "Outros", pedeObs: true },
 ];
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
