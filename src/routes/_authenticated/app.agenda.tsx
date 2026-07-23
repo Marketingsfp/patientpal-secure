@@ -3816,6 +3816,13 @@ function AgendaPage() {
       toast.error("O horário final deve ser após o inicial");
       return;
     }
+    if (form.orcamento_id && orcamentoOdonto && form.medico_id) {
+      const espSet = medicoEspec.get(form.medico_id);
+      if (!espSet || !espSet.has(ODONTO_ESPECIALIDADE_ID)) {
+        toast.error("Orçamentos de Odontologia só podem ser agendados com médicos da especialidade Odontologia.");
+        return;
+      }
+    }
     const multiPermitido =
       !!form.medico_id &&
       (medicoEhLaboratorioFormulario(form.medico_id) ||
