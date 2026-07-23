@@ -2693,11 +2693,13 @@ function DetalheContrato({
 
   const confirmarCancelamento = async () => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    const motivo = cancelMotivo.trim();
-    if (!motivo) {
-      toast.error("Informe o motivo do cancelamento");
+    const opcao = MOTIVOS_CANCELAMENTO.find((m) => m.value === cancelMotivoOpcao);
+    if (!opcao) {
+      toast.error("Selecione o motivo do cancelamento");
       return;
     }
+    const obs = cancelObs.trim();
+    const motivo = obs ? `${opcao.label} — ${obs}` : opcao.label;
     setCancelSaving(true);
     const agora = new Date().toISOString();
     const { error } = await supabase
@@ -2717,7 +2719,8 @@ function DetalheContrato({
     setCanceladoEm(agora);
     setCancelMotivoAtual(motivo);
     setCancelOpen(false);
-    setCancelMotivo("");
+    setCancelMotivoOpcao("");
+    setCancelObs("");
   };
 
   // Diálogo de forma de pagamento (espelha o da agenda)
