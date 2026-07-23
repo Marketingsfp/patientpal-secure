@@ -1,77 +1,52 @@
+## Problema
 
-## Diagnóstico — onde o valor "desincroniza" entre o % e a cobrança
+No cadastro/edição de benefícios do Cartão Convênio, o seletor **"Quando exceder, cobrar"** oferece a opção **"Aplicar regra padrão do convênio"**, mas o banco rejeita esse valor com o erro `cb_convenio_regras_limite_ck` (violação de CHECK). Isso faz aparecer o toast **"Configuração de limite inválida nesta regra…"** ao salvar.
 
-Investiguei o caminho de ponta a ponta (cadastro da regra → armazenamento → leitura na Agenda). Encontrei **duas fontes de verdade** para o valor do convênio, e é isso que faz o % cadastrado não bater com o valor cobrado.
+Causa raiz: incoerência entre a UI (que oferece 5 opções) e a trava do banco (que só aceita 4: `percentual_particular`, `valor_fixo`, `particular`, `bloquear`). Além disso, nenhum consumidor da regra (agenda, aviso de limite) trata esse modo hoje.
 
-### 1) Duas fontes de verdade sendo lidas por telas diferentes
+## O que vai ser feito
 
-- **Fonte A — regra viva:** tabela `cb_convenio_regras`. É o que você edita no formulário "Regras de preço".
-- **Fonte B — cache pré-calculado:** tabela `procedimento_cb_convenio_valores` (colunas `valor_dinheiro` e `valor_outros`), gerada pelo botão **"Reaplicar a todos os serviços"** em `src/components/cartao-beneficios/regras-tab.tsx` (linhas 353–463).
+Aplicar globalmente (todas as 3 clínicas), com semântica **"herdar da regra genérica do convênio"** conforme sua escolha.
 
-Quem lê o quê:
-- **Agenda / cobrança** (`src/routes/_authenticated/app.agenda.tsx` linha 552 em diante) → lê a **regra viva** e calcula na hora.
-- **Cadastro de Procedimentos** (`src/routes/_authenticated/app.procedimentos.tsx` linhas 488 e 615) → lê primeiro o **cache**; só cai no cálculo da regra quando o cache está vazio.
+### 1. Banco de dados — migration
 
-Consequência prática: se você altera a regra (ex.: muda de 5% para 10%) e **não** clica em "Reaplicar", a grade do cadastro de Procedimentos continua mostrando o preço antigo, mas a Agenda cobra pelo novo. Se você clica em "Reaplicar" com regra errada e depois conserta a regra sem reaplicar, é o contrário. Esse é o "erro de sincronização" que você está vendo.
+- Recriar a constraint `cb_convenio_regras_limite_ck` incluindo `regra_padrao_convenio` na lista de valores válidos para `excedente_modo`.
+- Atualizar o `COMMENT` da coluna descrevendo o novo modo.
+- Sem alteração em dados existentes (apenas relaxa a trava). Aditivo, sem risco para regras já cadastradas.
 
-### 2) O `applyAcrescimoCartao` legado ainda é aplicado num caminho
+### 2. Motor de aplicação da regra
 
-O comentário em `src/lib/cb-regras.ts` diz que essa função foi descontinuada em favor do campo "valor cartão/PIX" por-regra. Mas:
-- `app.procedimentos.tsx` linha 630 **ainda** aplica `applyAcrescimoCartao` sobre o resultado da regra.
-- `app.agenda.tsx` linha 4320 **ainda** aplica um equivalente local `aplicarAcrescimoCartaoAgenda` sobre o resultado da regra.
+Ajustar os dois pontos que hoje leem `excedente_modo` para tratar `regra_padrao_convenio` como fallback:
 
-Rodei auditoria: **nenhum convênio ativo tem `acrescimo_cartao_modo` preenchido**, então hoje o efeito é zero — mas o código está armado para dobrar o valor no dia em que alguém marcar essa configuração no convênio.
+- **`src/routes/_authenticated/app.agenda.tsx`** (cálculo do valor da consulta quando o paciente excede o limite)
+- **`src/lib/agenda/aviso-limite-pendentes.ts`** (texto do aviso mostrado ao operador)
 
-### 3) Reaplicar apaga e reescreve o cache — mas em fluxo manual
+Lógica de fallback:
 
-`reaplicar` (linha 437–444) deleta todas as linhas com `origem = 'regra'` e regrava. Isso significa que o cache é **inteiramente derivado** da regra — não deveria existir como fonte de verdade independente. Ele só existe porque a tela de Procedimentos precisa exibir preços por convênio numa grid grande.
+1. Se `excedente_modo === 'regra_padrao_convenio'`, procurar entre as regras já carregadas do mesmo `convenio_id` uma regra **genérica** — sem `procedimento_id` e sem `especialidade_id` (regra "coringa" do convênio).
+2. Se encontrar, usar o `excedente_modo` / `excedente_percentual` / `excedente_valor` dessa regra genérica no lugar.
+3. Se **não** encontrar regra genérica, aplicar `bloquear` como fallback seguro (impede uso sem contrapartida definida) e registrar no aviso: "Regra padrão do convênio não configurada — bloqueado".
 
-### 4) Efeito colateral no cadastro
+Nenhum outro consumidor usa esse campo hoje (validei com busca em `src/`).
 
-No `salvar` (linhas 314–318): se `percentual_cartao` estiver `null`, salva igual ao `percentual`; se estiver preenchido, mantém o valor. Isso significa que uma regra editada uma vez com "% cartão = 8" e depois trocada para "% = 10" fica com `10 / 8` — cartão mais barato que dinheiro, sem o operador perceber. Isso amplifica a sensação de "não bate".
+### 3. UI — `src/components/cartao-beneficios/regras-tab.tsx`
 
----
+- Manter a opção **"Aplicar regra padrão do convênio"** nos dois formulários (linhas 964 e 1424).
+- Adicionar dica curta abaixo do Select quando esse modo estiver selecionado: *"Ao exceder, o sistema usa o excedente da regra genérica deste convênio (a que não especifica procedimento nem especialidade). Se não houver, o benefício é bloqueado."*
+- Ocultar os campos "Percentual" e "Valor fixo" quando esse modo estiver selecionado (já são ocultados hoje para modos que não os usam — só preciso incluir o novo caso).
 
-## Solução (todas as 3 clínicas)
+### 4. Tipagens
 
-Vou aplicar em uma sequência que zera o descompasso na origem e ainda deixa rastreabilidade para auditoria futura.
+- Atualizar o comentário do tipo em `src/lib/cb-regras.ts` e `src/lib/agenda/aviso-limite-pendentes.ts` incluindo o novo modo.
 
-### A) Fonte única = regra viva
-- Centralizar todo cálculo em uma nova função `precoFinal({ regra, baseDinheiro, baseCartao, forma })` em `src/lib/cb-regras.ts`, retornando `{ valor, memoria }` onde `memoria` descreve regra + base + operação.
-- **Agenda:** trocar `aplicarDescontoPorForma` + `aplicarAcrescimoCartaoAgenda` (`app.agenda.tsx` 340–380 e 4318–4325) por chamadas a essa função.
-- **Cadastro de Procedimentos:** parar de ler `procedimento_cb_convenio_valores` como fonte primária. A grid passa a calcular pela regra em tempo real (bases já vêm do próprio procedimento). O cache continua existindo por retrocompatibilidade e para exportações, mas nunca mais é lido em fluxos de cobrança/exibição de preço.
+## Validação após implementar
 
-### B) Reaplicar automático ao salvar regra
-- Após qualquer `insert/update/delete` em `cb_convenio_regras`, rodar automaticamente a mesma rotina do botão "Reaplicar" para aquele convênio, sem depender do clique do operador. Assim, mesmo que alguma tela residual leia o cache, ele sempre está sincronizado.
-- O botão manual continua existindo para reprocessamento em massa.
+- Reabrir a regra de Mamografia do "Cartão Consulta + Seguros" (MENINO JESUS), selecionar "Aplicar regra padrão do convênio" e salvar → deve gravar sem erro.
+- Simular na Agenda: paciente com limite estourado nessa regra → o valor cobrado deve refletir a regra genérica do convênio (ou bloqueio, se não houver).
+- Sanity check: regras existentes com os 4 modos antigos continuam funcionando exatamente como antes (sem regressão).
 
-### C) Remover o acréscimo legado dos caminhos
-- Apagar `aplicarAcrescimoCartaoAgenda` de `app.agenda.tsx` e a chamada de `applyAcrescimoCartao` em `app.procedimentos.tsx`.
-- Manter as colunas `acrescimo_cartao_*` em `cb_convenios` intactas (retrocompatibilidade), mas marcar como não usadas no código. Se algum dia o negócio decidir revê-las, é uma feature nova consciente.
+## Fora de escopo
 
-### D) Cadastro de regra sem armadilha de dessincronização
-Em `src/components/cartao-beneficios/regras-tab.tsx`:
-- Ao editar `percentual`, se `percentual_cartao` estiver igual (ou nulo), continua espelhando; se estiver divergente, avisar com um badge "% cartão fixado em X" e um botão "sincronizar com dinheiro".
-- Mesma lógica para `valor` / `valor_cartao`.
-- Ao lado dos campos, mostrar em tempo real o R$ resultante para uma base de referência do procedimento selecionado (quando houver serviço), para o operador nunca cadastrar no escuro.
-
-### E) Memória de cálculo no modal de pagamento
-- No modal "Forma de pagamento" da Agenda, abaixo de cada linha (Dinheiro / Pix / Débito / Crédito) exibir em texto pequeno: base usada, regra que bateu (nome + prioridade) e a operação: p.ex. `R$ 130 − 10% = R$ 117 (Regra "RM Crânio", prio 10, base cartão)`. Isso encerra o "não bate" no ponto onde ele aparece.
-
-### F) Consertar multi-exame com regra escalar
-- No fluxo multi-procedimento (imagem/laboratório) em `app.agenda.tsx` linhas 4269–4325, resolver a regra e o desconto **por procedimento** e somar já com desconto, em vez de aplicar uma única regra ao total. Regras de `valor_fixo` deixam de virar "R$ 80 para 3 exames" e passam a ser R$ 80 × 3.
-
----
-
-## Validação
-- Antes/depois, para 3 casos típicos: (i) regra de % com bases dinheiro/cartão diferentes, (ii) regra de valor_fixo com valor cartão diferente, (iii) multi-exame de imagem com regras diferentes por procedimento.
-- Conferir que a grid do cadastro de Procedimentos e o modal da Agenda mostram o mesmo valor final para o mesmo (procedimento × convênio).
-- Rodar audit-query nas 3 clínicas confirmando que `cb_convenios.acrescimo_cartao_modo` continua nulo em todos e que nenhum caminho de código ainda o consulta.
-
-## Fora de escopo desta rodada
-- Redesenhar a tela de regras.
-- Reajustar em massa regras já cadastradas (as regras existentes ficam como estão — o operador continua livre para editar).
-
-## Riscos
-- Depois do deploy, o valor exibido na grid do cadastro de Procedimentos passa a **coincidir** com o cobrado na Agenda — ou seja, algumas regras que hoje mostram um valor mas cobram outro **vão passar a mostrar o valor real cobrado**. Recomendo comunicar as clínicas para que revisem as regras antes.
-- Remoção do acréscimo legado é segura hoje (nenhum convênio usa), mas se algum operador acabou de habilitar em algum convênio das 3 clínicas, essa configuração para de ter efeito — substituto correto é usar `valor_cartao`/`percentual_cartao` na regra.
+- Não altero dados existentes das regras.
+- Não mexo em outros seletores do cadastro (Modo, Prioridade, Carência, Cortesia, Limite de uso, Grupo de gratuidade).
+- Não crio regra genérica automaticamente para convênios que não tenham — se faltar, é o admin que cadastra (a UI vai avisar).
