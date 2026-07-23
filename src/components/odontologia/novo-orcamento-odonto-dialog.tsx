@@ -454,14 +454,26 @@ export function NovoOrcamentoOdontoDialog({
                               value={it.quantidade}
                               onChange={(e) => atualizarItem(idx, "quantidade", Number(e.target.value))}
                             />
-                            <div className="space-y-0.5">
-                              <div className="text-[10px] text-muted-foreground">Dinheiro/PIX</div>
-                              <div className="text-sm tabular-nums">R$ {valDin.toFixed(2)}</div>
-                            </div>
-                            <div className="space-y-0.5">
-                              <div className="text-[10px] text-muted-foreground">Cartão</div>
-                              <div className="text-sm tabular-nums">R$ {valCart.toFixed(2)}</div>
-                            </div>
+                            {it.procedimento_id == null ? (
+                              <div className="space-y-0.5 md:col-span-2">
+                                <div className="text-[10px] text-muted-foreground">Valor unitário</div>
+                                <CurrencyInput
+                                  value={it.valor_unitario ? it.valor_unitario.toFixed(2) : ""}
+                                  onChange={(v) => atualizarItem(idx, "valor_unitario", v === "" ? 0 : Number(v))}
+                                />
+                              </div>
+                            ) : (
+                              <>
+                                <div className="space-y-0.5">
+                                  <div className="text-[10px] text-muted-foreground">Dinheiro/PIX</div>
+                                  <div className="text-sm tabular-nums">R$ {valDin.toFixed(2)}</div>
+                                </div>
+                                <div className="space-y-0.5">
+                                  <div className="text-[10px] text-muted-foreground">Cartão</div>
+                                  <div className="text-sm tabular-nums">R$ {valCart.toFixed(2)}</div>
+                                </div>
+                              </>
+                            )}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Subtotal deste item: <span className="font-medium text-foreground">R$ {sub.toFixed(2)}</span>
