@@ -4760,7 +4760,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </div>
                 <Button size="sm" onClick={() => printContrato(contrato.id)}>
                   <Printer className="h-4 w-4 mr-1" />
-                  Imprimir A4
+                  Imprimir Contrato
                 </Button>
               </div>
               {contratoTexto ? (
