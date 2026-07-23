@@ -37,7 +37,9 @@ export function DentePicker({ value, onChange, disabled, inline, grade }: Props)
   };
   const limpar = () => onChange([]);
 
-  const arcada = <OdontogramaArcada value={value} onChange={onChange} disabled={disabled} />;
+  const arcada = (
+    <OdontogramaArcada value={value} onChange={onChange} disabled={disabled} semAcoes={inline} />
+  );
 
   const gradeQuadrados = (
     <div className="flex flex-col gap-2 select-none">
