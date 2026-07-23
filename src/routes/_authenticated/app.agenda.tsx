@@ -1453,6 +1453,90 @@ function AgendaPage() {
   const [editarPacienteData, setEditarPacienteData] = useState<PacienteFull | null>(null);
   const [editarPacienteLoading, setEditarPacienteLoading] = useState(false);
   const podeEditarCliente = usePodeEscrever("clientes");
+  type PacInfoEdit = {
+    cpf: string;
+    data_nascimento: string;
+    telefone: string;
+    email: string;
+    logradouro: string;
+    numero: string;
+    bairro: string;
+    cidade: string;
+    estado: string;
+  };
+  const emptyPacEdit: PacInfoEdit = {
+    cpf: "",
+    data_nascimento: "",
+    telefone: "",
+    email: "",
+    logradouro: "",
+    numero: "",
+    bairro: "",
+    cidade: "",
+    estado: "",
+  };
+  const [pacEdit, setPacEdit] = useState<PacInfoEdit>(emptyPacEdit);
+  const [pacEditSaving, setPacEditSaving] = useState(false);
+  useEffect(() => {
+    if (pacInfo) {
+      setPacEdit({
+        cpf: pacInfo.cpf ?? "",
+        data_nascimento: pacInfo.data_nascimento ?? "",
+        telefone: pacInfo.telefone ?? "",
+        email: pacInfo.email ?? "",
+        logradouro: pacInfo.logradouro ?? "",
+        numero: pacInfo.numero ?? "",
+        bairro: pacInfo.bairro ?? "",
+        cidade: pacInfo.cidade ?? "",
+        estado: pacInfo.estado ?? "",
+      });
+    } else {
+      setPacEdit(emptyPacEdit);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pacInfo]);
+  const pacEditDirty = useMemo(() => {
+    if (!pacInfo) return false;
+    const orig: PacInfoEdit = {
+      cpf: pacInfo.cpf ?? "",
+      data_nascimento: pacInfo.data_nascimento ?? "",
+      telefone: pacInfo.telefone ?? "",
+      email: pacInfo.email ?? "",
+      logradouro: pacInfo.logradouro ?? "",
+      numero: pacInfo.numero ?? "",
+      bairro: pacInfo.bairro ?? "",
+      cidade: pacInfo.cidade ?? "",
+      estado: pacInfo.estado ?? "",
+    };
+    return (Object.keys(orig) as (keyof PacInfoEdit)[]).some(
+      (k) => (pacEdit[k] ?? "").trim() !== (orig[k] ?? "").trim(),
+    );
+  }, [pacInfo, pacEdit]);
+  const salvarPacEditRapido = async () => {
+    if (!pacInfo?.id || !pacEditDirty) return;
+    setPacEditSaving(true);
+    try {
+      const patch: Record<string, any> = {
+        cpf: pacEdit.cpf.trim() || null,
+        data_nascimento: pacEdit.data_nascimento.trim() || null,
+        telefone: pacEdit.telefone.trim() || null,
+        email: pacEdit.email.trim() || null,
+        logradouro: pacEdit.logradouro.trim() || null,
+        numero: pacEdit.numero.trim() || null,
+        bairro: pacEdit.bairro.trim() || null,
+        cidade: pacEdit.cidade.trim() || null,
+        estado: pacEdit.estado.trim().toUpperCase().slice(0, 2) || null,
+      };
+      const { error } = await supabase.from("pacientes").update(patch).eq("id", pacInfo.id);
+      if (error) throw error;
+      setPacInfo({ ...pacInfo, ...patch });
+      toast.success("Dados atualizados.");
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setPacEditSaving(false);
+    }
+  };
   const abrirEditarPacienteInline = async (pacienteId: string) => {
     setEditarPacienteLoading(true);
     setEditarPacienteOpen(true);
