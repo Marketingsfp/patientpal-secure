@@ -1051,6 +1051,62 @@ function NovaRegraDialog({
 
   const upd = (patch: Partial<CbRegra>) => setR(prev => ({ ...prev, ...patch }));
 
+  // Regra "base" por especialidade deste convênio para o procedimento selecionado.
+  // Serve para avisar o operador (e pré-preencher) que ao salvar uma regra por
+  // procedimento, ele está sobrescrevendo o preço cartão/PIX do convênio.
+  const [regraBase, setRegraBase] = useState<{
+    valor: number | null;
+    valor_cartao: number | null;
+    especialidade_nome: string;
+  } | null>(null);
+  const [valorCartaoTocado, setValorCartaoTocado] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!r.procedimento_id) { setRegraBase(null); return; }
+    let cancel = false;
+    (async () => {
+      // especialidades do procedimento
+      const { data: pes } = await (supabase as any)
+        .from("procedimento_especialidades")
+        .select("especialidade_id, especialidades(nome)")
+        .eq("procedimento_id", r.procedimento_id);
+      const espIds = (pes ?? []).map((x: any) => x.especialidade_id);
+      if (!espIds.length) { if (!cancel) setRegraBase(null); return; }
+      const { data: regras } = await (supabase as any)
+        .from("cb_convenio_regras")
+        .select("valor, valor_cartao, especialidade_id, prioridade")
+        .eq("convenio_id", convenioId)
+        .in("especialidade_id", espIds)
+        .is("procedimento_id", null)
+        .eq("modo", "valor_fixo")
+        .eq("ativo", true)
+        .eq("gratuito", false)
+        .order("prioridade", { ascending: false });
+      const escolhida = (regras ?? []).find(
+        (x: any) => x.valor_cartao != null && Number(x.valor_cartao) > 0
+      ) ?? (regras ?? [])[0];
+      if (!escolhida) { if (!cancel) setRegraBase(null); return; }
+      const espNome =
+        (pes ?? []).find((x: any) => x.especialidade_id === escolhida.especialidade_id)
+          ?.especialidades?.nome ?? "especialidade";
+      if (cancel) return;
+      setRegraBase({
+        valor: escolhida.valor != null ? Number(escolhida.valor) : null,
+        valor_cartao: escolhida.valor_cartao != null ? Number(escolhida.valor_cartao) : null,
+        especialidade_nome: espNome,
+      });
+      // Pré-preenche valor_cartao se estiver vazio/zerado e o usuário ainda não digitou
+      if (!isEdit && !valorCartaoTocado && (r.valor_cartao == null || Number(r.valor_cartao) === 0)) {
+        if (escolhida.valor_cartao != null && Number(escolhida.valor_cartao) > 0) {
+          setR(prev => ({ ...prev, valor_cartao: Number(escolhida.valor_cartao) }));
+        }
+      }
+    })();
+    return () => { cancel = true; };
+    /* eslint-disable-next-line */
+  }, [open, r.procedimento_id, convenioId]);
+
   const procOptsFiltrados = useMemo(() => {
     if (!r.tipo) return procOpts;
     const t = r.tipo.toLowerCase();
@@ -1067,6 +1123,32 @@ function NovaRegraDialog({
   })();
 
   const salvarNovo = async () => {
+    // Guarda: se o operador está criando/editando uma regra por procedimento e
+    // deixou o valor cartão/PIX igual ao dinheiro (ou zero) enquanto existe uma
+    // regra por especialidade do convênio com valor cartão diferente, confirma
+    // antes de sobrescrever silenciosamente o benefício do cartão.
+    if (
+      r.modo === "valor_fixo" &&
+      r.procedimento_id &&
+      !r.gratuito &&
+      regraBase &&
+      regraBase.valor_cartao != null &&
+      regraBase.valor_cartao > 0
+    ) {
+      const vc = r.valor_cartao != null ? Number(r.valor_cartao) : 0;
+      const vd = Number(r.valor) || 0;
+      const cartaoDivergente = Math.abs(vc - regraBase.valor_cartao) > 0.009;
+      const cartaoIgualDinheiro = Math.abs(vc - vd) < 0.009;
+      if (cartaoDivergente && (cartaoIgualDinheiro || vc === 0)) {
+        const ok = window.confirm(
+          `Atenção: a regra por especialidade (${regraBase.especialidade_nome}) deste convênio ` +
+          `usa R$ ${regraBase.valor_cartao.toFixed(2)} no cartão/PIX. ` +
+          `Você está salvando este serviço com R$ ${vc.toFixed(2)} no cartão/PIX, ` +
+          `o que substitui o preço do convênio.\n\nDeseja continuar mesmo assim?`
+        );
+        if (!ok) return;
+      }
+    }
     setSaving(true);
     const payload: any = {
       clinica_id: clinicaId,
