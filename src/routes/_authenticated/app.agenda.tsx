@@ -1120,6 +1120,7 @@ function AgendaPage() {
   const [page, setPage] = useState(1);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<Agendamento[]>([]);
+  const [fichaBaseItems, setFichaBaseItems] = useState<Agendamento[]>([]);
   const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
   const [pagoInfoMap, setPagoInfoMap] = useState<Map<string, { valor: number; forma: string | null }>>(new Map());
   // Mapa agendamento_id → NFS-e mais recente (id/status/url_pdf).
@@ -1889,11 +1890,11 @@ function AgendaPage() {
     if (!clinicaAtual) return;
     const reqId = ++loadReqId.current;
     setLoading(true);
+    const agendaSelect =
+      "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
     let q = supabase
       .from("agendamentos")
-      .select(
-        "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as never,
-      )
+      .select(agendaSelect as never)
       .eq("clinica_id", clinicaAtual.clinica_id)
       .order("inicio", { ascending: apenasData ? false : true });
     // "agendado" agora significa "qualquer ficha com paciente alocado",
@@ -1930,6 +1931,7 @@ function AgendaPage() {
         if (reqId !== loadReqId.current) return;
         setLoading(false);
         setItems([]);
+        setFichaBaseItems([]);
         setPage(1);
         return;
       }
@@ -1972,22 +1974,87 @@ function AgendaPage() {
       mostrarErro(error);
       return;
     }
-    const mapped = (
+    const mapAgendaRows = (
+      rows: Array<
+        Agendamento & {
+          medico?: { nome: string | null; sexo: string | null } | null;
+          orcamento?: { numero: number | null } | null;
+        }
+      >,
+    ): Agendamento[] =>
+      rows.map((a) => ({
+        ...a,
+        paciente_nome: isSlotLivre(a.paciente_nome) ? "DISPONÍVEL" : a.paciente_nome,
+        medico_id: a.medico_id ?? null,
+        medico_nome: a.medico_nome ?? a.medico?.nome ?? null,
+        medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
+        orcamento_numero: a.orcamento_numero ?? a.orcamento?.numero ?? null,
+      }));
+
+    const mapped = mapAgendaRows(
       (data ?? []) as unknown as Array<
         Agendamento & {
           medico?: { nome: string | null; sexo: string | null } | null;
           orcamento?: { numero: number | null } | null;
         }
-      >
-    ).map((a) => ({
-      ...a,
-      paciente_nome: isSlotLivre(a.paciente_nome) ? "DISPONÍVEL" : a.paciente_nome,
-      medico_id: a.medico_id ?? null,
-      medico_nome: a.medico_nome ?? a.medico?.nome ?? null,
-      medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
-      orcamento_numero: a.orcamento_numero ?? a.orcamento?.numero ?? null,
-    }));
+      >,
+    );
+
+    let fichaBaseMapped = mapped;
+    const buscaClienteServidor = digitosCli.length >= 3 || termoCli.length >= 2;
+    if (buscaClienteServidor && mapped.length > 0) {
+      let fichaQ = supabase
+        .from("agendamentos")
+        .select(agendaSelect as never)
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .order("inicio", { ascending: true });
+
+      if (filtroMedico !== "todos") {
+        fichaQ = fichaQ.eq("medico_id", filtroMedico);
+      }
+
+      if (apenasData) {
+        const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
+        const fim = new Date(`${dataRef}T23:59:59`).toISOString();
+        fichaQ = fichaQ.gte("inicio", inicio).lte("inicio", fim);
+      } else {
+        const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
+        fichaQ = fichaQ.gte("inicio", inicio);
+        if (dataFim) {
+          const fim = new Date(`${dataFim}T23:59:59`).toISOString();
+          fichaQ = fichaQ.lte("inicio", fim);
+        } else {
+          const ultimoDiaEncontrado = [...mapped]
+            .map((a) =>
+              new Date(a.inicio).toLocaleDateString("en-CA", {
+                timeZone: "America/Sao_Paulo",
+              }),
+            )
+            .sort()
+            .at(-1);
+          if (ultimoDiaEncontrado) {
+            const fim = new Date(`${ultimoDiaEncontrado}T23:59:59`).toISOString();
+            fichaQ = fichaQ.lte("inicio", fim);
+          }
+        }
+      }
+
+      const { data: fichaData, error: fichaError } = await fichaQ.range(0, 9999);
+      if (reqId !== loadReqId.current) return;
+      if (!fichaError) {
+        fichaBaseMapped = mapAgendaRows(
+          (fichaData ?? []) as unknown as Array<
+            Agendamento & {
+              medico?: { nome: string | null; sexo: string | null } | null;
+              orcamento?: { numero: number | null } | null;
+            }
+          >,
+        );
+      }
+    }
+
     setItems(mapped as Agendamento[]);
+    setFichaBaseItems(fichaBaseMapped as Agendamento[]);
     setPage(1);
     setSelecionados(new Set());
     const agendaRows = (mapped ?? []) as unknown as Array<Agendamento & { fluxo_etapa?: string | null }>;
@@ -2825,7 +2892,8 @@ function AgendaPage() {
     // esses números — sempre calculamos sobre TODOS os items carregados, para
     // que a ficha exibida seja estável entre reloads e entre filtros.
     const contadores = new Map<string, number>();
-    const ordenados = [...items].sort((a, b) => {
+    const baseNumeracao = fichaBaseItems.length > 0 ? fichaBaseItems : items;
+    const ordenados = [...baseNumeracao].sort((a, b) => {
       const t = a.inicio.localeCompare(b.inicio);
       if (t !== 0) return t;
       // Mesmo horário: desempata em ordem alfabética do paciente (pt-BR,
@@ -2857,7 +2925,7 @@ function AgendaPage() {
       m.set(a.id, String(n).padStart(3, "0"));
     });
     return m;
-  }, [items]);
+  }, [items, fichaBaseItems]);
 
   const filtrados = useMemo(() => {
     return items.filter((a) => {
