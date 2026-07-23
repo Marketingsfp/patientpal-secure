@@ -1072,6 +1072,16 @@ function Page() {
                             <Undo2 className="h-3.5 w-3.5 text-amber-600" />
                           </Button>
                         ) : null}
+                        {podeEstornar && l.origem === "caixa" && l.caixaTipo === "sangria" ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Solicitar estorno da sangria — gera pedido para o Financeiro aprovar (compensação por suprimento)."
+                            onClick={() => setEstornoSangria(l)}
+                          >
+                            <Undo2 className="h-3.5 w-3.5 text-amber-600" />
+                          </Button>
+                        ) : null}
                         {podeEscrever && l.origem !== "caixa" ? (
                           <>
                             <Button variant="ghost" size="icon" title="Editar lançamento — alterar descrição, valor, categoria, conta ou forma de pagamento." onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
