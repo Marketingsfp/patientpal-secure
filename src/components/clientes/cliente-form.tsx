@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { descriptorDaFoto, registrarBiometriaPaciente } from "@/lib/biometria";
+import { useClinica } from "@/hooks/use-clinica";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export interface Paciente {
@@ -23,6 +24,7 @@ export interface Paciente {
   nome: string;
   cpf: string | null;
   numero_pasta: string | null;
+  codigo_prontuario?: string | null;
   telefone: string | null;
   telefone2: string | null;
   email: string | null;
@@ -44,7 +46,8 @@ export interface Paciente {
 }
 
 type FormState = {
-  nome: string; cpf: string; numero_pasta: string; telefone: string; telefone2: string; email: string;
+  nome: string; cpf: string; numero_pasta: string; codigo_prontuario: string;
+  telefone: string; telefone2: string; email: string;
   data_nascimento: string; sexo: string; ativo: boolean;
   cep: string; logradouro: string; numero: string; complemento: string;
   bairro: string; cidade: string; estado: string;
@@ -53,7 +56,8 @@ type FormState = {
 };
 
 const EMPTY: FormState = {
-  nome: "", cpf: "", numero_pasta: "", telefone: "", telefone2: "", email: "",
+  nome: "", cpf: "", numero_pasta: "", codigo_prontuario: "",
+  telefone: "", telefone2: "", email: "",
   data_nascimento: "", sexo: "nao_informar", ativo: true,
   cep: "", logradouro: "", numero: "", complemento: "",
   bairro: "", cidade: "", estado: "",
