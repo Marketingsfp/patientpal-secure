@@ -1026,6 +1026,8 @@ function NovaRegraDialog({
     modo: "valor_fixo",
     valor: 0,
     percentual: null,
+    valor_cartao: 0,
+    percentual_cartao: null,
     prioridade: 10,
     ativo: true,
     limite_qtd: null,
