@@ -365,21 +365,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         if (page.length < PAGE) break;
       }
 
-      // 1.5) Carrega acréscimo de cartão do convênio (aplicado sobre valor_outros
-      // quando NÃO for Convênio Funcionário).
-      const { data: convRow } = await (supabase as any)
-        .from("cb_convenios")
-        .select("acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor")
-        .eq("id", convenioId)
-        .maybeSingle();
-      const acr: CbAcrescimoCartao | null = convRow?.acrescimo_cartao_modo
-        ? {
-            modo: convRow.acrescimo_cartao_modo,
-            percentual: Number(convRow.acrescimo_cartao_percentual) || 0,
-            valor: Number(convRow.acrescimo_cartao_valor) || 0,
-          }
-        : null;
-
       // 2) carrega vínculos N:N de especialidades
       const { data: vinc, error: errVinc } = await supabase
         .from("procedimento_especialidades")
@@ -428,13 +413,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           }
         }
         if (best) {
-          const outrosComAcr = applyAcrescimoCartao(best.outros, acr, convenioNome);
           upserts.push({
             clinica_id: clinicaId,
             procedimento_id: p.id,
             convenio_id: convenioId,
             valor_dinheiro: best.dinheiro,
-            valor_outros: outrosComAcr,
+            valor_outros: best.outros,
             origem: "regra",
           });
         }
