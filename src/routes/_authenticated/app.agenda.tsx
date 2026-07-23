@@ -43,6 +43,7 @@ import { PatientQuickCompleteSheet } from "@/components/patient-quick-complete-s
 import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
 import { useTurboDisabled } from "@/hooks/use-turbo-disabled";
 import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/dividir-orcamento-dialog";
+import { SelecionarItensOrcamentoDialog, type SelectItemOrc } from "@/components/agenda/selecionar-itens-orcamento-dialog";
 import { calcularAvisoLimitePendentes } from "@/lib/agenda/aviso-limite-pendentes";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
