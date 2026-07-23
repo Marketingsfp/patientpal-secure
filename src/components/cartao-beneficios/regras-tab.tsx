@@ -342,6 +342,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     setLoading(false);
     toast.success("Regras salvas.");
     await load();
+    // Sincroniza automaticamente o cache procedimento_cb_convenio_valores
+    // para outros consumidores (backup, relatórios). Não bloqueia o toast:
+    // roda em background silencioso — sem confirm() e sem toast final.
+    void reaplicar({ silent: true }).catch(() => {});
   };
 
   /**
@@ -350,11 +354,14 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
    * para consultas N:N, ou via campo grupo) e o tipo, calcula o valor e
    * faz upsert em procedimento_cb_convenio_valores.
    */
-  const reaplicar = async () => {
+  const reaplicar = async (opts?: { silent?: boolean }) => {
+    const silent = !!opts?.silent;
     if (!convenioId) return;
-    if (!confirm(`Reaplicar as regras de "${convenioNome}" a todos os serviços? Valores manuais serão sobrescritos onde houver regra correspondente, e valores calculados por regras antigas (removidas ou alteradas) serão limpos.`)) return;
-    setReapplying(true);
-    setProgress("Carregando serviços…");
+    if (!silent && !confirm(`Reaplicar as regras de "${convenioNome}" a todos os serviços? Valores manuais serão sobrescritos onde houver regra correspondente, e valores calculados por regras antigas (removidas ou alteradas) serão limpos.`)) return;
+    if (!silent) {
+      setReapplying(true);
+      setProgress("Carregando serviços…");
+    }
     try {
       // 1) carrega procedimentos (paginado, db-max-rows = 1000)
       const PAGE = 1000;
@@ -390,7 +397,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       especialidades.forEach(e => espByName.set(norm(e.nome), e.id));
 
       // 4) calcula valores
-      setProgress(`Processando ${procs.length} serviços…`);
+      if (!silent) setProgress(`Processando ${procs.length} serviços…`);
       const upserts: any[] = [];
       for (const p of procs) {
         const baseDin = Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao) || 0;
@@ -434,7 +441,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       // isso, um procedimento que deixou de casar com qualquer regra (regra
       // removida ou alterada) ficava com o preço antigo indefinidamente.
       // Valores digitados manualmente (origem='manual') não são tocados.
-      setProgress("Limpando valores calculados anteriores…");
+      if (!silent) setProgress("Limpando valores calculados anteriores…");
       const { error: errClear } = await (supabase as any)
         .from("procedimento_cb_convenio_valores")
         .delete()
@@ -447,18 +454,21 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       const BATCH = 500;
       for (let i = 0; i < upserts.length; i += BATCH) {
         const slice = upserts.slice(i, i + BATCH);
-        setProgress(`Gravando ${i + slice.length}/${upserts.length}…`);
+        if (!silent) setProgress(`Gravando ${i + slice.length}/${upserts.length}…`);
         const { error } = await (supabase as any)
           .from("procedimento_cb_convenio_valores")
           .upsert(slice, { onConflict: "procedimento_id,convenio_id" });
         if (error) throw error;
       }
-      toast.success(`Regras aplicadas a ${upserts.length} serviços.`);
+      if (!silent) toast.success(`Regras aplicadas a ${upserts.length} serviços.`);
     } catch (err: any) {
-      mostrarErro(err);
+      if (!silent) mostrarErro(err);
+      else console.warn("[reaplicar silent]", err);
     } finally {
-      setReapplying(false);
-      setProgress("");
+      if (!silent) {
+        setReapplying(false);
+        setProgress("");
+      }
     }
   };
 
