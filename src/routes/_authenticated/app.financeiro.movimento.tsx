@@ -1118,6 +1118,14 @@ function Page() {
           })() : null}
           </>}
       </CardContent></Card>
+      <SolicitarEstornoDialog
+        open={!!estornoSangria}
+        onOpenChange={(v) => { if (!v) setEstornoSangria(null); }}
+        descricao={estornoSangria?.descricao ?? null}
+        valor={estornoSangria ? Number(estornoSangria.valor) : null}
+        caixaMovimentoId={estornoSangria?.id ?? null}
+        onCreated={() => { setEstornoSangria(null); load(); }}
+      />
     </div>
   );
 }
