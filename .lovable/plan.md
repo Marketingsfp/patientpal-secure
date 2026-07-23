@@ -1,30 +1,33 @@
-## Causa
-
-A renovação do contrato do paciente **RODRIGO SABADIM SANTANA DA SILVA** falhou porque foi acionado o fluxo de **Renovar contrato atual** (extensão, mesmo convênio), que chama a função `renovar_contrato_extensao` no banco. Essa função tenta gravar o histórico da renovação usando nomes de coluna que **não existem** na tabela `contrato_renovacoes`.
-
-Colunas reais da tabela: `contrato_id`, `contrato_novo_id`, `tipo`, `convenio_anterior_id`, `convenio_novo_id`, `valor_anterior`, `valor_novo`, `parcelas_geradas`, `periodo_inicio`, `periodo_fim`, `usuario_id`, `observacao`, `dependentes_incluidos`.
-
-A função está tentando inserir em: `contrato_original_id`, `contrato_novo_id`, `tipo`, `periodo_inicio`, `periodo_fim`, `valor_mensal`, `num_parcelas`, `observacao`, `criado_por` — daí o erro `column "contrato_original_id" of relation "contrato_renovacoes" does not exist`.
-
-Como a função roda numa única transação, o rollback desfez tudo (não gerou mensalidades, não atualizou `data_fim`), o número do contrato continua o mesmo (o fluxo de extensão nem cria contrato novo — apenas prorroga o atual, exatamente como você quer).
-
-O fluxo de "Troca de convênio" (`renovar_contrato_troca_plano`) já usa os nomes corretos e não é afetado.
-
-## Correção proposta
-
-Uma única migração ajustando **apenas o INSERT final** da função `renovar_contrato_extensao` para usar as colunas corretas:
-
-- `contrato_original_id` → `contrato_id`
-- `valor_mensal` → `valor_novo` (e preencher também `valor_anterior` com `v_contrato.valor_mensal`)
-- `num_parcelas` → `parcelas_geradas`
-- `criado_por` → `usuario_id`
-- Incluir `clinica_id` (obrigatório na tabela) e `convenio_anterior_id` / `convenio_novo_id` iguais (é o mesmo convênio, é uma extensão)
-
-Nenhuma outra lógica da função é alterada: continua prorrogando o mesmo contrato, mantendo o **mesmo número**, gerando novas 12 parcelas a partir do dia de vencimento, tratando dependentes e taxa de inclusão exatamente como hoje.
-
-Aplica em todas as 3 clínicas (é correção puramente técnica de coluna; sem regra de negócio nova). Após aplicar, refaço a renovação do contrato do RODRIGO para validar.
+## Objetivo
+No orçamento da Odontologia, exibir os valores separados por grupo de pagamento — **Dinheiro/PIX** e **Cartão** — tanto no painel lateral (drawer) quanto no cupom de impressão. Aplicar nas 3 clínicas.
 
 ## Escopo
+- Frontend/apresentação apenas. Nenhuma mudança de banco, regra de negócio ou de cálculo.
+- Os itens do orçamento odonto já são salvos com `valores_formas` (chaves: `Dinheiro`, `PIX`, `Cartão de Crédito`, `Cartão de Débito`) pelo `novo-orcamento-odonto-dialog.tsx`. A alteração apenas passa a ler esses valores em dois lugares onde hoje só aparece um total.
 
-- Dentro: migração corrigindo o `INSERT INTO contrato_renovacoes` dentro de `renovar_contrato_extensao`.
-- Fora: nada de frontend, nada em `renovar_contrato_troca_plano`, nada na estrutura da tabela `contrato_renovacoes`.
+## Alterações
+
+### 1. `src/components/orcamentos-v2/orcamento-drawer.tsx`
+- Passar a ler também `valores_formas` e `quantidade` de `orcamento_itens`.
+- Quando o item tiver `valores_formas` com Dinheiro/PIX e Cartão distintos, mostrar duas colunas por item (Dinheiro/PIX e Cartão) em vez de um valor único.
+- Substituir o campo "Valor total" único por dois totais no cabeçalho: **Total Dinheiro/PIX** e **Total Cartão**, calculados somando `quantidade × valores_formas[forma]` (Dinheiro/PIX = maior entre Dinheiro e PIX se ambos existirem; Cartão = maior entre Crédito e Débito).
+- Fallback: se o item não tiver `valores_formas` (orçamentos não-odonto ou antigos), manter o layout atual com um único total.
+
+### 2. `src/lib/print-orcamento.ts`
+- Já lê `valores_formas` para o bloco de "PAGAMENTO (escolha uma forma)" quando há múltiplas formas.
+- Ajuste: no rodapé de totais, quando os itens tiverem `valores_formas` com Dinheiro/PIX e Cartão, imprimir duas linhas:
+  - `TOTAL DINHEIRO/PIX  ..... R$ x`
+  - `TOTAL CARTÃO        ..... R$ y`
+  em vez de uma única linha `TOTAL`.
+- Manter `SUBTOTAL` e `DESCONTO` como estão.
+- Se os itens não tiverem `valores_formas` (orçamentos não-odonto ou antigos), manter o `TOTAL` único atual — nada muda para os demais fluxos.
+
+## Fora do escopo
+- Alterar como o orçamento é criado ou como `valor_total` é gravado no banco.
+- Mexer em impressões/telas de orçamentos não-odonto.
+- Módulos de Caixa, NFS-e, contratos etc.
+
+## Validação
+- Abrir o orçamento #ORC-202600084 (QUEDIMA SUELEN) no drawer: conferir os dois totais.
+- Imprimir o mesmo orçamento e conferir o rodapé com as duas linhas.
+- Abrir um orçamento não-odonto (ex.: um do módulo Orçamentos comum) e confirmar que o layout antigo (um total único) permanece intacto.

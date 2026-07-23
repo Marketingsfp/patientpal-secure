@@ -44,6 +44,33 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
   const desconto = Number(o.desconto || 0);
   const total = Number(o.valor_total || subtotal - desconto);
 
+  // Odonto: quando os itens têm valores_formas com Dinheiro/PIX vs Cartão,
+  // apresentar dois totais em vez de um único.
+  const splitFormas = (i: any): { din: number; cart: number } | null => {
+    const vf = i.valores_formas as Record<string, number> | null | undefined;
+    if (!vf) return null;
+    const din = Math.max(Number(vf["Dinheiro"] ?? 0), Number(vf["PIX"] ?? 0));
+    const cart = Math.max(
+      Number(vf["Cartão de Crédito"] ?? 0),
+      Number(vf["Cartão de Débito"] ?? 0),
+      Number(vf["Cartão"] ?? 0),
+    );
+    if (!din && !cart) return null;
+    if (din === cart) return null;
+    return { din, cart };
+  };
+  const temSplit = its.some((i) => splitFormas(i));
+  const totalDinheiro = its.reduce((s, i) => {
+    const sp = splitFormas(i);
+    const v = sp ? sp.din : Number(i.valor_unitario || 0);
+    return s + Number(i.quantidade || 0) * v;
+  }, 0) - (temSplit ? desconto : 0);
+  const totalCartao = its.reduce((s, i) => {
+    const sp = splitFormas(i);
+    const v = sp ? sp.cart : Number(i.valor_unitario || 0);
+    return s + Number(i.quantidade || 0) * v;
+  }, 0) - (temSplit ? desconto : 0);
+
   const formasList: string[] = o.forma_pagamento
     ? String(o.forma_pagamento).split("+").map((s: string) => s.trim()).filter(Boolean)
     : [];
@@ -125,9 +152,13 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
 
     <div class="sep"></div>
     <table>
-      <tr><td>SUBTOTAL</td><td class="right">${fmtBRL(subtotal)}</td></tr>
-      ${desconto > 0 ? `<tr><td>DESCONTO</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
-      <tr class="bold lg"><td>TOTAL</td><td class="right">${fmtBRL(total)}</td></tr>
+      ${temSplit
+        ? `${desconto > 0 ? `<tr><td>DESCONTO</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
+           <tr class="bold lg"><td>DINHEIRO/PIX</td><td class="right">${fmtBRL(totalDinheiro)}</td></tr>
+           <tr class="bold lg"><td>CARTÃO</td><td class="right">${fmtBRL(totalCartao)}</td></tr>`
+        : `<tr><td>SUBTOTAL</td><td class="right">${fmtBRL(subtotal)}</td></tr>
+           ${desconto > 0 ? `<tr><td>DESCONTO</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
+           <tr class="bold lg"><td>TOTAL</td><td class="right">${fmtBRL(total)}</td></tr>`}
     </table>
 
     ${o.forma_pagamento ? (() => {
