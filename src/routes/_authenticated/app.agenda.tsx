@@ -1820,11 +1820,12 @@ function AgendaPage() {
       q = q.ilike("paciente_nome", `%${termo}%`);
     }
     if (apenasData) {
-      // "Exibir apenas a data selecionada" — restringe ao dia escolhido
-      // (ou ao intervalo, se o usuário definiu uma data final no picker).
+      // "Exibir apenas a data selecionada" — restringe estritamente ao dia
+      // escolhido em `dataRef`, IGNORANDO qualquer `dataFim` do picker de
+      // intervalo. Os demais filtros (profissional, status, cliente etc.)
+      // seguem sendo aplicados normalmente.
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
-      const fimDia = dataFim ?? dataRef;
-      const fim = new Date(`${fimDia}T23:59:59`).toISOString();
+      const fim = new Date(`${dataRef}T23:59:59`).toISOString();
       q = q.gte("inicio", inicio).lte("inicio", fim);
     } else if (!statusEspecifico) {
       // Padrão "a partir de": mostra tudo do dia selecionado em diante.
