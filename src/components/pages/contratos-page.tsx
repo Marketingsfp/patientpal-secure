@@ -3176,7 +3176,7 @@ function DetalheContrato({
         ? `Taxa de adesão${convNome} — Contrato #${contrato.numero} — ${nomePac}`
         : `Mensalidade ${m.numero_parcela}/${mensalidades.length}${convNome} — Contrato #${contrato.numero} — ${nomePac}`;
       const descComDep = tomador.dependenteAtendido
-        ? `${rotulo} — Atendido: ${tomador.dependenteAtendido}`
+        ? `${rotulo} — Dependente do pagador: ${tomador.dependenteAtendido}`
         : rotulo;
       const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
       const descFinal = await pedirDescricaoNfse(descSugerida);

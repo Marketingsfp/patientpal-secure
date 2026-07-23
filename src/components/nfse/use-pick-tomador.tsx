@@ -80,6 +80,11 @@ export function usePickTomador() {
   const [terceiro, setTerceiro] = useState<TomadorPayload>({
     nome: "", cpfCnpj: "", email: "", cep: "", logradouro: "", numero: "", bairro: "", municipio: "", uf: "", dependenteAtendido: "",
   });
+  // "Dependente atendido" é compartilhado entre os dois modos (paciente e
+  // terceiro), porque também vale quando o titular financeiro paga a nota em
+  // nome de um dependente. Pré-preenchemos com o nome do paciente do
+  // agendamento como sugestão — o usuário pode limpar ou trocar antes de emitir.
+  const [dependenteAtendido, setDependenteAtendido] = useState<string>("");
   const resolverRef = useRef<((v: TomadorPayload | null) => void) | null>(null);
 
   const pick = useCallback(async (input: PickTomadorInput): Promise<TomadorPayload | null> => {
@@ -91,6 +96,7 @@ export function usePickTomador() {
     setPercentual(100);
     setErro("");
     setTerceiro({ nome: "", cpfCnpj: "", email: "", cep: "", logradouro: "", numero: "", bairro: "", municipio: "", uf: "", dependenteAtendido: "" });
+    setDependenteAtendido(input.paciente?.nome ?? "");
     return new Promise<TomadorPayload | null>((resolve) => {
       resolverRef.current = resolve;
       setOpen(true);
@@ -108,7 +114,13 @@ export function usePickTomador() {
       }
       const r = resolverRef.current; resolverRef.current = null;
       setOpen(false);
-      r?.({ ...paciente, percentualValor: pct });
+      r?.({
+        ...paciente,
+        percentualValor: pct,
+        dependenteAtendido: dependenteAtendido.trim() && dependenteAtendido.trim() !== (paciente.nome ?? "").trim()
+          ? dependenteAtendido.trim()
+          : undefined,
+      });
       return;
     }
 
@@ -134,7 +146,7 @@ export function usePickTomador() {
       bairro: terceiro.bairro?.trim() || undefined,
       municipio: terceiro.municipio?.trim() || undefined,
       uf: terceiro.uf?.trim() || undefined,
-      dependenteAtendido: terceiro.dependenteAtendido?.trim() || undefined,
+      dependenteAtendido: dependenteAtendido.trim() || undefined,
       percentualValor: pct,
     });
   };
@@ -224,22 +236,23 @@ export function usePickTomador() {
                 <Label>Município</Label>
                 <Input value={terceiro.municipio ?? ""} onChange={(e) => setTerceiro({ ...terceiro, municipio: e.target.value })} />
               </div>
-              <div className="sm:col-span-2 space-y-1">
-                <Label>Dependente atendido (opcional)</Label>
-                <Textarea
-                  rows={2}
-                  maxLength={200}
-                  placeholder="Nome do dependente / paciente efetivamente atendido"
-                  value={terceiro.dependenteAtendido ?? ""}
-                  onChange={(e) => setTerceiro({ ...terceiro, dependenteAtendido: e.target.value })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Aparecerá na descrição dos serviços da NFS-e.
-                </p>
-              </div>
             </div>
           </div>
         )}
+
+        <div className="space-y-1 border-t pt-3">
+          <Label>Dependente atendido (opcional)</Label>
+          <Textarea
+            rows={2}
+            maxLength={200}
+            placeholder="Nome do dependente / paciente efetivamente atendido"
+            value={dependenteAtendido}
+            onChange={(e) => setDependenteAtendido(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Se preenchido, aparecerá na descrição da NFS-e como "Dependente do pagador: …". Deixe em branco se o próprio tomador foi atendido.
+          </p>
+        </div>
 
         <div className="space-y-2 border-t pt-3">
           <Label>Emitir nota de quanto do valor?</Label>
