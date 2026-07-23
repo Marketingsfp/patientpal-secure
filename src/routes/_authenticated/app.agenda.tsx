@@ -360,22 +360,23 @@ function aplicarDescontoPorForma(valor: number, forma: string, d: DescontoConven
 }
 
 /**
- * Aplica o acréscimo configurado no convênio quando a forma de pagamento
- * NÃO é dinheiro (PIX, débito, crédito, etc.). Não afeta valores <= 0 nem
- * o Convênio Funcionário (checagem já feita antes de setar `acrescimoCartao`).
+ * Retorna a memória de cálculo do desconto aplicado a este canal, para
+ * exibir abaixo de cada opção do modal de "Forma de pagamento".
+ * Formato curto: "R$ 130 − 10% = R$ 117"  ou  "Valor fixo R$ 95".
  */
-function aplicarAcrescimoCartaoAgenda(
-  valor: number,
-  forma: string,
-  acr: NonNullable<ConvenioInfo["acrescimoCartao"]> | null | undefined,
-): number {
-  if (!acr || !acr.modo) return valor;
-  if (forma === "dinheiro") return valor;
-  if (!(valor > 0)) return valor;
-  const round2 = (n: number) => Math.round(n * 100) / 100;
-  if (acr.modo === "percentual") return round2(valor * (1 + (Number(acr.percentual) || 0) / 100));
-  if (acr.modo === "valor_fixo") return round2(valor + (Number(acr.valor) || 0));
-  return valor;
+function memoriaDescontoPorForma(baseValor: number, forma: string, d: DescontoConvenio): string {
+  const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  if (d.tipo === "gratuidade") return "Gratuidade (R$ 0,00)";
+  if (d.tipo === "valor_fixo") {
+    const v = forma === "dinheiro" ? Number(d.valor) : Number(d.valorOutros);
+    return `Valor fixo ${fmt(v || 0)}`;
+  }
+  if (d.tipo === "percentual") {
+    const pct = forma === "dinheiro" ? Number(d.valor) : Number(d.percentualOutros ?? d.valor);
+    const final = Math.max(0, baseValor * (1 - (pct || 0) / 100));
+    return `${fmt(baseValor)} − ${pct}% = ${fmt(final)}`;
+  }
+  return `${fmt(baseValor)} − ${fmt(Number(d.valor) || 0)}`;
 }
 
 async function obterInfoConvenioPaciente(params: {
@@ -1624,7 +1625,7 @@ function AgendaPage() {
     }
     setPacInfoLoading(false);
   };
-  type FormaOpcao = { forma: string; label: string; valor: number };
+  type FormaOpcao = { forma: string; label: string; valor: number; memoria?: string };
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [formaPagOpcoes, setFormaPagOpcoes] = useState<FormaOpcao[]>([]);
   const [formaPagCtx, setFormaPagCtx] = useState<{
@@ -4317,11 +4318,8 @@ function AgendaPage() {
         } else if (info.desconto) {
           opcoes = opcoes.map((o) => ({
             ...o,
-            valor: aplicarAcrescimoCartaoAgenda(
-              aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
-              o.forma,
-              info.acrescimoCartao,
-            ),
+            valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
+            memoria: memoriaDescontoPorForma(o.valor, o.forma, info.desconto!),
           }));
           const rotulo =
             info.desconto.tipo === "gratuidade"
@@ -4688,11 +4686,8 @@ function AgendaPage() {
         } else if (info.desconto) {
           opcoes = opcoes.map((o) => ({
             ...o,
-            valor: aplicarAcrescimoCartaoAgenda(
-              aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
-              o.forma,
-              info.acrescimoCartao,
-            ),
+            valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
+            memoria: memoriaDescontoPorForma(o.valor, o.forma, info.desconto!),
           }));
           const rotulo =
             info.desconto.tipo === "gratuidade"
@@ -6120,14 +6115,21 @@ function AgendaPage() {
               <Button
                 key={op.forma}
                 variant="outline"
-                className="justify-between h-12"
+                className="justify-between h-auto py-2"
                 onClick={() => escolherForma(op)}
               >
                 <span className="flex items-center gap-2">
                   <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border bg-muted text-xs font-mono">
                     {idx + 1}
                   </kbd>
-                  {op.label}
+                  <span className="flex flex-col items-start leading-tight">
+                    <span>{op.label}</span>
+                    {op.memoria ? (
+                      <span className="text-[10px] font-normal text-muted-foreground">
+                        {op.memoria}
+                      </span>
+                    ) : null}
+                  </span>
                 </span>
                 <span className="font-semibold">
                   {op.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
