@@ -134,6 +134,8 @@ interface ClienteFormProps {
 
 export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFooter, readOnly = false }: ClienteFormProps) {
   const editing = paciente;
+  const { clinicaAtual } = useClinica();
+  const isAdmin = clinicaAtual?.role === "admin";
   const [form, setForm] = useState<FormState>(EMPTY);
   const [tab, setTab] = useState("dados");
   const [saving, setSaving] = useState(false);
