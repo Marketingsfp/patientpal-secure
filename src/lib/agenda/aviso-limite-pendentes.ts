@@ -12,7 +12,7 @@
 export interface BeneficioAviso {
   gratuito?: boolean | null;
   limite_qtd?: number | null;
-  excedente_modo?: string | null; // "particular" | "percentual_particular" | "valor_fixo" | "bloquear"
+  excedente_modo?: string | null; // "particular" | "percentual_particular" | "valor_fixo" | "bloquear" | "regra_padrao_convenio"
   excedente_percentual?: number | null;
   excedente_valor?: number | null;
 }
@@ -66,6 +66,8 @@ export function calcularAvisoLimitePendentes(params: {
     excedenteTxt = `sairão pelo valor fixo excedente de R$ ${v.toFixed(2)}`;
   } else if (modo === "bloquear") {
     excedenteTxt = "serão bloqueados pelo convênio";
+  } else if (modo === "regra_padrao_convenio") {
+    excedenteTxt = "sairão pela regra padrão do convênio";
   }
   const total = pendentesRelevantes.length + 1;
   return `Existem ${total} agendamentos pendentes com este benefício no período. Apenas ${beneficio.limite_qtd} será cobrado com o benefício; os demais ${excedenteTxt} quando pagos.`;
