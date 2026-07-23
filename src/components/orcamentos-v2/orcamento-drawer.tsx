@@ -19,8 +19,9 @@ type Item = {
 function splitFormas(i: Item): { din: number; cart: number } | null {
   const vf = i.valores_formas;
   if (!vf) return null;
-  const din = Math.max(Number(vf["Dinheiro"] ?? 0), Number(vf["PIX"] ?? 0));
+  const din = Number(vf["Dinheiro"] ?? 0);
   const cart = Math.max(
+    Number(vf["PIX"] ?? 0),
     Number(vf["Cartão de Crédito"] ?? 0),
     Number(vf["Cartão de Débito"] ?? 0),
     Number(vf["Cartão"] ?? 0),
@@ -103,11 +104,11 @@ export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistoric
                 {temSplit ? (
                   <>
                     <div>
-                      <div className="text-xs text-muted-foreground">Total Dinheiro/PIX</div>
+                      <div className="text-xs text-muted-foreground">Total Dinheiro</div>
                       <div className="font-semibold">{BRL(totalDin)}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Total Cartão</div>
+                      <div className="text-xs text-muted-foreground">Total Cartão/PIX</div>
                       <div className="font-semibold">{BRL(totalCart)}</div>
                     </div>
                   </>
@@ -141,11 +142,11 @@ export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistoric
                           {sp && (
                             <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
                               <div className="flex justify-between rounded bg-muted/40 px-2 py-1">
-                                <span className="text-muted-foreground">Dinheiro/PIX</span>
+                                <span className="text-muted-foreground">Dinheiro</span>
                                 <span className="tabular-nums font-medium">{BRL(q * sp.din)}</span>
                               </div>
                               <div className="flex justify-between rounded bg-muted/40 px-2 py-1">
-                                <span className="text-muted-foreground">Cartão</span>
+                                <span className="text-muted-foreground">Cartão/PIX</span>
                                 <span className="tabular-nums font-medium">{BRL(q * sp.cart)}</span>
                               </div>
                             </div>
