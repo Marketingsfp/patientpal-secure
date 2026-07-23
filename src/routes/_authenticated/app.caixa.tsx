@@ -3657,7 +3657,9 @@ function Page() {
         descricao={estornoFor?.descricao ?? null}
         valor={estornoFor?.valor ?? null}
         lancamentoId={estornoFor?.lancamento_id ?? null}
+        caixaMovimentoId={estornoFor?.tipo === "sangria" ? estornoFor.id : null}
         pacienteNome={(() => {
+          if (estornoFor?.tipo === "sangria") return null;
           const d = estornoFor?.descricao ?? "";
           // Formato esperado: "NOME PACIENTE — PROCEDIMENTO"
           const idx = d.indexOf("—");
