@@ -908,28 +908,49 @@ function Page() {
   // às movimentações atuais para trocar o botão pelo rótulo
   // "Aguardando aprovação" quando o financeiro ainda não decidiu.
   const reloadEstornosPendentes = useCallback(async () => {
-    if (!clinicaAtual) { setEstornosPorLanc(new Map()); return; }
+    if (!clinicaAtual) {
+      setEstornosPorLanc(new Map());
+      setEstornosPorMov(new Map());
+      return;
+    }
     const ids = Array.from(new Set(
       minhasMovs.map((m) => m.lancamento_id).filter((x): x is string => !!x),
     ));
-    if (ids.length === 0) { setEstornosPorLanc(new Map()); return; }
-    const { data } = await supabase
+    const sangriaIds = Array.from(new Set(
+      minhasMovs.filter((m) => m.tipo === "sangria").map((m) => m.id),
+    ));
+    if (ids.length === 0 && sangriaIds.length === 0) {
+      setEstornosPorLanc(new Map());
+      setEstornosPorMov(new Map());
+      return;
+    }
+    let q = supabase
       .from("estorno_solicitacoes")
-      .select("lancamento_id, status")
+      .select("lancamento_id, caixa_movimento_id, status")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .in("lancamento_id", ids)
       .in("status", ["pendente", "aprovado"]);
-    const map = new Map<string, "pendente" | "aprovado">();
-    for (const r of (data ?? []) as Array<{ lancamento_id: string | null; status: string }>) {
-      if (!r.lancamento_id) continue;
-      // pendente prevalece sobre aprovado caso ambos existam
-      const prev = map.get(r.lancamento_id);
-      if (prev === "pendente") continue;
-      if (r.status === "pendente" || r.status === "aprovado") {
-        map.set(r.lancamento_id, r.status);
+    // OR entre os dois filtros de id (lancamento OU caixa_movimento).
+    const parts: string[] = [];
+    if (ids.length > 0) parts.push(`lancamento_id.in.(${ids.join(",")})`);
+    if (sangriaIds.length > 0) parts.push(`caixa_movimento_id.in.(${sangriaIds.join(",")})`);
+    q = q.or(parts.join(","));
+    const { data } = await q;
+    const mapLanc = new Map<string, "pendente" | "aprovado">();
+    const mapMov  = new Map<string, "pendente" | "aprovado">();
+    for (const r of (data ?? []) as Array<{ lancamento_id: string | null; caixa_movimento_id: string | null; status: string }>) {
+      const st = r.status === "pendente" || r.status === "aprovado" ? r.status : null;
+      if (!st) continue;
+      if (r.lancamento_id) {
+        const prev = mapLanc.get(r.lancamento_id);
+        if (prev !== "pendente") mapLanc.set(r.lancamento_id, st);
+      }
+      if (r.caixa_movimento_id) {
+        const prev = mapMov.get(r.caixa_movimento_id);
+        if (prev !== "pendente") mapMov.set(r.caixa_movimento_id, st);
       }
     }
-    setEstornosPorLanc(map);
+    setEstornosPorLanc(mapLanc);
+    setEstornosPorMov(mapMov);
   }, [clinicaAtual, minhasMovs]);
 
   useEffect(() => {
