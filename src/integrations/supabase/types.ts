@@ -3118,6 +3118,7 @@ export type Database = {
       estorno_solicitacoes: {
         Row: {
           agendamento_id: string | null
+          caixa_movimento_id: string | null
           clinica_id: string
           created_at: string
           data_estorno: string | null
@@ -3139,6 +3140,7 @@ export type Database = {
         }
         Insert: {
           agendamento_id?: string | null
+          caixa_movimento_id?: string | null
           clinica_id: string
           created_at?: string
           data_estorno?: string | null
@@ -3160,6 +3162,7 @@ export type Database = {
         }
         Update: {
           agendamento_id?: string | null
+          caixa_movimento_id?: string | null
           clinica_id?: string
           created_at?: string
           data_estorno?: string | null
@@ -8773,6 +8776,10 @@ export type Database = {
       }
       estornar_lancamento_receita: {
         Args: { _clinica_id: string; _lancamento_id: string }
+        Returns: Json
+      }
+      estornar_sangria: {
+        Args: { _clinica_id?: string; _movimento_id: string }
         Returns: Json
       }
       feature_flag_ativa: {
