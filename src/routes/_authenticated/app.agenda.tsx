@@ -6115,14 +6115,21 @@ function AgendaPage() {
               <Button
                 key={op.forma}
                 variant="outline"
-                className="justify-between h-12"
+                className="justify-between h-auto py-2"
                 onClick={() => escolherForma(op)}
               >
                 <span className="flex items-center gap-2">
                   <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border bg-muted text-xs font-mono">
                     {idx + 1}
                   </kbd>
-                  {op.label}
+                  <span className="flex flex-col items-start leading-tight">
+                    <span>{op.label}</span>
+                    {op.memoria ? (
+                      <span className="text-[10px] font-normal text-muted-foreground">
+                        {op.memoria}
+                      </span>
+                    ) : null}
+                  </span>
                 </span>
                 <span className="font-semibold">
                   {op.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
