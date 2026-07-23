@@ -1458,6 +1458,7 @@ function AgendaPage() {
     data_nascimento: string;
     telefone: string;
     email: string;
+    cep: string;
     logradouro: string;
     numero: string;
     bairro: string;
@@ -1469,6 +1470,7 @@ function AgendaPage() {
     data_nascimento: "",
     telefone: "",
     email: "",
+    cep: "",
     logradouro: "",
     numero: "",
     bairro: "",
@@ -1484,6 +1486,7 @@ function AgendaPage() {
         data_nascimento: pacInfo.data_nascimento ?? "",
         telefone: pacInfo.telefone ?? "",
         email: pacInfo.email ?? "",
+        cep: pacInfo.cep ?? "",
         logradouro: pacInfo.logradouro ?? "",
         numero: pacInfo.numero ?? "",
         bairro: pacInfo.bairro ?? "",
@@ -1502,6 +1505,7 @@ function AgendaPage() {
       data_nascimento: pacInfo.data_nascimento ?? "",
       telefone: pacInfo.telefone ?? "",
       email: pacInfo.email ?? "",
+      cep: pacInfo.cep ?? "",
       logradouro: pacInfo.logradouro ?? "",
       numero: pacInfo.numero ?? "",
       bairro: pacInfo.bairro ?? "",
@@ -1521,6 +1525,7 @@ function AgendaPage() {
         data_nascimento: pacEdit.data_nascimento.trim() || null,
         telefone: pacEdit.telefone.trim() || null,
         email: pacEdit.email.trim() || null,
+        cep: pacEdit.cep.replace(/\D/g, "").slice(0, 8) || null,
         logradouro: pacEdit.logradouro.trim() || null,
         numero: pacEdit.numero.trim() || null,
         bairro: pacEdit.bairro.trim() || null,
@@ -8149,6 +8154,42 @@ function AgendaPage() {
                 </div>
                 <div className="col-span-2 pt-1 text-xs font-medium text-muted-foreground">
                   Endereço
+                </div>
+                <div className="col-span-2 grid grid-cols-[130px_1fr] gap-2 items-end">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">CEP</Label>
+                    <Input
+                      value={pacEdit.cep}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/\D/g, "").slice(0, 8);
+                        const masked = raw.length > 5 ? `${raw.slice(0, 5)}-${raw.slice(5)}` : raw;
+                        setPacEdit((s) => ({ ...s, cep: masked }));
+                      }}
+                      onBlur={async () => {
+                        const digits = pacEdit.cep.replace(/\D/g, "");
+                        if (digits.length !== 8) return;
+                        try {
+                          const r = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+                          const j = await r.json();
+                          if (j && !j.erro) {
+                            setPacEdit((s) => ({
+                              ...s,
+                              logradouro: s.logradouro?.trim() ? s.logradouro : (j.logradouro ?? ""),
+                              bairro: s.bairro?.trim() ? s.bairro : (j.bairro ?? ""),
+                              cidade: s.cidade?.trim() ? s.cidade : (j.localidade ?? ""),
+                              estado: s.estado?.trim() ? s.estado : (j.uf ?? ""),
+                            }));
+                          }
+                        } catch {
+                          /* silencioso */
+                        }
+                      }}
+                      placeholder="00000-000"
+                      inputMode="numeric"
+                      className="h-8"
+                    />
+                  </div>
+                  <div />
                 </div>
                 <div className="col-span-2 grid grid-cols-[1fr_90px] gap-2">
                   <div className="space-y-1">
