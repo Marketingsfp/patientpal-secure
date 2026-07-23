@@ -8,6 +8,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 import { OdontogramaClinico, type FacesEstado } from "@/components/odontologia/odontograma-clinico";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
