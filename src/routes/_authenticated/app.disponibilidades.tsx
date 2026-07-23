@@ -756,6 +756,9 @@ function Page() {
                   {gerar.medico_id === "all" ? ` (${medicos.length} médicos)` : ""}.
                 </p>
               )}
+              <p className="text-xs text-muted-foreground">
+                Se a data já tiver horários criados, os novos serão adicionados <strong>após o último horário do dia</strong>, mantendo a numeração das fichas já existentes.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
