@@ -1153,6 +1153,31 @@ function AgendaPage() {
   useEffect(() => {
     if (!form.orcamento_id) setOrcamentoOdonto(false);
   }, [form.orcamento_id]);
+  // Orçamento vinculado ao form atual pertence à especialidade Laboratório?
+  // Quando true, só é permitido agendar com médicos da especialidade Laboratório.
+  const [orcamentoLaboratorio, setOrcamentoLaboratorio] = useState(false);
+  useEffect(() => {
+    if (!form.orcamento_id) setOrcamentoLaboratorio(false);
+  }, [form.orcamento_id]);
+  // IDs de especialidades cujo nome contém "laborat" (mesma heurística já
+  // usada em outros pontos do arquivo). Usado para restringir orçamentos
+  // de Laboratório a médicos laboratoristas.
+  const labEspecialidadeIds = useMemo(
+    () =>
+      new Set(
+        especialidades
+          .filter((e) => normalizar(e.nome ?? "").includes("laborat"))
+          .map((e) => e.id),
+      ),
+    [especialidades],
+  );
+  const medicoEhLaboratorista = (medicoId: string | null | undefined) => {
+    if (!medicoId) return false;
+    const set = medicoEspec.get(medicoId);
+    if (!set) return false;
+    for (const id of set) if (labEspecialidadeIds.has(id)) return true;
+    return false;
+  };
   // Dialog de divisão de orçamento (vários grupos de procedimentos → vários agendamentos vinculados)
   const [dividirOpen, setDividirOpen] = useState(false);
   const [dividirCtx, setDividirCtx] = useState<{
@@ -3481,6 +3506,12 @@ function AgendaPage() {
         setForm((f) => ({ ...f, medico_id: "" }));
         toast.info("Selecione um médico da especialidade Odontologia para este orçamento.");
       }
+      const orcEhLab = !!orc.especialidade_id && labEspecialidadeIds.has(orc.especialidade_id);
+      setOrcamentoLaboratorio(orcEhLab);
+      if (orcEhLab && form.medico_id && !medicoEhLaboratorista(form.medico_id)) {
+        setForm((f) => ({ ...f, medico_id: "" }));
+        toast.info("Selecione um médico da especialidade Laboratório para este orçamento.");
+      }
       if (isOdonto) {
         setSelecItensCtx({
           orcamento: {
@@ -3722,8 +3753,12 @@ function AgendaPage() {
         .eq("id", a.orcamento_id)
         .maybeSingle();
       setOrcamentoOdonto((orcRow?.especialidade_id ?? null) === ODONTO_ESPECIALIDADE_ID);
+      setOrcamentoLaboratorio(
+        !!orcRow?.especialidade_id && labEspecialidadeIds.has(orcRow.especialidade_id),
+      );
     } else {
       setOrcamentoOdonto(false);
+      setOrcamentoLaboratorio(false);
     }
     // Se o agendamento veio sem paciente_id (ex.: criado a partir de um
     // orçamento que também não tinha o vínculo), tenta resolver pelo nome
@@ -3826,6 +3861,10 @@ function AgendaPage() {
         toast.error("Orçamentos de Odontologia só podem ser agendados com médicos da especialidade Odontologia.");
         return;
       }
+    }
+    if (form.orcamento_id && orcamentoLaboratorio && form.medico_id && !medicoEhLaboratorista(form.medico_id)) {
+      toast.error("Orçamentos de Laboratório só podem ser agendados com médicos da especialidade Laboratório.");
+      return;
     }
     const multiPermitido =
       !!form.medico_id &&
@@ -5459,11 +5498,13 @@ function AgendaPage() {
                         { value: "none", label: "— Sem médico —" },
                         ...medicos
                           .filter((m) =>
-                            !(form.orcamento_id && orcamentoOdonto)
-                              || medicoEspec.get(m.id)?.has(ODONTO_ESPECIALIDADE_ID),
+                            (!(form.orcamento_id && orcamentoOdonto)
+                              || medicoEspec.get(m.id)?.has(ODONTO_ESPECIALIDADE_ID))
+                            && (!(form.orcamento_id && orcamentoLaboratorio)
+                              || medicoEhLaboratorista(m.id)),
                           )
                           .map((m) => ({ value: m.id, label: `👨‍⚕️ ${m.nome}` })),
-                        ...(form.orcamento_id && orcamentoOdonto
+                        ...((form.orcamento_id && orcamentoOdonto)
                           ? []
                           : exames.map((e) => ({ value: `exame:${e.nome}`, label: `🧪 ${e.nome}` }))),
                       ]}
