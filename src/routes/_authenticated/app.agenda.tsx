@@ -938,13 +938,15 @@ async function obterInfoConvenioPaciente(params: {
           if (fallback) {
             if (fallback.modo === "valor_fixo") {
               const v = Number(fallback.valor) || 0;
-              desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };
+              const vC = fallback.valor_cartao != null ? (Number(fallback.valor_cartao) || 0) : v;
+              desconto = { tipo: "valor_fixo", valor: v, valorOutros: vC };
               avisoLimite = consumidorTxt
                 ? `${consumidorTxt}Aplicando o desconto padrão do convênio (R$ ${v.toFixed(2)}).`
                 : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — aplicando desconto padrão do convênio (R$ ${v.toFixed(2)}).`;
             } else if (fallback.modo === "percentual_desconto") {
               const p = Number(fallback.percentual) || 0;
-              desconto = { tipo: "percentual", valor: p };
+              const pC = fallback.percentual_cartao != null ? (Number(fallback.percentual_cartao) || 0) : p;
+              desconto = { tipo: "percentual", valor: p, percentualOutros: pC };
               avisoLimite = consumidorTxt
                 ? `${consumidorTxt}Aplicando o desconto padrão do convênio (${p}% off).`
                 : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — aplicando desconto padrão do convênio (${p}% off).`;
