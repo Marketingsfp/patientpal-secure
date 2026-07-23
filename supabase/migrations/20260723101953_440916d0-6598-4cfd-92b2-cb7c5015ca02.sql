@@ -1,0 +1,1 @@
+ALTER VIEW public.nfse_emitentes_publico SET (security_invoker = true);
