@@ -507,55 +507,55 @@ function ConveniosPage() {
     <div className="space-y-4">
       {view === "list" ? (
         <>
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4" />
-              Tipos de cartão benefícios oferecidos pela clínica.
-            </p>
-            {podeEscrever && (
-              <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo convênio</Button>
-            )}
-          </div>
+        <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4" />
+          Tipos de cartão benefícios oferecidos pela clínica.
+        </p>
+        {podeEscrever && (
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo convênio</Button>
+        )}
+      </div>
 
-          <Card>
-            <CardContent className="p-0">
-              <Table className="table-fixed w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead className="w-[140px]">A partir de</TableHead>
-                    <TableHead className="w-[240px]">Descrição</TableHead>
-                    <TableHead className="w-[100px]">Status</TableHead>
-                    <TableHead className="w-[110px] text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
-                  ) : rows.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhum convênio cadastrado.</TableCell></TableRow>
-                  ) : rows.map((c) => (
-                    <TableRow key={c.id}>
-                      <TableCell className="font-medium truncate" title={c.nome}>{c.nome}</TableCell>
-                      <TableCell>{valoresMin[c.id] !== undefined ? `R$ ${valoresMin[c.id].toFixed(2)}` : "—"}</TableCell>
-                      <TableCell className="text-muted-foreground truncate" title={c.descricao ?? ""}>{c.descricao ?? "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant={c.ativo ? "default" : "outline"}>{c.ativo ? "Ativo" : "Inativo"}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {podeEscrever && (
-                          <>
-                            <Button size="sm" variant="ghost" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
-                            <Button size="sm" variant="ghost" onClick={() => setToDelete(c)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                          </>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+      <Card>
+        <CardContent className="p-0">
+          <Table className="table-fixed w-full">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead className="w-[140px]">A partir de</TableHead>
+                <TableHead className="w-[240px]">Descrição</TableHead>
+                <TableHead className="w-[100px]">Status</TableHead>
+                <TableHead className="w-[110px] text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>
+              ) : rows.length === 0 ? (
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhum convênio cadastrado.</TableCell></TableRow>
+              ) : rows.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell className="font-medium truncate" title={c.nome}>{c.nome}</TableCell>
+                  <TableCell>{valoresMin[c.id] !== undefined ? `R$ ${valoresMin[c.id].toFixed(2)}` : "—"}</TableCell>
+                  <TableCell className="text-muted-foreground truncate" title={c.descricao ?? ""}>{c.descricao ?? "—"}</TableCell>
+                  <TableCell>
+                    <Badge variant={c.ativo ? "default" : "outline"}>{c.ativo ? "Ativo" : "Inativo"}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {podeEscrever && (
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => setToDelete(c)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
         </>
       ) : (
         <Card>
@@ -568,252 +568,295 @@ function ConveniosPage() {
               <div />
             </div>
             <Tabs defaultValue="info" className="w-full">
-              <TabsList>
-                <TabsTrigger value="info">Informações</TabsTrigger>
-                {!isConvenioFuncionario(nome || editing?.nome || "") && (
-                  <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
-                )}
-                <TabsTrigger value="regras"><Gift className="h-4 w-4 mr-1" />Benefícios</TabsTrigger>
-                {!isConvenioFuncionario(nome || editing?.nome || "") && (
-                  <>
-                    <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
-                    <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
-                    <TabsTrigger value="termo"><FileSignature className="h-4 w-4 mr-1" />Termo de Inclusão</TabsTrigger>
-                  </>
-                )}
-              </TabsList>
-              <TabsContent value="info" className="space-y-3 mt-3">
-                <div>
-                  <Label>Nome *</Label>
-                  <Input
-                    value={nome}
-                    maxLength={NOME_MAX}
-                    onChange={(e) => setNome(e.target.value)}
-                    placeholder="Ex: Convênio Família"
-                  />
-                  <p className={`text-xs mt-1 text-right ${nome.trim().length > NOME_MAX ? "text-red-600" : "text-muted-foreground"}`}>
-                    {nome.trim().length} / {NOME_MAX}
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div>
-                    <Label>Taxa de adesão (R$)</Label>
-                    <CurrencyInput
-                      value={taxaAdesao ? taxaAdesao.toFixed(2) : ""}
-                      onChange={(v) => setTaxaAdesao(v ? parseFloat(v) : 0)}
-                    />
-                  </div>
-                  <div>
-                    <Label>Taxa de inclusão de dependente (R$)</Label>
-                    <CurrencyInput
-                      value={taxaInclusaoDep ? taxaInclusaoDep.toFixed(2) : ""}
-                      onChange={(v) => setTaxaInclusaoDep(v ? parseFloat(v) : 0)}
-                    />
-                  </div>
-                  <div>
-                    <Label>Nº parcelas</Label>
-                    <Input type="number" min="1" value={numParcelas}
-                      onChange={(e) => setNumParcelas(parseInt(e.target.value) || 0)} />
-                  </div>
-                  <div>
-                    <Label>Máx. dependentes</Label>
-                    <Input type="number" min="0" value={maxDependentes}
-                      onChange={(e) => setMaxDependentes(parseInt(e.target.value) || 0)} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <Label>Fidelidade (meses)</Label>
-                    <Input type="number" min="0" value={fidelidadeMeses}
-                      onChange={(e) => setFidelidadeMeses(parseInt(e.target.value) || 0)} />
-                  </div>
-                  <div>
-                    <Label>Vigência (meses)</Label>
-                    <Input type="number" min="0" value={vigenciaMeses}
-                      onChange={(e) => setVigenciaMeses(parseInt(e.target.value) || 0)} />
-                  </div>
-                </div>
-                <div>
-                  <Label>Descrição</Label>
-                  <Textarea
-                    value={descricao}
-                    maxLength={DESCRICAO_MAX}
-                    onChange={(e) => setDescricao(e.target.value)}
-                    rows={3}
-                  />
-                  <p className={`text-xs mt-1 text-right ${descricao.trim().length > DESCRICAO_MAX ? "text-red-600" : "text-muted-foreground"}`}>
-                    {descricao.trim().length} / {DESCRICAO_MAX}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch checked={ativo} onCheckedChange={setAtivo} />
-                  <Label>Ativo</Label>
-                </div>
-              </TabsContent>
-              <TabsContent value="faixas" className="mt-3">
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 font-medium">
-                        <Layers className="h-4 w-4" /> Faixas de Preço por Quantidade de Vidas
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Configure o valor mensal conforme a quantidade de vidas (titular + dependentes).
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost" size="sm"
-                      onClick={() => {
-                        const last = faixas[faixas.length - 1];
-                        const nextDe = last ? last.vidas_de + 1 : 1;
-                        setFaixas([...faixas, { vidas_de: nextDe, vidas_ate: null, valor_mensal: 0 }]);
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-1" /> Adicionar Faixa
-                    </Button>
-                  </div>
-                  <div className="border rounded-md overflow-hidden max-w-xl">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Quantidade de pessoas</TableHead>
-                          <TableHead className="text-right">Valor Mensal (R$)</TableHead>
-                          <TableHead className="w-10"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {faixas.map((f, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell>
-                              <Input
-                                type="number" min="1"
-                                className="border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent"
-                                value={f.vidas_de}
-                                onChange={(e) => {
-                                  const v = parseInt(e.target.value) || 1;
-                                  setFaixas(faixas.map((x, i) => i === idx ? { ...x, vidas_de: v, vidas_ate: v } : x));
-                                }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <CurrencyInput
-                                className="text-right border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent"
-                                value={f.valor_mensal ? Number(f.valor_mensal).toFixed(2) : ""}
-                                onChange={(v) => {
-                                  const num = v ? parseFloat(v) : 0;
-                                  setFaixas(faixas.map((x, i) => i === idx ? { ...x, valor_mensal: num } : x));
-                                }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                size="sm" variant="ghost"
-                                onClick={() => setFaixas(faixas.filter((_, i) => i !== idx))}
-                                disabled={faixas.length === 1}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Lightbulb className="h-3.5 w-3.5" />
-                    Exemplo: 1 pessoa = R$200, 2 pessoas = R$350, 3 pessoas = R$500. Adicione uma linha para cada quantidade.
-                  </p>
-                </div>
-              </TabsContent>
-              <TabsContent value="regras" className="mt-3">
-                <RegrasConvenioTab
-                  clinicaId={clinicaAtual.clinica_id}
-                  convenioId={editing?.id ?? null}
-                  convenioNome={editing?.nome ?? nome}
+            <TabsList>
+              <TabsTrigger value="info">Informações</TabsTrigger>
+              {!isConvenioFuncionario(nome || editing?.nome || "") && (
+                <TabsTrigger value="faixas"><Layers className="h-4 w-4 mr-1" />Faixas de Preço</TabsTrigger>
+              )}
+              <TabsTrigger value="regras"><Gift className="h-4 w-4 mr-1" />Benefícios</TabsTrigger>
+              {!isConvenioFuncionario(nome || editing?.nome || "") && (
+                <>
+                  <TabsTrigger value="contrato"><FileText className="h-4 w-4 mr-1" />Contrato</TabsTrigger>
+                  <TabsTrigger value="informativo"><Info className="h-4 w-4 mr-1" />Informativo</TabsTrigger>
+                  <TabsTrigger value="termo"><FileSignature className="h-4 w-4 mr-1" />Termo de Inclusão</TabsTrigger>
+                </>
+              )}
+            </TabsList>
+            <TabsContent value="info" className="space-y-3 mt-3">
+              <div>
+                <Label>Nome *</Label>
+                <Input
+                  value={nome}
+                  maxLength={NOME_MAX}
+                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Ex: Convênio Família"
                 />
-              </TabsContent>
-              {/* 🔥 ABA CONTRATO - IMPRIME DIRETO (SEM ABRIR NOVA ABA) */}
-              <TabsContent value="contrato" className="mt-3">
-                <div className="flex justify-end">
+                <p className={`text-xs mt-1 text-right ${nome.trim().length > NOME_MAX ? "text-red-600" : "text-muted-foreground"}`}>
+                  {nome.trim().length} / {NOME_MAX}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div>
+                  <Label>Taxa de adesão (R$)</Label>
+                  <CurrencyInput
+                    value={taxaAdesao ? taxaAdesao.toFixed(2) : ""}
+                    onChange={(v) => setTaxaAdesao(v ? parseFloat(v) : 0)}
+                  />
+                </div>
+                <div>
+                  <Label>Taxa de inclusão de dependente (R$)</Label>
+                  <CurrencyInput
+                    value={taxaInclusaoDep ? taxaInclusaoDep.toFixed(2) : ""}
+                    onChange={(v) => setTaxaInclusaoDep(v ? parseFloat(v) : 0)}
+                  />
+                </div>
+                <div>
+                  <Label>Nº parcelas</Label>
+                  <Input type="number" min="1" value={numParcelas}
+                    onChange={(e) => setNumParcelas(parseInt(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <Label>Máx. dependentes</Label>
+                  <Input type="number" min="0" value={maxDependentes}
+                    onChange={(e) => setMaxDependentes(parseInt(e.target.value) || 0)} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label>Fidelidade (meses)</Label>
+                  <Input type="number" min="0" value={fidelidadeMeses}
+                    onChange={(e) => setFidelidadeMeses(parseInt(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <Label>Vigência (meses)</Label>
+                  <Input type="number" min="0" value={vigenciaMeses}
+                    onChange={(e) => setVigenciaMeses(parseInt(e.target.value) || 0)} />
+                </div>
+              </div>
+              <div>
+                <Label>Descrição</Label>
+                <Textarea
+                  value={descricao}
+                  maxLength={DESCRICAO_MAX}
+                  onChange={(e) => setDescricao(e.target.value)}
+                  rows={3}
+                />
+                <p className={`text-xs mt-1 text-right ${descricao.trim().length > DESCRICAO_MAX ? "text-red-600" : "text-muted-foreground"}`}>
+                  {descricao.trim().length} / {DESCRICAO_MAX}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={ativo} onCheckedChange={setAtivo} />
+                <Label>Ativo</Label>
+              </div>
+            </TabsContent>
+            <TabsContent value="faixas" className="mt-3">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 font-medium">
+                      <Layers className="h-4 w-4" /> Faixas de Preço por Quantidade de Vidas
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Configure o valor mensal conforme a quantidade de vidas (titular + dependentes).
+                    </p>
+                  </div>
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant="ghost" size="sm"
                     onClick={() => {
-                      // Cria um iframe escondido com o PDF
-                      const iframe = document.createElement("iframe");
-                      iframe.style.display = "none";
-                      iframe.src = "/contrato.pdf.pdf";
-                      document.body.appendChild(iframe);
-
-                      // Aguarda carregar e imprime
-                      iframe.onload = () => {
-                        setTimeout(() => {
-                          iframe.contentWindow?.print();
-                          // Remove o iframe depois de imprimir
-                          setTimeout(() => {
-                            document.body.removeChild(iframe);
-                          }, 5000);
-                        }, 500);
-                      };
+                      const last = faixas[faixas.length - 1];
+                      const nextDe = last ? last.vidas_de + 1 : 1;
+                      setFaixas([...faixas, { vidas_de: nextDe, vidas_ate: null, valor_mensal: 0 }]);
                     }}
                   >
-                    <Printer className="h-4 w-4 mr-1" /> Imprimir Contrato
+                    <Plus className="h-4 w-4 mr-1" /> Adicionar Faixa
                   </Button>
                 </div>
-              </TabsContent>
-              {/* 🔥 ABA INFORMATIVO - APENAS BOTÃO IMPRIMIR */}
-              <TabsContent value="informativo" className="mt-3">
-                <div className="flex justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const iframe = document.createElement("iframe");
-                      iframe.style.display = "none";
-                      iframe.src = "/informativo.pdf";
-                      document.body.appendChild(iframe);
-
-                      iframe.onload = () => {
-                        setTimeout(() => {
-                          iframe.contentWindow?.print();
-                          setTimeout(() => {
-                            document.body.removeChild(iframe);
-                          }, 5000);
-                        }, 500);
-                      };
-                    }}
-                  >
-                    <Printer className="h-4 w-4 mr-1" /> Imprimir Informativo
+                <div className="border rounded-md overflow-hidden max-w-xl">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Quantidade de pessoas</TableHead>
+                        <TableHead className="text-right">Valor Mensal (R$)</TableHead>
+                        <TableHead className="w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {faixas.map((f, idx) => (
+                        <TableRow key={idx}>
+                          <TableCell>
+                            <Input
+                              type="number" min="1"
+                              className="border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent"
+                              value={f.vidas_de}
+                              onChange={(e) => {
+                                const v = parseInt(e.target.value) || 1;
+                                setFaixas(faixas.map((x, i) => i === idx ? { ...x, vidas_de: v, vidas_ate: v } : x));
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <CurrencyInput
+                              className="text-right border-0 rounded-none shadow-none focus-visible:ring-0 bg-transparent"
+                              value={f.valor_mensal ? Number(f.valor_mensal).toFixed(2) : ""}
+                              onChange={(v) => {
+                                const num = v ? parseFloat(v) : 0;
+                                setFaixas(faixas.map((x, i) => i === idx ? { ...x, valor_mensal: num } : x));
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm" variant="ghost"
+                              onClick={() => setFaixas(faixas.filter((_, i) => i !== idx))}
+                              disabled={faixas.length === 1}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Lightbulb className="h-3.5 w-3.5" />
+                  Exemplo: 1 pessoa = R$200, 2 pessoas = R$350, 3 pessoas = R$500. Adicione uma linha para cada quantidade.
+                </p>
+              </div>
+            </TabsContent>
+            <TabsContent value="regras" className="mt-3">
+              <RegrasConvenioTab
+                clinicaId={clinicaAtual.clinica_id}
+                convenioId={editing?.id ?? null}
+                convenioNome={editing?.nome ?? nome}
+              />
+            </TabsContent>
+            <TabsContent value="contrato" className="mt-3">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 font-medium">
+                    <FileText className="h-4 w-4" /> Modelo do Contrato
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => window.print()}>
+                    <Printer className="h-4 w-4 mr-1" /> Imprimir
                   </Button>
                 </div>
-              </TabsContent>
-              {/* 🔥 ABA TERMO DE INCLUSÃO - APENAS BOTÃO IMPRIMIR */}
-              <TabsContent value="termo" className="mt-3">
-                <div className="flex justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const iframe = document.createElement("iframe");
-                      iframe.style.display = "none";
-                      iframe.src = "/termo-inclusao.pdf";
-                      document.body.appendChild(iframe);
-
-                      iframe.onload = () => {
-                        setTimeout(() => {
-                          iframe.contentWindow?.print();
-                          setTimeout(() => {
-                            document.body.removeChild(iframe);
-                          }, 5000);
-                        }, 500);
-                      };
-                    }}
-                  >
-                    <Printer className="h-4 w-4 mr-1" /> Imprimir Termo de Inclusão
+                <p className="text-sm text-muted-foreground">
+                  Este modelo será usado para gerar o contrato nas novas vendas. Use o seletor
+                  <span className="font-medium"> Inserir variável </span>
+                  na barra de ferramentas para incluir campos como{" "}
+                  <code>{"{{PACIENTE_NOME}}"}</code>, <code>{"{{VALOR_MENSAL}}"}</code>,{" "}
+                  <code>{"{{DEPENDENTE_1}}"}</code>, <code>{"{{DEPENDENTE_1_PARENTESCO}}"}</code>,{" "}
+                  <code>{"{{CLINICA_NOME}}"}</code>. Use as variáveis numeradas
+                  (<code>{"{{DEPENDENTE_1}}"}</code>… até o máximo de dependentes do convênio)
+                  para um slot por dependente; slots não preenchidos ficam vazios.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium">Esconder slots vazios:</span> envolva o trecho de cada
+                  dependente entre <code>{"{{#DEPENDENTE_2}}"}</code> e <code>{"{{/DEPENDENTE_2}}"}</code>{" "}
+                  (idem para 3, 4 e 5). Use no seletor <em>Inserir variável</em> as opções
+                  "Dependente N — INÍCIO/FIM do bloco condicional". O bloco só será impresso se o
+                  dependente N existir no contrato.
+                </p>
+                <div id="convenio-contrato-print">
+                  <RichEditor
+                    value={modeloContrato}
+                    onChange={setModeloContrato}
+                    clinicaId={clinicaAtual.clinica_id}
+                    variables={buildContratoVariaveis(maxDependentes)}
+                  />
+                </div>
+                <style>{`
+                  @media print {
+                    @page { size: A4; margin: 0; }
+                    body * { visibility: hidden !important; }
+                    #convenio-contrato-print, #convenio-contrato-print * { visibility: visible !important; }
+                    #convenio-contrato-print { position: absolute; left: 0; top: 0; width: 100%; }
+                    #convenio-contrato-print .print\\:hidden { display: none !important; }
+                    #convenio-contrato-print .rt-shell { border: 0 !important; border-radius: 0 !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-contrato-print .rt-scroll { max-height: none !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-contrato-print .rt-page { width: 210mm !important; min-height: 297mm !important; margin: 0 auto !important; box-shadow: none !important; background: white !important; }
+                    #convenio-contrato-print .ProseMirror { min-height: 0 !important; }
+                    #convenio-contrato-print table { page-break-inside: auto; }
+                    #convenio-contrato-print tr { page-break-inside: avoid; page-break-after: auto; }
+                    #convenio-contrato-print img { max-width: 100% !important; height: auto !important; }
+                  }
+                `}</style>
+              </div>
+            </TabsContent>
+            <TabsContent value="informativo" className="mt-3">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 font-medium">
+                    <Info className="h-4 w-4" /> Informativo do Convênio
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => window.print()}>
+                    <Printer className="h-4 w-4 mr-1" /> Imprimir
                   </Button>
                 </div>
-              </TabsContent>
-            </Tabs>
+                <div id="convenio-informativo-print">
+                  <RichEditor
+                    value={informativoHtml}
+                    onChange={setInformativoHtml}
+                    clinicaId={clinicaAtual.clinica_id}
+                  />
+                </div>
+                <style>{`
+                  @media print {
+                    @page { size: A4; margin: 0; }
+                    body * { visibility: hidden !important; }
+                    #convenio-informativo-print, #convenio-informativo-print * { visibility: visible !important; }
+                    #convenio-informativo-print { position: absolute; left: 0; top: 0; width: 100%; }
+                    #convenio-informativo-print .print\\:hidden { display: none !important; }
+                    /* Neutralize the editor chrome (scroll wrapper + A4 mock page) for print */
+                    #convenio-informativo-print .rt-shell { border: 0 !important; border-radius: 0 !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-informativo-print .rt-scroll { max-height: none !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-informativo-print .rt-page { width: 210mm !important; min-height: 297mm !important; margin: 0 auto !important; box-shadow: none !important; background: white !important; }
+                    #convenio-informativo-print .ProseMirror { min-height: 0 !important; }
+                    #convenio-informativo-print table { page-break-inside: auto; }
+                    #convenio-informativo-print tr { page-break-inside: avoid; page-break-after: auto; }
+                    #convenio-informativo-print img { max-width: 100% !important; height: auto !important; }
+                  }
+                `}</style>
+              </div>
+            </TabsContent>
+            <TabsContent value="termo" className="mt-3">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 font-medium">
+                    <FileSignature className="h-4 w-4" /> Termo de Inclusão
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => window.print()}>
+                    <Printer className="h-4 w-4 mr-1" /> Imprimir
+                  </Button>
+                </div>
+                <div id="convenio-termo-print">
+                  <RichEditor
+                    value={termoInclusaoHtml}
+                    onChange={setTermoInclusaoHtml}
+                    clinicaId={clinicaAtual.clinica_id}
+                  />
+                </div>
+                <style>{`
+                  @media print {
+                    @page { size: A4; margin: 0; }
+                    body * { visibility: hidden !important; }
+                    #convenio-termo-print, #convenio-termo-print * { visibility: visible !important; }
+                    #convenio-termo-print { position: absolute; left: 0; top: 0; width: 100%; }
+                    #convenio-termo-print .print\\:hidden { display: none !important; }
+                    #convenio-termo-print .rt-shell { border: 0 !important; border-radius: 0 !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-termo-print .rt-scroll { max-height: none !important; overflow: visible !important; background: transparent !important; }
+                    #convenio-termo-print .rt-page { width: 210mm !important; min-height: 297mm !important; margin: 0 auto !important; box-shadow: none !important; background: white !important; }
+                    #convenio-termo-print .ProseMirror { min-height: 0 !important; }
+                    #convenio-termo-print table { page-break-inside: auto; }
+                    #convenio-termo-print tr { page-break-inside: avoid; page-break-after: auto; }
+                    #convenio-termo-print img { max-width: 100% !important; height: auto !important; }
+                  }
+                `}</style>
+              </div>
+            </TabsContent>
+          </Tabs>
             <div className="flex justify-end gap-2 border-t pt-4">
               <Button variant="outline" onClick={() => setView("list")}>Cancelar</Button>
               <Button
