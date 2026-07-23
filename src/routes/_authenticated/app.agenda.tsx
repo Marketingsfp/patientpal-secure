@@ -7870,6 +7870,46 @@ function AgendaPage() {
           }}
         />
       )}
+      {selecItensCtx && (
+        <SelecionarItensOrcamentoDialog
+          open={selecItensOpen}
+          onOpenChange={(v) => {
+            setSelecItensOpen(v);
+            if (!v) setSelecItensCtx(null);
+          }}
+          numero={selecItensCtx.orcamento.numero}
+          pacienteNome={selecItensCtx.orcamento.paciente_nome}
+          totalItens={selecItensCtx.totalItens}
+          itensRestantes={selecItensCtx.itensRestantes}
+          onConfirm={(ids) => {
+            const ctx = selecItensCtx;
+            const selecionados = ctx.itensRaw.filter((i) => ids.includes(i.id));
+            if (selecionados.length === 0) return;
+            const nomes = selecionados.map((i) => i.descricao);
+            const procStr = ctx.todosLab
+              ? `LABORATÓRIO (${nomes.length} EXAMES): ${nomes.join(", ")}`
+              : nomes.length === 1
+                ? nomes[0]
+                : `${nomes.length} ITENS: ${nomes.join(", ")}`;
+            setPendingOrcItemIds(selecionados.map((i) => i.id));
+            setForm((f) => ({
+              ...f,
+              orcamento_id: ctx.orcamento.id,
+              orcamento_numero: String(ctx.orcamento.numero),
+              orcamento_itens: nomes,
+              paciente_id: ctx.orcamento.paciente_id ?? f.paciente_id,
+              paciente_nome: ctx.orcamento.paciente_nome ?? f.paciente_nome,
+              procedimento: procStr,
+              procedimentos: procStr ? [procStr] : [],
+            }));
+            setSelecItensOpen(false);
+            setSelecItensCtx(null);
+            toast.success(
+              `${selecionados.length} ${selecionados.length === 1 ? "item vinculado" : "itens vinculados"} do orçamento #${String(ctx.orcamento.numero).padStart(5, "0")}.`,
+            );
+          }}
+        />
+      )}
     </div>
   );
 }
