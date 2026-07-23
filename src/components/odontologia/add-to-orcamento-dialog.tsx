@@ -217,8 +217,8 @@ export function AddToOrcamentoDialog({
     const baseCartao = Number(procSel.valor_padrao) || 0;
     const baseDinheiro = Number(procSel.valor_dinheiro_pix ?? procSel.valor_padrao) || 0;
     const linhas: LinhaPreco[] = [
-      { chave: "dinpix", rotulo: "Dinheiro / PIX", valorDinheiro: baseDinheiro, valorCartao: baseDinheiro },
-      { chave: "cartao", rotulo: "Cartão (crédito/débito)", valorDinheiro: baseCartao, valorCartao: baseCartao },
+      { chave: "din", rotulo: "Dinheiro", valorDinheiro: baseDinheiro, valorCartao: baseDinheiro },
+      { chave: "cartaopix", rotulo: "Cartão / PIX", valorDinheiro: baseCartao, valorCartao: baseCartao },
     ];
     const tipoNorm = (procSel.tipo ?? "").toLowerCase() || null;
     for (const c of convenios) {
