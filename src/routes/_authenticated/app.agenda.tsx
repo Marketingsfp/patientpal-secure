@@ -3471,7 +3471,8 @@ function AgendaPage() {
       // Odontologia: em vez de auto-juntar todos os itens restantes num
       // único agendamento, abre um pop-up para o usuário escolher quais
       // itens usar agora. O restante fica disponível para agendar depois.
-      const isOdonto = orc.especialidade_id === "f0cfaa0a-2a67-4176-97de-a7072c37077c";
+      const isOdonto = orc.especialidade_id === ODONTO_ESPECIALIDADE_ID;
+      setOrcamentoOdonto(isOdonto);
       if (isOdonto) {
         setSelecItensCtx({
           orcamento: {
