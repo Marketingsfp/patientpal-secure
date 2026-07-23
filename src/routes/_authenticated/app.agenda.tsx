@@ -3389,7 +3389,7 @@ function AgendaPage() {
       }
       const { data: itens, error: e2 } = await supabase
         .from("orcamento_itens")
-        .select("id, descricao, procedimento_id, valor_total, dentes")
+        .select("id, descricao, procedimento_id, valor_total, dentes, status_financeiro")
         .eq("orcamento_id", orc.id)
         .order("ordem");
       if (e2) {
@@ -3402,37 +3402,66 @@ function AgendaPage() {
         procedimento_id: string | null;
         valor_total: number | null;
         dentes: string[] | null;
+        status_financeiro: string | null;
       }[];
       if (itsAll.length === 0) {
         toast.error("Orçamento sem itens.");
         return;
       }
-      // Filtra itens já consumidos por agendamentos ativos. Permite agendar
-      // o restante quando o orçamento foi aproveitado em partes.
+      // Regra (2026-07-23): um item só é considerado "consumido" — e portanto
+      // some do seletor — quando estiver PAGO. Se o agendamento vinculado for
+      // desmarcado, remarcado, marcado como faltou ou simplesmente ainda não
+      // pago, o item volta a ficar disponível para novo agendamento.
+      // Pago = orcamento_itens.status_financeiro='pago' OU agendamento vinculado
+      // com fin_lancamentos de receita confirmado (mesma definição usada em
+      // pagamento-status.ts).
       const { data: consumidosRows } = await supabase
         .from("agendamento_orcamento_itens")
         .select("orcamento_item_id, agendamento_id, agendamentos!inner(status)")
         .eq("orcamento_id", orc.id);
-      const consumidos = new Set<string>(
-        ((consumidosRows ?? []) as Array<{ orcamento_item_id: string; agendamentos: { status: string } | null }>)
-          .filter((r) => r.agendamentos?.status !== "cancelado")
-          .map((r) => r.orcamento_item_id),
-      );
+      const linkRows = ((consumidosRows ?? []) as Array<{
+        orcamento_item_id: string;
+        agendamento_id: string;
+        agendamentos: { status: string } | null;
+      }>).filter((r) => r.agendamentos?.status !== "cancelado");
+      const agendaIds = Array.from(new Set(linkRows.map((r) => r.agendamento_id)));
+      let pagosAgendaSet = new Set<string>();
+      if (agendaIds.length) {
+        const { data: lancs } = await supabase
+          .from("fin_lancamentos")
+          .select("agendamento_id")
+          .eq("tipo", "receita")
+          .eq("status", "confirmado")
+          .in("agendamento_id", agendaIds);
+        pagosAgendaSet = new Set(
+          ((lancs ?? []) as Array<{ agendamento_id: string | null }>)
+            .map((r) => r.agendamento_id)
+            .filter((x): x is string => !!x),
+        );
+      }
+      const itensPorId = new Map(itsAll.map((i) => [i.id, i]));
+      const consumidos = new Set<string>();
+      for (const r of linkRows) {
+        const it = itensPorId.get(r.orcamento_item_id);
+        const pagoItem = it?.status_financeiro === "pago";
+        const pagoAgenda = pagosAgendaSet.has(r.agendamento_id);
+        if (pagoItem || pagoAgenda) consumidos.add(r.orcamento_item_id);
+      }
       const editingItemIdsLiberar = editing?.id
         ? new Set<string>(
-          ((consumidosRows ?? []) as Array<{ orcamento_item_id: string; agendamento_id: string }>)
+          linkRows
             .filter((r) => r.agendamento_id === editing.id)
             .map((r) => r.orcamento_item_id),
         )
         : new Set<string>();
       const its = itsAll.filter((i) => !consumidos.has(i.id) || editingItemIdsLiberar.has(i.id));
       if (its.length === 0) {
-        toast.error(`Todos os ${itsAll.length} itens deste orçamento já foram agendados.`);
+        toast.error(`Todos os ${itsAll.length} itens deste orçamento já foram pagos.`);
         return;
       }
       const totalConsumidos = itsAll.length - its.length;
       if (totalConsumidos > 0) {
-        toast.info(`${totalConsumidos} de ${itsAll.length} itens já agendados. Restam ${its.length} para agendar.`);
+        toast.info(`${totalConsumidos} de ${itsAll.length} itens já pagos. Restam ${its.length} para agendar.`);
       }
       const procIds = Array.from(new Set(its.map((i) => i.procedimento_id).filter((x): x is string => !!x)));
       let procs: { id: string; grupo: string | null; tipo: string | null }[] = [];
