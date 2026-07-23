@@ -3477,6 +3477,10 @@ function AgendaPage() {
       // itens usar agora. O restante fica disponível para agendar depois.
       const isOdonto = orc.especialidade_id === ODONTO_ESPECIALIDADE_ID;
       setOrcamentoOdonto(isOdonto);
+      if (isOdonto && form.medico_id && !medicoEspec.get(form.medico_id)?.has(ODONTO_ESPECIALIDADE_ID)) {
+        setForm((f) => ({ ...f, medico_id: "" }));
+        toast.info("Selecione um médico da especialidade Odontologia para este orçamento.");
+      }
       if (isOdonto) {
         setSelecItensCtx({
           orcamento: {
