@@ -637,9 +637,12 @@ async function obterInfoConvenioPaciente(params: {
       desconto = { tipo: "gratuidade", valor: 0 };
     } else if (regraMatch.modo === "valor_fixo") {
       const v = Number(regraMatch.valor) || 0;
-      desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };
+      const vC = regraMatch.valor_cartao != null ? (Number(regraMatch.valor_cartao) || 0) : v;
+      desconto = { tipo: "valor_fixo", valor: v, valorOutros: vC };
     } else if (regraMatch.modo === "percentual_desconto") {
-      desconto = { tipo: "percentual", valor: Number(regraMatch.percentual) || 0 };
+      const p = Number(regraMatch.percentual) || 0;
+      const pC = regraMatch.percentual_cartao != null ? (Number(regraMatch.percentual_cartao) || 0) : p;
+      desconto = { tipo: "percentual", valor: p, percentualOutros: pC };
     }
   }
 
