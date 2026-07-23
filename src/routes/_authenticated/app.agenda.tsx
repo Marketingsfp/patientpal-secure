@@ -1516,7 +1516,7 @@ function AgendaPage() {
     if (!pacInfo?.id || !pacEditDirty) return;
     setPacEditSaving(true);
     try {
-      const patch: Record<string, any> = {
+      const patch = {
         cpf: pacEdit.cpf.trim() || null,
         data_nascimento: pacEdit.data_nascimento.trim() || null,
         telefone: pacEdit.telefone.trim() || null,
@@ -1526,7 +1526,7 @@ function AgendaPage() {
         bairro: pacEdit.bairro.trim() || null,
         cidade: pacEdit.cidade.trim() || null,
         estado: pacEdit.estado.trim().toUpperCase().slice(0, 2) || null,
-      };
+      } as const;
       const { error } = await supabase.from("pacientes").update(patch).eq("id", pacInfo.id);
       if (error) throw error;
       setPacInfo({ ...pacInfo, ...patch });
