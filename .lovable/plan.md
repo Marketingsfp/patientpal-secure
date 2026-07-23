@@ -1,31 +1,45 @@
-## Escopo
+## O que muda
 
-Ajuste UX na aba **Orçamento** de `src/routes/_authenticated/app.odontologia.tsx` — plugar o cadastro rápido já existente no campo de busca de paciente.
+Diálogo **"Cancelar contrato"** (Cartão Benefícios → Vendas → contrato aberto) passa a exigir a escolha de um motivo em lista suspensa. Aplica-se às **3 clínicas** (é o mesmo código).
 
-## Confirmação
+### Novas opções da lista (nessa ordem)
+1. Troca de endereço
+2. Fez plano de saúde
+3. Falecimento
+4. Sem condições financeiras
+5. Não usa o convênio
+6. Insatisfação com o convênio
+7. Outros
 
-Aplicar nas 3 clínicas (componente é único e compartilhado). Confirmar se deve ser somente uma.
+### Campo "Observações"
+- Aparece **somente** quando o motivo escolhido for **"Insatisfação com o convênio"** ou **"Outros"**.
+- Preenchimento **opcional**.
+- Para os demais 5 motivos o campo fica oculto.
 
-## Mudança
+### Regra de gravação
+- Botão "Confirmar cancelamento" habilita assim que um motivo é escolhido (independe de observações).
+- No banco, o campo `cancelamento_motivo` já existente em `contratos_assinatura` recebe:
+  - Sem observação: `"<Motivo escolhido>"` (ex.: `"Falecimento"`).
+  - Com observação: `"<Motivo escolhido> — <texto da observação>"`.
+- Assim o motivo continua aparecendo no cabeçalho do contrato ("Motivo: …") e no **Histórico** (aba já existente, que lê a mesma coluna) sem precisar de migração.
 
-O `PatientSearchInput` já expõe a prop `onRequestCreate`, que ativa automaticamente o botão "Cadastrar novo paciente" quando a busca não retorna resultados. Também já existe `QuickPatientDialog` (`src/components/pacientes/quick-patient-dialog.tsx`) com os campos pedidos: nome completo, CPF, data de nascimento, telefone (e-mail é opcional, mantém).
-
-Na aba Orçamento da Odontologia (linhas ~537-541 de `app.odontologia.tsx`):
-
-1. Adicionar estados `quickOpen` (bool) e `quickInitial` (string do termo digitado).
-2. Passar `onRequestCreate={(q) => { setQuickInitial(q); setQuickOpen(true); }}` ao `PatientSearchInput`.
-3. Renderizar `<QuickPatientDialog>` no final da aba, apontando para `clinicaAtual.clinica_id`, `nomeInicial={quickInitial}` e `onCreated={(p) => { setPacienteSelOrc(p); setPacienteIdOrc(p.id); setQuickOpen(false); }}`.
-
-Assim, ao buscar um paciente inexistente, aparece o botão "Cadastrar novo paciente: '…'"; ao clicar, abre o diálogo já preenchido com o texto digitado, e após salvar o paciente é selecionado automaticamente para o orçamento.
-
-## Fora de escopo
-
-- Aba Prontuário (mantém como está — dá para replicar depois se pedirem).
-- Alterações no `PatientSearchInput` ou no `QuickPatientDialog` — ambos já estão prontos.
-- Nenhuma mudança de banco, RLS ou validação (o `QuickPatientDialog` já valida CPF, telefone e e-mail).
+### Compatibilidade retroativa
+- Contratos já cancelados continuam mostrando o texto livre antigo no cabeçalho e na aba Histórico — nada é reescrito.
 
 ## Detalhes técnicos
 
-- Arquivo único: `src/routes/_authenticated/app.odontologia.tsx`.
-- Import: `import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";`.
-- `clinicaId` já disponível na página via `useClinica()`; reaproveitar a variável existente no arquivo.
+Arquivo único: `src/components/pages/contratos-page.tsx`.
+
+1. Substituir os states `cancelMotivo` (string livre) por dois: `cancelMotivoOpcao` (enum das 7 opções) e `cancelObs` (string). Resetar ambos ao fechar o diálogo.
+2. Trocar o `<Textarea>` do diálogo (linhas ~5335-5345) por um `<Select>` (shadcn) com as 7 opções + `<Textarea>` "Observações (opcional)" renderizado condicionalmente quando a opção for `insatisfacao` ou `outros`.
+3. Ajustar `confirmarCancelamento` (linhas 2693-2720):
+   - Validar que `cancelMotivoOpcao` foi escolhido (`toast.error("Selecione o motivo do cancelamento")`).
+   - Montar `motivo` = label da opção + (observação truncada/trim, se houver): `` `${label} — ${obs}` `` quando `obs.trim()` existir, caso contrário só `label`.
+   - Enviar para `cancelamento_motivo` como já é feito hoje.
+4. Ajustar o `disabled` do botão para `!cancelMotivoOpcao` (não depende mais do textarea).
+5. Nenhuma alteração em RPC, RLS, migração ou em `contrato-historico-tab.tsx` — a aba Histórico já lê `cancelamento_motivo` e vai exibir a nova string formatada automaticamente.
+
+## Fora do escopo
+- Não altera fluxo de cancelamento automático (renovação/troca de convênio).
+- Não cria nova coluna estruturada para "categoria de motivo" (mantém texto único conforme já usado hoje).
+- Não muda permissões nem quem pode cancelar.
