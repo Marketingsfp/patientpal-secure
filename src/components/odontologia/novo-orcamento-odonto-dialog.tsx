@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Search, X } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { printOrcamento } from "@/lib/print-orcamento";
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
 import { DentePicker } from "./dente-picker";
 
 interface Procedimento {
@@ -78,27 +79,41 @@ export function NovoOrcamentoOdontoDialog({
   // Controla se o painel de busca está aberto (aparece após clicar em dente ou botão)
   const [buscaAberta, setBuscaAberta] = useState(false);
 
-  // IDs dos procedimentos vinculados à especialidade Odontologia (cache p/ busca)
-  const [procIdsOdonto, setProcIdsOdonto] = useState<Set<string> | null>(null);
-
-  // busca
-  const [procQuery, setProcQuery] = useState("");
-  const [procResults, setProcResults] = useState<Procedimento[]>([]);
-  const [searchingProc, setSearchingProc] = useState(false);
+  // Todos os procedimentos da especialidade Odontologia (para o combobox multi-select)
+  const [procsOdonto, setProcsOdonto] = useState<Procedimento[]>([]);
+  // Seleção corrente do combobox (procedimentos marcados, ainda não adicionados)
+  const [procsSelecionados, setProcsSelecionados] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) return;
     void (async () => {
-      const [{ data: medRows }, { data: peRows }] = await Promise.all([
-        supabase.from("medicos").select("id, nome").eq("clinica_id", clinicaId).order("nome").limit(500),
-        supabase.from("procedimento_especialidades")
-          .select("procedimento_id")
-          .eq("clinica_id", clinicaId)
-          .eq("especialidade_id", especialidadeOdontoId),
-      ]);
-      setMedicos((medRows ?? []) as { id: string; nome: string }[]);
-      const ids = new Set(((peRows ?? []) as { procedimento_id: string }[]).map((r) => r.procedimento_id));
-      setProcIdsOdonto(ids);
+      // Médicos que atendem Odontologia (join via medico_especialidades)
+      const { data: medRows } = await supabase
+        .from("medicos")
+        .select("id, nome, medico_especialidades!inner(especialidade_id)")
+        .eq("clinica_id", clinicaId)
+        .eq("medico_especialidades.especialidade_id", especialidadeOdontoId)
+        .order("nome")
+        .limit(500);
+      setMedicos(((medRows ?? []) as { id: string; nome: string }[]).map((m) => ({ id: m.id, nome: m.nome })));
+
+      // Procedimentos vinculados à especialidade Odontologia — carrega todos para lista suspensa
+      const { data: peRows } = await supabase
+        .from("procedimento_especialidades")
+        .select("procedimento_id")
+        .eq("clinica_id", clinicaId)
+        .eq("especialidade_id", especialidadeOdontoId);
+      const ids = ((peRows ?? []) as { procedimento_id: string }[]).map((r) => r.procedimento_id);
+      if (ids.length === 0) { setProcsOdonto([]); return; }
+      const { data: procRows } = await supabase
+        .from("procedimentos")
+        .select("id, nome, valor_padrao, valor_dinheiro, valor_pix, valor_dinheiro_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, preparo, valor_variavel")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .in("id", ids)
+        .order("nome")
+        .limit(1000);
+      setProcsOdonto((procRows ?? []) as Procedimento[]);
     })();
   }, [open, clinicaId, especialidadeOdontoId]);
 
@@ -107,41 +122,10 @@ export function NovoOrcamentoOdontoDialog({
       // reset ao fechar
       setMedicoNome(""); setMedicoId(""); setFormasPagamento(["Dinheiro"]);
       setDesconto(0); setValidade(30); setObservacoes(""); setItens([]);
-      setProcQuery(""); setProcResults([]);
+      setProcsSelecionados([]);
       setSelecao([]); setBuscaAberta(false);
     }
   }, [open]);
-
-  useEffect(() => {
-    let cancel = false;
-    if (!open || procQuery.trim().length < 2 || !procIdsOdonto) { setProcResults([]); return; }
-    if (procIdsOdonto.size === 0) { setProcResults([]); return; }
-    setSearchingProc(true);
-    const t = setTimeout(async () => {
-      const norm = procQuery.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      const ids = Array.from(procIdsOdonto);
-      // PostgREST aceita listas grandes por vírgula; 180 IDs é seguro.
-      const { sanitizePostgrestSearch } = await import("@/lib/sanitize-search");
-      const safeQ = sanitizePostgrestSearch(procQuery);
-      const safeNorm = sanitizePostgrestSearch(norm);
-      let q = supabase
-        .from("procedimentos")
-        .select("id, nome, valor_padrao, valor_dinheiro, valor_pix, valor_dinheiro_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, preparo, valor_variavel")
-        .eq("clinica_id", clinicaId)
-        .eq("ativo", true)
-        .in("id", ids);
-      if (safeQ.length > 0 || safeNorm.length > 0) {
-        const parts: string[] = [];
-        if (safeQ.length > 0) parts.push(`nome.ilike.%${safeQ}%`);
-        if (safeNorm.length > 0 && safeNorm !== safeQ)
-          parts.push(`nome.ilike.%${safeNorm}%`);
-        q = q.or(parts.join(","));
-      }
-      const { data } = await q.limit(20);
-      if (!cancel) { setProcResults((data ?? []) as Procedimento[]); setSearchingProc(false); }
-    }, 250);
-    return () => { cancel = true; clearTimeout(t); };
-  }, [procQuery, clinicaId, open, procIdsOdonto]);
 
   const selecionarMedico = (id: string) => {
     setMedicoId(id);
@@ -157,33 +141,48 @@ export function NovoOrcamentoOdontoDialog({
     });
   };
 
-  const adicionarProc = (p: Procedimento) => {
-    if (itens.some((it) => it.procedimento_id === p.id)) {
-      toast.warning(`${p.nome} já foi adicionado`); setProcQuery(""); setProcResults([]); return;
-    }
+  // Adiciona os procedimentos selecionados no combobox — 1 item por dente x procedimento.
+  // Ex.: 3 procedimentos em 2 dentes = 6 linhas independentes.
+  const adicionarProcsSelecionados = () => {
+    if (procsSelecionados.length === 0) { toast.info("Selecione ao menos um procedimento"); return; }
+    const dentes = selecao.length > 0 ? [...selecao].sort((a, b) => a - b) : [null as number | null];
     const formas = formasPagamento.length ? formasPagamento : ["Dinheiro"];
-    const valores: Record<string, number> = {};
-    for (const f of formas) valores[f] = valorPorForma(p, f);
-    setItens((arr) => [...arr, {
-      descricao: p.nome,
-      quantidade: 1,
-      valor_unitario: valorPorForma(p, formas[0]),
-      procedimento_id: p.id,
-      dentes: [...selecao].sort((a, b) => a - b),
-      valores_formas: valores,
-    }]);
-    if (p.valor_variavel) toast.info(`${p.nome} tem valor variável — informe o valor cobrado.`);
-    setProcQuery(""); setProcResults([]);
+    const novos: Item[] = [];
+    let algumVariavel = false;
+    for (const d of dentes) {
+      for (const pid of procsSelecionados) {
+        const p = procsOdonto.find((x) => x.id === pid);
+        if (!p) continue;
+        const valores: Record<string, number> = {};
+        for (const f of formas) valores[f] = valorPorForma(p, f);
+        novos.push({
+          descricao: p.nome,
+          quantidade: 1,
+          valor_unitario: valorPorForma(p, formas[0]),
+          procedimento_id: p.id,
+          dentes: d != null ? [d] : [],
+          valores_formas: valores,
+        });
+        if (p.valor_variavel) algumVariavel = true;
+      }
+    }
+    if (novos.length === 0) return;
+    setItens((arr) => [...arr, ...novos]);
+    if (algumVariavel) toast.info("Algum procedimento tem valor variável — revise no fechamento.");
+    setProcsSelecionados([]);
     setSelecao([]); setBuscaAberta(false);
   };
 
   const adicionarManual = () => {
-    setItens((arr) => [...arr, {
+    // 1 item manual por dente selecionado (ou 1 sem dente).
+    const dentes = selecao.length > 0 ? [...selecao].sort((a, b) => a - b) : [null as number | null];
+    const novos: Item[] = dentes.map((d) => ({
       descricao: "", quantidade: 1, valor_unitario: 0,
       procedimento_id: null,
-      dentes: [...selecao].sort((a, b) => a - b),
+      dentes: d != null ? [d] : [],
       valores_formas: null,
-    }]);
+    }));
+    setItens((arr) => [...arr, ...novos]);
     setSelecao([]); setBuscaAberta(false);
   };
 
@@ -237,7 +236,7 @@ export function NovoOrcamentoOdontoDialog({
       const qtd = Number(it.quantidade);
       if (!Number.isFinite(qtd) || qtd < 1 || qtd > 999) return toast.error(`Item ${i + 1}: quantidade 1..999`);
       const vu = Number(it.valor_unitario);
-      if (!Number.isFinite(vu) || vu <= 0) return toast.error(`Item ${i + 1}: valor deve ser > 0`);
+      if (!Number.isFinite(vu) || vu <= 0) return toast.error(`Item ${i + 1}: valor deve ser > 0 (procedimento sem valor cadastrado)`);
       if (it.dentes.length > 32) return toast.error(`Item ${i + 1}: máximo 32 dentes`);
     }
     if (Number(desconto) < 0) return toast.error("Desconto não pode ser negativo");
