@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { OdontogramaArcada } from "./odontograma-arcada";
 
 // FDI: mesmas fileiras usadas em <Odontograma />
 const SUP_DIR = [18, 17, 16, 15, 14, 13, 12, 11];
@@ -15,6 +16,8 @@ interface Props {
   disabled?: boolean;
   /** Se true, mostra o mini-odontograma sempre aberto (uso em card/edição). */
   inline?: boolean;
+  /** Usa a grade antiga de quadrados em vez da arcada anatômica. */
+  grade?: boolean;
 }
 
 /**
@@ -22,7 +25,7 @@ interface Props {
  * Múltipla seleção: clicar alterna. Renderiza em Popover por padrão para
  * caber dentro de linhas de item de orçamento.
  */
-export function DentePicker({ value, onChange, disabled, inline }: Props) {
+export function DentePicker({ value, onChange, disabled, inline, grade }: Props) {
   const selected = useMemo(() => new Set(value ?? []), [value]);
   const [open, setOpen] = useState(false);
 
@@ -34,7 +37,9 @@ export function DentePicker({ value, onChange, disabled, inline }: Props) {
   };
   const limpar = () => onChange([]);
 
-  const grid = (
+  const arcada = <OdontogramaArcada value={value} onChange={onChange} disabled={disabled} />;
+
+  const gradeQuadrados = (
     <div className="flex flex-col gap-2 select-none">
       {[[...SUP_DIR, ...SUP_ESQ], [...INF_DIR, ...INF_ESQ]].map((linha, idx) => (
         <div key={idx} className="flex justify-center gap-1 flex-wrap">
@@ -71,7 +76,9 @@ export function DentePicker({ value, onChange, disabled, inline }: Props) {
     </div>
   );
 
-  if (inline) return grid;
+  const conteudo = grade ? gradeQuadrados : arcada;
+
+  if (inline) return conteudo;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -99,8 +106,8 @@ export function DentePicker({ value, onChange, disabled, inline }: Props) {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-3" align="start">
-        {grid}
+      <PopoverContent className="w-[460px] max-w-[92vw] p-3" align="start">
+        {conteudo}
       </PopoverContent>
     </Popover>
   );
