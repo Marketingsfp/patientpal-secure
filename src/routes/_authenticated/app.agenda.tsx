@@ -1142,6 +1142,9 @@ function AgendaPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [buscandoOrc, setBuscandoOrc] = useState(false);
+  // Orçamento vinculado ao form atual pertence à especialidade Odontologia?
+  // Quando true, só é permitido agendar com médicos da especialidade Odontologia.
+  const [orcamentoOdonto, setOrcamentoOdonto] = useState(false);
   // Dialog de divisão de orçamento (vários grupos de procedimentos → vários agendamentos vinculados)
   const [dividirOpen, setDividirOpen] = useState(false);
   const [dividirCtx, setDividirCtx] = useState<{
