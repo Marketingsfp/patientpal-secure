@@ -1,49 +1,69 @@
-## Regra: nova geração deve acrescentar slots abaixo dos existentes
+## Objetivo
 
-Hoje, em **Horários médicos → Gerar agenda**, o sistema sempre monta os slots a partir do `hora_inicio` da disponibilidade semanal (ou do override do formulário) e ainda **apaga todos os slots livres** do intervalo antes de inserir. Resultado: quando o usuário roda a geração pela segunda vez em uma data que já tem fichas, os novos horários se sobrepõem aos antigos e a numeração é reembaralhada — foi exatamente o que aconteceu com o Dr. Carlos Eduardo.
+No cadastro de benefícios (regras de preço) dos convênios do Cartão Benefícios, cada regra passa a ter **dois valores**: um para pagamento em **dinheiro** e outro para **cartão/Pix**. O valor já existente vira o "dinheiro" e o novo campo "cartão/Pix" é preenchido manualmente pelo time. O acréscimo automático de cartão configurado no convênio é removido (foi criado errado).
 
-A regra nova é: **para cada (médico, agenda, data), se já existir algum slot criado, os novos slots começam depois do fim do último slot daquela data, mantendo o intervalo escolhido**. Assim as fichas antigas continuam com sua numeração e as novas entram na sequência (61, 62, …).
+Aplica-se às **3 clínicas** (arquivo/tabela única, sem feature flag).
 
-### Escopo
+## Escopo
 
-- Somente a tela `Horários médicos` (`/app/disponibilidades`) — fluxo de "Gerar agenda".
-- Vale para as 3 clínicas (o arquivo é único).
-- Não mexe em bloqueios, agenda global, painel, etc.
+Dentro:
+- Tabela `cb_convenio_regras`: novas colunas para o segundo valor.
+- Formulário de edição de regra em `src/components/cartao-beneficios/regras-tab.tsx`.
+- Motor de preços da agenda que consome a regra (usa `computeValor` em `src/lib/cb-regras.ts`).
+- Remoção do acréscimo automático de cartão do convênio (campos em `cb_convenios` e sua aplicação em `applyAcrescimoCartao`).
 
-### O que muda
+Fora:
+- Convênio Funcionário (não usa cartão benefícios).
+- Regras "gratuito" (permanecem 0 em ambos).
+- Histórico de lançamentos já feitos.
 
-1. **Buscar o "piso" por data/médico/agenda antes de gerar**
-   - Para cada combinação (medico_id, agenda_id, data) que aparece na pré-visualização, consultar em `agendamentos` o maior `fim` já existente naquela data (qualquer status — agendado, pago, disponível, bloqueio), em horário local (America/Sao_Paulo).
-   - Se existir, esse `max(fim)` vira o **novo `hora_inicio` efetivo** daquela data/médico/agenda. Se for maior que o `hora_fim` da janela, nada é gerado para o dia (toast informativo no final: "X datas já estavam completas").
+## Comportamento
 
-2. **Preview respeita o piso**
-   - O `slotsPreview` (usado no rodapé "Serão criados N horários") passa a refletir esse piso, para o usuário ver exatamente o que será acrescentado antes de confirmar.
+### Cadastro da regra
+- Campo atual "Valor (R$)" é renomeado para **"Valor dinheiro (R$)"**.
+- Novo campo ao lado: **"Valor cartão/Pix (R$)"**.
+- Quando o modo é "Percentual de desconto", o mesmo desdobramento vale: **"% desconto dinheiro"** e **"% desconto cartão/Pix"**.
+- Para regras já existentes, o segundo campo é pré-preenchido com o valor atual (mesma coisa que dinheiro) e o time ajusta manualmente quando precisar.
 
-3. **Parar de apagar slots livres do intervalo**
-   - Remover o `DELETE` de slots `DISPONÍVEL` no intervalo. A proteção contra duplicata continua garantida pelo `unique index uq_agend_slot_vazio` + dedupe do lote — se algum slot novo colidir com um existente, o insert simplesmente ignora aquela linha (usar `upsert` com `onConflict` ignorado ou tratar erro por lote).
-   - Isso preserva o comportamento pedido: os antigos permanecem, os novos ficam abaixo.
+### Aplicação na agenda
+- Base "dinheiro" da consulta usa `valor`/`percentual` (dinheiro).
+- Base "outros" (PIX, débito, crédito) usa os novos `valor_cartao`/`percentual_cartao`.
+- Nenhum acréscimo automático é somado por cima.
 
-4. **Aviso na UI**
-   - Adicionar uma linha curta abaixo do botão: *"Se a data já tiver horários criados, os novos serão adicionados após o último horário do dia."*
+### Acréscimo automático (remoção)
+- Deixa de ser aplicado em qualquer fluxo.
+- Os campos ficam no banco por segurança de dados históricos, mas a UI de configuração do convênio deixa de exibi-los e a função `applyAcrescimoCartao` passa a retornar o valor sem alteração (no-op).
 
-### Fora do escopo
+## Detalhes técnicos
 
-- Não altero a lógica de numeração de fichas na Agenda (já está correta após o fix de timezone de ontem).
-- Não mudo o comportamento quando não existem slots na data — continua igual (usa `hora_inicio` da disponibilidade/override).
-- Não toco em bloqueios nem no fluxo de "regerar" manual.
+### Banco (migration)
+```sql
+ALTER TABLE public.cb_convenio_regras
+  ADD COLUMN valor_cartao numeric,
+  ADD COLUMN percentual_cartao numeric;
 
-### Detalhes técnicos
+-- backfill: card = dinheiro
+UPDATE public.cb_convenio_regras
+   SET valor_cartao = valor,
+       percentual_cartao = percentual
+ WHERE valor_cartao IS NULL AND percentual_cartao IS NULL;
+```
 
-Arquivo: `src/routes/_authenticated/app.disponibilidades.tsx`.
+### Frontend
+- `src/lib/cb-regras.ts`
+  - `CbRegra`: adicionar `valor_cartao?: number | null`, `percentual_cartao?: number | null`.
+  - `computeValor`: passar a usar `valor_cartao`/`percentual_cartao` para o retorno `outros` (fallback no dinheiro se nulo, garantindo compatibilidade).
+  - `applyAcrescimoCartao`: transformar em no-op (retorna `valorOutros`), preservando assinatura para não quebrar chamadas.
+- `src/components/cartao-beneficios/regras-tab.tsx`
+  - Renomear label do campo atual e adicionar o novo campo (valor OU percentual, conforme modo).
+  - Persistir os novos campos no insert/update.
+- Remover a seção de "Acréscimo cartão" do formulário de convênio (mantendo colunas no banco, sem uso).
 
-- Novo `useQuery` (ou fetch dentro do `useMemo` assíncrono → melhor: fetch dentro de `gerarAgenda` + um estado `pisosPorChave` recomputado quando muda médico/intervalo) que retorna `Map<"medicoId|agendaId|YYYY-MM-DD" (local), "HH:MM">` com o maior `fim` local por chave, limitado ao intervalo `data_inicio`/`data_fim` e aos médicos alvo.
-- Conversão UTC→local usando `Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" })` — mesmo padrão já aplicado na Agenda.
-- No `slotsPreview`, após montar `dsEfetivo`, ajustar `hora_inicio` para `max(hora_inicio, piso)` e descartar disponibilidades cuja janela ficou inválida.
-- No `gerarAgenda`, remover o bloco `DELETE` e trocar o `insert` por `insert(..., { count: 'exact' })` tolerando o erro `23505` do índice único (log + continuar), ou pré-filtrar contra os slots existentes buscados no piso.
+### Verificação
+- Editar uma regra existente: os dois campos aparecem iguais; alterar só o de cartão/Pix e salvar.
+- Simular na agenda: valor em dinheiro e valor em cartão saem diferentes conforme regra; acréscimo automático não incide mais.
 
-### Confirmação necessária
+## Antes / Depois
 
-Antes de implementar, preciso confirmar duas coisas:
-
-1. **Clínicas alvo**: aplico em todas as 3 clínicas (padrão global, já que o arquivo é único), ou é para restringir a alguma via feature flag?
-2. **Piso considera qualquer slot ou só livres?** Minha proposta é considerar **qualquer slot** existente na data (agendado, pago, bloqueio, livre) — assim mesmo que só existam bloqueios ou fichas pagas no dia, os novos entram depois. Confirma?
+- **Antes:** uma regra tinha um único valor; para diferenciar cartão, dependia de um acréscimo global por convênio.
+- **Depois:** cada regra carrega explicitamente o valor de dinheiro e o valor de cartão/Pix; o acréscimo automático some.
