@@ -379,49 +379,42 @@ export function NovoOrcamentoOdontoDialog({
             {buscaAberta && (
               <div className="border rounded-md p-3 bg-background space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm">Escolher procedimento (Odontologia)</Label>
+                  <Label className="text-sm">Escolher procedimento(s) — Odontologia</Label>
                   <button
                     type="button"
-                    onClick={() => { setBuscaAberta(false); setProcQuery(""); setProcResults([]); }}
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label="Fechar busca"
+                    onClick={() => { setBuscaAberta(false); setProcsSelecionados([]); }}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    aria-label="Fechar"
                   >
-                    <X className="h-4 w-4" />
+                    Fechar
                   </button>
                 </div>
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    autoFocus
-                    className="pl-8"
-                    value={procQuery}
-                    onChange={(e) => setProcQuery(e.target.value)}
-                    placeholder="Digite ao menos 2 letras — ex.: restauração, canal, extração…"
-                  />
-                </div>
-                {procIdsOdonto && procIdsOdonto.size === 0 && (
+                {procsOdonto.length === 0 ? (
                   <p className="text-xs text-amber-600">
                     Nenhum procedimento cadastrado na especialidade Odontologia. Cadastre em Serviços.
                   </p>
-                )}
-                {procResults.length > 0 && (
-                  <div className="border rounded-md max-h-64 overflow-auto">
-                    {procResults.map((p) => (
-                      <button
-                        key={p.id}
+                ) : (
+                  <>
+                    <SearchableMultiSelect
+                      options={procsOdonto.map((p) => ({ value: p.id, label: p.nome }))}
+                      value={procsSelecionados}
+                      onChange={setProcsSelecionados}
+                      placeholder="Selecione um ou mais procedimentos…"
+                      searchPlaceholder="Filtrar por nome…"
+                    />
+                    <div className="flex justify-end">
+                      <Button
                         type="button"
-                        onClick={() => adicionarProc(p)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted border-b last:border-0"
+                        size="sm"
+                        onClick={adicionarProcsSelecionados}
+                        disabled={procsSelecionados.length === 0}
                       >
-                        <div className="font-medium">{p.nome}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {p.valor_padrao ? `Padrão R$ ${Number(p.valor_padrao).toFixed(2)}` : "Valor variável"}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                        <Plus className="h-4 w-4 mr-1" />
+                        Adicionar {procsSelecionados.length > 0 ? `(${procsSelecionados.length})` : ""}
+                      </Button>
+                    </div>
+                  </>
                 )}
-                {searchingProc && <p className="text-xs text-muted-foreground">Buscando…</p>}
               </div>
             )}
           </div>
@@ -453,7 +446,7 @@ export function NovoOrcamentoOdontoDialog({
                               <DentePicker value={it.dentes} onChange={(v) => atualizarItem(idx, "dentes", v)} />
                             </div>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-[1fr_70px_120px_120px_110px] gap-2 items-center">
+                          <div className="grid grid-cols-1 md:grid-cols-[1fr_70px_120px_120px] gap-2 items-center">
                             <Input
                               value={it.descricao}
                               onChange={(e) => atualizarItem(idx, "descricao", e.target.value)}
@@ -472,10 +465,6 @@ export function NovoOrcamentoOdontoDialog({
                               <div className="text-[10px] text-muted-foreground">Cartão</div>
                               <div className="text-sm tabular-nums">R$ {valCart.toFixed(2)}</div>
                             </div>
-                            <CurrencyInput
-                              value={it.valor_unitario ? it.valor_unitario.toFixed(2) : ""}
-                              onChange={(v) => atualizarItem(idx, "valor_unitario", v === "" ? 0 : Number(v))}
-                            />
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Subtotal deste item: <span className="font-medium text-foreground">R$ {sub.toFixed(2)}</span>
