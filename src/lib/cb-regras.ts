@@ -19,7 +19,7 @@ export interface CbRegra {
   limite_qtd?: number | null;
   limite_periodo?: string | null; // "dia" | "semana" | "mes"
   limite_escopo?: string | null;  // "contrato" | "paciente"
-  excedente_modo?: string | null; // "percentual_particular" | "valor_fixo" | "particular" | "bloquear"
+  excedente_modo?: string | null; // "percentual_particular" | "valor_fixo" | "particular" | "bloquear" | "regra_padrao_convenio"
   excedente_percentual?: number | null;
   excedente_valor?: number | null;
   /**
