@@ -24,6 +24,8 @@ interface Props {
   pacienteNome?: string | null;
   lancamentoId?: string | null;
   agendamentoId?: string | null;
+  /** Quando presente, a solicitação refere-se a um movimento de caixa (ex.: sangria). */
+  caixaMovimentoId?: string | null;
   onCreated?: () => void;
 }
 
@@ -31,12 +33,17 @@ const fmt = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export function SolicitarEstornoDialog({
-  open, onOpenChange, descricao, valor, pacienteNome, lancamentoId, agendamentoId, onCreated,
+  open, onOpenChange, descricao, valor, pacienteNome, lancamentoId, agendamentoId, caixaMovimentoId, onCreated,
 }: Props) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const hoje = new Date().toISOString().slice(0, 10);
   const [tipo, setTipo] = useState<"erro_caixa" | "devolucao">("erro_caixa");
+  const ehSangria = !!caixaMovimentoId;
+  // Sangria só faz sentido como "erro de caixa" — trava o tipo.
+  useEffect(() => {
+    if (ehSangria) setTipo("erro_caixa");
+  }, [ehSangria]);
   const [motivo, setMotivo] = useState("");
   const [dataPagamentoOriginal, setDataPagamentoOriginal] = useState<string>(hoje);
   const [dataEstorno, setDataEstorno] = useState<string>(hoje);
@@ -83,13 +90,15 @@ export function SolicitarEstornoDialog({
     setSaving(true);
     // Evita duplicidade: se já existe uma solicitação pendente ou aprovada
     // para o mesmo lançamento ou agendamento, não cria outra.
-    if (lancamentoId || agendamentoId) {
+    if (lancamentoId || agendamentoId || caixaMovimentoId) {
       let q = supabase
         .from("estorno_solicitacoes")
         .select("id, status")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .in("status", ["pendente", "aprovado"]);
-      if (lancamentoId && agendamentoId) {
+      if (caixaMovimentoId) {
+        q = q.eq("caixa_movimento_id", caixaMovimentoId);
+      } else if (lancamentoId && agendamentoId) {
         q = q.or(`lancamento_id.eq.${lancamentoId},agendamento_id.eq.${agendamentoId}`);
       } else if (lancamentoId) {
         q = q.eq("lancamento_id", lancamentoId);
@@ -112,8 +121,11 @@ export function SolicitarEstornoDialog({
     const { error } = await supabase.from("estorno_solicitacoes").insert({
       clinica_id: clinicaAtual.clinica_id,
       lancamento_id: lancamentoId ?? null,
+      caixa_movimento_id: caixaMovimentoId ?? null,
       agendamento_id: await (async () => {
         if (agendamentoId) return agendamentoId;
+        // Sangria não tem agendamento vinculado.
+        if (caixaMovimentoId) return null;
         // Deriva a partir do lançamento para que a Agenda consiga marcar
         // a linha em vermelho e ocultar o paciente para o médico.
         if (lancamentoId) {
@@ -135,7 +147,7 @@ export function SolicitarEstornoDialog({
       data_estorno: tipo === "devolucao" ? (dataEstorno || null) : null,
       status: "pendente",
       solicitado_por: user.id,
-    });
+    } as never);
     setSaving(false);
     if (error) {
       // Índice único parcial (uq_estorno_solicitacoes_lancamento_pendente) é a
@@ -164,7 +176,8 @@ export function SolicitarEstornoDialog({
         <form onSubmit={submit}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Undo2 className="h-4 w-4" /> Solicitar estorno ao financeiro
+              <Undo2 className="h-4 w-4" />
+              {ehSangria ? "Solicitar estorno de sangria" : "Solicitar estorno ao financeiro"}
             </DialogTitle>
             <DialogDescription>
               O financeiro será notificado em tempo real e decidirá pela aprovação ou recusa.
@@ -174,10 +187,15 @@ export function SolicitarEstornoDialog({
             {(descricao || valor != null || pacienteNome) && (
               <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-0.5">
                 {pacienteNome && <div><span className="text-muted-foreground">Paciente:</span> <strong>{pacienteNome}</strong></div>}
-                {descricao && <div><span className="text-muted-foreground">Lançamento:</span> {descricao}</div>}
+                {descricao && (
+                  <div>
+                    <span className="text-muted-foreground">{ehSangria ? "Sangria:" : "Lançamento:"}</span> {descricao}
+                  </div>
+                )}
                 {valor != null && <div><span className="text-muted-foreground">Valor:</span> <strong>{fmt(Number(valor))}</strong></div>}
               </div>
             )}
+            {!ehSangria && (
             <div>
               <Label>Tipo de estorno</Label>
               <RadioGroup
@@ -201,7 +219,8 @@ export function SolicitarEstornoDialog({
                 </label>
               </RadioGroup>
             </div>
-            {tipo === "devolucao" && (
+            )}
+            {!ehSangria && tipo === "devolucao" && (
               <>
               {caixaFechadoAviso && (
                 <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-amber-900 dark:text-amber-200">
