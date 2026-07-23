@@ -532,10 +532,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         </div>
       </div>
 
-      {convenioId && !isFuncionario && (
-        <AcrescimoCartaoBox convenioId={convenioId} />
-      )}
-
       <div className="flex items-center justify-end">
         <div className="text-xs text-muted-foreground">
           {regrasFiltradas.length} de {regras.length} regra(s)
