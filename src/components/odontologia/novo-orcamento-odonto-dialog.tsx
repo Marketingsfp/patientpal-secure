@@ -363,7 +363,7 @@ export function NovoOrcamentoOdontoDialog({
                   <Plus className="h-4 w-4 mr-1" /> Adicionar serviço aos dentes selecionados
                 </Button>
                 <Button type="button" size="sm" variant="ghost" onClick={adicionarManual}>
-                  Item manual
+                  Serviço sem dente
                 </Button>
               </div>
             </div>
