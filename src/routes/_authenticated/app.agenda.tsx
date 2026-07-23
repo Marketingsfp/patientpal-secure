@@ -2705,7 +2705,13 @@ function AgendaPage() {
       return (a.paciente_nome ?? "").localeCompare(b.paciente_nome ?? "", "pt-BR", { sensitivity: "base" });
     });
     ordenados.forEach((a) => {
-      const dia = a.inicio.slice(0, 10);
+      // Usa a data LOCAL (America/Sao_Paulo), não UTC. Antes usávamos
+      // a.inicio.slice(0,10), que pega o dia em UTC — slots que ocorrem
+      // depois das 21:00 locais caem no dia UTC seguinte, o que reiniciava
+      // a numeração da ficha no meio da agenda do mesmo dia.
+      const dia = new Date(a.inicio).toLocaleDateString("en-CA", {
+        timeZone: "America/Sao_Paulo",
+      });
       // Chave por profissional: usa medico_id (que já engloba recursos de
       // enfermagem, mapeados como "médicos virtuais" no load()). Slots sem
       // profissional atribuído são numerados em um bucket próprio por dia.
