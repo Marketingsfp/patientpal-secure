@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { findRegra, computeValor, applyAcrescimoCartao, type CbRegra, type CbAcrescimoCartao } from "@/lib/cb-regras";
+import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
 
 type EspOpt = { id: string; nome: string };
 type ProcOpt = { id: string; nome: string; codigo: string | null; tipo: string | null };
@@ -94,7 +94,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     const [{ data: r, error: e1 }, { data: e, error: e2 }] = await Promise.all([
       (supabase as any)
         .from("cb_convenio_regras")
-        .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito,grupo_gratuidade")
+        .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,valor_cartao,percentual_cartao,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito,grupo_gratuidade")
         .eq("convenio_id", convenioId)
         .order("prioridade", { ascending: false }),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
@@ -311,6 +311,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         modo: r.modo,
         valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
         percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
+        valor_cartao: r.modo === "valor_fixo"
+          ? (r.valor_cartao != null ? Number(r.valor_cartao) || 0 : Number(r.valor) || 0)
+          : null,
+        percentual_cartao: r.modo === "percentual_desconto"
+          ? (r.percentual_cartao != null ? Number(r.percentual_cartao) || 0 : Number(r.percentual) || 0)
+          : null,
         prioridade: Number(r.prioridade) || 1,
         ativo: r.ativo !== false,
         limite_qtd: r.limite_qtd != null ? Number(r.limite_qtd) : null,
@@ -365,21 +371,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         if (page.length < PAGE) break;
       }
 
-      // 1.5) Carrega acréscimo de cartão do convênio (aplicado sobre valor_outros
-      // quando NÃO for Convênio Funcionário).
-      const { data: convRow } = await (supabase as any)
-        .from("cb_convenios")
-        .select("acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor")
-        .eq("id", convenioId)
-        .maybeSingle();
-      const acr: CbAcrescimoCartao | null = convRow?.acrescimo_cartao_modo
-        ? {
-            modo: convRow.acrescimo_cartao_modo,
-            percentual: Number(convRow.acrescimo_cartao_percentual) || 0,
-            valor: Number(convRow.acrescimo_cartao_valor) || 0,
-          }
-        : null;
-
       // 2) carrega vínculos N:N de especialidades
       const { data: vinc, error: errVinc } = await supabase
         .from("procedimento_especialidades")
@@ -428,13 +419,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           }
         }
         if (best) {
-          const outrosComAcr = applyAcrescimoCartao(best.outros, acr, convenioNome);
           upserts.push({
             clinica_id: clinicaId,
             procedimento_id: p.id,
             convenio_id: convenioId,
             valor_dinheiro: best.dinheiro,
-            valor_outros: outrosComAcr,
+            valor_outros: best.outros,
             origem: "regra",
           });
         }
@@ -547,10 +537,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           </Button>
         </div>
       </div>
-
-      {convenioId && !isFuncionario && (
-        <AcrescimoCartaoBox convenioId={convenioId} />
-      )}
 
       <div className="flex items-center justify-end">
         <div className="text-xs text-muted-foreground">
@@ -882,106 +868,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   );
 }
 
-// ---------------------------------------------------------------------------
-// Acréscimo por cartão (convênio-level)
-// ---------------------------------------------------------------------------
-function AcrescimoCartaoBox({ convenioId }: { convenioId: string }) {
-  const [modo, setModo] = useState<"" | "percentual" | "valor_fixo">("");
-  const [percentual, setPercentual] = useState<string>("0");
-  const [valor, setValor] = useState<string>("0");
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    let cancel = false;
-    (async () => {
-      setLoading(true);
-      const { data, error } = await (supabase as any)
-        .from("cb_convenios")
-        .select("acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor")
-        .eq("id", convenioId)
-        .maybeSingle();
-      setLoading(false);
-      if (cancel) return;
-      if (error) { mostrarErro(error); return; }
-      setModo((data?.acrescimo_cartao_modo as any) ?? "");
-      setPercentual(String(data?.acrescimo_cartao_percentual ?? 0));
-      setValor(String(data?.acrescimo_cartao_valor ?? 0));
-    })();
-    return () => { cancel = true; };
-  }, [convenioId]);
-
-  const salvar = async () => {
-    setSaving(true);
-    const payload = {
-      acrescimo_cartao_modo: modo || null,
-      acrescimo_cartao_percentual: modo === "percentual" ? Number(percentual) || 0 : 0,
-      acrescimo_cartao_valor: modo === "valor_fixo" ? Number(valor) || 0 : 0,
-    };
-    const { error } = await (supabase as any)
-      .from("cb_convenios")
-      .update(payload)
-      .eq("id", convenioId);
-    setSaving(false);
-    if (error) { mostrarErro(error); return; }
-    toast.success("Acréscimo de cartão salvo.");
-  };
-
-  return (
-    <div className="rounded-md border bg-muted/30 p-4 space-y-3">
-      <div>
-        <div className="font-medium">Valor de cartão com acréscimo de</div>
-        <p className="text-xs text-muted-foreground">
-          Quando o paciente usa o benefício e paga em uma forma diferente de dinheiro
-          (PIX, débito ou crédito), o valor recebe este acréscimo automaticamente.
-          Não se aplica ao Convênio Funcionário.
-        </p>
-      </div>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs">Tipo</Label>
-          <Select value={modo || "none"} onValueChange={(v) => setModo(v === "none" ? "" : (v as any))}>
-            <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Sem acréscimo</SelectItem>
-              <SelectItem value="percentual">Percentual (%)</SelectItem>
-              <SelectItem value="valor_fixo">Valor fixo (R$)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {modo === "percentual" && (
-          <div className="space-y-1">
-            <Label className="text-xs">Percentual</Label>
-            <div className="flex items-center gap-1">
-              <Input
-                type="number" min="0" step="0.01" className="w-[110px] h-9"
-                value={percentual}
-                onChange={(e) => setPercentual(e.target.value)}
-                disabled={loading}
-              />
-              <span className="text-sm text-muted-foreground">%</span>
-            </div>
-          </div>
-        )}
-        {modo === "valor_fixo" && (
-          <div className="space-y-1">
-            <Label className="text-xs">Valor</Label>
-            <CurrencyInput
-              value={valor}
-              onChange={(v) => setValor(v)}
-              className="w-[140px] h-9"
-              disabled={loading}
-            />
-          </div>
-        )}
-        <Button size="sm" onClick={salvar} disabled={saving || loading}>
-          {saving ? "Salvando…" : "Salvar acréscimo"}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function LimiteDialog({
   idx, regras, onClose, onChange, onSave, saving,
 }: {
@@ -1140,6 +1026,8 @@ function NovaRegraDialog({
     modo: "valor_fixo",
     valor: 0,
     percentual: null,
+    valor_cartao: 0,
+    percentual_cartao: null,
     prioridade: 10,
     ativo: true,
     limite_qtd: null,
@@ -1189,6 +1077,12 @@ function NovaRegraDialog({
       modo: r.modo,
       valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
       percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
+      valor_cartao: r.modo === "valor_fixo"
+        ? (r.valor_cartao != null ? Number(r.valor_cartao) || 0 : Number(r.valor) || 0)
+        : null,
+      percentual_cartao: r.modo === "percentual_desconto"
+        ? (r.percentual_cartao != null ? Number(r.percentual_cartao) || 0 : Number(r.percentual) || 0)
+        : null,
       prioridade: Number(r.prioridade) || 1,
       ativo: r.ativo !== false,
       limite_qtd: hasLimit ? Number(r.limite_qtd) : null,
@@ -1278,7 +1172,7 @@ function NovaRegraDialog({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t pt-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t pt-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Modo</Label>
               <Select value={r.modo} onValueChange={(v) => upd({ modo: v })}>
@@ -1290,7 +1184,20 @@ function NovaRegraDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">{r.modo === "valor_fixo" ? "Valor (R$)" : "Percentual (%)"}</Label>
+              <Label className="text-xs">Prioridade</Label>
+              <Input
+                type="number" min="1" max="100"
+                value={r.prioridade}
+                onChange={(e) => upd({ prioridade: parseInt(e.target.value) || 1 })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">
+                {r.modo === "valor_fixo" ? "Valor dinheiro (R$)" : "% desconto dinheiro"}
+              </Label>
               {r.modo === "valor_fixo" ? (
                 <CurrencyInput
                   value={r.valor !== null ? Number(r.valor).toFixed(2) : ""}
@@ -1305,12 +1212,24 @@ function NovaRegraDialog({
               )}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Prioridade</Label>
-              <Input
-                type="number" min="1" max="100"
-                value={r.prioridade}
-                onChange={(e) => upd({ prioridade: parseInt(e.target.value) || 1 })}
-              />
+              <Label className="text-xs">
+                {r.modo === "valor_fixo" ? "Valor cartão/PIX (R$)" : "% desconto cartão/PIX"}
+              </Label>
+              {r.modo === "valor_fixo" ? (
+                <CurrencyInput
+                  value={r.valor_cartao != null ? Number(r.valor_cartao).toFixed(2) : ""}
+                  onChange={(v) => upd({ valor_cartao: v ? parseFloat(v) : 0 })}
+                />
+              ) : (
+                <Input
+                  type="number" min="0" max="100" step="0.01"
+                  value={r.percentual_cartao ?? ""}
+                  onChange={(e) => upd({ percentual_cartao: e.target.value ? parseFloat(e.target.value) : 0 })}
+                />
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Usado quando o pagamento é em PIX, débito ou crédito.
+              </p>
             </div>
           </div>
 
@@ -1337,7 +1256,7 @@ function NovaRegraDialog({
                   onCheckedChange={(v) => {
                     const on = v === true;
                     upd(on
-                      ? { gratuito: true, modo: "valor_fixo", valor: 0, percentual: null }
+                      ? { gratuito: true, modo: "valor_fixo", valor: 0, percentual: null, valor_cartao: 0, percentual_cartao: null }
                       : { gratuito: false });
                   }}
                 />

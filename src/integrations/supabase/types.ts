@@ -2004,11 +2004,13 @@ export type Database = {
           modo: string
           nome_padrao: string | null
           percentual: number | null
+          percentual_cartao: number | null
           prioridade: number
           procedimento_id: string | null
           tipo: string | null
           updated_at: string
           valor: number | null
+          valor_cartao: number | null
         }
         Insert: {
           ativo?: boolean
@@ -2029,11 +2031,13 @@ export type Database = {
           modo: string
           nome_padrao?: string | null
           percentual?: number | null
+          percentual_cartao?: number | null
           prioridade?: number
           procedimento_id?: string | null
           tipo?: string | null
           updated_at?: string
           valor?: number | null
+          valor_cartao?: number | null
         }
         Update: {
           ativo?: boolean
@@ -2054,11 +2058,13 @@ export type Database = {
           modo?: string
           nome_padrao?: string | null
           percentual?: number | null
+          percentual_cartao?: number | null
           prioridade?: number
           procedimento_id?: string | null
           tipo?: string | null
           updated_at?: string
           valor?: number | null
+          valor_cartao?: number | null
         }
         Relationships: [
           {
