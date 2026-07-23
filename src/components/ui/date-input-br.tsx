@@ -26,16 +26,24 @@ function brToIso(br: string): string {
   return `${yearText}-${m[2]}-${m[1]}`;
 }
 
-// Aplica máscara dd/mm/yyyy incrementalmente. Ao digitar (typing=true), insere
-// "/" ao completar 2 e 4 dígitos como feedback visual. Ao apagar (typing=false),
-// NÃO reinsere barras finais — assim backspace consegue remover tanto "/" quanto
-// dígitos sem "grudar" a barra de volta.
+// Aplica máscara dd/mm/yyyy incrementalmente.
+// - typing=true: insere "/" ao completar 2 e 4 dígitos como feedback visual e
+//   reflui os dígitos no formato dd/mm/yyyy.
+// - typing=false (apagando): NÃO reflui nem reinsere barras — preserva a
+//   posição atual das "/" para que o backspace apague um caractere por vez
+//   (o dígito antes da barra sem levar a barra junto, ou a própria barra
+//   sem "grudar" de volta).
 function applyMask(raw: string, typing: boolean): string {
+  if (!typing) {
+    // Mantém dígitos e barras exatamente como o usuário deixou, apenas limpa
+    // qualquer caractere inválido e limita a 10 posições (dd/mm/yyyy).
+    return raw.replace(/[^\d/]/g, "").slice(0, 10);
+  }
   const digits = raw.replace(/\D/g, "").slice(0, 8);
-  if (digits.length <= 2) return typing && digits.length === 2 ? `${digits}/` : digits;
+  if (digits.length <= 2) return digits.length === 2 ? `${digits}/` : digits;
   if (digits.length <= 4) {
     const base = `${digits.slice(0, 2)}/${digits.slice(2)}`;
-    return typing && digits.length === 4 ? `${base}/` : base;
+    return digits.length === 4 ? `${base}/` : base;
   }
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
