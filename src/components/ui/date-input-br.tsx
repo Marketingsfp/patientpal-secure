@@ -37,14 +37,17 @@ function brToIso(br: string): string {
   return `${yearText}-${m[2]}-${m[1]}`;
 }
 
-// Aplica máscara dd/mm/yyyy incrementalmente. Insere "/" já ao completar 2 e 4 dígitos
-// para dar feedback visual imediato ("23" -> "23/", "2305" -> "23/05/").
-function applyMask(raw: string): string {
+// Aplica máscara dd/mm/yyyy incrementalmente. Ao digitar (typing=true), insere
+// "/" ao completar 2 e 4 dígitos como feedback visual. Ao apagar (typing=false),
+// NÃO reinsere barras finais — assim backspace consegue remover tanto "/" quanto
+// dígitos sem "grudar" a barra de volta.
+function applyMask(raw: string, typing: boolean): string {
   const digits = raw.replace(/\D/g, "").slice(0, 8);
-  if (digits.length < 2) return digits;
-  if (digits.length === 2) return `${digits}/`;
-  if (digits.length < 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  if (digits.length === 4) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/`;
+  if (digits.length <= 2) return typing && digits.length === 2 ? `${digits}/` : digits;
+  if (digits.length <= 4) {
+    const base = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return typing && digits.length === 4 ? `${base}/` : base;
+  }
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
@@ -113,7 +116,9 @@ export const DateInputBR = forwardRef<HTMLInputElement, Props>(function DateInpu
       disabled={disabled}
       className={cn(showCalendar ? "pr-9" : "", className)}
       onChange={(e) => {
-        const masked = applyMask(e.target.value);
+        const inputType = (e.nativeEvent as InputEvent).inputType ?? "";
+        const typing = !inputType.startsWith("delete");
+        const masked = applyMask(e.target.value, typing);
         setText(masked);
         emitChange(brToIso(masked));
       }}
