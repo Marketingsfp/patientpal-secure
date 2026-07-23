@@ -84,6 +84,7 @@ function Page() {
   // existente naquela data. Usado para acrescentar novos slots ABAIXO dos
   // já criados, preservando a numeração de fichas.
   const [pisos, setPisos] = useState<Map<string, string>>(new Map());
+  const [pisoTick, setPisoTick] = useState(0);
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
   const [dispEditando, setDispEditando] = useState<string | null>(null);
   const [editRow, setEditRow] = useState<{ dia_semana: string; hora_inicio: string; hora_fim: string; limite_pacientes: string; intervalo_min: string; vigencia_inicio: string; vigencia_fim: string } | null>(null);
@@ -188,7 +189,7 @@ function Page() {
     })();
     return () => { cancelled = true; };
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [clinicaAtual?.clinica_id, gerar.data_inicio, gerar.data_fim, gerar.medico_id, medicos]);
+  }, [clinicaAtual?.clinica_id, gerar.data_inicio, gerar.data_fim, gerar.medico_id, medicos, pisoTick]);
 
   // Recarrega ao voltar para a aba/janela e quando o foco retorna,
   // garantindo que médicos recém cadastrados em outra tela apareçam aqui.
@@ -506,7 +507,7 @@ function Page() {
       if (ignorados > 0) toast.success(`${inseridos} horários criados (${ignorados} já existiam e foram ignorados)`);
       else toast.success(`${inseridos} horários criados`);
       // Recarrega o piso para refletir os novos slots imediatamente na preview.
-      setGerar((g) => ({ ...g }));
+      setPisoTick((t) => t + 1);
     } catch (e: any) {
       mostrarErro(e);
     } finally {
