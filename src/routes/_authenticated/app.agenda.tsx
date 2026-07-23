@@ -174,6 +174,10 @@ const STATUS_COR: Record<Status, string> = {
 const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const PAGE_SIZE = 100;
 
+// ID fixo da especialidade "Odontologia" no cadastro de especialidades.
+// Usado para restringir orçamentos odonto a médicos odontologistas.
+const ODONTO_ESPECIALIDADE_ID = "f0cfaa0a-2a67-4176-97de-a7072c37077c";
+
 const normalizar = (s: string) =>
   (s ?? "")
     .normalize("NFD")
@@ -1142,6 +1146,13 @@ function AgendaPage() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [buscandoOrc, setBuscandoOrc] = useState(false);
+  // Orçamento vinculado ao form atual pertence à especialidade Odontologia?
+  // Quando true, só é permitido agendar com médicos da especialidade Odontologia.
+  const [orcamentoOdonto, setOrcamentoOdonto] = useState(false);
+  // Sincroniza a flag "orçamento é odonto" quando o vínculo é limpo.
+  useEffect(() => {
+    if (!form.orcamento_id) setOrcamentoOdonto(false);
+  }, [form.orcamento_id]);
   // Dialog de divisão de orçamento (vários grupos de procedimentos → vários agendamentos vinculados)
   const [dividirOpen, setDividirOpen] = useState(false);
   const [dividirCtx, setDividirCtx] = useState<{
@@ -3464,7 +3475,12 @@ function AgendaPage() {
       // Odontologia: em vez de auto-juntar todos os itens restantes num
       // único agendamento, abre um pop-up para o usuário escolher quais
       // itens usar agora. O restante fica disponível para agendar depois.
-      const isOdonto = orc.especialidade_id === "f0cfaa0a-2a67-4176-97de-a7072c37077c";
+      const isOdonto = orc.especialidade_id === ODONTO_ESPECIALIDADE_ID;
+      setOrcamentoOdonto(isOdonto);
+      if (isOdonto && form.medico_id && !medicoEspec.get(form.medico_id)?.has(ODONTO_ESPECIALIDADE_ID)) {
+        setForm((f) => ({ ...f, medico_id: "" }));
+        toast.info("Selecione um médico da especialidade Odontologia para este orçamento.");
+      }
       if (isOdonto) {
         setSelecItensCtx({
           orcamento: {
@@ -3544,6 +3560,7 @@ function AgendaPage() {
   const limparOrcamento = () => {
     setForm((f) => ({ ...f, orcamento_id: "", orcamento_numero: "", orcamento_itens: [] }));
     setPendingOrcItemIds([]);
+    setOrcamentoOdonto(false);
   };
 
   // Abre o diálogo de novo agendamento já com o nº de orçamento preenchido
@@ -3699,6 +3716,14 @@ function AgendaPage() {
         .eq("orcamento_id", a.orcamento_id)
         .order("ordem");
       itensOrc = ((its ?? []) as { descricao: string }[]).map((x) => x.descricao);
+      const { data: orcRow } = await supabase
+        .from("orcamentos")
+        .select("especialidade_id")
+        .eq("id", a.orcamento_id)
+        .maybeSingle();
+      setOrcamentoOdonto((orcRow?.especialidade_id ?? null) === ODONTO_ESPECIALIDADE_ID);
+    } else {
+      setOrcamentoOdonto(false);
     }
     // Se o agendamento veio sem paciente_id (ex.: criado a partir de um
     // orçamento que também não tinha o vínculo), tenta resolver pelo nome
@@ -3794,6 +3819,13 @@ function AgendaPage() {
     if (new Date(form.fim) <= new Date(form.inicio)) {
       toast.error("O horário final deve ser após o inicial");
       return;
+    }
+    if (form.orcamento_id && orcamentoOdonto && form.medico_id) {
+      const espSet = medicoEspec.get(form.medico_id);
+      if (!espSet || !espSet.has(ODONTO_ESPECIALIDADE_ID)) {
+        toast.error("Orçamentos de Odontologia só podem ser agendados com médicos da especialidade Odontologia.");
+        return;
+      }
     }
     const multiPermitido =
       !!form.medico_id &&
@@ -5425,8 +5457,15 @@ function AgendaPage() {
                       searchPlaceholder="Buscar médico ou exame..."
                       options={[
                         { value: "none", label: "— Sem médico —" },
-                        ...medicos.map((m) => ({ value: m.id, label: `👨‍⚕️ ${m.nome}` })),
-                        ...exames.map((e) => ({ value: `exame:${e.nome}`, label: `🧪 ${e.nome}` })),
+                        ...medicos
+                          .filter((m) =>
+                            !(form.orcamento_id && orcamentoOdonto)
+                              || medicoEspec.get(m.id)?.has(ODONTO_ESPECIALIDADE_ID),
+                          )
+                          .map((m) => ({ value: m.id, label: `👨‍⚕️ ${m.nome}` })),
+                        ...(form.orcamento_id && orcamentoOdonto
+                          ? []
+                          : exames.map((e) => ({ value: `exame:${e.nome}`, label: `🧪 ${e.nome}` }))),
                       ]}
                     />
                   </div>
