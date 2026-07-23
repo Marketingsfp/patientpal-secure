@@ -14,24 +14,13 @@ function isoToBr(iso: string): string {
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
-// Converte "dd/mm/yyyy" ou "dd/mm/yy" -> "yyyy-mm-dd".
-// Ano curto: usa um pivô ~20 anos à frente do ano atual. 20yy até
-// (ano atual + 20) fica em 2000+yy; acima disso volta a 1900+yy.
-// Assim "15/01/27" → 2027 (vencimento futuro), "23/05/85" → 1985
-// (nascimento) e "10/01/30" → 2030.
+// Converte "dd/mm/yyyy" -> "yyyy-mm-dd".
+// Não aceita ano curto durante digitação: "28/07/20" deve continuar parcial,
+// não virar automaticamente "28/07/2020" ao apagar ou editar o campo.
 function brToIso(br: string): string {
-  const m = /^(\d{2})\/(\d{2})\/(\d{2}|\d{4})$/.exec(br);
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(br);
   if (!m) return "";
-  let yearText: string;
-  if (m[3].length === 2) {
-    const yy = Number(m[3]);
-    const currentYear = new Date().getFullYear();
-    const asTwentyK = 2000 + yy;
-    const pivot = currentYear + 20;
-    yearText = asTwentyK <= pivot ? String(asTwentyK) : String(1900 + yy);
-  } else {
-    yearText = m[3];
-  }
+  const yearText = m[3];
   const day = Number(m[1]), month = Number(m[2]), year = Number(yearText);
   if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900) return "";
   return `${yearText}-${m[2]}-${m[1]}`;
@@ -120,7 +109,8 @@ export const DateInputBR = forwardRef<HTMLInputElement, Props>(function DateInpu
         const typing = !inputType.startsWith("delete");
         const masked = applyMask(e.target.value, typing);
         setText(masked);
-        emitChange(brToIso(masked));
+        const iso = brToIso(masked);
+        if (iso || masked === "") emitChange(iso);
       }}
       onBlur={(e) => {
         if (onBlur) {
