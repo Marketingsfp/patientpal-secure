@@ -151,6 +151,45 @@ function Page() {
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
 
+  // Piso por (medico|agenda|dataLocal): consulta os agendamentos já criados
+  // no intervalo do formulário para os médicos-alvo e guarda o maior `fim`
+  // (HH:MM local) de cada dia. A geração de novos slots vai começar depois
+  // desse piso, garantindo que fichas novas fiquem ABAIXO das existentes.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!clinicaAtual || !gerar.data_inicio || !gerar.data_fim) {
+        setPisos(new Map()); return;
+      }
+      const alvoIds = gerar.medico_id === "all"
+        ? medicos.map((m) => m.id)
+        : (gerar.medico_id ? [gerar.medico_id] : []);
+      if (alvoIds.length === 0) { setPisos(new Map()); return; }
+      const iniIso = new Date(`${gerar.data_inicio}T00:00:00`).toISOString();
+      const fimIso = new Date(`${gerar.data_fim}T23:59:59`).toISOString();
+      const { data, error } = await supabase
+        .from("agendamentos")
+        .select("medico_id, agenda_id, inicio, fim")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .in("medico_id", alvoIds)
+        .gte("inicio", iniIso)
+        .lte("inicio", fimIso)
+        .limit(20000);
+      if (error || cancelled) return;
+      const map = new Map<string, string>();
+      for (const r of (data ?? []) as Array<{ medico_id: string; agenda_id: string | null; inicio: string; fim: string }>) {
+        const dLocal = toLocalDate(r.inicio);
+        const tFim = toLocalTime(r.fim);
+        const key = `${r.medico_id}|${r.agenda_id ?? ""}|${dLocal}`;
+        const prev = map.get(key);
+        if (!prev || tFim > prev) map.set(key, tFim);
+      }
+      if (!cancelled) setPisos(map);
+    })();
+    return () => { cancelled = true; };
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [clinicaAtual?.clinica_id, gerar.data_inicio, gerar.data_fim, gerar.medico_id, medicos]);
+
   // Recarrega ao voltar para a aba/janela e quando o foco retorna,
   // garantindo que médicos recém cadastrados em outra tela apareçam aqui.
   useEffect(() => {
