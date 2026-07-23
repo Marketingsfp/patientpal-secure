@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/movimento")({
   component: Page,
@@ -37,6 +38,8 @@ interface Lanc {
   origem?: "fin" | "caixa";
   /** direção da transferência: entrada (suprimento) ou saída (sangria) */
   transferSentido?: "entrada" | "saida";
+  /** Tipo original do movimento de caixa (só quando origem === "caixa"). */
+  caixaTipo?: "sangria" | "suprimento";
   /** HH:MM local — só preenchido para linhas vindas de caixa_movimentos */
   hora?: string | null;
   /** Nome do médico do lançamento (linhas de fin_lancamentos com medico_id). */
@@ -66,6 +69,7 @@ function Page() {
   const isMobile = useIsMobile();
   const modoMobile = uxMelhorias && isMobile;
   const [estornando, setEstornando] = useState<string | null>(null);
+  const [estornoSangria, setEstornoSangria] = useState<Lanc | null>(null);
   const [items, setItems] = useState<Lanc[]>([]);
   const [cats, setCats] = useState<Opt[]>([]);
   const [contas, setContas] = useState<Opt[]>([]);
