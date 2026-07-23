@@ -2124,7 +2124,8 @@ function DetalheContrato({
 
   // Cancelamento do contrato
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [cancelMotivo, setCancelMotivo] = useState("");
+  const [cancelMotivoOpcao, setCancelMotivoOpcao] = useState<string>("");
+  const [cancelObs, setCancelObs] = useState("");
   const [cancelSaving, setCancelSaving] = useState(false);
   const [canceladoEm, setCanceladoEm] = useState<string | null>(contrato.cancelado_em ?? null);
   const [cancelMotivoAtual, setCancelMotivoAtual] = useState<string | null>(contrato.cancelamento_motivo ?? null);
