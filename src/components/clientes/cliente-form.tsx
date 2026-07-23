@@ -242,6 +242,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     setForm({
       nome: editing.nome,
       cpf: editing.cpf ?? "", numero_pasta: editing.numero_pasta ?? "",
+      codigo_prontuario: (editing as any).codigo_prontuario ?? "",
       telefone: editing.telefone ?? "", telefone2: editing.telefone2 ?? "",
       email: editing.email ?? "",
       data_nascimento: editing.data_nascimento ?? "",
