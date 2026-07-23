@@ -44,6 +44,20 @@ function isFeriadoOuDomingo(d: Date): boolean {
   return FERIADOS_FIXOS.has(mmdd);
 }
 
+// Formatadores em horário local de Brasília — usados para calcular o "piso"
+// (último horário já criado numa data) em coerência com o que o usuário vê
+// na Agenda. Evita bug de fuso horário ao usar `.toISOString().slice(0,10)`
+// em datas próximas da meia-noite.
+const TZ_LOCAL = "America/Sao_Paulo";
+const fmtDateLocal = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TZ_LOCAL, year: "numeric", month: "2-digit", day: "2-digit",
+});
+const fmtTimeLocal = new Intl.DateTimeFormat("en-GB", {
+  timeZone: TZ_LOCAL, hour: "2-digit", minute: "2-digit", hour12: false,
+});
+const toLocalDate = (v: Date | string) => fmtDateLocal.format(new Date(v));
+const toLocalTime = (v: Date | string) => fmtTimeLocal.format(new Date(v));
+
 interface Disp { id: string; medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; observacoes: string | null; limite_pacientes: number | null; intervalo_min: number | null }
 type DispExt = Disp & { vigencia_inicio: string | null; vigencia_fim: string | null };
 interface Medico { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; procedimento_padrao_nome: string | null; especialidade_nome: string | null; cidade: string | null; estado: string | null; bairro: string | null }
