@@ -1256,7 +1256,7 @@ function NovaRegraDialog({
                   onCheckedChange={(v) => {
                     const on = v === true;
                     upd(on
-                      ? { gratuito: true, modo: "valor_fixo", valor: 0, percentual: null }
+                      ? { gratuito: true, modo: "valor_fixo", valor: 0, percentual: null, valor_cartao: 0, percentual_cartao: null }
                       : { gratuito: false });
                   }}
                 />
