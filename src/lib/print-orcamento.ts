@@ -49,8 +49,9 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
   const splitFormas = (i: any): { din: number; cart: number } | null => {
     const vf = i.valores_formas as Record<string, number> | null | undefined;
     if (!vf) return null;
-    const din = Math.max(Number(vf["Dinheiro"] ?? 0), Number(vf["PIX"] ?? 0));
+    const din = Number(vf["Dinheiro"] ?? 0);
     const cart = Math.max(
+      Number(vf["PIX"] ?? 0),
       Number(vf["Cartão de Crédito"] ?? 0),
       Number(vf["Cartão de Débito"] ?? 0),
       Number(vf["Cartão"] ?? 0),
@@ -154,8 +155,8 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
     <table>
       ${temSplit
         ? `${desconto > 0 ? `<tr><td>DESCONTO</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
-           <tr class="bold lg"><td>DINHEIRO/PIX</td><td class="right">${fmtBRL(totalDinheiro)}</td></tr>
-           <tr class="bold lg"><td>CARTÃO</td><td class="right">${fmtBRL(totalCartao)}</td></tr>`
+           <tr class="bold lg"><td>DINHEIRO</td><td class="right">${fmtBRL(totalDinheiro)}</td></tr>
+           <tr class="bold lg"><td>CARTÃO/PIX</td><td class="right">${fmtBRL(totalCartao)}</td></tr>`
         : `<tr><td>SUBTOTAL</td><td class="right">${fmtBRL(subtotal)}</td></tr>
            ${desconto > 0 ? `<tr><td>DESCONTO</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
            <tr class="bold lg"><td>TOTAL</td><td class="right">${fmtBRL(total)}</td></tr>`}
