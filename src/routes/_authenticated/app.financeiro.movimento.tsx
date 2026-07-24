@@ -106,6 +106,19 @@ function Page() {
   const [filterFichaDebounced, setFilterFichaDebounced] = useState<string>("");
   const PAGE_SIZE = 100;
   const [page, setPage] = useState(1);
+  // Preferência do usuário: decompor pagamentos "misto" nas formas reais
+  // (DINHEIRO, PIX, CARTÃO…) em TODAS as visões — tabela, drill-down,
+  // export e relatório. Padrão: ligado. Persistido por navegador.
+  const [decomporMisto, setDecomporMisto] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const v = window.localStorage.getItem("financeiro:decomporMisto");
+    return v === null ? true : v === "1";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("financeiro:decomporMisto", decomporMisto ? "1" : "0");
+    }
+  }, [decomporMisto]);
 
   useEffect(() => {
     const t = setTimeout(() => setFilterPacienteDebounced(filterPaciente.trim()), 300);
