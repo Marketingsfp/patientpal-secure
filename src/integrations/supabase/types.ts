@@ -5364,6 +5364,7 @@ export type Database = {
           clinica_id: string
           complemento: string | null
           conta: string | null
+          convenio_contrato_id: string | null
           cpf: string | null
           created_at: string
           crm: string
@@ -5382,6 +5383,7 @@ export type Database = {
           nacionalidade: string | null
           nome: string
           numero: string | null
+          paciente_id: string | null
           paytime_recipient_id: string | null
           percentual_repasse_padrao: number
           pix_chave: string | null
@@ -5414,6 +5416,7 @@ export type Database = {
           clinica_id: string
           complemento?: string | null
           conta?: string | null
+          convenio_contrato_id?: string | null
           cpf?: string | null
           created_at?: string
           crm: string
@@ -5432,6 +5435,7 @@ export type Database = {
           nacionalidade?: string | null
           nome: string
           numero?: string | null
+          paciente_id?: string | null
           paytime_recipient_id?: string | null
           percentual_repasse_padrao?: number
           pix_chave?: string | null
@@ -5464,6 +5468,7 @@ export type Database = {
           clinica_id?: string
           complemento?: string | null
           conta?: string | null
+          convenio_contrato_id?: string | null
           cpf?: string | null
           created_at?: string
           crm?: string
@@ -5482,6 +5487,7 @@ export type Database = {
           nacionalidade?: string | null
           nome?: string
           numero?: string | null
+          paciente_id?: string | null
           paytime_recipient_id?: string | null
           percentual_repasse_padrao?: number
           pix_chave?: string | null
@@ -5509,10 +5515,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "medicos_convenio_contrato_id_fkey"
+            columns: ["convenio_contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_assinatura"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "medicos_especialidade_id_fkey"
             columns: ["especialidade_id"]
             isOneToOne: false
             referencedRelation: "especialidades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medicos_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
             referencedColumns: ["id"]
           },
           {
@@ -8992,7 +9012,23 @@ export type Database = {
         Args: { p_item_id: string; p_motivo: string }
         Returns: Json
       }
+      medico_convenio_add_dependente: {
+        Args: { _medico_id: string; _paciente_id: string; _parentesco: string }
+        Returns: string
+      }
+      medico_convenio_remove_dependente: {
+        Args: { _dependente_id: string }
+        Returns: undefined
+      }
       medico_dados_sensiveis: { Args: { _medico_id: string }; Returns: Json }
+      medico_toggle_convenio_funcionario: {
+        Args: {
+          _habilitar: boolean
+          _medico_id: string
+          _titular_paciente_id: string
+        }
+        Returns: string
+      }
       medicos_face_lista: {
         Args: { _clinica_id: string }
         Returns: {
