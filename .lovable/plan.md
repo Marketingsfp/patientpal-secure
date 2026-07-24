@@ -1,52 +1,38 @@
-## Problema
+# Adicionar coluna "DIA" na Agenda
 
-No cadastro/edição de benefícios do Cartão Convênio, o seletor **"Quando exceder, cobrar"** oferece a opção **"Aplicar regra padrão do convênio"**, mas o banco rejeita esse valor com o erro `cb_convenio_regras_limite_ck` (violação de CHECK). Isso faz aparecer o toast **"Configuração de limite inválida nesta regra…"** ao salvar.
+Escopo: todas as 3 clínicas (mudança visual global na tabela da Agenda).
 
-Causa raiz: incoerência entre a UI (que oferece 5 opções) e a trava do banco (que só aceita 4: `percentual_particular`, `valor_fixo`, `particular`, `bloquear`). Além disso, nenhum consumidor da regra (agenda, aviso de limite) trata esse modo hoje.
+## O que muda
 
-## O que vai ser feito
+Na tabela da Agenda (visualização Lista, desktop), antes da coluna **DATA**, aparecerá uma nova coluna **DIA** com a abreviação do dia da semana em português, 3 letras, maiúsculas, sem acento:
 
-Aplicar globalmente (todas as 3 clínicas), com semântica **"herdar da regra genérica do convênio"** conforme sua escolha.
+- 23/07/26 → `QUI`
+- 24/07/26 → `SEX`
+- 25/07/26 → `SAB`
+- 26/07/26 → `DOM`
+- 27/07/26 → `SEG`
+- 28/07/26 → `TER`
+- 29/07/26 → `QUA`
 
-### 1. Banco de dados — migration
+Fora do escopo:
+- Visualização "Por médico" (não tem coluna Data).
+- Cards mobile/tablet (a data já aparece por extenso lá).
+- Comprovantes, impressões, exports do Excel.
 
-- Recriar a constraint `cb_convenio_regras_limite_ck` incluindo `regra_padrao_convenio` na lista de valores válidos para `excedente_modo`.
-- Atualizar o `COMMENT` da coluna descrevendo o novo modo.
-- Sem alteração em dados existentes (apenas relaxa a trava). Aditivo, sem risco para regras já cadastradas.
+## Detalhes técnicos
 
-### 2. Motor de aplicação da regra
+- Arquivo: `src/routes/_authenticated/app.agenda.tsx` (tabela desktop da view Lista).
+- Adicionar cabeçalho `<th>DIA</th>` imediatamente antes de `DATA`.
+- Adicionar célula correspondente em cada linha, calculando o dia da semana a partir do mesmo campo de data já usado na linha (parse local, sem UTC, para evitar o off-by-one que já corrigimos antes na numeração de ficha).
+- Mapeamento fixo `['DOM','SEG','TER','QUA','QUI','SEX','SAB']` para garantir 3 letras sem acento, independentemente da locale do navegador.
+- Estilo: mesma tipografia da coluna DATA, em `tabular-nums`, largura mínima suficiente para 3 letras.
+- Linhas de slot vazio e linhas agrupadas exibem o DIA normalmente (é derivado da data da linha).
 
-Ajustar os dois pontos que hoje leem `excedente_modo` para tratar `regra_padrao_convenio` como fallback:
+## Validação
 
-- **`src/routes/_authenticated/app.agenda.tsx`** (cálculo do valor da consulta quando o paciente excede o limite)
-- **`src/lib/agenda/aviso-limite-pendentes.ts`** (texto do aviso mostrado ao operador)
-
-Lógica de fallback:
-
-1. Se `excedente_modo === 'regra_padrao_convenio'`, procurar entre as regras já carregadas do mesmo `convenio_id` uma regra **genérica** — sem `procedimento_id` e sem `especialidade_id` (regra "coringa" do convênio).
-2. Se encontrar, usar o `excedente_modo` / `excedente_percentual` / `excedente_valor` dessa regra genérica no lugar.
-3. Se **não** encontrar regra genérica, aplicar `bloquear` como fallback seguro (impede uso sem contrapartida definida) e registrar no aviso: "Regra padrão do convênio não configurada — bloqueado".
-
-Nenhum outro consumidor usa esse campo hoje (validei com busca em `src/`).
-
-### 3. UI — `src/components/cartao-beneficios/regras-tab.tsx`
-
-- Manter a opção **"Aplicar regra padrão do convênio"** nos dois formulários (linhas 964 e 1424).
-- Adicionar dica curta abaixo do Select quando esse modo estiver selecionado: *"Ao exceder, o sistema usa o excedente da regra genérica deste convênio (a que não especifica procedimento nem especialidade). Se não houver, o benefício é bloqueado."*
-- Ocultar os campos "Percentual" e "Valor fixo" quando esse modo estiver selecionado (já são ocultados hoje para modos que não os usam — só preciso incluir o novo caso).
-
-### 4. Tipagens
-
-- Atualizar o comentário do tipo em `src/lib/cb-regras.ts` e `src/lib/agenda/aviso-limite-pendentes.ts` incluindo o novo modo.
-
-## Validação após implementar
-
-- Reabrir a regra de Mamografia do "Cartão Consulta + Seguros" (MENINO JESUS), selecionar "Aplicar regra padrão do convênio" e salvar → deve gravar sem erro.
-- Simular na Agenda: paciente com limite estourado nessa regra → o valor cobrado deve refletir a regra genérica do convênio (ou bloqueio, se não houver).
-- Sanity check: regras existentes com os 4 modos antigos continuam funcionando exatamente como antes (sem regressão).
-
-## Fora de escopo
-
-- Não altero dados existentes das regras.
-- Não mexo em outros seletores do cadastro (Modo, Prioridade, Carência, Cortesia, Limite de uso, Grupo de gratuidade).
-- Não crio regra genérica automaticamente para convênios que não tenham — se faltar, é o admin que cadastra (a UI vai avisar).
+- Abrir `/app/agenda` em cada uma das 3 clínicas e confirmar que:
+  1. A coluna DIA aparece antes de DATA.
+  2. Para 23/07/26 mostra QUI; navegando o filtro de data para outros dias, o valor acompanha.
+  3. Alinhamento da tabela permanece correto (nenhuma coluna desloca).
+  4. Ordenação e filtros continuam funcionando.
+- Não há mudança de dados, RLS ou regra de negócio; risco operacional baixo.

@@ -7733,6 +7733,7 @@ function AgendaPage() {
                 <TableHead className="w-14 text-center font-semibold text-xs uppercase text-muted-foreground">
                   Ficha
                 </TableHead>
+                <TableHead className="w-14 text-center font-semibold text-xs uppercase text-muted-foreground">Dia</TableHead>
                 <TableHead className="w-20 font-semibold text-xs uppercase text-muted-foreground">Data</TableHead>
                 <TableHead className="w-28 font-semibold text-xs uppercase text-muted-foreground">Horário</TableHead>
                 <TableHead className="min-w-[110px] xl:min-w-[130px] font-semibold text-xs uppercase text-muted-foreground">
@@ -7753,10 +7754,10 @@ function AgendaPage() {
             <TableBody>
               {loading ? (
                 <TableSkeletonRows
-                  cols={9}
+                  cols={10}
                   fallback={
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                         Carregando…
                       </TableCell>
                     </TableRow>
@@ -7764,13 +7765,13 @@ function AgendaPage() {
                 />
               ) : !clinicaAtual ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                     Selecione uma clínica.
                   </TableCell>
                 </TableRow>
               ) : paginados.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                     Nenhum agendamento encontrado.
                   </TableCell>
                 </TableRow>
@@ -7820,6 +7821,11 @@ function AgendaPage() {
                       {/* Ficha */}
                       <TableCell className="text-center font-mono text-sm font-medium py-1.5">
                         {fichaNum || "—"}
+                      </TableCell>
+
+                      {/* Dia da semana */}
+                      <TableCell className="py-1.5 text-center text-sm font-medium tabular-nums text-muted-foreground">
+                        {fmtDiaSemana(a.inicio)}
                       </TableCell>
 
                       {/* Data */}
