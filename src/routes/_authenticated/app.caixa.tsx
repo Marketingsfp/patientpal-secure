@@ -2643,6 +2643,7 @@ function Page() {
                         <TableHead>Serviço</TableHead>
                         <TableHead>Médico</TableHead>
                         <TableHead>Ficha</TableHead>
+                        <TableHead>Usuário</TableHead>
                         <TableHead>Forma</TableHead>
                         <TableHead className="text-right">Valor</TableHead>
                         <TableHead className="text-right w-[1%]">Ação</TableHead>
@@ -2651,7 +2652,7 @@ function Page() {
                     <TableBody>
                        {minhasMovsFiltrados.length === 0 ? (
                          <TableRow>
-                           <TableCell colSpan={11} className="text-center text-muted-foreground">
+                           <TableCell colSpan={12} className="text-center text-muted-foreground">
                             {filtrosAtivos
                               ? "Nenhum movimento corresponde aos filtros"
                               : "Sem movimentos no período"}
@@ -2663,6 +2664,7 @@ function Page() {
                          const medico = enr?.medico ?? null;
                          const ficha = enr?.ficha ?? null;
                          const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
+                         const usuario = usuarioNomeFor(m);
                          const bucket = bucketDeMov(m);
                          const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
                          const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
@@ -2678,6 +2680,7 @@ function Page() {
                                <TableCell className="text-xs">{idx === 0 ? (servico || "—") : ""}</TableCell>
                                <TableCell className="text-xs">{idx === 0 ? (medico || "—") : ""}</TableCell>
                                 <TableCell className="text-xs tabular-nums">{idx === 0 ? formatFichaCaixa(ficha) : ""}</TableCell>
+                               <TableCell className="text-xs uppercase" title={usuario}>{idx === 0 ? usuario : ""}</TableCell>
                                <TableCell className="text-xs">{FORMA_LABEL[k] ?? k}</TableCell>
                                <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                                  {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
@@ -2706,6 +2709,7 @@ function Page() {
                           <TableCell className="text-xs">{servico || "—"}</TableCell>
                           <TableCell className="text-xs">{medico || "—"}</TableCell>
                            <TableCell className="text-xs tabular-nums">{formatFichaCaixa(ficha)}</TableCell>
+                          <TableCell className="text-xs uppercase" title={usuario}>{usuario}</TableCell>
                           <TableCell><FormaCellEditavel m={m} /></TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
