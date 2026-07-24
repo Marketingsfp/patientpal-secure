@@ -691,6 +691,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       conta: form.conta || null,
       pix_chave: form.pix_chave || null,
       ativo: form.ativo,
+      paciente_id: pacienteVinculado?.id ?? null,
       // Só entra no INSERT (nunca no UPDATE, para não sobrescrever o vínculo
       // de um médico já existente): liga este novo registro a um user_id que
       // já tinha perfil de acesso "Médico" mas cadastro incompleto.
