@@ -246,6 +246,14 @@ export async function printContrato(contratoId: string) {
         .maybeSingle()
     : { data: null as any };
 
+  const { data: cv } = (c as any).convenio_id
+    ? await supabase
+        .from("cb_convenios")
+        .select("modelo_contrato")
+        .eq("id", (c as any).convenio_id)
+        .maybeSingle()
+    : { data: null as any };
+
   const { data: pa } = await supabase
     .from("pacientes")
     .select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep")
@@ -294,10 +302,10 @@ export async function printContrato(contratoId: string) {
     depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = pac?.telefone ?? d?.telefone ?? "";
   }
 
-  const templateBody =
-    ((pl as any)?.template_contrato && String((pl as any).template_contrato).trim().length > 0)
-      ? (pl as any).template_contrato
-      : TEXTO_CONTRATO_HTML;
+  const plTpl = (pl as any)?.template_contrato;
+  const cvTpl = (cv as any)?.modelo_contrato;
+  const pick = (v: any) => (v && String(v).replace(/<[^>]+>/g, "").trim().length > 0 ? v : null);
+  const templateBody = pick(plTpl) ?? pick(cvTpl) ?? TEXTO_CONTRATO_HTML;
 
   const corpo = applyTemplate(templateBody, {
     PACIENTE_NOME: c.paciente_nome ?? "",
