@@ -367,11 +367,8 @@ export async function printContrato(contratoId: string) {
 
   const isFullHtml = /<!doctype\s+html|<html[\s>]/i.test(corpo);
 
-  const html = isFullHtml
-    ? corpo.replace(
-        /<\/body>/i,
-        `<script>window.onload=()=>{setTimeout(()=>{window.print();},500);};</script></body>`,
-      )
+  const bodyHtml = isFullHtml
+    ? corpo
     : `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
 <title>Contrato #${c.numero} - ${esc(c.paciente_nome)}</title>
 <style>
@@ -387,12 +384,50 @@ export async function printContrato(contratoId: string) {
 </style>
 </head><body>
 ${corpo}
-<script>window.onload=()=>{setTimeout(()=>{window.print();},500);};</script>
 </body></html>`;
 
-  const w = window.open("", "_blank", "width=900,height=700");
-  if (!w) throw new Error("Bloqueador de pop-up impediu a impressão");
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  // Remove qualquer auto-print embutido no template — vamos disparar via iframe.
+  const cleanHtml = bodyHtml.replace(
+    /<script[^>]*>[\s\S]*?window\.print\([\s\S]*?<\/script>/gi,
+    "",
+  );
+
+  // Iframe invisível: imprime sem bloquear a janela mãe e é removido ao final.
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  document.body.appendChild(iframe);
+
+  const cleanup = () => {
+    try { iframe.parentNode?.removeChild(iframe); } catch { /* noop */ }
+  };
+
+  iframe.onload = () => {
+    const win = iframe.contentWindow;
+    if (!win) { cleanup(); return; }
+    // Aguarda o layout/imagens antes de imprimir.
+    setTimeout(() => {
+      try {
+        win.onafterprint = () => setTimeout(cleanup, 100);
+        win.focus();
+        win.print();
+      } catch {
+        cleanup();
+      }
+      // Fallback: remove o iframe mesmo se onafterprint não disparar.
+      setTimeout(cleanup, 60_000);
+    }, 350);
+  };
+
+  const doc = iframe.contentDocument;
+  if (!doc) { cleanup(); throw new Error("Não foi possível preparar a impressão"); }
+  doc.open();
+  doc.write(cleanHtml);
+  doc.close();
 }
