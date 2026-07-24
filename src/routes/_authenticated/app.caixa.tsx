@@ -38,6 +38,7 @@ import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
 import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
+import { useAutoReloadOnNewBuild } from "@/hooks/use-auto-reload-on-new-build";
 import { printComprovanteCaixa } from "@/lib/print-caixa-comprovante";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -158,6 +159,9 @@ function formatarFormaPagamento(
 function CaixaRouteDispatcher() {
   const { clinicaAtual } = useClinica();
   const { enabled, loading } = useCaixaV2Flag();
+  // Detecta novo bundle publicado enquanto a tela do Caixa está aberta e
+  // recarrega automaticamente — evita a necessidade de Ctrl+Shift+R.
+  useAutoReloadOnNewBuild(true);
   const role = clinicaAtual?.role ?? null;
   const v2Allowed = role === "admin" || role === "gestor";
   if (!loading && enabled && v2Allowed) return <CaixaV2Mount />;
