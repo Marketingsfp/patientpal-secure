@@ -1021,6 +1021,12 @@ function Page() {
             onChange={(e) => setFilterFicha(e.target.value)}
             placeholder="Nº da ficha"
           /></div>
+        <div className="flex items-center gap-2 pb-1 ml-auto">
+          <Switch id="decompor-misto" checked={decomporMisto} onCheckedChange={setDecomporMisto} />
+          <Label htmlFor="decompor-misto" className="text-xs cursor-pointer" title="Quando ligado, cada pagamento 'misto' aparece como várias linhas (uma por forma real: dinheiro, cartão, pix…). A soma dos valores é preservada.">
+            Decompor pagamentos mistos
+          </Label>
+        </div>
       </CardContent></Card>
 
       <Card><CardContent className="p-0">
