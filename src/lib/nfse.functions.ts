@@ -320,7 +320,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
 
     // Reserva o próximo número de DPS/RPS antes do envio (evita duplicidade).
     if (emitente.usar_ambiente_nacional) {
-      await supabase
+      await supabaseAdmin
         .from("nfse_emitentes")
         .update({ rps_proximo_numero: (emitente.rps_proximo_numero ?? 1) + 1 })
         .eq("id", emitente.id);
@@ -406,7 +406,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
     // Persiste o avanço do contador (mesmo em caso de falha final, para não
     // tentar de novo os mesmos números na próxima emissão).
     if (isNacional && bumpedTo !== (emitente.rps_proximo_numero ?? 1)) {
-      await supabase
+      await supabaseAdmin
         .from("nfse_emitentes")
         .update({ rps_proximo_numero: bumpedTo + 1 })
         .eq("id", emitente.id);
@@ -799,7 +799,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     }
 
     if (isNacional && bumpedTo !== (emitente.rps_proximo_numero ?? 1)) {
-      await supabase
+      await supabaseAdmin
         .from("nfse_emitentes")
         .update({ rps_proximo_numero: bumpedTo + 1 })
         .eq("id", emitente.id);
