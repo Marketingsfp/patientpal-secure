@@ -65,6 +65,50 @@ const EMPTY = {
 };
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+/** Extrai as partes de um pagamento "misto" a partir de fin_lancamentos.observacoes
+ *  no formato "Pagamento misto: DINHEIRO R$ 100,00; CARTAO DEBITO R$ 30,00".
+ *  Retorna [] quando não é misto ou não foi possível parsear. */
+function parseMistoPartes(forma: string | null | undefined, obs: string | null | undefined): Array<{ label: string; valor: number }> {
+  if ((forma ?? "").toLowerCase() !== "misto" || !obs) return [];
+  const idx = obs.toLowerCase().indexOf("misto:");
+  const trecho = idx >= 0 ? obs.slice(idx + "misto:".length) : obs;
+  const primeiroBloco = trecho.split(" | ")[0];
+  const partes: Array<{ label: string; valor: number }> = [];
+  for (const raw of primeiroBloco.split(";")) {
+    const m = raw.match(/^\s*([^R$]+?)\s*R\$\s*([\d.,]+)/i);
+    if (!m) continue;
+    const label = m[1].replace(/\s+/g, " ").trim().toUpperCase();
+    const num = Number(m[2].replace(/\./g, "").replace(",", "."));
+    if (!label || !Number.isFinite(num) || num <= 0) continue;
+    partes.push({ label, valor: num });
+  }
+  return partes;
+}
+
+/** Expande as linhas de "misto" em uma linha sintética por forma real.
+ *  A soma das partes = valor original (validado; caso contrário mantém a linha original). */
+function expandMistoItems(items: Lanc[]): Lanc[] {
+  const out: Lanc[] = [];
+  for (const l of items) {
+    const partes = parseMistoPartes(l.forma_pagamento, l.observacoes);
+    if (partes.length === 0) { out.push(l); continue; }
+    const soma = partes.reduce((s, p) => s + p.valor, 0);
+    if (Math.abs(soma - Number(l.valor || 0)) > 0.05) { out.push(l); continue; }
+    partes.forEach((p, i) => {
+      out.push({
+        ...l,
+        id: `${l.id}#m${i}`,
+        valor: p.valor,
+        forma_pagamento: p.label,
+        descricao: `${l.descricao} — ${p.label}`,
+        _mistoParte: true,
+        _mistoPaiId: l.id,
+      });
+    });
+  }
+  return out;
+}
+
 function Page() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("financeiro");
