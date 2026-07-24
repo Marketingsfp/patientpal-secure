@@ -61,7 +61,16 @@ function applyTemplate(tpl: string, vars: Record<string, string>): string {
   out = out.replace(/\{\{\^(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, key, body) =>
     vars[key] && String(vars[key]).trim() ? "" : body,
   );
-  return out.replace(/\{\{(\w+)\}\}/g, (_, k) => esc(vars[k] ?? ""));
+  return out.replace(/\{\{(\w+)\}\}/g, (_, k) => {
+    const raw = vars[k] ?? "";
+    const safe = esc(raw);
+    // Comprime horizontalmente valores longos para não invadir a coluna vizinha
+    // no template de posicionamento absoluto (Menino Jesus).
+    const len = raw.length;
+    if (len <= 22) return safe;
+    const scale = len > 40 ? 0.7 : len > 32 ? 0.78 : 0.86;
+    return `<span style="display:inline-block;white-space:nowrap;transform:scaleX(${scale});transform-origin:left top;letter-spacing:-0.02em;">${safe}</span>`;
+  });
 }
 
 // 🔥 HTML DO CONTRATO - COMPLETO
