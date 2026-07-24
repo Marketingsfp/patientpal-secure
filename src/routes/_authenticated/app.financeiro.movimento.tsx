@@ -1025,21 +1025,21 @@ function Page() {
 
       <Card><CardContent className="p-0">
         {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
-          : items.length === 0 ? <div className="py-12 text-center text-muted-foreground">Nenhum lançamento no período.</div>
+          : displayItems.length === 0 ? <div className="py-12 text-center text-muted-foreground">Nenhum lançamento no período.</div>
           : <>
           {(() => {
-            const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+            const totalPages = Math.max(1, Math.ceil(displayItems.length / PAGE_SIZE));
             const currentPage = Math.min(page, totalPages);
             return (
               <div className="px-4 py-2 text-xs text-muted-foreground bg-muted/30 border-b">
-                Página {currentPage} de {totalPages} — {items.length.toLocaleString("pt-BR")} lançamento(s) no período.
+                Página {currentPage} de {totalPages} — {displayItems.length.toLocaleString("pt-BR")} linha(s){decomporMisto ? " (mistos decompostos)" : ""} no período.
               </div>
             );
           })()}
           {(() => {
-            const totalPages2 = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+            const totalPages2 = Math.max(1, Math.ceil(displayItems.length / PAGE_SIZE));
             const currentPage2 = Math.min(page, totalPages2);
-            const paginaAtual = items.slice((currentPage2 - 1) * PAGE_SIZE, currentPage2 * PAGE_SIZE);
+            const paginaAtual = displayItems.slice((currentPage2 - 1) * PAGE_SIZE, currentPage2 * PAGE_SIZE);
             // Visão em cartões no celular (piloto SFP) — mesmos dados e ações
             // da tabela, só em layout vertical com alvos de toque maiores.
             if (modoMobile) {
@@ -1073,7 +1073,7 @@ function Page() {
                           {l.criado_por && <span className="whitespace-nowrap">{userMap.get(l.criado_por) ?? "—"}</span>}
                           <Badge variant={l.status === "confirmado" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">{l.status}</Badge>
                         </div>
-                        {l.origem !== "caixa" && (podeEstornar || podeEscrever) && (
+                        {l.origem !== "caixa" && !l._mistoParte && (podeEstornar || podeEscrever) && (
                           <div className="flex items-center gap-1 pt-1 -ml-2">
                             {podeEstornar && l.tipo !== "transferencia" && l.status !== "cancelado" ? (
                               <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" disabled={estornando === l.id} onClick={() => estornar(l)}>
@@ -1092,7 +1092,7 @@ function Page() {
                             ) : null}
                           </div>
                         )}
-                        {l.origem === "caixa" && l.caixaTipo === "sangria" && podeEstornar && (
+                        {l.origem === "caixa" && !l._mistoParte && l.caixaTipo === "sangria" && podeEstornar && (
                           <div className="flex items-center gap-1 pt-1 -ml-2">
                             <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setEstornoSangria(l)}>
                               <Undo2 className="h-3.5 w-3.5 text-amber-600 mr-1" /> Solicitar estorno
@@ -1145,7 +1145,7 @@ function Page() {
                         : (l.tipo === "receita" ? "+" : "-")} {fmt(Number(l.valor))}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-0.5">
-                        {podeEstornar && l.origem !== "caixa" && l.tipo !== "transferencia" && l.status !== "cancelado" ? (
+                        {podeEstornar && !l._mistoParte && l.origem !== "caixa" && l.tipo !== "transferencia" && l.status !== "cancelado" ? (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1156,7 +1156,7 @@ function Page() {
                             <Undo2 className="h-3.5 w-3.5 text-amber-600" />
                           </Button>
                         ) : null}
-                        {podeEstornar && l.origem === "caixa" && l.caixaTipo === "sangria" ? (
+                        {podeEstornar && !l._mistoParte && l.origem === "caixa" && l.caixaTipo === "sangria" ? (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1166,7 +1166,7 @@ function Page() {
                             <Undo2 className="h-3.5 w-3.5 text-amber-600" />
                           </Button>
                         ) : null}
-                        {podeEscrever && l.origem !== "caixa" ? (
+                        {podeEscrever && !l._mistoParte && l.origem !== "caixa" ? (
                           <>
                             <Button variant="ghost" size="icon" title="Editar lançamento — alterar descrição, valor, categoria, conta ou forma de pagamento." onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
                             <Button variant="ghost" size="icon" title="Excluir lançamento — remove definitivamente do banco (sem histórico). Use apenas para lançamentos criados por engano; para repasses prefira Estornar." onClick={() => remove(l)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
@@ -1180,15 +1180,15 @@ function Page() {
               </Table>
             );
           })()}
-          {items.length > PAGE_SIZE ? (() => {
-            const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+          {displayItems.length > PAGE_SIZE ? (() => {
+            const totalPages = Math.max(1, Math.ceil(displayItems.length / PAGE_SIZE));
             const currentPage = Math.min(page, totalPages);
             return (
               <div className="flex items-center justify-between gap-2 px-4 py-3 border-t bg-muted/20">
                 <div className="text-xs text-muted-foreground">
                   Mostrando {((currentPage - 1) * PAGE_SIZE + 1).toLocaleString("pt-BR")}
                   {"–"}
-                  {Math.min(currentPage * PAGE_SIZE, items.length).toLocaleString("pt-BR")} de {items.length.toLocaleString("pt-BR")}
+                  {Math.min(currentPage * PAGE_SIZE, displayItems.length).toLocaleString("pt-BR")} de {displayItems.length.toLocaleString("pt-BR")}
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(1)}>Primeira</Button>
