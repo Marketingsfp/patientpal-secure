@@ -76,7 +76,7 @@ export const reagendarAgendamento = createServerFn({ method: "POST" })
     // ---------- 0. Carrega origem ----------
     const { data: origem, error: e0 } = await supabase
       .from("agendamentos")
-      .select("id,clinica_id,inicio,fim,medico_id,status,paciente_nome,observacoes")
+      .select("id,clinica_id,inicio,fim,medico_id,agenda_id,status,paciente_nome,observacoes")
       .eq("id", agendamento_id)
       .maybeSingle();
     if (e0) return { ok: false, pg_error: toPgErrorLike(e0) };
@@ -118,14 +118,14 @@ export const reagendarAgendamento = createServerFn({ method: "POST" })
     const fimDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 23, 59, 59).toISOString();
     const { data: slotsDia, error: eSlots } = await supabase
       .from("agendamentos")
-      .select("id,paciente_nome,inicio,fim")
+      .select("id,paciente_nome,inicio,fim,agenda_id")
       .eq("clinica_id", clinica_id)
       .eq("medico_id", novoMedicoId)
       .gte("inicio", inicioDia)
       .lte("inicio", fimDia)
       .limit(500);
     if (eSlots) return { ok: false, pg_error: toPgErrorLike(eSlots) };
-    const lista = (slotsDia ?? []) as { id: string; paciente_nome: string; inicio: string; fim: string }[];
+    const lista = (slotsDia ?? []) as { id: string; paciente_nome: string; inicio: string; fim: string; agenda_id: string | null }[];
     // Regra C — excluir o próprio id (equivalente ao excludingEditing).
     const outros = lista.filter((x) => x.id !== agendamento_id);
     if (outros.length === 0) {
@@ -155,7 +155,15 @@ export const reagendarAgendamento = createServerFn({ method: "POST" })
 
     // ---------- 2. Swap preservando o id da origem ----------
     // Passo 3 — dest_slot assume o intervalo/médico antigos + marker TMP.
-    const antigo = { inicio: origem.inicio, fim: origem.fim, medico_id: origem.medico_id };
+    // Também troca `agenda_id` para evitar colisão com o índice único
+    // uq_agend_slot_vazio quando o médico tem agendas paralelas com um slot
+    // vazio no mesmo horário antigo (ex.: agendas de exames com duas salas).
+    const antigo = {
+      inicio: origem.inicio,
+      fim: origem.fim,
+      medico_id: origem.medico_id,
+      agenda_id: (origem as { agenda_id: string | null }).agenda_id,
+    };
     const { error: e3 } = await supabase
       .from("agendamentos")
       .update({
@@ -163,6 +171,7 @@ export const reagendarAgendamento = createServerFn({ method: "POST" })
         inicio: antigo.inicio,
         fim: antigo.fim,
         medico_id: antigo.medico_id,
+        agenda_id: antigo.agenda_id,
       } as never)
       .eq("id", destSlot.id);
     if (e3) return { ok: false, pg_error: toPgErrorLike(e3) };
@@ -178,6 +187,7 @@ export const reagendarAgendamento = createServerFn({ method: "POST" })
           inicio: novo_inicio,
           fim: novo_fim,
           medico_id: novoMedicoId,
+          agenda_id: destSlot.agenda_id,
           observacoes: novasObs,
         } as never)
         .eq("id", agendamento_id);

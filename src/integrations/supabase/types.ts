@@ -2011,6 +2011,7 @@ export type Database = {
           updated_at: string
           valor: number | null
           valor_cartao: number | null
+          valor_outros: number | null
         }
         Insert: {
           ativo?: boolean
@@ -2038,6 +2039,7 @@ export type Database = {
           updated_at?: string
           valor?: number | null
           valor_cartao?: number | null
+          valor_outros?: number | null
         }
         Update: {
           ativo?: boolean
@@ -2065,6 +2067,7 @@ export type Database = {
           updated_at?: string
           valor?: number | null
           valor_cartao?: number | null
+          valor_outros?: number | null
         }
         Relationships: [
           {
@@ -8416,6 +8419,7 @@ export type Database = {
       }
     }
     Functions: {
+      __actor_set_trocar_convenio: { Args: never; Returns: undefined }
       _do_fix_phones_prontuarios_mj: {
         Args: never
         Returns: {

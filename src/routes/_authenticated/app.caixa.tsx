@@ -362,7 +362,7 @@ function Page() {
   // Espelho do estornosPorLanc, mas indexado por caixa_movimento_id — usado
   // para o botão de estorno de sangria (que não tem lançamento financeiro).
   const [estornosPorMov, setEstornosPorMov] = useState<Map<string, "pendente" | "aprovado">>(new Map());
-  const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null }>>(new Map());
+  const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null; ficha: number | null }>>(new Map());
   // Conjunto de lancamento_ids cujo fin_lancamentos.status = 'cancelado'
   // (i.e., estornados). Esses recebimentos não devem entrar no saldo do
   // caixa mesmo que o movimento reverso ainda não tenha sido gravado.
@@ -769,10 +769,10 @@ function Page() {
     const enrichMovsList = async (
       movsList: Mov[],
     ): Promise<{
-      enrich: Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null }>;
+      enrich: Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null; ficha: number | null }>;
       cancelados: Set<string>;
     }> => {
-      const enrich = new Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null }>();
+      const enrich = new Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null; ficha: number | null }>();
       const cancelados = new Set<string>();
       const lancIds = Array.from(new Set(movsList.map((m) => m.lancamento_id).filter((x): x is string => !!x)));
       if (lancIds.length === 0) return { enrich, cancelados };
@@ -792,8 +792,8 @@ function Page() {
           ? supabase.from("medicos").select("id, nome").in("id", medIds)
           : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
         agIds.length > 0
-          ? supabase.from("agendamentos").select("id, procedimento_id, paciente_id").in("id", agIds)
-          : Promise.resolve({ data: [] as Array<{ id: string; procedimento_id: string | null; paciente_id: string | null }> }),
+          ? supabase.from("agendamentos").select("id, procedimento, paciente_id, medico_id, ficha_numero").in("id", agIds)
+          : Promise.resolve({ data: [] as Array<{ id: string; procedimento: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }> }),
         pacIds.length > 0
           ? supabase.from("pacientes").select("id, nome").in("id", pacIds)
           : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
@@ -802,16 +802,28 @@ function Page() {
       for (const m of (medRes.data ?? []) as Array<{ id: string; nome: string | null }>) {
         if (m.nome) medMap.set(m.id, m.nome);
       }
-      const agMap = new Map<string, { procedimento_id: string | null; paciente_id: string | null }>();
-      const procIds = new Set<string>();
+      const agMap = new Map<string, { procedimento: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }>();
       const pacIdsExtra = new Set<string>();
-      for (const a of (agRes.data ?? []) as Array<{ id: string; procedimento_id: string | null; paciente_id: string | null }>) {
-        agMap.set(a.id, { procedimento_id: a.procedimento_id, paciente_id: a.paciente_id });
-        if (a.procedimento_id) procIds.add(a.procedimento_id);
+      for (const a of (agRes.data ?? []) as Array<{ id: string; procedimento: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }>) {
+        agMap.set(a.id, { procedimento: a.procedimento, paciente_id: a.paciente_id, medico_id: a.medico_id, ficha_numero: a.ficha_numero });
+        if (a.medico_id && !medIds.includes(a.medico_id)) medIds.push(a.medico_id);
         // Paciente pelo agendamento cobre casos em que fin_lancamentos
         // não tem paciente_id (ex.: mensalidades ou lançamentos gerados
         // por caminhos antigos).
         if (a.paciente_id && !pacIds.includes(a.paciente_id)) pacIdsExtra.add(a.paciente_id);
+      }
+      // Busca médicos adicionais referenciados apenas via agendamento
+      const medIdsFaltantes = Array.from(agMap.values())
+        .map((a) => a.medico_id)
+        .filter((x): x is string => !!x && !medMap.has(x));
+      if (medIdsFaltantes.length > 0) {
+        const { data: medsExtra } = await supabase
+          .from("medicos")
+          .select("id, nome")
+          .in("id", medIdsFaltantes);
+        for (const m of (medsExtra ?? []) as Array<{ id: string; nome: string | null }>) {
+          if (m.nome) medMap.set(m.id, m.nome);
+        }
       }
       const pacMap = new Map<string, string>();
       for (const p of (pacRes.data ?? []) as Array<{ id: string; nome: string | null }>) {
@@ -826,20 +838,9 @@ function Page() {
           if (p.nome) pacMap.set(p.id, p.nome);
         }
       }
-      const procMap = new Map<string, string>();
-      if (procIds.size > 0) {
-        const { data: procs } = await supabase
-          .from("procedimentos")
-          .select("id, nome")
-          .in("id", Array.from(procIds));
-        for (const p of (procs ?? []) as Array<{ id: string; nome: string | null }>) {
-          if (p.nome) procMap.set(p.id, p.nome);
-        }
-      }
       for (const l of lancRows) {
         const agInfo = l.agendamento_id ? agMap.get(l.agendamento_id) : undefined;
-        const procId = agInfo?.procedimento_id ?? null;
-        const servicoFromProc = procId ? procMap.get(procId) ?? null : null;
+        const servicoFromProc = agInfo?.procedimento ?? null;
         // fallback: extrai serviço da descrição do lançamento
         let servico = servicoFromProc;
         if (!servico && l.descricao) {
@@ -852,11 +853,13 @@ function Page() {
         // linha usará pacienteFromDescricao() no render.
         const pacIdEfetivo = l.paciente_id ?? agInfo?.paciente_id ?? null;
         const pacienteNome = pacIdEfetivo ? pacMap.get(pacIdEfetivo) ?? null : null;
+        const medIdEfetivo = l.medico_id ?? agInfo?.medico_id ?? null;
         enrich.set(l.id, {
           servico,
-          medico: l.medico_id ? medMap.get(l.medico_id) ?? null : null,
+          medico: medIdEfetivo ? medMap.get(medIdEfetivo) ?? null : null,
           paciente: pacienteNome,
           paciente_id: pacIdEfetivo,
+          ficha: agInfo?.ficha_numero ?? null,
         });
       }
       return { enrich, cancelados };
@@ -2493,15 +2496,16 @@ function Page() {
                         <TableHead>Descrição</TableHead>
                         <TableHead>Serviço</TableHead>
                         <TableHead>Médico</TableHead>
+                        <TableHead>Ficha</TableHead>
                         <TableHead>Forma</TableHead>
                         <TableHead className="text-right">Valor</TableHead>
                         <TableHead className="text-right w-[1%]">Ação</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {minhasMovsFiltrados.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={10} className="text-center text-muted-foreground">
+                       {minhasMovsFiltrados.length === 0 ? (
+                         <TableRow>
+                           <TableCell colSpan={11} className="text-center text-muted-foreground">
                             {filtrosAtivos
                               ? "Nenhum movimento corresponde aos filtros"
                               : "Sem movimentos no período"}
@@ -2511,6 +2515,7 @@ function Page() {
                          const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
                          const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
                          const medico = enr?.medico ?? null;
+                         const ficha = enr?.ficha ?? null;
                          const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
                          const bucket = bucketDeMov(m);
                          const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
@@ -2526,6 +2531,7 @@ function Page() {
                                <TableCell className="max-w-[320px] truncate" title={m.descricao ?? undefined}>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
                                <TableCell className="text-xs">{idx === 0 ? (servico || "—") : ""}</TableCell>
                                <TableCell className="text-xs">{idx === 0 ? (medico || "—") : ""}</TableCell>
+                               <TableCell className="text-xs tabular-nums">{idx === 0 ? (ficha ?? "—") : ""}</TableCell>
                                <TableCell className="text-xs">{FORMA_LABEL[k] ?? k}</TableCell>
                                <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                                  {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
@@ -2553,6 +2559,7 @@ function Page() {
                           </TableCell>
                           <TableCell className="text-xs">{servico || "—"}</TableCell>
                           <TableCell className="text-xs">{medico || "—"}</TableCell>
+                          <TableCell className="text-xs tabular-nums">{ficha ?? "—"}</TableCell>
                           <TableCell><FormaCellEditavel m={m} /></TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}

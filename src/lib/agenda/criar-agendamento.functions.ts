@@ -198,7 +198,7 @@ export const criarAgendamento = createServerFn({ method: "POST" })
     const atual = editing_id
       ? (await supabase
           .from("agendamentos")
-          .select("medico_id, paciente_id, inicio, fim")
+          .select("medico_id, paciente_id, inicio, fim, agenda_id")
           .eq("id", editing_id)
           .maybeSingle()).data
       : null;
@@ -264,13 +264,13 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       const fimDia = new Date(di.getFullYear(), di.getMonth(), di.getDate(), 23, 59, 59).toISOString();
       const { data: slotsDia } = await supabase
         .from("agendamentos")
-        .select("id,paciente_nome,inicio,fim", { count: "exact", head: false })
+        .select("id,paciente_nome,inicio,fim,agenda_id", { count: "exact", head: false })
         .eq("clinica_id", clinica_id)
         .eq(recursoField, recursoId)
         .gte("inicio", inicioDia)
         .lte("inicio", fimDia)
         .limit(500);
-      const lista = (slotsDia ?? []) as { id: string; paciente_nome: string; inicio: string; fim: string }[];
+      const lista = (slotsDia ?? []) as { id: string; paciente_nome: string; inicio: string; fim: string; agenda_id: string | null }[];
       if (editing_id) {
         slotPacienteNomeNaValidacao = lista.find((x) => x.id === editing_id)?.paciente_nome ?? null;
       }
@@ -285,19 +285,74 @@ export const criarAgendamento = createServerFn({ method: "POST" })
       }
       const inicioMs = di.getTime();
       const fimMs = df.getTime();
-      const cobre = excluindoEditing.some((s) => {
+      const slotEscolhido = excluindoEditing.find((s) => {
         if (!isSlotLivreLocal(s.paciente_nome)) return false;
         const sIni = new Date(s.inicio).getTime();
         const sFim = new Date(s.fim).getTime();
         return sIni <= inicioMs && sFim >= fimMs;
       });
-      if (!cobre) {
+      if (!slotEscolhido) {
         return {
           ok: false,
           validation_error: {
             message: `Não há horário livre desse ${rotuloRecurso} cobrindo o intervalo escolhido. Escolha um slot DISPONÍVEL na agenda ou gere mais horários.`,
           },
         };
+      }
+
+      // ---------- 4b. Tipo da agenda × tipo do procedimento ----------
+      // Regra global (todas as clínicas): agenda de CONSULTA só aceita
+      // procedimentos com tipo='consulta'; agenda de EXAME só aceita
+      // 'exame'/'procedimento'. Cruzamos o tipo do procedimento escolhido
+      // com o whitelist de procedimentos linkados à agenda de destino
+      // (medico_agenda_procedimentos). Agendas sem linkagem (whitelist
+      // vazio) ou mistas ficam fora da checagem.
+      const agendaAlvoId = slotEscolhido.agenda_id;
+      if (agendaAlvoId) {
+        const nomesProc = (procedimentos.length > 0
+          ? procedimentos
+          : [String(payload.procedimento ?? "").trim()])
+          .map((n) => n.trim())
+          .filter(Boolean);
+        if (nomesProc.length > 0) {
+          const { data: procsEscolhidos } = await supabase
+            .from("procedimentos")
+            .select("nome,tipo")
+            .eq("clinica_id", clinica_id)
+            .in("nome", nomesProc);
+          const { data: linkados } = await supabase
+            .from("medico_agenda_procedimentos")
+            .select("procedimento_id, procedimentos!inner(tipo)")
+            .eq("agenda_id", agendaAlvoId);
+          const tiposAgenda = new Set(
+            ((linkados ?? []) as Array<{ procedimentos: { tipo: string | null } | null }>)
+              .map((l) => l.procedimentos?.tipo)
+              .filter((t): t is string => !!t),
+          );
+          const isConsulta = tiposAgenda.size > 0
+            && tiposAgenda.size === 1 && tiposAgenda.has("consulta");
+          const isExame = tiposAgenda.size > 0
+            && Array.from(tiposAgenda).every((t) => t === "exame" || t === "procedimento");
+          if (isConsulta || isExame) {
+            const rotuloAgenda = isConsulta ? "consultas" : "exames";
+            const procs = (procsEscolhidos ?? []) as Array<{ nome: string; tipo: string | null }>;
+            const incompatível = procs.find((p) => {
+              if (!p.tipo) return false;
+              if (isConsulta) return p.tipo !== "consulta";
+              return p.tipo === "consulta";
+            });
+            if (incompatível) {
+              const tipoProcLabel = incompatível.tipo === "consulta" ? "consulta" : "exame";
+              return {
+                ok: false,
+                validation_error: {
+                  message: `Esta agenda é de ${rotuloAgenda}. O procedimento "${incompatível.nome}" é de ${tipoProcLabel} e não pode ser agendado aqui. Escolha uma agenda compatível ou outro procedimento.`,
+                  toast_duration: 8000,
+                },
+              };
+            }
+          }
+        }
       }
     }
 
