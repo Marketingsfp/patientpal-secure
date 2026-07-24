@@ -918,7 +918,7 @@ function Page() {
           </DialogHeader>
           <div className="max-h-[60vh] overflow-auto">
             {(() => {
-              const list = detalhe === "saldo" ? items : items.filter((i) => i.tipo === detalhe);
+              const list = detalhe === "saldo" ? displayItems : displayItems.filter((i) => i.tipo === detalhe);
               if (list.length === 0) return <p className="text-sm text-muted-foreground py-6 text-center">Sem lançamentos.</p>;
               const catMap = new Map(cats.map((c) => [c.id, c.nome]));
               return (
