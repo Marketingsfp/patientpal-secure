@@ -743,12 +743,12 @@ function Page() {
         <Button
           variant="outline"
           onClick={() => {
-            if (!items.length) { toast.info("Sem dados para exportar."); return; }
+            if (!displayItems.length) { toast.info("Sem dados para exportar."); return; }
             const catMap = new Map(cats.map((c) => [c.id, c.nome]));
             const contaMap = new Map(contas.map((c) => [c.id, c.nome]));
             const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
             exportToExcel(
-              items.map((l) => ({
+              displayItems.map((l) => ({
                 data: (l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) : ""),
                 hora: l.hora ?? "",
                 tipo: l.tipo,
