@@ -5339,25 +5339,14 @@ function AgendaPage() {
     requestAnimationFrame(() => setFormaPagOpen(false));
   };
 
-  // Pagamento com valor manual: abre o diálogo de lançamento com valor vazio
-  // e sem forma pré-selecionada, permitindo ao usuário digitar livremente.
-  const escolherManual = () => {
-    if (!formaPagCtx) return;
-    const ids = formaPagCtx.agId.split(",").filter(Boolean);
-    const principal = ids[0] ?? null;
-    const extras = ids.slice(1);
-    setPagamentoDesc(`${descricaoComDesconto(formaPagCtx.desc)} — valor manual`);
-    setPagamentoValor("");
-    setPagamentoForma("");
-    setPagamentoAgId(principal);
-    setPagamentoExtraIds(extras);
-    setPagamentoOpen(true);
-    requestAnimationFrame(() => setFormaPagOpen(false));
-  };
+  // "Valor manual" foi removido do fluxo de pagamento da agenda para garantir
+  // que o valor cobrado sempre respeite a regra de desconto do convênio
+  // (Cartão Benefícios). Se precisar de valor diferente, ajuste a regra
+  // no cadastro do convênio.
 
   // Atalhos de teclado no diálogo "Forma de pagamento":
-  // 1=Dinheiro, 2=PIX, 3=Débito, 4=Crédito, 5=Mais de uma forma, 6=Valor manual
-  // (segue a ordem exibida em formaPagOpcoes; tecla N+1 = misto, N+2 = manual).
+  // 1=Dinheiro, 2=PIX, 3=Débito, 4=Crédito, 5=Mais de uma forma
+  // (segue a ordem exibida em formaPagOpcoes; tecla N+1 = misto).
   useEffect(() => {
     if (!formaPagOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -5371,9 +5360,6 @@ function AgendaPage() {
         } else if (idx === formaPagOpcoes.length) {
           e.preventDefault();
           escolherMisto();
-        } else if (idx === formaPagOpcoes.length + 1) {
-          e.preventDefault();
-          escolherManual();
         }
       }
     };
