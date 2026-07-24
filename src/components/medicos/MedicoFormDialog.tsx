@@ -140,6 +140,8 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
   const [existingEmail, setExistingEmail] = useState<string | null>(null);
   const [convenios, setConvenios] = useState<ConvenioRow[]>(CONVENIOS_PADRAO);
   const [form, setForm] = useState(emptyForm());
+  // Paciente vinculado ao médico — necessário para ser titular do "Convênio Funcionário".
+  const [pacienteVinculado, setPacienteVinculado] = useState<PatientOption | null>(null);
   // Laudo Terceiro: catálogo de cardiologistas ativos da clínica + linhas configuradas
   const [laudadoresCatalog, setLaudadoresCatalog] = useState<LaudadorOption[]>([]);
   const [laudadores, setLaudadores] = useState<LaudadorRow[]>([]);
