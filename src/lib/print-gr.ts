@@ -1329,12 +1329,12 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  const usuarioFinalNome = usuarioNome ?? primeiraVia?.impresso_por_nome;
+  let usuarioFinalNome: string | null | undefined = usuarioNome ?? primeiraVia?.impresso_por_nome;
 
   const [mensRes, cliRes] = await Promise.all([
     supabase
       .from("contrato_mensalidades")
-      .select("id, contrato_id, numero_parcela, vencimento, valor, pago_em")
+      .select("id, contrato_id, numero_parcela, vencimento, valor, pago_em, lancamento_id")
       .eq("id", mensalidadeId)
       .maybeSingle(),
     supabase
@@ -1344,8 +1344,32 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
       .maybeSingle(),
   ]);
   if (mensRes.error || !mensRes.data) throw new Error(mensRes.error?.message ?? "Mensalidade não encontrada");
-  const m = mensRes.data as { id: string; contrato_id: string; numero_parcela: number; vencimento: string; valor: number; pago_em: string | null };
+  const m = mensRes.data as { id: string; contrato_id: string; numero_parcela: number; vencimento: string; valor: number; pago_em: string | null; lancamento_id: string | null };
   const c = cliRes.data as { nome: string; endereco: string | null; cidade: string | null; estado: string | null; telefone: string | null; cnpj: string | null } | null;
+
+  // Fallback do "USUÁRIO:" na reimpressão: se a 1ª via não gravou o nome
+  // (contratos antigos / migrados), busca quem lançou o pagamento em
+  // fin_lancamentos.criado_por → profiles.nome. Sem isso, a reimpressão sai
+  // sem a linha USUÁRIO que constava na impressão original.
+  if (!usuarioFinalNome && m.lancamento_id) {
+    try {
+      const { data: lanc } = await supabase
+        .from("fin_lancamentos")
+        .select("criado_por")
+        .eq("id", m.lancamento_id)
+        .maybeSingle();
+      const criadoPor = (lanc as { criado_por: string | null } | null)?.criado_por;
+      if (criadoPor) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("nome")
+          .eq("id", criadoPor)
+          .maybeSingle();
+        const nome = (prof as { nome: string | null } | null)?.nome;
+        if (nome) usuarioFinalNome = nome;
+      }
+    } catch { /* mantém oculto se não conseguir resolver */ }
+  }
 
   const { data: contratoRow, error: errC } = await supabase
     .from("contratos_assinatura")
