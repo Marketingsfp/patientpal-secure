@@ -34,6 +34,9 @@ interface Lanc {
   id: string; tipo: "receita" | "despesa" | "transferencia"; descricao: string; valor: number;
   data: string; status: string; categoria_id: string | null; conta_id: string | null;
   forma_pagamento: string | null; criado_por: string | null;
+  /** Observações do lançamento — usadas para decompor pagamentos "misto"
+   *  em suas formas reais (DINHEIRO, PIX, CARTAO…) no relatório. */
+  observacoes?: string | null;
   /** true → linha veio de caixa_movimentos (sangria/suprimento); não editável aqui */
   origem?: "fin" | "caixa";
   /** direção da transferência: entrada (suprimento) ou saída (sangria) */
