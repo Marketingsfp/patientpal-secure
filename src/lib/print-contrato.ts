@@ -283,53 +283,57 @@ export async function printContrato(contratoId: string) {
     ? CONVENIO_PDF_OVERRIDES[(c as any).convenio_id]
     : null;
   if (pdfOverrideUrl) {
-    // Overlay in-page com o PDF visível — evita nova aba (bloqueada pelo Brave/adblockers)
-    // e permite imprimir pelo próprio botão do visualizador PDF do navegador.
-    const overlay = document.createElement("div");
-    overlay.setAttribute("role", "dialog");
-    overlay.setAttribute("aria-label", "Visualizar contrato para impressão");
-    overlay.style.cssText = [
-      "position:fixed", "inset:0", "z-index:2147483647",
-      "background:rgba(0,0,0,0.85)", "display:flex", "flex-direction:column",
-    ].join(";");
+    // Impressão direta do PDF via blob same-origin em iframe fora da tela.
+    // Baixa o PDF, gera blob: URL (contornando o bloqueio de cross-origin do
+    // visualizador embutido) e chama print() assim que o PDF plugin carrega.
+    try {
+      const resp = await fetch(pdfOverrideUrl, { credentials: "omit" });
+      if (!resp.ok) throw new Error(`Falha ao baixar PDF (${resp.status})`);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
 
-    const bar = document.createElement("div");
-    bar.style.cssText = [
-      "display:flex", "align-items:center", "justify-content:space-between",
-      "gap:12px", "padding:10px 16px", "background:#1a3a6b", "color:#fff",
-      "font-family:system-ui,-apple-system,Segoe UI,sans-serif", "font-size:14px",
-    ].join(";");
-    bar.innerHTML = `
-      <span>Contrato pronto para impressão — use o botão de imprimir do visualizador de PDF (ícone da impressora, canto superior direito) ou pressione Ctrl+P.</span>
-    `;
-    const closeBtn = document.createElement("button");
-    closeBtn.type = "button";
-    closeBtn.textContent = "Fechar";
-    closeBtn.style.cssText = [
-      "background:#fff", "color:#1a3a6b", "border:0", "border-radius:6px",
-      "padding:6px 14px", "font-weight:600", "cursor:pointer", "flex-shrink:0",
-    ].join(";");
-    bar.appendChild(closeBtn);
+      const frame = document.createElement("iframe");
+      frame.title = "Contrato";
+      // Off-screen mas com dimensão real (necessário para o plugin PDF inicializar).
+      frame.style.cssText = [
+        "position:fixed", "right:0", "bottom:0",
+        "width:794px", "height:1123px",
+        "border:0", "opacity:0", "pointer-events:none", "z-index:-1",
+      ].join(";");
 
-    const frame = document.createElement("iframe");
-    frame.src = pdfOverrideUrl;
-    frame.title = "Contrato";
-    frame.style.cssText = "flex:1;width:100%;border:0;background:#fff;";
+      let printed = false;
+      const doPrint = () => {
+        if (printed) return;
+        printed = true;
+        setTimeout(() => {
+          try {
+            frame.contentWindow?.focus();
+            frame.contentWindow?.print();
+          } catch {
+            // fallback: navega a janela atual para o blob (não abre nova aba)
+            window.location.href = blobUrl;
+          }
+        }, 400);
+      };
+      frame.addEventListener("load", doPrint);
+      // Fallback: alguns navegadores não disparam load no plugin PDF.
+      setTimeout(doPrint, 1500);
 
-    overlay.appendChild(bar);
-    overlay.appendChild(frame);
-    document.body.appendChild(overlay);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+      // Cleanup: quando a caixa de impressão fecha, o foco volta para a janela.
+      const cleanup = () => {
+        setTimeout(() => {
+          try { frame.remove(); } catch { /* noop */ }
+          URL.revokeObjectURL(blobUrl);
+          window.removeEventListener("focus", cleanup);
+        }, 1000);
+      };
+      window.addEventListener("focus", cleanup, { once: true });
 
-    const close = () => {
-      try { overlay.remove(); } catch { /* noop */ }
-      document.body.style.overflow = prevOverflow;
-      document.removeEventListener("keydown", onKey);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
-    closeBtn.addEventListener("click", close);
-    document.addEventListener("keydown", onKey);
+      frame.src = blobUrl;
+      document.body.appendChild(frame);
+    } catch (e) {
+      throw new Error(`Não foi possível imprimir o PDF: ${(e as Error).message}`);
+    }
     return;
   }
 
