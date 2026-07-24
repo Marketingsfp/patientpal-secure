@@ -1339,7 +1339,11 @@ function NovoContratoForm({
     const base = new Date(dataInicio + "T00:00:00");
     const valorParcela = valor + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
-      const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
+      // Regra: 1ª mensalidade cai no MÊS SEGUINTE à data de início e as
+      // demais seguem mês a mês, cobrindo exatamente 12 meses até
+      // data_termino (data_inicio + 1 ano). Ex.: início 01/02/2026 →
+      // parcelas 01/03/2026, 01/04/2026, …, 01/02/2027.
+      const venc = new Date(base.getFullYear(), base.getMonth() + i + 1, diaVenc);
       const jaPago = i < mensalidadesJaPagas;
       const vencStr = venc.toISOString().slice(0, 10);
       // Taxa de adesão só na 1ª parcela. Se o operador informou parcelas
@@ -2190,7 +2194,6 @@ function DetalheContrato({
   const [editValor, setEditValor] = useState<string>(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
   const [editDia, setEditDia] = useState<string>(String(contrato.dia_vencimento ?? 10));
   const [savingDados, setSavingDados] = useState(false);
-  const [regerando, setRegerando] = useState(false);
   useEffect(() => {
     setEditValor(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
     setEditDia(String(contrato.dia_vencimento ?? 10));
@@ -2645,80 +2648,6 @@ function DetalheContrato({
     setSavingDados(false);
     toast.success("Dados salvos.");
     await load();
-  };
-
-  // Regera as 12 parcelas do contrato usando valor_mensal e dia_vencimento já salvos.
-  // Regra: 1ª parcela SEMPRE cai no mês da data_inicio (com dia_vencimento),
-  // as 11 seguintes seguem mês a mês. Preserva parcelas já pagas/existentes
-  // (não apaga o que não é 'pendente' e não é futura).
-  const regerarParcelasFuturas = async () => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    const dataIni = (contrato as any).data_inicio as string | null;
-    if (!dataIni) { toast.error("Contrato sem data de início."); return; }
-    const dia = Math.max(1, Math.min(31, Number((contrato as any).dia_vencimento) || 0));
-    if (!dia) { toast.error("Contrato sem dia de vencimento válido."); return; }
-    const valor = Number((contrato as any).valor_mensal ?? 0);
-    if (!Number.isFinite(valor) || valor < 0) { toast.error("Valor mensal inválido."); return; }
-    if (!confirm("Isso apaga as parcelas pendentes futuras e recria 12 parcelas a partir do mês da data de início. Continuar?")) return;
-
-    setRegerando(true);
-    try {
-      const hoje = new Date().toISOString().slice(0, 10);
-      await supabase
-        .from("contrato_mensalidades")
-        .delete()
-        .eq("contrato_id", contrato.id)
-        .eq("status", "pendente")
-        .gt("numero_parcela", 0)
-        .gt("vencimento", hoje);
-
-      const { data: restantes } = await supabase
-        .from("contrato_mensalidades")
-        .select("numero_parcela")
-        .eq("contrato_id", contrato.id)
-        .gt("numero_parcela", 0)
-        .order("numero_parcela", { ascending: false });
-      const existentes = restantes ?? [];
-      const maxExistente = existentes.reduce(
-        (mx, r) => Math.max(mx, Number((r as { numero_parcela: number }).numero_parcela) || 0),
-        0,
-      );
-      const restantesParaGerar = Math.max(0, 12 - existentes.length);
-      // Base = mês/ano da data_inicio. A parcela N (1..12) cai no
-      // (mês_inicio + N - 1). Só geramos as parcelas cujo número ainda
-      // não existe no contrato.
-      const [yy, mm] = dataIni.slice(0, 10).split("-").map((s) => Number(s));
-      const baseYear = yy;
-      const baseMonth = (mm || 1) - 1; // 0-index
-      const rows: any[] = [];
-      let gerados = 0;
-      let prox = maxExistente + 1;
-      while (gerados < restantesParaGerar && prox <= 12) {
-        const offset = prox - 1;
-        const ref = new Date(baseYear, baseMonth + offset, 1);
-        const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
-        const d = Math.min(dia, lastDay);
-        const venc = new Date(ref.getFullYear(), ref.getMonth(), d);
-        rows.push({
-          contrato_id: contrato.id,
-          clinica_id: (contrato as any).clinica_id,
-          numero_parcela: prox,
-          vencimento: venc.toISOString().slice(0, 10),
-          valor,
-          status: "pendente",
-        });
-        prox++;
-        gerados++;
-      }
-      if (rows.length > 0) {
-        const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows);
-        if (insErr) { mostrarErro(insErr, "falha ao gerar parcelas"); return; }
-      }
-      toast.success(`Parcelas regeradas (${rows.length} nova(s)).`);
-      await load();
-    } finally {
-      setRegerando(false);
-    }
   };
 
   const confirmarCancelamento = async () => {
@@ -4837,17 +4766,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
               </div>
               <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
                 <span className="text-xs text-muted-foreground">
-                  A 1ª parcela é gerada no mês da data de início; as 11 seguintes seguem mês a mês.
+                  A 1ª parcela é gerada no mês seguinte à data de início; as 11 seguintes seguem mês a mês, cobrindo 12 meses até a data de término.
                 </span>
                 <div className="ml-auto flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={regerarParcelasFuturas}
-                    disabled={(cancelado && !isAdmin) || regerando || savingDados || !podeEscrever}
-                  >
-                    {regerando ? "Regerando…" : "Regerar 12 parcelas"}
-                  </Button>
                   <Button
                     size="sm"
                     onClick={salvarDadosFinanceiros}
