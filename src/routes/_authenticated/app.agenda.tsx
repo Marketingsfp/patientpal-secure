@@ -389,6 +389,19 @@ function aplicarDescontoPorForma(valor: number, forma: string, d: DescontoConven
 }
 
 /**
+ * Acréscimo automático de cartão foi descontinuado (ver `applyAcrescimoCartao`
+ * em `cb-regras.ts`). Mantido como pass-through para não quebrar os cálculos
+ * legados da Agenda.
+ */
+function aplicarAcrescimoCartaoAgenda(
+  valor: number,
+  _forma: string,
+  _acr: unknown,
+): number {
+  return valor;
+}
+
+/**
  * Retorna a memória de cálculo do desconto aplicado a este canal, para
  * exibir abaixo de cada opção do modal de "Forma de pagamento".
  * Formato curto: "R$ 130 − 10% = R$ 117"  ou  "Valor fixo R$ 95".
