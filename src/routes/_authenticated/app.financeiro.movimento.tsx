@@ -737,7 +737,7 @@ function Page() {
         <div><h1 className="text-2xl font-semibold">Movimento de Caixa</h1>
           <p className="text-sm text-muted-foreground">Receitas e despesas do período</p></div>
         <div className="flex gap-2">
-        <Button variant="outline" onClick={imprimirRelatorio} disabled={!items.length}>
+        <Button variant="outline" onClick={imprimirRelatorio} disabled={!displayItems.length}>
           <Printer className="h-4 w-4 mr-2" />Relatório
         </Button>
         <Button
