@@ -103,6 +103,22 @@ const fmtDcurto = (s?: string | null) => {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${String(d.getFullYear()).slice(-2)}`;
 };
+const fmtCPFDisplay = (s?: string | null) => {
+  const d = (s ?? "").replace(/\D/g, "");
+  if (d.length !== 11) return s || "—";
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+};
+const fmtCEPDisplay = (s?: string | null) => {
+  const d = (s ?? "").replace(/\D/g, "");
+  if (d.length !== 8) return s || "—";
+  return `${d.slice(0, 5)}-${d.slice(5)}`;
+};
+const fmtTelDisplay = (s?: string | null) => {
+  const d = (s ?? "").replace(/\D/g, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return s || "—";
+};
 const MESES_PT = [
   "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
   "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
