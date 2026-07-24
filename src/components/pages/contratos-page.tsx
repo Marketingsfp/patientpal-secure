@@ -242,6 +242,8 @@ type Dep = {
   tipo: string;
   cpf?: string | null;
   codigo_prontuario?: string | null;
+  data_nascimento?: string | null;
+  telefone?: string | null;
   incluido_em: string | null;
   excluido_em: string | null;
   ativo: boolean;
