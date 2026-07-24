@@ -1,0 +1,1 @@
+GRANT SELECT ON public.nfse_emitentes_publico TO authenticated;
