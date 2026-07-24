@@ -613,11 +613,41 @@ function Page() {
       if (isReceita) { c.recebimento += v; totReceb += v; }
       else if (isDespesa) { c.pagamento += v; totPag += v; }
       cats2.set(catLabel, c);
-      const fLabel = (l.forma_pagamento || "—").toUpperCase();
-      const f = formas.get(fLabel) ?? { label: fLabel, pagamento: 0, recebimento: 0 };
-      if (isReceita) f.recebimento += v;
-      else if (isDespesa) f.pagamento += v;
-      formas.set(fLabel, f);
+      // Decompõe pagamentos "misto" nas formas reais para não aparecer o
+      // rótulo genérico "MISTO" no Resumo por tipo de moeda — o pedido do
+      // caixa é ver DINHEIRO, PIX, CARTÃO, etc. separados. O texto vem em
+      // fin_lancamentos.observacoes no formato:
+      //   "Pagamento misto: DINHEIRO R$ 100,00; CARTAO DEBITO R$ 30,00"
+      // (case-insensitive, com ou sem sufixos entre parênteses).
+      const partes: Array<{ label: string; valor: number }> = [];
+      if ((l.forma_pagamento ?? "").toLowerCase() === "misto" && l.observacoes) {
+        const obs = l.observacoes;
+        const idx = obs.toLowerCase().indexOf("misto:");
+        const trecho = idx >= 0 ? obs.slice(idx + "misto:".length) : obs;
+        const primeiroBloco = trecho.split(" | ")[0];
+        for (const raw of primeiroBloco.split(";")) {
+          const m = raw.match(/^\s*([^R$]+?)\s*R\$\s*([\d.,]+)/i);
+          if (!m) continue;
+          const rotulo = m[1].replace(/\s+/g, " ").trim().toUpperCase();
+          const num = Number(m[2].replace(/\./g, "").replace(",", "."));
+          if (!rotulo || !Number.isFinite(num) || num <= 0) continue;
+          partes.push({ label: rotulo, valor: num });
+        }
+      }
+      if (partes.length) {
+        for (const p of partes) {
+          const f = formas.get(p.label) ?? { label: p.label, pagamento: 0, recebimento: 0 };
+          if (isReceita) f.recebimento += p.valor;
+          else if (isDespesa) f.pagamento += p.valor;
+          formas.set(p.label, f);
+        }
+      } else {
+        const fLabel = (l.forma_pagamento || "—").toUpperCase();
+        const f = formas.get(fLabel) ?? { label: fLabel, pagamento: 0, recebimento: 0 };
+        if (isReceita) f.recebimento += v;
+        else if (isDespesa) f.pagamento += v;
+        formas.set(fLabel, f);
+      }
     }
     let acc = 0;
     const linhasCat = Array.from(cats2.values()).map((c) => {
