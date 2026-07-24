@@ -2130,6 +2130,7 @@ function DetalheContrato({
   const [emitenteId, setEmitenteId] = useState<string>("");
   const [nfsePorLancamento, setNfsePorLancamento] = useState<Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }>>({});
   const [nfseEmitindoId, setNfseEmitindoId] = useState<string | null>(null);
+  const [nfseEmitindoLote, setNfseEmitindoLote] = useState(false);
 
   // Inclusão/exclusão de dependentes pós-venda
   const [incOpen, setIncOpen] = useState(false);
