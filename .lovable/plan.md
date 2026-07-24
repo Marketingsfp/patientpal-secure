@@ -1,46 +1,87 @@
-## Contexto (verificado)
+## Diagnóstico
 
-Comparando as duas GRs enviadas:
+O erro **"Já existe um registro com esses dados"** é a tradução de uma violação
+de índice único no banco (`uq_agend_slot_vazio`, que exige unicidade em
+`clinica_id + medico_id + agenda_id + inicio` para slots vazios).
 
-- **Impressão original** (foto 2 — Quédima) mostra a linha `USUÁRIO: QUÉDIMA SUELEN` logo após o VENCIMENTO.
-- **Reimpressão** (foto 1 — Stella) **não mostra** a linha `USUÁRIO`. O restante do layout já é igual, e o rodapé de reimpressão já está correto.
+O Dr. João Hélio tem **duas agendas paralelas no mesmo dia/horário** (é comum
+em agendas de exames, para atender dois pacientes ao mesmo tempo em salas
+diferentes):
 
-Em `src/lib/print-gr.ts` (função `printGuiaMensalidadeCore`, linhas ~1314–1465) o template usa:
+- Agenda `2e408b29…` (a que a Vania está ocupando em 11/08 às 12:30).
+- Agenda `1c0ddcb9…` (paralela, com um slot DISPONIVEL às 12:30 em 11/08).
 
-```
-${usuarioFinalNome ? `<tr>...USUÁRIO: ${esc(usuarioFinalNome)}...</tr>` : ""}
-```
+O fluxo atual de reagendamento (`reagendar-agendamento.functions.ts`) faz uma
+"troca" do slot para preservar o mesmo ID do agendamento. Nessa troca:
 
-E `usuarioFinalNome = usuarioNome ?? primeiraVia?.impresso_por_nome`.
+1. Pega o slot vazio de destino (por exemplo, 23/07 12:10 na agenda paralela
+   `1c0ddcb9…`).
+2. Reescreve esse slot vazio para assumir o horário/agenda **antigos** da
+   Vania — mas mantém o `agenda_id` de destino (`1c0ddcb9…`).
+3. Isso cria a chave `(medico, 1c0ddcb9…, 11/08 12:30, paciente_id NULL)` —
+   que **já existe** (é o slot DISPONIVEL da agenda paralela).
+4. O banco rejeita com `unique_violation` → toast genérico.
 
-Na chamada de reimpressão (`contratos-page.tsx` linha ~3229) só é passado `reimpressoPorNome`/`reimpressoPorId` — não vai `usuarioNome`. Portanto o valor exibido depende de `gr_impressoes.impresso_por_nome` da 1ª via. Quando o pagamento é antigo (contratos migrados / feitos antes de o sistema começar a gravar esse campo) a linha some.
+Ou seja: sempre que existe uma agenda paralela do mesmo médico com um slot
+vazio exatamente no horário antigo, o reagendamento quebra. Regra afetada:
+Passo B (`docs/agenda/criar-agendamento-shared.md`) — a criação está OK; só o
+reagendamento tem esse defeito.
 
-**Diagnóstico:** falta um fallback quando `gr_impressoes` não tem o nome — nesse caso podemos buscar quem lançou o pagamento pela `contrato_mensalidades.lancamento_id → fin_lancamentos.criado_por → profiles.nome`.
+## Plano
 
-## Escopo
+Ajustar o swap em `src/lib/agenda/reagendar-agendamento.functions.ts` para
+também trocar o `agenda_id` entre origem e slot de destino (hoje só troca
+horário/médico). Assim o slot vazio "herda" a posição completa do antigo
+horário (agenda inclusa), evitando colisão com slots paralelos.
 
-- Só front-end / lib de impressão. Sem mudança de banco ou de regra de negócio.
-- Aplica-se apenas à **GR de mensalidade** (que é o caso das fotos). A GR de atendimento e a agrupada não estão em discussão.
-- Clínica-alvo: correção puramente técnica (bug de exibição). Ajuste global salvo se você preferir aplicar por clínica — me avise nesse caso.
+Mudança pontual, cirúrgica:
 
-## O que muda
+- Passo 3 (dest_slot temporário): passa a atualizar `agenda_id` para o
+  `antigo.agenda_id` da origem (além de `inicio`, `fim`, `medico_id`).
+- Passo 4 (origem): passa a atualizar `agenda_id` para o `agenda_id` do
+  dest_slot capturado no Passo 1 (além de `inicio`, `fim`, `medico_id`,
+  `observacoes`).
+- Passo 5 (limpar marker) permanece igual.
 
-Em `src/lib/print-gr.ts`, dentro de `printGuiaMensalidadeCore` (e replicado para `printGuiaMensalidadeComTaxaCore`, que compartilha o mesmo template):
+Isso deixa a origem coerente com a agenda do novo horário e o slot vazio
+"reciclado" coerente com a agenda do horário antigo — sem conflito com o
+índice único.
 
-1. Depois de calcular `usuarioFinalNome = usuarioNome ?? primeiraVia?.impresso_por_nome`, se ainda estiver vazio, buscar via `contrato_mensalidades.lancamento_id`:
-   - `select criado_por from fin_lancamentos where id = <lancamento_id>`
-   - depois `select nome from profiles where id = <criado_por>`
-   - usar esse nome como `usuarioFinalNome`.
-2. Se mesmo assim continuar nulo, manter comportamento atual (linha oculta) — não inventar nome.
-3. O rodapé de reimpressão (`*** 2ª VIA — REIMPRESSÃO *** / REIMPRESSO POR / EM …`) continua idêntico.
+### Detalhes técnicos
 
-Resultado: a reimpressão terá exatamente o mesmo miolo da 1ª via (incluindo o `USUÁRIO:` correto do operador que faturou), acrescido do bloco de reimpressão no rodapé.
+- Arquivo único: `src/lib/agenda/reagendar-agendamento.functions.ts`.
+- Adicionar `agenda_id` ao `select` da origem (linha 79).
+- Adicionar `agenda_id: destSlot.agenda_id` ao SELECT/tipagem do destSlot
+  (linhas 121, 128).
+- Incluir `agenda_id: antigo.agenda_id` no update do Passo 3 (linhas 159–167).
+- Incluir `agenda_id: destSlot.agenda_id` no update do Passo 4
+  (linhas 175–183).
+- Nenhuma alteração em `criar-agendamento.functions.ts`, na Agenda clássica,
+  no wizard V2, ou em qualquer regra de negócio de criação (Passo B intacto).
+- Nenhuma migração de banco.
 
-## Validação
+### Validação proposta (depois do fix)
 
-- Reimprimir a GR do contrato da Stella (#20261926) e conferir que aparece `USUÁRIO: <nome de quem faturou>` acima do bloco QTD/DESCRIÇÃO, mantendo o rodapé de reimpressão.
-- Reimprimir uma GR recente (que já tenha `impresso_por_nome` gravado) para garantir que o comportamento não regride.
+1. Reagendar a Vania Maria Dario (11/08 12:30 → um horário novo com o Dr.
+   João Hélio) e confirmar que salva sem erro.
+2. Confirmar via SQL que o mesmo `agendamento.id` foi preservado (contrato do
+   Passo B).
+3. Conferir que o slot antigo (11/08 12:30 na agenda `2e408b29…`) voltou a
+   ficar DISPONIVEL e que o slot paralelo (`1c0ddcb9…` no mesmo horário)
+   continua intacto.
+4. Rodar um segundo reagendamento em uma agenda sem paralela para garantir
+   que o comportamento normal (sem paralelas) continua funcionando.
 
-## Pendências / confirmação
+### Escopo / não-escopo
 
-- Confirme que quer aplicar **global** (todas as clínicas). Como é bug de exibição sem regra de negócio, minha recomendação é global; se preferir só Menino Jesus, me diga.
+- **Dentro**: correção do reagendamento em todas as clínicas (é bug técnico,
+  não regra de negócio — global conforme regra 1.10 do AGENTS.md, mas
+  confirmo antes de aplicar).
+- **Fora**: mudanças no wizard "Nova sessão" da Agenda V2, na criação
+  clássica, no modelo de slots pré-gerados, ou em qualquer política/RLS.
+
+### Confirmação necessária antes de implementar
+
+- **Clínica-alvo**: aplicar globalmente (todas as 3 clínicas)? É correção
+  técnica pura sem regra de negócio nova, mas quero confirmar conforme a
+  regra 1.10 do AGENTS.md.
