@@ -147,7 +147,7 @@ function Page() {
       let offset = 0;
       for (;;) {
         let q = supabase.from("fin_lancamentos")
-          .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, criado_por, medico_id, agendamento_id, created_at")
+          .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, observacoes, criado_por, medico_id, agendamento_id, created_at")
           .eq("clinica_id", clinicaAtual.clinica_id)
           .gte("data", fromDate).lte("data", toDate)
           .order("data", { ascending: false })
