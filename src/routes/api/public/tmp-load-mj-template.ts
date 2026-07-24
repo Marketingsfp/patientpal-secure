@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS } from '@/lib/contract-templates/menino-jesus-cartao-consulta-seguros'
 
-export const Route = createFileRoute('/api/public/_tmp_load_mj_template')({
+export const Route = createFileRoute('/api/public/tmp-load-mj-template')({
   server: {
     handlers: {
       GET: async () => {
