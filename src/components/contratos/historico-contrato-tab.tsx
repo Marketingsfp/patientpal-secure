@@ -428,18 +428,30 @@ export function HistoricoContratoTab({ contratoId }: { contratoId: string }) {
                 </div>
                 <div className="mt-1 mb-2 flex items-center gap-2 text-xs text-muted-foreground">
                   <UserIcon className="h-3 w-3" />
-                  {e.user_nome || e.user_email ? (
-                    <>
-                      <span className="font-medium text-foreground">
-                        {e.user_nome || e.user_email}
-                      </span>
-                      {e.user_email && e.user_nome && e.user_email !== e.user_nome && (
-                        <span>({e.user_email})</span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="italic">Usuário não identificado</span>
-                  )}
+                  {(() => {
+                    const nome = e.user_nome || e.user_email || "Sistema";
+                    const ehSistema = !e.user_id && (
+                      !e.user_nome || /^sistema(\s*\(|$)/i.test(e.user_nome)
+                    );
+                    if (ehSistema) {
+                      return (
+                        <>
+                          <span className="font-medium text-foreground">Sistema</span>
+                          {e.user_email && /\(/.test(e.user_email) && (
+                            <span className="text-[10px] opacity-70">{e.user_email.replace(/^sistema\s*/i, "")}</span>
+                          )}
+                        </>
+                      );
+                    }
+                    return (
+                      <>
+                        <span className="font-medium text-foreground">{nome}</span>
+                        {e.user_email && e.user_nome && e.user_email !== e.user_nome && (
+                          <span>({e.user_email})</span>
+                        )}
+                      </>
+                    );
+                  })()}
                   <Badge variant="outline" className="ml-auto text-[10px]">
                     {grupoDe(e.tipo)}
                   </Badge>
