@@ -675,27 +675,35 @@ async function obterInfoConvenioPaciente(params: {
   // Deriva desconto a partir da regra escolhida (gratuidade > modo).
   let desconto: DescontoConvenio | null = null;
   let beneficioEscolhido: any = null;
-  if (regraMatch) {
+  const aplicarRegraEscolhida = (r: any) => {
     beneficioEscolhido = {
-      ...regraMatch,
+      ...r,
       // Campos derivados para compatibilidade com o resto do fluxo (limite/excedente).
-      escopo: regraMatch.procedimento_id ? "servico" : "especialidade",
+      escopo: r.procedimento_id ? "servico" : "especialidade",
     };
-    if (regraMatch.gratuito) {
+    if (r.gratuito) {
       desconto = { tipo: "gratuidade", valor: 0 };
-    } else if (regraMatch.modo === "valor_fixo") {
-      const v = Number(regraMatch.valor) || 0;
-      const vC = regraMatch.valor_cartao != null ? (Number(regraMatch.valor_cartao) || 0) : v;
+    } else if (r.modo === "valor_fixo") {
+      const v = Number(r.valor) || 0;
+      const vC = r.valor_cartao != null ? (Number(r.valor_cartao) || 0) : v;
       desconto = { tipo: "valor_fixo", valor: v, valorOutros: vC };
-    } else if (regraMatch.modo === "percentual_desconto") {
-      const p = Number(regraMatch.percentual) || 0;
-      const pC = regraMatch.percentual_cartao != null ? (Number(regraMatch.percentual_cartao) || 0) : p;
+    } else if (r.modo === "percentual_desconto") {
+      const p = Number(r.percentual) || 0;
+      const pC = r.percentual_cartao != null ? (Number(r.percentual_cartao) || 0) : p;
       desconto = { tipo: "percentual", valor: p, percentualOutros: pC };
     }
-  }
+  };
+  if (regraMatch) aplicarRegraEscolhida(regraMatch);
 
-  // 4b) Carência: se o contrato não cumpriu a carência mínima, suspende o desconto
-  //     (paga particular). Já era feito antes, agora fica junto com o resto.
+  // 4b) Carência: se a regra mais específica (regraMatch) não cumpriu a
+  //     carência mínima, NÃO cobra particular direto — procura a próxima
+  //     regra aplicável, menos específica, cuja carência o contrato já
+  //     cumpriu (mesmo princípio do fallback já usado para limite esgotado,
+  //     excedente_modo="regra_padrao_convenio"). Sem isso, uma regra por
+  //     serviço específico com carência alta (ex.: exame anual gratuito,
+  //     carência 6) bloqueava também descontos genéricos por especialidade
+  //     com carência menor (ex.: 10% de desconto, carência 2) que o
+  //     contrato já tinha direito — cobrando particular cheio à toa.
   let avisoLimite: string | undefined;
   let bloquear = false;
   // Contratos oriundos de renovação (extensão do mesmo contrato ou troca de
@@ -707,10 +715,38 @@ async function obterInfoConvenioPaciente(params: {
     !!(contrato as any)?.contrato_origem_id ||
     !!(contrato as any)?.sem_carencia;
   if (regraMatch && !isRenovacao && !carenciaCumprida(regraMatch, mensalidadesPagas)) {
-    const n = Number(regraMatch.carencia_mensalidades) || 0;
-    desconto = null;
-    beneficioEscolhido = null;
-    avisoLimite = `Convênio ${convenioNome}: benefício disponível somente após a ${n}ª mensalidade paga (contrato tem ${mensalidadesPagas} paga(s)). Cobrando valor particular.`;
+    const regraOriginal = regraMatch;
+    const tentadas = new Set<string>([regraMatch.id]);
+    let guard = 0;
+    while (guard < 20) {
+      guard++;
+      const regrasRestantes = (regrasCb as any[]).filter((r) => !tentadas.has(r.id));
+      let candidata: any = null;
+      for (const eid of espsTentativa) {
+        const r = findRegra(regrasRestantes, eid, procedimentoTipo, procedimentoId);
+        if (r && (!candidata || scoreRegra(r) > scoreRegra(candidata))) {
+          candidata = r;
+        }
+      }
+      if (!candidata) {
+        regraMatch = null;
+        break;
+      }
+      if (carenciaCumprida(candidata, mensalidadesPagas)) {
+        regraMatch = candidata;
+        break;
+      }
+      tentadas.add(candidata.id);
+      regraMatch = null;
+    }
+    if (regraMatch) {
+      aplicarRegraEscolhida(regraMatch);
+    } else {
+      desconto = null;
+      beneficioEscolhido = null;
+      const n = Number(regraOriginal.carencia_mensalidades) || 0;
+      avisoLimite = `Convênio ${convenioNome}: benefício disponível somente após a ${n}ª mensalidade paga (contrato tem ${mensalidadesPagas} paga(s)). Cobrando valor particular.`;
+    }
   }
 
   // 5) Checa limite de uso do benefício escolhido (ex.: "1 consulta R$9,99/dia/contrato")
