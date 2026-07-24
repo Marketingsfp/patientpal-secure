@@ -964,6 +964,32 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 </div>
 
                 <div className="pt-2">
+                  <div className="border-t pt-4 space-y-2">
+                    <div>
+                      <Label>Vínculo com cliente/paciente</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Vincule o médico ao próprio cadastro de paciente da clínica. Necessário para habilitar o <b>Convênio Funcionário</b> na aba <b>Convênio</b>.
+                      </p>
+                    </div>
+                    <PatientSearchInput
+                      value={pacienteVinculado}
+                      onSelect={setPacienteVinculado}
+                      clinicaIdsOverride={[activeClinicaId]}
+                      placeholder="Buscar o paciente do próprio médico…"
+                    />
+                    {pacienteVinculado && (
+                      <div className="text-xs text-muted-foreground">
+                        Vinculado a: <b>{pacienteVinculado.nome}</b>
+                        {" · "}
+                        <button type="button" className="underline" onClick={() => setPacienteVinculado(null)}>
+                          remover vínculo
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-2">
                   <div className="rounded-md border p-3 flex items-start gap-3 bg-muted/30">
                     <Checkbox
                       id="usa_sistema"
