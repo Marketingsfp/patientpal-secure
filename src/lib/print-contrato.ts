@@ -283,21 +283,53 @@ export async function printContrato(contratoId: string) {
     ? CONVENIO_PDF_OVERRIDES[(c as any).convenio_id]
     : null;
   if (pdfOverrideUrl) {
-    // Navegadores modernos (Chrome/Edge) não permitem chamar print() no
-    // visualizador de PDF embutido em iframe oculto — a chamada silenciosa
-    // não faz nada. Abrimos o PDF em uma nova aba: o próprio visualizador
-    // do navegador tem o botão de imprimir e o usuário controla o fechamento.
-    const w = window.open(pdfOverrideUrl, "_blank", "noopener,noreferrer");
-    if (!w) {
-      // Pop-up bloqueado: força download/abertura via link temporário
-      const a = document.createElement("a");
-      a.href = pdfOverrideUrl;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    }
+    // Overlay in-page com o PDF visível — evita nova aba (bloqueada pelo Brave/adblockers)
+    // e permite imprimir pelo próprio botão do visualizador PDF do navegador.
+    const overlay = document.createElement("div");
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-label", "Visualizar contrato para impressão");
+    overlay.style.cssText = [
+      "position:fixed", "inset:0", "z-index:2147483647",
+      "background:rgba(0,0,0,0.85)", "display:flex", "flex-direction:column",
+    ].join(";");
+
+    const bar = document.createElement("div");
+    bar.style.cssText = [
+      "display:flex", "align-items:center", "justify-content:space-between",
+      "gap:12px", "padding:10px 16px", "background:#1a3a6b", "color:#fff",
+      "font-family:system-ui,-apple-system,Segoe UI,sans-serif", "font-size:14px",
+    ].join(";");
+    bar.innerHTML = `
+      <span>Contrato pronto para impressão — use o botão de imprimir do visualizador de PDF (ícone da impressora, canto superior direito) ou pressione Ctrl+P.</span>
+    `;
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.textContent = "Fechar";
+    closeBtn.style.cssText = [
+      "background:#fff", "color:#1a3a6b", "border:0", "border-radius:6px",
+      "padding:6px 14px", "font-weight:600", "cursor:pointer", "flex-shrink:0",
+    ].join(";");
+    bar.appendChild(closeBtn);
+
+    const frame = document.createElement("iframe");
+    frame.src = pdfOverrideUrl;
+    frame.title = "Contrato";
+    frame.style.cssText = "flex:1;width:100%;border:0;background:#fff;";
+
+    overlay.appendChild(bar);
+    overlay.appendChild(frame);
+    document.body.appendChild(overlay);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const close = () => {
+      try { overlay.remove(); } catch { /* noop */ }
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKey);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    closeBtn.addEventListener("click", close);
+    document.addEventListener("keydown", onKey);
     return;
   }
 
