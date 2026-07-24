@@ -1339,7 +1339,11 @@ function NovoContratoForm({
     const base = new Date(dataInicio + "T00:00:00");
     const valorParcela = valor + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
-      const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
+      // Regra: 1ª mensalidade cai no MÊS SEGUINTE à data de início e as
+      // demais seguem mês a mês, cobrindo exatamente 12 meses até
+      // data_termino (data_inicio + 1 ano). Ex.: início 01/02/2026 →
+      // parcelas 01/03/2026, 01/04/2026, …, 01/02/2027.
+      const venc = new Date(base.getFullYear(), base.getMonth() + i + 1, diaVenc);
       const jaPago = i < mensalidadesJaPagas;
       const vencStr = venc.toISOString().slice(0, 10);
       // Taxa de adesão só na 1ª parcela. Se o operador informou parcelas
