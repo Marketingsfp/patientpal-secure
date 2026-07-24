@@ -191,6 +191,18 @@ const isSlotLivre = (pacienteNome: string | null | undefined) => {
   return nome === "disponivel" || nome === "bloqueio";
 };
 
+/**
+ * Data de hoje no fuso LOCAL, formato "YYYY-MM-DD". `new Date().toISOString()`
+ * converte para UTC — no Brasil (UTC-3), a partir das ~21h já retorna a data
+ * de amanhã, o que adiantava em 1 dia a contagem de atraso de mensalidade
+ * (e a restrição do convênio) nas últimas horas de cada dia.
+ */
+const hojeLocalISODate = (): string => {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
 const primeiroValorValido = (...valores: unknown[]) => {
   const numeros = valores.map((valor) => Number(valor)).filter((valor) => Number.isFinite(valor));
   return numeros.find((valor) => valor > 0) ?? numeros[0] ?? 0;
@@ -311,16 +323,42 @@ type DescontoConvenio =
   | { tipo: "percentual"; valor: number }
   | { tipo: "valor"; valor: number }
   | { tipo: "gratuidade"; valor: 0 }
-  | { tipo: "valor_fixo"; valor: number; valorOutros: number };
+  | {
+      tipo: "valor_fixo";
+      valor: number;
+      valorOutros: number;
+      /**
+       * true quando `valorOutros` veio de um valor explícito configurado na
+       * regra (`valor_outros`), não de um fallback igual a `valor`. Nesse
+       * caso o preço de cartão/Pix já está definido pela regra e o
+       * acréscimo global do convênio NÃO deve ser somado por cima (senão o
+       * valor é acrescido duas vezes).
+       */
+      outrosExplicito?: boolean;
+    };
+
+/** Acréscimo do convênio a aplicar sobre um desconto — null quando a regra já define o valor de cartão/Pix explicitamente. */
+function acrescimoParaDesconto(
+  desconto: DescontoConvenio | null | undefined,
+  acrescimoCartao: ConvenioInfo["acrescimoCartao"] | null | undefined,
+): ConvenioInfo["acrescimoCartao"] | null {
+  if (!desconto) return null;
+  if (desconto.tipo === "valor_fixo" && desconto.outrosExplicito) return null;
+  return acrescimoCartao ?? null;
+}
+
+type FormaOpcao = { forma: string; label: string; valor: number };
 
 type ConvenioInfo = {
   convenioNome: string;
+  /** true quando não há parcela vencida há MAIS de 5 dias — inclui o caso "em carência" (≤5 dias), que funciona normalmente. */
   emDia: boolean;
+  /** Parcelas vencidas há mais de 5 dias (tolerância). Só isso bloqueia o convênio. */
   parcelasAtrasadas: number;
   desconto: DescontoConvenio | null;
   avisoLimite?: string;
   bloquear?: boolean;
-  /** Contrato com parcela(s) vencida(s) dentro da tolerância de 5 dias. */
+  /** Contrato com parcela(s) vencida(s) dentro da tolerância de 5 dias — informativo, não restringe benefício algum. */
   emCarencia?: boolean;
   /** Dias restantes de tolerância na parcela vencida mais crítica. */
   diasCarenciaRestantes?: number | null;
@@ -382,18 +420,18 @@ async function obterInfoConvenioPaciente(params: {
   // 1) Contrato ativo: paciente como titular OU dependente ativo
   const { data: titularContratos } = await supabase
     .from("contratos_assinatura")
-    .select("id,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,cb_convenios(nome)")
+    .select("id,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,data_inicio,renovado_em,cb_convenios(nome)")
     .eq("clinica_id", clinicaId)
     .eq("status", "ativo")
     .eq("paciente_id", pacienteId)
     .limit(5);
-  let contrato: { id: string; convenio_id: string | null; contrato_origem_id?: string | null; numero_renovacoes?: number | null; sem_carencia?: boolean | null; cb_convenios: { nome: string } | null } | null =
+  let contrato: { id: string; convenio_id: string | null; contrato_origem_id?: string | null; numero_renovacoes?: number | null; sem_carencia?: boolean | null; data_inicio?: string | null; renovado_em?: string | null; cb_convenios: { nome: string } | null } | null =
     ((titularContratos ?? [])[0] as any) ?? null;
 
   if (!contrato) {
     const { data: deps } = await supabase
       .from("contrato_dependentes")
-      .select("contrato_id,ativo,contratos_assinatura!inner(id,clinica_id,status,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,cb_convenios(nome))")
+      .select("contrato_id,ativo,contratos_assinatura!inner(id,clinica_id,status,convenio_id,contrato_origem_id,numero_renovacoes,sem_carencia,data_inicio,renovado_em,cb_convenios(nome))")
       .eq("paciente_id", pacienteId)
       .eq("ativo", true)
       .limit(5);
@@ -407,11 +445,14 @@ async function obterInfoConvenioPaciente(params: {
   const convenioNome = contrato.cb_convenios?.nome ?? "Convênio";
 
   // 2) Verifica mensalidades em atraso do contrato.
-  //    Regra de negócio: tolerância de 5 dias corridos após o vencimento.
-  //    - 0..5 dias de atraso → contrato "em carência" (uso do convênio
-  //      restrito a consultas ≤ R$ 9,99, sem exames).
-  //    - > 5 dias → parcela conta como atrasada e o convênio é bloqueado.
-  const hojeStr = new Date().toISOString().slice(0, 10);
+  //    Regra de negócio: tolerância de 5 dias corridos após o vencimento —
+  //    dentro dela o convênio funciona NORMALMENTE (mesmos benefícios,
+  //    limites e descontos de sempre); só a partir do 6º dia a parcela conta
+  //    como atrasada e o convênio é bloqueado. `emDia` cobre os dois casos
+  //    "sem restrição" (nada vencido OU dentro da tolerância) — o único sinal
+  //    de bloqueio real é `parcelasAtrasadas > 0`. `emCarencia` fica só como
+  //    informativo (mostra "vence em N dias" sem travar nada).
+  const hojeStr = hojeLocalISODate();
   const { data: mens } = await supabase
     .from("contrato_mensalidades")
     .select("status,vencimento")
@@ -426,7 +467,7 @@ async function obterInfoConvenioPaciente(params: {
   });
   const parcelasAtrasadas = diasAtrasoLista.filter((d) => d > DIAS_TOLERANCIA).length;
   const parcelasEmCarencia = diasAtrasoLista.filter((d) => d >= 0 && d <= DIAS_TOLERANCIA).length;
-  const emDia = parcelasAtrasadas === 0 && parcelasEmCarencia === 0;
+  const emDia = parcelasAtrasadas === 0;
   const emCarencia = parcelasAtrasadas === 0 && parcelasEmCarencia > 0;
   const diasCarenciaRestantes = emCarencia
     ? Math.min(
@@ -545,7 +586,7 @@ async function obterInfoConvenioPaciente(params: {
   const { data: regrasRaw } = await (supabase as any)
     .from("cb_convenio_regras")
     .select(
-      "id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,grupo_gratuidade",
+      "id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,valor_outros,percentual,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,grupo_gratuidade",
     )
     .eq("convenio_id", contrato.convenio_id)
     .eq("ativo", true);
@@ -628,7 +669,9 @@ async function obterInfoConvenioPaciente(params: {
       desconto = { tipo: "gratuidade", valor: 0 };
     } else if (regraMatch.modo === "valor_fixo") {
       const v = Number(regraMatch.valor) || 0;
-      desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };
+      const temOutrosExplicito = regraMatch.valor_outros != null;
+      const vOutros = temOutrosExplicito ? Number(regraMatch.valor_outros) || 0 : v;
+      desconto = { tipo: "valor_fixo", valor: v, valorOutros: vOutros, outrosExplicito: temOutrosExplicito };
     } else if (regraMatch.modo === "percentual_desconto") {
       desconto = { tipo: "percentual", valor: Number(regraMatch.percentual) || 0 };
     }
@@ -672,6 +715,35 @@ async function obterInfoConvenioPaciente(params: {
     } else if (periodo === "mes") {
       janelaInicio = new Date(dataBase.getFullYear(), dataBase.getMonth(), 1, 0, 0, 0, 0);
       janelaFim = new Date(dataBase.getFullYear(), dataBase.getMonth() + 1, 0, 23, 59, 59, 999);
+    } else if (periodo === "ano") {
+      // Ciclo anual do CONTRATO (não o ano calendário): janela de 12 meses
+      // ancorada na renovação mais recente (ou início, se nunca renovado).
+      // Sem isso, benefícios como "1 exame por ano por contrato" só podiam
+      // usar periodo "contrato" (sem janela — vitalício), o que travava o
+      // benefício para sempre após o primeiro uso, mesmo em anos seguintes
+      // ou após a renovação do contrato.
+      const anchorStr = contrato.renovado_em || contrato.data_inicio;
+      const anchor = anchorStr ? new Date(anchorStr) : null;
+      if (!anchor || Number.isNaN(anchor.getTime())) {
+        janelaInicio = null;
+        janelaFim = null;
+      } else {
+        let cicloInicio = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate(), 0, 0, 0, 0);
+        let guard = 0;
+        while (cicloInicio.getTime() > dataBase.getTime() && guard < 200) {
+          cicloInicio = new Date(cicloInicio.getFullYear() - 1, cicloInicio.getMonth(), cicloInicio.getDate());
+          guard++;
+        }
+        let proxCiclo = new Date(cicloInicio.getFullYear() + 1, cicloInicio.getMonth(), cicloInicio.getDate());
+        guard = 0;
+        while (proxCiclo.getTime() <= dataBase.getTime() && guard < 200) {
+          cicloInicio = proxCiclo;
+          proxCiclo = new Date(cicloInicio.getFullYear() + 1, cicloInicio.getMonth(), cicloInicio.getDate());
+          guard++;
+        }
+        janelaInicio = cicloInicio;
+        janelaFim = new Date(proxCiclo.getTime() - 1);
+      }
     } else if (periodo === "contrato") {
       janelaInicio = null;
       janelaFim = null;
@@ -711,14 +783,19 @@ async function obterInfoConvenioPaciente(params: {
     if (pacientesCota.length > 0) {
       let q = supabase
         .from("agendamentos")
-        .select("id,medico_id,procedimento,paciente_id,status,inicio", { count: "exact" })
+        .select("id,medico_id,procedimento,paciente_id,status,inicio,tipo_atendimento", { count: "exact" })
         .eq("clinica_id", clinicaId)
         .in("paciente_id", pacientesCota)
         .neq("status", "cancelado");
       if (janelaInicio) q = q.gte("inicio", janelaInicio.toISOString());
       if (janelaFim) q = q.lte("inicio", janelaFim.toISOString());
       if (agendamentoId) q = q.neq("id", agendamentoId);
-      const { data: agsDia } = await q;
+      const { data: agsDiaRaw } = await q;
+      // Atendimentos "particular" não consomem a cota do convênio — o
+      // paciente escolheu pagar fora do benefício de propósito. Registros
+      // legados sem tipo_atendimento (null) continuam contando, para não
+      // quebrar a contagem de dados antigos.
+      const agsDia = (agsDiaRaw ?? []).filter((a: any) => a.tipo_atendimento !== "particular");
 
       // Se o benefício é por especialidade, filtra pelos agendamentos cujo
       // médico tem a mesma especialidade.
@@ -851,7 +928,7 @@ async function obterInfoConvenioPaciente(params: {
               ? "titular-ou-dependente"
               : "contrato";
         const periodoTxt =
-          periodo === "semana" ? "semana" : periodo === "mes" ? "mês" : periodo === "contrato" ? "contrato" : "dia";
+          periodo === "semana" ? "semana" : periodo === "mes" ? "mês" : periodo === "ano" ? "ano" : periodo === "contrato" ? "contrato" : "dia";
         // Se a regra é gratuita e o limite já foi consumido, monta um texto
         // detalhado com data/paciente/médico do consumidor (pode ser o
         // titular ou dependente do mesmo contrato).
@@ -926,7 +1003,9 @@ async function obterInfoConvenioPaciente(params: {
           if (fallback) {
             if (fallback.modo === "valor_fixo") {
               const v = Number(fallback.valor) || 0;
-              desconto = { tipo: "valor_fixo", valor: v, valorOutros: v };
+              const fbOutrosExplicito = fallback.valor_outros != null;
+              const vOutrosFb = fbOutrosExplicito ? Number(fallback.valor_outros) || 0 : v;
+              desconto = { tipo: "valor_fixo", valor: v, valorOutros: vOutrosFb, outrosExplicito: fbOutrosExplicito };
               avisoLimite = consumidorTxt
                 ? `${consumidorTxt}Aplicando o desconto padrão do convênio (R$ ${v.toFixed(2)}).`
                 : `Limite de ${beneficioEscolhido.limite_qtd}/${periodoTxt} por ${escopoTxt} atingido — aplicando desconto padrão do convênio (R$ ${v.toFixed(2)}).`;
@@ -963,37 +1042,15 @@ async function obterInfoConvenioPaciente(params: {
     }
   }
 
-  // 6) Trava de tolerância (5 dias corridos após vencimento).
-  //    Dentro da carência o convênio libera APENAS consultas cujo valor com
-  //    o benefício fique ≤ R$ 9,99. Exames e demais procedimentos ficam sem
-  //    o benefício (paga particular) até a mensalidade ser quitada.
+  // 6) Tolerância de 5 dias corridos após o vencimento: dentro dela o
+  //    convênio funciona NORMALMENTE (mesmo desconto/limite de sempre) — só
+  //    avisa que a mensalidade está vencida, sem restringir nada. O bloqueio
+  //    de verdade só acontece a partir do 6º dia (`bloquear`/`emDia=false`,
+  //    tratado nos fluxos de cobrança que chamam esta função).
   if (emCarencia) {
-    const LIMITE_CONSULTA = 9.99;
-    const tipoLower = (procedimentoTipo ?? "").toLowerCase();
-    const nomeLower = (procedimentoNome ?? "").toLowerCase();
-    const ehExame = tipoLower.includes("exame") || nomeLower.includes("exame");
-    const ehConsulta = tipoLower.includes("consulta") || nomeLower.includes("consulta");
-    let valorFinalConvenio: number | null = null;
-    if (desconto?.tipo === "gratuidade") valorFinalConvenio = 0;
-    else if (desconto?.tipo === "valor_fixo") valorFinalConvenio = Number(desconto.valor) || 0;
-    // percentual/valor: não conseguimos garantir ≤ R$ 9,99 sem base — reprova.
-    const elegivelCarencia =
-      !ehExame && ehConsulta && valorFinalConvenio !== null && valorFinalConvenio <= LIMITE_CONSULTA;
     const diasAtraso = DIAS_TOLERANCIA - (diasCarenciaRestantes ?? 0);
-    const suffix = ` Mensalidade em atraso há ${diasAtraso} dia(s) — dentro da tolerância de ${DIAS_TOLERANCIA} dias apenas consultas até R$ ${LIMITE_CONSULTA.toFixed(2)} são cobertas pelo convênio.`;
-    if (!elegivelCarencia) {
-      desconto = null;
-      const motivo = ehExame
-        ? "Convênio suspenso para exames enquanto a mensalidade não for quitada."
-        : ehConsulta && valorFinalConvenio !== null && valorFinalConvenio > LIMITE_CONSULTA
-          ? `Convênio suspenso: benefício desta consulta (R$ ${valorFinalConvenio.toFixed(2)}) está acima do teto de R$ ${LIMITE_CONSULTA.toFixed(2)} permitido na tolerância.`
-          : "Convênio suspenso: procedimento fora da tolerância — cobrando valor particular.";
-      avisoLimite = `${motivo}${suffix}`;
-    } else {
-      // Consulta permitida: informa mas não bloqueia.
-      const info = `Contrato em carência — parcela vence sem juros por mais ${diasCarenciaRestantes ?? 0} dia(s). Consulta liberada por estar dentro do teto de R$ ${LIMITE_CONSULTA.toFixed(2)}.`;
-      avisoLimite = avisoLimite ? `${info} ${avisoLimite}` : info;
-    }
+    const info = `Mensalidade vencida há ${diasAtraso} dia(s) — dentro da tolerância de ${DIAS_TOLERANCIA} dias, convênio segue liberado normalmente. Regularize em até ${diasCarenciaRestantes ?? 0} dia(s) para evitar bloqueio.`;
+    avisoLimite = avisoLimite ? `${info} ${avisoLimite}` : info;
   }
 
   // Carrega acréscimo de cartão do convênio (aplicado no fluxo de cobrança
@@ -1018,6 +1075,115 @@ async function obterInfoConvenioPaciente(params: {
   }
 
   return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear, emCarencia, diasCarenciaRestantes, acrescimoCartao };
+}
+
+/**
+ * Calcula as opções de pagamento (dinheiro/Pix/débito/crédito) de uma
+ * cobrança com MAIS DE UM procedimento (multi-exame laboratório/imagem),
+ * aplicando a regra de convênio de CADA procedimento individualmente.
+ *
+ * Antes, a cobrança de multi-exame buscava o desconto UMA VEZ usando o nome
+ * concatenado ("HEMOGRAMA + TOMOGRAFIA") — que não bate com nenhum
+ * procedimento cadastrado, então a regra encontrada (quando encontrava
+ * alguma) era aplicada por engano sobre a SOMA de todos os itens (ex.:
+ * Hemograma tem 10% de desconto e Tomografia 5%, mas o sistema aplicava um
+ * dos dois sobre o total dos dois). Esta função resolve o convênio por
+ * item e soma os valores já com o desconto correto de cada um.
+ *
+ * Gratuidade não é aplicada automaticamente aqui (seria preciso perguntar
+ * "usar agora/depois" por item) — mesma regra já adotada pela cobrança em
+ * lote: o item de gratuidade sai pelo valor particular nesta cobrança.
+ */
+async function calcularOpcoesMultiExame(params: {
+  clinicaId: string;
+  pacienteId: string | null | undefined;
+  medicoId: string | null | undefined;
+  tipoAtendimento: string;
+  dataRef: string | null | undefined;
+  nomes: string[];
+  agendamentoIds: (string | null | undefined)[];
+  procs: unknown[];
+}): Promise<{
+  opcoes: FormaOpcao[];
+  descSuffix: string;
+  avisoLimite?: { tom: "warning" | "error"; mensagem: string };
+}> {
+  const { clinicaId, pacienteId, medicoId, tipoAtendimento, dataRef, nomes, procs } = params;
+  const infos = await Promise.all(
+    nomes.map((nome, idx) =>
+      tipoAtendimento === "particular"
+        ? Promise.resolve(null)
+        : obterInfoConvenioPaciente({
+            clinicaId,
+            pacienteId,
+            medicoId,
+            procedimentoNome: nome,
+            agendamentoId: params.agendamentoIds[idx] ?? params.agendamentoIds[0] ?? null,
+            dataRef: dataRef ?? null,
+          }).catch(() => null),
+    ),
+  );
+  let vDinheiro = 0, vPix = 0, vDebito = 0, vCredito = 0;
+  let algumDesconto = false;
+  let convenioNome = "";
+  const avisos = new Set<string>();
+  let algumAtraso: { convenioNome: string; parcelasAtrasadas: number } | null = null;
+  let algumBloqueio: string | null = null;
+  infos.forEach((info, idx) => {
+    const p = procs[idx] as any;
+    const baseCartao = valorCartaoProcedimento(p);
+    const baseDin = primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+    if (info) convenioNome = info.convenioNome;
+    if (info && !info.emDia && !algumAtraso) {
+      algumAtraso = { convenioNome: info.convenioNome, parcelasAtrasadas: info.parcelasAtrasadas };
+    }
+    if (info && info.bloquear && !algumBloqueio) {
+      algumBloqueio = info.avisoLimite ?? "Limite do convênio atingido — agendamento bloqueado.";
+    }
+    const desc =
+      info && info.emDia && !info.bloquear && info.desconto && info.desconto.tipo !== "gratuidade"
+        ? info.desconto
+        : null;
+    const acr = acrescimoParaDesconto(desc, info?.acrescimoCartao);
+    if (desc) algumDesconto = true;
+    if (info?.avisoLimite) avisos.add(info.avisoLimite);
+    vDinheiro += desc ? aplicarDescontoPorForma(baseDin, "dinheiro", desc) : baseDin;
+    vPix += desc
+      ? aplicarAcrescimoCartaoAgenda(aplicarDescontoPorForma(baseCartao, "pix", desc), "pix", acr)
+      : baseCartao;
+    vDebito += desc
+      ? aplicarAcrescimoCartaoAgenda(aplicarDescontoPorForma(baseCartao, "cartao_debito", desc), "cartao_debito", acr)
+      : baseCartao;
+    vCredito += desc
+      ? aplicarAcrescimoCartaoAgenda(aplicarDescontoPorForma(baseCartao, "cartao_credito", desc), "cartao_credito", acr)
+      : baseCartao;
+  });
+  const opcoes: FormaOpcao[] = [
+    { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
+    { forma: "pix", label: "Pix", valor: vPix },
+    { forma: "cartao_debito", label: "Cartão de Débito", valor: vDebito },
+    { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
+  ];
+  let descSuffix = "";
+  let avisoLimite: { tom: "warning" | "error"; mensagem: string } | undefined;
+  if (algumAtraso) {
+    const at = algumAtraso as { convenioNome: string; parcelasAtrasadas: number };
+    descSuffix = ` — ${at.convenioNome} EM ATRASO`;
+    avisoLimite = {
+      tom: "error",
+      mensagem: `Convênio ${at.convenioNome} em atraso (${at.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`,
+    };
+  } else if (algumBloqueio) {
+    descSuffix = ` — ${convenioNome} BLOQUEADO`;
+    avisoLimite = { tom: "error", mensagem: algumBloqueio };
+  } else if (algumDesconto) {
+    descSuffix = ` — Convênio ${convenioNome} (desconto aplicado por item)`;
+    if (avisos.size > 0) avisoLimite = { tom: "warning", mensagem: Array.from(avisos).join(" ") };
+  } else if (avisos.size > 0) {
+    descSuffix = ` — ${convenioNome} (limite atingido)`;
+    avisoLimite = { tom: "warning", mensagem: Array.from(avisos).join(" ") };
+  }
+  return { opcoes, descSuffix, avisoLimite };
 }
 
 const toLocalInput = (iso: string) => {
@@ -1171,6 +1337,9 @@ function AgendaPage() {
     convenioNome: string;
     totalAberto: number;
     qtdAtrasadas: number;
+    /** Vencidas há ≤5 dias — dentro da tolerância, não bloqueia o convênio. */
+    qtdEmCarencia: number;
+    diasCarenciaRestantes: number | null;
   } | null>(null);
   const contratoPacienteReqId = useRef(0);
   useEffect(() => {
@@ -1210,8 +1379,12 @@ function AgendaPage() {
         setContratoPacienteInfo(null);
         return;
       }
-      // 2) Mensalidades vencidas
-      const hojeStr = new Date().toISOString().slice(0, 10);
+      // 2) Mensalidades vencidas — tolerância de 5 dias corridos após o
+      //    vencimento: dentro dela o convênio segue liberado normalmente
+      //    (mesma regra de `obterInfoConvenioPaciente`). Só bloqueia
+      //    ("Particular") quando alguma parcela passou de 5 dias vencida.
+      const DIAS_TOLERANCIA = 5;
+      const hojeStr = hojeLocalISODate();
       const { data: mens } = await supabase
         .from("contrato_mensalidades")
         .select("valor,vencimento,status")
@@ -1220,19 +1393,28 @@ function AgendaPage() {
         .lte("vencimento", hojeStr);
       if (reqId !== contratoPacienteReqId.current) return;
       const lista = (mens ?? []) as Array<{ valor: number | string; vencimento: string }>;
-      const totalAberto = lista.reduce((s, m) => s + (Number(m.valor) || 0), 0);
+      const hojeMs = new Date(hojeStr + "T00:00:00").getTime();
+      const diasAtrasoLista = lista.map((m) =>
+        Math.max(0, Math.floor((hojeMs - new Date(String(m.vencimento) + "T00:00:00").getTime()) / 86400000)),
+      );
+      const atrasadas = lista.filter((_, i) => diasAtrasoLista[i] > DIAS_TOLERANCIA);
+      const emCarenciaLista = diasAtrasoLista.filter((d) => d >= 0 && d <= DIAS_TOLERANCIA);
+      const totalAberto = atrasadas.reduce((s, m) => s + (Number(m.valor) || 0), 0);
       setContratoPacienteInfo({
         convenioNome: contrato.convenioNome,
         totalAberto,
-        qtdAtrasadas: lista.length,
+        qtdAtrasadas: atrasadas.length,
+        qtdEmCarencia: emCarenciaLista.length,
+        diasCarenciaRestantes: emCarenciaLista.length > 0 ? Math.min(...emCarenciaLista.map((d) => DIAS_TOLERANCIA - d)) : null,
       });
-      // Regra: se o paciente tem cartão convênio e está EM DIA → "Convênio".
-      // Se está EM ATRASO → "Particular". Aplica também na edição de
-      // agendamentos antigos que ficaram gravados incorretamente como
-      // "particular" mesmo com o cartão em dia.
+      // Regra: se o paciente tem cartão convênio e não tem parcela vencida
+      // há mais de 5 dias → "Convênio" (inclui dentro da tolerância). Só
+      // força "Particular" quando há parcela de fato bloqueada. Aplica
+      // também na edição de agendamentos antigos gravados incorretamente
+      // como "particular" mesmo com o cartão em dia.
       setForm((f) => ({
         ...f,
-        tipo_atendimento: lista.length === 0 ? "convenio" : "particular",
+        tipo_atendimento: atrasadas.length === 0 ? "convenio" : "particular",
       }));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1465,7 +1647,6 @@ function AgendaPage() {
     }
     setPacInfoLoading(false);
   };
-  type FormaOpcao = { forma: string; label: string; valor: number };
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [formaPagOpcoes, setFormaPagOpcoes] = useState<FormaOpcao[]>([]);
   const [formaPagCtx, setFormaPagCtx] = useState<{
@@ -2858,24 +3039,65 @@ function AgendaPage() {
           ),
         ),
       );
+      // Desconto do convênio POR ITEM. Sem isto, a cobrança em lote somava
+      // sempre o valor particular CHEIO, ignorando o desconto (%/valor fixo)
+      // configurado nas Regras de Preço do convênio — ao contrário da
+      // cobrança individual (cobrarAgendamento), que já aplica. Atendimento
+      // "particular" ignora o convênio de propósito. Atraso/bloqueio/gratuidade
+      // caem no valor cheio aqui (a gratuidade exige a confirmação
+      // "usar agora/depois", disponível apenas na cobrança individual).
+      const infosConvenio = await Promise.all(
+        itens.map((it) =>
+          it.tipo_atendimento === "particular"
+            ? Promise.resolve(null)
+            : obterInfoConvenioPaciente({
+                clinicaId: clinicaAtual.clinica_id,
+                pacienteId: it.paciente_id,
+                medicoId: it.medico_id,
+                procedimentoNome: it.procedimento ?? "",
+                agendamentoId: it.id,
+                dataRef: it.inicio ?? null,
+              }).catch(() => null),
+        ),
+      );
       const pesos: Record<string, number> = {};
       const rotulos: Record<string, string> = {};
+      let algumDescontoConvenio = false;
       (procsResolvidos as any[]).forEach((p, idx) => {
-        const valorCartao = valorCartaoProcedimento(p);
-        const valorDin = primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+        const baseCartao = valorCartaoProcedimento(p);
+        const baseDin = primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+        const info = infosConvenio[idx];
+        // Só aplica o benefício quando o convênio está em dia, não bloqueado e
+        // com desconto de %/valor fixo (gratuidade fica para a cobrança avulsa).
+        const desc =
+          info && info.emDia && !info.bloquear && info.desconto && info.desconto.tipo !== "gratuidade"
+            ? info.desconto
+            : null;
+        const acr = acrescimoParaDesconto(desc, info?.acrescimoCartao);
+        if (desc) algumDescontoConvenio = true;
+        const valorDin = desc ? aplicarDescontoPorForma(baseDin, "dinheiro", desc) : baseDin;
+        const valorPix = desc
+          ? aplicarAcrescimoCartaoAgenda(aplicarDescontoPorForma(baseCartao, "pix", desc), "pix", acr)
+          : baseCartao;
+        const valorDebito = desc
+          ? aplicarAcrescimoCartaoAgenda(aplicarDescontoPorForma(baseCartao, "cartao_debito", desc), "cartao_debito", acr)
+          : baseCartao;
+        const valorCredito = desc
+          ? aplicarAcrescimoCartaoAgenda(aplicarDescontoPorForma(baseCartao, "cartao_credito", desc), "cartao_credito", acr)
+          : baseCartao;
         totalDinheiro += valorDin;
-        totalPix += valorCartao;
-        totalDebito += valorCartao;
-        totalCredito += valorCartao;
-        // Peso p/ rateio: prioriza valor de cartão (cheio); se 0, usa dinheiro.
-        pesos[itens[idx].id] = valorCartao > 0 ? valorCartao : valorDin;
+        totalPix += valorPix;
+        totalDebito += valorDebito;
+        totalCredito += valorCredito;
+        // Peso p/ rateio: prioriza valor de cartão (já com desconto); se 0, usa dinheiro.
+        pesos[itens[idx].id] = valorCredito > 0 ? valorCredito : valorDin;
         rotulos[itens[idx].id] = itens[idx].procedimento ?? rotuloFallbackProc(itens[idx].medico_id);
       });
       setPagamentoPesos(pesos);
       setPagamentoRotulos(rotulos);
       const paciente = itens[0].paciente_nome;
       setPagamentoPacienteNome(paciente);
-      const desc = `${paciente} — ${itens.map((i) => i.procedimento ?? rotuloFallbackProc(i.medico_id)).join(" + ")} (${itens.length} serviços)`;
+      const desc = `${paciente} — ${itens.map((i) => i.procedimento ?? rotuloFallbackProc(i.medico_id)).join(" + ")} (${itens.length} serviços)${algumDescontoConvenio ? " — desconto de convênio aplicado" : ""}`;
       const opcoes: FormaOpcao[] = [
         { forma: "dinheiro", label: "Dinheiro", valor: totalDinheiro },
         { forma: "pix", label: "Pix", valor: totalPix },
@@ -3886,11 +4108,21 @@ function AgendaPage() {
     fecharDialogoAgenda();
     await load();
     if (irParaPagamento && novoId) {
+      // Multi-exame: quando há mais de um procedimento (imagem ou laboratório),
+      // o payload.procedimento vem concatenado ("A + B + C") e não encontra match
+      // no cadastro. Resolvemos cada procedimento individualmente e somamos.
+      const nomesParaValorar =
+        procedimentosParaSalvar.length > 0
+          ? procedimentosParaSalvar
+          : [payload.procedimento ?? rotuloFallbackProc(payload.medico_id)];
+      const isMulti = nomesParaValorar.length > 1;
       let [lista, info] = await Promise.all([
         getProcedimentosComValor(clinicaAtual.clinica_id),
         // Atendimento marcado como "Particular" ignora o convênio do paciente
         // de propósito — cobra valor cheio, sem desconto/bloqueio/gratuidade.
-        payload.tipo_atendimento === "particular"
+        // Multi-exame resolve o convênio por item mais abaixo (o nome
+        // concatenado não bate com nenhum procedimento cadastrado).
+        isMulti || payload.tipo_atendimento === "particular"
           ? Promise.resolve(null)
           : obterInfoConvenioPaciente({
             clinicaId: clinicaAtual.clinica_id,
@@ -3901,85 +4133,100 @@ function AgendaPage() {
             dataRef: payload.inicio ?? null,
           }),
       ]);
-      // Multi-exame: quando há mais de um procedimento (imagem ou laboratório),
-      // o payload.procedimento vem concatenado ("A + B + C") e não encontra match
-      // no cadastro. Resolvemos cada procedimento individualmente e somamos.
-      const nomesParaValorar =
-        procedimentosParaSalvar.length > 0
-          ? procedimentosParaSalvar
-          : [payload.procedimento ?? rotuloFallbackProc(payload.medico_id)];
       const procsIndividuais = await Promise.all(
         nomesParaValorar.map((nome) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista)),
       );
-      let vDinheiro = 0,
-        vPix = 0,
-        vDebito = 0,
-        vCredito = 0;
-      for (const p of procsIndividuais as any[]) {
-        const valorCartao = valorCartaoProcedimento(p);
-        vDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
-        vPix += valorCartao;
-        vDebito += valorCartao;
-        vCredito += valorCartao;
-      }
-      let opcoes: FormaOpcao[] = [
-        { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
-        { forma: "pix", label: "Pix", valor: vPix },
-        { forma: "cartao_debito", label: "Cartão de Débito", valor: vDebito },
-        { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
-      ];
+      let opcoes: FormaOpcao[];
       let descSuffix = "";
       const opcoesOrc = payload.orcamento_id ? await opcoesPagamentoDeOrcamento(payload.orcamento_id) : null;
-      // Gratuidade: pergunta se o paciente quer usar agora ou depois.
-      // Se "depois", zera o desconto para cobrar particular nesta cobrança.
-      if (info?.desconto?.tipo === "gratuidade" && !opcoesOrc) {
-        const escolha = await perguntarGratuidade(info.convenioNome);
-        if (escolha === "cancel") return;
-        if (escolha === "depois") info = { ...info, desconto: null };
-      }
-      if (opcoesOrc) {
-        opcoes = opcoesOrc;
-      } else if (info) {
-        if (!info.emDia) {
-          setAvisoConvenio({
-            tom: "error",
-            mensagem: `Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`,
-          });
-          descSuffix = ` — ${info.convenioNome} EM ATRASO`;
-        } else if (info.bloquear) {
-          setAvisoConvenio({
-            tom: "error",
-            mensagem: info.avisoLimite ?? "Limite do convênio atingido — agendamento bloqueado.",
-          });
-          descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
-        } else if (info.desconto) {
-          opcoes = opcoes.map((o) => ({
-            ...o,
-            valor: aplicarAcrescimoCartaoAgenda(
-              aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
-              o.forma,
-              info.acrescimoCartao,
-            ),
-          }));
-          const rotulo =
-            info.desconto.tipo === "gratuidade"
-              ? "GRATUIDADE"
-              : info.desconto.tipo === "percentual"
-                ? `-${info.desconto.valor}%`
-                : info.desconto.tipo === "valor_fixo"
-                  ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
-                  : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-          descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
-          if (info.avisoLimite) setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
-          else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
-        } else if (info.avisoLimite) {
-          setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
-          descSuffix = ` — ${info.convenioNome} (limite atingido)`;
+
+      if (isMulti) {
+        if (opcoesOrc) {
+          opcoes = opcoesOrc;
         } else {
-          setAvisoConvenio({
-            tom: "warning",
-            mensagem: `Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`,
+          const resultado = await calcularOpcoesMultiExame({
+            clinicaId: clinicaAtual.clinica_id,
+            pacienteId: payload.paciente_id,
+            medicoId: payload.medico_id,
+            tipoAtendimento: payload.tipo_atendimento,
+            dataRef: payload.inicio ?? null,
+            nomes: nomesParaValorar,
+            agendamentoIds: [novoId, ...(result.sibling_ids ?? [])],
+            procs: procsIndividuais,
           });
+          opcoes = resultado.opcoes;
+          descSuffix = resultado.descSuffix;
+          if (resultado.avisoLimite) setAvisoConvenio(resultado.avisoLimite);
+        }
+      } else {
+        let vDinheiro = 0,
+          vPix = 0,
+          vDebito = 0,
+          vCredito = 0;
+        for (const p of procsIndividuais as any[]) {
+          const valorCartao = valorCartaoProcedimento(p);
+          vDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+          vPix += valorCartao;
+          vDebito += valorCartao;
+          vCredito += valorCartao;
+        }
+        opcoes = [
+          { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
+          { forma: "pix", label: "Pix", valor: vPix },
+          { forma: "cartao_debito", label: "Cartão de Débito", valor: vDebito },
+          { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
+        ];
+        // Gratuidade: pergunta se o paciente quer usar agora ou depois.
+        // Se "depois", zera o desconto para cobrar particular nesta cobrança.
+        if (info?.desconto?.tipo === "gratuidade" && !opcoesOrc) {
+          const escolha = await perguntarGratuidade(info.convenioNome);
+          if (escolha === "cancel") return;
+          if (escolha === "depois") info = { ...info, desconto: null };
+        }
+        if (opcoesOrc) {
+          opcoes = opcoesOrc;
+        } else if (info) {
+          if (!info.emDia) {
+            setAvisoConvenio({
+              tom: "error",
+              mensagem: `Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`,
+            });
+            descSuffix = ` — ${info.convenioNome} EM ATRASO`;
+          } else if (info.bloquear) {
+            setAvisoConvenio({
+              tom: "error",
+              mensagem: info.avisoLimite ?? "Limite do convênio atingido — agendamento bloqueado.",
+            });
+            descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
+          } else if (info.desconto) {
+            opcoes = opcoes.map((o) => ({
+              ...o,
+              valor: aplicarAcrescimoCartaoAgenda(
+                aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
+                o.forma,
+                acrescimoParaDesconto(info.desconto, info.acrescimoCartao),
+              ),
+            }));
+            const rotulo =
+              info.desconto.tipo === "gratuidade"
+                ? "GRATUIDADE"
+                : info.desconto.tipo === "percentual"
+                  ? `-${info.desconto.valor}%`
+                  : info.desconto.tipo === "valor_fixo"
+                    ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
+                    : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+            descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
+            if (info.avisoLimite) setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
+            else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+          } else if (info.avisoLimite) {
+            setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
+            descSuffix = ` — ${info.convenioNome} (limite atingido)`;
+          } else {
+            setAvisoConvenio({
+              tom: "warning",
+              mensagem: `Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`,
+            });
+          }
         }
       }
       setFormaPagOpcoes(opcoes);
@@ -4215,6 +4462,15 @@ function AgendaPage() {
       // Roda em paralelo: checagem de pago + lista de procedimentos (cache)
       // + info de convênio do paciente. Antes era serial (3-5s); agora ~= a
       // chamada mais lenta.
+      // Multi-exame (laboratório/imagem): quando o nome vem concatenado com " + ",
+      // resolvemos cada item individualmente e somamos. Para agendamento simples,
+      // o split retorna apenas um item e o comportamento permanece igual.
+      const nomesParaValorar = (a.procedimento ?? rotuloFallbackProc(a.medico_id))
+        .split(/\s+\+\s+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const nomesEfetivos = nomesParaValorar.length > 0 ? nomesParaValorar : [rotuloFallbackProc(a.medico_id)];
+      const isMulti = nomesEfetivos.length > 1;
       let [{ data: jaPagos }, lista, info] = await Promise.all([
         supabase
           .from("fin_lancamentos")
@@ -4227,7 +4483,9 @@ function AgendaPage() {
         getProcedimentosComValor(clinicaAtual.clinica_id),
         // Atendimento marcado como "Particular" ignora o convênio do paciente
         // de propósito — cobra valor cheio, sem desconto/bloqueio/gratuidade.
-        a.tipo_atendimento === "particular"
+        // Multi-exame resolve o convênio por item mais abaixo (o nome
+        // concatenado não bate com nenhum procedimento cadastrado).
+        isMulti || a.tipo_atendimento === "particular"
           ? Promise.resolve(null)
           : obterInfoConvenioPaciente({
             clinicaId: clinicaAtual.clinica_id,
@@ -4247,88 +4505,101 @@ function AgendaPage() {
         });
         return;
       }
-      // Multi-exame (laboratório/imagem): quando o nome vem concatenado com " + ",
-      // resolvemos cada item individualmente e somamos. Para agendamento simples,
-      // o split retorna apenas um item e o comportamento permanece igual.
-      const nomesParaValorar = (a.procedimento ?? rotuloFallbackProc(a.medico_id))
-        .split(/\s+\+\s+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
       const procsIndividuais = await Promise.all(
-        (nomesParaValorar.length > 0 ? nomesParaValorar : [rotuloFallbackProc(a.medico_id)]).map((nome) =>
-          buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista),
-        ),
+        nomesEfetivos.map((nome) => buscarProcedimentoPorNome(clinicaAtual.clinica_id, nome, lista)),
       );
-      let vDinheiro = 0,
-        vPix = 0,
-        vDebito = 0,
-        vCredito = 0;
-      for (const p of procsIndividuais as any[]) {
-        const valorCartao = valorCartaoProcedimento(p);
-        vDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
-        vPix += valorCartao;
-        vDebito += valorCartao;
-        vCredito += valorCartao;
-      }
-      let opcoes: FormaOpcao[] = [
-        { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
-        { forma: "pix", label: "Pix", valor: vPix },
-        { forma: "cartao_debito", label: "Cartão de Débito", valor: vDebito },
-        { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
-      ];
+      let opcoes: FormaOpcao[];
       let descSuffix = "";
-      // Gratuidade: pergunta se quer usar agora ou depois (antes de qualquer
-      // registro). "Depois" → cobra particular sem consumir o benefício.
-      if (info?.desconto?.tipo === "gratuidade" && !opcoesOrc) {
-        const escolha = await perguntarGratuidade(info.convenioNome);
-        if (escolha === "cancel") return;
-        if (escolha === "depois") info = { ...info, desconto: null };
-      }
-      if (opcoesOrc) {
-        // Valores do orçamento já consideram desconto/convênio definidos na hora
-        // de gerar o orçamento — não aplicamos nada por cima.
-        opcoes = opcoesOrc;
-      } else if (info) {
-        if (!info.emDia) {
-          setAvisoConvenio({
-            tom: "error",
-            mensagem: `Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`,
-          });
-          descSuffix = ` — ${info.convenioNome} EM ATRASO`;
-        } else if (info.bloquear) {
-          setAvisoConvenio({
-            tom: "error",
-            mensagem: info.avisoLimite ?? "Limite do convênio atingido — cobrança bloqueada.",
-          });
-          descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
-        } else if (info.desconto) {
-          opcoes = opcoes.map((o) => ({
-            ...o,
-            valor: aplicarAcrescimoCartaoAgenda(
-              aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
-              o.forma,
-              info.acrescimoCartao,
-            ),
-          }));
-          const rotulo =
-            info.desconto.tipo === "gratuidade"
-              ? "GRATUIDADE"
-              : info.desconto.tipo === "percentual"
-                ? `-${info.desconto.valor}%`
-                : info.desconto.tipo === "valor_fixo"
-                  ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
-                  : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-          descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
-          if (info.avisoLimite) setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
-          else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
-        } else if (info.avisoLimite) {
-          setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
-          descSuffix = ` — ${info.convenioNome} (limite atingido)`;
+
+      if (isMulti) {
+        if (opcoesOrc) {
+          opcoes = opcoesOrc;
         } else {
-          setAvisoConvenio({
-            tom: "warning",
-            mensagem: `Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`,
+          const resultado = await calcularOpcoesMultiExame({
+            clinicaId: clinicaAtual.clinica_id,
+            pacienteId: a.paciente_id,
+            medicoId: a.medico_id,
+            tipoAtendimento: a.tipo_atendimento,
+            dataRef: a.inicio ?? null,
+            nomes: nomesEfetivos,
+            agendamentoIds: [a.id],
+            procs: procsIndividuais,
           });
+          opcoes = resultado.opcoes;
+          descSuffix = resultado.descSuffix;
+          if (resultado.avisoLimite) setAvisoConvenio(resultado.avisoLimite);
+        }
+      } else {
+        let vDinheiro = 0,
+          vPix = 0,
+          vDebito = 0,
+          vCredito = 0;
+        for (const p of procsIndividuais as any[]) {
+          const valorCartao = valorCartaoProcedimento(p);
+          vDinheiro += primeiroValorValido(p?.valor_dinheiro, p?.valor_dinheiro_pix, p?.valor_padrao);
+          vPix += valorCartao;
+          vDebito += valorCartao;
+          vCredito += valorCartao;
+        }
+        opcoes = [
+          { forma: "dinheiro", label: "Dinheiro", valor: vDinheiro },
+          { forma: "pix", label: "Pix", valor: vPix },
+          { forma: "cartao_debito", label: "Cartão de Débito", valor: vDebito },
+          { forma: "cartao_credito", label: "Cartão de Crédito", valor: vCredito },
+        ];
+        // Gratuidade: pergunta se quer usar agora ou depois (antes de qualquer
+        // registro). "Depois" → cobra particular sem consumir o benefício.
+        if (info?.desconto?.tipo === "gratuidade" && !opcoesOrc) {
+          const escolha = await perguntarGratuidade(info.convenioNome);
+          if (escolha === "cancel") return;
+          if (escolha === "depois") info = { ...info, desconto: null };
+        }
+        if (opcoesOrc) {
+          // Valores do orçamento já consideram desconto/convênio definidos na hora
+          // de gerar o orçamento — não aplicamos nada por cima.
+          opcoes = opcoesOrc;
+        } else if (info) {
+          if (!info.emDia) {
+            setAvisoConvenio({
+              tom: "error",
+              mensagem: `Convênio ${info.convenioNome} em atraso (${info.parcelasAtrasadas} parcela(s)). Cobrando valor cheio.`,
+            });
+            descSuffix = ` — ${info.convenioNome} EM ATRASO`;
+          } else if (info.bloquear) {
+            setAvisoConvenio({
+              tom: "error",
+              mensagem: info.avisoLimite ?? "Limite do convênio atingido — cobrança bloqueada.",
+            });
+            descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
+          } else if (info.desconto) {
+            opcoes = opcoes.map((o) => ({
+              ...o,
+              valor: aplicarAcrescimoCartaoAgenda(
+                aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
+                o.forma,
+                acrescimoParaDesconto(info.desconto, info.acrescimoCartao),
+              ),
+            }));
+            const rotulo =
+              info.desconto.tipo === "gratuidade"
+                ? "GRATUIDADE"
+                : info.desconto.tipo === "percentual"
+                  ? `-${info.desconto.valor}%`
+                  : info.desconto.tipo === "valor_fixo"
+                    ? `R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} dinheiro / R$ ${Number(info.desconto.valorOutros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} outros`
+                    : `-R$ ${Number(info.desconto.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+            descSuffix = ` — Convênio ${info.convenioNome} (${rotulo})`;
+            if (info.avisoLimite) setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
+            else toast.success(`Desconto do convênio ${info.convenioNome} aplicado (${rotulo}).`);
+          } else if (info.avisoLimite) {
+            setAvisoConvenio({ tom: "warning", mensagem: info.avisoLimite });
+            descSuffix = ` — ${info.convenioNome} (limite atingido)`;
+          } else {
+            setAvisoConvenio({
+              tom: "warning",
+              mensagem: `Cliente possui convênio ${info.convenioNome}, mas sem benefício para este procedimento.`,
+            });
+          }
         }
       }
       // Procedimento sem valor (ex.: REVISÃO / retorno gratuito). Não abre o
@@ -5344,14 +5615,21 @@ function AgendaPage() {
                       {contratoPacienteInfo.qtdAtrasadas > 0 && form.tipo_atendimento === "particular" && (
                         <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
                           Paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em aberto no cartão (
-                          {contratoPacienteInfo.qtdAtrasadas} parcela(s) vencida(s)). Este atendimento será cobrado como
-                          Particular.
+                          {contratoPacienteInfo.qtdAtrasadas} parcela(s) vencida(s) há mais de 5 dias). Este atendimento
+                          será cobrado como Particular.
                         </p>
                       )}
                       {contratoPacienteInfo.qtdAtrasadas > 0 && form.tipo_atendimento === "convenio" && (
                         <p className="text-xs rounded-md border border-destructive/40 bg-destructive/5 text-destructive px-2 py-1.5">
                           Convênio bloqueado: paciente tem <b>R$ {contratoPacienteInfo.totalAberto.toFixed(2)}</b> em
-                          atraso. Para agendar, mude para <b>Particular</b> ou regularize o débito.
+                          atraso há mais de 5 dias. Para agendar, mude para <b>Particular</b> ou regularize o débito.
+                        </p>
+                      )}
+                      {contratoPacienteInfo.qtdAtrasadas === 0 && contratoPacienteInfo.qtdEmCarencia > 0 && (
+                        <p className="text-xs rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5">
+                          Mensalidade vencida, mas dentro da tolerância de 5 dias — convênio segue liberado
+                          normalmente. Regularize em até <b>{contratoPacienteInfo.diasCarenciaRestantes}</b> dia(s)
+                          para evitar bloqueio.
                         </p>
                       )}
                     </div>

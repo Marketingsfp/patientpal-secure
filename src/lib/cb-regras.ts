@@ -9,11 +9,19 @@ export interface CbRegra {
   tipo: string | null;
   modo: string; // "valor_fixo" | "percentual_desconto"
   valor: number | null;
+  /**
+   * Valor cobrado em Pix/débito/crédito quando difere do valor em dinheiro
+   * (`valor`). Nulo = usa `valor` para ambos (com acréscimo global do
+   * convênio, se configurado, aplicado por fora). Só se aplica a
+   * modo === "valor_fixo" — descontos percentuais já incidem sobre a base
+   * de cada forma de pagamento.
+   */
+  valor_outros?: number | null;
   percentual: number | null;
   prioridade: number;
   ativo?: boolean;
   limite_qtd?: number | null;
-  limite_periodo?: string | null; // "dia" | "semana" | "mes"
+  limite_periodo?: string | null; // "dia" | "semana" | "mes" | "ano" | "contrato"
   limite_escopo?: string | null;  // "contrato" | "paciente"
   excedente_modo?: string | null; // "percentual_particular" | "valor_fixo" | "particular" | "bloquear"
   excedente_percentual?: number | null;
@@ -87,7 +95,8 @@ export function computeValor(
   const round2 = (n: number) => Math.round(n * 100) / 100;
   if (regra.modo === "valor_fixo") {
     const v = Number(regra.valor) || 0;
-    return { dinheiro: round2(v), outros: round2(v) };
+    const vOutros = regra.valor_outros != null ? Number(regra.valor_outros) || 0 : v;
+    return { dinheiro: round2(v), outros: round2(vOutros) };
   }
   if (regra.modo === "percentual_desconto") {
     const p = Number(regra.percentual) || 0;

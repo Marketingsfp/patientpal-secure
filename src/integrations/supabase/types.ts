@@ -2009,6 +2009,7 @@ export type Database = {
           tipo: string | null
           updated_at: string
           valor: number | null
+          valor_outros: number | null
         }
         Insert: {
           ativo?: boolean
@@ -2034,6 +2035,7 @@ export type Database = {
           tipo?: string | null
           updated_at?: string
           valor?: number | null
+          valor_outros?: number | null
         }
         Update: {
           ativo?: boolean
@@ -2059,6 +2061,7 @@ export type Database = {
           tipo?: string | null
           updated_at?: string
           valor?: number | null
+          valor_outros?: number | null
         }
         Relationships: [
           {

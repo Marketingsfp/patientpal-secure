@@ -94,7 +94,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     const [{ data: r, error: e1 }, { data: e, error: e2 }] = await Promise.all([
       (supabase as any)
         .from("cb_convenio_regras")
-        .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito,grupo_gratuidade")
+        .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,valor_outros,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito,grupo_gratuidade")
         .eq("convenio_id", convenioId)
         .order("prioridade", { ascending: false }),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
@@ -310,6 +310,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         tipo: r.procedimento_id ? null : r.tipo,
         modo: r.modo,
         valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
+        valor_outros: r.modo === "valor_fixo" && r.valor_outros != null ? Number(r.valor_outros) || 0 : null,
         percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
         prioridade: Number(r.prioridade) || 1,
         ativo: r.ativo !== false,
@@ -418,17 +419,22 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         if (possibleEspIds.length === 0) possibleEspIds.push(null);
         let best: ReturnType<typeof computeValor> = null;
         let bestScore = -1;
+        let bestRegra: CbRegra | null = null;
         for (const eid of possibleEspIds) {
           const r = findRegra(regras, eid, tipo, p.id);
           if (!r) continue;
           const sc = (r.procedimento_id ? 100 : 0) + (r.especialidade_id ? 10 : 0) + (r.tipo ? 5 : 0) + (r.prioridade || 0) * 0.01;
           if (sc > bestScore) {
             const v = computeValor(r, baseDin, baseOut);
-            if (v) { best = v; bestScore = sc; }
+            if (v) { best = v; bestScore = sc; bestRegra = r; }
           }
         }
         if (best) {
-          const outrosComAcr = applyAcrescimoCartao(best.outros, acr, convenioNome);
+          // Regra com valor_outros explícito já define o preço final do
+          // Pix/cartão — não soma o acréscimo global do convênio por cima
+          // (senão o valor é acrescido duas vezes).
+          const temOutrosExplicito = bestRegra?.modo === "valor_fixo" && bestRegra.valor_outros != null;
+          const outrosComAcr = temOutrosExplicito ? best.outros : applyAcrescimoCartao(best.outros, acr, convenioNome);
           upserts.push({
             clinica_id: clinicaId,
             procedimento_id: p.id,
@@ -1035,6 +1041,7 @@ function LimiteDialog({
                   <SelectItem value="dia">Por dia</SelectItem>
                   <SelectItem value="semana">Por semana</SelectItem>
                   <SelectItem value="mes">Por mês</SelectItem>
+                  <SelectItem value="ano">Por ano (ciclo do contrato)</SelectItem>
                   <SelectItem value="contrato">Por contrato</SelectItem>
                 </SelectContent>
               </Select>
@@ -1139,6 +1146,7 @@ function NovaRegraDialog({
     tipo: null,
     modo: "valor_fixo",
     valor: 0,
+    valor_outros: null,
     percentual: null,
     prioridade: 10,
     ativo: true,
@@ -1174,7 +1182,11 @@ function NovaRegraDialog({
   const preview = (() => {
     const v = computeValor(r, 100, 100);
     if (!v) return "—";
-    if (r.modo === "valor_fixo") return `R$ ${v.dinheiro.toFixed(2)} (fixo)`;
+    if (r.modo === "valor_fixo") {
+      return v.dinheiro !== v.outros
+        ? `R$ ${v.dinheiro.toFixed(2)} dinheiro / R$ ${v.outros.toFixed(2)} Pix-cartão (fixo)`
+        : `R$ ${v.dinheiro.toFixed(2)} (fixo)`;
+    }
     return `de R$100 → R$ ${v.dinheiro.toFixed(2)} (${r.percentual}% off)`;
   })();
 
@@ -1188,6 +1200,7 @@ function NovaRegraDialog({
       tipo: r.procedimento_id ? null : r.tipo,
       modo: r.modo,
       valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
+      valor_outros: r.modo === "valor_fixo" && r.valor_outros != null ? Number(r.valor_outros) || 0 : null,
       percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
       prioridade: Number(r.prioridade) || 1,
       ativo: r.ativo !== false,
@@ -1290,7 +1303,7 @@ function NovaRegraDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">{r.modo === "valor_fixo" ? "Valor (R$)" : "Percentual (%)"}</Label>
+              <Label className="text-xs">{r.modo === "valor_fixo" ? "Valor em dinheiro (R$)" : "Percentual (%)"}</Label>
               {r.modo === "valor_fixo" ? (
                 <CurrencyInput
                   value={r.valor !== null ? Number(r.valor).toFixed(2) : ""}
@@ -1313,6 +1326,23 @@ function NovaRegraDialog({
               />
             </div>
           </div>
+
+          {r.modo === "valor_fixo" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Valor no Pix/cartão (opcional)</Label>
+              <CurrencyInput
+                value={r.valor_outros != null ? Number(r.valor_outros).toFixed(2) : ""}
+                onChange={(v) => upd({ valor_outros: v ? parseFloat(v) : null })}
+                placeholder={r.valor !== null ? Number(r.valor).toFixed(2) : "0,00"}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Deixe em branco para cobrar o mesmo valor do dinheiro (
+                {r.valor !== null ? `R$ ${Number(r.valor).toFixed(2)}` : "R$ 0,00"}
+                {" "}+ acréscimo de cartão do convênio, se houver). Preencha quando o valor no Pix/cartão for diferente,
+                ex.: R$ 60,00 dinheiro / R$ 72,00 Pix/cartão.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -1370,6 +1400,7 @@ function NovaRegraDialog({
                     <SelectItem value="dia">Por dia</SelectItem>
                     <SelectItem value="semana">Por semana</SelectItem>
                     <SelectItem value="mes">Por mês</SelectItem>
+                    <SelectItem value="ano">Por ano (ciclo do contrato)</SelectItem>
                     <SelectItem value="contrato">Por contrato</SelectItem>
                   </SelectContent>
                 </Select>
