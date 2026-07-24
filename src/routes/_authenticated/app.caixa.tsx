@@ -188,6 +188,10 @@ type MovEnrich = {
   paciente: string | null;
   paciente_id: string | null;
   ficha: number | null;
+  /** ID do usuário que faturou (fin_lancamentos.criado_por) — pode diferir
+   *  do operador de caixa (caixa_movimentos.user_id) em cobranças
+   *  centralizadas. Usado para exibir "Quem faturou" na coluna Usuário. */
+  faturado_por_id: string | null;
 };
 type LancamentoEnrichRow = {
   id: string;
@@ -196,6 +200,7 @@ type LancamentoEnrichRow = {
   paciente_id: string | null;
   descricao: string | null;
   status: string | null;
+  criado_por: string | null;
 };
 type AgendamentoEnrichRow = {
   id: string;
