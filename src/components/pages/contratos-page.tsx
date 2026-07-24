@@ -2964,15 +2964,22 @@ function DetalheContrato({
     let cancel = false;
     void supabase
       .from("nfse")
-      .select("id, numero, status, url_pdf, pagamento_id")
+      .select("id, numero, status, url_pdf, pagamento_id, pagamento_ids")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .in("pagamento_id", ids)
+      .overlaps("pagamento_ids", ids)
       .neq("status", "cancelada")
       .then(({ data }) => {
         if (cancel) return;
         const map: Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }> = {};
-        for (const r of (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string }>) {
-          map[r.pagamento_id] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
+        for (const r of (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string | null; pagamento_ids: string[] | null }>) {
+          const linkedIds = (r.pagamento_ids && r.pagamento_ids.length > 0)
+            ? r.pagamento_ids
+            : (r.pagamento_id ? [r.pagamento_id] : []);
+          for (const pid of linkedIds) {
+            if (ids.includes(pid)) {
+              map[pid] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
+            }
+          }
         }
         setNfsePorLancamento(map);
       });
