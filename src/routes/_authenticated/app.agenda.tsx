@@ -7754,10 +7754,10 @@ function AgendaPage() {
             <TableBody>
               {loading ? (
                 <TableSkeletonRows
-                  cols={9}
+                  cols={10}
                   fallback={
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                         Carregando…
                       </TableCell>
                     </TableRow>
@@ -7765,13 +7765,13 @@ function AgendaPage() {
                 />
               ) : !clinicaAtual ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                     Selecione uma clínica.
                   </TableCell>
                 </TableRow>
               ) : paginados.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                     Nenhum agendamento encontrado.
                   </TableCell>
                 </TableRow>
