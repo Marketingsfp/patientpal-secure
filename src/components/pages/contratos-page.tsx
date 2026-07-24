@@ -4185,37 +4185,66 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </div>
                 {podeEscrever && !(cancelado && !isAdmin) ? (() => {
                   const selecionaveis = mens.filter(
-                    (m) => m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida),
+                    (m) => !(isAdesao(m) && adesaoEmbutida),
                   );
                   const selecionadas = selecionaveis.filter((m) => selectedHistIds.has(m.id));
-                  const total = selecionadas.reduce((s, m) => s + (Number(m.valor) || 0), 0);
+                  const total = selecionadas.reduce(
+                    (s, m) => s + (Number(m.status === "pago" ? (m.valor_pago ?? m.valor) : m.valor) || 0),
+                    0,
+                  );
                   if (selecionadas.length === 0) return null;
+                  const pendentes = selecionadas.filter((m) => m.status !== "pago");
+                  const pagasComLanc = selecionadas.filter((m) => m.status === "pago" && !!m.lancamento_id);
+                  const pagasSemNfse = pagasComLanc.filter((m) => !nfsePorLancamento[m.lancamento_id!]);
+                  const soPendentes = pendentes.length > 0 && pagasComLanc.length === 0;
+                  const soPagasElegiveis = pendentes.length === 0 && pagasSemNfse.length === selecionadas.length && selecionadas.length >= 2;
+                  const mistura = pendentes.length > 0 && pagasComLanc.length > 0;
                   return (
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
                       <div>
                         <strong>{selecionadas.length}</strong> parcela(s) selecionada(s) — Total{" "}
                         <strong>R$ {total.toFixed(2).replace(".", ",")}</strong>
+                        {mistura ? (
+                          <span className="ml-2 text-destructive">Separe pagas e pendentes em seleções distintas.</span>
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-2">
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={limparHistSel}
-                          disabled={aplicandoHistLote}
+                          disabled={aplicandoHistLote || nfseEmitindoLote}
                         >
                           Limpar seleção
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={marcarPagasHistoricasEmLote}
-                          disabled={aplicandoHistLote}
-                        >
-                          {aplicandoHistLote ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                          ) : null}
-                          Marcar selecionadas como Paga (histórica)
-                        </Button>
+                        {soPendentes ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={marcarPagasHistoricasEmLote}
+                            disabled={aplicandoHistLote}
+                          >
+                            {aplicandoHistLote ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : null}
+                            Marcar selecionadas como Paga (histórica)
+                          </Button>
+                        ) : null}
+                        {podeEmitirNfse && soPagasElegiveis ? (
+                          <Button
+                            size="sm"
+                            onClick={() => emitirNfseAgrupada(pagasSemNfse)}
+                            disabled={nfseEmitindoLote || !emitenteId}
+                            title="Emitir uma única NFS-e somando todas as parcelas selecionadas"
+                          >
+                            {nfseEmitindoLote ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                              <FileText className="h-3 w-3 mr-1" />
+                            )}
+                            Emitir NFS-e agrupada ({pagasSemNfse.length})
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                   );
