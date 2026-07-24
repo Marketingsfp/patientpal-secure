@@ -1716,6 +1716,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
               </TabsContent>
 
               <TabsContent value="acesso" className="space-y-4 pt-4 pb-16">
+                {/* placeholder to anchor patch */}
                 {hasLogin ? (
                   <div className="space-y-4 py-2 text-sm">
                     {existingEmail ? (
