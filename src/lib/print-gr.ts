@@ -374,40 +374,35 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  // Em reimpressão, o "USUÁRIO:" tem que ser SEMPRE quem faturou a 1ª via —
-  // não o operador que está reimprimindo agora. Só usa `usuarioNome` quando é
-  // a 1ª via (não há via anterior).
-  let usuarioFinalNome: string | null | undefined = reimpressao
-    ? primeiraVia?.impresso_por_nome
-    : (usuarioNome ?? primeiraVia?.impresso_por_nome);
-
-  // Fallback do "USUÁRIO:" (mesma lógica da GR de mensalidade): quando a 1ª
-  // via não gravou o nome (registros antigos), busca quem lançou o pagamento
-  // em fin_lancamentos.criado_por → profiles.nome. Assim toda GR sai com o
-  // usuário que faturou, inclusive em reimpressões.
-  if (!usuarioFinalNome) {
-    try {
-      const { data: lancs } = await supabase
-        .from("fin_lancamentos")
-        .select("criado_por, created_at")
-        .eq("agendamento_id", agendamentoId)
-        .eq("tipo", "receita")
-        .eq("status", "confirmado")
-        .order("created_at", { ascending: true });
-      const criadoPor = ((lancs ?? []) as Array<{ criado_por: string | null }>)
-        .map((l) => l.criado_por)
-        .find((v): v is string => !!v);
-      if (criadoPor) {
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("nome")
-          .eq("id", criadoPor)
-          .maybeSingle();
-        const nome = (prof as { nome: string | null } | null)?.nome;
-        if (nome) usuarioFinalNome = nome;
-      }
-    } catch { /* mantém oculto se não conseguir resolver */ }
-  }
+  // "USUÁRIO:" da GR = quem FATUROU o atendimento (autor do lançamento
+  // financeiro), tanto na 1ª via quanto em qualquer reimpressão. Nunca é o
+  // operador logado que está imprimindo. Ordem de resolução:
+  //   1) fin_lancamentos.criado_por → profiles.nome (fonte da verdade)
+  //   2) impresso_por_nome gravado na 1ª via (histórico)
+  //   3) usuarioNome do caller (fallback quando não há lançamento)
+  let usuarioFinalNome: string | null | undefined = undefined;
+  try {
+    const { data: lancs } = await supabase
+      .from("fin_lancamentos")
+      .select("criado_por, created_at")
+      .eq("agendamento_id", agendamentoId)
+      .eq("tipo", "receita")
+      .eq("status", "confirmado")
+      .order("created_at", { ascending: true });
+    const criadoPor = ((lancs ?? []) as Array<{ criado_por: string | null }>)
+      .map((l) => l.criado_por)
+      .find((v): v is string => !!v);
+    if (criadoPor) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("nome")
+        .eq("id", criadoPor)
+        .maybeSingle();
+      const nome = (prof as { nome: string | null } | null)?.nome;
+      if (nome) usuarioFinalNome = nome;
+    }
+  } catch { /* segue para fallback */ }
+  if (!usuarioFinalNome) usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
 
   // Busca dados em paralelo
   const [ag, cli] = await Promise.all([
