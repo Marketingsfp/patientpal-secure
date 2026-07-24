@@ -84,7 +84,7 @@ const TEXTO_CONTRATO_HTML = `
 
   <p style="text-align: justify; text-indent: 2em;">Pelo presente instrumento, e na melhor forma de Direito, os signatários:</p>
 
-  <div style="border: 1px solid #ccc; padding: 15px; margin: 15px 0; background: #f9f9f9;">
+  <div style="padding: 10px 0; margin: 12px 0;">
     <p style="margin: 0 0 8px 0;"><strong>CONTRATADA: POLICARDMED SERV. E SOLUÇÕES EM MEDICINA EIRELI</strong></p>
     <p style="margin: 4px 0;"><strong>CNPJ:</strong> 27.045.917/0001-69</p>
     <p style="margin: 4px 0;"><strong>Endereço:</strong> Rua Expedicionários, nº 148</p>
@@ -92,7 +92,7 @@ const TEXTO_CONTRATO_HTML = `
     <p style="margin: 4px 0;"><strong>CEP:</strong> 25.520-591</p>
   </div>
 
-  <div style="border: 1px solid #ccc; padding: 15px; margin: 15px 0;">
+  <div style="padding: 10px 0; margin: 12px 0;">
     <p style="margin: 0 0 8px 0;"><strong>CONTRATANTE: ASSOCIADO TITULAR</strong></p>
     <p style="margin: 4px 0;"><strong>Nome:</strong> {{PACIENTE_NOME}}</p>
     <p style="margin: 4px 0;"><strong>CPF:</strong> {{PACIENTE_CPF}}</p>
@@ -103,62 +103,62 @@ const TEXTO_CONTRATO_HTML = `
     <p style="margin: 4px 0;"><strong>Vencimento:</strong> {{DATA_HOJE}}</p>
   </div>
 
-  <div style="border: 1px solid #ccc; padding: 15px; margin: 15px 0;">
+  <div style="padding: 10px 0; margin: 12px 0;">
     <p style="margin: 0 0 8px 0;"><strong>ASSOCIADOS DEPENDENTES</strong></p>
     <table style="width: 100%; border-collapse: collapse; font-size: 11pt;">
       <thead>
-        <tr style="background: #e8e8e8;">
-          <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left;">#</th>
-          <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left;">Nome</th>
-          <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left;">Nascimento</th>
-          <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left;">Parentesco</th>
-          <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left;">Telefone</th>
+        <tr>
+          <th style="border-bottom: 1px solid #999; padding: 6px 8px; text-align: left;">#</th>
+          <th style="border-bottom: 1px solid #999; padding: 6px 8px; text-align: left;">Nome</th>
+          <th style="border-bottom: 1px solid #999; padding: 6px 8px; text-align: left;">Nascimento</th>
+          <th style="border-bottom: 1px solid #999; padding: 6px 8px; text-align: left;">Parentesco</th>
+          <th style="border-bottom: 1px solid #999; padding: 6px 8px; text-align: left;">Telefone</th>
         </tr>
       </thead>
       <tbody>
         {{#DEPENDENTE_1}}
         <tr>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">1</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_1}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_1_NASCIMENTO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_1_PARENTESCO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_1_TELEFONE}}</td>
+          <td style="padding: 6px 8px;">1</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_1}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_1_NASCIMENTO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_1_PARENTESCO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_1_TELEFONE}}</td>
         </tr>
         {{/DEPENDENTE_1}}
         {{#DEPENDENTE_2}}
         <tr>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">2</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_2}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_2_NASCIMENTO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_2_PARENTESCO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_2_TELEFONE}}</td>
+          <td style="padding: 6px 8px;">2</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_2}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_2_NASCIMENTO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_2_PARENTESCO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_2_TELEFONE}}</td>
         </tr>
         {{/DEPENDENTE_2}}
         {{#DEPENDENTE_3}}
         <tr>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">3</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_3}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_3_NASCIMENTO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_3_PARENTESCO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_3_TELEFONE}}</td>
+          <td style="padding: 6px 8px;">3</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_3}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_3_NASCIMENTO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_3_PARENTESCO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_3_TELEFONE}}</td>
         </tr>
         {{/DEPENDENTE_3}}
         {{#DEPENDENTE_4}}
         <tr>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">4</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_4}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_4_NASCIMENTO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_4_PARENTESCO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_4_TELEFONE}}</td>
+          <td style="padding: 6px 8px;">4</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_4}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_4_NASCIMENTO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_4_PARENTESCO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_4_TELEFONE}}</td>
         </tr>
         {{/DEPENDENTE_4}}
         {{#DEPENDENTE_5}}
         <tr>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">5</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_5}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_5_NASCIMENTO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_5_PARENTESCO}}</td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">{{DEPENDENTE_5_TELEFONE}}</td>
+          <td style="padding: 6px 8px;">5</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_5}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_5_NASCIMENTO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_5_PARENTESCO}}</td>
+          <td style="padding: 6px 8px;">{{DEPENDENTE_5_TELEFONE}}</td>
         </tr>
         {{/DEPENDENTE_5}}
       </tbody>
