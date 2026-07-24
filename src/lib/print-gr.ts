@@ -967,35 +967,31 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  let usuarioFinalNome: string | null | undefined = reimpressao
-    ? primeiraVia?.impresso_por_nome
-    : (usuarioNome ?? primeiraVia?.impresso_por_nome);
-
-  // Fallback do "USUÁRIO:" idêntico ao da GR individual/mensalidade: se a 1ª
-  // via não gravou o nome, resolve via fin_lancamentos.criado_por → profiles.
-  if (!usuarioFinalNome) {
-    try {
-      const { data: lancs } = await supabase
-        .from("fin_lancamentos")
-        .select("criado_por, created_at")
-        .in("agendamento_id", ids)
-        .eq("tipo", "receita")
-        .eq("status", "confirmado")
-        .order("created_at", { ascending: true });
-      const criadoPor = ((lancs ?? []) as Array<{ criado_por: string | null }>)
-        .map((l) => l.criado_por)
-        .find((v): v is string => !!v);
-      if (criadoPor) {
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("nome")
-          .eq("id", criadoPor)
-          .maybeSingle();
-        const nome = (prof as { nome: string | null } | null)?.nome;
-        if (nome) usuarioFinalNome = nome;
-      }
-    } catch { /* mantém oculto se não conseguir resolver */ }
-  }
+  // "USUÁRIO:" = quem faturou (autor do lançamento), sempre. Ordem: criador do
+  // fin_lancamento → nome gravado na 1ª via → usuarioNome do caller.
+  let usuarioFinalNome: string | null | undefined = undefined;
+  try {
+    const { data: lancs } = await supabase
+      .from("fin_lancamentos")
+      .select("criado_por, created_at")
+      .in("agendamento_id", ids)
+      .eq("tipo", "receita")
+      .eq("status", "confirmado")
+      .order("created_at", { ascending: true });
+    const criadoPor = ((lancs ?? []) as Array<{ criado_por: string | null }>)
+      .map((l) => l.criado_por)
+      .find((v): v is string => !!v);
+    if (criadoPor) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("nome")
+        .eq("id", criadoPor)
+        .maybeSingle();
+      const nome = (prof as { nome: string | null } | null)?.nome;
+      if (nome) usuarioFinalNome = nome;
+    }
+  } catch { /* segue para fallback */ }
+  if (!usuarioFinalNome) usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
 
   // Busca agendamentos + clínica + tabela de procedimentos da clínica
   const [agsRes, cliRes, procsRes, lancsRes] = await Promise.all([
