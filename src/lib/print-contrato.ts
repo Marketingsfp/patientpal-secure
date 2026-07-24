@@ -326,9 +326,9 @@ export async function printContrato(contratoId: string) {
     const idx = i + 1;
     depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
     depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
-    depSlotVars[`DEPENDENTE_${idx}_CPF`] = pac?.cpf ?? "";
+    depSlotVars[`DEPENDENTE_${idx}_CPF`] = fmtCPF(pac?.cpf);
     depSlotVars[`DEPENDENTE_${idx}_NASCIMENTO`] = pac?.data_nascimento ? fmtData(pac.data_nascimento) : "";
-    depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = pac?.telefone ?? d?.telefone ?? "";
+    depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = fmtTelefone(pac?.telefone ?? d?.telefone);
   }
 
   const plTpl = (pl as any)?.template_contrato;
