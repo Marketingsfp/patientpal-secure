@@ -867,6 +867,19 @@ async function obterInfoConvenioPaciente(params: {
           .trim()
           .toUpperCase();
       if (beneficioEscolhido.escopo === "especialidade" && beneficioEscolhido.especialidade_id) {
+        // Regras por especialidade com grupo_gratuidade compartilham a cota
+        // entre TODAS as especialidades do grupo (ex.: "1 consulta/dia por
+        // CONTRATO" entre as 13 especialidades sem carência do Cartão
+        // Consulta — não 1/dia por especialidade individualmente). Sem
+        // grupo, o alvo continua sendo só a própria especialidade da regra
+        // (comportamento original, ex.: franquias por especialidade).
+        const especialidadesAlvo = beneficioEscolhido.grupo_gratuidade
+          ? new Set(
+              (regrasCb as Array<{ grupo_gratuidade: string | null; especialidade_id: string | null }>)
+                .filter((r) => r.grupo_gratuidade === beneficioEscolhido.grupo_gratuidade && r.especialidade_id)
+                .map((r) => r.especialidade_id as string),
+            )
+          : new Set<string>([beneficioEscolhido.especialidade_id as string]);
         const medicoIds = Array.from(
           new Set(
             ((agsDia ?? []) as Array<{ medico_id: string | null }>)
@@ -902,7 +915,9 @@ async function obterInfoConvenioPaciente(params: {
           ).filter((a) => {
             if (!a.medico_id) return false;
             const s = espByMed.get(a.medico_id);
-            return s ? s.has(beneficioEscolhido.especialidade_id) : false;
+            if (!s) return false;
+            for (const eid of s) if (especialidadesAlvo.has(eid)) return true;
+            return false;
           });
         }
       } else if (
