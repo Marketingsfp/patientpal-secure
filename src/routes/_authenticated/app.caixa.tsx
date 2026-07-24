@@ -838,7 +838,7 @@ function Page() {
       for (const ids of chunkArray(lancIds, 200)) {
         const { data, error } = await supabase
           .from("fin_lancamentos")
-          .select("id, medico_id, agendamento_id, paciente_id, descricao, status")
+          .select("id, medico_id, agendamento_id, paciente_id, descricao, status, criado_por")
           .in("id", ids);
         if (error) {
           console.warn("Falha ao enriquecer movimentos do caixa por lançamento", error);
@@ -954,6 +954,7 @@ function Page() {
           paciente: pacienteNome,
           paciente_id: pacIdEfetivo,
           ficha: agInfo ? (agInfo.ficha_numero ?? fichaCalculadaPorAg.get(agInfo.id) ?? null) : null,
+          faturado_por_id: l.criado_por ?? null,
         });
       }
       return { enrich, cancelados };
