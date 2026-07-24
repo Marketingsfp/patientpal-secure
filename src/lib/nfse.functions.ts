@@ -320,6 +320,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
         emitente_id: emitente.id,
         paciente_id: data.pacienteId ?? null,
         pagamento_id: data.pagamentoId ?? null,
+        pagamento_ids: (data.pagamentoIds && data.pagamentoIds.length > 0)
+          ? data.pagamentoIds
+          : (data.pagamentoId ? [data.pagamentoId] : []),
         agendamento_id: data.agendamentoId ?? null,
         data_emissao: new Date().toISOString().slice(0, 10),
         valor_servicos: data.valorServicos,
