@@ -72,3 +72,44 @@ export function calcularAvisoLimitePendentes(params: {
   const total = pendentesRelevantes.length + 1;
   return `Existem ${total} agendamentos pendentes com este benefício no período. Apenas ${beneficio.limite_qtd} será cobrado com o benefício; os demais ${excedenteTxt} quando pagos.`;
 }
+
+/**
+ * Retorna `true` quando a segunda (ou N-ésima) tentativa de agendamento — ainda
+ * pendente — estoura o limite do benefício **e** a regra manda bloquear
+ * (`excedente_modo === "bloquear"`).
+ *
+ * Isso é necessário porque o fluxo padrão só marca `bloquear=true` quando os
+ * pendentes já foram persistidos e contabilizados em `usados`. Se o operador
+ * abre duas telas de agendamento seguidas do mesmo contrato no mesmo dia, o
+ * segundo precisa ser bloqueado antes mesmo do primeiro virar `usados`.
+ *
+ * Regras preservadas:
+ *  - Só se aplica quando o modo excedente é "bloquear"; nos demais retorna false.
+ *  - Para benefícios gratuitos, os pendentes precisam ser do MESMO serviço
+ *    (mesma normalização do aviso).
+ *  - Para os demais, considera todos os pendentes (compartilham a cota).
+ */
+export function deveBloquearPorLimitePendente(params: {
+  beneficio: BeneficioAviso;
+  pendentes: PendenteAviso[];
+  usados: number;
+  procedimentoNome: string | null | undefined;
+}): boolean {
+  const { beneficio, pendentes, usados, procedimentoNome } = params;
+  if (!beneficio || beneficio.excedente_modo !== "bloquear") return false;
+  if (!pendentes || pendentes.length === 0) return false;
+  const limite = Number(beneficio.limite_qtd) || 0;
+  if (limite <= 0) return false;
+
+  let relevantes: PendenteAviso[];
+  if (beneficio.gratuito) {
+    const procAtual = normalizarProcedimento(procedimentoNome);
+    relevantes = pendentes.filter(
+      (a) => normalizarProcedimento(a.procedimento) === procAtual,
+    );
+  } else {
+    relevantes = pendentes;
+  }
+
+  return usados + relevantes.length + 1 > limite;
+}

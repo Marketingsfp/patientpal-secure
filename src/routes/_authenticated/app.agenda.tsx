@@ -44,7 +44,7 @@ import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
 import { useTurboDisabled } from "@/hooks/use-turbo-disabled";
 import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/dividir-orcamento-dialog";
 import { SelecionarItensOrcamentoDialog, type SelectItemOrc } from "@/components/agenda/selecionar-itens-orcamento-dialog";
-import { calcularAvisoLimitePendentes } from "@/lib/agenda/aviso-limite-pendentes";
+import { calcularAvisoLimitePendentes, deveBloquearPorLimitePendente } from "@/lib/agenda/aviso-limite-pendentes";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
   CalendarDays,
@@ -1140,6 +1140,19 @@ async function obterInfoConvenioPaciente(params: {
           procedimentoNome,
         });
         if (aviso) avisoLimite = aviso;
+        // Se o convênio bloqueia excedente e os pendentes já estouram a cota,
+        // bloqueia esta tentativa antes mesmo do primeiro virar consumido.
+        if (
+          deveBloquearPorLimitePendente({
+            beneficio: beneficioEscolhido,
+            pendentes: agsPendentes as { procedimento?: string | null }[],
+            usados,
+            procedimentoNome,
+          })
+        ) {
+          bloquear = true;
+          desconto = null;
+        }
       }
     }
   }
