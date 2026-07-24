@@ -664,7 +664,8 @@ function Page() {
   const displayItems = decomporMisto ? expandMistoItems(items) : items;
 
   const imprimirRelatorio = () => {
-    if (!items.length) { toast.info("Sem dados para o relatório."); return; }
+    const source = displayItems;
+    if (!source.length) { toast.info("Sem dados para o relatório."); return; }
     const catMap = new Map(cats.map((c) => [c.id, c.nome]));
     const esc = (v: unknown) =>
       String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
@@ -672,7 +673,7 @@ function Page() {
     const cats2 = new Map<string, Row>();
     const formas = new Map<string, Row>();
     let totPag = 0, totReceb = 0;
-    for (const l of items) {
+    for (const l of source) {
       const v = Number(l.valor || 0);
       const isReceita = l.tipo === "receita" || (l.tipo === "transferencia" && l.transferSentido === "entrada");
       const isDespesa = l.tipo === "despesa" || (l.tipo === "transferencia" && l.transferSentido === "saida");
@@ -681,27 +682,9 @@ function Page() {
       if (isReceita) { c.recebimento += v; totReceb += v; }
       else if (isDespesa) { c.pagamento += v; totPag += v; }
       cats2.set(catLabel, c);
-      // Decompõe pagamentos "misto" nas formas reais para não aparecer o
-      // rótulo genérico "MISTO" no Resumo por tipo de moeda — o pedido do
-      // caixa é ver DINHEIRO, PIX, CARTÃO, etc. separados. O texto vem em
-      // fin_lancamentos.observacoes no formato:
-      //   "Pagamento misto: DINHEIRO R$ 100,00; CARTAO DEBITO R$ 30,00"
-      // (case-insensitive, com ou sem sufixos entre parênteses).
-      const partes: Array<{ label: string; valor: number }> = [];
-      if ((l.forma_pagamento ?? "").toLowerCase() === "misto" && l.observacoes) {
-        const obs = l.observacoes;
-        const idx = obs.toLowerCase().indexOf("misto:");
-        const trecho = idx >= 0 ? obs.slice(idx + "misto:".length) : obs;
-        const primeiroBloco = trecho.split(" | ")[0];
-        for (const raw of primeiroBloco.split(";")) {
-          const m = raw.match(/^\s*([^R$]+?)\s*R\$\s*([\d.,]+)/i);
-          if (!m) continue;
-          const rotulo = m[1].replace(/\s+/g, " ").trim().toUpperCase();
-          const num = Number(m[2].replace(/\./g, "").replace(",", "."));
-          if (!rotulo || !Number.isFinite(num) || num <= 0) continue;
-          partes.push({ label: rotulo, valor: num });
-        }
-      }
+      // Decompõe pagamentos "misto" quando a opção estiver ligada; caso
+      // contrário mantém o rótulo original "MISTO" no Resumo por tipo de moeda.
+      const partes = decomporMisto ? parseMistoPartes(l.forma_pagamento, l.observacoes) : [];
       if (partes.length) {
         for (const p of partes) {
           const f = formas.get(p.label) ?? { label: p.label, pagamento: 0, recebimento: 0 };
@@ -740,7 +723,7 @@ function Page() {
       '<table><thead><tr><th>GERAL — Descrição</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + linhasCat + '</tbody></table>' +
       '<table><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + linhasForma + '</tbody>' +
       '<tfoot><tr><td>TOTAL</td><td class="right">' + fmt(totPag) + '</td><td class="right">' + fmt(totReceb) + '</td><td class="right">' + fmt(totReceb - totPag) + '</td></tr></tfoot></table>' +
-      '<div class="meta"><span>' + items.length + ' registro' + (items.length === 1 ? '' : 's') + '</span></div>' +
+      '<div class="meta"><span>' + source.length + ' registro' + (source.length === 1 ? '' : 's') + '</span></div>' +
       '<script>window.onload=function(){window.print();}</script></body></html>';
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
