@@ -4606,6 +4606,21 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                   )}
                                 </>
                               ) : null}
+                              {m.status === "pago" && m.lancamento_id ? (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Reimprimir 2ª via da GR"
+                                  disabled={reimprimindoId === m.id}
+                                  onClick={() => reimprimirGrMensalidade(m)}
+                                >
+                                  {reimprimindoId === m.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Printer className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              ) : null}
                               {isAdmin && podeEscrever ? (
                                 <Button
                                   size="sm"
