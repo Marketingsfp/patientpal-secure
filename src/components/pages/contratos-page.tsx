@@ -3797,7 +3797,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
   };
 
   const contratoTexto = useMemo(() => {
-    const tpl = convenio?.modelo_contrato ?? "";
+    const overrideTpl = (contrato as any).convenio_id
+      ? CONVENIO_TEMPLATE_OVERRIDES[(contrato as any).convenio_id]
+      : null;
+    const tpl = overrideTpl ?? convenio?.modelo_contrato ?? "";
     if (!tpl) return "";
     const _cl = clinica ?? {};
     const _pa = pacienteFull ?? {};
@@ -3820,6 +3823,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
       depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
       depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
       depSlotVars[`DEPENDENTE_${idx}_CPF`] = d?.cpf ?? "";
+      depSlotVars[`DEPENDENTE_${idx}_NASCIMENTO`] = fmtD(d?.data_nascimento);
+      depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = fmtTelDisplay(d?.telefone) || "";
     }
     const vars: Record<string, string> = {
       CLINICA_NOME: _cl.nome ?? "",
@@ -3827,10 +3832,16 @@ h1, h2, h3 { margin: 0 0 6mm; }
       CLINICA_ENDERECO: [_cl.endereco, _cl.cidade, _cl.estado].filter(Boolean).join(", "),
       CIDADE: _cl.cidade ?? "",
       PACIENTE_NOME: contrato.paciente_nome ?? "",
-      PACIENTE_CPF: _pa.cpf ?? "",
+      PACIENTE_CPF: fmtCPFDisplay(_pa.cpf),
       PACIENTE_NASCIMENTO: fmtD(_pa.data_nascimento),
       PACIENTE_ENDERECO: enderecoPaciente,
-      PACIENTE_TELEFONE: _pa.telefone ?? "",
+      PACIENTE_LOGRADOURO: _pa.logradouro ?? "",
+      PACIENTE_NUMERO: _pa.numero ?? "",
+      PACIENTE_BAIRRO: _pa.bairro ?? "",
+      PACIENTE_CIDADE: _pa.cidade ?? "",
+      PACIENTE_ESTADO: _pa.estado ?? "",
+      PACIENTE_CEP: fmtCEPDisplay(_pa.cep),
+      PACIENTE_TELEFONE: fmtTelDisplay(_pa.telefone),
       PACIENTE_EMAIL: _pa.email ?? "",
       VALOR_MENSAL: BRL(Number(contrato.valor_mensal)),
       TAXA_ADESAO: BRL(Number((contrato as any).taxa_adesao ?? 0)),
