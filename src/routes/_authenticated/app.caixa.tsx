@@ -1416,6 +1416,50 @@ function Page() {
     return () => { alive = false; };
   }, [mistoLancIds, mistoObs]);
 
+  // Resolve nomes de usuários referenciados por movimentos e enriquecimentos
+  // (operador do caixa + quem faturou o lançamento). Executa em lotes de 200
+  // e cacheia no state para evitar refetch a cada re-render.
+  useEffect(() => {
+    const alvo = new Set<string>();
+    const scanMovs = (arr: Mov[]) => arr.forEach((m) => { if (m.user_id) alvo.add(m.user_id); });
+    scanMovs(minhasMovs);
+    scanMovs(minhasMovsHist);
+    scanMovs(detalheMovs);
+    scanMovs(todosMovs);
+    enrichPorLanc.forEach((e) => { if (e.faturado_por_id) alvo.add(e.faturado_por_id); });
+    const pendentes = Array.from(alvo).filter((id) => !userNamesById.has(id));
+    if (pendentes.length === 0) return;
+    let alive = true;
+    (async () => {
+      const acc = new Map<string, string>();
+      for (const ids of chunkArray(pendentes, 200)) {
+        const { data } = await supabase.from("profiles").select("id, nome").in("id", ids);
+        for (const p of ((data ?? []) as Array<{ id: string; nome: string | null }>)) {
+          acc.set(p.id, (p.nome ?? "").trim() || p.id.slice(0, 8));
+        }
+        // marca também os não retornados para não refazer o fetch em loop
+        for (const id of ids) if (!acc.has(id)) acc.set(id, id.slice(0, 8));
+      }
+      if (!alive) return;
+      setUserNamesById((prev) => {
+        const next = new Map(prev);
+        acc.forEach((v, k) => next.set(k, v));
+        return next;
+      });
+    })();
+    return () => { alive = false; };
+  }, [minhasMovs, minhasMovsHist, detalheMovs, todosMovs, enrichPorLanc, userNamesById]);
+
+  /** Retorna o nome de quem faturou o movimento (prioriza
+   *  fin_lancamentos.criado_por → autor real do lançamento; fallback para
+   *  caixa_movimentos.user_id → operador do caixa que registrou o mov). */
+  const usuarioNomeFor = useCallback((m: Mov): string => {
+    const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
+    const uid = enr?.faturado_por_id ?? m.user_id ?? null;
+    if (!uid) return "—";
+    return userNamesById.get(uid) ?? "…";
+  }, [enrichPorLanc, userNamesById]);
+
   // Entradas agrupadas por forma de pagamento (recebimento + suprimento).
   // Aliases cartao_credito/cartao_debito ficam em credito/debito; pagamentos
   // "misto" são decompostos pelas observações do fin_lancamento.
