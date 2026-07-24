@@ -34,7 +34,7 @@ const ACTION_LABEL: Record<string, string> = {
 export function HistoricoAtendimentoDialog({ open, onClose, lancamentoId, agendamentoId, clinicaId }: Props) {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
-  const [autores, setAutores] = useState<Record<string, { nome: string; papel: "medico" | "funcionario" | "desconhecido" }>>({});
+  const [autores, setAutores] = useState<Record<string, { nome: string; papel: "medico" | "funcionario" | "desconhecido" | "sistema" }>>({});
 
   useEffect(() => {
     if (!open) return;
@@ -66,7 +66,7 @@ export function HistoricoAtendimentoDialog({ open, onClose, lancamentoId, agenda
           supabase.from("profiles").select("id, nome, email").in("id", userIds),
           supabase.from("medicos").select("user_id, nome").in("user_id", userIds),
         ]);
-        const map: Record<string, { nome: string; papel: "medico" | "funcionario" | "desconhecido" }> = {};
+        const map: Record<string, { nome: string; papel: "medico" | "funcionario" | "desconhecido" | "sistema" }> = {};
         const medUserIds = new Set((meds ?? []).map((m: any) => m.user_id));
         for (const p of profs ?? []) {
           const nome = (p as any).nome || (p as any).email || "Usuário";
@@ -89,6 +89,12 @@ export function HistoricoAtendimentoDialog({ open, onClose, lancamentoId, agenda
 
   function autorDe(r: Row) {
     if (r.user_id && autores[r.user_id]) return autores[r.user_id];
+    if (!r.user_id) {
+      const raw = (r.user_email || "").trim();
+      const m = raw.match(/^sistema\s*\((.+)\)$/i);
+      const nome = m ? `Sistema (${m[1]})` : "Sistema";
+      return { nome, papel: "sistema" as const };
+    }
     return { nome: r.user_email || "Sistema", papel: "desconhecido" as const };
   }
 
@@ -137,6 +143,7 @@ export function HistoricoAtendimentoDialog({ open, onClose, lancamentoId, agenda
                     <span>Por: <span className="text-foreground">{a.nome}</span></span>
                     {a.papel === "medico" && <Badge variant="secondary" className="text-[10px]">Médico</Badge>}
                     {a.papel === "funcionario" && <Badge variant="outline" className="text-[10px]">Funcionário</Badge>}
+                    {a.papel === "sistema" && <Badge variant="outline" className="text-[10px]">Sistema</Badge>}
                     <span className="ml-auto text-[10px] opacity-60">{r.table_name}</span>
                   </div>
                 </div>
