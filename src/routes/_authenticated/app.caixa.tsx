@@ -362,7 +362,7 @@ function Page() {
   // Espelho do estornosPorLanc, mas indexado por caixa_movimento_id — usado
   // para o botão de estorno de sangria (que não tem lançamento financeiro).
   const [estornosPorMov, setEstornosPorMov] = useState<Map<string, "pendente" | "aprovado">>(new Map());
-  const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null }>>(new Map());
+  const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null; ficha: number | null }>>(new Map());
   // Conjunto de lancamento_ids cujo fin_lancamentos.status = 'cancelado'
   // (i.e., estornados). Esses recebimentos não devem entrar no saldo do
   // caixa mesmo que o movimento reverso ainda não tenha sido gravado.
@@ -2509,6 +2509,7 @@ function Page() {
                         <TableHead>Descrição</TableHead>
                         <TableHead>Serviço</TableHead>
                         <TableHead>Médico</TableHead>
+                        <TableHead>Ficha</TableHead>
                         <TableHead>Forma</TableHead>
                         <TableHead className="text-right">Valor</TableHead>
                         <TableHead className="text-right w-[1%]">Ação</TableHead>
