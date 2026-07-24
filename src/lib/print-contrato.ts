@@ -64,12 +64,12 @@ function applyTemplate(tpl: string, vars: Record<string, string>): string {
   return out.replace(/\{\{(\w+)\}\}/g, (_, k) => {
     const raw = vars[k] ?? "";
     const safe = esc(raw);
-    // Comprime horizontalmente valores longos para não invadir a coluna vizinha
-    // no template de posicionamento absoluto (Menino Jesus).
+    // Reduz o tamanho real da fonte (não só o transform visual) para os
+    // valores longos caberem na coluna dos templates absolutos.
     const len = raw.length;
-    if (len <= 22) return safe;
-    const scale = len > 40 ? 0.7 : len > 32 ? 0.78 : 0.86;
-    return `<span style="display:inline-block;white-space:nowrap;transform:scaleX(${scale});transform-origin:left top;letter-spacing:-0.02em;">${safe}</span>`;
+    if (len <= 20) return safe;
+    const pct = len > 42 ? 62 : len > 36 ? 68 : len > 30 ? 75 : len > 26 ? 82 : 90;
+    return `<span style="font-size:${pct}%;letter-spacing:-0.02em;white-space:nowrap;">${safe}</span>`;
   });
 }
 
