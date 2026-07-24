@@ -7854,7 +7854,14 @@ function AgendaPage() {
           ) : !clinicaAtual ? (
             <div className="text-center py-8 text-muted-foreground text-sm">Selecione uma clínica.</div>
           ) : paginados.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground text-sm">Nenhum agendamento encontrado.</div>
+            <AgendaEmptyState
+              apenasData={apenasData}
+              dataRef={dataRef}
+              info={emptyInfo}
+              onIrProxima={(d) => setDataRef(d)}
+              onDesmarcarApenas={() => setApenasData(false)}
+              onLimparFiltros={limparFiltros}
+            />
           ) : (
             paginados.map((a) => {
               const fichaNum = fichaPorId.get(a.id) ?? "";
