@@ -4336,14 +4336,18 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         <TableRow>
                           {podeEscrever && !(cancelado && !isAdmin) ? (
                             <TableCell className="w-8">
-                              {m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida) ? (
-                                <input
-                                  type="checkbox"
-                                  aria-label="Selecionar parcela para pagamento histórico"
-                                  checked={selectedHistIds.has(m.id)}
-                                  onChange={() => toggleHistSel(m.id)}
-                                />
-                              ) : null}
+                              {(() => {
+                                if (isAdesao(m) && adesaoEmbutida) return null;
+                                if (m.status === "pago" && (!m.lancamento_id || nfsePorLancamento[m.lancamento_id])) return null;
+                                return (
+                                  <input
+                                    type="checkbox"
+                                    aria-label="Selecionar parcela"
+                                    checked={selectedHistIds.has(m.id)}
+                                    onChange={() => toggleHistSel(m.id)}
+                                  />
+                                );
+                              })()}
                             </TableCell>
                           ) : null}
                           <TableCell>
