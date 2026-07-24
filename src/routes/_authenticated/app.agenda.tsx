@@ -810,6 +810,12 @@ async function obterInfoConvenioPaciente(params: {
         status?: string | null;
         inicio?: string | null;
       }> = [];
+      const normProcServico = (s: string | null | undefined) =>
+        (s ?? "")
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .trim()
+          .toUpperCase();
       if (beneficioEscolhido.escopo === "especialidade" && beneficioEscolhido.especialidade_id) {
         const medicoIds = Array.from(
           new Set(
@@ -849,6 +855,34 @@ async function obterInfoConvenioPaciente(params: {
             return s ? s.has(beneficioEscolhido.especialidade_id) : false;
           });
         }
+      } else if (
+        beneficioEscolhido.escopo === "servico" &&
+        beneficioEscolhido.procedimento_id &&
+        !beneficioEscolhido.grupo_gratuidade
+      ) {
+        // Regra por serviço específico SEM grupo de gratuidade (ex.: Preventivo,
+        // Densitometria, ECG, Raio-X Tórax — exames anuais que não têm um "OU"
+        // com outro exame). Sem este filtro, o "else" genérico logo abaixo
+        // contava QUALQUER atendimento pago do contrato como consumo da cota —
+        // uma consulta comum já esgotava o exame anual gratuito, porque só o
+        // bloco de grupo_gratuidade (mais abaixo) filtrava por procedimento, e
+        // só quando a regra tinha grupo configurado.
+        const { data: procRegra } = await supabase
+          .from("procedimentos")
+          .select("nome")
+          .eq("id", beneficioEscolhido.procedimento_id)
+          .maybeSingle();
+        const nomeRegra = normProcServico((procRegra as { nome?: string } | null)?.nome);
+        agsFiltrados = (
+          (agsDia ?? []) as Array<{
+            id: string;
+            medico_id: string | null;
+            paciente_id?: string | null;
+            status?: string | null;
+            inicio?: string | null;
+            procedimento?: string | null;
+          }>
+        ).filter((a) => normProcServico(a.procedimento) === nomeRegra);
       } else {
         agsFiltrados = (agsDia ?? []) as Array<{
           id: string;

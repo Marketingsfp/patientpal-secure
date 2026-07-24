@@ -140,7 +140,7 @@ export function AddToOrcamentoDialog({
         const conveniosIds = Array.from(porConvenio.keys());
         const { data: regrasRaw } = await supabase
           .from("cb_convenio_regras")
-          .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,grupo_gratuidade")
+          .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,valor_cartao,percentual,percentual_cartao,prioridade,ativo,carencia_mensalidades,gratuito,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,grupo_gratuidade")
           .in("convenio_id", conveniosIds)
           .eq("ativo", true);
         const regrasByConv = new Map<string, CbRegra[]>();
