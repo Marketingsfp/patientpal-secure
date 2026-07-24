@@ -374,7 +374,35 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  const usuarioFinalNome = usuarioNome ?? primeiraVia?.impresso_por_nome;
+  let usuarioFinalNome: string | null | undefined = usuarioNome ?? primeiraVia?.impresso_por_nome;
+
+  // Fallback do "USUÁRIO:" (mesma lógica da GR de mensalidade): quando a 1ª
+  // via não gravou o nome (registros antigos), busca quem lançou o pagamento
+  // em fin_lancamentos.criado_por → profiles.nome. Assim toda GR sai com o
+  // usuário que faturou, inclusive em reimpressões.
+  if (!usuarioFinalNome) {
+    try {
+      const { data: lancs } = await supabase
+        .from("fin_lancamentos")
+        .select("criado_por, criado_em")
+        .eq("agendamento_id", agendamentoId)
+        .eq("tipo", "receita")
+        .eq("status", "confirmado")
+        .order("criado_em", { ascending: true });
+      const criadoPor = ((lancs ?? []) as Array<{ criado_por: string | null }>)
+        .map((l) => l.criado_por)
+        .find((v): v is string => !!v);
+      if (criadoPor) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("nome")
+          .eq("id", criadoPor)
+          .maybeSingle();
+        const nome = (prof as { nome: string | null } | null)?.nome;
+        if (nome) usuarioFinalNome = nome;
+      }
+    } catch { /* mantém oculto se não conseguir resolver */ }
+  }
 
   // Busca dados em paralelo
   const [ag, cli] = await Promise.all([
