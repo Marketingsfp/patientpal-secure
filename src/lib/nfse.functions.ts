@@ -470,6 +470,7 @@ export const consultarNfse = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: nota, error } = await supabase
       .from("nfse")
       .select("id, focus_ref, emitente_id")
@@ -477,7 +478,7 @@ export const consultarNfse = createServerFn({ method: "POST" })
       .single();
     if (error || !nota?.focus_ref) throw new Error("Nota sem referência Focus");
 
-    const { data: emitente } = await supabase
+    const { data: emitente } = await supabaseAdmin
       .from("nfse_emitentes")
       .select("focus_ambiente, usar_ambiente_nacional")
       .eq("id", nota.emitente_id!)
