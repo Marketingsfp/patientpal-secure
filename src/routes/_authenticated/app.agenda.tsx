@@ -389,6 +389,19 @@ function aplicarDescontoPorForma(valor: number, forma: string, d: DescontoConven
 }
 
 /**
+ * Acréscimo automático de cartão foi descontinuado (ver `applyAcrescimoCartao`
+ * em `cb-regras.ts`). Mantido como pass-through para não quebrar os cálculos
+ * legados da Agenda.
+ */
+function aplicarAcrescimoCartaoAgenda(
+  valor: number,
+  _forma: string,
+  _acr: unknown,
+): number {
+  return valor;
+}
+
+/**
  * Retorna a memória de cálculo do desconto aplicado a este canal, para
  * exibir abaixo de cada opção do modal de "Forma de pagamento".
  * Formato curto: "R$ 130 − 10% = R$ 117"  ou  "Valor fixo R$ 95".
@@ -4549,10 +4562,11 @@ function AgendaPage() {
             });
             descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
           } else if (info.desconto) {
+            const descAtual = info.desconto;
             opcoes = opcoes.map((o) => ({
               ...o,
-              valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
-              memoria: memoriaDescontoPorForma(o.valor, o.forma, info.desconto!),
+              valor: aplicarDescontoPorForma(o.valor, o.forma, descAtual),
+              memoria: memoriaDescontoPorForma(o.valor, o.forma, descAtual),
             }));
             const rotulo =
               info.desconto.tipo === "gratuidade"
@@ -4888,7 +4902,7 @@ function AgendaPage() {
             clinicaId: clinicaAtual.clinica_id,
             pacienteId: a.paciente_id,
             medicoId: a.medico_id,
-            tipoAtendimento: a.tipo_atendimento,
+            tipoAtendimento: a.tipo_atendimento ?? "",
             dataRef: a.inicio ?? null,
             nomes: nomesEfetivos,
             agendamentoIds: [a.id],
@@ -4941,10 +4955,11 @@ function AgendaPage() {
             });
             descSuffix = ` — ${info.convenioNome} BLOQUEADO`;
           } else if (info.desconto) {
+            const descAtual = info.desconto;
             opcoes = opcoes.map((o) => ({
               ...o,
-              valor: aplicarDescontoPorForma(o.valor, o.forma, info.desconto!),
-              memoria: memoriaDescontoPorForma(o.valor, o.forma, info.desconto!),
+              valor: aplicarDescontoPorForma(o.valor, o.forma, descAtual),
+              memoria: memoriaDescontoPorForma(o.valor, o.forma, descAtual),
             }));
             const rotulo =
               info.desconto.tipo === "gratuidade"
