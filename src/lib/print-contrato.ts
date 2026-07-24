@@ -283,54 +283,81 @@ export async function printContrato(contratoId: string) {
     ? CONVENIO_PDF_OVERRIDES[(c as any).convenio_id]
     : null;
   if (pdfOverrideUrl) {
-    // Impressão direta do PDF via blob same-origin em iframe fora da tela.
-    // Baixa o PDF, gera blob: URL (contornando o bloqueio de cross-origin do
-    // visualizador embutido) e chama print() assim que o PDF plugin carrega.
+    // Chromium/Brave bloqueiam iframe.contentWindow.print() em PDFs embutidos
+    // (o plugin de visualização ignora a chamada). Solução: renderizar cada
+    // página do PDF em canvas via pdfjs-dist e imprimir as imagens em um
+    // iframe HTML normal — que funciona em todos os navegadores.
     try {
+      const pdfjs: any = await import("pdfjs-dist");
+      // Worker via CDN para evitar problemas de bundling em Vite/Cloudflare.
+      const workerUrl = (await import("pdfjs-dist/build/pdf.worker.min.mjs?url")).default;
+      pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+
       const resp = await fetch(pdfOverrideUrl, { credentials: "omit" });
       if (!resp.ok) throw new Error(`Falha ao baixar PDF (${resp.status})`);
-      const blob = await resp.blob();
-      const blobUrl = URL.createObjectURL(blob);
+      const buf = await resp.arrayBuffer();
+      const pdf = await pdfjs.getDocument({ data: buf }).promise;
 
-      const frame = document.createElement("iframe");
-      frame.title = "Contrato";
-      // Off-screen mas com dimensão real (necessário para o plugin PDF inicializar).
-      frame.style.cssText = [
-        "position:fixed", "right:0", "bottom:0",
-        "width:794px", "height:1123px",
-        "border:0", "opacity:0", "pointer-events:none", "z-index:-1",
-      ].join(";");
+      const imgs: string[] = [];
+      const scale = 2; // resolução ~150dpi para impressão nítida
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) continue;
+        await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
+        imgs.push(canvas.toDataURL("image/jpeg", 0.92));
+        canvas.width = 0; canvas.height = 0;
+      }
 
-      let printed = false;
-      const doPrint = () => {
-        if (printed) return;
-        printed = true;
-        setTimeout(() => {
-          try {
-            frame.contentWindow?.focus();
-            frame.contentWindow?.print();
-          } catch {
-            // fallback: navega a janela atual para o blob (não abre nova aba)
-            window.location.href = blobUrl;
-          }
-        }, 400);
+      const html = `<!doctype html><html><head><meta charset="utf-8"/>
+<title>Contrato</title>
+<style>
+  @page { size: A4; margin: 0; }
+  html, body { margin: 0; padding: 0; background: white; }
+  img { display: block; width: 100%; height: auto; page-break-after: always; }
+  img:last-child { page-break-after: auto; }
+</style></head><body>
+${imgs.map((src) => `<img src="${src}"/>`).join("")}
+</body></html>`;
+
+      const iframe = document.createElement("iframe");
+      iframe.setAttribute("aria-hidden", "true");
+      iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;";
+      document.body.appendChild(iframe);
+
+      const cleanup = () => { try { iframe.remove(); } catch { /* noop */ } };
+      iframe.onload = () => {
+        const win = iframe.contentWindow;
+        if (!win) { cleanup(); return; }
+        // Espera todas as <img> carregarem antes de imprimir.
+        const doc = iframe.contentDocument!;
+        const images = Array.from(doc.images);
+        const waitAll = Promise.all(
+          images.map((im) =>
+            im.complete ? Promise.resolve() : new Promise<void>((r) => {
+              im.onload = () => r();
+              im.onerror = () => r();
+            })
+          )
+        );
+        waitAll.then(() => {
+          setTimeout(() => {
+            try {
+              win.onafterprint = () => setTimeout(cleanup, 100);
+              win.focus();
+              win.print();
+            } catch { cleanup(); }
+            setTimeout(cleanup, 60_000);
+          }, 200);
+        });
       };
-      frame.addEventListener("load", doPrint);
-      // Fallback: alguns navegadores não disparam load no plugin PDF.
-      setTimeout(doPrint, 1500);
-
-      // Cleanup: quando a caixa de impressão fecha, o foco volta para a janela.
-      const cleanup = () => {
-        setTimeout(() => {
-          try { frame.remove(); } catch { /* noop */ }
-          URL.revokeObjectURL(blobUrl);
-          window.removeEventListener("focus", cleanup);
-        }, 1000);
-      };
-      window.addEventListener("focus", cleanup, { once: true });
-
-      frame.src = blobUrl;
-      document.body.appendChild(frame);
+      const doc = iframe.contentDocument;
+      if (!doc) { cleanup(); throw new Error("Não foi possível preparar a impressão"); }
+      doc.open(); doc.write(html); doc.close();
     } catch (e) {
       throw new Error(`Não foi possível imprimir o PDF: ${(e as Error).message}`);
     }
