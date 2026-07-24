@@ -73,7 +73,7 @@ import { estornarLancamentoReceita } from "@/lib/estornar-lancamento";
 import { incluirDependenteContrato } from "@/lib/contrato-dependentes";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
-import { printContrato } from "@/lib/print-contrato";
+import { printContrato, CONVENIO_TEMPLATE_OVERRIDES } from "@/lib/print-contrato";
 import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { printGuiaMensalidade, printGuiaMensalidadeComTaxa } from "@/lib/print-gr";
