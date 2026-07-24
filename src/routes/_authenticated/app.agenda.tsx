@@ -2248,6 +2248,48 @@ function AgendaPage() {
     setFichaBaseItems(fichaBaseMapped as Agendamento[]);
     setPage(1);
     setSelecionados(new Set());
+    // Diagnóstico do estado vazio: só quando o usuário está com "apenas a
+    // data selecionada" e nada apareceu — assim distinguimos "sem slots
+    // cadastrados" de "filtros escondendo" e sugerimos a próxima data com
+    // agenda para o profissional atual.
+    if (apenasData && mapped.length === 0) {
+      try {
+        const inicioDia = new Date(`${dataRef}T00:00:00`).toISOString();
+        const fimDia = new Date(`${dataRef}T23:59:59`).toISOString();
+        // 1) Existe QUALQUER agendamento no dia (só clínica), ignorando filtros?
+        const { count: countDia } = await supabase
+          .from("agendamentos")
+          .select("id", { count: "exact", head: true })
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .gte("inicio", inicioDia)
+          .lte("inicio", fimDia);
+        if (reqId !== loadReqId.current) return;
+        if ((countDia ?? 0) > 0) {
+          setEmptyInfo({ motivo: "filtros_escondem", proximaData: null });
+        } else {
+          // 2) Próxima data com agenda respeitando filtro de profissional
+          let proxQ = supabase
+            .from("agendamentos")
+            .select("inicio")
+            .eq("clinica_id", clinicaAtual.clinica_id)
+            .gt("inicio", fimDia)
+            .order("inicio", { ascending: true })
+            .limit(1);
+          if (filtroMedico !== "todos") proxQ = proxQ.eq("medico_id", filtroMedico);
+          const { data: prox } = await proxQ;
+          if (reqId !== loadReqId.current) return;
+          const proximaIso = prox?.[0]?.inicio ?? null;
+          const proximaData = proximaIso
+            ? new Date(proximaIso).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })
+            : null;
+          setEmptyInfo({ motivo: proximaData ? "so_futuro" : "sem_slots", proximaData });
+        }
+      } catch {
+        setEmptyInfo({ motivo: "sem_slots", proximaData: null });
+      }
+    } else {
+      setEmptyInfo(null);
+    }
     const agendaRows = (mapped ?? []) as unknown as Array<Agendamento & { fluxo_etapa?: string | null }>;
     setEtapaMap(new Map(agendaRows.map((r) => [r.id, r.fluxo_etapa ?? "aguardando_recepcao"] as [string, string])));
     // Busca dados auxiliares dos pacientes em paralelo para não atrasar a agenda.
