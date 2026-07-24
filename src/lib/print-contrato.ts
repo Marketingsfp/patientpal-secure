@@ -24,7 +24,7 @@ const fmtTelefone = (s?: string | null) => {
 
 // Override por convênio: quando o convênio corresponder a um destes IDs,
 // o modelo hard-coded (fiel ao PDF original) prevalece sobre o modelo salvo no banco.
-const CONVENIO_TEMPLATE_OVERRIDES: Record<string, string> = {
+export const CONVENIO_TEMPLATE_OVERRIDES: Record<string, string> = {
   // POLICLINICA MENINO JESUS — CARTÃO CONSULTA + SEGUROS
   "4fdce541-5b2b-4816-ba7d-911b36741b7d": CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS,
 };

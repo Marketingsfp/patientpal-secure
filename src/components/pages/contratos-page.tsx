@@ -73,7 +73,7 @@ import { estornarLancamentoReceita } from "@/lib/estornar-lancamento";
 import { incluirDependenteContrato } from "@/lib/contrato-dependentes";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
-import { printContrato } from "@/lib/print-contrato";
+import { printContrato, CONVENIO_TEMPLATE_OVERRIDES } from "@/lib/print-contrato";
 import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { printGuiaMensalidade, printGuiaMensalidadeComTaxa } from "@/lib/print-gr";
@@ -242,6 +242,8 @@ type Dep = {
   tipo: string;
   cpf?: string | null;
   codigo_prontuario?: string | null;
+  data_nascimento?: string | null;
+  telefone?: string | null;
   incluido_em: string | null;
   excluido_em: string | null;
   ativo: boolean;
@@ -2823,13 +2825,17 @@ function DetalheContrato({
     const pids = Array.from(new Set(rows.map((r) => r.paciente_id).filter(Boolean)));
     let cpfMap: Record<string, string | null> = {};
     let prontMap: Record<string, string | null> = {};
+    let nascMap: Record<string, string | null> = {};
+    let telMap: Record<string, string | null> = {};
     if (pids.length) {
       const { data: pacs } = await supabase
         .from("pacientes")
-        .select("id, cpf, codigo_prontuario")
+        .select("id, cpf, codigo_prontuario, data_nascimento, telefone")
         .in("id", pids);
       cpfMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.cpf]));
       prontMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.codigo_prontuario]));
+      nascMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.data_nascimento]));
+      telMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.telefone]));
     }
     const depsRows = rows.map((r) => ({
       id: r.id,
@@ -2839,6 +2845,8 @@ function DetalheContrato({
       tipo: r.tipo,
       cpf: cpfMap[r.paciente_id] ?? null,
       codigo_prontuario: prontMap[r.paciente_id] ?? null,
+      data_nascimento: nascMap[r.paciente_id] ?? null,
+      telefone: telMap[r.paciente_id] ?? null,
       incluido_em: r.incluido_em ?? null,
       excluido_em: r.excluido_em ?? null,
       ativo: !!r.ativo,
@@ -3797,7 +3805,10 @@ h1, h2, h3 { margin: 0 0 6mm; }
   };
 
   const contratoTexto = useMemo(() => {
-    const tpl = convenio?.modelo_contrato ?? "";
+    const overrideTpl = (contrato as any).convenio_id
+      ? CONVENIO_TEMPLATE_OVERRIDES[(contrato as any).convenio_id]
+      : null;
+    const tpl = overrideTpl ?? convenio?.modelo_contrato ?? "";
     if (!tpl) return "";
     const _cl = clinica ?? {};
     const _pa = pacienteFull ?? {};
@@ -3820,6 +3831,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
       depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
       depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
       depSlotVars[`DEPENDENTE_${idx}_CPF`] = d?.cpf ?? "";
+      depSlotVars[`DEPENDENTE_${idx}_NASCIMENTO`] = fmtD(d?.data_nascimento);
+      depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = fmtTelDisplay(d?.telefone) || "";
     }
     const vars: Record<string, string> = {
       CLINICA_NOME: _cl.nome ?? "",
@@ -3827,10 +3840,16 @@ h1, h2, h3 { margin: 0 0 6mm; }
       CLINICA_ENDERECO: [_cl.endereco, _cl.cidade, _cl.estado].filter(Boolean).join(", "),
       CIDADE: _cl.cidade ?? "",
       PACIENTE_NOME: contrato.paciente_nome ?? "",
-      PACIENTE_CPF: _pa.cpf ?? "",
+      PACIENTE_CPF: fmtCPFDisplay(_pa.cpf),
       PACIENTE_NASCIMENTO: fmtD(_pa.data_nascimento),
       PACIENTE_ENDERECO: enderecoPaciente,
-      PACIENTE_TELEFONE: _pa.telefone ?? "",
+      PACIENTE_LOGRADOURO: _pa.logradouro ?? "",
+      PACIENTE_NUMERO: _pa.numero ?? "",
+      PACIENTE_BAIRRO: _pa.bairro ?? "",
+      PACIENTE_CIDADE: _pa.cidade ?? "",
+      PACIENTE_ESTADO: _pa.estado ?? "",
+      PACIENTE_CEP: fmtCEPDisplay(_pa.cep),
+      PACIENTE_TELEFONE: fmtTelDisplay(_pa.telefone),
       PACIENTE_EMAIL: _pa.email ?? "",
       VALOR_MENSAL: BRL(Number(contrato.valor_mensal)),
       TAXA_ADESAO: BRL(Number((contrato as any).taxa_adesao ?? 0)),
