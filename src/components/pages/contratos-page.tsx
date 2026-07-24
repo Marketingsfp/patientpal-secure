@@ -3805,10 +3805,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
   };
 
   const contratoTexto = useMemo(() => {
-    const overrideTpl = (contrato as any).convenio_id
-      ? CONVENIO_TEMPLATE_OVERRIDES[(contrato as any).convenio_id]
-      : null;
-    const tpl = overrideTpl ?? convenio?.modelo_contrato ?? "";
+    const tpl = convenio?.modelo_contrato ?? "";
     if (!tpl) return "";
     const _cl = clinica ?? {};
     const _pa = pacienteFull ?? {};
