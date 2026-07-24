@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/movimento")({
@@ -49,6 +50,11 @@ interface Lanc {
   medico_nome?: string | null;
   /** Nº da ficha do agendamento vinculado. */
   ficha_numero?: number | null;
+  /** true → linha sintética criada pela decomposição de um pagamento "misto"
+   *  (só para exibição; ações de editar/excluir/estornar ficam desabilitadas). */
+  _mistoParte?: boolean;
+  /** id do lançamento pai quando esta linha é uma parte de "misto". */
+  _mistoPaiId?: string;
 }
 interface Opt { id: string; nome: string; tipo?: string }
 
