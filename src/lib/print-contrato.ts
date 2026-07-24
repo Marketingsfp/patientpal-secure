@@ -238,6 +238,14 @@ export async function printContrato(contratoId: string) {
     .eq("id", (c as any).clinica_id)
     .maybeSingle();
 
+  const { data: pl } = (c as any).plano_id
+    ? await supabase
+        .from("planos_assinatura")
+        .select("template_contrato")
+        .eq("id", (c as any).plano_id)
+        .maybeSingle()
+    : { data: null as any };
+
   const { data: pa } = await supabase
     .from("pacientes")
     .select("cpf, data_nascimento, telefone, email, logradouro, numero, bairro, cidade, estado, cep")
@@ -286,11 +294,22 @@ export async function printContrato(contratoId: string) {
     depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = pac?.telefone ?? d?.telefone ?? "";
   }
 
-  const corpo = applyTemplate(TEXTO_CONTRATO_HTML, {
+  const templateBody =
+    ((pl as any)?.template_contrato && String((pl as any).template_contrato).trim().length > 0)
+      ? (pl as any).template_contrato
+      : TEXTO_CONTRATO_HTML;
+
+  const corpo = applyTemplate(templateBody, {
     PACIENTE_NOME: c.paciente_nome ?? "",
     PACIENTE_CPF: _pa.cpf ?? "",
     PACIENTE_NASCIMENTO: fmtData(_pa.data_nascimento),
     PACIENTE_ENDERECO: enderecoPaciente,
+    PACIENTE_LOGRADOURO: _pa.logradouro ?? "",
+    PACIENTE_NUMERO: _pa.numero ?? "",
+    PACIENTE_BAIRRO: _pa.bairro ?? "",
+    PACIENTE_CIDADE: _pa.cidade ?? "",
+    PACIENTE_ESTADO: _pa.estado ?? "",
+    PACIENTE_CEP: _pa.cep ?? "",
     PACIENTE_TELEFONE: _pa.telefone ?? "",
     PACIENTE_EMAIL: _pa.email ?? "",
     DATA_HOJE: fmtDataExtenso(new Date().toISOString()),
