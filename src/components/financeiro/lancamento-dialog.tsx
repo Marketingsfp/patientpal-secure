@@ -338,6 +338,24 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         return;
       }
     }
+    // ------------------------------------------------------------------
+    // Data retroativa: avisa o operador e força o movimento no caixa de HOJE
+    // (evita que o valor caia em uma sessão de caixa já fechada e "suma"
+    // do fechamento do dia). O lançamento contábil mantém a data escolhida.
+    // ------------------------------------------------------------------
+    const _hojeISO = new Date().toISOString().slice(0, 10);
+    const _ehRetroativo = tipo === "receita" && !!data && data < _hojeISO;
+    if (_ehRetroativo) {
+      const [aaaa, mm, dd] = data.split("-");
+      const ok = window.confirm(
+        `Atenção: a data escolhida é retroativa (${dd}/${mm}/${aaaa}).\n\n` +
+        `Para não cair em uma sessão de caixa já fechada, o movimento será ` +
+        `registrado no SEU caixa aberto de HOJE.\n\n` +
+        `A data contábil do lançamento continuará ${dd}/${mm}/${aaaa}.\n\n` +
+        `Deseja continuar?`,
+      );
+      if (!ok) return;
+    }
     setSaving(true);
     if (descontoAtivo) {
       if (!supervisorInfo && !ehSupervisor) {
