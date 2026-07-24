@@ -450,6 +450,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLaudadoresCatalog([]);
       initialProcedimentosCountRef.current = 0;
       setForm({ ...emptyForm(), nome: prefillNome ?? "" });
+      setPacienteVinculado(null);
       return;
     }
     void (async () => {
