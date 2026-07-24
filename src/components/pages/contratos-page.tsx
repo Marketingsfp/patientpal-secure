@@ -2194,7 +2194,6 @@ function DetalheContrato({
   const [editValor, setEditValor] = useState<string>(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
   const [editDia, setEditDia] = useState<string>(String(contrato.dia_vencimento ?? 10));
   const [savingDados, setSavingDados] = useState(false);
-  const [regerando, setRegerando] = useState(false);
   useEffect(() => {
     setEditValor(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
     setEditDia(String(contrato.dia_vencimento ?? 10));
