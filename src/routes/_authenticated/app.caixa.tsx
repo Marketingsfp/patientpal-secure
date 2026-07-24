@@ -3767,6 +3767,7 @@ function Page() {
                       <TableHead>Tipo</TableHead>
                       <TableHead>Descrição</TableHead>
                       <TableHead>Forma</TableHead>
+                      <TableHead>Usuário</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -3784,6 +3785,7 @@ function Page() {
                             <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
                             <TableCell>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
                             <TableCell>{FORMA_LABEL[k] ?? k}</TableCell>
+                            <TableCell className="text-xs uppercase">{idx === 0 ? usuarioNomeFor(m) : ""}</TableCell>
                             <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                               {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
                             </TableCell>
@@ -3797,6 +3799,7 @@ function Page() {
                           <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                           <TableCell>{m.descricao || "—"}</TableCell>
                           <TableCell><FormaCellEditavel m={m} /></TableCell>
+                          <TableCell className="text-xs uppercase">{usuarioNomeFor(m)}</TableCell>
                           <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                           </TableCell>
