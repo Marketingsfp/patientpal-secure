@@ -1291,6 +1291,9 @@ export interface PrintGRMensalidadeInput {
   usuarioNome?: string;
   usuarioId?: string | null;
   reimpressao?: boolean;
+  /** Nome de quem está reimprimindo esta 2ª via — impresso ao final da GR. */
+  reimpressoPorNome?: string;
+  reimpressoPorId?: string | null;
   pagamento: {
     valor: number;
     forma_pagamento: string | null;
@@ -1308,7 +1311,7 @@ export async function reimprimirGuiaMensalidade(input: PrintGRMensalidadeInput) 
   return printGuiaMensalidadeCore({ ...input, reimpressao: true });
 }
 
-async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento }: PrintGRMensalidadeInput) {
+async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome, usuarioId, reimpressao, reimpressoPorNome, reimpressoPorId, pagamento }: PrintGRMensalidadeInput) {
   // Controle de vias 1ª/2ª via por mensalidade
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
@@ -1453,6 +1456,12 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
       <div>DATA</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
+    ${reimpressao && reimpressoPorNome ? `
+    <div class="sep"></div>
+    <div class="center sm">*** 2ª VIA — REIMPRESSÃO ***</div>
+    <div class="center sm">REIMPRESSO POR: <span class="v">${esc(reimpressoPorNome)}</span></div>
+    <div class="center sm">EM ${fmtData(new Date().toISOString())}</div>
+    ` : ""}
   </div>`;
 
   const nVias = numViasGR(pagamento);
@@ -1478,6 +1487,18 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
         via_numero: viaNumero,
         impresso_por: usuarioId ?? null,
         impresso_por_nome: usuarioNome ?? null,
+        tipo: "mensalidade",
+      } as never);
+    } catch (_) { /* falha silenciosa */ }
+  } else if (reimpressoPorNome) {
+    // Registra também as reimpressões, para auditoria (não afeta a 1ª via original).
+    try {
+      await supabase.from("gr_impressoes" as never).insert({
+        clinica_id: clinicaId,
+        mensalidade_id: mensalidadeId,
+        via_numero: ultimaVia + 1,
+        impresso_por: reimpressoPorId ?? null,
+        impresso_por_nome: reimpressoPorNome,
         tipo: "mensalidade",
       } as never);
     } catch (_) { /* falha silenciosa */ }
