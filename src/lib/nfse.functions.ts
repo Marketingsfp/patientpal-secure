@@ -112,12 +112,26 @@ export const emitirNfse = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    let { data: emitente, error: errEmit } = await supabase
+    // A RLS de `nfse_emitentes` restringe SELECT a managers da clínica
+    // (para proteger certificado/senha). Para permitir emissão por qualquer
+    // membro autorizado da clínica, buscamos com o cliente admin e validamos
+    // manualmente a associação do usuário à clínica do emitente.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let { data: emitente, error: errEmit } = await supabaseAdmin
       .from("nfse_emitentes")
       .select("*")
       .eq("id", data.emitenteId)
       .single();
     if (errEmit || !emitente) throw new Error("Emitente não encontrado");
+
+    // Autorização: o usuário precisa ter vínculo com a clínica do emitente.
+    const { data: membership } = await supabase
+      .from("clinica_memberships")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("clinica_id", emitente.clinica_id)
+      .maybeSingle();
+    if (!membership) throw new Error("Sem permissão para emitir por este emitente");
 
     // Regra de negócio: toda NFS-e de CONSULTA deve ser emitida no CNPJ
     // 31.919.483/0003-18 (CASA DE SAUDE E MATERNIDADE), independente do
@@ -134,7 +148,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
     const alvoNome = ehExame ? "MA IMAGENS" : "CASA DE SAUDE E MATERNIDADE";
 
     if (alvoCnpj && only(emitente.cnpj) !== alvoCnpj) {
-      const { data: emitConsulta } = await supabase
+      const { data: emitConsulta } = await supabaseAdmin
         .from("nfse_emitentes")
         .select("*")
         .eq("clinica_id", emitente.clinica_id)
