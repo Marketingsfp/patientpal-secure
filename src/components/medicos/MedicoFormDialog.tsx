@@ -1715,8 +1715,23 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                 )}
               </TabsContent>
 
+              <TabsContent value="convenio" className="space-y-4 pt-4 pb-16">
+                {editingMedicoId ? (
+                  <ConvenioMedicoTab
+                    medicoId={editingMedicoId}
+                    clinicaId={activeClinicaId}
+                    pacienteId={pacienteVinculado?.id ?? null}
+                    pacienteNome={pacienteVinculado?.nome ?? ""}
+                    podeEscrever={podeGerenciarEquipe}
+                  />
+                ) : (
+                  <div className="py-6 text-center text-sm text-muted-foreground">
+                    Salve o cadastro do médico antes de configurar o convênio.
+                  </div>
+                )}
+              </TabsContent>
+
               <TabsContent value="acesso" className="space-y-4 pt-4 pb-16">
-                {/* placeholder to anchor patch */}
                 {hasLogin ? (
                   <div className="space-y-4 py-2 text-sm">
                     {existingEmail ? (
