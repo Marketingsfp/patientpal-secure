@@ -5935,13 +5935,6 @@ export type Database = {
             referencedRelation: "orcamentos"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "nfse_pagamento_id_fkey"
-            columns: ["pagamento_id"]
-            isOneToOne: false
-            referencedRelation: "pagamentos"
-            referencedColumns: ["id"]
-          },
         ]
       }
       nfse_agendamentos: {
