@@ -535,7 +535,8 @@ export const cancelarNfse = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .single();
     if (!nota?.focus_ref) throw new Error("Nota sem referência Focus");
-    const { data: emitente } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: emitente } = await supabaseAdmin
       .from("nfse_emitentes")
       .select("focus_ambiente, usar_ambiente_nacional")
       .eq("id", nota.emitente_id!)
@@ -629,7 +630,8 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     if (error || !nota) throw new Error("Nota não encontrada");
 
     const tomadorEndereco = (nota.tomador_endereco ?? {}) as Record<string, unknown>;
-    const emitenteRow = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const emitenteRow = await supabaseAdmin
       .from("nfse_emitentes")
       .select("*")
       .eq("id", nota.emitente_id!)
