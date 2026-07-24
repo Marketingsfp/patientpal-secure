@@ -384,11 +384,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     try {
       const { data: lancs } = await supabase
         .from("fin_lancamentos")
-        .select("criado_por, criado_em")
+        .select("criado_por, created_at")
         .eq("agendamento_id", agendamentoId)
         .eq("tipo", "receita")
         .eq("status", "confirmado")
-        .order("criado_em", { ascending: true });
+        .order("created_at", { ascending: true });
       const criadoPor = ((lancs ?? []) as Array<{ criado_por: string | null }>)
         .map((l) => l.criado_por)
         .find((v): v is string => !!v);
