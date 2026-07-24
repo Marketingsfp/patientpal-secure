@@ -88,6 +88,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
       emitenteId: z.string().uuid(),
       pacienteId: z.string().uuid().optional(),
       pagamentoId: z.string().uuid().optional(),
+      pagamentoIds: z.array(z.string().uuid()).optional(),
       agendamentoId: z.string().uuid().optional(),
       agendamentoIds: z.array(z.string().uuid()).optional(),
       valorServicos: z.number().positive(),
@@ -111,12 +112,26 @@ export const emitirNfse = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    let { data: emitente, error: errEmit } = await supabase
+    // A RLS de `nfse_emitentes` restringe SELECT a managers da clínica
+    // (para proteger certificado/senha). Para permitir emissão por qualquer
+    // membro autorizado da clínica, buscamos com o cliente admin e validamos
+    // manualmente a associação do usuário à clínica do emitente.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let { data: emitente, error: errEmit } = await supabaseAdmin
       .from("nfse_emitentes")
       .select("*")
       .eq("id", data.emitenteId)
       .single();
     if (errEmit || !emitente) throw new Error("Emitente não encontrado");
+
+    // Autorização: o usuário precisa ter vínculo com a clínica do emitente.
+    const { data: membership } = await supabase
+      .from("clinica_memberships")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("clinica_id", emitente.clinica_id)
+      .maybeSingle();
+    if (!membership) throw new Error("Sem permissão para emitir por este emitente");
 
     // Regra de negócio: toda NFS-e de CONSULTA deve ser emitida no CNPJ
     // 31.919.483/0003-18 (CASA DE SAUDE E MATERNIDADE), independente do
@@ -133,7 +148,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
     const alvoNome = ehExame ? "MA IMAGENS" : "CASA DE SAUDE E MATERNIDADE";
 
     if (alvoCnpj && only(emitente.cnpj) !== alvoCnpj) {
-      const { data: emitConsulta } = await supabase
+      const { data: emitConsulta } = await supabaseAdmin
         .from("nfse_emitentes")
         .select("*")
         .eq("clinica_id", emitente.clinica_id)
@@ -305,7 +320,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
 
     // Reserva o próximo número de DPS/RPS antes do envio (evita duplicidade).
     if (emitente.usar_ambiente_nacional) {
-      await supabase
+      await supabaseAdmin
         .from("nfse_emitentes")
         .update({ rps_proximo_numero: (emitente.rps_proximo_numero ?? 1) + 1 })
         .eq("id", emitente.id);
@@ -319,6 +334,9 @@ export const emitirNfse = createServerFn({ method: "POST" })
         emitente_id: emitente.id,
         paciente_id: data.pacienteId ?? null,
         pagamento_id: data.pagamentoId ?? null,
+        pagamento_ids: (data.pagamentoIds && data.pagamentoIds.length > 0)
+          ? data.pagamentoIds
+          : (data.pagamentoId ? [data.pagamentoId] : []),
         agendamento_id: data.agendamentoId ?? null,
         data_emissao: new Date().toISOString().slice(0, 10),
         valor_servicos: data.valorServicos,
@@ -388,7 +406,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
     // Persiste o avanço do contador (mesmo em caso de falha final, para não
     // tentar de novo os mesmos números na próxima emissão).
     if (isNacional && bumpedTo !== (emitente.rps_proximo_numero ?? 1)) {
-      await supabase
+      await supabaseAdmin
         .from("nfse_emitentes")
         .update({ rps_proximo_numero: bumpedTo + 1 })
         .eq("id", emitente.id);
@@ -452,6 +470,7 @@ export const consultarNfse = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: nota, error } = await supabase
       .from("nfse")
       .select("id, focus_ref, emitente_id")
@@ -459,7 +478,7 @@ export const consultarNfse = createServerFn({ method: "POST" })
       .single();
     if (error || !nota?.focus_ref) throw new Error("Nota sem referência Focus");
 
-    const { data: emitente } = await supabase
+    const { data: emitente } = await supabaseAdmin
       .from("nfse_emitentes")
       .select("focus_ambiente, usar_ambiente_nacional")
       .eq("id", nota.emitente_id!)
@@ -516,7 +535,8 @@ export const cancelarNfse = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .single();
     if (!nota?.focus_ref) throw new Error("Nota sem referência Focus");
-    const { data: emitente } = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: emitente } = await supabaseAdmin
       .from("nfse_emitentes")
       .select("focus_ambiente, usar_ambiente_nacional")
       .eq("id", nota.emitente_id!)
@@ -610,7 +630,8 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     if (error || !nota) throw new Error("Nota não encontrada");
 
     const tomadorEndereco = (nota.tomador_endereco ?? {}) as Record<string, unknown>;
-    const emitenteRow = await supabase
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const emitenteRow = await supabaseAdmin
       .from("nfse_emitentes")
       .select("*")
       .eq("id", nota.emitente_id!)
@@ -781,7 +802,7 @@ export const reenviarNfse = createServerFn({ method: "POST" })
     }
 
     if (isNacional && bumpedTo !== (emitente.rps_proximo_numero ?? 1)) {
-      await supabase
+      await supabaseAdmin
         .from("nfse_emitentes")
         .update({ rps_proximo_numero: bumpedTo + 1 })
         .eq("id", emitente.id);

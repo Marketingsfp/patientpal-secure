@@ -217,8 +217,8 @@ export function AddToOrcamentoDialog({
     const baseCartao = Number(procSel.valor_padrao) || 0;
     const baseDinheiro = Number(procSel.valor_dinheiro_pix ?? procSel.valor_padrao) || 0;
     const linhas: LinhaPreco[] = [
-      { chave: "dinpix", rotulo: "Dinheiro / PIX", valorDinheiro: baseDinheiro, valorCartao: baseDinheiro },
-      { chave: "cartao", rotulo: "Cartão (crédito/débito)", valorDinheiro: baseCartao, valorCartao: baseCartao },
+      { chave: "din", rotulo: "Dinheiro", valorDinheiro: baseDinheiro, valorCartao: baseDinheiro },
+      { chave: "cartaopix", rotulo: "Cartão / PIX", valorDinheiro: baseCartao, valorCartao: baseCartao },
     ];
     const tipoNorm = (procSel.tipo ?? "").toLowerCase() || null;
     for (const c of convenios) {
@@ -299,9 +299,11 @@ export function AddToOrcamentoDialog({
         valor_total: valor,
         ordem,
         dentes: [dente],
-        // Grava Dinheiro/PIX e Cartão para o drawer/impressão exibirem totais separados.
+        // Grava Dinheiro, PIX e Cartão. PIX é agrupado com Cartão (regra da clínica),
+        // por isso PIX recebe o mesmo valor do Cartão de Crédito.
         valores_formas: {
           Dinheiro: valor,
+          PIX: valorCartao,
           "Cartão de Crédito": valorCartao,
         },
       });
@@ -402,8 +404,8 @@ export function AddToOrcamentoDialog({
               </div>
               <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1 text-xs">
                 <div className="text-muted-foreground">Forma</div>
-                <div className="text-muted-foreground text-right">Dinheiro/PIX</div>
-                <div className="text-muted-foreground text-right">Cartão</div>
+                <div className="text-muted-foreground text-right">Dinheiro</div>
+                <div className="text-muted-foreground text-right">Cartão/PIX</div>
                 {linhasPreco.map((l) => (
                   <div key={l.chave} className="contents">
                     <div className={l.destaque ? "font-medium text-emerald-700" : ""}>{l.rotulo}</div>

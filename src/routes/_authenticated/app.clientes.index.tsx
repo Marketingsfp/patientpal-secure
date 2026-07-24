@@ -367,15 +367,34 @@ function ClientesPage() {
             variant="outline"
             onClick={async () => {
               if (!clinicaAtual) return;
-              const { data, error } = await supabase
-                .from("pacientes")
-                .select("nome,cpf,telefone,email,data_nascimento,cidade,estado,bairro,logradouro,numero,cep,ativo")
-                .eq("clinica_id", clinicaAtual.clinica_id)
-                .order("nome");
-              if (error) { mostrarErro(error); return; }
-              if (!data?.length) { toast.info("Sem dados para exportar."); return; }
+              const PAGE = 1000;
+              const all: any[] = [];
+              const toastId = toast.loading("Exportando clientes…");
+              try {
+                for (let from = 0; ; from += PAGE) {
+                  const { data, error } = await supabase
+                    .from("pacientes")
+                    .select("nome,cpf,telefone,email,data_nascimento,cidade,estado,bairro,logradouro,numero,cep,ativo,codigo_prontuario,numero_pasta")
+                    .eq("clinica_id", clinicaAtual.clinica_id)
+                    .order("nome")
+                    .range(from, from + PAGE - 1);
+                  if (error) { toast.dismiss(toastId); mostrarErro(error); return; }
+                  const rows = data ?? [];
+                  all.push(...rows);
+                  toast.loading(`Exportando clientes… (${all.length})`, { id: toastId });
+                  if (rows.length < PAGE) break;
+                }
+              } catch (e) {
+                toast.dismiss(toastId);
+                toast.error("Falha ao exportar clientes.");
+                return;
+              }
+              toast.dismiss(toastId);
+              if (!all.length) { toast.info("Sem dados para exportar."); return; }
               exportToExcel(
-                data.map((p: any) => ({
+                all.map((p: any) => ({
+                  prontuario: p.codigo_prontuario ?? "",
+                  pasta: p.numero_pasta ?? "",
                   nome: p.nome,
                   cpf: p.cpf ?? "",
                   telefone: p.telefone ?? "",
@@ -389,6 +408,8 @@ function ClientesPage() {
                 })),
                 `clientes-${new Date().toISOString().slice(0, 10)}`,
                 [
+                  { key: "prontuario", label: "Prontuário" },
+                  { key: "pasta", label: "Nº Serviço" },
                   { key: "nome", label: "Nome" },
                   { key: "cpf", label: "CPF" },
                   { key: "telefone", label: "Telefone" },
@@ -401,6 +422,7 @@ function ClientesPage() {
                   { key: "ativo", label: "Ativo" },
                 ],
               );
+              toast.success(`${all.length} clientes exportados.`);
             }}
           >
             <Download className="h-4 w-4 mr-2" /> Exportar Excel

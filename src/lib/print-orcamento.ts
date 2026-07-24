@@ -49,8 +49,9 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
   const splitFormas = (i: any): { din: number; cart: number } | null => {
     const vf = i.valores_formas as Record<string, number> | null | undefined;
     if (!vf) return null;
-    const din = Math.max(Number(vf["Dinheiro"] ?? 0), Number(vf["PIX"] ?? 0));
+    const din = Number(vf["Dinheiro"] ?? 0);
     const cart = Math.max(
+      Number(vf["PIX"] ?? 0),
       Number(vf["Cartão de Crédito"] ?? 0),
       Number(vf["Cartão de Débito"] ?? 0),
       Number(vf["Cartão"] ?? 0),
@@ -135,7 +136,23 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
           <div>${Number(i.quantidade)} x ${fmtBRL(Number(i.valor_unitario))}</div>
           <div class="bold">${fmtBRL(Number(i.valor_total))}</div>
         </div>
-        ${formasList.length > 1 ? `
+        ${(() => {
+          const sp = splitFormas(i);
+          if (sp) {
+            const qtd = Number(i.quantidade) || 1;
+            return `
+          <div class="sm" style="margin-top:2px; padding-left:4px">
+            <div style="display:flex; justify-content:space-between">
+              <span>DINHEIRO</span>
+              <span>${fmtBRL(qtd * sp.din)}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between">
+              <span>CARTÃO/PIX</span>
+              <span>${fmtBRL(qtd * sp.cart)}</span>
+            </div>
+          </div>`;
+          }
+          return formasList.length > 1 ? `
           <div class="sm" style="margin-top:2px; padding-left:4px">
             ${formasList.map((f: string) => {
               const vu = Number((i.valores_formas as Record<string, number>)?.[f] ?? i.valor_unitario ?? 0);
@@ -146,7 +163,8 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
               </div>`;
             }).join("")}
           </div>
-        ` : ""}
+        ` : "";
+        })()}
       </div>
     `).join("")}
 
@@ -154,8 +172,8 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
     <table>
       ${temSplit
         ? `${desconto > 0 ? `<tr><td>DESCONTO</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
-           <tr class="bold lg"><td>DINHEIRO/PIX</td><td class="right">${fmtBRL(totalDinheiro)}</td></tr>
-           <tr class="bold lg"><td>CARTÃO</td><td class="right">${fmtBRL(totalCartao)}</td></tr>`
+           <tr class="bold lg"><td>DINHEIRO</td><td class="right">${fmtBRL(totalDinheiro)}</td></tr>
+           <tr class="bold lg"><td>CARTÃO/PIX</td><td class="right">${fmtBRL(totalCartao)}</td></tr>`
         : `<tr><td>SUBTOTAL</td><td class="right">${fmtBRL(subtotal)}</td></tr>
            ${desconto > 0 ? `<tr><td>DESCONTO</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
            <tr class="bold lg"><td>TOTAL</td><td class="right">${fmtBRL(total)}</td></tr>`}

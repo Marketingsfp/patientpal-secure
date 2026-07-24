@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { findRegra, computeValor, applyAcrescimoCartao, type CbRegra, type CbAcrescimoCartao } from "@/lib/cb-regras";
+import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
 
 type EspOpt = { id: string; nome: string };
 type ProcOpt = { id: string; nome: string; codigo: string | null; tipo: string | null };
@@ -94,7 +94,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     const [{ data: r, error: e1 }, { data: e, error: e2 }] = await Promise.all([
       (supabase as any)
         .from("cb_convenio_regras")
-        .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,valor_outros,percentual,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito,grupo_gratuidade")
+        .select("id,convenio_id,especialidade_id,procedimento_id,tipo,modo,valor,percentual,valor_cartao,percentual_cartao,prioridade,ativo,limite_qtd,limite_periodo,limite_escopo,excedente_modo,excedente_percentual,excedente_valor,carencia_mensalidades,gratuito,grupo_gratuidade")
         .eq("convenio_id", convenioId)
         .order("prioridade", { ascending: false }),
       supabase.from("especialidades").select("id,nome").eq("ativo", true).order("nome"),
@@ -310,8 +310,13 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         tipo: r.procedimento_id ? null : r.tipo,
         modo: r.modo,
         valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
-        valor_outros: r.modo === "valor_fixo" && r.valor_outros != null ? Number(r.valor_outros) || 0 : null,
         percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
+        valor_cartao: r.modo === "valor_fixo"
+          ? (r.valor_cartao != null ? Number(r.valor_cartao) || 0 : Number(r.valor) || 0)
+          : null,
+        percentual_cartao: r.modo === "percentual_desconto"
+          ? (r.percentual_cartao != null ? Number(r.percentual_cartao) || 0 : Number(r.percentual) || 0)
+          : null,
         prioridade: Number(r.prioridade) || 1,
         ativo: r.ativo !== false,
         limite_qtd: r.limite_qtd != null ? Number(r.limite_qtd) : null,
@@ -337,6 +342,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     setLoading(false);
     toast.success("Regras salvas.");
     await load();
+    // Sincroniza automaticamente o cache procedimento_cb_convenio_valores
+    // para outros consumidores (backup, relatórios). Não bloqueia o toast:
+    // roda em background silencioso — sem confirm() e sem toast final.
+    void reaplicar({ silent: true }).catch(() => {});
   };
 
   /**
@@ -345,11 +354,14 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
    * para consultas N:N, ou via campo grupo) e o tipo, calcula o valor e
    * faz upsert em procedimento_cb_convenio_valores.
    */
-  const reaplicar = async () => {
+  const reaplicar = async (opts?: { silent?: boolean }) => {
+    const silent = !!opts?.silent;
     if (!convenioId) return;
-    if (!confirm(`Reaplicar as regras de "${convenioNome}" a todos os serviços? Valores manuais serão sobrescritos onde houver regra correspondente, e valores calculados por regras antigas (removidas ou alteradas) serão limpos.`)) return;
-    setReapplying(true);
-    setProgress("Carregando serviços…");
+    if (!silent && !confirm(`Reaplicar as regras de "${convenioNome}" a todos os serviços? Valores manuais serão sobrescritos onde houver regra correspondente, e valores calculados por regras antigas (removidas ou alteradas) serão limpos.`)) return;
+    if (!silent) {
+      setReapplying(true);
+      setProgress("Carregando serviços…");
+    }
     try {
       // 1) carrega procedimentos (paginado, db-max-rows = 1000)
       const PAGE = 1000;
@@ -365,21 +377,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         procs.push(...page);
         if (page.length < PAGE) break;
       }
-
-      // 1.5) Carrega acréscimo de cartão do convênio (aplicado sobre valor_outros
-      // quando NÃO for Convênio Funcionário).
-      const { data: convRow } = await (supabase as any)
-        .from("cb_convenios")
-        .select("acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor")
-        .eq("id", convenioId)
-        .maybeSingle();
-      const acr: CbAcrescimoCartao | null = convRow?.acrescimo_cartao_modo
-        ? {
-            modo: convRow.acrescimo_cartao_modo,
-            percentual: Number(convRow.acrescimo_cartao_percentual) || 0,
-            valor: Number(convRow.acrescimo_cartao_valor) || 0,
-          }
-        : null;
 
       // 2) carrega vínculos N:N de especialidades
       const { data: vinc, error: errVinc } = await supabase
@@ -400,7 +397,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       especialidades.forEach(e => espByName.set(norm(e.nome), e.id));
 
       // 4) calcula valores
-      setProgress(`Processando ${procs.length} serviços…`);
+      if (!silent) setProgress(`Processando ${procs.length} serviços…`);
       const upserts: any[] = [];
       for (const p of procs) {
         const baseDin = Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao) || 0;
@@ -419,28 +416,22 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         if (possibleEspIds.length === 0) possibleEspIds.push(null);
         let best: ReturnType<typeof computeValor> = null;
         let bestScore = -1;
-        let bestRegra: CbRegra | null = null;
         for (const eid of possibleEspIds) {
           const r = findRegra(regras, eid, tipo, p.id);
           if (!r) continue;
           const sc = (r.procedimento_id ? 100 : 0) + (r.especialidade_id ? 10 : 0) + (r.tipo ? 5 : 0) + (r.prioridade || 0) * 0.01;
           if (sc > bestScore) {
             const v = computeValor(r, baseDin, baseOut);
-            if (v) { best = v; bestScore = sc; bestRegra = r; }
+            if (v) { best = v; bestScore = sc; }
           }
         }
         if (best) {
-          // Regra com valor_outros explícito já define o preço final do
-          // Pix/cartão — não soma o acréscimo global do convênio por cima
-          // (senão o valor é acrescido duas vezes).
-          const temOutrosExplicito = bestRegra?.modo === "valor_fixo" && bestRegra.valor_outros != null;
-          const outrosComAcr = temOutrosExplicito ? best.outros : applyAcrescimoCartao(best.outros, acr, convenioNome);
           upserts.push({
             clinica_id: clinicaId,
             procedimento_id: p.id,
             convenio_id: convenioId,
             valor_dinheiro: best.dinheiro,
-            valor_outros: outrosComAcr,
+            valor_outros: best.outros,
             origem: "regra",
           });
         }
@@ -450,7 +441,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       // isso, um procedimento que deixou de casar com qualquer regra (regra
       // removida ou alterada) ficava com o preço antigo indefinidamente.
       // Valores digitados manualmente (origem='manual') não são tocados.
-      setProgress("Limpando valores calculados anteriores…");
+      if (!silent) setProgress("Limpando valores calculados anteriores…");
       const { error: errClear } = await (supabase as any)
         .from("procedimento_cb_convenio_valores")
         .delete()
@@ -463,18 +454,21 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       const BATCH = 500;
       for (let i = 0; i < upserts.length; i += BATCH) {
         const slice = upserts.slice(i, i + BATCH);
-        setProgress(`Gravando ${i + slice.length}/${upserts.length}…`);
+        if (!silent) setProgress(`Gravando ${i + slice.length}/${upserts.length}…`);
         const { error } = await (supabase as any)
           .from("procedimento_cb_convenio_valores")
           .upsert(slice, { onConflict: "procedimento_id,convenio_id" });
         if (error) throw error;
       }
-      toast.success(`Regras aplicadas a ${upserts.length} serviços.`);
+      if (!silent) toast.success(`Regras aplicadas a ${upserts.length} serviços.`);
     } catch (err: any) {
-      mostrarErro(err);
+      if (!silent) mostrarErro(err);
+      else console.warn("[reaplicar silent]", err);
     } finally {
-      setReapplying(false);
-      setProgress("");
+      if (!silent) {
+        setReapplying(false);
+        setProgress("");
+      }
     }
   };
 
@@ -547,16 +541,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           <Button variant="ghost" size="sm" onClick={addRegra}>
             <Plus className="h-4 w-4 mr-1" /> Adicionar regra
           </Button>
-          <Button variant="outline" size="sm" onClick={reaplicar} disabled={reapplying || regras.length === 0}>
+          <Button variant="outline" size="sm" onClick={() => reaplicar()} disabled={reapplying || regras.length === 0}>
             <RefreshCw className={`h-4 w-4 mr-1 ${reapplying ? "animate-spin" : ""}`} />
             {reapplying ? (progress || "Aplicando…") : "Reaplicar a todos os serviços"}
           </Button>
         </div>
       </div>
-
-      {convenioId && !isFuncionario && (
-        <AcrescimoCartaoBox convenioId={convenioId} />
-      )}
 
       <div className="flex items-center justify-end">
         <div className="text-xs text-muted-foreground">
@@ -888,106 +878,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   );
 }
 
-// ---------------------------------------------------------------------------
-// Acréscimo por cartão (convênio-level)
-// ---------------------------------------------------------------------------
-function AcrescimoCartaoBox({ convenioId }: { convenioId: string }) {
-  const [modo, setModo] = useState<"" | "percentual" | "valor_fixo">("");
-  const [percentual, setPercentual] = useState<string>("0");
-  const [valor, setValor] = useState<string>("0");
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    let cancel = false;
-    (async () => {
-      setLoading(true);
-      const { data, error } = await (supabase as any)
-        .from("cb_convenios")
-        .select("acrescimo_cartao_modo,acrescimo_cartao_percentual,acrescimo_cartao_valor")
-        .eq("id", convenioId)
-        .maybeSingle();
-      setLoading(false);
-      if (cancel) return;
-      if (error) { mostrarErro(error); return; }
-      setModo((data?.acrescimo_cartao_modo as any) ?? "");
-      setPercentual(String(data?.acrescimo_cartao_percentual ?? 0));
-      setValor(String(data?.acrescimo_cartao_valor ?? 0));
-    })();
-    return () => { cancel = true; };
-  }, [convenioId]);
-
-  const salvar = async () => {
-    setSaving(true);
-    const payload = {
-      acrescimo_cartao_modo: modo || null,
-      acrescimo_cartao_percentual: modo === "percentual" ? Number(percentual) || 0 : 0,
-      acrescimo_cartao_valor: modo === "valor_fixo" ? Number(valor) || 0 : 0,
-    };
-    const { error } = await (supabase as any)
-      .from("cb_convenios")
-      .update(payload)
-      .eq("id", convenioId);
-    setSaving(false);
-    if (error) { mostrarErro(error); return; }
-    toast.success("Acréscimo de cartão salvo.");
-  };
-
-  return (
-    <div className="rounded-md border bg-muted/30 p-4 space-y-3">
-      <div>
-        <div className="font-medium">Valor de cartão com acréscimo de</div>
-        <p className="text-xs text-muted-foreground">
-          Quando o paciente usa o benefício e paga em uma forma diferente de dinheiro
-          (PIX, débito ou crédito), o valor recebe este acréscimo automaticamente.
-          Não se aplica ao Convênio Funcionário.
-        </p>
-      </div>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1">
-          <Label className="text-xs">Tipo</Label>
-          <Select value={modo || "none"} onValueChange={(v) => setModo(v === "none" ? "" : (v as any))}>
-            <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Sem acréscimo</SelectItem>
-              <SelectItem value="percentual">Percentual (%)</SelectItem>
-              <SelectItem value="valor_fixo">Valor fixo (R$)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {modo === "percentual" && (
-          <div className="space-y-1">
-            <Label className="text-xs">Percentual</Label>
-            <div className="flex items-center gap-1">
-              <Input
-                type="number" min="0" step="0.01" className="w-[110px] h-9"
-                value={percentual}
-                onChange={(e) => setPercentual(e.target.value)}
-                disabled={loading}
-              />
-              <span className="text-sm text-muted-foreground">%</span>
-            </div>
-          </div>
-        )}
-        {modo === "valor_fixo" && (
-          <div className="space-y-1">
-            <Label className="text-xs">Valor</Label>
-            <CurrencyInput
-              value={valor}
-              onChange={(v) => setValor(v)}
-              className="w-[140px] h-9"
-              disabled={loading}
-            />
-          </div>
-        )}
-        <Button size="sm" onClick={salvar} disabled={saving || loading}>
-          {saving ? "Salvando…" : "Salvar acréscimo"}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function LimiteDialog({
   idx, regras, onClose, onChange, onSave, saving,
 }: {
@@ -1146,8 +1036,9 @@ function NovaRegraDialog({
     tipo: null,
     modo: "valor_fixo",
     valor: 0,
-    valor_outros: null,
     percentual: null,
+    valor_cartao: 0,
+    percentual_cartao: null,
     prioridade: 10,
     ativo: true,
     limite_qtd: null,
@@ -1171,6 +1062,62 @@ function NovaRegraDialog({
 
   const upd = (patch: Partial<CbRegra>) => setR(prev => ({ ...prev, ...patch }));
 
+  // Regra "base" por especialidade deste convênio para o procedimento selecionado.
+  // Serve para avisar o operador (e pré-preencher) que ao salvar uma regra por
+  // procedimento, ele está sobrescrevendo o preço cartão/PIX do convênio.
+  const [regraBase, setRegraBase] = useState<{
+    valor: number | null;
+    valor_cartao: number | null;
+    especialidade_nome: string;
+  } | null>(null);
+  const [valorCartaoTocado, setValorCartaoTocado] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!r.procedimento_id) { setRegraBase(null); return; }
+    let cancel = false;
+    (async () => {
+      // especialidades do procedimento
+      const { data: pes } = await (supabase as any)
+        .from("procedimento_especialidades")
+        .select("especialidade_id, especialidades(nome)")
+        .eq("procedimento_id", r.procedimento_id);
+      const espIds = (pes ?? []).map((x: any) => x.especialidade_id);
+      if (!espIds.length) { if (!cancel) setRegraBase(null); return; }
+      const { data: regras } = await (supabase as any)
+        .from("cb_convenio_regras")
+        .select("valor, valor_cartao, especialidade_id, prioridade")
+        .eq("convenio_id", convenioId)
+        .in("especialidade_id", espIds)
+        .is("procedimento_id", null)
+        .eq("modo", "valor_fixo")
+        .eq("ativo", true)
+        .eq("gratuito", false)
+        .order("prioridade", { ascending: false });
+      const escolhida = (regras ?? []).find(
+        (x: any) => x.valor_cartao != null && Number(x.valor_cartao) > 0
+      ) ?? (regras ?? [])[0];
+      if (!escolhida) { if (!cancel) setRegraBase(null); return; }
+      const espNome =
+        (pes ?? []).find((x: any) => x.especialidade_id === escolhida.especialidade_id)
+          ?.especialidades?.nome ?? "especialidade";
+      if (cancel) return;
+      setRegraBase({
+        valor: escolhida.valor != null ? Number(escolhida.valor) : null,
+        valor_cartao: escolhida.valor_cartao != null ? Number(escolhida.valor_cartao) : null,
+        especialidade_nome: espNome,
+      });
+      // Pré-preenche valor_cartao se estiver vazio/zerado e o usuário ainda não digitou
+      if (!isEdit && !valorCartaoTocado && (r.valor_cartao == null || Number(r.valor_cartao) === 0)) {
+        if (escolhida.valor_cartao != null && Number(escolhida.valor_cartao) > 0) {
+          setR(prev => ({ ...prev, valor_cartao: Number(escolhida.valor_cartao) }));
+        }
+      }
+    })();
+    return () => { cancel = true; };
+    /* eslint-disable-next-line */
+  }, [open, r.procedimento_id, convenioId]);
+
   const procOptsFiltrados = useMemo(() => {
     if (!r.tipo) return procOpts;
     const t = r.tipo.toLowerCase();
@@ -1191,6 +1138,32 @@ function NovaRegraDialog({
   })();
 
   const salvarNovo = async () => {
+    // Guarda: se o operador está criando/editando uma regra por procedimento e
+    // deixou o valor cartão/PIX igual ao dinheiro (ou zero) enquanto existe uma
+    // regra por especialidade do convênio com valor cartão diferente, confirma
+    // antes de sobrescrever silenciosamente o benefício do cartão.
+    if (
+      r.modo === "valor_fixo" &&
+      r.procedimento_id &&
+      !r.gratuito &&
+      regraBase &&
+      regraBase.valor_cartao != null &&
+      regraBase.valor_cartao > 0
+    ) {
+      const vc = r.valor_cartao != null ? Number(r.valor_cartao) : 0;
+      const vd = Number(r.valor) || 0;
+      const cartaoDivergente = Math.abs(vc - regraBase.valor_cartao) > 0.009;
+      const cartaoIgualDinheiro = Math.abs(vc - vd) < 0.009;
+      if (cartaoDivergente && (cartaoIgualDinheiro || vc === 0)) {
+        const ok = window.confirm(
+          `Atenção: a regra por especialidade (${regraBase.especialidade_nome}) deste convênio ` +
+          `usa R$ ${regraBase.valor_cartao.toFixed(2)} no cartão/PIX. ` +
+          `Você está salvando este serviço com R$ ${vc.toFixed(2)} no cartão/PIX, ` +
+          `o que substitui o preço do convênio.\n\nDeseja continuar mesmo assim?`
+        );
+        if (!ok) return;
+      }
+    }
     setSaving(true);
     const payload: any = {
       clinica_id: clinicaId,
@@ -1200,8 +1173,13 @@ function NovaRegraDialog({
       tipo: r.procedimento_id ? null : r.tipo,
       modo: r.modo,
       valor: r.modo === "valor_fixo" ? Number(r.valor) || 0 : null,
-      valor_outros: r.modo === "valor_fixo" && r.valor_outros != null ? Number(r.valor_outros) || 0 : null,
       percentual: r.modo === "percentual_desconto" ? Number(r.percentual) || 0 : null,
+      valor_cartao: r.modo === "valor_fixo"
+        ? (r.valor_cartao != null ? Number(r.valor_cartao) || 0 : Number(r.valor) || 0)
+        : null,
+      percentual_cartao: r.modo === "percentual_desconto"
+        ? (r.percentual_cartao != null ? Number(r.percentual_cartao) || 0 : Number(r.percentual) || 0)
+        : null,
       prioridade: Number(r.prioridade) || 1,
       ativo: r.ativo !== false,
       limite_qtd: hasLimit ? Number(r.limite_qtd) : null,
@@ -1291,7 +1269,7 @@ function NovaRegraDialog({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t pt-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t pt-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Modo</Label>
               <Select value={r.modo} onValueChange={(v) => upd({ modo: v })}>
@@ -1303,7 +1281,20 @@ function NovaRegraDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">{r.modo === "valor_fixo" ? "Valor em dinheiro (R$)" : "Percentual (%)"}</Label>
+              <Label className="text-xs">Prioridade</Label>
+              <Input
+                type="number" min="1" max="100"
+                value={r.prioridade}
+                onChange={(e) => upd({ prioridade: parseInt(e.target.value) || 1 })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">
+                {r.modo === "valor_fixo" ? "Valor dinheiro (R$)" : "% desconto dinheiro"}
+              </Label>
               {r.modo === "valor_fixo" ? (
                 <CurrencyInput
                   value={r.valor !== null ? Number(r.valor).toFixed(2) : ""}
@@ -1318,31 +1309,36 @@ function NovaRegraDialog({
               )}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Prioridade</Label>
-              <Input
-                type="number" min="1" max="100"
-                value={r.prioridade}
-                onChange={(e) => upd({ prioridade: parseInt(e.target.value) || 1 })}
-              />
+              <Label className="text-xs">
+                {r.modo === "valor_fixo" ? "Valor cartão/PIX (R$)" : "% desconto cartão/PIX"}
+              </Label>
+              {r.modo === "valor_fixo" ? (
+                <CurrencyInput
+                  value={r.valor_cartao != null ? Number(r.valor_cartao).toFixed(2) : ""}
+                  onChange={(v) => { setValorCartaoTocado(true); upd({ valor_cartao: v ? parseFloat(v) : 0 }); }}
+                />
+              ) : (
+                <Input
+                  type="number" min="0" max="100" step="0.01"
+                  value={r.percentual_cartao ?? ""}
+                  onChange={(e) => upd({ percentual_cartao: e.target.value ? parseFloat(e.target.value) : 0 })}
+                />
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Usado quando o pagamento é em PIX, débito ou crédito.
+              </p>
+              {r.procedimento_id && regraBase && r.modo === "valor_fixo" && (
+                <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                  Regra do convênio para <b>{regraBase.especialidade_nome}</b>:{" "}
+                  R$ {(regraBase.valor ?? 0).toFixed(2)} dinheiro
+                  {regraBase.valor_cartao != null && (
+                    <> / R$ {regraBase.valor_cartao.toFixed(2)} cartão·PIX</>
+                  )}
+                  . Esta regra por serviço <b>substitui</b> esses valores.
+                </p>
+              )}
             </div>
           </div>
-
-          {r.modo === "valor_fixo" && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Valor no Pix/cartão (opcional)</Label>
-              <CurrencyInput
-                value={r.valor_outros != null ? Number(r.valor_outros).toFixed(2) : ""}
-                onChange={(v) => upd({ valor_outros: v ? parseFloat(v) : null })}
-                placeholder={r.valor !== null ? Number(r.valor).toFixed(2) : "0,00"}
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Deixe em branco para cobrar o mesmo valor do dinheiro (
-                {r.valor !== null ? `R$ ${Number(r.valor).toFixed(2)}` : "R$ 0,00"}
-                {" "}+ acréscimo de cartão do convênio, se houver). Preencha quando o valor no Pix/cartão for diferente,
-                ex.: R$ 60,00 dinheiro / R$ 72,00 Pix/cartão.
-              </p>
-            </div>
-          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -1367,7 +1363,7 @@ function NovaRegraDialog({
                   onCheckedChange={(v) => {
                     const on = v === true;
                     upd(on
-                      ? { gratuito: true, modo: "valor_fixo", valor: 0, percentual: null }
+                      ? { gratuito: true, modo: "valor_fixo", valor: 0, percentual: null, valor_cartao: 0, percentual_cartao: null }
                       : { gratuito: false });
                   }}
                 />

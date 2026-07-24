@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FaceCaptureDialog } from "@/components/face/FaceCaptureDialog";
 import { descriptorDaFoto, registrarBiometriaPaciente } from "@/lib/biometria";
+import { useClinica } from "@/hooks/use-clinica";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 export interface Paciente {
@@ -23,6 +24,7 @@ export interface Paciente {
   nome: string;
   cpf: string | null;
   numero_pasta: string | null;
+  codigo_prontuario?: string | null;
   telefone: string | null;
   telefone2: string | null;
   email: string | null;
@@ -44,7 +46,8 @@ export interface Paciente {
 }
 
 type FormState = {
-  nome: string; cpf: string; numero_pasta: string; telefone: string; telefone2: string; email: string;
+  nome: string; cpf: string; numero_pasta: string; codigo_prontuario: string;
+  telefone: string; telefone2: string; email: string;
   data_nascimento: string; sexo: string; ativo: boolean;
   cep: string; logradouro: string; numero: string; complemento: string;
   bairro: string; cidade: string; estado: string;
@@ -53,7 +56,8 @@ type FormState = {
 };
 
 const EMPTY: FormState = {
-  nome: "", cpf: "", numero_pasta: "", telefone: "", telefone2: "", email: "",
+  nome: "", cpf: "", numero_pasta: "", codigo_prontuario: "",
+  telefone: "", telefone2: "", email: "",
   data_nascimento: "", sexo: "nao_informar", ativo: true,
   cep: "", logradouro: "", numero: "", complemento: "",
   bairro: "", cidade: "", estado: "",
@@ -130,6 +134,8 @@ interface ClienteFormProps {
 
 export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFooter, readOnly = false }: ClienteFormProps) {
   const editing = paciente;
+  const { clinicaAtual } = useClinica();
+  const isAdmin = clinicaAtual?.role === "admin";
   const [form, setForm] = useState<FormState>(EMPTY);
   const [tab, setTab] = useState("dados");
   const [saving, setSaving] = useState(false);
@@ -238,6 +244,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     setForm({
       nome: editing.nome,
       cpf: editing.cpf ?? "", numero_pasta: editing.numero_pasta ?? "",
+      codigo_prontuario: (editing as any).codigo_prontuario ?? "",
       telefone: editing.telefone ?? "", telefone2: editing.telefone2 ?? "",
       email: editing.email ?? "",
       data_nascimento: editing.data_nascimento ?? "",
@@ -746,7 +753,6 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     const payload = {
       nome: form.nome.trim(),
       cpf: form.cpf.trim() ? somenteDigitos(form.cpf) : null,
-      numero_pasta: form.numero_pasta.trim() || null,
       telefone: form.telefone.trim() || null,
       telefone2: form.telefone2.trim() || null,
       email: form.email.trim() || null,
@@ -767,14 +773,19 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
       responsavel_telefone: form.responsavel_telefone.trim() || null,
       responsavel_parentesco: form.responsavel_parentesco.trim() || null,
       clinica_id: clinicaId,
-    };
+    } as Record<string, unknown>;
+    // Número de prontuário / pasta: só admin pode alterar.
+    if (isAdmin) {
+      payload.numero_pasta = form.numero_pasta.trim() || null;
+      payload.codigo_prontuario = form.codigo_prontuario.trim() || null;
+    }
     let pacienteId: string | undefined = editing?.id;
     if (editing) {
-      const { error } = await supabase.from("pacientes").update(payload).eq("id", editing.id);
+      const { error } = await supabase.from("pacientes").update(payload as any).eq("id", editing.id);
       if (error) { setSaving(false); mostrarErro(error); return; }
     } else {
       const { data: novo, error } = await supabase
-        .from("pacientes").insert(payload).select("id").single();
+        .from("pacientes").insert(payload as any).select("id").single();
       if (error) { setSaving(false); mostrarErro(error); return; }
       pacienteId = novo?.id;
     }
@@ -880,7 +891,34 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
               </div>
             </div>
             <div className="space-y-1"><Label>Nome *</Label><InputVoz {...fieldProps("nome")} required maxLength={120} /></div>
-            <div className="space-y-1"><Label>Número de serviço</Label><InputVoz {...fieldProps("numero_pasta")} placeholder="Ex.: 1234" /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>
+                  Número de prontuário
+                  {!isAdmin && <span className="ml-2 text-xs text-muted-foreground">(somente admin)</span>}
+                </Label>
+                <Input
+                  value={form.codigo_prontuario}
+                  onChange={(e) => setForm(f => ({ ...f, codigo_prontuario: e.target.value }))}
+                  placeholder="Ex.: 000123"
+                  disabled={!isAdmin}
+                  readOnly={!isAdmin}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>
+                  Número de serviço / pasta
+                  {!isAdmin && <span className="ml-2 text-xs text-muted-foreground">(somente admin)</span>}
+                </Label>
+                <Input
+                  value={form.numero_pasta}
+                  onChange={(e) => setForm(f => ({ ...f, numero_pasta: e.target.value }))}
+                  placeholder="Ex.: 1234"
+                  disabled={!isAdmin}
+                  readOnly={!isAdmin}
+                />
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label>CPF</Label><InputVoz {...fieldProps("cpf")} /></div>
               <div className="space-y-1"><Label>Telefone *</Label><InputVoz {...fieldProps("telefone")} /></div>

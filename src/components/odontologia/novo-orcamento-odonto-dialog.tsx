@@ -155,11 +155,14 @@ export function NovoOrcamentoOdontoDialog({
         if (!p) continue;
         const valores: Record<string, number> = {};
         for (const f of formas) valores[f] = valorPorForma(p, f);
-        // Grava SEMPRE Dinheiro e Cartão de Crédito baseados na tabela do procedimento,
+        // Grava SEMPRE Dinheiro, PIX e Cartão de Crédito baseados na tabela do procedimento,
         // independente das formas escolhidas no cabeçalho — assim o drawer e a impressão
-        // conseguem exibir os totais separados de Dinheiro/PIX vs Cartão.
+        // conseguem exibir os totais separados de Dinheiro vs Cartão/PIX
+        // (PIX é agrupado junto com Cartão).
         if (valores["Dinheiro"] == null) valores["Dinheiro"] = valorPorForma(p, "Dinheiro");
         if (valores["Cartão de Crédito"] == null) valores["Cartão de Crédito"] = valorPorForma(p, "Cartão de Crédito");
+        // PIX passa a valer o mesmo que Cartão (regra da clínica).
+        valores["PIX"] = valores["Cartão de Crédito"];
         novos.push({
           descricao: p.nome,
           quantidade: 1,
@@ -424,8 +427,13 @@ export function NovoOrcamentoOdontoDialog({
               </div>
               <div className="divide-y">
                 {itens.map((it, idx) => {
-                  const valDin = Number(it.valores_formas?.["Dinheiro"] ?? it.valores_formas?.["PIX"] ?? it.valor_unitario ?? 0);
-                  const valCart = Number(it.valores_formas?.["Cartão de Crédito"] ?? it.valores_formas?.["Cartão de Débito"] ?? it.valor_unitario ?? 0);
+                  const valDin = Number(it.valores_formas?.["Dinheiro"] ?? it.valor_unitario ?? 0);
+                  const valCart = Number(
+                    it.valores_formas?.["Cartão de Crédito"] ??
+                    it.valores_formas?.["Cartão de Débito"] ??
+                    it.valores_formas?.["PIX"] ??
+                    it.valor_unitario ?? 0,
+                  );
                   const sub = Number(it.quantidade || 0) * Number(it.valor_unitario || 0);
                   return (
                     <div key={idx} className="p-3 space-y-2">
@@ -467,11 +475,11 @@ export function NovoOrcamentoOdontoDialog({
                             ) : (
                               <>
                                 <div className="space-y-0.5">
-                                  <div className="text-[10px] text-muted-foreground">Dinheiro/PIX</div>
+                                  <div className="text-[10px] text-muted-foreground">Dinheiro</div>
                                   <div className="text-sm tabular-nums">R$ {valDin.toFixed(2)}</div>
                                 </div>
                                 <div className="space-y-0.5">
-                                  <div className="text-[10px] text-muted-foreground">Cartão</div>
+                                  <div className="text-[10px] text-muted-foreground">Cartão/PIX</div>
                                   <div className="text-sm tabular-nums">R$ {valCart.toFixed(2)}</div>
                                 </div>
                               </>

@@ -2004,12 +2004,13 @@ export type Database = {
           modo: string
           nome_padrao: string | null
           percentual: number | null
+          percentual_cartao: number | null
           prioridade: number
           procedimento_id: string | null
           tipo: string | null
           updated_at: string
           valor: number | null
-          valor_outros: number | null
+          valor_cartao: number | null
         }
         Insert: {
           ativo?: boolean
@@ -2030,12 +2031,13 @@ export type Database = {
           modo: string
           nome_padrao?: string | null
           percentual?: number | null
+          percentual_cartao?: number | null
           prioridade?: number
           procedimento_id?: string | null
           tipo?: string | null
           updated_at?: string
           valor?: number | null
-          valor_outros?: number | null
+          valor_cartao?: number | null
         }
         Update: {
           ativo?: boolean
@@ -2056,12 +2058,13 @@ export type Database = {
           modo?: string
           nome_padrao?: string | null
           percentual?: number | null
+          percentual_cartao?: number | null
           prioridade?: number
           procedimento_id?: string | null
           tipo?: string | null
           updated_at?: string
           valor?: number | null
-          valor_outros?: number | null
+          valor_cartao?: number | null
         }
         Relationships: [
           {
@@ -3115,6 +3118,7 @@ export type Database = {
       estorno_solicitacoes: {
         Row: {
           agendamento_id: string | null
+          caixa_movimento_id: string | null
           clinica_id: string
           created_at: string
           data_estorno: string | null
@@ -3136,6 +3140,7 @@ export type Database = {
         }
         Insert: {
           agendamento_id?: string | null
+          caixa_movimento_id?: string | null
           clinica_id: string
           created_at?: string
           data_estorno?: string | null
@@ -3157,6 +3162,7 @@ export type Database = {
         }
         Update: {
           agendamento_id?: string | null
+          caixa_movimento_id?: string | null
           clinica_id?: string
           created_at?: string
           data_estorno?: string | null
@@ -5802,6 +5808,7 @@ export type Database = {
           orcamento_id: string | null
           paciente_id: string | null
           pagamento_id: string | null
+          pagamento_ids: string[]
           payload_envio: Json | null
           payload_resposta: Json | null
           rps_numero: number | null
@@ -5841,6 +5848,7 @@ export type Database = {
           orcamento_id?: string | null
           paciente_id?: string | null
           pagamento_id?: string | null
+          pagamento_ids?: string[]
           payload_envio?: Json | null
           payload_resposta?: Json | null
           rps_numero?: number | null
@@ -5880,6 +5888,7 @@ export type Database = {
           orcamento_id?: string | null
           paciente_id?: string | null
           pagamento_id?: string | null
+          pagamento_ids?: string[]
           payload_envio?: Json | null
           payload_resposta?: Json | null
           rps_numero?: number | null
@@ -5924,13 +5933,6 @@ export type Database = {
             columns: ["orcamento_id"]
             isOneToOne: false
             referencedRelation: "orcamentos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "nfse_pagamento_id_fkey"
-            columns: ["pagamento_id"]
-            isOneToOne: false
-            referencedRelation: "pagamentos"
             referencedColumns: ["id"]
           },
         ]
@@ -8770,6 +8772,10 @@ export type Database = {
       }
       estornar_lancamento_receita: {
         Args: { _clinica_id: string; _lancamento_id: string }
+        Returns: Json
+      }
+      estornar_sangria: {
+        Args: { _clinica_id?: string; _movimento_id: string }
         Returns: Json
       }
       feature_flag_ativa: {

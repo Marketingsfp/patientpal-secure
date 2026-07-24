@@ -42,6 +42,7 @@ const MOTIVOS_CANCELAMENTO: ReadonlyArray<{ value: string; label: string; pedeOb
   { value: "sem_condicoes", label: "Sem condições financeiras", pedeObs: false },
   { value: "nao_usa", label: "Não usa o convênio", pedeObs: false },
   { value: "insatisfacao", label: "Insatisfação com o convênio", pedeObs: true },
+  { value: "duplicidade_bd", label: "Duplicidade - Banco de dados", pedeObs: true },
   { value: "outros", label: "Outros", pedeObs: true },
 ];
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -72,10 +73,10 @@ import { estornarLancamentoReceita } from "@/lib/estornar-lancamento";
 import { incluirDependenteContrato } from "@/lib/contrato-dependentes";
 import DOMPurify from "dompurify";
 import { ChevronsUpDown } from "lucide-react";
-import { printContrato } from "@/lib/print-contrato";
+import { printContrato, CONVENIO_TEMPLATE_OVERRIDES } from "@/lib/print-contrato";
 import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
-import { printGuiaMensalidade, printGuiaMensalidadeComTaxa } from "@/lib/print-gr";
+import { printGuiaMensalidade, printGuiaMensalidadeComTaxa, reimprimirGuiaMensalidade } from "@/lib/print-gr";
 import { gerarCarnePDF } from "@/lib/print-carne";
 import { gerarBoletosContrato } from "@/lib/boleto.functions";
 import { useServerFn } from "@tanstack/react-start";
@@ -101,6 +102,22 @@ const fmtDcurto = (s?: string | null) => {
   const d = new Date(s + (s.length === 10 ? "T00:00:00" : ""));
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${String(d.getFullYear()).slice(-2)}`;
+};
+const fmtCPFDisplay = (s?: string | null) => {
+  const d = (s ?? "").replace(/\D/g, "");
+  if (d.length !== 11) return s || "—";
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+};
+const fmtCEPDisplay = (s?: string | null) => {
+  const d = (s ?? "").replace(/\D/g, "");
+  if (d.length !== 8) return s || "—";
+  return `${d.slice(0, 5)}-${d.slice(5)}`;
+};
+const fmtTelDisplay = (s?: string | null) => {
+  const d = (s ?? "").replace(/\D/g, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return s || "—";
 };
 const MESES_PT = [
   "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
@@ -225,6 +242,8 @@ type Dep = {
   tipo: string;
   cpf?: string | null;
   codigo_prontuario?: string | null;
+  data_nascimento?: string | null;
+  telefone?: string | null;
   incluido_em: string | null;
   excluido_em: string | null;
   ativo: boolean;
@@ -2113,6 +2132,7 @@ function DetalheContrato({
   const [emitenteId, setEmitenteId] = useState<string>("");
   const [nfsePorLancamento, setNfsePorLancamento] = useState<Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }>>({});
   const [nfseEmitindoId, setNfseEmitindoId] = useState<string | null>(null);
+  const [nfseEmitindoLote, setNfseEmitindoLote] = useState(false);
 
   // Inclusão/exclusão de dependentes pós-venda
   const [incOpen, setIncOpen] = useState(false);
@@ -2805,13 +2825,17 @@ function DetalheContrato({
     const pids = Array.from(new Set(rows.map((r) => r.paciente_id).filter(Boolean)));
     let cpfMap: Record<string, string | null> = {};
     let prontMap: Record<string, string | null> = {};
+    let nascMap: Record<string, string | null> = {};
+    let telMap: Record<string, string | null> = {};
     if (pids.length) {
       const { data: pacs } = await supabase
         .from("pacientes")
-        .select("id, cpf, codigo_prontuario")
+        .select("id, cpf, codigo_prontuario, data_nascimento, telefone")
         .in("id", pids);
       cpfMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.cpf]));
       prontMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.codigo_prontuario]));
+      nascMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.data_nascimento]));
+      telMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.telefone]));
     }
     const depsRows = rows.map((r) => ({
       id: r.id,
@@ -2821,6 +2845,8 @@ function DetalheContrato({
       tipo: r.tipo,
       cpf: cpfMap[r.paciente_id] ?? null,
       codigo_prontuario: prontMap[r.paciente_id] ?? null,
+      data_nascimento: nascMap[r.paciente_id] ?? null,
+      telefone: telMap[r.paciente_id] ?? null,
       incluido_em: r.incluido_em ?? null,
       excluido_em: r.excluido_em ?? null,
       ativo: !!r.ativo,
@@ -2947,15 +2973,22 @@ function DetalheContrato({
     let cancel = false;
     void supabase
       .from("nfse")
-      .select("id, numero, status, url_pdf, pagamento_id")
+      .select("id, numero, status, url_pdf, pagamento_id, pagamento_ids")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .in("pagamento_id", ids)
+      .overlaps("pagamento_ids", ids)
       .neq("status", "cancelada")
       .then(({ data }) => {
         if (cancel) return;
         const map: Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }> = {};
-        for (const r of (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string }>) {
-          map[r.pagamento_id] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
+        for (const r of (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string | null; pagamento_ids: string[] | null }>) {
+          const linkedIds = (r.pagamento_ids && r.pagamento_ids.length > 0)
+            ? r.pagamento_ids
+            : (r.pagamento_id ? [r.pagamento_id] : []);
+          for (const pid of linkedIds) {
+            if (ids.includes(pid)) {
+              map[pid] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
+            }
+          }
         }
         setNfsePorLancamento(map);
       });
@@ -3134,6 +3167,86 @@ function DetalheContrato({
     setFormaPagOpen(true);
   };
 
+  // Reimprime a 2ª via da GR de uma mensalidade paga (com lançamento real
+  // no caixa). Só habilita quando existe lancamento_id — parcelas marcadas
+  // como "Paga (histórica)" não geram GR porque não houve pagamento real.
+  // A GR sai idêntica à 1ª via (mesmo usuário original), acrescentando ao
+  // final o nome de quem está reimprimindo.
+  const [reimprimindoId, setReimprimindoId] = useState<string | null>(null);
+  const reimprimirGrMensalidade = async (m: Mens) => {
+    if (!clinicaAtual) return;
+    if (m.status !== "pago") {
+      toast.error("Só é possível reimprimir GR de parcelas pagas.");
+      return;
+    }
+    if (!m.lancamento_id) {
+      toast.error("Esta parcela foi marcada como paga (histórica) — não há pagamento real, não há GR a reimprimir.");
+      return;
+    }
+    setReimprimindoId(m.id);
+    try {
+      const { data: lanc, error } = await supabase
+        .from("fin_lancamentos")
+        .select("valor, forma_pagamento, parcelas, bandeira_cartao, observacoes")
+        .eq("id", m.lancamento_id)
+        .maybeSingle();
+      if (error || !lanc) throw new Error(error?.message ?? "Lançamento não encontrado.");
+      const l = lanc as { valor: number | string; forma_pagamento: string | null; parcelas: number | null; bandeira_cartao: string | null; observacoes: string | null };
+
+      // Reconstrói o detalhe do misto a partir das observações (mesma
+      // convenção usada em print-gr.ts para reimpressões de atendimento).
+      let detalhe: Array<{ forma: string; pago: number; troco: number; recebido: number }> | undefined;
+      if (l.forma_pagamento === "misto" && l.observacoes) {
+        const idx = l.observacoes.indexOf("Pagamento misto:");
+        if (idx >= 0) {
+          const trecho = l.observacoes.slice(idx + "Pagamento misto:".length).split(" | ")[0];
+          const LABEL_TO_KEY: Array<[RegExp, string]> = [
+            [/^cart[ãa]o\s*cr[ée]dito/i, "cartao_credito"],
+            [/^cart[ãa]o\s*d[ée]bito/i, "cartao_debito"],
+            [/^cr[ée]dito/i, "cartao_credito"],
+            [/^d[ée]bito/i, "cartao_debito"],
+            [/^dinheiro/i, "dinheiro"],
+            [/^pix/i, "pix"],
+            [/^boleto/i, "boleto"],
+            [/^conv[êe]nio/i, "convenio"],
+            [/^transfer[êe]ncia/i, "transferencia"],
+          ];
+          const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
+          const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
+          const acc: Array<{ forma: string; pago: number; troco: number; recebido: number }> = [];
+          for (const p of partes) {
+            const match = LABEL_TO_KEY.find(([re]) => re.test(p));
+            if (!match) continue;
+            const valMatch = p.match(/R\$\s*([\d.]+,\d{2})/);
+            if (!valMatch) continue;
+            acc.push({ forma: match[1], pago: parseBRL(valMatch[1]), troco: 0, recebido: 0 });
+          }
+          if (acc.length > 0) detalhe = acc;
+        }
+      }
+
+      const reimpressoPorNome = user?.user_metadata?.nome ?? user?.email ?? "Usuário";
+      await reimprimirGuiaMensalidade({
+        mensalidadeId: m.id,
+        clinicaId: clinicaAtual.clinica_id,
+        reimpressoPorNome,
+        reimpressoPorId: user?.id ?? null,
+        pagamento: {
+          valor: Number(m.valor_pago ?? l.valor ?? m.valor),
+          forma_pagamento: l.forma_pagamento,
+          parcelas: l.parcelas,
+          bandeira_cartao: l.bandeira_cartao,
+          detalhe,
+        },
+      });
+      toast.success("2ª via da GR enviada para impressão.");
+    } catch (err) {
+      mostrarErro(err);
+    } finally {
+      setReimprimindoId(null);
+    }
+  };
+
   // Emite NFS-e a partir de uma parcela paga (mensalidade ou taxa de adesão).
   // Reutiliza o mesmo picker/prompt do módulo Financeiro › Atendimentos,
   // com bloqueio de endereço e escolha de percentual do valor.
@@ -3176,7 +3289,7 @@ function DetalheContrato({
         ? `Taxa de adesão${convNome} — Contrato #${contrato.numero} — ${nomePac}`
         : `Mensalidade ${m.numero_parcela}/${mensalidades.length}${convNome} — Contrato #${contrato.numero} — ${nomePac}`;
       const descComDep = tomador.dependenteAtendido
-        ? `${rotulo} — Atendido: ${tomador.dependenteAtendido}`
+        ? `${rotulo} — Dependente do pagador: ${tomador.dependenteAtendido}`
         : rotulo;
       const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
       const descFinal = await pedirDescricaoNfse(descSugerida);
@@ -3218,6 +3331,122 @@ function DetalheContrato({
       mostrarErro(e);
     } finally {
       setNfseEmitindoId(null);
+    }
+  };
+
+  // Competência textual para a descrição agrupada.
+  const mesExtenso = (iso: string) => {
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  };
+
+  // Emite UMA NFS-e para várias parcelas pagas (mensalidades/taxas) do mesmo
+  // contrato/paciente. Soma valores, monta descrição consolidada e vincula
+  // todos os lançamentos via nfse.pagamento_ids.
+  const emitirNfseAgrupada = async (parcelas: Mens[]) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!clinicaAtual) return;
+    if (parcelas.length < 2) { toast.error("Selecione ao menos 2 parcelas pagas."); return; }
+    if (!emitentes.length || !emitenteId) {
+      toast.error("Cadastre um emitente ativo em Configurações › NFS-e antes de emitir.");
+      return;
+    }
+    // Validações: todas pagas, com lancamento_id, sem NFS-e ativa.
+    const invalida = parcelas.find((m) => m.status !== "pago" || !m.lancamento_id);
+    if (invalida) { toast.error("Selecione apenas parcelas pagas com lançamento financeiro."); return; }
+    const jaEmitida = parcelas.find((m) => m.lancamento_id && nfsePorLancamento[m.lancamento_id]);
+    if (jaEmitida) { toast.error("Uma ou mais parcelas selecionadas já têm NFS-e ativa. Cancele-as antes de reemitir."); return; }
+    const pac = pacienteFull ?? {};
+    const nomePac = contrato.paciente_nome ?? "";
+    if (!nomePac) { toast.error("Contrato sem paciente vinculado."); return; }
+    const valorTotal = parcelas.reduce(
+      (s, m) => s + (Number(m.valor_pago ?? m.valor) || 0),
+      0,
+    );
+    if (valorTotal <= 0) { toast.error("Valor total é zero."); return; }
+    setNfseEmitindoLote(true);
+    try {
+      const tomador = await pickTomadorNfse({
+        paciente: {
+          nome: nomePac,
+          cpfCnpj: pac.cpf ?? undefined,
+          email: pac.email ?? undefined,
+          cep: pac.cep ?? undefined,
+          logradouro: pac.logradouro ?? undefined,
+          numero: pac.numero ?? undefined,
+          bairro: pac.bairro ?? undefined,
+          municipio: pac.cidade ?? undefined,
+          uf: pac.estado ?? undefined,
+        },
+        valorBase: valorTotal,
+      });
+      if (!tomador) { toast.error("Emissão cancelada."); return; }
+      const parcial = aplicarValorParcial(valorTotal, tomador);
+      const convNome = convenio?.nome ? ` — Cartão Benefício ${convenio.nome}` : " — Cartão Benefício";
+      // Descrição consolidada, agrupando adesão/taxas separadas das mensalidades.
+      const mensSort = [...parcelas].sort(
+        (a, b) => a.vencimento.localeCompare(b.vencimento),
+      );
+      const linhasMens = mensSort
+        .filter((m) => !isAdesao(m) && !isTaxaInclusao(m))
+        .map((m) => `Mensalidade ${m.numero_parcela} (${mesExtenso(m.vencimento)})`);
+      const linhasTaxas = mensSort
+        .filter((m) => isAdesao(m) || isTaxaInclusao(m))
+        .map((m) => isAdesao(m) ? "Taxa de adesão" : "Taxa de inclusão de dependente");
+      const itens = [...linhasTaxas, ...linhasMens].join("; ");
+      const rotulo = `${itens}${convNome} — Contrato #${contrato.numero} — ${nomePac}`;
+      const descComDep = tomador.dependenteAtendido
+        ? `${rotulo} — Dependente do pagador: ${tomador.dependenteAtendido}`
+        : rotulo;
+      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
+      const descFinal = await pedirDescricaoNfse(descSugerida);
+      if (!descFinal) { toast.error("Emissão cancelada."); return; }
+      const paciente_id = (contrato as { paciente_id?: string | null }).paciente_id ?? undefined;
+      const pagamentoIds = mensSort.map((m) => m.lancamento_id as string);
+      const res = await emitirNfseFn({
+        data: {
+          emitenteId,
+          pacienteId: paciente_id,
+          pagamentoId: pagamentoIds[0],
+          pagamentoIds,
+          valorServicos: parcial.valor,
+          descricaoServicos: descFinal,
+          tomador,
+        },
+      });
+      const nfseId = (res as { id?: string })?.id;
+      toast.success("NFS-e agrupada enviada. Consultando status...");
+      if (nfseId) {
+        await new Promise((r) => setTimeout(r, 4000));
+        await consultarNfseFn({ data: { id: nfseId } });
+      }
+      // Atualiza o mapa: consulta pelas parcelas vinculadas ao array.
+      const { data } = await supabase
+        .from("nfse")
+        .select("id, numero, status, url_pdf, pagamento_id, pagamento_ids")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .overlaps("pagamento_ids", pagamentoIds)
+        .neq("status", "cancelada");
+      const rows = (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string | null; pagamento_ids: string[] | null }>;
+      setNfsePorLancamento((prev) => {
+        const next = { ...prev };
+        for (const r of rows) {
+          const linked = (r.pagamento_ids && r.pagamento_ids.length > 0)
+            ? r.pagamento_ids
+            : (r.pagamento_id ? [r.pagamento_id] : []);
+          for (const pid of linked) {
+            if (pagamentoIds.includes(pid)) {
+              next[pid] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
+            }
+          }
+        }
+        return next;
+      });
+      limparHistSel();
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setNfseEmitindoLote(false);
     }
   };
 
@@ -3679,6 +3908,8 @@ h1, h2, h3 { margin: 0 0 6mm; }
       depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
       depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
       depSlotVars[`DEPENDENTE_${idx}_CPF`] = d?.cpf ?? "";
+      depSlotVars[`DEPENDENTE_${idx}_NASCIMENTO`] = fmtD(d?.data_nascimento);
+      depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = fmtTelDisplay(d?.telefone) || "";
     }
     const vars: Record<string, string> = {
       CLINICA_NOME: _cl.nome ?? "",
@@ -3686,10 +3917,16 @@ h1, h2, h3 { margin: 0 0 6mm; }
       CLINICA_ENDERECO: [_cl.endereco, _cl.cidade, _cl.estado].filter(Boolean).join(", "),
       CIDADE: _cl.cidade ?? "",
       PACIENTE_NOME: contrato.paciente_nome ?? "",
-      PACIENTE_CPF: _pa.cpf ?? "",
+      PACIENTE_CPF: fmtCPFDisplay(_pa.cpf),
       PACIENTE_NASCIMENTO: fmtD(_pa.data_nascimento),
       PACIENTE_ENDERECO: enderecoPaciente,
-      PACIENTE_TELEFONE: _pa.telefone ?? "",
+      PACIENTE_LOGRADOURO: _pa.logradouro ?? "",
+      PACIENTE_NUMERO: _pa.numero ?? "",
+      PACIENTE_BAIRRO: _pa.bairro ?? "",
+      PACIENTE_CIDADE: _pa.cidade ?? "",
+      PACIENTE_ESTADO: _pa.estado ?? "",
+      PACIENTE_CEP: fmtCEPDisplay(_pa.cep),
+      PACIENTE_TELEFONE: fmtTelDisplay(_pa.telefone),
       PACIENTE_EMAIL: _pa.email ?? "",
       VALOR_MENSAL: BRL(Number(contrato.valor_mensal)),
       TAXA_ADESAO: BRL(Number((contrato as any).taxa_adesao ?? 0)),
@@ -4044,37 +4281,66 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </div>
                 {podeEscrever && !(cancelado && !isAdmin) ? (() => {
                   const selecionaveis = mens.filter(
-                    (m) => m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida),
+                    (m) => !(isAdesao(m) && adesaoEmbutida),
                   );
                   const selecionadas = selecionaveis.filter((m) => selectedHistIds.has(m.id));
-                  const total = selecionadas.reduce((s, m) => s + (Number(m.valor) || 0), 0);
+                  const total = selecionadas.reduce(
+                    (s, m) => s + (Number(m.status === "pago" ? (m.valor_pago ?? m.valor) : m.valor) || 0),
+                    0,
+                  );
                   if (selecionadas.length === 0) return null;
+                  const pendentes = selecionadas.filter((m) => m.status !== "pago");
+                  const pagasComLanc = selecionadas.filter((m) => m.status === "pago" && !!m.lancamento_id);
+                  const pagasSemNfse = pagasComLanc.filter((m) => !nfsePorLancamento[m.lancamento_id!]);
+                  const soPendentes = pendentes.length > 0 && pagasComLanc.length === 0;
+                  const soPagasElegiveis = pendentes.length === 0 && pagasSemNfse.length === selecionadas.length && selecionadas.length >= 2;
+                  const mistura = pendentes.length > 0 && pagasComLanc.length > 0;
                   return (
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
                       <div>
                         <strong>{selecionadas.length}</strong> parcela(s) selecionada(s) — Total{" "}
                         <strong>R$ {total.toFixed(2).replace(".", ",")}</strong>
+                        {mistura ? (
+                          <span className="ml-2 text-destructive">Separe pagas e pendentes em seleções distintas.</span>
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-2">
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={limparHistSel}
-                          disabled={aplicandoHistLote}
+                          disabled={aplicandoHistLote || nfseEmitindoLote}
                         >
                           Limpar seleção
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={marcarPagasHistoricasEmLote}
-                          disabled={aplicandoHistLote}
-                        >
-                          {aplicandoHistLote ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                          ) : null}
-                          Marcar selecionadas como Paga (histórica)
-                        </Button>
+                        {soPendentes ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={marcarPagasHistoricasEmLote}
+                            disabled={aplicandoHistLote}
+                          >
+                            {aplicandoHistLote ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : null}
+                            Marcar selecionadas como Paga (histórica)
+                          </Button>
+                        ) : null}
+                        {podeEmitirNfse && soPagasElegiveis ? (
+                          <Button
+                            size="sm"
+                            onClick={() => emitirNfseAgrupada(pagasSemNfse)}
+                            disabled={nfseEmitindoLote || !emitenteId}
+                            title="Emitir uma única NFS-e somando todas as parcelas selecionadas"
+                          >
+                            {nfseEmitindoLote ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                              <FileText className="h-3 w-3 mr-1" />
+                            )}
+                            Emitir NFS-e agrupada ({pagasSemNfse.length})
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -4086,16 +4352,20 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         {podeEscrever && !(cancelado && !isAdmin) ? (
                           <TableHead className="w-8">
                             {(() => {
-                              const selecionaveis = mens.filter(
-                                (m) => m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida),
-                              );
+                              const selecionaveis = mens.filter((m) => {
+                                if (isAdesao(m) && adesaoEmbutida) return false;
+                                if (m.status === "pago") {
+                                  return !!m.lancamento_id && !nfsePorLancamento[m.lancamento_id];
+                                }
+                                return true;
+                              });
                               const allSel = selecionaveis.length > 0 &&
                                 selecionaveis.every((m) => selectedHistIds.has(m.id));
                               const someSel = selecionaveis.some((m) => selectedHistIds.has(m.id));
                               return (
                                 <input
                                   type="checkbox"
-                                  aria-label="Selecionar todas as parcelas em aberto"
+                                  aria-label="Selecionar todas as parcelas elegíveis"
                                   ref={(el) => {
                                     if (el) el.indeterminate = !allSel && someSel;
                                   }}
@@ -4162,14 +4432,18 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         <TableRow>
                           {podeEscrever && !(cancelado && !isAdmin) ? (
                             <TableCell className="w-8">
-                              {m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida) ? (
-                                <input
-                                  type="checkbox"
-                                  aria-label="Selecionar parcela para pagamento histórico"
-                                  checked={selectedHistIds.has(m.id)}
-                                  onChange={() => toggleHistSel(m.id)}
-                                />
-                              ) : null}
+                              {(() => {
+                                if (isAdesao(m) && adesaoEmbutida) return null;
+                                if (m.status === "pago" && (!m.lancamento_id || nfsePorLancamento[m.lancamento_id])) return null;
+                                return (
+                                  <input
+                                    type="checkbox"
+                                    aria-label="Selecionar parcela"
+                                    checked={selectedHistIds.has(m.id)}
+                                    onChange={() => toggleHistSel(m.id)}
+                                  />
+                                );
+                              })()}
                             </TableCell>
                           ) : null}
                           <TableCell>
@@ -4331,6 +4605,21 @@ h1, h2, h3 { margin: 0 0 6mm; }
                                     </>
                                   )}
                                 </>
+                              ) : null}
+                              {m.status === "pago" && m.lancamento_id ? (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Reimprimir 2ª via da GR"
+                                  disabled={reimprimindoId === m.id}
+                                  onClick={() => reimprimirGrMensalidade(m)}
+                                >
+                                  {reimprimindoId === m.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Printer className="h-3 w-3" />
+                                  )}
+                                </Button>
                               ) : null}
                               {isAdmin && podeEscrever ? (
                                 <Button
@@ -4760,8 +5049,69 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </div>
                 <Button size="sm" onClick={() => printContrato(contrato.id)}>
                   <Printer className="h-4 w-4 mr-1" />
-                  Imprimir A4
+                  Imprimir Contrato
                 </Button>
+              </div>
+              <div className="rounded-md border bg-card p-4 mb-3 space-y-4">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
+                    Contratante — Titular
+                  </div>
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+                    {[
+                      ["Nome", contrato.paciente_nome],
+                      ["CPF", fmtCPFDisplay(pacienteFull?.cpf)],
+                      ["Nascimento", pacienteFull?.data_nascimento ? fmtD(pacienteFull.data_nascimento) : "—"],
+                      ["Prontuário", pacienteFull?.codigo_prontuario ?? "—"],
+                      ["Telefone", fmtTelDisplay(pacienteFull?.telefone)],
+                      ["E-mail", pacienteFull?.email ?? "—"],
+                      ["Endereço", [pacienteFull?.logradouro, pacienteFull?.numero].filter(Boolean).join(", ") || "—"],
+                      ["Bairro", pacienteFull?.bairro ?? "—"],
+                      ["Cidade/UF", [pacienteFull?.cidade, pacienteFull?.estado].filter(Boolean).join("/") || "—"],
+                      ["CEP", fmtCEPDisplay(pacienteFull?.cep)],
+                    ].map(([label, value]) => (
+                      <div key={label as string} className="grid grid-cols-[9rem_minmax(0,1fr)] items-baseline gap-2 border-b border-dashed border-border/50 py-1">
+                        <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+                        <dd className="min-w-0 truncate font-medium">{(value as string) || "—"}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
+                    Associados / Dependentes ({depsAtivos.length})
+                  </div>
+                  {depsAtivos.length === 0 ? (
+                    <div className="text-sm text-muted-foreground italic">Nenhum dependente ativo.</div>
+                  ) : (
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-10">#</TableHead>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Parentesco</TableHead>
+                            <TableHead>CPF</TableHead>
+                            <TableHead>Prontuário</TableHead>
+                            <TableHead>Tipo</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {depsAtivos.map((d, i) => (
+                            <TableRow key={d.id}>
+                              <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                              <TableCell className="font-medium">{d.paciente_nome}</TableCell>
+                              <TableCell>{d.parentesco || "—"}</TableCell>
+                              <TableCell>{fmtCPFDisplay(d.cpf)}</TableCell>
+                              <TableCell>{d.codigo_prontuario ?? "—"}</TableCell>
+                              <TableCell className="capitalize">{d.tipo}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
               </div>
               {contratoTexto ? (
                 /<[a-z][\s\S]*>/i.test(contratoTexto) ? (

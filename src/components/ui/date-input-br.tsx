@@ -14,37 +14,37 @@ function isoToBr(iso: string): string {
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
-// Converte "dd/mm/yyyy" ou "dd/mm/yy" -> "yyyy-mm-dd".
-// Ano curto: usa um pivô ~20 anos à frente do ano atual. 20yy até
-// (ano atual + 20) fica em 2000+yy; acima disso volta a 1900+yy.
-// Assim "15/01/27" → 2027 (vencimento futuro), "23/05/85" → 1985
-// (nascimento) e "10/01/30" → 2030.
+// Converte "dd/mm/yyyy" -> "yyyy-mm-dd".
+// Não aceita ano curto durante digitação: "28/07/20" deve continuar parcial,
+// não virar automaticamente "28/07/2020" ao apagar ou editar o campo.
 function brToIso(br: string): string {
-  const m = /^(\d{2})\/(\d{2})\/(\d{2}|\d{4})$/.exec(br);
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(br);
   if (!m) return "";
-  let yearText: string;
-  if (m[3].length === 2) {
-    const yy = Number(m[3]);
-    const currentYear = new Date().getFullYear();
-    const asTwentyK = 2000 + yy;
-    const pivot = currentYear + 20;
-    yearText = asTwentyK <= pivot ? String(asTwentyK) : String(1900 + yy);
-  } else {
-    yearText = m[3];
-  }
+  const yearText = m[3];
   const day = Number(m[1]), month = Number(m[2]), year = Number(yearText);
   if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1900) return "";
   return `${yearText}-${m[2]}-${m[1]}`;
 }
 
-// Aplica máscara dd/mm/yyyy incrementalmente. Insere "/" já ao completar 2 e 4 dígitos
-// para dar feedback visual imediato ("23" -> "23/", "2305" -> "23/05/").
-function applyMask(raw: string): string {
+// Aplica máscara dd/mm/yyyy incrementalmente.
+// - typing=true: insere "/" ao completar 2 e 4 dígitos como feedback visual e
+//   reflui os dígitos no formato dd/mm/yyyy.
+// - typing=false (apagando): NÃO reflui nem reinsere barras — preserva a
+//   posição atual das "/" para que o backspace apague um caractere por vez
+//   (o dígito antes da barra sem levar a barra junto, ou a própria barra
+//   sem "grudar" de volta).
+function applyMask(raw: string, typing: boolean): string {
+  if (!typing) {
+    // Mantém dígitos e barras exatamente como o usuário deixou, apenas limpa
+    // qualquer caractere inválido e limita a 10 posições (dd/mm/yyyy).
+    return raw.replace(/[^\d/]/g, "").slice(0, 10);
+  }
   const digits = raw.replace(/\D/g, "").slice(0, 8);
-  if (digits.length < 2) return digits;
-  if (digits.length === 2) return `${digits}/`;
-  if (digits.length < 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  if (digits.length === 4) return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/`;
+  if (digits.length <= 2) return digits.length === 2 ? `${digits}/` : digits;
+  if (digits.length <= 4) {
+    const base = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return digits.length === 4 ? `${base}/` : base;
+  }
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
@@ -113,9 +113,12 @@ export const DateInputBR = forwardRef<HTMLInputElement, Props>(function DateInpu
       disabled={disabled}
       className={cn(showCalendar ? "pr-9" : "", className)}
       onChange={(e) => {
-        const masked = applyMask(e.target.value);
+        const inputType = (e.nativeEvent as InputEvent).inputType ?? "";
+        const typing = !inputType.startsWith("delete");
+        const masked = applyMask(e.target.value, typing);
         setText(masked);
-        emitChange(brToIso(masked));
+        const iso = brToIso(masked);
+        if (iso || masked === "") emitChange(iso);
       }}
       onBlur={(e) => {
         if (onBlur) {

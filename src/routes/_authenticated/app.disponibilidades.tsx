@@ -44,6 +44,20 @@ function isFeriadoOuDomingo(d: Date): boolean {
   return FERIADOS_FIXOS.has(mmdd);
 }
 
+// Formatadores em horário local de Brasília — usados para calcular o "piso"
+// (último horário já criado numa data) em coerência com o que o usuário vê
+// na Agenda. Evita bug de fuso horário ao usar `.toISOString().slice(0,10)`
+// em datas próximas da meia-noite.
+const TZ_LOCAL = "America/Sao_Paulo";
+const fmtDateLocal = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TZ_LOCAL, year: "numeric", month: "2-digit", day: "2-digit",
+});
+const fmtTimeLocal = new Intl.DateTimeFormat("en-GB", {
+  timeZone: TZ_LOCAL, hour: "2-digit", minute: "2-digit", hour12: false,
+});
+const toLocalDate = (v: Date | string) => fmtDateLocal.format(new Date(v));
+const toLocalTime = (v: Date | string) => fmtTimeLocal.format(new Date(v));
+
 interface Disp { id: string; medico_id: string; dia_semana: number; hora_inicio: string; hora_fim: string; observacoes: string | null; limite_pacientes: number | null; intervalo_min: number | null }
 type DispExt = Disp & { vigencia_inicio: string | null; vigencia_fim: string | null };
 interface Medico { id: string; nome: string; duracao_consulta_min: number | null; procedimento_padrao_id: string | null; procedimento_padrao_nome: string | null; especialidade_nome: string | null; cidade: string | null; estado: string | null; bairro: string | null }
@@ -66,6 +80,11 @@ function Page() {
   const [gerar, setGerar] = useState({ medico_id: "all", dias: "30", data_inicio: hojeIso, data_fim: em30Iso, limite_fichas: "", hora_inicio: "", hora_fim: "", intervalo_min: "" });
   const [gerarDias, setGerarDias] = useState<number[]>([1, 2, 3, 4, 5, 6]);
   const [gerando, setGerando] = useState(false);
+  // Piso por (medico|agenda|data-local) → maior `fim` (HH:MM local) já
+  // existente naquela data. Usado para acrescentar novos slots ABAIXO dos
+  // já criados, preservando a numeração de fichas.
+  const [pisos, setPisos] = useState<Map<string, string>>(new Map());
+  const [pisoTick, setPisoTick] = useState(0);
   const [medicoEditando, setMedicoEditando] = useState<string | null>(null);
   const [dispEditando, setDispEditando] = useState<string | null>(null);
   const [editRow, setEditRow] = useState<{ dia_semana: string; hora_inicio: string; hora_fim: string; limite_pacientes: string; intervalo_min: string; vigencia_inicio: string; vigencia_fim: string } | null>(null);
@@ -132,6 +151,45 @@ function Page() {
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaAtual?.clinica_id]);
+
+  // Piso por (medico|agenda|dataLocal): consulta os agendamentos já criados
+  // no intervalo do formulário para os médicos-alvo e guarda o maior `fim`
+  // (HH:MM local) de cada dia. A geração de novos slots vai começar depois
+  // desse piso, garantindo que fichas novas fiquem ABAIXO das existentes.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!clinicaAtual || !gerar.data_inicio || !gerar.data_fim) {
+        setPisos(new Map()); return;
+      }
+      const alvoIds = gerar.medico_id === "all"
+        ? medicos.map((m) => m.id)
+        : (gerar.medico_id ? [gerar.medico_id] : []);
+      if (alvoIds.length === 0) { setPisos(new Map()); return; }
+      const iniIso = new Date(`${gerar.data_inicio}T00:00:00`).toISOString();
+      const fimIso = new Date(`${gerar.data_fim}T23:59:59`).toISOString();
+      const { data, error } = await supabase
+        .from("agendamentos")
+        .select("medico_id, agenda_id, inicio, fim")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .in("medico_id", alvoIds)
+        .gte("inicio", iniIso)
+        .lte("inicio", fimIso)
+        .limit(20000);
+      if (error || cancelled) return;
+      const map = new Map<string, string>();
+      for (const r of (data ?? []) as Array<{ medico_id: string; agenda_id: string | null; inicio: string; fim: string }>) {
+        const dLocal = toLocalDate(r.inicio);
+        const tFim = toLocalTime(r.fim);
+        const key = `${r.medico_id}|${r.agenda_id ?? ""}|${dLocal}`;
+        const prev = map.get(key);
+        if (!prev || tFim > prev) map.set(key, tFim);
+      }
+      if (!cancelled) setPisos(map);
+    })();
+    return () => { cancelled = true; };
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [clinicaAtual?.clinica_id, gerar.data_inicio, gerar.data_fim, gerar.medico_id, medicos, pisoTick]);
 
   // Recarrega ao voltar para a aba/janela e quando o foco retorna,
   // garantindo que médicos recém cadastrados em outra tela apareçam aqui.
@@ -307,7 +365,9 @@ function Page() {
           ? agendasDoMedico
           : [{ id: null }];
         for (const ag of agendasAlvo) {
-          const diaIso = d.toISOString().slice(0, 10);
+          const diaIso = fmtDateLocal.format(d);
+          const pisoKey = `${m.id}|${ag.id ?? ""}|${diaIso}`;
+          const piso = pisos.get(pisoKey) ?? "";
           const ds = disps.filter((x) =>
             x.medico_id === m.id && (ag.id === null || x.agenda_id === ag.id) && x.dia_semana === dow
             && (!x.vigencia_inicio || x.vigencia_inicio <= diaIso)
@@ -335,11 +395,14 @@ function Page() {
                 vigencia_fim: null,
               } as DispRow];
           // Aplica filtros/overrides de horário e intervalo do formulário
-          const dsEfetivo = baseDs.map((x) => ({
-            ...x,
-            hora_inicio: overrideIni ? (overrideIni > x.hora_inicio ? overrideIni : x.hora_inicio) : x.hora_inicio,
-            hora_fim: overrideFim ? (overrideFim < x.hora_fim ? overrideFim : x.hora_fim) : x.hora_fim,
-          })).filter((x) => x.hora_inicio < x.hora_fim);
+          const dsEfetivo = baseDs.map((x) => {
+            const hiOverride = overrideIni ? (overrideIni > x.hora_inicio ? overrideIni : x.hora_inicio) : x.hora_inicio;
+            // Se já existem slots criados nessa data para esse médico/agenda,
+            // a nova geração começa DEPOIS do último `fim` existente.
+            const hiComPiso = piso && piso > hiOverride ? piso : hiOverride;
+            const hf = overrideFim ? (overrideFim < x.hora_fim ? overrideFim : x.hora_fim) : x.hora_fim;
+            return { ...x, hora_inicio: hiComPiso, hora_fim: hf };
+          }).filter((x) => x.hora_inicio < x.hora_fim);
           const overrideLimite = gerar.limite_fichas ? parseInt(gerar.limite_fichas) : 0;
           const overrideIntervalo = gerar.intervalo_min ? parseInt(gerar.intervalo_min) : 0;
           let limiteDia: number;
@@ -362,7 +425,7 @@ function Page() {
               const inicio = `${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`;
               const fimMin = cur + dur;
               const fim = `${String(Math.floor(fimMin / 60)).padStart(2, "0")}:${String(fimMin % 60).padStart(2, "0")}`;
-              out.push({ data: d.toISOString().slice(0, 10), medico_id: m.id, agenda_id: ag.id ?? "", inicio, fim });
+              out.push({ data: fmtDateLocal.format(d), medico_id: m.id, agenda_id: ag.id ?? "", inicio, fim });
               cur += dur;
               criadosNoDia += 1;
             }
@@ -371,7 +434,7 @@ function Page() {
       }
     }
     return out;
-  }, [gerar, gerarDias, medicos, disps, agendas]);
+  }, [gerar, gerarDias, medicos, disps, agendas, pisos]);
 
   if (!clinicaAtual) return <p className="text-muted-foreground">Selecione uma clínica.</p>;
 
@@ -393,28 +456,12 @@ function Page() {
     setGerando(true);
     try {
       const medicoById = new Map(medicos.map((m) => [m.id, m]));
-      // A-2: limpar slots "DISPONÍVEL" pré-existentes no intervalo/médico/agenda antes de regerar,
-      // evitando duplicatas ao clicar em "Gerar" mais de uma vez.
-      const iniIso = new Date(`${gerar.data_inicio}T00:00:00`).toISOString();
-      const fimIso = new Date(`${gerar.data_fim}T23:59:59`).toISOString();
-      const medicoIdsSet = new Set(slotsPreview.map((s) => s.medico_id));
-      if (medicoIdsSet.size > 0) {
-        // Limpa TODOS os slots livres (sem paciente) no intervalo/médicos —
-        // o unique index uq_agend_slot_vazio bate em (clinica, medico, agenda, inicio)
-        // WHERE paciente_id IS NULL AND status='agendado', então filtrar apenas
-        // por paciente_nome='DISPONÍVEL' deixa slots antigos com outro rótulo
-        // (ex.: "BLOQUEIO", vazio, etc.) causando colisão ao regerar.
-        const { error: delErr } = await supabase
-          .from("agendamentos")
-          .delete()
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .is("paciente_id", null)
-          .eq("status", "agendado")
-          .in("medico_id", Array.from(medicoIdsSet))
-          .gte("inicio", iniIso)
-          .lte("inicio", fimIso);
-        if (delErr) throw delErr;
-      }
+      // Regra: novos slots são ACRESCENTADOS abaixo dos já existentes na
+      // data. Não apagamos mais os slots livres do intervalo — o `piso`
+      // (computado no useEffect acima) já garante que a geração começa
+      // depois do último `fim` existente por (médico, agenda, data). Se
+      // ainda houver colisão pontual com o unique index uq_agend_slot_vazio,
+      // tratamos por lote/linha abaixo.
       const rowsRaw = slotsPreview.map((s) => {
         const inicio = new Date(`${s.data}T${s.inicio}:00`);
         const fim = new Date(`${s.data}T${s.fim}:00`);
@@ -440,12 +487,27 @@ function Page() {
         rowsMap.set(`${r.medico_id}|${r.agenda_id ?? ""}|${r.inicio}`, r);
       }
       const rows = Array.from(rowsMap.values());
-      // Inserir em lotes de 500
+      // Inserir em lotes de 500 tolerando colisões pontuais com o unique
+      // index (23505): se o lote falhar, tenta linha a linha e apenas
+      // contabiliza as ignoradas — não interrompe a geração.
+      let inseridos = 0;
+      let ignorados = 0;
       for (let i = 0; i < rows.length; i += 500) {
-        const { error } = await supabase.from("agendamentos").insert(rows.slice(i, i + 500));
-        if (error) throw error;
+        const lote = rows.slice(i, i + 500);
+        const { error } = await supabase.from("agendamentos").insert(lote);
+        if (!error) { inseridos += lote.length; continue; }
+        // fallback linha a linha
+        for (const r of lote) {
+          const { error: e2 } = await supabase.from("agendamentos").insert(r);
+          if (!e2) inseridos += 1;
+          else if ((e2 as any).code === "23505") ignorados += 1;
+          else throw e2;
+        }
       }
-      toast.success(`${rows.length} horários criados`);
+      if (ignorados > 0) toast.success(`${inseridos} horários criados (${ignorados} já existiam e foram ignorados)`);
+      else toast.success(`${inseridos} horários criados`);
+      // Recarrega o piso para refletir os novos slots imediatamente na preview.
+      setPisoTick((t) => t + 1);
     } catch (e: any) {
       mostrarErro(e);
     } finally {
@@ -694,6 +756,9 @@ function Page() {
                   {gerar.medico_id === "all" ? ` (${medicos.length} médicos)` : ""}.
                 </p>
               )}
+              <p className="text-xs text-muted-foreground">
+                Se a data já tiver horários criados, os novos serão adicionados <strong>após o último horário do dia</strong>, mantendo a numeração das fichas já existentes.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

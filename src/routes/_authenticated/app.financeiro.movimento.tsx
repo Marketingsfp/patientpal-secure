@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/movimento")({
   component: Page,
@@ -37,6 +38,8 @@ interface Lanc {
   origem?: "fin" | "caixa";
   /** direção da transferência: entrada (suprimento) ou saída (sangria) */
   transferSentido?: "entrada" | "saida";
+  /** Tipo original do movimento de caixa (só quando origem === "caixa"). */
+  caixaTipo?: "sangria" | "suprimento";
   /** HH:MM local — só preenchido para linhas vindas de caixa_movimentos */
   hora?: string | null;
   /** Nome do médico do lançamento (linhas de fin_lancamentos com medico_id). */
@@ -66,6 +69,7 @@ function Page() {
   const isMobile = useIsMobile();
   const modoMobile = uxMelhorias && isMobile;
   const [estornando, setEstornando] = useState<string | null>(null);
+  const [estornoSangria, setEstornoSangria] = useState<Lanc | null>(null);
   const [items, setItems] = useState<Lanc[]>([]);
   const [cats, setCats] = useState<Opt[]>([]);
   const [contas, setContas] = useState<Opt[]>([]);
@@ -286,6 +290,7 @@ function Page() {
         criado_por: m.user_id,
         origem: "caixa" as const,
         transferSentido: m.tipo === "suprimento" ? "entrada" : "saida",
+        caixaTipo: m.tipo,
       }));
     }
     // Merge ordenado por data + hora desc (mais recente primeiro)
@@ -1003,6 +1008,13 @@ function Page() {
                             ) : null}
                           </div>
                         )}
+                        {l.origem === "caixa" && l.caixaTipo === "sangria" && podeEstornar && (
+                          <div className="flex items-center gap-1 pt-1 -ml-2">
+                            <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setEstornoSangria(l)}>
+                              <Undo2 className="h-3.5 w-3.5 text-amber-600 mr-1" /> Solicitar estorno
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1060,6 +1072,16 @@ function Page() {
                             <Undo2 className="h-3.5 w-3.5 text-amber-600" />
                           </Button>
                         ) : null}
+                        {podeEstornar && l.origem === "caixa" && l.caixaTipo === "sangria" ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Solicitar estorno da sangria — gera pedido para o Financeiro aprovar (compensação por suprimento)."
+                            onClick={() => setEstornoSangria(l)}
+                          >
+                            <Undo2 className="h-3.5 w-3.5 text-amber-600" />
+                          </Button>
+                        ) : null}
                         {podeEscrever && l.origem !== "caixa" ? (
                           <>
                             <Button variant="ghost" size="icon" title="Editar lançamento — alterar descrição, valor, categoria, conta ou forma de pagamento." onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
@@ -1096,6 +1118,14 @@ function Page() {
           })() : null}
           </>}
       </CardContent></Card>
+      <SolicitarEstornoDialog
+        open={!!estornoSangria}
+        onOpenChange={(v) => { if (!v) setEstornoSangria(null); }}
+        descricao={estornoSangria?.descricao ?? null}
+        valor={estornoSangria ? Number(estornoSangria.valor) : null}
+        caixaMovimentoId={estornoSangria?.id ?? null}
+        onCreated={() => { setEstornoSangria(null); load(); }}
+      />
     </div>
   );
 }

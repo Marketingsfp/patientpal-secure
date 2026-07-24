@@ -1,44 +1,81 @@
-## O que muda
+## Objetivo
 
-Hoje, quando você informa o nº de um orçamento na tela de agendamento, o sistema pega **todos os itens que ainda não foram agendados** e junta num único agendamento (foi por isso que apareceu "Marcando 2 exames em uma única ficha" com BLOCO DE CERAMICA + COROA EM PORCELANA).
+Permitir agrupar **várias cobranças pagas do mesmo paciente** em **uma única NFS-e**, combinando:
 
-Vamos passar a abrir um **pop-up de seleção de itens** sempre que o orçamento for da especialidade **Odontologia**. O usuário marca com checkbox quais itens quer usar naquele agendamento. Os itens não marcados permanecem disponíveis e o mesmo orçamento pode ser usado várias vezes até esgotar os itens ou até o orçamento expirar/ser cancelado.
+- Mensalidades de contrato (Cartão Benefícios / Convênios)
+- Atendimentos avulsos pagos (Agenda / Financeiro)
+- Taxas de adesão / inclusão de dependente
 
-Aplicação: **as 3 clínicas** (SFP, Menino Jesus, Policlínica).
+Escopo confirmado: **todas as 3 clínicas**, comportamento **global**.
 
-## Fluxo novo (Odontologia)
+---
 
-1. Usuário digita o nº do orçamento e clica em buscar.
-2. Sistema carrega os itens restantes (já filtra o que foi consumido por agendamentos ativos, como hoje).
-3. Se o orçamento for de Odontologia e tiver mais de 1 item restante → abre pop-up **"Escolher itens do orçamento"** com:
-   - Cabeçalho: nº orçamento, paciente, quantos itens já foram agendados (ex: "2 de 5 já agendados").
-   - Lista de itens restantes com checkbox, descrição, dente(s) FDI (quando houver) e valor.
-   - Botões "Marcar todos" / "Limpar".
-   - Rodapé com contagem e "Confirmar seleção".
-4. Ao confirmar, o agendamento é preenchido só com os itens marcados e vincula apenas eles em `agendamento_orcamento_itens`.
-5. Se sobrar 1 item apenas ou o usuário marcar tudo, o comportamento final é o mesmo de hoje.
+## Antes × Depois
 
-Nada muda para orçamentos de outras especialidades (laboratório, imagem, consulta, misto entre grupos etc.) — o fluxo atual segue igual.
+**Hoje** — cada parcela paga e cada atendimento pago geram uma NFS-e independente. Não há como somar 6 mensalidades pagas retroativamente em uma nota só, nem juntar “consulta avulsa + mensalidade” do mesmo tomador.
 
-## Regra de expiração / esgotamento
+**Depois** — o operador seleciona *N* itens pagos do mesmo paciente (na aba Mensalidades do contrato **e/ou** em uma nova aba “NFS-e agrupada”), o sistema:
 
-- Orçamento cancelado ou expirado (`status = 'cancelado'` ou `validade < hoje`) → bloqueia com mensagem clara, como já faz para cancelado hoje. Passa a checar validade também.
-- Todos os itens já agendados → mensagem "Todos os itens deste orçamento já foram agendados" (comportamento atual mantido).
+1. Soma os valores.
+2. Monta descrição consolidada (“Mensalidades set/2026 a dez/2026 + Consulta 12/07/2026…”).
+3. Emite **1 NFS-e** com valor total.
+4. Vincula todos os `fin_lancamentos` selecionados à mesma nota (o botão “NFS-e” some/aparece como emitida em cada linha origem).
 
-## Onde mexer (técnico)
+---
 
-- `src/routes/_authenticated/app.agenda.tsx` — função `buscarOrcamento`: detectar se o orçamento é de Odontologia (via `procedimentos.grupo`/`especialidade` dos itens ou `orcamentos.especialidade_id`) e, se sim, abrir o novo dialog em vez de auto-vincular tudo.
-- Novo componente `src/components/agenda/selecionar-itens-orcamento-dialog.tsx` — pop-up com checkbox, semelhante em estilo ao `DividirOrcamentoDialog` existente.
-- Ao confirmar, reutiliza o caminho existente: `setPendingOrcItemIds(idsSelecionados)` + preenche `form.procedimento`, `orcamento_id`, `orcamento_numero` com base só nos itens marcados. Nenhuma mudança de schema.
-- Validação de `validade` do orçamento adicionada no `buscarOrcamento` (a coluna `validade`/`data_validade` já existe em `orcamentos`; confirmo no momento da implementação).
+## Mudanças (o que será tocado)
 
-## Antes x Depois
+### 1. Banco (1 migração)
 
-- **Antes:** informar o nº do orçamento na agenda enfia todos os itens pendentes numa única ficha, sem opção de escolher.
-- **Depois:** para Odontologia, você escolhe no pop-up quais itens entram naquele agendamento e reutiliza o mesmo orçamento em vários agendamentos até esgotar.
+- Adicionar coluna `nfse.pagamento_ids uuid[]` (mantém `pagamento_id` como principal para retrocompatibilidade).
+- Índice GIN em `pagamento_ids` para consulta rápida por lançamento.
+- Sem mudança em RLS/políticas (herda `nfse`).
+
+### 2. Backend / Server function
+
+- `src/lib/nfse.functions.ts`: aceitar `pagamentoIds: uuid[]` no `inputValidator`. Ao inserir em `nfse`, gravar array; manter primeiro id em `pagamento_id`.
+- Nada muda no envio ao Focus NFe (é uma nota só, valor total).
+
+### 3. Frontend
+
+**a) Aba “Mensalidades” do contrato** (`contratos-page.tsx`)
+
+- Estender a barra flutuante de seleção existente (que já soma parcelas selecionadas) com o botão **“Emitir NFS-e agrupada (N)”**, habilitado quando **todas as selecionadas estiverem pagas** e tiverem `lancamento_id`.
+- Reaproveita `pickTomadorNfse` + `pedirDescricaoNfse` (fluxo idêntico ao unitário).
+- Após emitir, atualiza `nfsePorLancamento` de todos os ids selecionados.
+
+**b) Nova página “NFS-e agrupada por paciente”** em `Financeiro › Notas`
+
+- Campo de busca de paciente.
+- Lista `fin_lancamentos` pagos do paciente **sem NFS-e emitida** (mensalidades, taxas, atendimentos) das últimas 12 meses, com filtro por período.
+- Seleção múltipla → mesmo fluxo de emissão agrupada.
+
+### 4. Validações / regras
+
+- Todos os itens têm que ser do **mesmo `clinica_id`** e do **mesmo paciente/tomador**.
+- Nenhum item selecionado pode já ter NFS-e ativa (`status != 'cancelada'`).
+- Se houver mistura consulta+exame, a nota vai pelo CNPJ do **primeiro item** (mantém a heurística atual do `nfse.functions.ts`); se o operador quiser separar, seleciona em lotes distintos. Isso será avisado no dialog antes de emitir.
+
+---
 
 ## Fora do escopo
 
-- Fluxo de outras especialidades.
-- Mudança na conversão do orçamento pelo drawer da Odontologia (`ConversaoOrcamentoDialog`) — continua como está.
-- Alterações no odontograma ou na impressão do orçamento.
+- Cancelamento / substituição de nota agrupada (fica para depois — cancela igual às unitárias, já suportado).
+- Rateio de valores/impostos entre itens (a nota é única, valor cheio).
+- Emissão agrupada envolvendo tomadores diferentes.
+
+---
+
+## Riscos
+
+- **Produção**: mexe em fluxo que dispara integração real Focus NFe. Vou testar primeiro em uma seleção pequena (2 parcelas) na Menino Jesus e reportar antes de considerar concluído.
+- Retrocompatibilidade: consultas antigas em `nfse.pagamento_id` continuam funcionando; código que usa a nova capacidade lê `pagamento_ids`.
+
+---
+
+## Validação prevista
+
+1. Migração aplicada.
+2. Rebuild dos tipos Supabase.
+3. Selecionar 2 mensalidades pagas de um contrato de teste → emitir agrupada → verificar no banco: 1 linha em `nfse`, `pagamento_ids` com 2 UUIDs, ambos os botões “Emitir NFS-e” trocados por link.
+4. Repetir com 1 mensalidade + 1 atendimento avulso do mesmo paciente na nova aba do Financeiro.

@@ -359,6 +359,9 @@ function Page() {
   // "Solicitar estorno" por "Aguardando aprovação" (pendente) ou
   // "Estornado" (aprovado) conforme a decisão do financeiro.
   const [estornosPorLanc, setEstornosPorLanc] = useState<Map<string, "pendente" | "aprovado">>(new Map());
+  // Espelho do estornosPorLanc, mas indexado por caixa_movimento_id — usado
+  // para o botão de estorno de sangria (que não tem lançamento financeiro).
+  const [estornosPorMov, setEstornosPorMov] = useState<Map<string, "pendente" | "aprovado">>(new Map());
   const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null }>>(new Map());
   // Conjunto de lancamento_ids cujo fin_lancamentos.status = 'cancelado'
   // (i.e., estornados). Esses recebimentos não devem entrar no saldo do
@@ -905,28 +908,49 @@ function Page() {
   // às movimentações atuais para trocar o botão pelo rótulo
   // "Aguardando aprovação" quando o financeiro ainda não decidiu.
   const reloadEstornosPendentes = useCallback(async () => {
-    if (!clinicaAtual) { setEstornosPorLanc(new Map()); return; }
+    if (!clinicaAtual) {
+      setEstornosPorLanc(new Map());
+      setEstornosPorMov(new Map());
+      return;
+    }
     const ids = Array.from(new Set(
       minhasMovs.map((m) => m.lancamento_id).filter((x): x is string => !!x),
     ));
-    if (ids.length === 0) { setEstornosPorLanc(new Map()); return; }
-    const { data } = await supabase
+    const sangriaIds = Array.from(new Set(
+      minhasMovs.filter((m) => m.tipo === "sangria").map((m) => m.id),
+    ));
+    if (ids.length === 0 && sangriaIds.length === 0) {
+      setEstornosPorLanc(new Map());
+      setEstornosPorMov(new Map());
+      return;
+    }
+    let q = supabase
       .from("estorno_solicitacoes")
-      .select("lancamento_id, status")
+      .select("lancamento_id, caixa_movimento_id, status")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .in("lancamento_id", ids)
       .in("status", ["pendente", "aprovado"]);
-    const map = new Map<string, "pendente" | "aprovado">();
-    for (const r of (data ?? []) as Array<{ lancamento_id: string | null; status: string }>) {
-      if (!r.lancamento_id) continue;
-      // pendente prevalece sobre aprovado caso ambos existam
-      const prev = map.get(r.lancamento_id);
-      if (prev === "pendente") continue;
-      if (r.status === "pendente" || r.status === "aprovado") {
-        map.set(r.lancamento_id, r.status);
+    // OR entre os dois filtros de id (lancamento OU caixa_movimento).
+    const parts: string[] = [];
+    if (ids.length > 0) parts.push(`lancamento_id.in.(${ids.join(",")})`);
+    if (sangriaIds.length > 0) parts.push(`caixa_movimento_id.in.(${sangriaIds.join(",")})`);
+    q = q.or(parts.join(","));
+    const { data } = await q;
+    const mapLanc = new Map<string, "pendente" | "aprovado">();
+    const mapMov  = new Map<string, "pendente" | "aprovado">();
+    for (const r of (data ?? []) as Array<{ lancamento_id: string | null; caixa_movimento_id: string | null; status: string }>) {
+      const st = r.status === "pendente" || r.status === "aprovado" ? r.status : null;
+      if (!st) continue;
+      if (r.lancamento_id) {
+        const prev = mapLanc.get(r.lancamento_id);
+        if (prev !== "pendente") mapLanc.set(r.lancamento_id, st);
+      }
+      if (r.caixa_movimento_id) {
+        const prev = mapMov.get(r.caixa_movimento_id);
+        if (prev !== "pendente") mapMov.set(r.caixa_movimento_id, st);
       }
     }
-    setEstornosPorLanc(map);
+    setEstornosPorLanc(mapLanc);
+    setEstornosPorMov(mapMov);
   }, [clinicaAtual, minhasMovs]);
 
   useEffect(() => {
@@ -2579,6 +2603,43 @@ function Page() {
                                 );
                               })()
                             )}
+                            {m.tipo === "sangria" && podeEscrever && (
+                              (() => {
+                                const st = estornosPorMov.get(m.id);
+                                if (st === "pendente") {
+                                  return (
+                                    <Button
+                                      type="button" size="sm" variant="outline" disabled
+                                      className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
+                                      title="Solicitação de estorno enviada — aguardando decisão do financeiro"
+                                    >
+                                      <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
+                                    </Button>
+                                  );
+                                }
+                                if (st === "aprovado") {
+                                  return (
+                                    <Button
+                                      type="button" size="sm" variant="outline" disabled
+                                      className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
+                                      title="Esta sangria já foi estornada"
+                                    >
+                                      <Undo2 className="h-3 w-3 mr-1" /> Estornada
+                                    </Button>
+                                  );
+                                }
+                                return (
+                                  <Button
+                                    type="button" size="sm" variant="outline"
+                                    className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+                                    title="Solicitar estorno da sangria ao financeiro"
+                                    onClick={() => setEstornoFor(m)}
+                                  >
+                                    <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
+                                  </Button>
+                                );
+                              })()
+                            )}
                           </TableCell>
                         </TableRow>
                          )];
@@ -3596,7 +3657,9 @@ function Page() {
         descricao={estornoFor?.descricao ?? null}
         valor={estornoFor?.valor ?? null}
         lancamentoId={estornoFor?.lancamento_id ?? null}
+        caixaMovimentoId={estornoFor?.tipo === "sangria" ? estornoFor.id : null}
         pacienteNome={(() => {
+          if (estornoFor?.tipo === "sangria") return null;
           const d = estornoFor?.descricao ?? "";
           // Formato esperado: "NOME PACIENTE — PROCEDIMENTO"
           const idx = d.indexOf("—");

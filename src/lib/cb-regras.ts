@@ -9,21 +9,17 @@ export interface CbRegra {
   tipo: string | null;
   modo: string; // "valor_fixo" | "percentual_desconto"
   valor: number | null;
-  /**
-   * Valor cobrado em Pix/débito/crédito quando difere do valor em dinheiro
-   * (`valor`). Nulo = usa `valor` para ambos (com acréscimo global do
-   * convênio, se configurado, aplicado por fora). Só se aplica a
-   * modo === "valor_fixo" — descontos percentuais já incidem sobre a base
-   * de cada forma de pagamento.
-   */
-  valor_outros?: number | null;
   percentual: number | null;
+  /** Valor fixo cobrado quando o pagamento é em cartão/PIX (não-dinheiro). Se nulo, usa `valor`. */
+  valor_cartao?: number | null;
+  /** Percentual de desconto quando o pagamento é em cartão/PIX. Se nulo, usa `percentual`. */
+  percentual_cartao?: number | null;
   prioridade: number;
   ativo?: boolean;
   limite_qtd?: number | null;
   limite_periodo?: string | null; // "dia" | "semana" | "mes" | "ano" | "contrato"
   limite_escopo?: string | null;  // "contrato" | "paciente"
-  excedente_modo?: string | null; // "percentual_particular" | "valor_fixo" | "particular" | "bloquear"
+  excedente_modo?: string | null; // "percentual_particular" | "valor_fixo" | "particular" | "bloquear" | "regra_padrao_convenio"
   excedente_percentual?: number | null;
   excedente_valor?: number | null;
   /**
@@ -95,13 +91,15 @@ export function computeValor(
   const round2 = (n: number) => Math.round(n * 100) / 100;
   if (regra.modo === "valor_fixo") {
     const v = Number(regra.valor) || 0;
-    const vOutros = regra.valor_outros != null ? Number(regra.valor_outros) || 0 : v;
-    return { dinheiro: round2(v), outros: round2(vOutros) };
+    const vCartao = regra.valor_cartao != null ? (Number(regra.valor_cartao) || 0) : v;
+    return { dinheiro: round2(v), outros: round2(vCartao) };
   }
   if (regra.modo === "percentual_desconto") {
     const p = Number(regra.percentual) || 0;
-    const k = 1 - p / 100;
-    return { dinheiro: round2(baseDinheiro * k), outros: round2(baseOutros * k) };
+    const pCartao = regra.percentual_cartao != null ? (Number(regra.percentual_cartao) || 0) : p;
+    const kDin = 1 - p / 100;
+    const kOut = 1 - pCartao / 100;
+    return { dinheiro: round2(baseDinheiro * kDin), outros: round2(baseOutros * kOut) };
   }
   return null;
 }
@@ -135,20 +133,12 @@ export function isConvenioFuncionarioNome(nome: string | null | undefined): bool
  */
 export function applyAcrescimoCartao(
   valorOutros: number,
-  acr: CbAcrescimoCartao | null | undefined,
-  convenioNome?: string | null,
+  _acr: CbAcrescimoCartao | null | undefined,
+  _convenioNome?: string | null,
 ): number {
-  if (!acr || !acr.modo) return valorOutros;
-  if (isConvenioFuncionarioNome(convenioNome)) return valorOutros;
-  if (!(valorOutros > 0)) return valorOutros;
-  const round2 = (n: number) => Math.round(n * 100) / 100;
-  if (acr.modo === "percentual") {
-    const p = Number(acr.percentual) || 0;
-    return round2(valorOutros * (1 + p / 100));
-  }
-  if (acr.modo === "valor_fixo") {
-    const v = Number(acr.valor) || 0;
-    return round2(valorOutros + v);
-  }
+  // Descontinuado: o acréscimo automático de cartão foi substituído pelo
+  // campo "valor cartão/PIX" cadastrado diretamente em cada regra
+  // (ver `computeValor`). Mantido como no-op para preservar a assinatura
+  // usada em telas antigas até serem migradas.
   return valorOutros;
 }
