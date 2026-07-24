@@ -576,6 +576,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           valor: Number(valor),
           descricao: descricao.trim(),
           forma_pagamento: formaFinal,
+          // Sempre lança o movimento no caixa aberto de hoje do operador,
+          // mesmo quando a data do lançamento é retroativa (evita cair em
+          // sessão fechada e sumir do relatório do dia).
+          forcar_sessao_hoje: true,
         }
       : null;
 
