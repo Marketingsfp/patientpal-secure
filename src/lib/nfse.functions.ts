@@ -88,6 +88,7 @@ export const emitirNfse = createServerFn({ method: "POST" })
       emitenteId: z.string().uuid(),
       pacienteId: z.string().uuid().optional(),
       pagamentoId: z.string().uuid().optional(),
+      pagamentoIds: z.array(z.string().uuid()).optional(),
       agendamentoId: z.string().uuid().optional(),
       agendamentoIds: z.array(z.string().uuid()).optional(),
       valorServicos: z.number().positive(),
