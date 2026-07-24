@@ -324,7 +324,14 @@ export async function printContrato(contratoId: string) {
     ...depSlotVars,
   });
 
-  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
+  const isFullHtml = /<!doctype\s+html|<html[\s>]/i.test(corpo);
+
+  const html = isFullHtml
+    ? corpo.replace(
+        /<\/body>/i,
+        `<script>window.onload=()=>{setTimeout(()=>{window.print();},500);};</script></body>`,
+      )
+    : `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
 <title>Contrato #${c.numero} - ${esc(c.paciente_nome)}</title>
 <style>
   @page { size: A4; margin: 15mm; }
