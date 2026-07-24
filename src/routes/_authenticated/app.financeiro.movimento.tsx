@@ -658,6 +658,11 @@ function Page() {
 
   const catsFiltradas = cats.filter((c) => !c.tipo || c.tipo === form.tipo);
 
+  // Lista efetivamente usada em TODAS as visões (tabela, drill-down, export,
+  // relatório). Quando a opção está ligada, cada lançamento "misto" vira N
+  // linhas sintéticas (uma por forma real). A soma dos valores é preservada.
+  const displayItems = decomporMisto ? expandMistoItems(items) : items;
+
   const imprimirRelatorio = () => {
     if (!items.length) { toast.info("Sem dados para o relatório."); return; }
     const catMap = new Map(cats.map((c) => [c.id, c.nome]));
