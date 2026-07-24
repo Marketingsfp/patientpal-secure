@@ -3167,6 +3167,86 @@ function DetalheContrato({
     setFormaPagOpen(true);
   };
 
+  // Reimprime a 2ª via da GR de uma mensalidade paga (com lançamento real
+  // no caixa). Só habilita quando existe lancamento_id — parcelas marcadas
+  // como "Paga (histórica)" não geram GR porque não houve pagamento real.
+  // A GR sai idêntica à 1ª via (mesmo usuário original), acrescentando ao
+  // final o nome de quem está reimprimindo.
+  const [reimprimindoId, setReimprimindoId] = useState<string | null>(null);
+  const reimprimirGrMensalidade = async (m: Mens) => {
+    if (!clinicaAtual) return;
+    if (m.status !== "pago") {
+      toast.error("Só é possível reimprimir GR de parcelas pagas.");
+      return;
+    }
+    if (!m.lancamento_id) {
+      toast.error("Esta parcela foi marcada como paga (histórica) — não há pagamento real, não há GR a reimprimir.");
+      return;
+    }
+    setReimprimindoId(m.id);
+    try {
+      const { data: lanc, error } = await supabase
+        .from("fin_lancamentos")
+        .select("valor, forma_pagamento, parcelas, bandeira_cartao, observacoes")
+        .eq("id", m.lancamento_id)
+        .maybeSingle();
+      if (error || !lanc) throw new Error(error?.message ?? "Lançamento não encontrado.");
+      const l = lanc as { valor: number | string; forma_pagamento: string | null; parcelas: number | null; bandeira_cartao: string | null; observacoes: string | null };
+
+      // Reconstrói o detalhe do misto a partir das observações (mesma
+      // convenção usada em print-gr.ts para reimpressões de atendimento).
+      let detalhe: Array<{ forma: string; pago: number; troco: number; recebido: number }> | undefined;
+      if (l.forma_pagamento === "misto" && l.observacoes) {
+        const idx = l.observacoes.indexOf("Pagamento misto:");
+        if (idx >= 0) {
+          const trecho = l.observacoes.slice(idx + "Pagamento misto:".length).split(" | ")[0];
+          const LABEL_TO_KEY: Array<[RegExp, string]> = [
+            [/^cart[ãa]o\s*cr[ée]dito/i, "cartao_credito"],
+            [/^cart[ãa]o\s*d[ée]bito/i, "cartao_debito"],
+            [/^cr[ée]dito/i, "cartao_credito"],
+            [/^d[ée]bito/i, "cartao_debito"],
+            [/^dinheiro/i, "dinheiro"],
+            [/^pix/i, "pix"],
+            [/^boleto/i, "boleto"],
+            [/^conv[êe]nio/i, "convenio"],
+            [/^transfer[êe]ncia/i, "transferencia"],
+          ];
+          const parseBRL = (s: string) => Number(s.replace(/\./g, "").replace(",", ".")) || 0;
+          const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
+          const acc: Array<{ forma: string; pago: number; troco: number; recebido: number }> = [];
+          for (const p of partes) {
+            const match = LABEL_TO_KEY.find(([re]) => re.test(p));
+            if (!match) continue;
+            const valMatch = p.match(/R\$\s*([\d.]+,\d{2})/);
+            if (!valMatch) continue;
+            acc.push({ forma: match[1], pago: parseBRL(valMatch[1]), troco: 0, recebido: 0 });
+          }
+          if (acc.length > 0) detalhe = acc;
+        }
+      }
+
+      const reimpressoPorNome = user?.user_metadata?.nome ?? user?.email ?? "Usuário";
+      await reimprimirGuiaMensalidade({
+        mensalidadeId: m.id,
+        clinicaId: clinicaAtual.clinica_id,
+        reimpressoPorNome,
+        reimpressoPorId: user?.id ?? null,
+        pagamento: {
+          valor: Number(m.valor_pago ?? l.valor ?? m.valor),
+          forma_pagamento: l.forma_pagamento,
+          parcelas: l.parcelas,
+          bandeira_cartao: l.bandeira_cartao,
+          detalhe,
+        },
+      });
+      toast.success("2ª via da GR enviada para impressão.");
+    } catch (err) {
+      mostrarErro(err);
+    } finally {
+      setReimprimindoId(null);
+    }
+  };
+
   // Emite NFS-e a partir de uma parcela paga (mensalidade ou taxa de adesão).
   // Reutiliza o mesmo picker/prompt do módulo Financeiro › Atendimentos,
   // com bloqueio de endereço e escolha de percentual do valor.
