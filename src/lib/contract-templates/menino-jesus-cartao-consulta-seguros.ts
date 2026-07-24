@@ -63,7 +63,8 @@ export const CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS = `<!DOCTYPE html>
 }
 .pdf24_07 {
 	font-size: 1em;
-	font-family: "CDQDOS+Calibri Bold";
+	font-family: "CDQDOS+Calibri Bold", "Calibri", "Carlito", "Arial", sans-serif;
+	font-weight: bold;
 	color: #FFFFFF;
 }
 .pdf24_08 {
@@ -98,7 +99,7 @@ export const CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS = `<!DOCTYPE html>
 }
 .pdf24_12 {
 	font-size: 1em;
-	font-family: "WCHOSB+Calibri";
+	font-family: "WCHOSB+Calibri", "Calibri", "Carlito", "Arial", sans-serif;
 	color: #000000;
 }
 .pdf24_13 {
