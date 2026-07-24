@@ -457,7 +457,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setLoading(true);
       const { data: m } = await supabase
         .from("medicos")
-        .select("id, clinica_id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, duracao_consulta_min, usa_sistema, procedimento_padrao_id, cep, logradouro, numero, complemento, bairro, cidade, estado, ativo, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
+        .select("id, clinica_id, user_id, nome, crm, crm_uf, email, telefone, telefone2, nacionalidade, estado_civil, sexo, duracao_consulta_min, usa_sistema, procedimento_padrao_id, paciente_id, cep, logradouro, numero, complemento, bairro, cidade, estado, ativo, medico_especialidades(especialidade_id, tem_rqe, rqe_numero, especialidade:especialidades(id, nome))")
         .eq("id", editingMedicoId)
         .maybeSingle();
       if (cancelled) return;
@@ -468,6 +468,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         setExistingEmail(null);
         setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
         setForm(emptyForm());
+        setPacienteVinculado(null);
         return;
       }
       const med = m as any;
