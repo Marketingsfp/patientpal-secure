@@ -1381,7 +1381,10 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  let usuarioFinalNome: string | null | undefined = usuarioNome ?? primeiraVia?.impresso_por_nome;
+  // "USUÁRIO:" = quem faturou (criador do lançamento), sempre — 1ª via e
+  // reimpressões. Resolvido abaixo após carregar a mensalidade; caller fica
+  // como último fallback.
+  let usuarioFinalNome: string | null | undefined = undefined;
 
   const [mensRes, cliRes] = await Promise.all([
     supabase
@@ -1399,11 +1402,9 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
   const m = mensRes.data as { id: string; contrato_id: string; numero_parcela: number; vencimento: string; valor: number; pago_em: string | null; lancamento_id: string | null };
   const c = cliRes.data as { nome: string; endereco: string | null; cidade: string | null; estado: string | null; telefone: string | null; cnpj: string | null } | null;
 
-  // Fallback do "USUÁRIO:" na reimpressão: se a 1ª via não gravou o nome
-  // (contratos antigos / migrados), busca quem lançou o pagamento em
-  // fin_lancamentos.criado_por → profiles.nome. Sem isso, a reimpressão sai
-  // sem a linha USUÁRIO que constava na impressão original.
-  if (!usuarioFinalNome && m.lancamento_id) {
+  // Resolve o usuário SEMPRE via fin_lancamentos.criado_por → profiles.nome.
+  // Não usa o operador logado; o "USUÁRIO:" tem que ser quem faturou.
+  if (m.lancamento_id) {
     try {
       const { data: lanc } = await supabase
         .from("fin_lancamentos")
@@ -1422,6 +1423,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
       }
     } catch { /* mantém oculto se não conseguir resolver */ }
   }
+  if (!usuarioFinalNome) usuarioFinalNome = primeiraVia?.impresso_por_nome ?? usuarioNome;
 
   const { data: contratoRow, error: errC } = await supabase
     .from("contratos_assinatura")
