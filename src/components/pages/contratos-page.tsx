@@ -4256,16 +4256,20 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         {podeEscrever && !(cancelado && !isAdmin) ? (
                           <TableHead className="w-8">
                             {(() => {
-                              const selecionaveis = mens.filter(
-                                (m) => m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida),
-                              );
+                              const selecionaveis = mens.filter((m) => {
+                                if (isAdesao(m) && adesaoEmbutida) return false;
+                                if (m.status === "pago") {
+                                  return !!m.lancamento_id && !nfsePorLancamento[m.lancamento_id];
+                                }
+                                return true;
+                              });
                               const allSel = selecionaveis.length > 0 &&
                                 selecionaveis.every((m) => selectedHistIds.has(m.id));
                               const someSel = selecionaveis.some((m) => selectedHistIds.has(m.id));
                               return (
                                 <input
                                   type="checkbox"
-                                  aria-label="Selecionar todas as parcelas em aberto"
+                                  aria-label="Selecionar todas as parcelas elegíveis"
                                   ref={(el) => {
                                     if (el) el.indeterminate = !allSel && someSel;
                                   }}
