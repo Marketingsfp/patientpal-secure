@@ -824,7 +824,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           existe = data;
         }
         if (!existe) {
-          await supabase.from("pacientes").insert({
+          const { data: novoPac } = await supabase.from("pacientes").insert({
             clinica_id: clinicaId,
             nome: nomeLimpo,
             cpf: form.cpf || null,
@@ -840,8 +840,15 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
             cidade: form.cidade || null,
             estado: form.estado ? form.estado.toUpperCase() : null,
             ativo: true,
-          } as never);
+          } as never).select("id").maybeSingle();
+          if (novoPac?.id && medicoId) {
+            await supabase.from("medicos").update({ paciente_id: novoPac.id } as never).eq("id", medicoId);
+          }
           toast.success("Cadastro de paciente criado automaticamente.");
+        } else if (existe.id && medicoId && !pacienteVinculado?.id) {
+          // Se já existe paciente com mesmo CPF/e-mail e o médico ainda não
+          // está vinculado, faz o vínculo automático.
+          await supabase.from("medicos").update({ paciente_id: existe.id } as never).eq("id", medicoId);
         }
       } catch (err: any) {
         toast.warning(`Médico salvo, mas paciente não foi criado: ${err?.message ?? err}`);
