@@ -374,7 +374,12 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  let usuarioFinalNome: string | null | undefined = usuarioNome ?? primeiraVia?.impresso_por_nome;
+  // Em reimpressão, o "USUÁRIO:" tem que ser SEMPRE quem faturou a 1ª via —
+  // não o operador que está reimprimindo agora. Só usa `usuarioNome` quando é
+  // a 1ª via (não há via anterior).
+  let usuarioFinalNome: string | null | undefined = reimpressao
+    ? primeiraVia?.impresso_por_nome
+    : (usuarioNome ?? primeiraVia?.impresso_por_nome);
 
   // Fallback do "USUÁRIO:" (mesma lógica da GR de mensalidade): quando a 1ª
   // via não gravou o nome (registros antigos), busca quem lançou o pagamento
@@ -967,7 +972,9 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  let usuarioFinalNome: string | null | undefined = usuarioNome ?? primeiraVia?.impresso_por_nome;
+  let usuarioFinalNome: string | null | undefined = reimpressao
+    ? primeiraVia?.impresso_por_nome
+    : (usuarioNome ?? primeiraVia?.impresso_por_nome);
 
   // Fallback do "USUÁRIO:" idêntico ao da GR individual/mensalidade: se a 1ª
   // via não gravou o nome, resolve via fin_lancamentos.criado_por → profiles.
