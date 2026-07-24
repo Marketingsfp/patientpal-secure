@@ -1,87 +1,47 @@
-## Diagnóstico
+## Diagnóstico técnico (o que está acontecendo)
 
-O erro **"Já existe um registro com esses dados"** é a tradução de uma violação
-de índice único no banco (`uq_agend_slot_vazio`, que exige unicidade em
-`clinica_id + medico_id + agenda_id + inicio` para slots vazios).
+Confirmei no banco:
 
-O Dr. João Hélio tem **duas agendas paralelas no mesmo dia/horário** (é comum
-em agendas de exames, para atender dois pacientes ao mesmo tempo em salas
-diferentes):
+- A Vania Maria Dario tem hoje **1 agendamento futuro em aberto**: **11/08/2026 12:30 — PAQUIMETRIA**, na agenda **EXAMES** do Dr. João Hélio (o card da tela reflete isso — a data no cabeçalho é 11/08/26, não 18/07). É esse o agendamento que está sendo movido.
+- No dia **23/07/2026** essa agenda EXAMES do Dr. João Hélio tem **21 slots ocupados e apenas 4 disponíveis**: **15:10, 15:20, 16:20 e 16:30**.
+- Quando você clica em qualquer outro horário do 23/07 (que na tela aparece livre visualmente, mas no banco já tem paciente), a função `reagendar_atendimento` dispara este trecho:
 
-- Agenda `2e408b29…` (a que a Vania está ocupando em 11/08 às 12:30).
-- Agenda `1c0ddcb9…` (paralela, com um slot DISPONIVEL às 12:30 em 11/08).
+```text
+raise exception 'Esse horário não está disponível...'
+  using errcode = '23505';
+```
 
-O fluxo atual de reagendamento (`reagendar-agendamento.functions.ts`) faz uma
-"troca" do slot para preservar o mesmo ID do agendamento. Nessa troca:
+O código `23505` é o mesmo código de "chave duplicada". O frontend genérico traduz qualquer `23505` como **"Já existe um registro com esses dados"**. Ou seja: o sistema **está bloqueando corretamente**, mas mostra uma mensagem enganosa que faz parecer bug/duplicidade.
 
-1. Pega o slot vazio de destino (por exemplo, 23/07 12:10 na agenda paralela
-   `1c0ddcb9…`).
-2. Reescreve esse slot vazio para assumir o horário/agenda **antigos** da
-   Vania — mas mantém o `agenda_id` de destino (`1c0ddcb9…`).
-3. Isso cria a chave `(medico, 1c0ddcb9…, 11/08 12:30, paciente_id NULL)` —
-   que **já existe** (é o slot DISPONIVEL da agenda paralela).
-4. O banco rejeita com `unique_violation` → toast genérico.
+Também existe uma segunda armadilha: a agenda "EXAMES" desse médico tem consultas misturadas (histórico antigo antes da regra nova de consulta × exame). Isso deixa muito slot já ocupado, dando a sensação de que "não tem lugar em lugar nenhum".
 
-Ou seja: sempre que existe uma agenda paralela do mesmo médico com um slot
-vazio exatamente no horário antigo, o reagendamento quebra. Regra afetada:
-Passo B (`docs/agenda/criar-agendamento-shared.md`) — a criação está OK; só o
-reagendamento tem esse defeito.
+## Solução em duas frentes
 
-## Plano
+### 1) Resolver a Vania agora (operacional)
 
-Ajustar o swap em `src/lib/agenda/reagendar-agendamento.functions.ts` para
-também trocar o `agenda_id` entre origem e slot de destino (hoje só troca
-horário/médico). Assim o slot vazio "herda" a posição completa do antigo
-horário (agenda inclusa), evitando colisão com slots paralelos.
+Escolher **um** dos 4 slots realmente livres em 23/07 na EXAMES e mover a PAQUIMETRIA para lá — direto no banco, mesma lógica do RPC (libera 11/08 12:30, ocupa o slot alvo, mantém o pagamento ligado):
 
-Mudança pontual, cirúrgica:
+- Sugestão: **23/07/2026 15:10** (primeiro slot livre).
 
-- Passo 3 (dest_slot temporário): passa a atualizar `agenda_id` para o
-  `antigo.agenda_id` da origem (além de `inicio`, `fim`, `medico_id`).
-- Passo 4 (origem): passa a atualizar `agenda_id` para o `agenda_id` do
-  dest_slot capturado no Passo 1 (além de `inicio`, `fim`, `medico_id`,
-  `observacoes`).
-- Passo 5 (limpar marker) permanece igual.
+Precisa confirmar comigo:
+- Confirma **23/07 às 15:10**? Ou prefere 15:20 / 16:20 / 16:30?
 
-Isso deixa a origem coerente com a agenda do novo horário e o slot vazio
-"reciclado" coerente com a agenda do horário antigo — sem conflito com o
-índice único.
+### 2) Correção definitiva (todas as clínicas)
 
-### Detalhes técnicos
+Para não repetir o mesmo susto:
 
-- Arquivo único: `src/lib/agenda/reagendar-agendamento.functions.ts`.
-- Adicionar `agenda_id` ao `select` da origem (linha 79).
-- Adicionar `agenda_id: destSlot.agenda_id` ao SELECT/tipagem do destSlot
-  (linhas 121, 128).
-- Incluir `agenda_id: antigo.agenda_id` no update do Passo 3 (linhas 159–167).
-- Incluir `agenda_id: destSlot.agenda_id` no update do Passo 4
-  (linhas 175–183).
-- Nenhuma alteração em `criar-agendamento.functions.ts`, na Agenda clássica,
-  no wizard V2, ou em qualquer regra de negócio de criação (Passo B intacto).
-- Nenhuma migração de banco.
+- **RPC `reagendar_atendimento`**: trocar o `errcode 23505` por um código próprio (`P0001` ou `restrict_violation`) e propagar a mensagem real ("Esse horário não está disponível — escolha um slot DISPONÍVEL").
+- **Frontend (`app.agenda.tsx`, fluxo de reagendar)**: quando a resposta do RPC vier com esse novo código, mostrar a mensagem exata devolvida pelo banco em vez do texto genérico "Já existe um registro com esses dados"; e desabilitar visualmente o clique em slots que não estão como DISPONÍVEL enquanto o modo "Reagendando" estiver ativo, para o operador ver de cara onde pode soltar.
+- **Sem tocar** na regra de negócio: continua bloqueando reagendar sobre slot ocupado (isso está correto).
 
-### Validação proposta (depois do fix)
+Escopo de aplicação (**Regra 1.10 do AGENTS.md**): preciso confirmar antes de codar — a correção da mensagem/UX deve valer para **todas as clínicas** (Menino Jesus, SFP e a terceira)? A recomendação técnica é sim, porque é bug de UX genérico, mas quero sua confirmação explícita.
 
-1. Reagendar a Vania Maria Dario (11/08 12:30 → um horário novo com o Dr.
-   João Hélio) e confirmar que salva sem erro.
-2. Confirmar via SQL que o mesmo `agendamento.id` foi preservado (contrato do
-   Passo B).
-3. Conferir que o slot antigo (11/08 12:30 na agenda `2e408b29…`) voltou a
-   ficar DISPONIVEL e que o slot paralelo (`1c0ddcb9…` no mesmo horário)
-   continua intacto.
-4. Rodar um segundo reagendamento em uma agenda sem paralela para garantir
-   que o comportamento normal (sem paralelas) continua funcionando.
+## O que NÃO vou fazer sem sua ordem
 
-### Escopo / não-escopo
+- Não vou renomear/limpar a agenda EXAMES misturada com consultas do Dr. João Hélio (é regra de negócio antiga; entra em outro ticket).
+- Não vou criar novos slots no 23/07 automaticamente — se você quiser mais horários nesse dia, me diga o intervalo.
 
-- **Dentro**: correção do reagendamento em todas as clínicas (é bug técnico,
-  não regra de negócio — global conforme regra 1.10 do AGENTS.md, mas
-  confirmo antes de aplicar).
-- **Fora**: mudanças no wizard "Nova sessão" da Agenda V2, na criação
-  clássica, no modelo de slots pré-gerados, ou em qualquer política/RLS.
+## Confirmações que preciso de você
 
-### Confirmação necessária antes de implementar
-
-- **Clínica-alvo**: aplicar globalmente (todas as 3 clínicas)? É correção
-  técnica pura sem regra de negócio nova, mas quero confirmar conforme a
-  regra 1.10 do AGENTS.md.
+1. Qual horário livre em 23/07 usar para a Vania: **15:10**, 15:20, 16:20 ou 16:30?
+2. A correção de mensagem/UX pode ser aplicada em **todas as clínicas**?
