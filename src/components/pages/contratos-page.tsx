@@ -2825,13 +2825,17 @@ function DetalheContrato({
     const pids = Array.from(new Set(rows.map((r) => r.paciente_id).filter(Boolean)));
     let cpfMap: Record<string, string | null> = {};
     let prontMap: Record<string, string | null> = {};
+    let nascMap: Record<string, string | null> = {};
+    let telMap: Record<string, string | null> = {};
     if (pids.length) {
       const { data: pacs } = await supabase
         .from("pacientes")
-        .select("id, cpf, codigo_prontuario")
+        .select("id, cpf, codigo_prontuario, data_nascimento, telefone")
         .in("id", pids);
       cpfMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.cpf]));
       prontMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.codigo_prontuario]));
+      nascMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.data_nascimento]));
+      telMap = Object.fromEntries((pacs ?? []).map((p: any) => [p.id, p.telefone]));
     }
     const depsRows = rows.map((r) => ({
       id: r.id,
@@ -2841,6 +2845,8 @@ function DetalheContrato({
       tipo: r.tipo,
       cpf: cpfMap[r.paciente_id] ?? null,
       codigo_prontuario: prontMap[r.paciente_id] ?? null,
+      data_nascimento: nascMap[r.paciente_id] ?? null,
+      telefone: telMap[r.paciente_id] ?? null,
       incluido_em: r.incluido_em ?? null,
       excluido_em: r.excluido_em ?? null,
       ativo: !!r.ativo,
