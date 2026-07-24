@@ -5808,6 +5808,7 @@ export type Database = {
           orcamento_id: string | null
           paciente_id: string | null
           pagamento_id: string | null
+          pagamento_ids: string[]
           payload_envio: Json | null
           payload_resposta: Json | null
           rps_numero: number | null
@@ -5847,6 +5848,7 @@ export type Database = {
           orcamento_id?: string | null
           paciente_id?: string | null
           pagamento_id?: string | null
+          pagamento_ids?: string[]
           payload_envio?: Json | null
           payload_resposta?: Json | null
           rps_numero?: number | null
@@ -5886,6 +5888,7 @@ export type Database = {
           orcamento_id?: string | null
           paciente_id?: string | null
           pagamento_id?: string | null
+          pagamento_ids?: string[]
           payload_envio?: Json | null
           payload_resposta?: Json | null
           rps_numero?: number | null

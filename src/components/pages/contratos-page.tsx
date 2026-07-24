@@ -2130,6 +2130,7 @@ function DetalheContrato({
   const [emitenteId, setEmitenteId] = useState<string>("");
   const [nfsePorLancamento, setNfsePorLancamento] = useState<Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }>>({});
   const [nfseEmitindoId, setNfseEmitindoId] = useState<string | null>(null);
+  const [nfseEmitindoLote, setNfseEmitindoLote] = useState(false);
 
   // Inclusão/exclusão de dependentes pós-venda
   const [incOpen, setIncOpen] = useState(false);
@@ -2964,15 +2965,22 @@ function DetalheContrato({
     let cancel = false;
     void supabase
       .from("nfse")
-      .select("id, numero, status, url_pdf, pagamento_id")
+      .select("id, numero, status, url_pdf, pagamento_id, pagamento_ids")
       .eq("clinica_id", clinicaAtual.clinica_id)
-      .in("pagamento_id", ids)
+      .overlaps("pagamento_ids", ids)
       .neq("status", "cancelada")
       .then(({ data }) => {
         if (cancel) return;
         const map: Record<string, { id: string; numero: string | null; status: string | null; pdf_url: string | null }> = {};
-        for (const r of (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string }>) {
-          map[r.pagamento_id] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
+        for (const r of (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string | null; pagamento_ids: string[] | null }>) {
+          const linkedIds = (r.pagamento_ids && r.pagamento_ids.length > 0)
+            ? r.pagamento_ids
+            : (r.pagamento_id ? [r.pagamento_id] : []);
+          for (const pid of linkedIds) {
+            if (ids.includes(pid)) {
+              map[pid] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
+            }
+          }
         }
         setNfsePorLancamento(map);
       });
@@ -3235,6 +3243,122 @@ function DetalheContrato({
       mostrarErro(e);
     } finally {
       setNfseEmitindoId(null);
+    }
+  };
+
+  // Competência textual para a descrição agrupada.
+  const mesExtenso = (iso: string) => {
+    const d = new Date(`${iso}T12:00:00`);
+    return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  };
+
+  // Emite UMA NFS-e para várias parcelas pagas (mensalidades/taxas) do mesmo
+  // contrato/paciente. Soma valores, monta descrição consolidada e vincula
+  // todos os lançamentos via nfse.pagamento_ids.
+  const emitirNfseAgrupada = async (parcelas: Mens[]) => {
+    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
+    if (!clinicaAtual) return;
+    if (parcelas.length < 2) { toast.error("Selecione ao menos 2 parcelas pagas."); return; }
+    if (!emitentes.length || !emitenteId) {
+      toast.error("Cadastre um emitente ativo em Configurações › NFS-e antes de emitir.");
+      return;
+    }
+    // Validações: todas pagas, com lancamento_id, sem NFS-e ativa.
+    const invalida = parcelas.find((m) => m.status !== "pago" || !m.lancamento_id);
+    if (invalida) { toast.error("Selecione apenas parcelas pagas com lançamento financeiro."); return; }
+    const jaEmitida = parcelas.find((m) => m.lancamento_id && nfsePorLancamento[m.lancamento_id]);
+    if (jaEmitida) { toast.error("Uma ou mais parcelas selecionadas já têm NFS-e ativa. Cancele-as antes de reemitir."); return; }
+    const pac = pacienteFull ?? {};
+    const nomePac = contrato.paciente_nome ?? "";
+    if (!nomePac) { toast.error("Contrato sem paciente vinculado."); return; }
+    const valorTotal = parcelas.reduce(
+      (s, m) => s + (Number(m.valor_pago ?? m.valor) || 0),
+      0,
+    );
+    if (valorTotal <= 0) { toast.error("Valor total é zero."); return; }
+    setNfseEmitindoLote(true);
+    try {
+      const tomador = await pickTomadorNfse({
+        paciente: {
+          nome: nomePac,
+          cpfCnpj: pac.cpf ?? undefined,
+          email: pac.email ?? undefined,
+          cep: pac.cep ?? undefined,
+          logradouro: pac.logradouro ?? undefined,
+          numero: pac.numero ?? undefined,
+          bairro: pac.bairro ?? undefined,
+          municipio: pac.cidade ?? undefined,
+          uf: pac.estado ?? undefined,
+        },
+        valorBase: valorTotal,
+      });
+      if (!tomador) { toast.error("Emissão cancelada."); return; }
+      const parcial = aplicarValorParcial(valorTotal, tomador);
+      const convNome = convenio?.nome ? ` — Cartão Benefício ${convenio.nome}` : " — Cartão Benefício";
+      // Descrição consolidada, agrupando adesão/taxas separadas das mensalidades.
+      const mensSort = [...parcelas].sort(
+        (a, b) => a.vencimento.localeCompare(b.vencimento),
+      );
+      const linhasMens = mensSort
+        .filter((m) => !isAdesao(m) && !isTaxaInclusao(m))
+        .map((m) => `Mensalidade ${m.numero_parcela} (${mesExtenso(m.vencimento)})`);
+      const linhasTaxas = mensSort
+        .filter((m) => isAdesao(m) || isTaxaInclusao(m))
+        .map((m) => isAdesao(m) ? "Taxa de adesão" : "Taxa de inclusão de dependente");
+      const itens = [...linhasTaxas, ...linhasMens].join("; ");
+      const rotulo = `${itens}${convNome} — Contrato #${contrato.numero} — ${nomePac}`;
+      const descComDep = tomador.dependenteAtendido
+        ? `${rotulo} — Dependente do pagador: ${tomador.dependenteAtendido}`
+        : rotulo;
+      const descSugerida = `${descComDep}${parcial.descricaoSufixo}`;
+      const descFinal = await pedirDescricaoNfse(descSugerida);
+      if (!descFinal) { toast.error("Emissão cancelada."); return; }
+      const paciente_id = (contrato as { paciente_id?: string | null }).paciente_id ?? undefined;
+      const pagamentoIds = mensSort.map((m) => m.lancamento_id as string);
+      const res = await emitirNfseFn({
+        data: {
+          emitenteId,
+          pacienteId: paciente_id,
+          pagamentoId: pagamentoIds[0],
+          pagamentoIds,
+          valorServicos: parcial.valor,
+          descricaoServicos: descFinal,
+          tomador,
+        },
+      });
+      const nfseId = (res as { id?: string })?.id;
+      toast.success("NFS-e agrupada enviada. Consultando status...");
+      if (nfseId) {
+        await new Promise((r) => setTimeout(r, 4000));
+        await consultarNfseFn({ data: { id: nfseId } });
+      }
+      // Atualiza o mapa: consulta pelas parcelas vinculadas ao array.
+      const { data } = await supabase
+        .from("nfse")
+        .select("id, numero, status, url_pdf, pagamento_id, pagamento_ids")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .overlaps("pagamento_ids", pagamentoIds)
+        .neq("status", "cancelada");
+      const rows = (data ?? []) as Array<{ id: string; numero: string | null; status: string | null; url_pdf: string | null; pagamento_id: string | null; pagamento_ids: string[] | null }>;
+      setNfsePorLancamento((prev) => {
+        const next = { ...prev };
+        for (const r of rows) {
+          const linked = (r.pagamento_ids && r.pagamento_ids.length > 0)
+            ? r.pagamento_ids
+            : (r.pagamento_id ? [r.pagamento_id] : []);
+          for (const pid of linked) {
+            if (pagamentoIds.includes(pid)) {
+              next[pid] = { id: r.id, numero: r.numero, status: r.status, pdf_url: r.url_pdf };
+            }
+          }
+        }
+        return next;
+      });
+      limparHistSel();
+    } catch (e) {
+      mostrarErro(e);
+    } finally {
+      setNfseEmitindoLote(false);
     }
   };
 
@@ -4061,37 +4185,66 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 </div>
                 {podeEscrever && !(cancelado && !isAdmin) ? (() => {
                   const selecionaveis = mens.filter(
-                    (m) => m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida),
+                    (m) => !(isAdesao(m) && adesaoEmbutida),
                   );
                   const selecionadas = selecionaveis.filter((m) => selectedHistIds.has(m.id));
-                  const total = selecionadas.reduce((s, m) => s + (Number(m.valor) || 0), 0);
+                  const total = selecionadas.reduce(
+                    (s, m) => s + (Number(m.status === "pago" ? (m.valor_pago ?? m.valor) : m.valor) || 0),
+                    0,
+                  );
                   if (selecionadas.length === 0) return null;
+                  const pendentes = selecionadas.filter((m) => m.status !== "pago");
+                  const pagasComLanc = selecionadas.filter((m) => m.status === "pago" && !!m.lancamento_id);
+                  const pagasSemNfse = pagasComLanc.filter((m) => !nfsePorLancamento[m.lancamento_id!]);
+                  const soPendentes = pendentes.length > 0 && pagasComLanc.length === 0;
+                  const soPagasElegiveis = pendentes.length === 0 && pagasSemNfse.length === selecionadas.length && selecionadas.length >= 2;
+                  const mistura = pendentes.length > 0 && pagasComLanc.length > 0;
                   return (
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
                       <div>
                         <strong>{selecionadas.length}</strong> parcela(s) selecionada(s) — Total{" "}
                         <strong>R$ {total.toFixed(2).replace(".", ",")}</strong>
+                        {mistura ? (
+                          <span className="ml-2 text-destructive">Separe pagas e pendentes em seleções distintas.</span>
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-2">
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={limparHistSel}
-                          disabled={aplicandoHistLote}
+                          disabled={aplicandoHistLote || nfseEmitindoLote}
                         >
                           Limpar seleção
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={marcarPagasHistoricasEmLote}
-                          disabled={aplicandoHistLote}
-                        >
-                          {aplicandoHistLote ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                          ) : null}
-                          Marcar selecionadas como Paga (histórica)
-                        </Button>
+                        {soPendentes ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={marcarPagasHistoricasEmLote}
+                            disabled={aplicandoHistLote}
+                          >
+                            {aplicandoHistLote ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : null}
+                            Marcar selecionadas como Paga (histórica)
+                          </Button>
+                        ) : null}
+                        {podeEmitirNfse && soPagasElegiveis ? (
+                          <Button
+                            size="sm"
+                            onClick={() => emitirNfseAgrupada(pagasSemNfse)}
+                            disabled={nfseEmitindoLote || !emitenteId}
+                            title="Emitir uma única NFS-e somando todas as parcelas selecionadas"
+                          >
+                            {nfseEmitindoLote ? (
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            ) : (
+                              <FileText className="h-3 w-3 mr-1" />
+                            )}
+                            Emitir NFS-e agrupada ({pagasSemNfse.length})
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -4103,16 +4256,20 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         {podeEscrever && !(cancelado && !isAdmin) ? (
                           <TableHead className="w-8">
                             {(() => {
-                              const selecionaveis = mens.filter(
-                                (m) => m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida),
-                              );
+                              const selecionaveis = mens.filter((m) => {
+                                if (isAdesao(m) && adesaoEmbutida) return false;
+                                if (m.status === "pago") {
+                                  return !!m.lancamento_id && !nfsePorLancamento[m.lancamento_id];
+                                }
+                                return true;
+                              });
                               const allSel = selecionaveis.length > 0 &&
                                 selecionaveis.every((m) => selectedHistIds.has(m.id));
                               const someSel = selecionaveis.some((m) => selectedHistIds.has(m.id));
                               return (
                                 <input
                                   type="checkbox"
-                                  aria-label="Selecionar todas as parcelas em aberto"
+                                  aria-label="Selecionar todas as parcelas elegíveis"
                                   ref={(el) => {
                                     if (el) el.indeterminate = !allSel && someSel;
                                   }}
@@ -4179,14 +4336,18 @@ h1, h2, h3 { margin: 0 0 6mm; }
                         <TableRow>
                           {podeEscrever && !(cancelado && !isAdmin) ? (
                             <TableCell className="w-8">
-                              {m.status !== "pago" && !(isAdesao(m) && adesaoEmbutida) ? (
-                                <input
-                                  type="checkbox"
-                                  aria-label="Selecionar parcela para pagamento histórico"
-                                  checked={selectedHistIds.has(m.id)}
-                                  onChange={() => toggleHistSel(m.id)}
-                                />
-                              ) : null}
+                              {(() => {
+                                if (isAdesao(m) && adesaoEmbutida) return null;
+                                if (m.status === "pago" && (!m.lancamento_id || nfsePorLancamento[m.lancamento_id])) return null;
+                                return (
+                                  <input
+                                    type="checkbox"
+                                    aria-label="Selecionar parcela"
+                                    checked={selectedHistIds.has(m.id)}
+                                    onChange={() => toggleHistSel(m.id)}
+                                  />
+                                );
+                              })()}
                             </TableCell>
                           ) : null}
                           <TableCell>

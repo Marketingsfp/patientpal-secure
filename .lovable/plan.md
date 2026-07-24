@@ -1,22 +1,81 @@
-## Contexto
+## Objetivo
 
-Voc\u00ea escolheu a op\u00e7\u00e3o **B** para o erro que aparecia no cadastro do paciente SERGIO GARRIER DOS SANTOS mesmo com o cadastro completo, e informou que o endere\u00e7o dele j\u00e1 foi salvo agora. A corre\u00e7\u00e3o deve valer para **as 3 cl\u00ednicas** (POLICL\u00cdNICA MENINO JESUS, POLICL\u00cdNICA S\u00c3O FRANCISCO DE PAULA e a terceira unidade), sem feature flag por cl\u00ednica.
+Permitir agrupar **várias cobranças pagas do mesmo paciente** em **uma única NFS-e**, combinando:
 
-## O que ser\u00e1 feito
+- Mensalidades de contrato (Cartão Benefícios / Convênios)
+- Atendimentos avulsos pagos (Agenda / Financeiro)
+- Taxas de adesão / inclusão de dependente
 
-1. **Reproduzir o erro atual** no fluxo do SERGIO (agora com endere\u00e7o preenchido) para confirmar se o problema desapareceu s\u00f3 com o endere\u00e7o ou se persiste alguma outra valida\u00e7\u00e3o bloqueando.
-2. **Aplicar a corre\u00e7\u00e3o da op\u00e7\u00e3o B** de forma global (todas as cl\u00ednicas), sem criar `clinica_feature_flags` para isolar.
-3. **Revalidar** repetindo a a\u00e7\u00e3o que gerava o erro (venda / contrato / NFS-e / agendamento \u2014 conforme o fluxo original) para o SERGIO e para um paciente de outra cl\u00ednica, garantindo que:
-   - N\u00e3o aparece mais a mensagem de erro.
-   - Os cadastros considerados "completos" passam a ser aceitos.
-   - Nenhum outro fluxo dependente foi quebrado.
-4. **Resumo antes/depois** com o que mudou, quais arquivos/regra foram tocados e o que ainda precisa de valida\u00e7\u00e3o humana.
+Escopo confirmado: **todas as 3 clínicas**, comportamento **global**.
 
-## Antes de eu executar \u2014 preciso confirmar 2 pontos
+---
 
-Como a janela de hist\u00f3rico est\u00e1 parcial, quero evitar aplicar a corre\u00e7\u00e3o errada:
+## Antes × Depois
 
-- **Qual era exatamente a op\u00e7\u00e3o B?** (por exemplo: "relaxar a valida\u00e7\u00e3o no backend", "tornar o campo opcional no formul\u00e1rio", "normalizar o dado antes de validar", etc.)
-- **Em qual tela/fluxo o erro aparecia?** (Cadastro do paciente? Emiss\u00e3o de NFS-e? Gera\u00e7\u00e3o de contrato? Agendamento?)
+**Hoje** — cada parcela paga e cada atendimento pago geram uma NFS-e independente. Não há como somar 6 mensalidades pagas retroativamente em uma nota só, nem juntar “consulta avulsa + mensalidade” do mesmo tomador.
 
-Se voc\u00ea confirmar esses dois pontos (ou colar novamente o print do erro), sigo direto com a implementa\u00e7\u00e3o global e a revalida\u00e7\u00e3o \u2014 sem tocar em regras de neg\u00f3cio que n\u00e3o foram pedidas.
+**Depois** — o operador seleciona *N* itens pagos do mesmo paciente (na aba Mensalidades do contrato **e/ou** em uma nova aba “NFS-e agrupada”), o sistema:
+
+1. Soma os valores.
+2. Monta descrição consolidada (“Mensalidades set/2026 a dez/2026 + Consulta 12/07/2026…”).
+3. Emite **1 NFS-e** com valor total.
+4. Vincula todos os `fin_lancamentos` selecionados à mesma nota (o botão “NFS-e” some/aparece como emitida em cada linha origem).
+
+---
+
+## Mudanças (o que será tocado)
+
+### 1. Banco (1 migração)
+
+- Adicionar coluna `nfse.pagamento_ids uuid[]` (mantém `pagamento_id` como principal para retrocompatibilidade).
+- Índice GIN em `pagamento_ids` para consulta rápida por lançamento.
+- Sem mudança em RLS/políticas (herda `nfse`).
+
+### 2. Backend / Server function
+
+- `src/lib/nfse.functions.ts`: aceitar `pagamentoIds: uuid[]` no `inputValidator`. Ao inserir em `nfse`, gravar array; manter primeiro id em `pagamento_id`.
+- Nada muda no envio ao Focus NFe (é uma nota só, valor total).
+
+### 3. Frontend
+
+**a) Aba “Mensalidades” do contrato** (`contratos-page.tsx`)
+
+- Estender a barra flutuante de seleção existente (que já soma parcelas selecionadas) com o botão **“Emitir NFS-e agrupada (N)”**, habilitado quando **todas as selecionadas estiverem pagas** e tiverem `lancamento_id`.
+- Reaproveita `pickTomadorNfse` + `pedirDescricaoNfse` (fluxo idêntico ao unitário).
+- Após emitir, atualiza `nfsePorLancamento` de todos os ids selecionados.
+
+**b) Nova página “NFS-e agrupada por paciente”** em `Financeiro › Notas`
+
+- Campo de busca de paciente.
+- Lista `fin_lancamentos` pagos do paciente **sem NFS-e emitida** (mensalidades, taxas, atendimentos) das últimas 12 meses, com filtro por período.
+- Seleção múltipla → mesmo fluxo de emissão agrupada.
+
+### 4. Validações / regras
+
+- Todos os itens têm que ser do **mesmo `clinica_id`** e do **mesmo paciente/tomador**.
+- Nenhum item selecionado pode já ter NFS-e ativa (`status != 'cancelada'`).
+- Se houver mistura consulta+exame, a nota vai pelo CNPJ do **primeiro item** (mantém a heurística atual do `nfse.functions.ts`); se o operador quiser separar, seleciona em lotes distintos. Isso será avisado no dialog antes de emitir.
+
+---
+
+## Fora do escopo
+
+- Cancelamento / substituição de nota agrupada (fica para depois — cancela igual às unitárias, já suportado).
+- Rateio de valores/impostos entre itens (a nota é única, valor cheio).
+- Emissão agrupada envolvendo tomadores diferentes.
+
+---
+
+## Riscos
+
+- **Produção**: mexe em fluxo que dispara integração real Focus NFe. Vou testar primeiro em uma seleção pequena (2 parcelas) na Menino Jesus e reportar antes de considerar concluído.
+- Retrocompatibilidade: consultas antigas em `nfse.pagamento_id` continuam funcionando; código que usa a nova capacidade lê `pagamento_ids`.
+
+---
+
+## Validação prevista
+
+1. Migração aplicada.
+2. Rebuild dos tipos Supabase.
+3. Selecionar 2 mensalidades pagas de um contrato de teste → emitir agrupada → verificar no banco: 1 linha em `nfse`, `pagamento_ids` com 2 UUIDs, ambos os botões “Emitir NFS-e” trocados por link.
+4. Repetir com 1 mensalidade + 1 atendimento avulso do mesmo paciente na nova aba do Financeiro.
