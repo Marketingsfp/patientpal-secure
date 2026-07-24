@@ -103,6 +103,22 @@ const fmtDcurto = (s?: string | null) => {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${String(d.getFullYear()).slice(-2)}`;
 };
+const fmtCPFDisplay = (s?: string | null) => {
+  const d = (s ?? "").replace(/\D/g, "");
+  if (d.length !== 11) return s || "—";
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+};
+const fmtCEPDisplay = (s?: string | null) => {
+  const d = (s ?? "").replace(/\D/g, "");
+  if (d.length !== 8) return s || "—";
+  return `${d.slice(0, 5)}-${d.slice(5)}`;
+};
+const fmtTelDisplay = (s?: string | null) => {
+  const d = (s ?? "").replace(/\D/g, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return s || "—";
+};
 const MESES_PT = [
   "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
   "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
@@ -4763,6 +4779,67 @@ h1, h2, h3 { margin: 0 0 6mm; }
                   <Printer className="h-4 w-4 mr-1" />
                   Imprimir Contrato
                 </Button>
+              </div>
+              <div className="rounded-md border bg-card p-4 mb-3 space-y-4">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
+                    Contratante — Titular
+                  </div>
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+                    {[
+                      ["Nome", contrato.paciente_nome],
+                      ["CPF", fmtCPFDisplay(pacienteFull?.cpf)],
+                      ["Nascimento", pacienteFull?.data_nascimento ? fmtD(pacienteFull.data_nascimento) : "—"],
+                      ["Prontuário", pacienteFull?.codigo_prontuario ?? "—"],
+                      ["Telefone", fmtTelDisplay(pacienteFull?.telefone)],
+                      ["E-mail", pacienteFull?.email ?? "—"],
+                      ["Endereço", [pacienteFull?.logradouro, pacienteFull?.numero].filter(Boolean).join(", ") || "—"],
+                      ["Bairro", pacienteFull?.bairro ?? "—"],
+                      ["Cidade/UF", [pacienteFull?.cidade, pacienteFull?.estado].filter(Boolean).join("/") || "—"],
+                      ["CEP", fmtCEPDisplay(pacienteFull?.cep)],
+                    ].map(([label, value]) => (
+                      <div key={label as string} className="grid grid-cols-[9rem_minmax(0,1fr)] items-baseline gap-2 border-b border-dashed border-border/50 py-1">
+                        <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+                        <dd className="min-w-0 truncate font-medium">{(value as string) || "—"}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-primary mb-2">
+                    Associados / Dependentes ({depsAtivos.length})
+                  </div>
+                  {depsAtivos.length === 0 ? (
+                    <div className="text-sm text-muted-foreground italic">Nenhum dependente ativo.</div>
+                  ) : (
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-10">#</TableHead>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Parentesco</TableHead>
+                            <TableHead>CPF</TableHead>
+                            <TableHead>Prontuário</TableHead>
+                            <TableHead>Tipo</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {depsAtivos.map((d, i) => (
+                            <TableRow key={d.id}>
+                              <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                              <TableCell className="font-medium">{d.paciente_nome}</TableCell>
+                              <TableCell>{d.parentesco || "—"}</TableCell>
+                              <TableCell>{fmtCPFDisplay(d.cpf)}</TableCell>
+                              <TableCell>{d.codigo_prontuario ?? "—"}</TableCell>
+                              <TableCell className="capitalize">{d.tipo}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
               </div>
               {contratoTexto ? (
                 /<[a-z][\s\S]*>/i.test(contratoTexto) ? (
