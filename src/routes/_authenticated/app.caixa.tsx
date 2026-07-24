@@ -866,11 +866,13 @@ function Page() {
         // linha usará pacienteFromDescricao() no render.
         const pacIdEfetivo = l.paciente_id ?? agInfo?.paciente_id ?? null;
         const pacienteNome = pacIdEfetivo ? pacMap.get(pacIdEfetivo) ?? null : null;
+        const medIdEfetivo = l.medico_id ?? agInfo?.medico_id ?? null;
         enrich.set(l.id, {
           servico,
-          medico: l.medico_id ? medMap.get(l.medico_id) ?? null : null,
+          medico: medIdEfetivo ? medMap.get(medIdEfetivo) ?? null : null,
           paciente: pacienteNome,
           paciente_id: pacIdEfetivo,
+          ficha: agInfo?.ficha_numero ?? null,
         });
       }
       return { enrich, cancelados };
