@@ -6572,12 +6572,9 @@ function AgendaPage() {
               </kbd>
               💰 Mais de uma forma de pagamento
             </Button>
-            <Button variant="secondary" className="justify-center h-12" onClick={escolherManual}>
-              <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border bg-muted text-xs font-mono mr-2">
-                {formaPagOpcoes.length + 2}
-              </kbd>
-              ✏️ Valor manual
-            </Button>
+            {/* Botão "Valor manual" removido: valores devem sempre seguir a
+                regra do convênio (Cartão Benefícios) para evitar cobranças
+                divergentes do desconto configurado. */}
           </div>
         </DialogContent>
       </Dialog>
