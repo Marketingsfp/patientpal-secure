@@ -1,4 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
+import { CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS } from "./contract-templates/menino-jesus-cartao-consulta-seguros";
+
+// Override por convênio: quando o convênio corresponder a um destes IDs,
+// o modelo hard-coded (fiel ao PDF original) prevalece sobre o modelo salvo no banco.
+const CONVENIO_TEMPLATE_OVERRIDES: Record<string, string> = {
+  // POLICLINICA MENINO JESUS — CARTÃO CONSULTA + SEGUROS
+  "4fdce541-5b2b-4816-ba7d-911b36741b7d": CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS,
+};
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(v || 0));
@@ -305,7 +313,10 @@ export async function printContrato(contratoId: string) {
   const plTpl = (pl as any)?.template_contrato;
   const cvTpl = (cv as any)?.modelo_contrato;
   const pick = (v: any) => (v && String(v).replace(/<[^>]+>/g, "").trim().length > 0 ? v : null);
-  const templateBody = pick(plTpl) ?? pick(cvTpl) ?? TEXTO_CONTRATO_HTML;
+  const overrideTpl = (c as any).convenio_id
+    ? CONVENIO_TEMPLATE_OVERRIDES[(c as any).convenio_id]
+    : null;
+  const templateBody = overrideTpl ?? pick(plTpl) ?? pick(cvTpl) ?? TEXTO_CONTRATO_HTML;
 
   const corpo = applyTemplate(templateBody, {
     PACIENTE_NOME: c.paciente_nome ?? "",
@@ -324,7 +335,14 @@ export async function printContrato(contratoId: string) {
     ...depSlotVars,
   });
 
-  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
+  const isFullHtml = /<!doctype\s+html|<html[\s>]/i.test(corpo);
+
+  const html = isFullHtml
+    ? corpo.replace(
+        /<\/body>/i,
+        `<script>window.onload=()=>{setTimeout(()=>{window.print();},500);};</script></body>`,
+      )
+    : `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
 <title>Contrato #${c.numero} - ${esc(c.paciente_nome)}</title>
 <style>
   @page { size: A4; margin: 15mm; }
