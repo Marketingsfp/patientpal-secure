@@ -8419,6 +8419,7 @@ export type Database = {
       }
     }
     Functions: {
+      __actor_set_trocar_convenio: { Args: never; Returns: undefined }
       _do_fix_phones_prontuarios_mj: {
         Args: never
         Returns: {
