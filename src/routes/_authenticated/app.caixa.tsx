@@ -792,8 +792,8 @@ function Page() {
           ? supabase.from("medicos").select("id, nome").in("id", medIds)
           : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
         agIds.length > 0
-          ? supabase.from("agendamentos").select("id, procedimento_id, paciente_id, medico_id, ficha_numero").in("id", agIds)
-          : Promise.resolve({ data: [] as Array<{ id: string; procedimento_id: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }> }),
+          ? supabase.from("agendamentos").select("id, procedimento, paciente_id, medico_id, ficha_numero").in("id", agIds)
+          : Promise.resolve({ data: [] as Array<{ id: string; procedimento: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }> }),
         pacIds.length > 0
           ? supabase.from("pacientes").select("id, nome").in("id", pacIds)
           : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
@@ -802,12 +802,10 @@ function Page() {
       for (const m of (medRes.data ?? []) as Array<{ id: string; nome: string | null }>) {
         if (m.nome) medMap.set(m.id, m.nome);
       }
-      const agMap = new Map<string, { procedimento_id: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }>();
-      const procIds = new Set<string>();
+      const agMap = new Map<string, { procedimento: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }>();
       const pacIdsExtra = new Set<string>();
-      for (const a of (agRes.data ?? []) as Array<{ id: string; procedimento_id: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }>) {
-        agMap.set(a.id, { procedimento_id: a.procedimento_id, paciente_id: a.paciente_id, medico_id: a.medico_id, ficha_numero: a.ficha_numero });
-        if (a.procedimento_id) procIds.add(a.procedimento_id);
+      for (const a of (agRes.data ?? []) as Array<{ id: string; procedimento: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }>) {
+        agMap.set(a.id, { procedimento: a.procedimento, paciente_id: a.paciente_id, medico_id: a.medico_id, ficha_numero: a.ficha_numero });
         if (a.medico_id && !medIds.includes(a.medico_id)) medIds.push(a.medico_id);
         // Paciente pelo agendamento cobre casos em que fin_lancamentos
         // não tem paciente_id (ex.: mensalidades ou lançamentos gerados
@@ -840,20 +838,9 @@ function Page() {
           if (p.nome) pacMap.set(p.id, p.nome);
         }
       }
-      const procMap = new Map<string, string>();
-      if (procIds.size > 0) {
-        const { data: procs } = await supabase
-          .from("procedimentos")
-          .select("id, nome")
-          .in("id", Array.from(procIds));
-        for (const p of (procs ?? []) as Array<{ id: string; nome: string | null }>) {
-          if (p.nome) procMap.set(p.id, p.nome);
-        }
-      }
       for (const l of lancRows) {
         const agInfo = l.agendamento_id ? agMap.get(l.agendamento_id) : undefined;
-        const procId = agInfo?.procedimento_id ?? null;
-        const servicoFromProc = procId ? procMap.get(procId) ?? null : null;
+        const servicoFromProc = agInfo?.procedimento ?? null;
         // fallback: extrai serviço da descrição do lançamento
         let servico = servicoFromProc;
         if (!servico && l.descricao) {
