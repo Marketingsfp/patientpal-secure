@@ -8110,7 +8110,14 @@ function AgendaPage() {
               ) : paginados.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                    Nenhum agendamento encontrado.
+                    <AgendaEmptyState
+                      apenasData={apenasData}
+                      dataRef={dataRef}
+                      info={emptyInfo}
+                      onIrProxima={(d) => setDataRef(d)}
+                      onDesmarcarApenas={() => setApenasData(false)}
+                      onLimparFiltros={limparFiltros}
+                    />
                   </TableCell>
                 </TableRow>
               ) : (
