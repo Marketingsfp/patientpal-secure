@@ -2240,6 +2240,7 @@ function Page() {
       Tipo: TIPO_LABEL[m.tipo],
       Descricao: m.descricao ?? "",
       Forma: m.forma_pagamento ?? "",
+      Usuario: usuarioNomeFor(m),
       Valor: (TIPO_SINAL[m.tipo] < 0 ? -1 : 1) * Number(m.valor || 0),
     }));
     const op = (openDetalhe.user_nome || "operador").replace(/\s+/g, "_");
@@ -2258,6 +2259,7 @@ function Page() {
         <td>${TIPO_LABEL[m.tipo]}</td>
         <td>${esc(m.descricao ?? "")}</td>
         <td>${esc(m.forma_pagamento ?? "—")}</td>
+        <td>${esc(usuarioNomeFor(m))}</td>
         <td style="text-align:right;">${TIPO_SINAL[m.tipo] < 0 ? "-" : ""}${fmt(m.valor)}</td>
       </tr>`).join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"/>
@@ -2281,7 +2283,7 @@ function Page() {
         <div><b>Diferença</b><br/>${fmt(s.diferenca)}</div>
       </div>
       <table><thead><tr>
-        <th>Data</th><th>Hora</th><th>Tipo</th><th>Descrição</th><th>Forma</th><th style="text-align:right;">Valor</th>
+        <th>Data</th><th>Hora</th><th>Tipo</th><th>Descrição</th><th>Forma</th><th>Usuário</th><th style="text-align:right;">Valor</th>
       </tr></thead><tbody>${linhas}</tbody></table>
       <script>window.onload=()=>{window.print();}</script>
       </body></html>`;
