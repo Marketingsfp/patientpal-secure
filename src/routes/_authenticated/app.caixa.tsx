@@ -769,10 +769,10 @@ function Page() {
     const enrichMovsList = async (
       movsList: Mov[],
     ): Promise<{
-      enrich: Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null }>;
+      enrich: Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null; ficha: number | null }>;
       cancelados: Set<string>;
     }> => {
-      const enrich = new Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null }>();
+      const enrich = new Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null; ficha: number | null }>();
       const cancelados = new Set<string>();
       const lancIds = Array.from(new Set(movsList.map((m) => m.lancamento_id).filter((x): x is string => !!x)));
       if (lancIds.length === 0) return { enrich, cancelados };
@@ -792,8 +792,8 @@ function Page() {
           ? supabase.from("medicos").select("id, nome").in("id", medIds)
           : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
         agIds.length > 0
-          ? supabase.from("agendamentos").select("id, procedimento_id, paciente_id").in("id", agIds)
-          : Promise.resolve({ data: [] as Array<{ id: string; procedimento_id: string | null; paciente_id: string | null }> }),
+          ? supabase.from("agendamentos").select("id, procedimento_id, paciente_id, medico_id, ficha_numero").in("id", agIds)
+          : Promise.resolve({ data: [] as Array<{ id: string; procedimento_id: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }> }),
         pacIds.length > 0
           ? supabase.from("pacientes").select("id, nome").in("id", pacIds)
           : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
@@ -802,16 +802,30 @@ function Page() {
       for (const m of (medRes.data ?? []) as Array<{ id: string; nome: string | null }>) {
         if (m.nome) medMap.set(m.id, m.nome);
       }
-      const agMap = new Map<string, { procedimento_id: string | null; paciente_id: string | null }>();
+      const agMap = new Map<string, { procedimento_id: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }>();
       const procIds = new Set<string>();
       const pacIdsExtra = new Set<string>();
-      for (const a of (agRes.data ?? []) as Array<{ id: string; procedimento_id: string | null; paciente_id: string | null }>) {
-        agMap.set(a.id, { procedimento_id: a.procedimento_id, paciente_id: a.paciente_id });
+      for (const a of (agRes.data ?? []) as Array<{ id: string; procedimento_id: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }>) {
+        agMap.set(a.id, { procedimento_id: a.procedimento_id, paciente_id: a.paciente_id, medico_id: a.medico_id, ficha_numero: a.ficha_numero });
         if (a.procedimento_id) procIds.add(a.procedimento_id);
+        if (a.medico_id && !medIds.includes(a.medico_id)) medIds.push(a.medico_id);
         // Paciente pelo agendamento cobre casos em que fin_lancamentos
         // não tem paciente_id (ex.: mensalidades ou lançamentos gerados
         // por caminhos antigos).
         if (a.paciente_id && !pacIds.includes(a.paciente_id)) pacIdsExtra.add(a.paciente_id);
+      }
+      // Busca médicos adicionais referenciados apenas via agendamento
+      const medIdsFaltantes = Array.from(agMap.values())
+        .map((a) => a.medico_id)
+        .filter((x): x is string => !!x && !medMap.has(x));
+      if (medIdsFaltantes.length > 0) {
+        const { data: medsExtra } = await supabase
+          .from("medicos")
+          .select("id, nome")
+          .in("id", medIdsFaltantes);
+        for (const m of (medsExtra ?? []) as Array<{ id: string; nome: string | null }>) {
+          if (m.nome) medMap.set(m.id, m.nome);
+        }
       }
       const pacMap = new Map<string, string>();
       for (const p of (pacRes.data ?? []) as Array<{ id: string; nome: string | null }>) {
