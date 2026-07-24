@@ -97,6 +97,7 @@ import { IdadeIcon } from "@/components/idade-icon";
 import { ClienteForm, type Paciente as PacienteFull } from "@/components/clientes/cliente-form";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
+import { AgendaEmptyState } from "@/components/agenda/agenda-empty-state";
 export const Route = createFileRoute("/_authenticated/app/agenda")({
   component: AgendaPage,
 });
