@@ -2484,11 +2484,14 @@ function AtendimentosPage() {
             <Table containerClassName="max-h-[70vh]" className="max-lg:table max-lg:overflow-visible">
               <TableHeader className="sticky top-0 z-20">
                 <TableRow className="bg-muted">
-                  {!isMedicoOnly && (
-                    <TableHead className="w-8 px-2">
-                      <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos" />
-                    </TableHead>
-                  )}
+                   {!isMedicoOnly && (
+                     <TableHead className="px-2 whitespace-nowrap">
+                       <label className="flex items-center gap-2 cursor-pointer select-none">
+                         <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Selecionar todos os repasses" />
+                         <span className="text-[11px] font-medium">Selecionar todos os repasses</span>
+                       </label>
+                     </TableHead>
+                   )}
                   <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap text-center w-10">Ficha</TableHead>
                   <TableHead className="text-[11px] font-medium px-2 whitespace-nowrap">Data</TableHead>
                   <TableHead className="text-[11px] font-medium px-2">Médico</TableHead>
