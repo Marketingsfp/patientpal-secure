@@ -579,6 +579,29 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       } else {
         setExistingEmail(null);
       }
+      // Vínculo com paciente (para aba Convênio)
+      const pacIdMed = (med as { paciente_id?: string | null }).paciente_id ?? null;
+      if (pacIdMed) {
+        const { data: pac } = await supabase
+          .from("pacientes")
+          .select("id, nome, cpf, telefone, data_nascimento, clinica_id")
+          .eq("id", pacIdMed)
+          .maybeSingle();
+        setPacienteVinculado(
+          pac
+            ? {
+                id: pac.id as string,
+                nome: pac.nome as string,
+                cpf: (pac as { cpf: string | null }).cpf ?? null,
+                telefone: (pac as { telefone: string | null }).telefone ?? null,
+                data_nascimento: (pac as { data_nascimento: string | null }).data_nascimento ?? null,
+                clinica_id: (pac as { clinica_id: string }).clinica_id,
+              }
+            : null,
+        );
+      } else {
+        setPacienteVinculado(null);
+      }
       setLoading(false);
     })();
     return () => {
