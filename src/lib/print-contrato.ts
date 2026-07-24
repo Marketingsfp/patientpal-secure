@@ -1,5 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import { CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS } from "./contract-templates/menino-jesus-cartao-consulta-seguros";
+import contratoPdfAsset from "@/assets/contrato-cartao-consulta-seguros.pdf.asset.json";
+
+// Override por convênio para PDF estático (sem preenchimento automático).
+// O PDF em branco é aberto em iframe e disparada a impressão.
+const CONVENIO_PDF_OVERRIDES: Record<string, string> = {
+  // POLICLINICA MENINO JESUS — CARTÃO CONSULTA + SEGUROS
+  "4fdce541-5b2b-4816-ba7d-911b36741b7d": contratoPdfAsset.url,
+};
 
 const soDig = (s?: string | null) => (s ?? "").replace(/\D/g, "");
 
