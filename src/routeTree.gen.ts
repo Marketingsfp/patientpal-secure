@@ -36,6 +36,7 @@ import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticat
 import { Route as TotemTTokenRouteImport } from './routes/totem_.t.$token'
 import { Route as PainelTTokenRouteImport } from './routes/painel_.t.$token'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
+import { Route as ApiPublicTmpLoadMjTemplateRouteImport } from './routes/api/public/tmp-load-mj-template'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
 import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
 import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
@@ -273,6 +274,12 @@ const PContratoTokenRoute = PContratoTokenRouteImport.update({
   path: '/p/contrato/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicTmpLoadMjTemplateRoute =
+  ApiPublicTmpLoadMjTemplateRouteImport.update({
+    id: '/api/public/tmp-load-mj-template',
+    path: '/api/public/tmp-load-mj-template',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedAppUnidadesRoute =
   AuthenticatedAppUnidadesRouteImport.update({
     id: '/unidades',
@@ -951,6 +958,7 @@ export interface FileRoutesByFullPath {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/api/public/tmp-load-mj-template': typeof ApiPublicTmpLoadMjTemplateRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/painel/t/$token': typeof PainelTTokenRoute
   '/totem/t/$token': typeof TotemTTokenRoute
@@ -1077,6 +1085,7 @@ export interface FileRoutesByTo {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/api/public/tmp-load-mj-template': typeof ApiPublicTmpLoadMjTemplateRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/painel/t/$token': typeof PainelTTokenRoute
   '/totem/t/$token': typeof TotemTTokenRoute
@@ -1209,6 +1218,7 @@ export interface FileRoutesById {
   '/_authenticated/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/_authenticated/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/api/public/tmp-load-mj-template': typeof ApiPublicTmpLoadMjTemplateRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/painel_/t/$token': typeof PainelTTokenRoute
   '/totem_/t/$token': typeof TotemTTokenRoute
@@ -1341,6 +1351,7 @@ export interface FileRouteTypes {
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
+    | '/api/public/tmp-load-mj-template'
     | '/p/contrato/$token'
     | '/painel/t/$token'
     | '/totem/t/$token'
@@ -1467,6 +1478,7 @@ export interface FileRouteTypes {
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
+    | '/api/public/tmp-load-mj-template'
     | '/p/contrato/$token'
     | '/painel/t/$token'
     | '/totem/t/$token'
@@ -1598,6 +1610,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/treinamentos'
     | '/_authenticated/app/triagem-enfermagem'
     | '/_authenticated/app/unidades'
+    | '/api/public/tmp-load-mj-template'
     | '/p/contrato/$token'
     | '/painel_/t/$token'
     | '/totem_/t/$token'
@@ -1666,6 +1679,7 @@ export interface RootRouteChildren {
   TotemClinicaIdRoute: typeof TotemClinicaIdRoute
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
+  ApiPublicTmpLoadMjTemplateRoute: typeof ApiPublicTmpLoadMjTemplateRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
   PainelTTokenRoute: typeof PainelTTokenRoute
   TotemTTokenRoute: typeof TotemTTokenRoute
@@ -1863,6 +1877,13 @@ declare module '@tanstack/react-router' {
       path: '/p/contrato/$token'
       fullPath: '/p/contrato/$token'
       preLoaderRoute: typeof PContratoTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/tmp-load-mj-template': {
+      id: '/api/public/tmp-load-mj-template'
+      path: '/api/public/tmp-load-mj-template'
+      fullPath: '/api/public/tmp-load-mj-template'
+      preLoaderRoute: typeof ApiPublicTmpLoadMjTemplateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app/unidades': {
@@ -2920,6 +2941,7 @@ const rootRouteChildren: RootRouteChildren = {
   TotemClinicaIdRoute: TotemClinicaIdRoute,
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
+  ApiPublicTmpLoadMjTemplateRoute: ApiPublicTmpLoadMjTemplateRoute,
   PContratoTokenRoute: PContratoTokenRoute,
   PainelTTokenRoute: PainelTTokenRoute,
   TotemTTokenRoute: TotemTTokenRoute,
@@ -2930,3 +2952,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
