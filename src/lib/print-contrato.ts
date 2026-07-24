@@ -1,5 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import { CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS } from "./contract-templates/menino-jesus-cartao-consulta-seguros";
+import contratoPdfAsset from "@/assets/contrato-cartao-consulta-seguros.pdf.asset.json";
+
+// Override por convênio para PDF estático (sem preenchimento automático).
+// O PDF em branco é aberto em iframe e disparada a impressão.
+const CONVENIO_PDF_OVERRIDES: Record<string, string> = {
+  // POLICLINICA MENINO JESUS — CARTÃO CONSULTA + SEGUROS
+  "4fdce541-5b2b-4816-ba7d-911b36741b7d": contratoPdfAsset.url,
+};
 
 const soDig = (s?: string | null) => (s ?? "").replace(/\D/g, "");
 
@@ -269,6 +277,42 @@ const TEXTO_CONTRATO_HTML = `
 export async function printContrato(contratoId: string) {
   const { data: c, error } = await supabase.from("contratos_assinatura").select("*").eq("id", contratoId).maybeSingle();
   if (error || !c) throw new Error(error?.message ?? "Contrato não encontrado");
+
+  // PDF estático por convênio: abre o PDF em iframe e imprime, sem renderizar HTML.
+  const pdfOverrideUrl = (c as any).convenio_id
+    ? CONVENIO_PDF_OVERRIDES[(c as any).convenio_id]
+    : null;
+  if (pdfOverrideUrl) {
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.style.opacity = "0";
+    iframe.src = pdfOverrideUrl;
+    document.body.appendChild(iframe);
+    const cleanup = () => { try { iframe.parentNode?.removeChild(iframe); } catch { /* noop */ } };
+    iframe.onload = () => {
+      setTimeout(() => {
+        try {
+          const win = iframe.contentWindow;
+          if (!win) { cleanup(); return; }
+          win.onafterprint = () => setTimeout(cleanup, 100);
+          win.focus();
+          win.print();
+        } catch {
+          // Fallback: abre em nova aba se o navegador bloquear print do PDF em iframe
+          window.open(pdfOverrideUrl, "_blank", "noopener,noreferrer");
+          cleanup();
+        }
+        setTimeout(cleanup, 60_000);
+      }, 500);
+    };
+    return;
+  }
 
   const { data: cl } = await supabase
     .from("clinicas")
