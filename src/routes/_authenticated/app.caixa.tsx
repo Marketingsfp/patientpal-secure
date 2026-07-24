@@ -2516,9 +2516,9 @@ function Page() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {minhasMovsFiltrados.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={10} className="text-center text-muted-foreground">
+                       {minhasMovsFiltrados.length === 0 ? (
+                         <TableRow>
+                           <TableCell colSpan={11} className="text-center text-muted-foreground">
                             {filtrosAtivos
                               ? "Nenhum movimento corresponde aos filtros"
                               : "Sem movimentos no período"}
@@ -2528,6 +2528,7 @@ function Page() {
                          const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
                          const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
                          const medico = enr?.medico ?? null;
+                         const ficha = enr?.ficha ?? null;
                          const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
                          const bucket = bucketDeMov(m);
                          const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
@@ -2543,6 +2544,7 @@ function Page() {
                                <TableCell className="max-w-[320px] truncate" title={m.descricao ?? undefined}>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
                                <TableCell className="text-xs">{idx === 0 ? (servico || "—") : ""}</TableCell>
                                <TableCell className="text-xs">{idx === 0 ? (medico || "—") : ""}</TableCell>
+                               <TableCell className="text-xs tabular-nums">{idx === 0 ? (ficha ?? "—") : ""}</TableCell>
                                <TableCell className="text-xs">{FORMA_LABEL[k] ?? k}</TableCell>
                                <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                                  {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
@@ -2570,6 +2572,7 @@ function Page() {
                           </TableCell>
                           <TableCell className="text-xs">{servico || "—"}</TableCell>
                           <TableCell className="text-xs">{medico || "—"}</TableCell>
+                          <TableCell className="text-xs tabular-nums">{ficha ?? "—"}</TableCell>
                           <TableCell><FormaCellEditavel m={m} /></TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
