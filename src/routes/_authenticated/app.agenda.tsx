@@ -1259,6 +1259,15 @@ function AgendaPage() {
   // "Exibir apenas a data selecionada" o filtro passa a trazer só o dia
   // escolhido (comportamento antigo).
   const [apenasData, setApenasData] = useState(false);
+  // Diagnóstico do estado vazio quando "Exibir apenas a data selecionada"
+  // está marcado. Diferencia:
+  //  - 'sem_slots'       → nenhum horário cadastrado nesse dia (nem com filtros)
+  //  - 'filtros_escondem'→ existem horários no dia, mas os filtros ocultam
+  //  - 'so_futuro'       → nada no dia, mas há próxima data com agenda
+  const [emptyInfo, setEmptyInfo] = useState<{
+    motivo: "sem_slots" | "filtros_escondem" | "so_futuro";
+    proximaData: string | null;
+  } | null>(null);
   const [mostrarLivres, setMostrarLivres] = useState(true);
   const [filtroMedico, setFiltroMedico] = useState<string>("todos");
   const [filtroEspecialidade, setFiltroEspecialidade] = useState<string>("todos");
