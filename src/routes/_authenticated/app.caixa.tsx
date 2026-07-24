@@ -421,6 +421,13 @@ function Page() {
   // para o botão de estorno de sangria (que não tem lançamento financeiro).
   const [estornosPorMov, setEstornosPorMov] = useState<Map<string, "pendente" | "aprovado">>(new Map());
   const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, MovEnrich>>(new Map());
+  // Mapa user_id → nome de exibição. Alimenta a coluna "Usuário" (quem
+  // faturou) em Movimentos, no Detalhe de sessão, no drill-down do saldo
+  // e na exportação/impressão. Cobre tanto o operador do caixa
+  // (caixa_movimentos.user_id) quanto o autor do lançamento financeiro
+  // (fin_lancamentos.criado_por) — que podem divergir em cobranças
+  // centralizadas (ex.: financeiro/laboratório).
+  const [userNamesById, setUserNamesById] = useState<Map<string, string>>(new Map());
   // Conjunto de lancamento_ids cujo fin_lancamentos.status = 'cancelado'
   // (i.e., estornados). Esses recebimentos não devem entrar no saldo do
   // caixa mesmo que o movimento reverso ainda não tenha sido gravado.
