@@ -38,6 +38,7 @@ import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
 import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
+import { useAutoReloadOnNewBuild } from "@/hooks/use-auto-reload-on-new-build";
 import { printComprovanteCaixa } from "@/lib/print-caixa-comprovante";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
@@ -158,6 +159,9 @@ function formatarFormaPagamento(
 function CaixaRouteDispatcher() {
   const { clinicaAtual } = useClinica();
   const { enabled, loading } = useCaixaV2Flag();
+  // Detecta novo bundle publicado enquanto a tela do Caixa está aberta e
+  // recarrega automaticamente — evita a necessidade de Ctrl+Shift+R.
+  useAutoReloadOnNewBuild(true);
   const role = clinicaAtual?.role ?? null;
   const v2Allowed = role === "admin" || role === "gestor";
   if (!loading && enabled && v2Allowed) return <CaixaV2Mount />;
@@ -178,6 +182,31 @@ interface Mov {
   created_at: string;
   lancamento_id?: string | null;
 }
+type MovEnrich = {
+  servico: string | null;
+  medico: string | null;
+  paciente: string | null;
+  paciente_id: string | null;
+  ficha: number | null;
+};
+type LancamentoEnrichRow = {
+  id: string;
+  medico_id: string | null;
+  agendamento_id: string | null;
+  paciente_id: string | null;
+  descricao: string | null;
+  status: string | null;
+};
+type AgendamentoEnrichRow = {
+  id: string;
+  procedimento: string | null;
+  paciente_id: string | null;
+  medico_id: string | null;
+  ficha_numero: number | null;
+  inicio: string | null;
+  agenda_id: string | null;
+  paciente_nome: string | null;
+};
 interface FilaCaixa {
   id: string;
   paciente_id: string | null;
@@ -264,6 +293,30 @@ function pacienteFromDescricao(desc: string | null): string | null {
     return nome;
   }
   return null;
+}
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+}
+
+function saoPauloDayKey(value: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+function saoPauloDayRange(day: string): { start: string; end: string } {
+  return {
+    start: `${day}T00:00:00.000-03:00`,
+    end: `${day}T23:59:59.999-03:00`,
+  };
+}
+
+function formatFichaCaixa(ficha: number | null | undefined): string {
+  return typeof ficha === "number" && ficha > 0 ? String(ficha).padStart(3, "0") : "—";
 }
 
 const BANDEIRAS_CARTAO = [
@@ -362,7 +415,7 @@ function Page() {
   // Espelho do estornosPorLanc, mas indexado por caixa_movimento_id — usado
   // para o botão de estorno de sangria (que não tem lançamento financeiro).
   const [estornosPorMov, setEstornosPorMov] = useState<Map<string, "pendente" | "aprovado">>(new Map());
-  const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null; ficha: number | null }>>(new Map());
+  const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, MovEnrich>>(new Map());
   // Conjunto de lancamento_ids cujo fin_lancamentos.status = 'cancelado'
   // (i.e., estornados). Esses recebimentos não devem entrar no saldo do
   // caixa mesmo que o movimento reverso ainda não tenha sido gravado.
@@ -769,75 +822,111 @@ function Page() {
     const enrichMovsList = async (
       movsList: Mov[],
     ): Promise<{
-      enrich: Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null; ficha: number | null }>;
+      enrich: Map<string, MovEnrich>;
       cancelados: Set<string>;
     }> => {
-      const enrich = new Map<string, { servico: string | null; medico: string | null; paciente: string | null; paciente_id: string | null; ficha: number | null }>();
+      const enrich = new Map<string, MovEnrich>();
       const cancelados = new Set<string>();
       const lancIds = Array.from(new Set(movsList.map((m) => m.lancamento_id).filter((x): x is string => !!x)));
       if (lancIds.length === 0) return { enrich, cancelados };
-      const { data: lancs } = await supabase
-        .from("fin_lancamentos")
-        .select("id, medico_id, agendamento_id, paciente_id, descricao, status")
-        .in("id", lancIds);
-      const lancRows = (lancs ?? []) as Array<{ id: string; medico_id: string | null; agendamento_id: string | null; paciente_id: string | null; descricao: string | null; status: string | null }>;
+      const lancRows: LancamentoEnrichRow[] = [];
+      for (const ids of chunkArray(lancIds, 200)) {
+        const { data, error } = await supabase
+          .from("fin_lancamentos")
+          .select("id, medico_id, agendamento_id, paciente_id, descricao, status")
+          .in("id", ids);
+        if (error) {
+          console.warn("Falha ao enriquecer movimentos do caixa por lançamento", error);
+          continue;
+        }
+        lancRows.push(...((data ?? []) as LancamentoEnrichRow[]));
+      }
       for (const l of lancRows) {
         if (l.status === "cancelado") cancelados.add(l.id);
       }
-      const medIds = Array.from(new Set(lancRows.map((l) => l.medico_id).filter((x): x is string => !!x)));
+      const medIds = new Set(lancRows.map((l) => l.medico_id).filter((x): x is string => !!x));
       const agIds = Array.from(new Set(lancRows.map((l) => l.agendamento_id).filter((x): x is string => !!x)));
-      const pacIds = Array.from(new Set(lancRows.map((l) => l.paciente_id).filter((x): x is string => !!x)));
-      const [medRes, agRes, pacRes] = await Promise.all([
-        medIds.length > 0
-          ? supabase.from("medicos").select("id, nome").in("id", medIds)
-          : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
-        agIds.length > 0
-          ? supabase.from("agendamentos").select("id, procedimento, paciente_id, medico_id, ficha_numero").in("id", agIds)
-          : Promise.resolve({ data: [] as Array<{ id: string; procedimento: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }> }),
-        pacIds.length > 0
-          ? supabase.from("pacientes").select("id, nome").in("id", pacIds)
-          : Promise.resolve({ data: [] as Array<{ id: string; nome: string | null }> }),
-      ]);
-      const medMap = new Map<string, string>();
-      for (const m of (medRes.data ?? []) as Array<{ id: string; nome: string | null }>) {
-        if (m.nome) medMap.set(m.id, m.nome);
+      const pacIds = new Set(lancRows.map((l) => l.paciente_id).filter((x): x is string => !!x));
+
+      const agRows: AgendamentoEnrichRow[] = [];
+      for (const ids of chunkArray(agIds, 200)) {
+        const { data, error } = await supabase
+          .from("agendamentos")
+          .select("id, procedimento, paciente_id, medico_id, ficha_numero, inicio, agenda_id, paciente_nome")
+          .in("id", ids);
+        if (error) {
+          console.warn("Falha ao enriquecer movimentos do caixa por agendamento", error);
+          continue;
+        }
+        agRows.push(...((data ?? []) as AgendamentoEnrichRow[]));
       }
-      const agMap = new Map<string, { procedimento: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }>();
-      const pacIdsExtra = new Set<string>();
-      for (const a of (agRes.data ?? []) as Array<{ id: string; procedimento: string | null; paciente_id: string | null; medico_id: string | null; ficha_numero: number | null }>) {
-        agMap.set(a.id, { procedimento: a.procedimento, paciente_id: a.paciente_id, medico_id: a.medico_id, ficha_numero: a.ficha_numero });
-        if (a.medico_id && !medIds.includes(a.medico_id)) medIds.push(a.medico_id);
+
+      const agMap = new Map<string, AgendamentoEnrichRow>();
+      for (const a of agRows) {
+        agMap.set(a.id, a);
+        if (a.medico_id) medIds.add(a.medico_id);
         // Paciente pelo agendamento cobre casos em que fin_lancamentos
         // não tem paciente_id (ex.: mensalidades ou lançamentos gerados
         // por caminhos antigos).
-        if (a.paciente_id && !pacIds.includes(a.paciente_id)) pacIdsExtra.add(a.paciente_id);
+        if (a.paciente_id) pacIds.add(a.paciente_id);
       }
-      // Busca médicos adicionais referenciados apenas via agendamento
-      const medIdsFaltantes = Array.from(agMap.values())
-        .map((a) => a.medico_id)
-        .filter((x): x is string => !!x && !medMap.has(x));
-      if (medIdsFaltantes.length > 0) {
-        const { data: medsExtra } = await supabase
-          .from("medicos")
-          .select("id, nome")
-          .in("id", medIdsFaltantes);
-        for (const m of (medsExtra ?? []) as Array<{ id: string; nome: string | null }>) {
+
+      const medMap = new Map<string, string>();
+      for (const ids of chunkArray(Array.from(medIds), 200)) {
+        const { data, error } = await supabase.from("medicos").select("id, nome").in("id", ids);
+        if (error) {
+          console.warn("Falha ao enriquecer movimentos do caixa por médico", error);
+          continue;
+        }
+        for (const m of (data ?? []) as Array<{ id: string; nome: string | null }>) {
           if (m.nome) medMap.set(m.id, m.nome);
         }
       }
+
       const pacMap = new Map<string, string>();
-      for (const p of (pacRes.data ?? []) as Array<{ id: string; nome: string | null }>) {
-        if (p.nome) pacMap.set(p.id, p.nome);
-      }
-      if (pacIdsExtra.size > 0) {
-        const { data: pacsExtra } = await supabase
-          .from("pacientes")
-          .select("id, nome")
-          .in("id", Array.from(pacIdsExtra));
-        for (const p of (pacsExtra ?? []) as Array<{ id: string; nome: string | null }>) {
+      for (const ids of chunkArray(Array.from(pacIds), 200)) {
+        const { data, error } = await supabase.from("pacientes").select("id, nome").in("id", ids);
+        if (error) {
+          console.warn("Falha ao enriquecer movimentos do caixa por paciente", error);
+          continue;
+        }
+        for (const p of (data ?? []) as Array<{ id: string; nome: string | null }>) {
           if (p.nome) pacMap.set(p.id, p.nome);
         }
       }
+
+      const fichaCalculadaPorAg = new Map<string, number>();
+      const gruposFicha = new Map<string, { day: string; medicoId: string | null; agendaId: string | null }>();
+      for (const a of agRows) {
+        if (typeof a.ficha_numero === "number" && a.ficha_numero > 0) continue;
+        const day = saoPauloDayKey(a.inicio);
+        if (!day) continue;
+        const key = `${day}::${a.medico_id ?? "__sem_profissional__"}::${a.agenda_id ?? "__sem_agenda__"}`;
+        if (!gruposFicha.has(key)) gruposFicha.set(key, { day, medicoId: a.medico_id, agendaId: a.agenda_id });
+      }
+      for (const grupo of gruposFicha.values()) {
+        const range = saoPauloDayRange(grupo.day);
+        let q = supabase
+          .from("agendamentos")
+          .select("id, inicio, paciente_nome")
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .gte("inicio", range.start)
+          .lte("inicio", range.end);
+        q = grupo.medicoId ? q.eq("medico_id", grupo.medicoId) : q.is("medico_id", null);
+        q = grupo.agendaId ? q.eq("agenda_id", grupo.agendaId) : q.is("agenda_id", null);
+        const { data, error } = await q.range(0, 9999);
+        if (error) {
+          console.warn("Falha ao calcular ficha no caixa", error);
+          continue;
+        }
+        const ordenados = [...((data ?? []) as Array<{ id: string; inicio: string | null; paciente_nome: string | null }>)].sort((a, b) => {
+          const t = String(a.inicio ?? "").localeCompare(String(b.inicio ?? ""));
+          if (t !== 0) return t;
+          return String(a.paciente_nome ?? "").localeCompare(String(b.paciente_nome ?? ""), "pt-BR", { sensitivity: "base" });
+        });
+        ordenados.forEach((row, index) => fichaCalculadaPorAg.set(row.id, index + 1));
+      }
+
       for (const l of lancRows) {
         const agInfo = l.agendamento_id ? agMap.get(l.agendamento_id) : undefined;
         const servicoFromProc = agInfo?.procedimento ?? null;
@@ -859,7 +948,7 @@ function Page() {
           medico: medIdEfetivo ? medMap.get(medIdEfetivo) ?? null : null,
           paciente: pacienteNome,
           paciente_id: pacIdEfetivo,
-          ficha: agInfo?.ficha_numero ?? null,
+          ficha: agInfo ? (agInfo.ficha_numero ?? fichaCalculadaPorAg.get(agInfo.id) ?? null) : null,
         });
       }
       return { enrich, cancelados };
@@ -2531,7 +2620,7 @@ function Page() {
                                <TableCell className="max-w-[320px] truncate" title={m.descricao ?? undefined}>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
                                <TableCell className="text-xs">{idx === 0 ? (servico || "—") : ""}</TableCell>
                                <TableCell className="text-xs">{idx === 0 ? (medico || "—") : ""}</TableCell>
-                               <TableCell className="text-xs tabular-nums">{idx === 0 ? (ficha ?? "—") : ""}</TableCell>
+                                <TableCell className="text-xs tabular-nums">{idx === 0 ? formatFichaCaixa(ficha) : ""}</TableCell>
                                <TableCell className="text-xs">{FORMA_LABEL[k] ?? k}</TableCell>
                                <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                                  {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
@@ -2559,7 +2648,7 @@ function Page() {
                           </TableCell>
                           <TableCell className="text-xs">{servico || "—"}</TableCell>
                           <TableCell className="text-xs">{medico || "—"}</TableCell>
-                          <TableCell className="text-xs tabular-nums">{ficha ?? "—"}</TableCell>
+                           <TableCell className="text-xs tabular-nums">{formatFichaCaixa(ficha)}</TableCell>
                           <TableCell><FormaCellEditavel m={m} /></TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
