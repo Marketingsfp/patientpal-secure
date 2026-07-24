@@ -1,6 +1,27 @@
 import { supabase } from "@/integrations/supabase/client";
 import { CONTRATO_MJ_CARTAO_CONSULTA_SEGUROS } from "./contract-templates/menino-jesus-cartao-consulta-seguros";
 
+const soDig = (s?: string | null) => (s ?? "").replace(/\D/g, "");
+
+const fmtCPF = (s?: string | null) => {
+  const d = soDig(s);
+  if (d.length !== 11) return s ?? "";
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+};
+
+const fmtCEP = (s?: string | null) => {
+  const d = soDig(s);
+  if (d.length !== 8) return s ?? "";
+  return `${d.slice(0, 5)}-${d.slice(5)}`;
+};
+
+const fmtTelefone = (s?: string | null) => {
+  const d = soDig(s);
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return s ?? "";
+};
+
 // Override por convênio: quando o convênio corresponder a um destes IDs,
 // o modelo hard-coded (fiel ao PDF original) prevalece sobre o modelo salvo no banco.
 const CONVENIO_TEMPLATE_OVERRIDES: Record<string, string> = {
@@ -305,9 +326,9 @@ export async function printContrato(contratoId: string) {
     const idx = i + 1;
     depSlotVars[`DEPENDENTE_${idx}`] = d?.paciente_nome ?? "";
     depSlotVars[`DEPENDENTE_${idx}_PARENTESCO`] = d?.parentesco ?? "";
-    depSlotVars[`DEPENDENTE_${idx}_CPF`] = pac?.cpf ?? "";
+    depSlotVars[`DEPENDENTE_${idx}_CPF`] = fmtCPF(pac?.cpf);
     depSlotVars[`DEPENDENTE_${idx}_NASCIMENTO`] = pac?.data_nascimento ? fmtData(pac.data_nascimento) : "";
-    depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = pac?.telefone ?? d?.telefone ?? "";
+    depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = fmtTelefone(pac?.telefone ?? d?.telefone);
   }
 
   const plTpl = (pl as any)?.template_contrato;
@@ -320,7 +341,7 @@ export async function printContrato(contratoId: string) {
 
   const corpo = applyTemplate(templateBody, {
     PACIENTE_NOME: c.paciente_nome ?? "",
-    PACIENTE_CPF: _pa.cpf ?? "",
+    PACIENTE_CPF: fmtCPF(_pa.cpf),
     PACIENTE_NASCIMENTO: fmtData(_pa.data_nascimento),
     PACIENTE_ENDERECO: enderecoPaciente,
     PACIENTE_LOGRADOURO: _pa.logradouro ?? "",
@@ -328,8 +349,8 @@ export async function printContrato(contratoId: string) {
     PACIENTE_BAIRRO: _pa.bairro ?? "",
     PACIENTE_CIDADE: _pa.cidade ?? "",
     PACIENTE_ESTADO: _pa.estado ?? "",
-    PACIENTE_CEP: _pa.cep ?? "",
-    PACIENTE_TELEFONE: _pa.telefone ?? "",
+    PACIENTE_CEP: fmtCEP(_pa.cep),
+    PACIENTE_TELEFONE: fmtTelefone(_pa.telefone),
     PACIENTE_EMAIL: _pa.email ?? "",
     DATA_HOJE: fmtDataExtenso(new Date().toISOString()),
     ...depSlotVars,
