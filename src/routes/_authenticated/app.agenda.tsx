@@ -4901,7 +4901,7 @@ function AgendaPage() {
             clinicaId: clinicaAtual.clinica_id,
             pacienteId: a.paciente_id,
             medicoId: a.medico_id,
-            tipoAtendimento: a.tipo_atendimento,
+            tipoAtendimento: a.tipo_atendimento ?? "",
             dataRef: a.inicio ?? null,
             nomes: nomesEfetivos,
             agendamentoIds: [a.id],
