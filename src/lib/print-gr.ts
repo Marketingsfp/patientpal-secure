@@ -859,7 +859,15 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(clinica)}</td></tr>
       <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(prestador)}</td></tr>
     </table>
-    ` : ""}
+    ` : (isGratuidade && (clinica > 0 || prestador > 0) ? `
+    <div class="center bold lg" style="margin-top:8px; letter-spacing:2px">GRATUIDADE</div>
+    <div class="center sm">PACIENTE ISENTO DE PAGAMENTO</div>
+    <div class="sep"></div>
+    <table>
+      <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(clinica)}</td></tr>
+      <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(prestador)}</td></tr>
+    </table>
+    ` : "")}
 
     <div class="sep"></div>
     <div class="row sm">
