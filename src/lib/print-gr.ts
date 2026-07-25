@@ -488,7 +488,41 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       if (m) medicoCb = { aceita: !!m.aceita_cartao_beneficios, tipo: m.cb_tipo_repasse ?? null, valor: m.cb_valor_repasse ?? null, percentual: m.cb_percentual_repasse ?? null };
     } catch { medicoCb = null; }
   }
-  const procData = proc.data as { id: string; nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
+  let procData = proc.data as { id: string; nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
+  // Fallback: a.procedimento pode vir com sufixos como "(ECG) (CARDIOLOGIA)"
+  // que não existem exatamente na tabela `procedimentos`. Tenta variantes
+  // progressivamente mais curtas (removendo parênteses do fim) para achar o
+  // procedimento cadastrado e preservar o valor de tabela — essencial para
+  // gratuidades, onde não há valor pago para fallback.
+  if (!procData && a.procedimento) {
+    const stripParens = (s: string): string[] => {
+      const out: string[] = [];
+      let cur = s.trim();
+      out.push(cur);
+      for (let i = 0; i < 3; i++) {
+        const m = cur.match(/^(.*)\s*\([^()]*\)\s*$/);
+        if (!m) break;
+        cur = m[1].trim();
+        if (cur) out.push(cur);
+      }
+      const semParens = s.replace(/\s*\([^()]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+      if (semParens && !out.includes(semParens)) out.push(semParens);
+      return out;
+    };
+    for (const alvo of stripParens(a.procedimento)) {
+      if (alvo === a.procedimento) continue;
+      const { data: pAlt } = await supabase
+        .from("procedimentos")
+        .select("id, nome, valor_dinheiro_pix, valor_cartao, tipo")
+        .eq("clinica_id", clinicaId)
+        .ilike("nome", alvo)
+        .maybeSingle();
+      if (pAlt) {
+        procData = pAlt as typeof procData;
+        break;
+      }
+    }
+  }
 
   // Especialidade correta = a que está vinculada a ESTE serviço para ESTE médico
   // (medico_procedimentos.especialidade_id), definida na aba Especialidades/Serviços
