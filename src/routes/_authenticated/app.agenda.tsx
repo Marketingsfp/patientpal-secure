@@ -2817,7 +2817,7 @@ function AgendaPage() {
       if (t) clearTimeout(t);
       t = setTimeout(() => {
         void loadFnRef.current();
-      }, 800);
+      }, 400);
     };
     const ch = supabase
       .channel(`agenda-rt-${clinicaAtual.clinica_id}`)
