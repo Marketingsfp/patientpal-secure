@@ -89,6 +89,7 @@ import { RenovarContratoDialog } from "@/components/contratos/renovar-contrato-d
 import { HistoricoContratoTab } from "@/components/contratos/historico-contrato-tab";
 import { RecalcularVencimentosDialog } from "@/components/contratos/recalcular-vencimentos-dialog";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
+import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 
@@ -2687,6 +2688,10 @@ function DetalheContrato({
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [lancOpen, setLancOpen] = useState(false);
   const [pagInitialForma, setPagInitialForma] = useState<string>("");
+  // Isenção de juros + multa para a mensalidade atualmente em pagamento.
+  // Vale só enquanto o diálogo de forma de pagamento estiver aberto; reseta ao fechar.
+  const [isencaoEncargos, setIsencaoEncargos] = useState<{ autorizadoPorNome: string; autorizadoPorUserId: string } | null>(null);
+  const [isencaoAuthOpen, setIsencaoAuthOpen] = useState(false);
 
   const formaOpcoes: Array<{ forma: string; label: string }> = [
     { forma: "dinheiro", label: "Dinheiro" },
@@ -3387,6 +3392,9 @@ function DetalheContrato({
     if (!m) return 0;
     const base = Number(m.valor) || 0;
     if (m.status === "pago") return base;
+    // Se um gestor autorizou a isenção de juros e multa para ESTA parcela,
+    // devolve o valor original — sem multa e sem juros.
+    if (isencaoEncargos && pagMens?.id === m.id) return base;
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     const venc = new Date(m.vencimento + "T00:00:00");
@@ -5145,7 +5153,13 @@ h1, h2, h3 { margin: 0 0 6mm; }
         </DialogContent>
       </Dialog>
 
-      <Dialog open={formaPagOpen} onOpenChange={setFormaPagOpen}>
+      <Dialog
+        open={formaPagOpen}
+        onOpenChange={(v) => {
+          setFormaPagOpen(v);
+          if (!v) setIsencaoEncargos(null);
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Forma de pagamento</DialogTitle>
@@ -5185,6 +5199,29 @@ h1, h2, h3 { margin: 0 0 6mm; }
             </div>
           ) : null}
           {pagMens && pagDiasAtraso > 5 ? (
+            isencaoEncargos ? (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs space-y-1">
+                <div className="font-semibold">Juros e multa isentados</div>
+                <div className="text-muted-foreground">
+                  Autorizado por <span className="font-medium">{isencaoEncargos.autorizadoPorNome}</span>. Cobrando o valor original da parcela.
+                </div>
+                <div className="flex justify-between pt-1 border-t border-amber-500/30">
+                  <span>Valor a cobrar</span>
+                  <span className="font-semibold">{BRL(Number(pagMens.valor))}</span>
+                </div>
+                <div className="pt-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setIsencaoEncargos(null)}
+                  >
+                    Reaplicar juros e multa
+                  </Button>
+                </div>
+              </div>
+            ) : (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs space-y-0.5">
               <div className="flex justify-between">
                 <span>Valor original</span>
@@ -5202,7 +5239,19 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <span>Total com encargos</span>
                 <span>{BRL(pagValorFinal)}</span>
               </div>
+            <div className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs w-full"
+                onClick={() => setIsencaoAuthOpen(true)}
+              >
+                Isentar juros e multa (gestor)
+              </Button>
             </div>
+            </div>
+            )
           ) : null}
           <div className="grid gap-2 mt-2">
             {formaOpcoes.map((op, idx) => (
@@ -5230,6 +5279,47 @@ h1, h2, h3 { margin: 0 0 6mm; }
           </div>
         </DialogContent>
       </Dialog>
+
+      <SupervisorAuthDialog
+        open={isencaoAuthOpen}
+        onOpenChange={setIsencaoAuthOpen}
+        acao="isentar juros e multa desta mensalidade"
+        rolesPermitidos={["admin", "gestor"]}
+        onAuthorized={async (info) => {
+          setIsencaoAuthOpen(false);
+          if (!pagMens || !clinicaAtual) return;
+          const valorOriginal = Number(pagMens.valor) || 0;
+          const valorComEncargos = valorOriginal * 1.1 + valorOriginal * 0.0033 * pagDiasAtraso;
+          try {
+            await supabase.from("audit_log").insert({
+              clinica_id: clinicaAtual.clinica_id,
+              user_id: user?.id ?? null,
+              user_email: user?.email ?? null,
+              table_name: "contrato_mensalidades",
+              record_id: pagMens.id,
+              action: "UPDATE",
+              dados_depois: {
+                acao: "isentar_juros_multa_mensalidade",
+                contrato_id: contrato.id,
+                contrato_numero: contrato.numero,
+                numero_parcela: pagMens.numero_parcela,
+                valor_original: valorOriginal,
+                valor_com_encargos: Number(valorComEncargos.toFixed(2)),
+                dias_atraso: pagDiasAtraso,
+                autorizado_por_user_id: info.userId,
+                autorizado_por_nome: info.nome,
+                autorizado_por_email: info.email,
+                autorizado_por_role: info.role,
+              },
+            });
+          } catch (e) {
+            // Auditoria não deve bloquear a operação, apenas avisa.
+            console.error("Falha ao registrar auditoria de isenção", e);
+          }
+          setIsencaoEncargos({ autorizadoPorNome: info.nome, autorizadoPorUserId: info.userId });
+          toast.success(`Juros e multa isentados por ${info.nome}.`);
+        }}
+      />
 
       <LancamentoDialog
         open={lancOpen}

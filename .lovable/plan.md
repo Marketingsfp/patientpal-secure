@@ -1,36 +1,43 @@
 ## Objetivo
 
-Alinhar o texto dos contratos ao juros que o sistema realmente cobra: **0,33% ao dia** (o texto atual diz "0,033% ao dia", que é 10× menor que o valor efetivamente aplicado). Vale para **todas as clínicas**.
+Permitir remover **juros + multa** de uma mensalidade atrasada do Cartão Benefícios sem usar valor manual (que continua bloqueado). A ação exige **senha de gestor** e fica registrada em auditoria.
 
-O motor de cálculo (`calcValorComJuros` em `contratos-page.tsx`) e o carnê impresso (`print-carne.ts`, que já diz "0,33% ao dia") **não serão tocados** — eles já estão corretos.
+**Escopo:** todas as clínicas. Apenas a tela de contrato (aba Mensalidades). Somente a linha visual/UX de pagamento — motor de cálculo e RLS permanecem intactos.
 
-## O que será alterado
+## Comportamento
 
-### 1. Template HTML de impressão de contrato
-Arquivo: `src/lib/print-contrato.ts` (Parágrafo Quinto, linha 197)
-- Trocar `"juros de 0,033% ao dia"` → `"juros de 0,33% ao dia"`
+No diálogo "Forma de pagamento" (que aparece ao clicar em **Pagar** numa mensalidade), quando a parcela estiver com mais de 5 dias de atraso (`pagDiasAtraso > 5`, é a mesma condição que hoje mostra o box vermelho de multa + juros):
 
-### 2. Template Menino Jesus (Cartão Consulta + Seguros)
-Arquivo: `src/lib/contract-templates/menino-jesus-cartao-consulta-seguros.ts` (linha 784)
-- Trocar `"além de juros de 0,033% ao dia"` → `"além de juros de 0,33% ao dia"`
+1. Aparece um botão secundário **"Isentar juros e multa"** logo acima da grade de formas de pagamento.
+2. Ao clicar, abre o `SupervisorAuthDialog` existente (`acao="isentar juros e multa"`, roles `admin` e `gestor`).
+3. Autorizado: a tela passa a mostrar o valor da parcela **sem encargos** (`Number(m.valor)`), o box vermelho de encargos é substituído por um aviso amarelo "Juros e multa isentados por {nome do gestor}", e todos os botões de forma de pagamento passam a cobrar o valor original. Um botão pequeno "Reaplicar juros" permite desfazer antes de escolher a forma.
+4. A isenção vale só para aquele pagamento; ao fechar o diálogo, some.
+5. Ao efetivar o lançamento (via `LancamentoDialog`), o `valor_manual` continua bloqueado — o valor já sai correto porque `initialValor` passa a ser o valor original da parcela.
 
-### 3. Templates armazenados no banco (`planos_assinatura.template_contrato`)
-Migração SQL simples para todas as clínicas:
-```sql
-UPDATE public.planos_assinatura
-SET template_contrato = replace(template_contrato, '0,033%', '0,33%')
-WHERE template_contrato ILIKE '%0,033%';
-```
-Isso afeta 4 planos (2 da Menino Jesus, 1 da SFP, 1 da São Francisco) identificados na análise. Contratos **já assinados/impressos** não mudam retroativamente — a alteração vale para contratos futuros gerados a partir desses templates.
+## Auditoria
 
-## Fora do escopo
+Como o pedido foi "só auditoria automática", registra-se um insert em `audit_log` no momento da autorização (antes de abrir a forma de pagamento) com:
 
-- Não alterar `calcValorComJuros` (o cálculo já é 0,33%/dia).
-- Não alterar `print-carne.ts` (o carnê já diz 0,33%).
-- Não regravar contratos antigos já impressos/assinados.
-- Não mexer no valor da multa (10%) nem na tolerância de 5 dias.
+- `acao = 'isentar_juros_multa_mensalidade'`
+- `entidade = 'contrato_mensalidades'`, `entidade_id = pagMens.id`
+- `payload` com: `contrato_id`, `numero_parcela`, `valor_original`, `valor_com_encargos`, `dias_atraso`, `autorizado_por_user_id`, `autorizado_por_nome`, `executado_por_user_id` (usuário logado).
 
-## Validação
+Sem migration nova — a tabela `audit_log` já existe e é usada pelo projeto.
 
-- Grep confirmando que não sobrou "0,033%" em `src/lib/print-contrato.ts` nem no template Menino Jesus.
-- `SELECT count(*)` em `planos_assinatura` mostrando 0 registros com `0,033%` após a migração.
+## Arquivos
+
+- `src/components/pages/contratos-page.tsx`
+  - Novo estado local `isencaoEncargos: { autorizadoPor: string } | null`.
+  - Ajustar `pagValorFinal` para retornar o valor base quando `isencaoEncargos` estiver ativo.
+  - Renderizar o botão "Isentar juros e multa" e o `SupervisorAuthDialog` (já importado no projeto).
+  - Ao autorizar: `insert` em `audit_log` e set do estado.
+  - Reset do estado quando `formaPagOpen` fecha ou `pagMens` muda.
+
+Nenhuma outra tela é afetada. Nenhum arquivo gerado (`types.ts`, `client.ts` etc.) é tocado. Sem alteração no banco.
+
+## Fora de escopo
+
+- Isenção em lote (várias parcelas de uma vez).
+- Isenção parcial (só multa, ou só juros).
+- Alteração no template do contrato ou no cálculo de juros.
+- Fluxos fora da tela de contrato (Financeiro avulso, Agenda).
