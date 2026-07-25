@@ -76,6 +76,7 @@ import {
   Camera,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
+import { GRPreviewDialog } from "@/components/gr/gr-preview-dialog";
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
@@ -1704,6 +1705,14 @@ function AgendaPage() {
   // repetidos, enquanto a GR ainda está sendo montada, disparem várias
   // impressões e registrem vias duplicadas.
   const imprimindoGRRef = useRef<Set<string>>(new Set());
+  // Prévia da GR antes de imprimir: guarda o HTML montado e o callback que
+  // efetivamente dispara a impressão + grava a via no histórico.
+  const [grPreview, setGrPreview] = useState<{
+    html: string;
+    title: string;
+    confirm: () => Promise<void>;
+    onCancel?: () => void;
+  } | null>(null);
   const navigate = useNavigate();
   // ── Desconto aplicado ANTES de "Salvar e Pagar" (com autorização da supervisão).
   type DescontoPendente = { tipo: "valor" | "percentual"; input: string; autorizadoPor: string; motivo: string };
@@ -5665,15 +5674,28 @@ function AgendaPage() {
       }
       const fichaStr = fichaPorId.get(a.id);
       const fichaNumero = fichaStr && fichaStr !== "—" ? Number(fichaStr) : undefined;
-      await printGuiaAtendimento({
+      const resultado = await printGuiaAtendimento({
         agendamentoId: a.id,
         clinicaId: clinicaAtual.clinica_id,
         usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
         usuarioId: user?.id ?? null,
         pagamento: pagamentoInfo,
         fichaNumero,
+        preview: true,
       });
-      toast.success("GR enviada para impressão.", { id: toastId });
+      toast.dismiss(toastId);
+      if (resultado && resultado.preview) {
+        const nomePac = a.paciente_nome ?? "paciente";
+        setGrPreview({
+          html: resultado.html,
+          title: `Prévia da GR — ${nomePac}`,
+          confirm: async () => {
+            await resultado.confirm();
+            setGrPreview(null);
+            toast.success("GR enviada para impressão.");
+          },
+        });
+      }
     } catch (err) {
       toast.dismiss(toastId);
       mostrarErro(err);
@@ -6747,7 +6769,7 @@ function AgendaPage() {
           try {
             // Imprime a guia só do que foi de fato confirmado — se o rateio
             // falhou, isso é [agId] (só o principal), não o grupo inteiro.
-            await printGuiaAtendimentoAgrupada({
+            const resultadoGr = await printGuiaAtendimentoAgrupada({
               agendamentoIds: idsConfirmados,
               clinicaId: clinicaAtual.clinica_id,
               usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
@@ -6759,8 +6781,28 @@ function AgendaPage() {
                 bandeira_cartao: dados.bandeira_cartao,
                 detalhe: dados.pagamentos_detalhe,
               },
+              preview: true,
             });
-            if (!rateioFalhou) {
+            if (resultadoGr && resultadoGr.preview) {
+              const nomePac = items.find((x) => x.id === (idsConfirmados[0] ?? agId))?.paciente_nome ?? "paciente";
+              setGrPreview({
+                html: resultadoGr.html,
+                title: `Prévia da GR — ${nomePac}`,
+                confirm: async () => {
+                  await resultadoGr.confirm();
+                  setGrPreview(null);
+                  if (!rateioFalhou) {
+                    toast.success("Pagamento registrado e GR enviado para impressão.");
+                  }
+                },
+                onCancel: () => {
+                  setGrPreview(null);
+                  if (!rateioFalhou) {
+                    toast.success("Pagamento registrado. GR não impressa — você pode reimprimir pelo menu.");
+                  }
+                },
+              });
+            } else if (!rateioFalhou) {
               toast.success("Pagamento registrado e GR enviado para impressão.");
             }
           } catch (err) {
@@ -8888,6 +8930,19 @@ function AgendaPage() {
           }}
         />
       )}
+      <GRPreviewDialog
+        open={!!grPreview}
+        html={grPreview?.html ?? null}
+        title={grPreview?.title}
+        onCancel={() => {
+          const cb = grPreview?.onCancel;
+          setGrPreview(null);
+          if (cb) cb();
+        }}
+        onConfirm={async () => {
+          if (grPreview) await grPreview.confirm();
+        }}
+      />
     </div>
   );
 }
