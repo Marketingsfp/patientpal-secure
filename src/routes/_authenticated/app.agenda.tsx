@@ -6769,7 +6769,7 @@ function AgendaPage() {
           try {
             // Imprime a guia só do que foi de fato confirmado — se o rateio
             // falhou, isso é [agId] (só o principal), não o grupo inteiro.
-            await printGuiaAtendimentoAgrupada({
+            const resultadoGr = await printGuiaAtendimentoAgrupada({
               agendamentoIds: idsConfirmados,
               clinicaId: clinicaAtual.clinica_id,
               usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
@@ -6781,8 +6781,28 @@ function AgendaPage() {
                 bandeira_cartao: dados.bandeira_cartao,
                 detalhe: dados.pagamentos_detalhe,
               },
+              preview: true,
             });
-            if (!rateioFalhou) {
+            if (resultadoGr && resultadoGr.preview) {
+              const nomePac = items.find((x) => x.id === (idsConfirmados[0] ?? agId))?.paciente_nome ?? "paciente";
+              setGrPreview({
+                html: resultadoGr.html,
+                title: `Prévia da GR — ${nomePac}`,
+                confirm: async () => {
+                  await resultadoGr.confirm();
+                  setGrPreview(null);
+                  if (!rateioFalhou) {
+                    toast.success("Pagamento registrado e GR enviado para impressão.");
+                  }
+                },
+                onCancel: () => {
+                  setGrPreview(null);
+                  if (!rateioFalhou) {
+                    toast.success("Pagamento registrado. GR não impressa — você pode reimprimir pelo menu.");
+                  }
+                },
+              });
+            } else if (!rateioFalhou) {
               toast.success("Pagamento registrado e GR enviado para impressão.");
             }
           } catch (err) {
