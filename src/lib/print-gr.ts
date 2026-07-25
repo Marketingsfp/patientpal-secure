@@ -1331,7 +1331,17 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
           </tr>
           ${linhas}
         </table>
-        ${g.subtotal > 0 ? `
+        ${g.allGratuidade ? `
+        <div class="center bold lg" style="margin-top:8px; letter-spacing:2px">GRATUIDADE</div>
+        <div class="center sm">PACIENTE ISENTO DE PAGAMENTO</div>
+        ${(g.clinica > 0 || g.prestador > 0) ? `
+        <div class="sep"></div>
+        <table>
+          <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(g.clinica)}</td></tr>
+          <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(g.prestador)}</td></tr>
+        </table>
+        ` : ""}
+        ` : g.subtotal > 0 ? `
         <div class="row" style="margin-top:8px">
           <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
           <div class="bold lg">${fmtBRL(g.subtotal)}</div>
