@@ -1,0 +1,14 @@
+# Arquivos regenerados pelo Lovable a partir do Cloud vinculado a cada projeto.
+# Em merges entre branches de ambientes diferentes (main <-> develop), preserve
+# sempre a versão da branch de destino para não vazar credenciais/URL de um
+# ambiente para outro. O Lovable regera esses arquivos localmente se necessário.
+.env merge=ours
+src/integrations/supabase/client.ts merge=ours
+src/integrations/supabase/client.server.ts merge=ours
+src/integrations/supabase/types.ts merge=ours
+src/integrations/supabase/auth-middleware.ts merge=ours
+src/integrations/supabase/auth-attacher.ts merge=ours
+supabase/config.toml merge=ours
+
+# Para que "merge=ours" funcione, cada clone precisa ativar o driver uma vez:
+#   git config merge.ours.driver true
