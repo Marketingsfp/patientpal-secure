@@ -5245,9 +5245,40 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 variant="outline"
                 size="sm"
                 className="h-7 px-2 text-xs w-full"
-                onClick={() => setIsencaoAuthOpen(true)}
+                onClick={async () => {
+                  if (!pagMens || !clinicaAtual) return;
+                  const nome = (user?.user_metadata as any)?.nome || user?.email || "Usuário";
+                  const valorOriginal = Number(pagMens.valor) || 0;
+                  const valorComEncargos = valorOriginal * 1.1 + valorOriginal * 0.0033 * pagDiasAtraso;
+                  try {
+                    await supabase.from("audit_log").insert({
+                      clinica_id: clinicaAtual.clinica_id,
+                      user_id: user?.id ?? null,
+                      user_email: user?.email ?? null,
+                      table_name: "contrato_mensalidades",
+                      record_id: pagMens.id,
+                      action: "UPDATE",
+                      dados_depois: {
+                        acao: "isentar_juros_multa_mensalidade",
+                        contrato_id: contrato.id,
+                        contrato_numero: contrato.numero,
+                        numero_parcela: pagMens.numero_parcela,
+                        valor_original: valorOriginal,
+                        valor_com_encargos: Number(valorComEncargos.toFixed(2)),
+                        dias_atraso: pagDiasAtraso,
+                        autorizado_por_user_id: user?.id ?? null,
+                        autorizado_por_nome: nome,
+                        autorizado_por_email: user?.email ?? null,
+                      },
+                    });
+                  } catch (e) {
+                    console.error("Falha ao registrar auditoria de isenção", e);
+                  }
+                  setIsencaoEncargos({ autorizadoPorNome: nome, autorizadoPorUserId: user?.id ?? "" });
+                  toast.success("Juros e multa isentados.");
+                }}
               >
-                Isentar juros e multa (gestor)
+                Isentar juros e multa
               </Button>
             </div>
             </div>
