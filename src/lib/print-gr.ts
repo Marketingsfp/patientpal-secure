@@ -1204,8 +1204,11 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     // GR independente com o repasse calculado só para aquele serviço.
     const key = a.id;
     const medicoNome = a.medico_id ? (medById.get(a.medico_id)?.nome ?? "—") : "SEM PROFISSIONAL";
-    const g: Grupo = grupos.get(key) ?? { medicoId: a.medico_id ?? null, agendaId: (a as any).agenda_id ?? null, agIdRef: a.id, medicoNome, itens: [] as Item[], subtotal: 0, prestador: 0, clinica: 0, inicioRef: a.inicio };
-    g.itens.push({ procNome, valor, prestador, clinica: clin, inicio: a.inicio });
+    const gratuidade = gratuidadeByAg.get(a.id) === true;
+    const g: Grupo = grupos.get(key) ?? { medicoId: a.medico_id ?? null, agendaId: (a as any).agenda_id ?? null, agIdRef: a.id, medicoNome, itens: [] as Item[], subtotal: 0, prestador: 0, clinica: 0, inicioRef: a.inicio, allGratuidade: true, anyPago: false };
+    g.itens.push({ procNome, valor, prestador, clinica: clin, inicio: a.inicio, gratuidade });
+    if (!gratuidade) g.anyPago = true;
+    if (!gratuidade) g.allGratuidade = false;
     if (a.inicio < g.inicioRef) { g.inicioRef = a.inicio; g.agIdRef = a.id; }
     g.subtotal = +(g.subtotal + valor).toFixed(2);
     g.prestador = +(g.prestador + prestador).toFixed(2);
