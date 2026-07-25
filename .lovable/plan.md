@@ -262,3 +262,49 @@ Resultado: main tem só pagamento corrigido; develop tem pagamento **e** triagem
 - [ ] Definiu quem serão os "usuários fictícios" e clínica(s) espelho no Lab.
 
 Aguardo sua aprovação para começar pelos itens que estão do meu lado.
+
+---
+
+## 15. Status da execução (25/07/2026)
+
+**Aprovado — implantação em andamento pelo meu lado.**
+
+Já entregue nesta branch (`main`, código dormente — sem efeito em produção
+enquanto `APP_ENV`/`VITE_APP_ENV` continuar diferente de `lab`):
+
+- `.gitattributes` protege `.env`, `src/integrations/supabase/client.ts` e
+  `types.ts` contra sobrescrita em merges main↔develop.
+- `.github/pull_request_template.md` com checklist da regra 1.10 e do fluxo
+  Prod/Lab.
+- `AMBIENTE.md` explica o modelo dos dois projetos Lovable para o time.
+- `src/lib/env.ts` — `getAppEnv()` / `isLab()` (client + SSR).
+- `src/lib/env.server.ts` — `assertNotLabForRealOps()` e
+  `isLabAllowedDestino()` para bloquear envios reais no Lab.
+- `src/components/LabBanner.tsx` — banner vermelho fixo no topo, renderiza
+  somente quando `VITE_APP_ENV=lab`. Montado no `__root.tsx`.
+- Migration `lab_allowlist_contatos` (tabela + RLS restrita a admin global +
+  função `public.is_global_admin`). Aplicada nos dois Clouds quando existirem;
+  fica vazia em produção e não afeta nenhum fluxo até `APP_ENV=lab`.
+- `supabase/seeds/lab.sql` — seed manual (rodar apenas no Cloud-Lab).
+
+Pendências suas antes de ativar o modelo B:
+
+1. Conectar este projeto ao GitHub (Plus → GitHub → Connect).
+2. Habilitar Labs → GitHub Branch Switching.
+3. Remixar o projeto para criar o **Lovable-Lab** (novo Cloud próprio).
+4. Conectar o Lovable-Lab ao **mesmo repositório**, apontando para `develop`.
+5. No Cloud-Lab, adicionar os Secrets: `APP_ENV=lab` (backend) e
+   `VITE_APP_ENV=lab` no `.env` da branch `develop` (o banner só liga com esse).
+6. Rodar `supabase/seeds/lab.sql` no Cloud-Lab e cadastrar os contatos da
+   equipe na allowlist.
+7. Configurar tokens de sandbox (Focus NFe homolog, WhatsApp teste, e-mail
+   de teste) como Secrets do Cloud-Lab.
+8. Configurar branch protections no GitHub (`main` protegida, `develop` sem
+   force push).
+
+Próximas entregas (quando você pedir, ainda dormentes até o Lab existir):
+
+- Envolver `whatsapp.functions.ts`, `nfse.functions.ts` e envio de e-mail com
+  `assertNotLabForRealOps()` + consulta a `lab_allowlist_contatos`.
+- Criar mocks `whatsapp.lab.ts` e `nfse.lab.ts` roteados por `APP_ENV`.
+- Tela admin para gerenciar a allowlist (aparece só quando `isLab()`).
