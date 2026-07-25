@@ -4521,36 +4521,6 @@ export type Database = {
           },
         ]
       }
-      lab_allowlist_contatos: {
-        Row: {
-          created_at: string
-          criado_por: string | null
-          descricao: string | null
-          id: string
-          tipo: string
-          updated_at: string
-          valor: string
-        }
-        Insert: {
-          created_at?: string
-          criado_por?: string | null
-          descricao?: string | null
-          id?: string
-          tipo: string
-          updated_at?: string
-          valor: string
-        }
-        Update: {
-          created_at?: string
-          criado_por?: string | null
-          descricao?: string | null
-          id?: string
-          tipo?: string
-          updated_at?: string
-          valor?: string
-        }
-        Relationships: []
-      }
       lgpd_consentimentos: {
         Row: {
           aceito: boolean
@@ -8995,7 +8965,6 @@ export type Database = {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean
       }
-      is_global_admin: { Args: { _user_id: string }; Returns: boolean }
       is_medico: {
         Args: { _clinica_id: string; _user_id: string }
         Returns: boolean

@@ -11,7 +11,6 @@ import {
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/sonner";
-import { LabBanner } from "@/components/LabBanner";
 // ThemeSwitcher removido a pedido do usuário
 
 function NotFoundComponent() {
@@ -162,7 +161,6 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <LabBanner />
         <Outlet />
         <Toaster richColors position="top-right" />
       </AuthProvider>
