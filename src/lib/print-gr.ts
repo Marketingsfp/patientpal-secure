@@ -1413,10 +1413,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   ${corpoVias}
 </body></html>`;
 
-  imprimirViaIframe(html);
-
-  // Registra a impressão para cada agendamento (mantém limite de 2 vias por id).
-  if (!reimpressao) {
+  const persistirVias = async () => {
+    if (reimpressao) return;
     try {
       const rows = ids.map((agId) => ({
         clinica_id: clinicaId,
@@ -1427,7 +1425,21 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       }));
       await supabase.from("gr_impressoes" as never).insert(rows as never);
     } catch (_) { /* falha silenciosa */ }
+  };
+
+  if (preview) {
+    return {
+      preview: true,
+      html,
+      confirm: async () => {
+        imprimirViaIframe(html);
+        await persistirVias();
+      },
+    };
   }
+
+  imprimirViaIframe(html);
+  await persistirVias();
 }
 
 // ============================================================================
