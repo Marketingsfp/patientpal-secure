@@ -5311,47 +5311,6 @@ h1, h2, h3 { margin: 0 0 6mm; }
         </DialogContent>
       </Dialog>
 
-      <SupervisorAuthDialog
-        open={isencaoAuthOpen}
-        onOpenChange={setIsencaoAuthOpen}
-        acao="isentar juros e multa desta mensalidade"
-        rolesPermitidos={["admin", "gestor"]}
-        onAuthorized={async (info) => {
-          setIsencaoAuthOpen(false);
-          if (!pagMens || !clinicaAtual) return;
-          const valorOriginal = Number(pagMens.valor) || 0;
-          const valorComEncargos = valorOriginal * 1.1 + valorOriginal * 0.0033 * pagDiasAtraso;
-          try {
-            await supabase.from("audit_log").insert({
-              clinica_id: clinicaAtual.clinica_id,
-              user_id: user?.id ?? null,
-              user_email: user?.email ?? null,
-              table_name: "contrato_mensalidades",
-              record_id: pagMens.id,
-              action: "UPDATE",
-              dados_depois: {
-                acao: "isentar_juros_multa_mensalidade",
-                contrato_id: contrato.id,
-                contrato_numero: contrato.numero,
-                numero_parcela: pagMens.numero_parcela,
-                valor_original: valorOriginal,
-                valor_com_encargos: Number(valorComEncargos.toFixed(2)),
-                dias_atraso: pagDiasAtraso,
-                autorizado_por_user_id: info.userId,
-                autorizado_por_nome: info.nome,
-                autorizado_por_email: info.email,
-                autorizado_por_role: info.role,
-              },
-            });
-          } catch (e) {
-            // Auditoria não deve bloquear a operação, apenas avisa.
-            console.error("Falha ao registrar auditoria de isenção", e);
-          }
-          setIsencaoEncargos({ autorizadoPorNome: info.nome, autorizadoPorUserId: info.userId });
-          toast.success(`Juros e multa isentados por ${info.nome}.`);
-        }}
-      />
-
       <LancamentoDialog
         open={lancOpen}
         onOpenChange={(v) => {
