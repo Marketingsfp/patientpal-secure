@@ -370,11 +370,11 @@ function imprimirViaIframe(html: string): void {
   setTimeout(() => { if (iframe.isConnected) dispararPrint(); }, 1200);
 }
 
-export async function printGuiaAtendimento(input: PrintGRInput) {
+export async function printGuiaAtendimento(input: PrintGRInput): Promise<void | PrintGRPreviewResult> {
   return printGuiaAtendimentoCore(input);
 }
 
-async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento, fichaNumero }: PrintGRInput) {
+async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento, fichaNumero, preview }: PrintGRInput): Promise<void | PrintGRPreviewResult> {
   // Controle de vias: máximo 2 (1ª e 2ª via). Reimpressão repete a última sem incrementar.
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
