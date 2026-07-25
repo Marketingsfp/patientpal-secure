@@ -89,6 +89,7 @@ import { RenovarContratoDialog } from "@/components/contratos/renovar-contrato-d
 import { HistoricoContratoTab } from "@/components/contratos/historico-contrato-tab";
 import { RecalcularVencimentosDialog } from "@/components/contratos/recalcular-vencimentos-dialog";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
+import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 
