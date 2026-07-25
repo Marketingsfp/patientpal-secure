@@ -76,6 +76,7 @@ import {
   Camera,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
+import { GRPreviewDialog } from "@/components/gr/gr-preview-dialog";
 import { printComprovanteAgendamento } from "@/lib/print-comprovante-agendamento";
 import { VoiceInput } from "@/components/voice-input";
 import { exportToExcel } from "@/lib/export-csv";
