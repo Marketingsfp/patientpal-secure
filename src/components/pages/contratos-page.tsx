@@ -3392,6 +3392,9 @@ function DetalheContrato({
     if (!m) return 0;
     const base = Number(m.valor) || 0;
     if (m.status === "pago") return base;
+    // Se um gestor autorizou a isenção de juros e multa para ESTA parcela,
+    // devolve o valor original — sem multa e sem juros.
+    if (isencaoEncargos && pagMens?.id === m.id) return base;
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     const venc = new Date(m.vencimento + "T00:00:00");
