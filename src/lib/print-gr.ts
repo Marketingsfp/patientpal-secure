@@ -47,12 +47,6 @@ export interface PrintGRInput {
   /** Se true, NÃO grava nova via — apenas reimprime a última via existente. */
   reimpressao?: boolean;
   /**
-   * Se true, NÃO envia para impressão nem grava auditoria — apenas monta o HTML
-   * da GR e devolve `{ preview: true, html, confirm }`. Chamar `confirm()`
-   * imprime de fato e registra a via (respeitando `reimpressao`).
-   */
-  preview?: boolean;
-  /**
    * Número da ficha (posição da linha na agenda) já calculado pelo chamador.
    * Quando informado, a guia usa EXATAMENTE este número — garante que a guia
    * bate com a lista da agenda mesmo havendo slots no mesmo horário. Sem ele,
@@ -66,17 +60,6 @@ export interface PrintGRInput {
     bandeira_cartao: string | null;
     detalhe?: Array<{ forma: string; pago: number; troco: number; recebido: number }>;
   };
-}
-
-/**
- * Resultado devolvido quando `preview: true` é usado nas funções de impressão
- * de GR. Contém o HTML final montado (idêntico ao que seria impresso) e um
- * callback `confirm()` que efetivamente dispara a impressão e grava a via.
- */
-export interface PrintGRPreviewResult {
-  preview: true;
-  html: string;
-  confirm: () => Promise<void>;
 }
 
 const fmtBRL = (v: number) =>
@@ -370,11 +353,11 @@ function imprimirViaIframe(html: string): void {
   setTimeout(() => { if (iframe.isConnected) dispararPrint(); }, 1200);
 }
 
-export async function printGuiaAtendimento(input: PrintGRInput): Promise<void | PrintGRPreviewResult> {
+export async function printGuiaAtendimento(input: PrintGRInput) {
   return printGuiaAtendimentoCore(input);
 }
 
-async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento, fichaNumero, preview }: PrintGRInput): Promise<void | PrintGRPreviewResult> {
+async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome, usuarioId, reimpressao, pagamento, fichaNumero }: PrintGRInput) {
   // Controle de vias: máximo 2 (1ª e 2ª via). Reimpressão repete a última sem incrementar.
   const { data: visExistentes, error: errVias } = await supabase
     .from("gr_impressoes" as never)
@@ -940,8 +923,10 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   ${corpoVias}
 </body></html>`;
 
-  const persistirVia = async () => {
-    if (reimpressao) return;
+  imprimirViaIframe(html);
+
+  // Registra a impressão (se for nova via). Não bloqueia a janela já aberta em caso de erro.
+  if (!reimpressao) {
     try {
       await supabase.from("gr_impressoes" as never).insert({
         clinica_id: clinicaId,
@@ -952,21 +937,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         ficha_numero: fichaNum > 0 ? fichaNum : null,
       } as never);
     } catch (_) { /* falha silenciosa: registro de via não deve bloquear impressão */ }
-  };
-
-  if (preview) {
-    return {
-      preview: true,
-      html,
-      confirm: async () => {
-        imprimirViaIframe(html);
-        await persistirVia();
-      },
-    };
+    // Não "congela" mais ficha_numero no agendamento: a ficha é POSICIONAL e
+    // acompanha a lista da agenda (pode mudar se slots forem inseridos/removidos
+    // antes da paciente). O gr_impressoes acima guarda o número de cada via só
+    // para histórico.
   }
-
-  imprimirViaIframe(html);
-  await persistirVia();
 }
 
 /** Reimprime a última via já emitida sem gerar novo registro. */
@@ -984,8 +959,6 @@ export interface PrintGRAgrupadaInput {
   usuarioNome?: string;
   usuarioId?: string | null;
   reimpressao?: boolean;
-  /** Idem `PrintGRInput.preview`: devolve `{ preview, html, confirm }` sem imprimir. */
-  preview?: boolean;
   pagamento: {
     valor: number;
     forma_pagamento: string | null;
@@ -998,7 +971,7 @@ export interface PrintGRAgrupadaInput {
 const normalizar = (s: string) =>
   s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
-export async function printGuiaAtendimentoAgrupada(input: PrintGRAgrupadaInput): Promise<void | PrintGRPreviewResult> {
+export async function printGuiaAtendimentoAgrupada(input: PrintGRAgrupadaInput) {
   const ids = Array.from(new Set((input.agendamentoIds ?? []).filter(Boolean)));
   if (ids.length === 0) throw new Error("Nenhum agendamento informado para impressão.");
 
@@ -1010,7 +983,6 @@ export async function printGuiaAtendimentoAgrupada(input: PrintGRAgrupadaInput):
       usuarioNome: input.usuarioNome,
       usuarioId: input.usuarioId,
       reimpressao: input.reimpressao,
-      preview: input.preview,
       pagamento: input.pagamento,
     });
   }
@@ -1023,8 +995,8 @@ export async function reimprimirGuiaAtendimentoAgrupada(input: PrintGRAgrupadaIn
   return printGuiaAtendimentoAgrupada({ ...input, reimpressao: true });
 }
 
-async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids: string[]): Promise<void | PrintGRPreviewResult> {
-  const { clinicaId, usuarioNome, usuarioId, reimpressao, pagamento, preview } = input;
+async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids: string[]) {
+  const { clinicaId, usuarioNome, usuarioId, reimpressao, pagamento } = input;
 
   // Controle de vias: usa o primeiro id como "chave" para limite (1ª/2ª via).
   const chaveVia = ids[0];
@@ -1413,8 +1385,10 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   ${corpoVias}
 </body></html>`;
 
-  const persistirVias = async () => {
-    if (reimpressao) return;
+  imprimirViaIframe(html);
+
+  // Registra a impressão para cada agendamento (mantém limite de 2 vias por id).
+  if (!reimpressao) {
     try {
       const rows = ids.map((agId) => ({
         clinica_id: clinicaId,
@@ -1425,21 +1399,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       }));
       await supabase.from("gr_impressoes" as never).insert(rows as never);
     } catch (_) { /* falha silenciosa */ }
-  };
-
-  if (preview) {
-    return {
-      preview: true,
-      html,
-      confirm: async () => {
-        imprimirViaIframe(html);
-        await persistirVias();
-      },
-    };
   }
-
-  imprimirViaIframe(html);
-  await persistirVias();
 }
 
 // ============================================================================
