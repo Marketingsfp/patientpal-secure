@@ -5685,7 +5685,7 @@ function AgendaPage() {
       });
       toast.dismiss(toastId);
       if (resultado && resultado.preview) {
-        const nomePac = (a as { paciente?: { nome?: string | null } }).paciente?.nome ?? "paciente";
+        const nomePac = a.paciente_nome ?? "paciente";
         setGrPreview({
           html: resultado.html,
           title: `Prévia da GR — ${nomePac}`,
