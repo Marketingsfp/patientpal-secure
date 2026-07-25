@@ -1705,6 +1705,14 @@ function AgendaPage() {
   // repetidos, enquanto a GR ainda está sendo montada, disparem várias
   // impressões e registrem vias duplicadas.
   const imprimindoGRRef = useRef<Set<string>>(new Set());
+  // Prévia da GR antes de imprimir: guarda o HTML montado e o callback que
+  // efetivamente dispara a impressão + grava a via no histórico.
+  const [grPreview, setGrPreview] = useState<{
+    html: string;
+    title: string;
+    confirm: () => Promise<void>;
+    onCancel?: () => void;
+  } | null>(null);
   const navigate = useNavigate();
   // ── Desconto aplicado ANTES de "Salvar e Pagar" (com autorização da supervisão).
   type DescontoPendente = { tipo: "valor" | "percentual"; input: string; autorizadoPor: string; motivo: string };
