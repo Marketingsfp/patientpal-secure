@@ -47,6 +47,12 @@ export interface PrintGRInput {
   /** Se true, NÃO grava nova via — apenas reimprime a última via existente. */
   reimpressao?: boolean;
   /**
+   * Se true, NÃO envia para impressão nem grava auditoria — apenas monta o HTML
+   * da GR e devolve `{ preview: true, html, confirm }`. Chamar `confirm()`
+   * imprime de fato e registra a via (respeitando `reimpressao`).
+   */
+  preview?: boolean;
+  /**
    * Número da ficha (posição da linha na agenda) já calculado pelo chamador.
    * Quando informado, a guia usa EXATAMENTE este número — garante que a guia
    * bate com a lista da agenda mesmo havendo slots no mesmo horário. Sem ele,
