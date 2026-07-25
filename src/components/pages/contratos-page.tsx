@@ -5153,7 +5153,13 @@ h1, h2, h3 { margin: 0 0 6mm; }
         </DialogContent>
       </Dialog>
 
-      <Dialog open={formaPagOpen} onOpenChange={setFormaPagOpen}>
+      <Dialog
+        open={formaPagOpen}
+        onOpenChange={(v) => {
+          setFormaPagOpen(v);
+          if (!v) setIsencaoEncargos(null);
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Forma de pagamento</DialogTitle>
@@ -5193,6 +5199,29 @@ h1, h2, h3 { margin: 0 0 6mm; }
             </div>
           ) : null}
           {pagMens && pagDiasAtraso > 5 ? (
+            isencaoEncargos ? (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs space-y-1">
+                <div className="font-semibold">Juros e multa isentados</div>
+                <div className="text-muted-foreground">
+                  Autorizado por <span className="font-medium">{isencaoEncargos.autorizadoPorNome}</span>. Cobrando o valor original da parcela.
+                </div>
+                <div className="flex justify-between pt-1 border-t border-amber-500/30">
+                  <span>Valor a cobrar</span>
+                  <span className="font-semibold">{BRL(Number(pagMens.valor))}</span>
+                </div>
+                <div className="pt-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setIsencaoEncargos(null)}
+                  >
+                    Reaplicar juros e multa
+                  </Button>
+                </div>
+              </div>
+            ) : (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs space-y-0.5">
               <div className="flex justify-between">
                 <span>Valor original</span>
@@ -5210,7 +5239,19 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <span>Total com encargos</span>
                 <span>{BRL(pagValorFinal)}</span>
               </div>
+            <div className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs w-full"
+                onClick={() => setIsencaoAuthOpen(true)}
+              >
+                Isentar juros e multa (gestor)
+              </Button>
             </div>
+            </div>
+            )
           ) : null}
           <div className="grid gap-2 mt-2">
             {formaOpcoes.map((op, idx) => (
