@@ -696,6 +696,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     return Array.from(out).filter(Boolean);
   };
 
+  // Gratuidade: paciente isento (nenhum lançamento pago). Clínica e prestador
+  // continuam recebendo normalmente, usando o valor de tabela do procedimento
+  // como base do cálculo.
+  const isGratuidade = !pagamento && valor === 0;
+  const valorBase = isGratuidade ? Number(procData?.valor_dinheiro_pix ?? 0) : valor;
   let prestador = 0;
   let repasseFixoConvenio = false;
   // Cartão Consulta tem prioridade: usa o cb_*_repasse do médico.
@@ -708,7 +713,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       // limitar pelo valor pago.
       repasseFixoConvenio = true;
     } else if (medicoCb.tipo === "percentual" && medicoCb.percentual != null) {
-      prestador = +(valor * Number(medicoCb.percentual) / 100).toFixed(2);
+      prestador = +(valorBase * Number(medicoCb.percentual) / 100).toFixed(2);
     }
   } else if (a.medico_id) {
     const { data: convs } = await supabase
@@ -734,28 +739,29 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         // pagamento normal, segue para o Math.min abaixo e limita ao recebido.
         if (valor <= 0) repasseFixoConvenio = true;
       } else if (conv.tipo_repasse === "percentual" && conv.percentual != null) {
-        prestador = +(valor * Number(conv.percentual) / 100).toFixed(2);
+        prestador = +(valorBase * Number(conv.percentual) / 100).toFixed(2);
       } else if (medicoData) {
         // sem tipo/valor cadastrado para o serviço → usa padrão do médico
         if (medicoData.tipo_repasse === "valor" && medicoData.valor_repasse_padrao != null) {
           prestador = Number(medicoData.valor_repasse_padrao);
         } else {
-          prestador = +(valor * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+          prestador = +(valorBase * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
         }
       }
     } else if (medicoData) {
       if (medicoData.tipo_repasse === "valor" && medicoData.valor_repasse_padrao != null) {
         prestador = Number(medicoData.valor_repasse_padrao);
       } else {
-        prestador = +(valor * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+        prestador = +(valorBase * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
       }
     }
   }
   // Só limita o repasse pelo valor pago quando NÃO é repasse fixo de convênio.
+  // Em gratuidade, o "teto" passa a ser o valor de tabela (valorBase).
   if (!repasseFixoConvenio) {
-    prestador = Math.min(prestador, valor);
+    prestador = Math.min(prestador, valorBase);
   }
-  const clinica = +(Math.max(0, valor - prestador)).toFixed(2);
+  const clinica = +(Math.max(0, valorBase - prestador)).toFixed(2);
 
   // NUNCA assumir "DINHEIRO" quando a forma real é desconhecida (lançamento
   // antigo sem forma_pagamento salva, ou pagamento ainda não processado) — um
