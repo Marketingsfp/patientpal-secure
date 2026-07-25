@@ -5674,15 +5674,28 @@ function AgendaPage() {
       }
       const fichaStr = fichaPorId.get(a.id);
       const fichaNumero = fichaStr && fichaStr !== "—" ? Number(fichaStr) : undefined;
-      await printGuiaAtendimento({
+      const resultado = await printGuiaAtendimento({
         agendamentoId: a.id,
         clinicaId: clinicaAtual.clinica_id,
         usuarioNome: user?.user_metadata?.nome ?? user?.email ?? undefined,
         usuarioId: user?.id ?? null,
         pagamento: pagamentoInfo,
         fichaNumero,
+        preview: true,
       });
-      toast.success("GR enviada para impressão.", { id: toastId });
+      toast.dismiss(toastId);
+      if (resultado && resultado.preview) {
+        const nomePac = (a as { paciente?: { nome?: string | null } }).paciente?.nome ?? "paciente";
+        setGrPreview({
+          html: resultado.html,
+          title: `Prévia da GR — ${nomePac}`,
+          confirm: async () => {
+            await resultado.confirm();
+            setGrPreview(null);
+            toast.success("GR enviada para impressão.");
+          },
+        });
+      }
     } catch (err) {
       toast.dismiss(toastId);
       mostrarErro(err);
