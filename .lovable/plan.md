@@ -1,49 +1,49 @@
-# Repasse de laudo para o exame ITB
+## Problema
 
-Vamos habilitar exatamente o mesmo fluxo que hoje existe para o Eletrocardiograma (ECG), agora também para o exame **ITB**, em todas as clínicas (SFP, Menino Jesus e Consulta Hoje). Os médicos laudadores continuam sendo todos os cardiologistas ativos da clínica — igual ao ECG.
+Na GR do "FRANCISCO NOE" (Foto 1) o exame foi lançado como **gratuidade** (paciente não pagou nada). Hoje, quando `valor pago = 0`, o `src/lib/print-gr.ts` **oculta o bloco inteiro** de "VALOR RECEBIDO" + "CLINICA" + "PRESTADOR" (linhas 832 e 1275 do arquivo, controladas pelo `${valor > 0 ? ... : ""}`).
 
-## O que existe hoje (verificado)
+Consequência: a GR sai sem valor de clínica nem de prestador — mas a clínica e o médico têm direito a receber normalmente na gratuidade. Só o paciente é isento.
 
-- Cada clínica tem um "médico agenda" chamado **ELETROCARDIOGRAMA**. Ao editá-lo, aparece a seção **"REPASSE LAUDO TERCEIRO"**, onde se lista os cardiologistas ativos e o % ou valor fixo que cada um recebe por laudo. Essa seção **só aparece hoje quando o nome do cadastro é exatamente "ELETROCARDIOGRAMA"** (regra fixa no código).
-- No procedimento **ELETROCARDIOGRAMA (ECG)** o campo `requer_laudo` está marcado como *true*, o que faz aparecer no menu **Financeiro → Atendimentos** o botão **"Vincular laudo"** (individual e em lote).
-- O motor de repasse (`medico_repasse_laudo`) e a aba **Comprovantes / Repasse** já são genéricos e não dependem do nome — funcionam para qualquer agenda de exame.
-- Já existe o "médico agenda" **ITB** cadastrado em SFP e Menino Jesus. Em Consulta Hoje ele ainda **não existe**.
-- Já existe o **procedimento ITB** nas 3 clínicas, mas hoje ele está com `requer_laudo = false` e sem tipo.
+## Escopo
 
-## O que muda
+- Aplica-se a **todas as clínicas** (regra 1.10: correção puramente técnica, sem regra de negócio nova). Só ajusta a impressão da GR — não altera cálculo de repasse, caixa, financeiro nem lançamentos.
+- Afeta apenas `src/lib/print-gr.ts`, nas duas funções que imprimem GR de atendimento:
+  - `printGuiaAtendimentoCore` (GR individual — linhas ~520–856)
+  - `printGuiaAtendimentoAgrupada` (GR agrupada por médico — linhas ~1080–1300)
+- **Não** mexe na GR de mensalidade (`printGRMensalidade`), pois mensalidade sem valor não existe nesse fluxo.
 
-### 1. Frontend — liberar a seção de repasse de laudo para ITB
-Arquivo: `src/components/medicos/MedicoFormDialog.tsx`
+## Solução
 
-- Trocar a condição atual que só exibe a seção "REPASSE LAUDO TERCEIRO" para o cadastro chamado `ELETROCARDIOGRAMA`, passando a exibi-la também quando o cadastro se chamar `ITB`.
-- Ajustar o texto do bloco para citar os dois exames como exemplo, mantendo a mesma explicação (cardiologistas ativos, % ou valor fixo, sem lançamento automático).
-- Nenhuma outra tela é alterada — a aba **Convênio**, o cadastro geral do médico e o fluxo do financeiro continuam iguais.
+1. Detectar gratuidade: `valorPago === 0` (nenhum `fin_lancamentos` confirmado para o agendamento).
+2. Quando for gratuidade, usar como **valor base** o `procedimentos.valor_dinheiro_pix` (já lido em `procData`) para calcular **clínica** e **prestador** com as mesmas regras atuais (convênio do médico → convênio do paciente → padrão do médico). Nada de novo no motor de cálculo — só troca a entrada.
+3. Renderizar o bloco inferior da GR mesmo com `valor pago = 0`, com este layout:
+   - Substituir "VALOR RECEBIDO (FORMA)" por um selo **"GRATUIDADE"** em destaque (bold, mesma tipografia grande).
+   - Manter as linhas **CLINICA: R$ x,xx** e **PRESTADOR: R$ y,yy** com os valores calculados a partir do valor de tabela.
+   - Não mostrar bandeira/parcelamento (não há pagamento).
+4. Espelhar o mesmo comportamento na variante agrupada: se `g.subtotal === 0`, imprimir "GRATUIDADE" e manter `CLINICA` / `PRESTADOR` calculados pela soma dos valores de tabela dos itens do grupo.
+5. Preservar comportamento atual quando houver pagamento (nada muda).
 
-### 2. Banco — marcar o procedimento ITB como "requer laudo"
-Nas 3 clínicas (Consulta Hoje, Menino Jesus, SFP):
-- Atualizar o procedimento **ITB** para `requer_laudo = true` e `tipo_procedimento = 'equipamento'` (mesmo padrão do ECG). Isso faz o botão **"Vincular laudo"** aparecer em Financeiro → Atendimentos para atendimentos de ITB.
+## Detalhes técnicos
 
-### 3. Banco — criar o médico agenda "ITB" onde falta
-- Criar o cadastro de agenda de exame chamado **ITB** na **CLINICA CONSULTA HOJE** (SFP e Menino Jesus já têm). Sem essa agenda não é possível configurar os laudadores nem vincular o laudo no financeiro.
+- Em `printGuiaAtendimentoCore` (após linha ~580):
+  - Guardar `valorPago` como está.
+  - Introduzir `const isGratuidade = valorPago === 0 && !pagamento;`
+  - Definir `const valorBase = isGratuidade ? Number(procData?.valor_dinheiro_pix ?? 0) : valor;` e usar `valorBase` no bloco de cálculo de `prestador`/`clinica` (linhas ~700–758) **apenas** quando `isGratuidade` — caso contrário mantém `valor` como hoje.
+  - No template (linha 832), trocar `${valor > 0 ? ... : ""}` por lógica que:
+    - se `pago`, imprime o bloco atual;
+    - se `gratuidade` e (`clinica > 0 || prestador > 0`), imprime `<div class="bold lg center">GRATUIDADE</div>` + tabela CLINICA/PRESTADOR.
+- Em `printGuiaAtendimentoAgrupada`, replicar: para cada item, se `valorPago == null`, usa `proc.valor_dinheiro_pix` como `valorBase` para calcular prestador/clínica; e no render (linha 1275) trocar `g.subtotal > 0` pela mesma lógica de gratuidade quando `g.subtotal === 0 && (g.clinica > 0 || g.prestador > 0)`.
+- Nenhuma nova consulta ao banco — os campos já são lidos.
+- Não altera `numViasGR`, registros em `gr_impressoes` nem regras de repasse.
 
-## Como o time vai usar depois
+## Validação
 
-1. Menu **Médicos** → editar o cadastro **ITB** → aparece a seção **REPASSE LAUDO TERCEIRO** com todos os cardiologistas ativos da clínica → define % ou valor fixo para cada um → **Salvar**.
-2. Menu **Financeiro → Atendimentos** → localizar o atendimento de ITB → botão **"Vincular laudo"** (individual ou em lote) → escolher o cardiologista → sistema sugere o valor conforme regra cadastrada.
-3. Aba **Comprovantes / Repasse** do cardiologista passa a somar o `valor_laudo` do ITB da mesma forma que já soma o do ECG.
+1. Reimprimir a GR do Francisco Noe (ECG 23/07 11:15 — Menino Jesus) e conferir se sai "GRATUIDADE" + CLINICA e PRESTADOR corretos.
+2. Reimprimir uma GR paga comum (qualquer clínica) para garantir que o layout com "VALOR RECEBIDO" continua idêntico.
+3. Reimprimir uma GR agrupada (paciente com múltiplos exames no mesmo médico) tanto paga quanto gratuita.
 
-## Fora do escopo
+## Fora de escopo
 
-- Não altera o motor de cálculo de repasse (já genérico).
-- Não altera Comprovantes/Repasse, Convênios, NF-e nem regras de cartão benefícios.
-- Não mexe em outras clínicas nem em outros exames.
-- Não cria lançamento automático — o financeiro continua decidindo quando lançar.
-
-## Riscos e validação
-
-- Risco baixo: mudança de front é apenas ampliar uma condição de exibição; mudança de banco é limitada aos registros ITB.
-- Validação após aplicar:
-  1. Abrir cadastro do médico **ITB** em cada clínica → confirmar que a seção de laudadores aparece e que lista os cardiologistas ativos.
-  2. Cadastrar um laudador de teste com % e salvar → reabrir e conferir persistência.
-  3. Em um atendimento de ITB no Financeiro → confirmar que o botão "Vincular laudo" aparece e sugere o valor configurado.
-  4. Conferir na aba Comprovantes que o valor entra no repasse do cardiologista escolhido.
+- Não altera regras de cálculo de repasse, caixa, NFS-e, contratos ou financeiro.
+- Não introduz botão/menu novo — a mudança é apenas no HTML impresso.
+- Não altera GR de mensalidade.
