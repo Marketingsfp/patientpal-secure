@@ -518,7 +518,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         .ilike("nome", alvo)
         .maybeSingle();
       if (pAlt) {
-        procData = pAlt as typeof procData;
+        procData = pAlt as unknown as typeof procData;
         break;
       }
     }
