@@ -1135,8 +1135,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   }
 
   // Agrupa por médico
-  type Item = { procNome: string; valor: number; prestador: number; clinica: number; inicio: string };
-  type Grupo = { medicoId: string | null; agendaId: string | null; agIdRef: string; medicoNome: string; itens: Item[]; subtotal: number; prestador: number; clinica: number; inicioRef: string };
+  type Item = { procNome: string; valor: number; prestador: number; clinica: number; inicio: string; gratuidade: boolean };
+  type Grupo = { medicoId: string | null; agendaId: string | null; agIdRef: string; medicoNome: string; itens: Item[]; subtotal: number; prestador: number; clinica: number; inicioRef: string; allGratuidade: boolean; anyPago: boolean };
   const grupos = new Map<string, Grupo>();
 
   for (const a of ags) {
