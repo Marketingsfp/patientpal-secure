@@ -13,10 +13,7 @@
 export type AppEnv = "production" | "lab";
 
 export function getAppEnv(): AppEnv {
-  const raw =
-    (typeof import.meta !== "undefined" &&
-      (import.meta as any)?.env?.VITE_APP_ENV) ||
-    "production";
+  const raw = (import.meta as any)?.env?.VITE_APP_ENV ?? "production";
   return raw === "lab" ? "lab" : "production";
 }
 
