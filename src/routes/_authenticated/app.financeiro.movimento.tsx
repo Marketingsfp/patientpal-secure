@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 
 export const Route = createFileRoute("/_authenticated/app/financeiro/movimento")({
@@ -34,6 +35,9 @@ interface Lanc {
   id: string; tipo: "receita" | "despesa" | "transferencia"; descricao: string; valor: number;
   data: string; status: string; categoria_id: string | null; conta_id: string | null;
   forma_pagamento: string | null; criado_por: string | null;
+  /** Observações do lançamento — usadas para decompor pagamentos "misto"
+   *  em suas formas reais (DINHEIRO, PIX, CARTAO…) no relatório. */
+  observacoes?: string | null;
   /** true → linha veio de caixa_movimentos (sangria/suprimento); não editável aqui */
   origem?: "fin" | "caixa";
   /** direção da transferência: entrada (suprimento) ou saída (sangria) */
@@ -46,6 +50,11 @@ interface Lanc {
   medico_nome?: string | null;
   /** Nº da ficha do agendamento vinculado. */
   ficha_numero?: number | null;
+  /** true → linha sintética criada pela decomposição de um pagamento "misto"
+   *  (só para exibição; ações de editar/excluir/estornar ficam desabilitadas). */
+  _mistoParte?: boolean;
+  /** id do lançamento pai quando esta linha é uma parte de "misto". */
+  _mistoPaiId?: string;
 }
 interface Opt { id: string; nome: string; tipo?: string }
 
@@ -55,6 +64,50 @@ const EMPTY = {
   referente_a: "outros" as "medico" | "funcionario" | "outros",
 };
 const fmt = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+/** Extrai as partes de um pagamento "misto" a partir de fin_lancamentos.observacoes
+ *  no formato "Pagamento misto: DINHEIRO R$ 100,00; CARTAO DEBITO R$ 30,00".
+ *  Retorna [] quando não é misto ou não foi possível parsear. */
+function parseMistoPartes(forma: string | null | undefined, obs: string | null | undefined): Array<{ label: string; valor: number }> {
+  if ((forma ?? "").toLowerCase() !== "misto" || !obs) return [];
+  const idx = obs.toLowerCase().indexOf("misto:");
+  const trecho = idx >= 0 ? obs.slice(idx + "misto:".length) : obs;
+  const primeiroBloco = trecho.split(" | ")[0];
+  const partes: Array<{ label: string; valor: number }> = [];
+  for (const raw of primeiroBloco.split(";")) {
+    const m = raw.match(/^\s*([^R$]+?)\s*R\$\s*([\d.,]+)/i);
+    if (!m) continue;
+    const label = m[1].replace(/\s+/g, " ").trim().toUpperCase();
+    const num = Number(m[2].replace(/\./g, "").replace(",", "."));
+    if (!label || !Number.isFinite(num) || num <= 0) continue;
+    partes.push({ label, valor: num });
+  }
+  return partes;
+}
+
+/** Expande as linhas de "misto" em uma linha sintética por forma real.
+ *  A soma das partes = valor original (validado; caso contrário mantém a linha original). */
+function expandMistoItems(items: Lanc[]): Lanc[] {
+  const out: Lanc[] = [];
+  for (const l of items) {
+    const partes = parseMistoPartes(l.forma_pagamento, l.observacoes);
+    if (partes.length === 0) { out.push(l); continue; }
+    const soma = partes.reduce((s, p) => s + p.valor, 0);
+    if (Math.abs(soma - Number(l.valor || 0)) > 0.05) { out.push(l); continue; }
+    partes.forEach((p, i) => {
+      out.push({
+        ...l,
+        id: `${l.id}#m${i}`,
+        valor: p.valor,
+        forma_pagamento: p.label,
+        descricao: `${l.descricao} — ${p.label}`,
+        _mistoParte: true,
+        _mistoPaiId: l.id,
+      });
+    });
+  }
+  return out;
+}
 
 function Page() {
   const { clinicaAtual } = useClinica();
@@ -97,6 +150,19 @@ function Page() {
   const [filterFichaDebounced, setFilterFichaDebounced] = useState<string>("");
   const PAGE_SIZE = 100;
   const [page, setPage] = useState(1);
+  // Preferência do usuário: decompor pagamentos "misto" nas formas reais
+  // (DINHEIRO, PIX, CARTÃO…) em TODAS as visões — tabela, drill-down,
+  // export e relatório. Padrão: ligado. Persistido por navegador.
+  const [decomporMisto, setDecomporMisto] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const v = window.localStorage.getItem("financeiro:decomporMisto");
+    return v === null ? true : v === "1";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("financeiro:decomporMisto", decomporMisto ? "1" : "0");
+    }
+  }, [decomporMisto]);
 
   useEffect(() => {
     const t = setTimeout(() => setFilterPacienteDebounced(filterPaciente.trim()), 300);
@@ -144,7 +210,7 @@ function Page() {
       let offset = 0;
       for (;;) {
         let q = supabase.from("fin_lancamentos")
-          .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, criado_por, medico_id, agendamento_id, created_at")
+          .select("id, tipo, descricao, valor, data, status, categoria_id, conta_id, forma_pagamento, observacoes, criado_por, medico_id, agendamento_id, created_at")
           .eq("clinica_id", clinicaAtual.clinica_id)
           .gte("data", fromDate).lte("data", toDate)
           .order("data", { ascending: false })
@@ -592,8 +658,14 @@ function Page() {
 
   const catsFiltradas = cats.filter((c) => !c.tipo || c.tipo === form.tipo);
 
+  // Lista efetivamente usada em TODAS as visões (tabela, drill-down, export,
+  // relatório). Quando a opção está ligada, cada lançamento "misto" vira N
+  // linhas sintéticas (uma por forma real). A soma dos valores é preservada.
+  const displayItems = decomporMisto ? expandMistoItems(items) : items;
+
   const imprimirRelatorio = () => {
-    if (!items.length) { toast.info("Sem dados para o relatório."); return; }
+    const source = displayItems;
+    if (!source.length) { toast.info("Sem dados para o relatório."); return; }
     const catMap = new Map(cats.map((c) => [c.id, c.nome]));
     const esc = (v: unknown) =>
       String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
@@ -601,7 +673,7 @@ function Page() {
     const cats2 = new Map<string, Row>();
     const formas = new Map<string, Row>();
     let totPag = 0, totReceb = 0;
-    for (const l of items) {
+    for (const l of source) {
       const v = Number(l.valor || 0);
       const isReceita = l.tipo === "receita" || (l.tipo === "transferencia" && l.transferSentido === "entrada");
       const isDespesa = l.tipo === "despesa" || (l.tipo === "transferencia" && l.transferSentido === "saida");
@@ -610,11 +682,23 @@ function Page() {
       if (isReceita) { c.recebimento += v; totReceb += v; }
       else if (isDespesa) { c.pagamento += v; totPag += v; }
       cats2.set(catLabel, c);
-      const fLabel = (l.forma_pagamento || "—").toUpperCase();
-      const f = formas.get(fLabel) ?? { label: fLabel, pagamento: 0, recebimento: 0 };
-      if (isReceita) f.recebimento += v;
-      else if (isDespesa) f.pagamento += v;
-      formas.set(fLabel, f);
+      // Decompõe pagamentos "misto" quando a opção estiver ligada; caso
+      // contrário mantém o rótulo original "MISTO" no Resumo por tipo de moeda.
+      const partes = decomporMisto ? parseMistoPartes(l.forma_pagamento, l.observacoes) : [];
+      if (partes.length) {
+        for (const p of partes) {
+          const f = formas.get(p.label) ?? { label: p.label, pagamento: 0, recebimento: 0 };
+          if (isReceita) f.recebimento += p.valor;
+          else if (isDespesa) f.pagamento += p.valor;
+          formas.set(p.label, f);
+        }
+      } else {
+        const fLabel = (l.forma_pagamento || "—").toUpperCase();
+        const f = formas.get(fLabel) ?? { label: fLabel, pagamento: 0, recebimento: 0 };
+        if (isReceita) f.recebimento += v;
+        else if (isDespesa) f.pagamento += v;
+        formas.set(fLabel, f);
+      }
     }
     let acc = 0;
     const linhasCat = Array.from(cats2.values()).map((c) => {
@@ -639,7 +723,7 @@ function Page() {
       '<table><thead><tr><th>GERAL — Descrição</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + linhasCat + '</tbody></table>' +
       '<table><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + linhasForma + '</tbody>' +
       '<tfoot><tr><td>TOTAL</td><td class="right">' + fmt(totPag) + '</td><td class="right">' + fmt(totReceb) + '</td><td class="right">' + fmt(totReceb - totPag) + '</td></tr></tfoot></table>' +
-      '<div class="meta"><span>' + items.length + ' registro' + (items.length === 1 ? '' : 's') + '</span></div>' +
+      '<div class="meta"><span>' + source.length + ' registro' + (source.length === 1 ? '' : 's') + '</span></div>' +
       '<script>window.onload=function(){window.print();}</script></body></html>';
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
@@ -653,18 +737,18 @@ function Page() {
         <div><h1 className="text-2xl font-semibold">Movimento de Caixa</h1>
           <p className="text-sm text-muted-foreground">Receitas e despesas do período</p></div>
         <div className="flex gap-2">
-        <Button variant="outline" onClick={imprimirRelatorio} disabled={!items.length}>
+        <Button variant="outline" onClick={imprimirRelatorio} disabled={!displayItems.length}>
           <Printer className="h-4 w-4 mr-2" />Relatório
         </Button>
         <Button
           variant="outline"
           onClick={() => {
-            if (!items.length) { toast.info("Sem dados para exportar."); return; }
+            if (!displayItems.length) { toast.info("Sem dados para exportar."); return; }
             const catMap = new Map(cats.map((c) => [c.id, c.nome]));
             const contaMap = new Map(contas.map((c) => [c.id, c.nome]));
             const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
             exportToExcel(
-              items.map((l) => ({
+              displayItems.map((l) => ({
                 data: (l.data ? l.data.slice(8,10)+"/"+l.data.slice(5,7)+"/"+l.data.slice(0,4) : ""),
                 hora: l.hora ?? "",
                 tipo: l.tipo,
@@ -834,7 +918,7 @@ function Page() {
           </DialogHeader>
           <div className="max-h-[60vh] overflow-auto">
             {(() => {
-              const list = detalhe === "saldo" ? items : items.filter((i) => i.tipo === detalhe);
+              const list = detalhe === "saldo" ? displayItems : displayItems.filter((i) => i.tipo === detalhe);
               if (list.length === 0) return <p className="text-sm text-muted-foreground py-6 text-center">Sem lançamentos.</p>;
               const catMap = new Map(cats.map((c) => [c.id, c.nome]));
               return (
@@ -937,25 +1021,31 @@ function Page() {
             onChange={(e) => setFilterFicha(e.target.value)}
             placeholder="Nº da ficha"
           /></div>
+        <div className="flex items-center gap-2 pb-1 ml-auto">
+          <Switch id="decompor-misto" checked={decomporMisto} onCheckedChange={setDecomporMisto} />
+          <Label htmlFor="decompor-misto" className="text-xs cursor-pointer" title="Quando ligado, cada pagamento 'misto' aparece como várias linhas (uma por forma real: dinheiro, cartão, pix…). A soma dos valores é preservada.">
+            Decompor pagamentos mistos
+          </Label>
+        </div>
       </CardContent></Card>
 
       <Card><CardContent className="p-0">
         {loading ? <div className="py-12 text-center text-muted-foreground">Carregando...</div>
-          : items.length === 0 ? <div className="py-12 text-center text-muted-foreground">Nenhum lançamento no período.</div>
+          : displayItems.length === 0 ? <div className="py-12 text-center text-muted-foreground">Nenhum lançamento no período.</div>
           : <>
           {(() => {
-            const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+            const totalPages = Math.max(1, Math.ceil(displayItems.length / PAGE_SIZE));
             const currentPage = Math.min(page, totalPages);
             return (
               <div className="px-4 py-2 text-xs text-muted-foreground bg-muted/30 border-b">
-                Página {currentPage} de {totalPages} — {items.length.toLocaleString("pt-BR")} lançamento(s) no período.
+                Página {currentPage} de {totalPages} — {displayItems.length.toLocaleString("pt-BR")} linha(s){decomporMisto ? " (mistos decompostos)" : ""} no período.
               </div>
             );
           })()}
           {(() => {
-            const totalPages2 = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+            const totalPages2 = Math.max(1, Math.ceil(displayItems.length / PAGE_SIZE));
             const currentPage2 = Math.min(page, totalPages2);
-            const paginaAtual = items.slice((currentPage2 - 1) * PAGE_SIZE, currentPage2 * PAGE_SIZE);
+            const paginaAtual = displayItems.slice((currentPage2 - 1) * PAGE_SIZE, currentPage2 * PAGE_SIZE);
             // Visão em cartões no celular (piloto SFP) — mesmos dados e ações
             // da tabela, só em layout vertical com alvos de toque maiores.
             if (modoMobile) {
@@ -989,7 +1079,7 @@ function Page() {
                           {l.criado_por && <span className="whitespace-nowrap">{userMap.get(l.criado_por) ?? "—"}</span>}
                           <Badge variant={l.status === "confirmado" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">{l.status}</Badge>
                         </div>
-                        {l.origem !== "caixa" && (podeEstornar || podeEscrever) && (
+                        {l.origem !== "caixa" && !l._mistoParte && (podeEstornar || podeEscrever) && (
                           <div className="flex items-center gap-1 pt-1 -ml-2">
                             {podeEstornar && l.tipo !== "transferencia" && l.status !== "cancelado" ? (
                               <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" disabled={estornando === l.id} onClick={() => estornar(l)}>
@@ -1008,7 +1098,7 @@ function Page() {
                             ) : null}
                           </div>
                         )}
-                        {l.origem === "caixa" && l.caixaTipo === "sangria" && podeEstornar && (
+                        {l.origem === "caixa" && !l._mistoParte && l.caixaTipo === "sangria" && podeEstornar && (
                           <div className="flex items-center gap-1 pt-1 -ml-2">
                             <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setEstornoSangria(l)}>
                               <Undo2 className="h-3.5 w-3.5 text-amber-600 mr-1" /> Solicitar estorno
@@ -1061,7 +1151,7 @@ function Page() {
                         : (l.tipo === "receita" ? "+" : "-")} {fmt(Number(l.valor))}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-0.5">
-                        {podeEstornar && l.origem !== "caixa" && l.tipo !== "transferencia" && l.status !== "cancelado" ? (
+                        {podeEstornar && !l._mistoParte && l.origem !== "caixa" && l.tipo !== "transferencia" && l.status !== "cancelado" ? (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1072,7 +1162,7 @@ function Page() {
                             <Undo2 className="h-3.5 w-3.5 text-amber-600" />
                           </Button>
                         ) : null}
-                        {podeEstornar && l.origem === "caixa" && l.caixaTipo === "sangria" ? (
+                        {podeEstornar && !l._mistoParte && l.origem === "caixa" && l.caixaTipo === "sangria" ? (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1082,7 +1172,7 @@ function Page() {
                             <Undo2 className="h-3.5 w-3.5 text-amber-600" />
                           </Button>
                         ) : null}
-                        {podeEscrever && l.origem !== "caixa" ? (
+                        {podeEscrever && !l._mistoParte && l.origem !== "caixa" ? (
                           <>
                             <Button variant="ghost" size="icon" title="Editar lançamento — alterar descrição, valor, categoria, conta ou forma de pagamento." onClick={() => openEdit(l)}><Pencil className="h-3.5 w-3.5" /></Button>
                             <Button variant="ghost" size="icon" title="Excluir lançamento — remove definitivamente do banco (sem histórico). Use apenas para lançamentos criados por engano; para repasses prefira Estornar." onClick={() => remove(l)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
@@ -1096,15 +1186,15 @@ function Page() {
               </Table>
             );
           })()}
-          {items.length > PAGE_SIZE ? (() => {
-            const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+          {displayItems.length > PAGE_SIZE ? (() => {
+            const totalPages = Math.max(1, Math.ceil(displayItems.length / PAGE_SIZE));
             const currentPage = Math.min(page, totalPages);
             return (
               <div className="flex items-center justify-between gap-2 px-4 py-3 border-t bg-muted/20">
                 <div className="text-xs text-muted-foreground">
                   Mostrando {((currentPage - 1) * PAGE_SIZE + 1).toLocaleString("pt-BR")}
                   {"–"}
-                  {Math.min(currentPage * PAGE_SIZE, items.length).toLocaleString("pt-BR")} de {items.length.toLocaleString("pt-BR")}
+                  {Math.min(currentPage * PAGE_SIZE, displayItems.length).toLocaleString("pt-BR")} de {displayItems.length.toLocaleString("pt-BR")}
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(1)}>Primeira</Button>

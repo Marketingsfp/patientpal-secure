@@ -1,0 +1,1 @@
+DELETE FROM public.caixa_movimentos WHERE id = 'c6b27406-4607-49a3-ad5c-839b4ae779c2';

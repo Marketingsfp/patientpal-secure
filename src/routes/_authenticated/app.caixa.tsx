@@ -188,6 +188,10 @@ type MovEnrich = {
   paciente: string | null;
   paciente_id: string | null;
   ficha: number | null;
+  /** ID do usuário que faturou (fin_lancamentos.criado_por) — pode diferir
+   *  do operador de caixa (caixa_movimentos.user_id) em cobranças
+   *  centralizadas. Usado para exibir "Quem faturou" na coluna Usuário. */
+  faturado_por_id: string | null;
 };
 type LancamentoEnrichRow = {
   id: string;
@@ -196,6 +200,7 @@ type LancamentoEnrichRow = {
   paciente_id: string | null;
   descricao: string | null;
   status: string | null;
+  criado_por: string | null;
 };
 type AgendamentoEnrichRow = {
   id: string;
@@ -416,6 +421,13 @@ function Page() {
   // para o botão de estorno de sangria (que não tem lançamento financeiro).
   const [estornosPorMov, setEstornosPorMov] = useState<Map<string, "pendente" | "aprovado">>(new Map());
   const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, MovEnrich>>(new Map());
+  // Mapa user_id → nome de exibição. Alimenta a coluna "Usuário" (quem
+  // faturou) em Movimentos, no Detalhe de sessão, no drill-down do saldo
+  // e na exportação/impressão. Cobre tanto o operador do caixa
+  // (caixa_movimentos.user_id) quanto o autor do lançamento financeiro
+  // (fin_lancamentos.criado_por) — que podem divergir em cobranças
+  // centralizadas (ex.: financeiro/laboratório).
+  const [userNamesById, setUserNamesById] = useState<Map<string, string>>(new Map());
   // Conjunto de lancamento_ids cujo fin_lancamentos.status = 'cancelado'
   // (i.e., estornados). Esses recebimentos não devem entrar no saldo do
   // caixa mesmo que o movimento reverso ainda não tenha sido gravado.
@@ -833,7 +845,7 @@ function Page() {
       for (const ids of chunkArray(lancIds, 200)) {
         const { data, error } = await supabase
           .from("fin_lancamentos")
-          .select("id, medico_id, agendamento_id, paciente_id, descricao, status")
+          .select("id, medico_id, agendamento_id, paciente_id, descricao, status, criado_por")
           .in("id", ids);
         if (error) {
           console.warn("Falha ao enriquecer movimentos do caixa por lançamento", error);
@@ -949,6 +961,7 @@ function Page() {
           paciente: pacienteNome,
           paciente_id: pacIdEfetivo,
           ficha: agInfo ? (agInfo.ficha_numero ?? fichaCalculadaPorAg.get(agInfo.id) ?? null) : null,
+          faturado_por_id: l.criado_por ?? null,
         });
       }
       return { enrich, cancelados };
@@ -1402,6 +1415,50 @@ function Page() {
     })();
     return () => { alive = false; };
   }, [mistoLancIds, mistoObs]);
+
+  // Resolve nomes de usuários referenciados por movimentos e enriquecimentos
+  // (operador do caixa + quem faturou o lançamento). Executa em lotes de 200
+  // e cacheia no state para evitar refetch a cada re-render.
+  useEffect(() => {
+    const alvo = new Set<string>();
+    const scanMovs = (arr: Mov[]) => arr.forEach((m) => { if (m.user_id) alvo.add(m.user_id); });
+    scanMovs(minhasMovs);
+    scanMovs(minhasMovsHist);
+    scanMovs(detalheMovs);
+    scanMovs(todosMovs);
+    enrichPorLanc.forEach((e) => { if (e.faturado_por_id) alvo.add(e.faturado_por_id); });
+    const pendentes = Array.from(alvo).filter((id) => !userNamesById.has(id));
+    if (pendentes.length === 0) return;
+    let alive = true;
+    (async () => {
+      const acc = new Map<string, string>();
+      for (const ids of chunkArray(pendentes, 200)) {
+        const { data } = await supabase.from("profiles").select("id, nome").in("id", ids);
+        for (const p of ((data ?? []) as Array<{ id: string; nome: string | null }>)) {
+          acc.set(p.id, (p.nome ?? "").trim() || p.id.slice(0, 8));
+        }
+        // marca também os não retornados para não refazer o fetch em loop
+        for (const id of ids) if (!acc.has(id)) acc.set(id, id.slice(0, 8));
+      }
+      if (!alive) return;
+      setUserNamesById((prev) => {
+        const next = new Map(prev);
+        acc.forEach((v, k) => next.set(k, v));
+        return next;
+      });
+    })();
+    return () => { alive = false; };
+  }, [minhasMovs, minhasMovsHist, detalheMovs, todosMovs, enrichPorLanc, userNamesById]);
+
+  /** Retorna o nome de quem faturou o movimento (prioriza
+   *  fin_lancamentos.criado_por → autor real do lançamento; fallback para
+   *  caixa_movimentos.user_id → operador do caixa que registrou o mov). */
+  const usuarioNomeFor = useCallback((m: Mov): string => {
+    const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
+    const uid = enr?.faturado_por_id ?? m.user_id ?? null;
+    if (!uid) return "—";
+    return userNamesById.get(uid) ?? "…";
+  }, [enrichPorLanc, userNamesById]);
 
   // Entradas agrupadas por forma de pagamento (recebimento + suprimento).
   // Aliases cartao_credito/cartao_debito ficam em credito/debito; pagamentos
@@ -2183,6 +2240,7 @@ function Page() {
       Tipo: TIPO_LABEL[m.tipo],
       Descricao: m.descricao ?? "",
       Forma: m.forma_pagamento ?? "",
+      Usuario: usuarioNomeFor(m),
       Valor: (TIPO_SINAL[m.tipo] < 0 ? -1 : 1) * Number(m.valor || 0),
     }));
     const op = (openDetalhe.user_nome || "operador").replace(/\s+/g, "_");
@@ -2201,6 +2259,7 @@ function Page() {
         <td>${TIPO_LABEL[m.tipo]}</td>
         <td>${esc(m.descricao ?? "")}</td>
         <td>${esc(m.forma_pagamento ?? "—")}</td>
+        <td>${esc(usuarioNomeFor(m))}</td>
         <td style="text-align:right;">${TIPO_SINAL[m.tipo] < 0 ? "-" : ""}${fmt(m.valor)}</td>
       </tr>`).join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"/>
@@ -2224,7 +2283,7 @@ function Page() {
         <div><b>Diferença</b><br/>${fmt(s.diferenca)}</div>
       </div>
       <table><thead><tr>
-        <th>Data</th><th>Hora</th><th>Tipo</th><th>Descrição</th><th>Forma</th><th style="text-align:right;">Valor</th>
+        <th>Data</th><th>Hora</th><th>Tipo</th><th>Descrição</th><th>Forma</th><th>Usuário</th><th style="text-align:right;">Valor</th>
       </tr></thead><tbody>${linhas}</tbody></table>
       <script>window.onload=()=>{window.print();}</script>
       </body></html>`;
@@ -2586,6 +2645,7 @@ function Page() {
                         <TableHead>Serviço</TableHead>
                         <TableHead>Médico</TableHead>
                         <TableHead>Ficha</TableHead>
+                        <TableHead>Usuário</TableHead>
                         <TableHead>Forma</TableHead>
                         <TableHead className="text-right">Valor</TableHead>
                         <TableHead className="text-right w-[1%]">Ação</TableHead>
@@ -2594,7 +2654,7 @@ function Page() {
                     <TableBody>
                        {minhasMovsFiltrados.length === 0 ? (
                          <TableRow>
-                           <TableCell colSpan={11} className="text-center text-muted-foreground">
+                           <TableCell colSpan={12} className="text-center text-muted-foreground">
                             {filtrosAtivos
                               ? "Nenhum movimento corresponde aos filtros"
                               : "Sem movimentos no período"}
@@ -2606,6 +2666,7 @@ function Page() {
                          const medico = enr?.medico ?? null;
                          const ficha = enr?.ficha ?? null;
                          const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
+                         const usuario = usuarioNomeFor(m);
                          const bucket = bucketDeMov(m);
                          const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
                          const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
@@ -2621,6 +2682,7 @@ function Page() {
                                <TableCell className="text-xs">{idx === 0 ? (servico || "—") : ""}</TableCell>
                                <TableCell className="text-xs">{idx === 0 ? (medico || "—") : ""}</TableCell>
                                 <TableCell className="text-xs tabular-nums">{idx === 0 ? formatFichaCaixa(ficha) : ""}</TableCell>
+                               <TableCell className="text-xs uppercase" title={usuario}>{idx === 0 ? usuario : ""}</TableCell>
                                <TableCell className="text-xs">{FORMA_LABEL[k] ?? k}</TableCell>
                                <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                                  {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
@@ -2649,6 +2711,7 @@ function Page() {
                           <TableCell className="text-xs">{servico || "—"}</TableCell>
                           <TableCell className="text-xs">{medico || "—"}</TableCell>
                            <TableCell className="text-xs tabular-nums">{formatFichaCaixa(ficha)}</TableCell>
+                          <TableCell className="text-xs uppercase" title={usuario}>{usuario}</TableCell>
                           <TableCell><FormaCellEditavel m={m} /></TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
@@ -3704,6 +3767,7 @@ function Page() {
                       <TableHead>Tipo</TableHead>
                       <TableHead>Descrição</TableHead>
                       <TableHead>Forma</TableHead>
+                      <TableHead>Usuário</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -3721,6 +3785,7 @@ function Page() {
                             <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
                             <TableCell>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
                             <TableCell>{FORMA_LABEL[k] ?? k}</TableCell>
+                            <TableCell className="text-xs uppercase">{idx === 0 ? usuarioNomeFor(m) : ""}</TableCell>
                             <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                               {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
                             </TableCell>
@@ -3734,6 +3799,7 @@ function Page() {
                           <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
                           <TableCell>{m.descricao || "—"}</TableCell>
                           <TableCell><FormaCellEditavel m={m} /></TableCell>
+                          <TableCell className="text-xs uppercase">{usuarioNomeFor(m)}</TableCell>
                           <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                           </TableCell>

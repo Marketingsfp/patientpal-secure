@@ -89,6 +89,7 @@ import { RenovarContratoDialog } from "@/components/contratos/renovar-contrato-d
 import { HistoricoContratoTab } from "@/components/contratos/historico-contrato-tab";
 import { RecalcularVencimentosDialog } from "@/components/contratos/recalcular-vencimentos-dialog";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
+import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import { usePickTomador, aplicarValorParcial } from "@/components/nfse/use-pick-tomador";
 import { usePromptDescricaoNfse } from "@/components/nfse/use-prompt-descricao";
 
@@ -1339,7 +1340,11 @@ function NovoContratoForm({
     const base = new Date(dataInicio + "T00:00:00");
     const valorParcela = valor + (tipoCobranca === "boleto" ? TAXA_BOLETO : 0);
     const parcelas = Array.from({ length: convenio.num_parcelas }, (_, i) => {
-      const venc = new Date(base.getFullYear(), base.getMonth() + i, diaVenc);
+      // Regra: 1ª mensalidade cai no MÊS SEGUINTE à data de início e as
+      // demais seguem mês a mês, cobrindo exatamente 12 meses até
+      // data_termino (data_inicio + 1 ano). Ex.: início 01/02/2026 →
+      // parcelas 01/03/2026, 01/04/2026, …, 01/02/2027.
+      const venc = new Date(base.getFullYear(), base.getMonth() + i + 1, diaVenc);
       const jaPago = i < mensalidadesJaPagas;
       const vencStr = venc.toISOString().slice(0, 10);
       // Taxa de adesão só na 1ª parcela. Se o operador informou parcelas
@@ -2190,7 +2195,6 @@ function DetalheContrato({
   const [editValor, setEditValor] = useState<string>(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
   const [editDia, setEditDia] = useState<string>(String(contrato.dia_vencimento ?? 10));
   const [savingDados, setSavingDados] = useState(false);
-  const [regerando, setRegerando] = useState(false);
   useEffect(() => {
     setEditValor(String(Number(contrato.valor_mensal ?? 0).toFixed(2)));
     setEditDia(String(contrato.dia_vencimento ?? 10));
@@ -2647,80 +2651,6 @@ function DetalheContrato({
     await load();
   };
 
-  // Regera as 12 parcelas do contrato usando valor_mensal e dia_vencimento já salvos.
-  // Regra: 1ª parcela SEMPRE cai no mês da data_inicio (com dia_vencimento),
-  // as 11 seguintes seguem mês a mês. Preserva parcelas já pagas/existentes
-  // (não apaga o que não é 'pendente' e não é futura).
-  const regerarParcelasFuturas = async () => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    const dataIni = (contrato as any).data_inicio as string | null;
-    if (!dataIni) { toast.error("Contrato sem data de início."); return; }
-    const dia = Math.max(1, Math.min(31, Number((contrato as any).dia_vencimento) || 0));
-    if (!dia) { toast.error("Contrato sem dia de vencimento válido."); return; }
-    const valor = Number((contrato as any).valor_mensal ?? 0);
-    if (!Number.isFinite(valor) || valor < 0) { toast.error("Valor mensal inválido."); return; }
-    if (!confirm("Isso apaga as parcelas pendentes futuras e recria 12 parcelas a partir do mês da data de início. Continuar?")) return;
-
-    setRegerando(true);
-    try {
-      const hoje = new Date().toISOString().slice(0, 10);
-      await supabase
-        .from("contrato_mensalidades")
-        .delete()
-        .eq("contrato_id", contrato.id)
-        .eq("status", "pendente")
-        .gt("numero_parcela", 0)
-        .gt("vencimento", hoje);
-
-      const { data: restantes } = await supabase
-        .from("contrato_mensalidades")
-        .select("numero_parcela")
-        .eq("contrato_id", contrato.id)
-        .gt("numero_parcela", 0)
-        .order("numero_parcela", { ascending: false });
-      const existentes = restantes ?? [];
-      const maxExistente = existentes.reduce(
-        (mx, r) => Math.max(mx, Number((r as { numero_parcela: number }).numero_parcela) || 0),
-        0,
-      );
-      const restantesParaGerar = Math.max(0, 12 - existentes.length);
-      // Base = mês/ano da data_inicio. A parcela N (1..12) cai no
-      // (mês_inicio + N - 1). Só geramos as parcelas cujo número ainda
-      // não existe no contrato.
-      const [yy, mm] = dataIni.slice(0, 10).split("-").map((s) => Number(s));
-      const baseYear = yy;
-      const baseMonth = (mm || 1) - 1; // 0-index
-      const rows: any[] = [];
-      let gerados = 0;
-      let prox = maxExistente + 1;
-      while (gerados < restantesParaGerar && prox <= 12) {
-        const offset = prox - 1;
-        const ref = new Date(baseYear, baseMonth + offset, 1);
-        const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
-        const d = Math.min(dia, lastDay);
-        const venc = new Date(ref.getFullYear(), ref.getMonth(), d);
-        rows.push({
-          contrato_id: contrato.id,
-          clinica_id: (contrato as any).clinica_id,
-          numero_parcela: prox,
-          vencimento: venc.toISOString().slice(0, 10),
-          valor,
-          status: "pendente",
-        });
-        prox++;
-        gerados++;
-      }
-      if (rows.length > 0) {
-        const { error: insErr } = await supabase.from("contrato_mensalidades").insert(rows);
-        if (insErr) { mostrarErro(insErr, "falha ao gerar parcelas"); return; }
-      }
-      toast.success(`Parcelas regeradas (${rows.length} nova(s)).`);
-      await load();
-    } finally {
-      setRegerando(false);
-    }
-  };
-
   const confirmarCancelamento = async () => {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const opcao = MOTIVOS_CANCELAMENTO.find((m) => m.value === cancelMotivoOpcao);
@@ -2758,6 +2688,9 @@ function DetalheContrato({
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [lancOpen, setLancOpen] = useState(false);
   const [pagInitialForma, setPagInitialForma] = useState<string>("");
+  // Isenção de juros + multa para a mensalidade atualmente em pagamento.
+  // Vale só enquanto o diálogo de forma de pagamento estiver aberto; reseta ao fechar.
+  const [isencaoEncargos, setIsencaoEncargos] = useState<{ autorizadoPorNome: string; autorizadoPorUserId: string } | null>(null);
 
   const formaOpcoes: Array<{ forma: string; label: string }> = [
     { forma: "dinheiro", label: "Dinheiro" },
@@ -3458,6 +3391,9 @@ function DetalheContrato({
     if (!m) return 0;
     const base = Number(m.valor) || 0;
     if (m.status === "pago") return base;
+    // Se um gestor autorizou a isenção de juros e multa para ESTA parcela,
+    // devolve o valor original — sem multa e sem juros.
+    if (isencaoEncargos && pagMens?.id === m.id) return base;
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     const venc = new Date(m.vencimento + "T00:00:00");
@@ -4837,17 +4773,9 @@ h1, h2, h3 { margin: 0 0 6mm; }
               </div>
               <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
                 <span className="text-xs text-muted-foreground">
-                  A 1ª parcela é gerada no mês da data de início; as 11 seguintes seguem mês a mês.
+                  A 1ª parcela é gerada no mês seguinte à data de início; as 11 seguintes seguem mês a mês, cobrindo 12 meses até a data de término.
                 </span>
                 <div className="ml-auto flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={regerarParcelasFuturas}
-                    disabled={(cancelado && !isAdmin) || regerando || savingDados || !podeEscrever}
-                  >
-                    {regerando ? "Regerando…" : "Regerar 12 parcelas"}
-                  </Button>
                   <Button
                     size="sm"
                     onClick={salvarDadosFinanceiros}
@@ -5224,7 +5152,13 @@ h1, h2, h3 { margin: 0 0 6mm; }
         </DialogContent>
       </Dialog>
 
-      <Dialog open={formaPagOpen} onOpenChange={setFormaPagOpen}>
+      <Dialog
+        open={formaPagOpen}
+        onOpenChange={(v) => {
+          setFormaPagOpen(v);
+          if (!v) setIsencaoEncargos(null);
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Forma de pagamento</DialogTitle>
@@ -5264,6 +5198,29 @@ h1, h2, h3 { margin: 0 0 6mm; }
             </div>
           ) : null}
           {pagMens && pagDiasAtraso > 5 ? (
+            isencaoEncargos ? (
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs space-y-1">
+                <div className="font-semibold">Juros e multa isentados</div>
+                <div className="text-muted-foreground">
+                  Autorizado por <span className="font-medium">{isencaoEncargos.autorizadoPorNome}</span>. Cobrando o valor original da parcela.
+                </div>
+                <div className="flex justify-between pt-1 border-t border-amber-500/30">
+                  <span>Valor a cobrar</span>
+                  <span className="font-semibold">{BRL(Number(pagMens.valor))}</span>
+                </div>
+                <div className="pt-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setIsencaoEncargos(null)}
+                  >
+                    Reaplicar juros e multa
+                  </Button>
+                </div>
+              </div>
+            ) : (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs space-y-0.5">
               <div className="flex justify-between">
                 <span>Valor original</span>
@@ -5281,7 +5238,50 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <span>Total com encargos</span>
                 <span>{BRL(pagValorFinal)}</span>
               </div>
+            <div className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs w-full"
+                onClick={async () => {
+                  if (!pagMens || !clinicaAtual) return;
+                  const nome = (user?.user_metadata as any)?.nome || user?.email || "Usuário";
+                  const valorOriginal = Number(pagMens.valor) || 0;
+                  const valorComEncargos = valorOriginal * 1.1 + valorOriginal * 0.0033 * pagDiasAtraso;
+                  try {
+                    await supabase.from("audit_log").insert({
+                      clinica_id: clinicaAtual.clinica_id,
+                      user_id: user?.id ?? null,
+                      user_email: user?.email ?? null,
+                      table_name: "contrato_mensalidades",
+                      record_id: pagMens.id,
+                      action: "UPDATE",
+                      dados_depois: {
+                        acao: "isentar_juros_multa_mensalidade",
+                        contrato_id: contrato.id,
+                        contrato_numero: contrato.numero,
+                        numero_parcela: pagMens.numero_parcela,
+                        valor_original: valorOriginal,
+                        valor_com_encargos: Number(valorComEncargos.toFixed(2)),
+                        dias_atraso: pagDiasAtraso,
+                        autorizado_por_user_id: user?.id ?? null,
+                        autorizado_por_nome: nome,
+                        autorizado_por_email: user?.email ?? null,
+                      },
+                    });
+                  } catch (e) {
+                    console.error("Falha ao registrar auditoria de isenção", e);
+                  }
+                  setIsencaoEncargos({ autorizadoPorNome: nome, autorizadoPorUserId: user?.id ?? "" });
+                  toast.success("Juros e multa isentados.");
+                }}
+              >
+                Isentar juros e multa
+              </Button>
             </div>
+            </div>
+            )
           ) : null}
           <div className="grid gap-2 mt-2">
             {formaOpcoes.map((op, idx) => (

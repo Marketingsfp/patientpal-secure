@@ -44,7 +44,7 @@ import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
 import { useTurboDisabled } from "@/hooks/use-turbo-disabled";
 import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/dividir-orcamento-dialog";
 import { SelecionarItensOrcamentoDialog, type SelectItemOrc } from "@/components/agenda/selecionar-itens-orcamento-dialog";
-import { calcularAvisoLimitePendentes } from "@/lib/agenda/aviso-limite-pendentes";
+import { calcularAvisoLimitePendentes, deveBloquearPorLimitePendente } from "@/lib/agenda/aviso-limite-pendentes";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
   CalendarDays,
@@ -1140,6 +1140,19 @@ async function obterInfoConvenioPaciente(params: {
           procedimentoNome,
         });
         if (aviso) avisoLimite = aviso;
+        // Se o convênio bloqueia excedente e os pendentes já estouram a cota,
+        // bloqueia esta tentativa antes mesmo do primeiro virar consumido.
+        if (
+          deveBloquearPorLimitePendente({
+            beneficio: beneficioEscolhido,
+            pendentes: agsPendentes as { procedimento?: string | null }[],
+            usados,
+            procedimentoNome,
+          })
+        ) {
+          bloquear = true;
+          desconto = null;
+        }
       }
     }
   }
@@ -5326,25 +5339,14 @@ function AgendaPage() {
     requestAnimationFrame(() => setFormaPagOpen(false));
   };
 
-  // Pagamento com valor manual: abre o diálogo de lançamento com valor vazio
-  // e sem forma pré-selecionada, permitindo ao usuário digitar livremente.
-  const escolherManual = () => {
-    if (!formaPagCtx) return;
-    const ids = formaPagCtx.agId.split(",").filter(Boolean);
-    const principal = ids[0] ?? null;
-    const extras = ids.slice(1);
-    setPagamentoDesc(`${descricaoComDesconto(formaPagCtx.desc)} — valor manual`);
-    setPagamentoValor("");
-    setPagamentoForma("");
-    setPagamentoAgId(principal);
-    setPagamentoExtraIds(extras);
-    setPagamentoOpen(true);
-    requestAnimationFrame(() => setFormaPagOpen(false));
-  };
+  // "Valor manual" foi removido do fluxo de pagamento da agenda para garantir
+  // que o valor cobrado sempre respeite a regra de desconto do convênio
+  // (Cartão Benefícios). Se precisar de valor diferente, ajuste a regra
+  // no cadastro do convênio.
 
   // Atalhos de teclado no diálogo "Forma de pagamento":
-  // 1=Dinheiro, 2=PIX, 3=Débito, 4=Crédito, 5=Mais de uma forma, 6=Valor manual
-  // (segue a ordem exibida em formaPagOpcoes; tecla N+1 = misto, N+2 = manual).
+  // 1=Dinheiro, 2=PIX, 3=Débito, 4=Crédito, 5=Mais de uma forma
+  // (segue a ordem exibida em formaPagOpcoes; tecla N+1 = misto).
   useEffect(() => {
     if (!formaPagOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -5358,9 +5360,6 @@ function AgendaPage() {
         } else if (idx === formaPagOpcoes.length) {
           e.preventDefault();
           escolherMisto();
-        } else if (idx === formaPagOpcoes.length + 1) {
-          e.preventDefault();
-          escolherManual();
         }
       }
     };
@@ -6559,12 +6558,9 @@ function AgendaPage() {
               </kbd>
               💰 Mais de uma forma de pagamento
             </Button>
-            <Button variant="secondary" className="justify-center h-12" onClick={escolherManual}>
-              <kbd className="inline-flex h-6 w-6 items-center justify-center rounded border bg-muted text-xs font-mono mr-2">
-                {formaPagOpcoes.length + 2}
-              </kbd>
-              ✏️ Valor manual
-            </Button>
+            {/* Botão "Valor manual" removido: valores devem sempre seguir a
+                regra do convênio (Cartão Benefícios) para evitar cobranças
+                divergentes do desconto configurado. */}
           </div>
         </DialogContent>
       </Dialog>
