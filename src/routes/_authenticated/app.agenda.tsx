@@ -8930,6 +8930,19 @@ function AgendaPage() {
           }}
         />
       )}
+      <GRPreviewDialog
+        open={!!grPreview}
+        html={grPreview?.html ?? null}
+        title={grPreview?.title}
+        onCancel={() => {
+          const cb = grPreview?.onCancel;
+          setGrPreview(null);
+          if (cb) cb();
+        }}
+        onConfirm={async () => {
+          if (grPreview) await grPreview.confirm();
+        }}
+      />
     </div>
   );
 }
