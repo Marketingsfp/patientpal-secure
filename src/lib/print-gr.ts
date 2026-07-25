@@ -940,10 +940,8 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   ${corpoVias}
 </body></html>`;
 
-  imprimirViaIframe(html);
-
-  // Registra a impressão (se for nova via). Não bloqueia a janela já aberta em caso de erro.
-  if (!reimpressao) {
+  const persistirVia = async () => {
+    if (reimpressao) return;
     try {
       await supabase.from("gr_impressoes" as never).insert({
         clinica_id: clinicaId,
@@ -954,11 +952,21 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         ficha_numero: fichaNum > 0 ? fichaNum : null,
       } as never);
     } catch (_) { /* falha silenciosa: registro de via não deve bloquear impressão */ }
-    // Não "congela" mais ficha_numero no agendamento: a ficha é POSICIONAL e
-    // acompanha a lista da agenda (pode mudar se slots forem inseridos/removidos
-    // antes da paciente). O gr_impressoes acima guarda o número de cada via só
-    // para histórico.
+  };
+
+  if (preview) {
+    return {
+      preview: true,
+      html,
+      confirm: async () => {
+        imprimirViaIframe(html);
+        await persistirVia();
+      },
+    };
   }
+
+  imprimirViaIframe(html);
+  await persistirVia();
 }
 
 /** Reimprime a última via já emitida sem gerar novo registro. */
