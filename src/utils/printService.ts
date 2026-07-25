@@ -41,6 +41,25 @@ QcYMFI4W0Au3e5rI/TmVcPSetw55lGyBggSTzXBpr9vDIU79lclJA4ZrYJsOgEWC
 C+z11nSEQpzbGw/luxLvuAvQYg==
 -----END CERTIFICATE-----`;
 
+// ---------------------------------------------------------------------------
+// Estado compartilhado entre impressões (totem: uma senha atrás da outra).
+//
+// Cada chamada à API do QZ é assinada por uma server function (round-trip ao
+// backend), e `qz.websocket.connect()` varre wss://localhost:8181/8282/8383/
+// 8484 + hosts alternativos antes de desistir. Reconectar/redescobrir a
+// impressora a cada senha custava vários segundos com o papel já saindo — por
+// isso o socket e o nome da impressora ficam vivos entre os trabalhos, e o
+// aquecimento acontece fora do caminho crítico (ver `prepararImpressao`).
+// ---------------------------------------------------------------------------
+
+let impressoraPadraoPromise: Promise<string> | null = null;
+
+// Quando o QZ Tray não está instalado/rodando, a varredura de portas leva
+// segundos para falhar. Guardamos a indisponibilidade por um tempo para que as
+// próximas senhas caiam direto no fallback por iframe, sem repetir a varredura.
+const QZ_INDISPONIVEL_MS = 60_000;
+let qzIndisponivelAte = 0;
+
 let qzConfigurado = false;
 function configurarQzUmaVez() {
   if (qzConfigurado) return;
@@ -61,6 +80,65 @@ function configurarQzUmaVez() {
   });
 }
 
+/** Abre o websocket do QZ Tray, reaproveitando a conexão já ativa. */
+async function garantirConexao(): Promise<void> {
+  if (Date.now() < qzIndisponivelAte) {
+    throw new Error("QZ Tray indisponível (verificado há pouco).");
+  }
+  // Registra certificado e assinatura antes de conectar.
+  configurarQzUmaVez();
+  if (qz.websocket.isActive()) return;
+  try {
+    await qz.websocket.connect();
+  } catch (e) {
+    qzIndisponivelAte = Date.now() + QZ_INDISPONIVEL_MS;
+    throw e;
+  }
+}
+
+/** Nome da impressora padrão, resolvido uma vez e reaproveitado. */
+function obterImpressoraPadrao(): Promise<string> {
+  if (!impressoraPadraoPromise) {
+    impressoraPadraoPromise = (async () => {
+      const impressora = await qz.printers.getDefault();
+      if (!impressora) {
+        throw new Error("Nenhuma impressora padrão configurada no sistema.");
+      }
+      return impressora;
+    })().catch((e) => {
+      impressoraPadraoPromise = null; // não cacheia falha
+      throw e;
+    });
+  }
+  return impressoraPadraoPromise;
+}
+
+/** Derruba o estado do QZ para que a próxima tentativa comece limpa. */
+function descartarConexao(): void {
+  impressoraPadraoPromise = null;
+  try {
+    if (qz.websocket.isActive()) void qz.websocket.disconnect();
+  } catch {
+    // Silencia falhas de disconnect — a impressão já foi tentada.
+  }
+}
+
+/**
+ * Aquecimento: conecta o websocket e resolve a impressora padrão antes de o
+ * paciente pedir a senha, para que a impressão em si só faça o `qz.print`.
+ * Nunca lança — se o QZ Tray não estiver disponível, a impressão cai no
+ * fallback por diálogo do navegador normalmente.
+ */
+export async function prepararImpressao(): Promise<boolean> {
+  try {
+    await garantirConexao();
+    await obterImpressoraPadrao();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function imprimirDocumentoSilencioso(pdfBase64: string): Promise<void> {
   if (!pdfBase64 || typeof pdfBase64 !== "string") {
     throw new Error("PDF em base64 não informado para impressão.");
@@ -70,19 +148,11 @@ export async function imprimirDocumentoSilencioso(pdfBase64: string): Promise<vo
   const base64Limpo = pdfBase64.replace(/^data:application\/pdf;base64,/, "").trim();
 
   try {
-    // 0) Registra certificado e assinatura antes de conectar.
-    configurarQzUmaVez();
+    // 1) Websocket ativo (normalmente já aberto pelo aquecimento).
+    await garantirConexao();
 
-    // 1) Garante o websocket ativo antes de qualquer chamada.
-    if (!qz.websocket.isActive()) {
-      await qz.websocket.connect();
-    }
-
-    // 2) Busca a impressora padrão do sistema.
-    const impressora = await qz.printers.getDefault();
-    if (!impressora) {
-      throw new Error("Nenhuma impressora padrão configurada no sistema.");
-    }
+    // 2) Impressora padrão (normalmente já em cache).
+    const impressora = await obterImpressoraPadrao();
 
     // 3) Configuração do trabalho de impressão.
     const config = qz.configs.create(impressora);
@@ -96,16 +166,11 @@ export async function imprimirDocumentoSilencioso(pdfBase64: string): Promise<vo
       },
     ];
 
-    // 5) Envia à impressora.
+    // 5) Envia à impressora. O socket fica aberto para a próxima senha —
+    //    desconectar aqui só adiava o fim do "Imprimindo…" na tela.
     await qz.print(config, data);
-  } finally {
-    // 6) Encerra o websocket ao final (sucesso ou erro).
-    try {
-      if (qz.websocket.isActive()) {
-        await qz.websocket.disconnect();
-      }
-    } catch {
-      // Silencia falhas de disconnect — a impressão já foi tentada.
-    }
+  } catch (e) {
+    descartarConexao();
+    throw e;
   }
 }

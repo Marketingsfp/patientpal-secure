@@ -20,8 +20,8 @@ import {
   Contrast,
   AlertTriangle,
 } from "lucide-react";
-import { imprimirSenhaTotem, gerarSenhaPdfBase64 } from "@/lib/print-senha";
-import { imprimirDocumentoSilencioso } from "@/utils/printService";
+import { imprimirSenhaTotem, gerarSenhaPdfBase64, precarregarGeradorPdf } from "@/lib/print-senha";
+import { imprimirDocumentoSilencioso, prepararImpressao } from "@/utils/printService";
 import { TecladoNumerico, formatarCpfParcial } from "@/components/totem/teclado-numerico";
 import { detectDescriptor, ensureFaceModels, FACE_MATCH_THRESHOLD } from "@/lib/face-recognition";
 
@@ -58,6 +58,10 @@ const TIPOS: { tipo: TipoSenha; titulo: string; sub: string; Icon: typeof Hash; 
 // são telas de conclusão com auto-retorno.
 type Step = "menu" | "senha" | "checkin" | "checkin-facial" | "checkin-ok" | "ticket";
 
+// Tempo máximo que o "Imprimindo…" fica na tela do ticket. Ver comentário em
+// `emitir` — o papel sai antes de a promessa de impressão resolver.
+const TETO_SPINNER_MS = 1200;
+
 type CheckinInfo = {
   paciente_nome: string;
   inicio: string | null;
@@ -78,6 +82,23 @@ export function TotemPage() {
   const streamRef = useRef<MediaStream | null>(null);
   // Status da impressão da senha — ver item 10 (feedback de impressão).
   const [printStatus, setPrintStatus] = useState<"imprimindo" | "ok" | "falha" | null>(null);
+  const spinnerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Aquecimento da impressão: baixa o chunk do jsPDF, abre o websocket do QZ
+  // Tray e resolve a impressora padrão enquanto o paciente ainda está no menu.
+  // Sem isso, tudo acontecia depois do toque no botão e o "Imprimindo…" ficava
+  // segundos na tela com o papel já saindo.
+  useEffect(() => {
+    precarregarGeradorPdf();
+    void prepararImpressao();
+  }, []);
+
+  // Reaquece ao entrar na escolha do tipo de senha: cobre o caso do QZ Tray ter
+  // sido reiniciado (socket caído) ou de a checagem do aquecimento inicial já
+  // ter expirado, sempre alguns segundos antes do toque que dispara a impressão.
+  useEffect(() => {
+    if (step === "senha") void prepararImpressao();
+  }, [step]);
 
   // ---- Acessibilidade (idosos / baixa visão / PCD) ----
   // escalaIdx: índice em ESCALAS aplicado ao font-size do <html> (rem → escala
@@ -224,6 +245,10 @@ export function TotemPage() {
 
   function reset() {
     stopCamera();
+    if (spinnerTimerRef.current) {
+      clearTimeout(spinnerTimerRef.current);
+      spinnerTimerRef.current = null;
+    }
     setTicket(null);
     setCpf("");
     setCheckinInfo(null);
@@ -263,6 +288,15 @@ export function TotemPage() {
     // impresso (nem silenciosamente nem via diálogo), em vez de dizer
     // "retire sua senha impressa" quando não saiu nada da impressora.
     setPrintStatus("imprimindo");
+    // A tela do ticket só dura DURACAO_CONCLUSAO.ticket segundos, e o `qz.print`
+    // só resolve depois que o QZ Tray renderiza o PDF e o spooler confirma —
+    // isto é, com o papel já saindo. Passado esse teto o spinner sai da frente
+    // em vez de consumir a tela inteira; se a impressão falhar depois, o aviso
+    // de falha ainda substitui a mensagem.
+    if (spinnerTimerRef.current) clearTimeout(spinnerTimerRef.current);
+    spinnerTimerRef.current = setTimeout(() => {
+      setPrintStatus((s) => (s === "imprimindo" ? "ok" : s));
+    }, TETO_SPINNER_MS);
     void (async () => {
       try {
         const pdfBase64 = await gerarSenhaPdfBase64({
