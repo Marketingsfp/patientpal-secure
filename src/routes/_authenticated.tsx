@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { ClinicaProvider } from "@/hooks/use-clinica";
+import { PermissoesProvider } from "@/hooks/use-permissoes";
 import { supabase } from "@/integrations/supabase/client";
 import { isMedicoOnlyUser } from "@/lib/medico-only";
 
@@ -27,7 +28,10 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedApp() {
   return (
     <ClinicaProvider>
-      <AppShell />
+      {/* Dentro do ClinicaProvider: as permissões dependem de (clínica, papel). */}
+      <PermissoesProvider>
+        <AppShell />
+      </PermissoesProvider>
     </ClinicaProvider>
   );
 }

@@ -1,9 +1,16 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { presetAllowedSet, PRESETS } from "@/lib/permissoes-presets";
 
 export type Acesso = "none" | "read" | "write";
+
+export interface PermissoesValue {
+  allowed: Set<string> | null;
+  nivel: Map<string, "read" | "write"> | null;
+  configured: Set<string> | null;
+  loading: boolean;
+}
 
 function nivelDoPreset(role: string): Map<string, "read" | "write"> {
   const preset = (PRESETS as Record<string, Partial<Record<string, Acesso>>>)[role] ?? {};
@@ -25,12 +32,7 @@ function nivelDoPreset(role: string): Map<string, "read" | "write"> {
  * `src/lib/permissoes-presets.ts` para que o sistema não fique vazio antes
  * do gestor salvar a primeira configuração.
  */
-export function usePermissoes(): {
-  allowed: Set<string> | null;
-  nivel: Map<string, "read" | "write"> | null;
-  configured: Set<string> | null;
-  loading: boolean;
-} {
+function usePermissoesQuery(): PermissoesValue {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const role = clinicaAtual?.role ?? null;
@@ -120,7 +122,35 @@ export function usePermissoes(): {
     return () => { cancelled = true; };
   }, [clinicaId, role]);
 
-  return { allowed, nivel, configured, loading };
+  return useMemo(() => ({ allowed, nivel, configured, loading }), [allowed, nivel, configured, loading]);
+}
+
+const PermissoesContext = createContext<PermissoesValue | null>(null);
+
+// Fallback fechado para quando o provider não está acima na árvore (ex.: rotas
+// isoladas como /medico ou /totem). Autorização falha fechada por princípio.
+const PERMISSOES_FECHADO: PermissoesValue = {
+  allowed: new Set(),
+  nivel: new Map(),
+  configured: new Set(),
+  loading: false,
+};
+
+/**
+ * Busca as permissões UMA vez por (clínica, papel) e compartilha com toda a
+ * árvore. Antes cada `usePodeEscrever()` era um hook independente, com estado e
+ * efeito próprios, refazendo as duas queries sequenciais (`perfis_acesso` →
+ * `perfil_permissoes`). Como há ~80 pontos de uso e o componente da rota
+ * remonta a cada troca de aba, isso custava vários round trips redundantes por
+ * navegação.
+ */
+export function PermissoesProvider({ children }: { children: ReactNode }) {
+  const value = usePermissoesQuery();
+  return <PermissoesContext.Provider value={value}>{children}</PermissoesContext.Provider>;
+}
+
+export function usePermissoes(): PermissoesValue {
+  return useContext(PermissoesContext) ?? PERMISSOES_FECHADO;
 }
 
 /**
