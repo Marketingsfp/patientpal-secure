@@ -488,7 +488,41 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       if (m) medicoCb = { aceita: !!m.aceita_cartao_beneficios, tipo: m.cb_tipo_repasse ?? null, valor: m.cb_valor_repasse ?? null, percentual: m.cb_percentual_repasse ?? null };
     } catch { medicoCb = null; }
   }
-  const procData = proc.data as { id: string; nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
+  let procData = proc.data as { id: string; nome: string; valor_dinheiro_pix: number | null; valor_cartao: number | null; tipo: string | null } | null;
+  // Fallback: a.procedimento pode vir com sufixos como "(ECG) (CARDIOLOGIA)"
+  // que não existem exatamente na tabela `procedimentos`. Tenta variantes
+  // progressivamente mais curtas (removendo parênteses do fim) para achar o
+  // procedimento cadastrado e preservar o valor de tabela — essencial para
+  // gratuidades, onde não há valor pago para fallback.
+  if (!procData && a.procedimento) {
+    const stripParens = (s: string): string[] => {
+      const out: string[] = [];
+      let cur = s.trim();
+      out.push(cur);
+      for (let i = 0; i < 3; i++) {
+        const m = cur.match(/^(.*)\s*\([^()]*\)\s*$/);
+        if (!m) break;
+        cur = m[1].trim();
+        if (cur) out.push(cur);
+      }
+      const semParens = s.replace(/\s*\([^()]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+      if (semParens && !out.includes(semParens)) out.push(semParens);
+      return out;
+    };
+    for (const alvo of stripParens(a.procedimento)) {
+      if (alvo === a.procedimento) continue;
+      const { data: pAlt } = await supabase
+        .from("procedimentos")
+        .select("id, nome, valor_dinheiro_pix, valor_cartao, tipo")
+        .eq("clinica_id", clinicaId)
+        .ilike("nome", alvo)
+        .maybeSingle();
+      if (pAlt) {
+        procData = pAlt as unknown as typeof procData;
+        break;
+      }
+    }
+  }
 
   // Especialidade correta = a que está vinculada a ESTE serviço para ESTE médico
   // (medico_procedimentos.especialidade_id), definida na aba Especialidades/Serviços
@@ -696,6 +730,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     return Array.from(out).filter(Boolean);
   };
 
+  // Gratuidade: paciente isento (nenhum lançamento pago). Clínica e prestador
+  // continuam recebendo normalmente, usando o valor de tabela do procedimento
+  // como base do cálculo.
+  const isGratuidade = !pagamento && valor === 0;
+  const valorBase = isGratuidade ? Number(procData?.valor_dinheiro_pix ?? 0) : valor;
   let prestador = 0;
   let repasseFixoConvenio = false;
   // Cartão Consulta tem prioridade: usa o cb_*_repasse do médico.
@@ -708,7 +747,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       // limitar pelo valor pago.
       repasseFixoConvenio = true;
     } else if (medicoCb.tipo === "percentual" && medicoCb.percentual != null) {
-      prestador = +(valor * Number(medicoCb.percentual) / 100).toFixed(2);
+      prestador = +(valorBase * Number(medicoCb.percentual) / 100).toFixed(2);
     }
   } else if (a.medico_id) {
     const { data: convs } = await supabase
@@ -734,28 +773,29 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         // pagamento normal, segue para o Math.min abaixo e limita ao recebido.
         if (valor <= 0) repasseFixoConvenio = true;
       } else if (conv.tipo_repasse === "percentual" && conv.percentual != null) {
-        prestador = +(valor * Number(conv.percentual) / 100).toFixed(2);
+        prestador = +(valorBase * Number(conv.percentual) / 100).toFixed(2);
       } else if (medicoData) {
         // sem tipo/valor cadastrado para o serviço → usa padrão do médico
         if (medicoData.tipo_repasse === "valor" && medicoData.valor_repasse_padrao != null) {
           prestador = Number(medicoData.valor_repasse_padrao);
         } else {
-          prestador = +(valor * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+          prestador = +(valorBase * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
         }
       }
     } else if (medicoData) {
       if (medicoData.tipo_repasse === "valor" && medicoData.valor_repasse_padrao != null) {
         prestador = Number(medicoData.valor_repasse_padrao);
       } else {
-        prestador = +(valor * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
+        prestador = +(valorBase * Number(medicoData.percentual_repasse_padrao ?? 0) / 100).toFixed(2);
       }
     }
   }
   // Só limita o repasse pelo valor pago quando NÃO é repasse fixo de convênio.
+  // Em gratuidade, o "teto" passa a ser o valor de tabela (valorBase).
   if (!repasseFixoConvenio) {
-    prestador = Math.min(prestador, valor);
+    prestador = Math.min(prestador, valorBase);
   }
-  const clinica = +(Math.max(0, valor - prestador)).toFixed(2);
+  const clinica = +(Math.max(0, valorBase - prestador)).toFixed(2);
 
   // NUNCA assumir "DINHEIRO" quando a forma real é desconhecida (lançamento
   // antigo sem forma_pagamento salva, ou pagamento ainda não processado) — um
@@ -853,7 +893,15 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(clinica)}</td></tr>
       <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(prestador)}</td></tr>
     </table>
-    ` : ""}
+    ` : (isGratuidade && (clinica > 0 || prestador > 0) ? `
+    <div class="center bold lg" style="margin-top:8px; letter-spacing:2px">GRATUIDADE</div>
+    <div class="center sm">PACIENTE ISENTO DE PAGAMENTO</div>
+    <div class="sep"></div>
+    <table>
+      <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(clinica)}</td></tr>
+      <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(prestador)}</td></tr>
+    </table>
+    ` : "")}
 
     <div class="sep"></div>
     <div class="row sm">
@@ -1025,9 +1073,17 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const procByNome = new Map(procs.map((p) => [normalizar(p.nome ?? ""), p]));
   // Valor efetivamente pago por agendamento (fonte da verdade — usa quando há lançamento confirmado).
   const valorPagoByAg = new Map<string, number>();
+  // Agendamentos que têm lançamento confirmado mas com valor total 0 →
+  // gratuidade (paciente isento). Clínica e prestador seguem recebendo.
+  const gratuidadeByAg = new Map<string, boolean>();
   for (const l of ((lancsRes.data ?? []) as Array<{ agendamento_id: string | null; valor: number | string }>)) {
     if (!l.agendamento_id) continue;
     valorPagoByAg.set(l.agendamento_id, (valorPagoByAg.get(l.agendamento_id) ?? 0) + Number(l.valor));
+    gratuidadeByAg.set(l.agendamento_id, true);
+  }
+  // Depois de somar, mantém true só quando o total é 0.
+  for (const [k, total] of valorPagoByAg.entries()) {
+    if (total > 0) gratuidadeByAg.set(k, false);
   }
 
   // Paciente: pega do primeiro agendamento (mesmo paciente esperado em todos).
@@ -1079,8 +1135,8 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   }
 
   // Agrupa por médico
-  type Item = { procNome: string; valor: number; prestador: number; clinica: number; inicio: string };
-  type Grupo = { medicoId: string | null; agendaId: string | null; agIdRef: string; medicoNome: string; itens: Item[]; subtotal: number; prestador: number; clinica: number; inicioRef: string };
+  type Item = { procNome: string; valor: number; prestador: number; clinica: number; inicio: string; gratuidade: boolean };
+  type Grupo = { medicoId: string | null; agendaId: string | null; agIdRef: string; medicoNome: string; itens: Item[]; subtotal: number; prestador: number; clinica: number; inicioRef: string; allGratuidade: boolean; anyPago: boolean };
   const grupos = new Map<string, Grupo>();
 
   for (const a of ags) {
@@ -1148,8 +1204,11 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     // GR independente com o repasse calculado só para aquele serviço.
     const key = a.id;
     const medicoNome = a.medico_id ? (medById.get(a.medico_id)?.nome ?? "—") : "SEM PROFISSIONAL";
-    const g: Grupo = grupos.get(key) ?? { medicoId: a.medico_id ?? null, agendaId: (a as any).agenda_id ?? null, agIdRef: a.id, medicoNome, itens: [] as Item[], subtotal: 0, prestador: 0, clinica: 0, inicioRef: a.inicio };
-    g.itens.push({ procNome, valor, prestador, clinica: clin, inicio: a.inicio });
+    const gratuidade = gratuidadeByAg.get(a.id) === true;
+    const g: Grupo = grupos.get(key) ?? { medicoId: a.medico_id ?? null, agendaId: (a as any).agenda_id ?? null, agIdRef: a.id, medicoNome, itens: [] as Item[], subtotal: 0, prestador: 0, clinica: 0, inicioRef: a.inicio, allGratuidade: true, anyPago: false };
+    g.itens.push({ procNome, valor, prestador, clinica: clin, inicio: a.inicio, gratuidade });
+    if (!gratuidade) g.anyPago = true;
+    if (!gratuidade) g.allGratuidade = false;
     if (a.inicio < g.inicioRef) { g.inicioRef = a.inicio; g.agIdRef = a.id; }
     g.subtotal = +(g.subtotal + valor).toFixed(2);
     g.prestador = +(g.prestador + prestador).toFixed(2);
@@ -1272,7 +1331,17 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
           </tr>
           ${linhas}
         </table>
-        ${g.subtotal > 0 ? `
+        ${g.allGratuidade ? `
+        <div class="center bold lg" style="margin-top:8px; letter-spacing:2px">GRATUIDADE</div>
+        <div class="center sm">PACIENTE ISENTO DE PAGAMENTO</div>
+        ${(g.clinica > 0 || g.prestador > 0) ? `
+        <div class="sep"></div>
+        <table>
+          <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(g.clinica)}</td></tr>
+          <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(g.prestador)}</td></tr>
+        </table>
+        ` : ""}
+        ` : g.subtotal > 0 ? `
         <div class="row" style="margin-top:8px">
           <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
           <div class="bold lg">${fmtBRL(g.subtotal)}</div>
