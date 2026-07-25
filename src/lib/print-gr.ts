@@ -68,6 +68,17 @@ export interface PrintGRInput {
   };
 }
 
+/**
+ * Resultado devolvido quando `preview: true` é usado nas funções de impressão
+ * de GR. Contém o HTML final montado (idêntico ao que seria impresso) e um
+ * callback `confirm()` que efetivamente dispara a impressão e grava a via.
+ */
+export interface PrintGRPreviewResult {
+  preview: true;
+  html: string;
+  confirm: () => Promise<void>;
+}
+
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 
