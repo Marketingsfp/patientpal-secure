@@ -1073,9 +1073,17 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const procByNome = new Map(procs.map((p) => [normalizar(p.nome ?? ""), p]));
   // Valor efetivamente pago por agendamento (fonte da verdade — usa quando há lançamento confirmado).
   const valorPagoByAg = new Map<string, number>();
+  // Agendamentos que têm lançamento confirmado mas com valor total 0 →
+  // gratuidade (paciente isento). Clínica e prestador seguem recebendo.
+  const gratuidadeByAg = new Map<string, boolean>();
   for (const l of ((lancsRes.data ?? []) as Array<{ agendamento_id: string | null; valor: number | string }>)) {
     if (!l.agendamento_id) continue;
     valorPagoByAg.set(l.agendamento_id, (valorPagoByAg.get(l.agendamento_id) ?? 0) + Number(l.valor));
+    gratuidadeByAg.set(l.agendamento_id, true);
+  }
+  // Depois de somar, mantém true só quando o total é 0.
+  for (const [k, total] of valorPagoByAg.entries()) {
+    if (total > 0) gratuidadeByAg.set(k, false);
   }
 
   // Paciente: pega do primeiro agendamento (mesmo paciente esperado em todos).
