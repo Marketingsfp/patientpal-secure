@@ -2688,6 +2688,10 @@ function DetalheContrato({
   const [formaPagOpen, setFormaPagOpen] = useState(false);
   const [lancOpen, setLancOpen] = useState(false);
   const [pagInitialForma, setPagInitialForma] = useState<string>("");
+  // Isenção de juros + multa para a mensalidade atualmente em pagamento.
+  // Vale só enquanto o diálogo de forma de pagamento estiver aberto; reseta ao fechar.
+  const [isencaoEncargos, setIsencaoEncargos] = useState<{ autorizadoPorNome: string; autorizadoPorUserId: string } | null>(null);
+  const [isencaoAuthOpen, setIsencaoAuthOpen] = useState(false);
 
   const formaOpcoes: Array<{ forma: string; label: string }> = [
     { forma: "dinheiro", label: "Dinheiro" },
