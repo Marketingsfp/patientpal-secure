@@ -984,6 +984,8 @@ export interface PrintGRAgrupadaInput {
   usuarioNome?: string;
   usuarioId?: string | null;
   reimpressao?: boolean;
+  /** Idem `PrintGRInput.preview`: devolve `{ preview, html, confirm }` sem imprimir. */
+  preview?: boolean;
   pagamento: {
     valor: number;
     forma_pagamento: string | null;
@@ -996,7 +998,7 @@ export interface PrintGRAgrupadaInput {
 const normalizar = (s: string) =>
   s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
-export async function printGuiaAtendimentoAgrupada(input: PrintGRAgrupadaInput) {
+export async function printGuiaAtendimentoAgrupada(input: PrintGRAgrupadaInput): Promise<void | PrintGRPreviewResult> {
   const ids = Array.from(new Set((input.agendamentoIds ?? []).filter(Boolean)));
   if (ids.length === 0) throw new Error("Nenhum agendamento informado para impressão.");
 
@@ -1008,6 +1010,7 @@ export async function printGuiaAtendimentoAgrupada(input: PrintGRAgrupadaInput) 
       usuarioNome: input.usuarioNome,
       usuarioId: input.usuarioId,
       reimpressao: input.reimpressao,
+      preview: input.preview,
       pagamento: input.pagamento,
     });
   }
@@ -1020,8 +1023,8 @@ export async function reimprimirGuiaAtendimentoAgrupada(input: PrintGRAgrupadaIn
   return printGuiaAtendimentoAgrupada({ ...input, reimpressao: true });
 }
 
-async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids: string[]) {
-  const { clinicaId, usuarioNome, usuarioId, reimpressao, pagamento } = input;
+async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids: string[]): Promise<void | PrintGRPreviewResult> {
+  const { clinicaId, usuarioNome, usuarioId, reimpressao, pagamento, preview } = input;
 
   // Controle de vias: usa o primeiro id como "chave" para limite (1ª/2ª via).
   const chaveVia = ids[0];
