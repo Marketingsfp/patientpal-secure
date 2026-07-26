@@ -17,6 +17,11 @@ import {
   type RepasseMedico,
   type RepasseConvenio,
 } from "@/lib/repasse-calc";
+import {
+  carregarMapaConvenioPacientes,
+  resolverModalidade,
+  type MapaConvenioPaciente,
+} from "@/lib/convenio/modalidade";
 
 type Row = {
   id: string;
@@ -99,6 +104,21 @@ export function ComprovantesTab() {
     convenios: [],
     procTipos: new Map(),
   });
+  // Mapa paciente -> convênio ativo (cadastro). Fonte da verdade para saber
+  // se o atendimento é de Cartão Consulta/Desconto, no lugar do texto.
+  const [mapaConvenio, setMapaConvenio] = useState<MapaConvenioPaciente>(new Map());
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      if (!clinicaId) return;
+      const m = await carregarMapaConvenioPacientes(clinicaId);
+      if (!cancel) setMapaConvenio(m);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [clinicaId]);
 
   useEffect(() => {
     let cancel = false;
@@ -225,7 +245,7 @@ export function ComprovantesTab() {
         supabase
           .from("fin_lancamentos")
           .select(
-            "id, data, descricao, valor, valor_medico_override, valor_laudo, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, medico_id, paciente_id, agendamento_id, medicos:medico_id(nome), pacientes:paciente_id(nome), agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio)",
+            "id, data, descricao, valor, valor_medico_override, valor_laudo, convenio_modalidade, repasse_pago_em, repasse_pago_at, repasse_forma_pagamento, repasse_conta_id, repasse_lancamento_id, medico_id, paciente_id, agendamento_id, medicos:medico_id(nome), pacientes:paciente_id(nome), agendamento:agendamentos(procedimento, paciente_nome, paciente_id, medico_id, inicio)",
           )
           .eq("clinica_id", clinicaId)
           .eq("repasse_pago", true)
@@ -258,6 +278,10 @@ export function ComprovantesTab() {
           valorTotal,
           (r.procedimento as string) ?? null,
           null,
+          resolverModalidade({
+            pacienteId: (r.paciente_id as string) ?? null,
+            mapa: mapaConvenio,
+          }),
         ).repasse;
         return {
           id: r.id as string,
@@ -307,6 +331,11 @@ export function ComprovantesTab() {
                 valorPago,
                 procedimento,
                 (r.descricao as string) ?? null,
+                resolverModalidade({
+                  modalidadeLancamento: (r.convenio_modalidade as string) ?? null,
+                  pacienteId,
+                  mapa: mapaConvenio,
+                }),
               ).repasse;
         return {
           id: r.id as string,
@@ -337,7 +366,7 @@ export function ComprovantesTab() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clinicaId, de, ate, repasseCtx]);
+  }, [clinicaId, de, ate, repasseCtx, mapaConvenio]);
 
   const medicosDisponiveis = useMemo(() => {
     const m = new Map<string, string>();

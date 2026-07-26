@@ -2114,6 +2114,7 @@ export type Database = {
           id: string
           informativo_html: string | null
           max_dependentes: number
+          modalidade: string | null
           modelo_contrato: string | null
           nome: string
           num_parcelas: number
@@ -2137,6 +2138,7 @@ export type Database = {
           id?: string
           informativo_html?: string | null
           max_dependentes?: number
+          modalidade?: string | null
           modelo_contrato?: string | null
           nome: string
           num_parcelas?: number
@@ -2160,6 +2162,7 @@ export type Database = {
           id?: string
           informativo_html?: string | null
           max_dependentes?: number
+          modalidade?: string | null
           modelo_contrato?: string | null
           nome?: string
           num_parcelas?: number
@@ -3608,6 +3611,9 @@ export type Database = {
           categoria_id: string | null
           clinica_id: string
           conta_id: string | null
+          contrato_id: string | null
+          convenio_id: string | null
+          convenio_modalidade: string | null
           created_at: string
           criado_por: string | null
           data: string
@@ -3651,6 +3657,9 @@ export type Database = {
           categoria_id?: string | null
           clinica_id: string
           conta_id?: string | null
+          contrato_id?: string | null
+          convenio_id?: string | null
+          convenio_modalidade?: string | null
           created_at?: string
           criado_por?: string | null
           data?: string
@@ -3694,6 +3703,9 @@ export type Database = {
           categoria_id?: string | null
           clinica_id?: string
           conta_id?: string | null
+          contrato_id?: string | null
+          convenio_id?: string | null
+          convenio_modalidade?: string | null
           created_at?: string
           criado_por?: string | null
           data?: string
@@ -3750,6 +3762,20 @@ export type Database = {
             columns: ["conta_id"]
             isOneToOne: false
             referencedRelation: "fin_contas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_contrato_id_fkey"
+            columns: ["contrato_id"]
+            isOneToOne: false
+            referencedRelation: "contratos_assinatura"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fin_lancamentos_convenio_id_fkey"
+            columns: ["convenio_id"]
+            isOneToOne: false
+            referencedRelation: "cb_convenios"
             referencedColumns: ["id"]
           },
           {

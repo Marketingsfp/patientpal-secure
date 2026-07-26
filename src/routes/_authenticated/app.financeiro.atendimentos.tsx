@@ -1015,13 +1015,20 @@ function AtendimentosPage() {
     totalPago: number,
     procNome: string | null,
     descricao?: string | null,
+    /** Modalidade vinda do cadastro (contrato ativo) — prevalece sobre o texto. */
+    modalidade?: "cartao_consulta" | "cartao_desconto" | null,
   ): { total: number; repasse: number } => {
     if (!medicoId) return { total: totalPago, repasse: 0 };
     const med = medicosById.get(medicoId);
     // Cartão Consulta: o paciente paga um valor reduzido (ex.: R$ 9,99) e o
     // repasse ao médico é o cb_valor_repasse cadastrado (não o valor do
-    // convênio particular). Detecta pela descrição do lançamento.
-    if (isCartaoConsultaDesc(descricao) && med?.aceita_cartao_beneficios) {
+    // convênio particular). Detecta pelo CADASTRO do paciente (contrato ativo)
+    // e, só como fallback histórico, pela descrição do lançamento.
+    const ehConvenio =
+      modalidade === "cartao_consulta" ||
+      modalidade === "cartao_desconto" ||
+      (modalidade == null && isCartaoConsultaDesc(descricao));
+    if (ehConvenio && med?.aceita_cartao_beneficios) {
       if (med.cb_tipo_repasse === "valor" && med.cb_valor_repasse != null) {
         return { total: totalPago, repasse: Number(med.cb_valor_repasse) };
       }
@@ -1253,7 +1260,13 @@ function AtendimentosPage() {
       // Recalcula repasse usando convênio cadastrado por procedimento
       // (ex.: PREVENTIVO R$ 10,40). Mantém o valor armazenado apenas como
       // fallback caso o cálculo retorne 0 e o banco já tenha um valor manual.
-      const { total, repasse } = calcRepasseFull(r.medico_id, pago, r.procedimento, null);
+      const { total, repasse } = calcRepasseFull(
+        r.medico_id,
+        pago,
+        r.procedimento,
+        null,
+        resolverModalidade({ pacienteId: r.paciente_id, mapa: mapaConvenio }),
+      );
       const valorMedico = repasse > 0 ? repasse : Number(r.valor_medico);
       const valorTotal = total > 0 ? total : pago;
       return {
@@ -1304,7 +1317,17 @@ function AtendimentosPage() {
       const medIdEff = r.medico_id ?? ag?.medico_id ?? null;
       const dataRepasse = ag?.inicio ? ag.inicio.slice(0, 10) : r.data;
       const pago = Number(r.valor);
-      const { total, repasse } = calcRepasseFull(medIdEff, pago, proc, r.descricao ?? null);
+      const { total, repasse } = calcRepasseFull(
+        medIdEff,
+        pago,
+        proc,
+        r.descricao ?? null,
+        resolverModalidade({
+          modalidadeLancamento: (r as { convenio_modalidade?: string | null }).convenio_modalidade ?? null,
+          pacienteId: pacIdEff,
+          mapa: mapaConvenio,
+        }),
+      );
       // Override manual do repasse (editado na tela). Quando presente,
       // sobrescreve o cálculo por regra.
       const overrideRaw = (r as { valor_medico_override?: number | string | null }).valor_medico_override;
