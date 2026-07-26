@@ -75,6 +75,7 @@ function DashboardPage() {
   const [rawAgs, setRawAgs] = useState<RawAg[]>([]);
   const [rawLancs, setRawLancs] = useState<RawLanc[]>([]);
   const [rawAtends, setRawAtends] = useState<RawAtend[]>([]);
+  const [pagosAgIds, setPagosAgIds] = useState<Set<string>>(new Set());
   const [novosIds, setNovosIds] = useState<Set<string>>(new Set());
   const [pacNomes, setPacNomes] = useState<Map<string, string>>(new Map());
   const [medNomes, setMedNomes] = useState<Map<string, string>>(new Map());
@@ -222,8 +223,28 @@ function DashboardPage() {
     const vendasTotal = atends.reduce((s, a) => s + Number(a.valor_total || 0), 0);
     const comissoesPagas = atends.reduce((s, a) => s + Number(a.valor_medico || 0), 0);
 
-    // Pagamentos das senhas (pagos/não pagos): a partir de atendimentos status
-    const pagos = atends.filter(a => a.status === "pago" || a.status === "realizado").length;
+    // Pagamentos das fichas: consideramos pago o agendamento que tem
+    // recebimento confirmado no caixa (fin_lancamentos.agendamento_id) ou
+    // atendimento financeiro quitado. O status da agenda ("realizado") não
+    // significa pagamento — por isso antes tudo aparecia como "não pago".
+    const agIds = ags.map(x => x.id);
+    const pagosSet = new Set<string>();
+    if (agIds.length > 0) {
+      for (let i = 0; i < agIds.length; i += 500) {
+        const { data: pagosR } = await supabase
+          .from("fin_lancamentos")
+          .select("agendamento_id,status,tipo")
+          .eq("clinica_id", cid)
+          .eq("tipo", "receita")
+          .eq("status", "confirmado")
+          .in("agendamento_id", agIds.slice(i, i + 500));
+        for (const l of (pagosR ?? []) as Array<{ agendamento_id: string | null }>) {
+          if (l.agendamento_id) pagosSet.add(l.agendamento_id);
+        }
+      }
+    }
+    setPagosAgIds(pagosSet);
+    const pagos = contarGRs(ags.filter(x => pagosSet.has(x.id)));
     const naoPagos = Math.max(0, total - pagos);
 
     // Por médico
@@ -351,12 +372,8 @@ function DashboardPage() {
         if (kind === "agend_total") return true;
         if (kind === "agend_atendidos") return g.status === "realizado";
         if (kind === "agend_faltas") return g.status === "faltou";
-        if (kind === "agend_pagos") {
-          const atIds = new Set(rawAtends.filter(at => at.status === "pago" || at.status === "realizado").map(at => at.id));
-          // approximate: agendamentos com status realizado/pago
-          return g.status === "realizado" || atIds.has(g.id);
-        }
-        if (kind === "agend_naopagos") return g.status !== "realizado" && g.status !== "pago";
+        if (kind === "agend_pagos") return pagosAgIds.has(g.id);
+        if (kind === "agend_naopagos") return !pagosAgIds.has(g.id);
         return true;
       };
       const titulos: Record<string, string> = {
