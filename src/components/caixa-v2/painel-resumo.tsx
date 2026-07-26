@@ -38,13 +38,13 @@ export function PainelResumo({ data, sessaoInfo }: { data: ResumoData; sessaoInf
   return (
     <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b pb-2 pt-1">
       <div className="flex gap-2 overflow-x-auto scrollbar-thin -mx-1 px-1">
-        <div className="rounded-lg border bg-primary/5 px-3 py-2 min-w-[190px] shadow-sm">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">Sessão</div>
-          <div className="text-sm font-medium truncate">{sessaoInfo}</div>
+        <div className="rounded-lg border bg-primary/5 px-3 py-2 min-w-[210px] shadow-sm" title="Entradas menos saídas (sangrias, despesas e estornos) dos movimentos do filtro selecionado.">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">Saldo do filtro</div>
+          <div className="text-sm font-medium truncate">Sessão aberta: {sessaoInfo}</div>
           <div className="text-base font-semibold tabular-nums">{brl(data.saldo)}</div>
         </div>
-        <Card label="Recebido hoje"   value={brl(data.recebidoHoje)}   tone="success" testId="kpi-hoje" />
-        <Card label="Recebido sessão" value={brl(data.recebidoSessao)} tone="success" testId="kpi-sessao" />
+        <Card label="Recebido no filtro"  value={brl(data.recebidoHoje)}   tone="success" testId="kpi-hoje" />
+        <Card label="Recebido na sessão"  value={brl(data.recebidoSessao)} tone="success" testId="kpi-sessao" />
         <Card label="Particular"      value={brl(data.particular)}     testId="kpi-particular" />
         <Card label="Associado"       value={brl(data.associado)}      testId="kpi-associado" />
         <Card label="Dinheiro"        value={brl(data.dinheiro)}       testId="kpi-dinheiro" />
