@@ -6581,6 +6581,7 @@ function AgendaPage() {
         open={pagamentoOpen}
         onOpenChange={(v) => {
           setPagamentoOpen(v);
+          if (false) setFatRapidoOpen(false);
           if (!v) {
             setPagamentoAgId(null);
             setPagamentoExtraIds([]);
