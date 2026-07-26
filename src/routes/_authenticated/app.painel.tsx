@@ -63,7 +63,7 @@ function DashboardPage() {
     conf: { presencas: 0, ausencias: 0 },
     vendas: { total: 0, orcamentos: 0 },
     pagamentos: { realizado: 0, aPagar: 0 },
-    recebimentos: { realizado: 0, aReceber: 0, qtdRealizado: 0, qtdAReceber: 0, mensalidades: 0, qtdMensalidades: 0 },
+    recebimentos: { realizado: 0, aReceber: 0, qtdRealizado: 0, qtdAReceber: 0, mensalidades: 0, qtdMensalidades: 0, atendimentos: 0, qtdAtendimentos: 0 },
     comissoes: { pagas: 0, pendentes: 0, percentReceita: 0 },
     // Atendimentos do dia = GRs de agendamento + GRs de mensalidade do cartão.
     grs: { agendamentos: 0, mensalidades: 0, outrosDias: 0, total: 0 },
