@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { printGuiaMensalidade } from "@/lib/print-gr";
+import { PagamentoAvulsoMensalidadeDialog } from "@/components/cartao-beneficios/pagamento-avulso-dialog";
 
 const BRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -427,17 +428,14 @@ export function FaturamentoRapidoMensalidadeDialog({
         }}
       />
 
-      <LancamentoDialog
+      <PagamentoAvulsoMensalidadeDialog
         open={avulsoOpen}
         onOpenChange={setAvulsoOpen}
-        tipo="receita"
-        categoriaFixaNome="MENSALIDADE CARTAO CONSULTA"
-        initialDescricao={
-          paciente ? `Mensalidade Cartão (avulso) - ${paciente.nome}` : "Mensalidade Cartão (avulso)"
-        }
-        onSavedWithData={async () => {
-          toast.success("Pagamento avulso registrado no caixa.");
-          setAvulsoOpen(false);
+        clinicaId={clinicaId}
+        usuario={usuario}
+        pacienteInicial={paciente}
+        onPago={() => {
+          if (paciente) void buscar(paciente);
           onPago?.();
         }}
       />
