@@ -337,6 +337,7 @@ function DashboardPage() {
   const moneyBRL = (n: number) => `R$ ${fmtMoney(Number(n || 0))}`;
 
   const openDrill = (kind: string, ctx?: Record<string, string>) => {
+    setDrillBusca("");
     if (kind === "alertas") {
       setDrill({
         title: `Central de alertas (${data.alertas.length})`,
@@ -374,6 +375,7 @@ function DashboardPage() {
         rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), medico: medNome(g.medico_id), proc: g.procedimento ?? "—", status: g.status })),
       });
     } else if (kind === "clientes_novos" || kind === "clientes_regulares" || kind === "clientes_total") {
+      // (mantido)
       const pacsAg = Array.from(new Set(rawAgs.map(g => g.paciente_id).filter(Boolean) as string[]));
       const lista = pacsAg.filter(p => kind === "clientes_total" ? true : (kind === "clientes_novos" ? novosIds.has(p) : !novosIds.has(p)));
       const titulos: Record<string, string> = { clientes_total: "Clientes agendados", clientes_novos: "Clientes novos", clientes_regulares: "Clientes regulares" };
