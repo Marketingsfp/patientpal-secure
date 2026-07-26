@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
+  carregarMapaConvenioPacientes,
+  resolverModalidade,
+  type MapaConvenioPaciente,
+} from "@/lib/convenio/modalidade";
+import {
   Plus,
   Pencil,
   Trash2,
