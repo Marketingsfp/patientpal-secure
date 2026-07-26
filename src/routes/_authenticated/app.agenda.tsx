@@ -6586,6 +6586,12 @@ function AgendaPage() {
         onSavedWithData={async (dados) => {
           if (!pagamentoAgId || !clinicaAtual) return;
           const agId = pagamentoAgId;
+          const clinicaIdCarimbo = clinicaAtual.clinica_id;
+          const idsCarimbo = [agId, ...pagamentoExtraIds];
+          // Fluxo original do pagamento — encapsulado para que o carimbo do
+          // convênio (convenio_id/contrato_id/modalidade) rode sempre no fim,
+          // inclusive quando o fluxo sai mais cedo.
+          const executarPagamento = async () => {
           // Cobrança agrupada: em vez de 1 lançamento principal + N sombras (R$ 0,00),
           // divide o valor total proporcionalmente entre os N atendimentos e cria
           // 1 lançamento por atendimento — permitindo estorno individual sem
