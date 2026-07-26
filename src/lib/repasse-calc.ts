@@ -21,7 +21,45 @@ export interface RepasseConvenio {
   tipo_repasse: string | null;
   percentual: number | null;
   valor: number | null;
+  /** Repasse quando o atendimento é por convênio (nulo = usa padrão) */
+  convenio_tipo_repasse?: string | null;
+  convenio_percentual?: number | null;
+  convenio_valor?: number | null;
+  /** Repasse fixo em pagamentos via Cartão Consulta (nulo = usa padrão) */
+  cartao_consulta_valor?: number | null;
+  /** Repasse fixo em pagamentos via Cartão Desconto (nulo = usa padrão) */
+  cartao_desconto_valor?: number | null;
 }
+
+/** Localiza a linha de repasse cadastrada para o serviço (ou sua categoria). */
+function findConvenioRow(
+  ctx: RepasseCtx,
+  medicoId: string,
+  procNome: string | null,
+): RepasseConvenio | undefined {
+  if (!procNome) return undefined;
+  const { convenios, procTipos } = ctx;
+  const variants = procVariants(procNome);
+  for (const alvo of variants) {
+    const c = convenios.find((cv) => cv.medico_id === medicoId && normRepasse(cv.nome) === alvo);
+    if (c) return c;
+  }
+  for (const alvo of variants) {
+    const tipo = procTipos.get(alvo);
+    if (!tipo) continue;
+    const sentinel = `__CAT__:${String(tipo).toUpperCase()}`;
+    const c = convenios.find((cv) => cv.medico_id === medicoId && cv.nome === sentinel);
+    if (c) return c;
+  }
+  return undefined;
+}
+
+export const isCartaoDescontoDesc = (desc: string | null | undefined): boolean => {
+  if (!desc) return false;
+  const d = desc.toUpperCase();
+  if (d.includes("ADESAO") || d.includes("ADESÃO")) return false;
+  return d.includes("CARTAO DESCONTO") || d.includes("CARTÃO DESCONTO");
+};
 
 export interface RepasseCtx {
   medicos: RepasseMedico[];
@@ -73,6 +111,18 @@ export function calcRepasseFull(
   const { medicos, convenios, procTipos } = ctx;
   if (!medicoId) return { total: totalPago, repasse: 0 };
   const med = medicos.find((m) => m.id === medicoId);
+
+  // 1) Repasse cadastrado por serviço para a forma de pagamento usada.
+  //    Em branco = cai nas regras existentes (padrão do médico / categoria).
+  const linhaServico = findConvenioRow(ctx, medicoId, procNome);
+  if (linhaServico) {
+    if (isCartaoConsultaDesc(descricao) && linhaServico.cartao_consulta_valor != null) {
+      return { total: totalPago, repasse: Number(linhaServico.cartao_consulta_valor) };
+    }
+    if (isCartaoDescontoDesc(descricao) && linhaServico.cartao_desconto_valor != null) {
+      return { total: totalPago, repasse: Number(linhaServico.cartao_desconto_valor) };
+    }
+  }
 
   if (isCartaoConsultaDesc(descricao) && med?.aceita_cartao_beneficios) {
     if (med.cb_tipo_repasse === "valor" && med.cb_valor_repasse != null) {
