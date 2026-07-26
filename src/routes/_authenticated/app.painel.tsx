@@ -587,10 +587,10 @@ function DashboardPage() {
           ]} />
         </KpiCard>
 
-        <KpiCard icon={Receipt} title="Atendimentos do Dia (GRs)" value={data.grs.total} format={fmtInt}>
+        <KpiCard icon={Receipt} title="Atendimentos do Dia (GRs)" value={data.grs.total} format={fmtInt} onClick={() => openDrill("grs_total")}>
           <SubGrid items={[
-            { label: "Agendamentos", value: fmtInt(data.grs.agendamentos), onClick: () => openDrill("agend_total") },
-            { label: "Mensalidades do cartão", value: fmtInt(data.grs.mensalidades) },
+            { label: "Agendamentos realizados", value: fmtInt(data.grs.agendamentos), onClick: () => openDrill("agend_atendidos") },
+            { label: "Mensalidades do cartão", value: fmtInt(data.grs.mensalidades), onClick: () => openDrill("grs_mens") },
           ]} />
         </KpiCard>
 
