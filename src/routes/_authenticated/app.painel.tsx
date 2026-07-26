@@ -116,7 +116,7 @@ function DashboardPage() {
     // GRs de mensalidade (cartão consulta / cartão desconto) impressas no período:
     // cada pagamento de mensalidade conta como uma GR do dia.
     const [grMensR, recebidoR] = await Promise.all([
-      supabase.from("gr_impressoes").select("id,mensalidade_id,ficha_numero,created_at").eq("clinica_id", cid)
+      supabase.from("gr_impressoes").select("id,mensalidade_id,agendamento_id,ficha_numero,created_at").eq("clinica_id", cid)
         .in("tipo", ["mensalidade", "taxa_adesao"]).eq("via_numero", 1)
         .gte("created_at", ini).lte("created_at", fim),
       // Recebimentos efetivados no período (data de lançamento no caixa),
