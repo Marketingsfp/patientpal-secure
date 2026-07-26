@@ -66,7 +66,7 @@ function DashboardPage() {
     recebimentos: { realizado: 0, aReceber: 0, qtdRealizado: 0, qtdAReceber: 0 },
     comissoes: { pagas: 0, pendentes: 0, percentReceita: 0 },
     // Atendimentos do dia = GRs de agendamento + GRs de mensalidade do cartão.
-    grs: { agendamentos: 0, mensalidades: 0, total: 0 },
+    grs: { agendamentos: 0, mensalidades: 0, outrosDias: 0, total: 0 },
     // Pagamentos recebidos no período, separando o que é do próprio dia
     // do que se refere a atendimentos/competências de outras datas.
     caixaDia: { total: 0, doDia: 0, outrasDatas: 0, qtd: 0 },
@@ -323,7 +323,13 @@ function DashboardPage() {
     setData({
       alertas: alertasR.data ?? [],
       // Atendimentos REALIZADOS do dia (não o total agendado) + GRs de mensalidade.
-      grs: { agendamentos: atendidos, mensalidades: qtdMensGR, total: atendidos + qtdMensGR },
+      // GRs pagas no período: atendidos + pagos para outras datas + mensalidades do cartão.
+      grs: {
+        agendamentos: atendidos,
+        mensalidades: qtdMensGR,
+        outrosDias: Math.max(0, pagos - atendidos),
+        total: Math.max(pagos, atendidos) + qtdMensGR,
+      },
       caixaDia: { total: caixaTotal, doDia: caixaDoDia, outrasDatas: caixaTotal - caixaDoDia, qtd: recebidos.length },
       agend: { total, atendidos, faltas, pagos, naoPagos, novos, regulares, retornos, semAgenda },
       msgs: { enviadas: 0, respostas: 0, total: 0 },
