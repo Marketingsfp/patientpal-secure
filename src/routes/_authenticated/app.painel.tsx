@@ -634,13 +634,14 @@ function DashboardPage() {
           ]} />
         </KpiCard>
 
-        <KpiCard icon={Receipt} title="Atendimentos no período (GRs)" value={data.grs.total} format={fmtInt} onClick={() => openDrill("grs_total")}>
+        <KpiCard icon={Receipt} title="GRs pagas no período" value={data.grs.total} format={fmtInt} onClick={() => openDrill("grs_total")}>
           <p className="text-[11px] text-muted-foreground mb-1">
             Segue o filtro de Período acima
           </p>
           <SubGrid items={[
             { label: "Atendidos", value: fmtInt(data.grs.agendamentos), onClick: () => openDrill("agend_atendidos") },
             { label: "Mensalidades do cartão", value: fmtInt(data.grs.mensalidades), onClick: () => openDrill("grs_mens") },
+            { label: "Pagas para outros dias", value: fmtInt(data.grs.outrosDias), onClick: () => openDrill("grs_outros") },
           ]} />
         </KpiCard>
 
