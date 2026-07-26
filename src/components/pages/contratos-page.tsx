@@ -78,6 +78,8 @@ import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { printGuiaMensalidade, printGuiaMensalidadeComTaxa, reimprimirGuiaMensalidade } from "@/lib/print-gr";
 import { gerarCarnePDF } from "@/lib/print-carne";
+import { Receipt } from "lucide-react";
+import { FaturamentoRapidoMensalidadeDialog } from "@/components/cartao-beneficios/faturamento-rapido-dialog";
 import { gerarBoletosContrato } from "@/lib/boleto.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Barcode, FileText } from "lucide-react";
@@ -296,6 +298,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
 
   // Fluxo "É renovação?" acionado antes de abrir a nova venda.
   const [perguntaRenovOpen, setPerguntaRenovOpen] = useState(false);
+  const [fatRapidoOpen, setFatRapidoOpen] = useState(false);
   const [escolhaContratoOpen, setEscolhaContratoOpen] = useState(false);
   const [pacRenov, setPacRenov] = useState<PatientOption | null>(null);
   const [contratosPac, setContratosPac] = useState<Contrato[]>([]);
@@ -626,12 +629,25 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           Contratos
         </h1>
         {podeEscrever && (
+          <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setFatRapidoOpen(true)}>
+            <Receipt className="h-4 w-4 mr-2" />
+            Faturamento rápido
+          </Button>
           <Button onClick={() => setPerguntaRenovOpen(true)} disabled={convenios.length === 0}>
             <Plus className="h-4 w-4 mr-2" />
             Vendas
           </Button>
+          </div>
         )}
       </div>
+      <FaturamentoRapidoMensalidadeDialog
+        open={fatRapidoOpen}
+        onOpenChange={setFatRapidoOpen}
+        clinicaId={clinicaAtual?.clinica_id ?? ""}
+        usuario={{ id: user?.id ?? null, nome: user?.user_metadata?.nome ?? user?.email ?? null }}
+        onPago={load}
+      />
       {convenios.length === 0 && !loading ? (
         <div className="rounded-md border bg-muted/40 p-3 text-sm">
           Cadastre um convênio antes em <strong>Cartão de Benefícios → Convênios</strong>.

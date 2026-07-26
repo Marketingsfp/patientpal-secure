@@ -1,4 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { carimbarConvenioNosLancamentos } from "@/lib/convenio/modalidade";
+import { FaturamentoRapidoMensalidadeDialog } from "@/components/cartao-beneficios/faturamento-rapido-dialog";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -1686,6 +1688,8 @@ function AgendaPage() {
   };
 
   const [pagamentoOpen, setPagamentoOpen] = useState(false);
+  // Faturamento rápido da mensalidade do Cartão Benefícios direto da agenda.
+  const [fatRapidoOpen, setFatRapidoOpen] = useState(false);
   const [pagamentoDesc, setPagamentoDesc] = useState("");
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
   const [pagamentoExtraIds, setPagamentoExtraIds] = useState<string[]>([]);
@@ -5856,6 +5860,15 @@ function AgendaPage() {
           </div>
           <EncerrarExpedienteButton />
           <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-[11px] px-2"
+            title="Receber mensalidade do Cartão Benefícios"
+            onClick={() => setFatRapidoOpen(true)}
+          >
+            💳 Mensalidade do cartão
+          </Button>
+          <Button
             asChild
             variant="outline"
             size="sm"
@@ -6565,6 +6578,13 @@ function AgendaPage() {
         </DialogContent>
       </Dialog>
 
+      <FaturamentoRapidoMensalidadeDialog
+        open={fatRapidoOpen}
+        onOpenChange={setFatRapidoOpen}
+        clinicaId={clinicaAtual?.clinica_id ?? ""}
+        usuario={{ id: user?.id ?? null, nome: user?.user_metadata?.nome ?? user?.email ?? null }}
+      />
+
       <LancamentoDialog
         open={pagamentoOpen}
         onOpenChange={(v) => {
@@ -6586,6 +6606,12 @@ function AgendaPage() {
         onSavedWithData={async (dados) => {
           if (!pagamentoAgId || !clinicaAtual) return;
           const agId = pagamentoAgId;
+          const clinicaIdCarimbo = clinicaAtual.clinica_id;
+          const idsCarimbo = [agId, ...pagamentoExtraIds];
+          // Fluxo original do pagamento — encapsulado para que o carimbo do
+          // convênio (convenio_id/contrato_id/modalidade) rode sempre no fim,
+          // inclusive quando o fluxo sai mais cedo.
+          const executarPagamento = async () => {
           // Cobrança agrupada: em vez de 1 lançamento principal + N sombras (R$ 0,00),
           // divide o valor total proporcionalmente entre os N atendimentos e cria
           // 1 lançamento por atendimento — permitindo estorno individual sem
@@ -6844,6 +6870,12 @@ function AgendaPage() {
               mostrarErro(err, "falha ao emitir NFS-e");
               navigate({ to: "/app/nfse" });
             }
+          }
+          };
+          try {
+            await executarPagamento();
+          } finally {
+            await carimbarConvenioNosLancamentos(clinicaIdCarimbo, idsCarimbo);
           }
         }}
       />
