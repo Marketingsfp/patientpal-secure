@@ -729,18 +729,21 @@ function DashboardPage() {
             { label: "À receber", value: fmtMoney(data.recebimentos.aReceber), onClick: () => openDrill("rec_areceber") },
           ]} />
           <p className="text-[11px] text-muted-foreground mt-2">
-            Sendo {fmtMoney(data.recebimentos.mensalidades)} de mensalidades do cartão
-            {data.recebimentos.qtdMensalidades > 0 ? ` (${fmtInt(data.recebimentos.qtdMensalidades)} lançamento${data.recebimentos.qtdMensalidades > 1 ? "s" : ""})` : ""}
+            Atendimentos: {fmtMoney(data.recebimentos.atendimentos)} ({fmtInt(data.recebimentos.qtdAtendimentos)})
+            {" · "}Mensalidades do cartão: {fmtMoney(data.recebimentos.mensalidades)} ({fmtInt(data.recebimentos.qtdMensalidades)})
           </p>
         </KpiCard>
         )}
 
         {podeVerFinanceiro && (
-        <KpiCard icon={Receipt} title="Recebimentos Qtd." value={data.recebimentos.qtdRealizado + data.recebimentos.qtdAReceber} format={fmtInt} onClick={() => openDrill("rec_real")}>
+        <KpiCard icon={Receipt} title="Lançamentos de recebimento (Qtd.)" value={data.recebimentos.qtdRealizado + data.recebimentos.qtdAReceber} format={fmtInt} onClick={() => openDrill("rec_real")}>
           <SubGrid items={[
             { label: "Realizado", value: fmtInt(data.recebimentos.qtdRealizado), onClick: () => openDrill("rec_real") },
             { label: "À receber", value: fmtInt(data.recebimentos.qtdAReceber), onClick: () => openDrill("rec_areceber") },
           ]} />
+          <p className="text-[11px] text-muted-foreground mt-2">
+            Conta lançamentos no caixa (não GRs). Sendo {fmtInt(data.recebimentos.qtdAtendimentos)} de atendimentos e {fmtInt(data.recebimentos.qtdMensalidades)} de mensalidades do cartão.
+          </p>
         </KpiCard>
         )}
 
