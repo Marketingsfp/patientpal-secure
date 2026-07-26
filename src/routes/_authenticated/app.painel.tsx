@@ -475,7 +475,7 @@ function DashboardPage() {
       }));
       const rows = kind === "grs_mens" ? rowsMens : [...rowsAg, ...rowsMens];
       setDrill({
-        title: `${kind === "grs_mens" ? "Mensalidades do cartão" : "Atendimentos do dia (GRs)"} (${rows.length})`,
+        title: `${kind === "grs_mens" ? "Mensalidades do cartão" : "Atendimentos no período (GRs)"} (${rows.length})`,
         columns: [
           { key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" },
           { key: "proc", label: "Procedimento" }, { key: "origem", label: "Origem" },
