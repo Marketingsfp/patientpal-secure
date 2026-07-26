@@ -271,11 +271,23 @@ export function FaturamentoRapidoMensalidadeDialog({
               </div>
             )}
 
+            {!loading && !paciente && (
+              <Button variant="outline" className="w-full" onClick={() => setAvulsoOpen(true)}>
+                <Receipt className="h-4 w-4 mr-1" /> Pagamento avulso (paciente sem contrato no sistema)
+              </Button>
+            )}
+
             {!loading && paciente && !itens.length && (
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground flex items-center gap-2">
                   <Search className="h-4 w-4" /> Nenhuma mensalidade em aberto para este paciente.
                 </p>
+                {!contratosAtivos.length && (
+                  <p className="text-xs text-muted-foreground rounded-md border border-dashed p-2">
+                    Este paciente não tem contrato ativo cadastrado — pode ser um cadastro que não veio na
+                    migração do sistema antigo. Use o pagamento avulso abaixo para não segurar o caixa.
+                  </p>
+                )}
                 {contratosAtivos.map((c) => (
                   <div key={c.id} className="flex items-center justify-between gap-3 rounded-md border p-3">
                     <div className="min-w-0">
@@ -295,7 +307,11 @@ export function FaturamentoRapidoMensalidadeDialog({
                     </Button>
                   </div>
                 ))}
-                <Button variant="secondary" className="w-full" onClick={() => setAvulsoOpen(true)}>
+                <Button
+                  variant={contratosAtivos.length ? "secondary" : "default"}
+                  className="w-full"
+                  onClick={() => setAvulsoOpen(true)}
+                >
                   <Receipt className="h-4 w-4 mr-1" /> Pagamento avulso (sem contrato)
                 </Button>
               </div>
