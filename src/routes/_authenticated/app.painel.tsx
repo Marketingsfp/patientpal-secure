@@ -105,7 +105,7 @@ function DashboardPage() {
     const [alertasR, agendR, lancR, atendR, medicosR, espR, medEspR, procR] = await Promise.all([
       supabase.from("fin_alertas").select("id,mensagem").eq("clinica_id", cid).eq("lido", false).order("created_at", { ascending: false }).limit(5),
       supabase.from("agendamentos").select("id,status,medico_id,paciente_id,procedimento,inicio").eq("clinica_id", cid).gte("inicio", ini).lte("inicio", fim),
-      supabase.from("fin_lancamentos").select("id,tipo,status,valor,medico_id,contrato_id").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
+      supabase.from("fin_lancamentos").select("id,tipo,status,valor,medico_id,contrato_id,descricao").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
       supabase.from("fin_atendimentos").select("id,valor_total,valor_medico,medico_id,status").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
       supabase.from("medicos").select("id,nome").eq("clinica_id", cid).eq("ativo", true),
       supabase.from("especialidades").select("id,nome"),
