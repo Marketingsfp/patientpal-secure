@@ -269,7 +269,7 @@ function DashboardPage() {
       })
       .sort((a, b) => b.total - a.total);
 
-    const grMensRows = (grMensR.data ?? []) as Array<{ id: string; mensalidade_id: string | null; ficha_numero: number | null; created_at: string | null }>;
+    const grMensRows = (grMensR.data ?? []) as Array<{ id: string; mensalidade_id: string | null; agendamento_id: string | null; ficha_numero: number | null; created_at: string | null }>;
     const qtdMensGR = grMensRows.length;
     // Nome do paciente de cada GR de mensalidade (mensalidade -> contrato -> titular)
     const mensIds = Array.from(new Set(grMensRows.map(g => g.mensalidade_id).filter(Boolean) as string[]));
@@ -290,10 +290,29 @@ function DashboardPage() {
         nomePorMens.set(m.id, (m.contrato_id && nomePorContrato.get(m.contrato_id)) || "—");
       }
     }
+    // Fallback do nome: algumas GRs de mensalidade não gravam mensalidade_id,
+    // mas guardam o agendamento — daí puxamos o paciente.
+    const agIdsGr = Array.from(new Set(grMensRows.map(g => g.agendamento_id).filter(Boolean) as string[]));
+    const nomePorAgGr = new Map<string, string>();
+    if (agIdsGr.length > 0) {
+      const { data: agsGr } = await supabase
+        .from("agendamentos").select("id,paciente_id").in("id", agIdsGr);
+      const pacIdsGr = Array.from(new Set(((agsGr ?? []) as Array<{ paciente_id: string | null }>).map(a => a.paciente_id).filter(Boolean) as string[]));
+      const nomePorPacGr = new Map<string, string>();
+      if (pacIdsGr.length > 0) {
+        const { data: pacsGr } = await supabase.from("pacientes").select("id,nome").in("id", pacIdsGr);
+        for (const p of (pacsGr ?? []) as Array<{ id: string; nome: string | null }>) nomePorPacGr.set(p.id, p.nome ?? "—");
+      }
+      for (const a of (agsGr ?? []) as Array<{ id: string; paciente_id: string | null }>) {
+        nomePorAgGr.set(a.id, (a.paciente_id && nomePorPacGr.get(a.paciente_id)) || "—");
+      }
+    }
     setGrMensLista(grMensRows.map(g => ({
       ficha: g.ficha_numero,
       quando: g.created_at,
-      paciente: (g.mensalidade_id && nomePorMens.get(g.mensalidade_id)) || "—",
+      paciente: (g.mensalidade_id && nomePorMens.get(g.mensalidade_id))
+        || (g.agendamento_id && nomePorAgGr.get(g.agendamento_id))
+        || "—",
     })));
     const recebidos = (recebidoR.data ?? []) as Array<{ valor: number; data: string | null }>;
     const caixaTotal = recebidos.reduce((s2, r) => s2 + Number(r.valor || 0), 0);
