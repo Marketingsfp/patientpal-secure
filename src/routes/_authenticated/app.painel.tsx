@@ -598,6 +598,9 @@ function DashboardPage() {
         </KpiCard>
 
         <KpiCard icon={CalendarDays} title="Agendamentos" value={a.total} format={fmtInt} onClick={() => openDrill("agend_total")}>
+          <p className="text-[11px] text-muted-foreground mb-1">
+            No período filtrado · contado por GR (serviços do mesmo paciente no mesmo atendimento contam como 1)
+          </p>
           <SubGrid items={[
             { label: "Atendidos", value: fmtInt(a.atendidos), pct: pct(a.atendidos, a.total), onClick: () => openDrill("agend_atendidos") },
             { label: "Faltas", value: fmtInt(a.faltas), pct: pct(a.faltas, a.total), onClick: () => openDrill("agend_faltas") },
@@ -606,7 +609,10 @@ function DashboardPage() {
           ]} />
         </KpiCard>
 
-        <KpiCard icon={Receipt} title="Atendimentos do Dia (GRs)" value={data.grs.total} format={fmtInt} onClick={() => openDrill("grs_total")}>
+        <KpiCard icon={Receipt} title="Atendimentos no período (GRs)" value={data.grs.total} format={fmtInt} onClick={() => openDrill("grs_total")}>
+          <p className="text-[11px] text-muted-foreground mb-1">
+            Segue o filtro de Período acima
+          </p>
           <SubGrid items={[
             { label: "Agendamentos realizados", value: fmtInt(data.grs.agendamentos), onClick: () => openDrill("agend_atendidos") },
             { label: "Mensalidades do cartão", value: fmtInt(data.grs.mensalidades), onClick: () => openDrill("grs_mens") },
@@ -614,15 +620,21 @@ function DashboardPage() {
         </KpiCard>
 
         {podeVerFinanceiro && (
-        <KpiCard icon={Banknote} title="Pagamentos do Dia" value={data.caixaDia.total} format={fmtMoney}>
+        <KpiCard icon={Banknote} title="Pagamentos no período" value={data.caixaDia.total} format={fmtMoney}>
+          <p className="text-[11px] text-muted-foreground mb-1">
+            Recebimentos lançados no caixa dentro do período filtrado
+          </p>
           <SubGrid items={[
-            { label: "Pagos hoje (do dia)", value: fmtMoney(data.caixaDia.doDia) },
-            { label: "Pagos hoje (outras datas)", value: fmtMoney(data.caixaDia.outrasDatas) },
+            { label: "Com data do período", value: fmtMoney(data.caixaDia.doDia) },
+            { label: "De outras datas (retroativos)", value: fmtMoney(data.caixaDia.outrasDatas) },
           ]} />
         </KpiCard>
         )}
 
         <KpiCard icon={Users} title="Clientes Agendados" value={a.novos + a.regulares} format={fmtInt} onClick={() => openDrill("clientes_total")}>
+          <p className="text-[11px] text-muted-foreground mb-1">
+            Pacientes distintos no período (um paciente com várias fichas conta 1 vez)
+          </p>
           <SubGrid items={[
             { label: "Novos", value: fmtInt(a.novos), pct: pct(a.novos, a.novos + a.regulares), onClick: () => openDrill("clientes_novos") },
             { label: "Regulares", value: fmtInt(a.regulares), pct: pct(a.regulares, a.novos + a.regulares), onClick: () => openDrill("clientes_regulares") },
