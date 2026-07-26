@@ -66,7 +66,7 @@ function DashboardPage() {
     recebimentos: { realizado: 0, aReceber: 0, qtdRealizado: 0, qtdAReceber: 0 },
     comissoes: { pagas: 0, pendentes: 0, percentReceita: 0 },
     // Atendimentos do dia = GRs de agendamento + GRs de mensalidade do cartão.
-    grs: { agendamentos: 0, mensalidades: 0, total: 0 },
+    grs: { agendamentos: 0, mensalidades: 0, outrosDias: 0, total: 0 },
     // Pagamentos recebidos no período, separando o que é do próprio dia
     // do que se refere a atendimentos/competências de outras datas.
     caixaDia: { total: 0, doDia: 0, outrasDatas: 0, qtd: 0 },
@@ -116,7 +116,7 @@ function DashboardPage() {
     // GRs de mensalidade (cartão consulta / cartão desconto) impressas no período:
     // cada pagamento de mensalidade conta como uma GR do dia.
     const [grMensR, recebidoR] = await Promise.all([
-      supabase.from("gr_impressoes").select("id,mensalidade_id,ficha_numero,created_at").eq("clinica_id", cid)
+      supabase.from("gr_impressoes").select("id,mensalidade_id,agendamento_id,ficha_numero,created_at").eq("clinica_id", cid)
         .in("tipo", ["mensalidade", "taxa_adesao"]).eq("via_numero", 1)
         .gte("created_at", ini).lte("created_at", fim),
       // Recebimentos efetivados no período (data de lançamento no caixa),
@@ -269,7 +269,7 @@ function DashboardPage() {
       })
       .sort((a, b) => b.total - a.total);
 
-    const grMensRows = (grMensR.data ?? []) as Array<{ id: string; mensalidade_id: string | null; ficha_numero: number | null; created_at: string | null }>;
+    const grMensRows = (grMensR.data ?? []) as Array<{ id: string; mensalidade_id: string | null; agendamento_id: string | null; ficha_numero: number | null; created_at: string | null }>;
     const qtdMensGR = grMensRows.length;
     // Nome do paciente de cada GR de mensalidade (mensalidade -> contrato -> titular)
     const mensIds = Array.from(new Set(grMensRows.map(g => g.mensalidade_id).filter(Boolean) as string[]));
@@ -290,10 +290,29 @@ function DashboardPage() {
         nomePorMens.set(m.id, (m.contrato_id && nomePorContrato.get(m.contrato_id)) || "—");
       }
     }
+    // Fallback do nome: algumas GRs de mensalidade não gravam mensalidade_id,
+    // mas guardam o agendamento — daí puxamos o paciente.
+    const agIdsGr = Array.from(new Set(grMensRows.map(g => g.agendamento_id).filter(Boolean) as string[]));
+    const nomePorAgGr = new Map<string, string>();
+    if (agIdsGr.length > 0) {
+      const { data: agsGr } = await supabase
+        .from("agendamentos").select("id,paciente_id").in("id", agIdsGr);
+      const pacIdsGr = Array.from(new Set(((agsGr ?? []) as Array<{ paciente_id: string | null }>).map(a => a.paciente_id).filter(Boolean) as string[]));
+      const nomePorPacGr = new Map<string, string>();
+      if (pacIdsGr.length > 0) {
+        const { data: pacsGr } = await supabase.from("pacientes").select("id,nome").in("id", pacIdsGr);
+        for (const p of (pacsGr ?? []) as Array<{ id: string; nome: string | null }>) nomePorPacGr.set(p.id, p.nome ?? "—");
+      }
+      for (const a of (agsGr ?? []) as Array<{ id: string; paciente_id: string | null }>) {
+        nomePorAgGr.set(a.id, (a.paciente_id && nomePorPacGr.get(a.paciente_id)) || "—");
+      }
+    }
     setGrMensLista(grMensRows.map(g => ({
       ficha: g.ficha_numero,
       quando: g.created_at,
-      paciente: (g.mensalidade_id && nomePorMens.get(g.mensalidade_id)) || "—",
+      paciente: (g.mensalidade_id && nomePorMens.get(g.mensalidade_id))
+        || (g.agendamento_id && nomePorAgGr.get(g.agendamento_id))
+        || "—",
     })));
     const recebidos = (recebidoR.data ?? []) as Array<{ valor: number; data: string | null }>;
     const caixaTotal = recebidos.reduce((s2, r) => s2 + Number(r.valor || 0), 0);
@@ -304,7 +323,13 @@ function DashboardPage() {
     setData({
       alertas: alertasR.data ?? [],
       // Atendimentos REALIZADOS do dia (não o total agendado) + GRs de mensalidade.
-      grs: { agendamentos: atendidos, mensalidades: qtdMensGR, total: atendidos + qtdMensGR },
+      // GRs pagas no período: atendidos + pagos para outras datas + mensalidades do cartão.
+      grs: {
+        agendamentos: atendidos,
+        mensalidades: qtdMensGR,
+        outrosDias: Math.max(0, pagos - atendidos),
+        total: Math.max(pagos, atendidos) + qtdMensGR,
+      },
       caixaDia: { total: caixaTotal, doDia: caixaDoDia, outrasDatas: caixaTotal - caixaDoDia, qtd: recebidos.length },
       agend: { total, atendidos, faltas, pagos, naoPagos, novos, regulares, retornos, semAgenda },
       msgs: { enviadas: 0, respostas: 0, total: 0 },
@@ -460,22 +485,26 @@ function DashboardPage() {
         columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "proc", label: "Procedimento" }, { key: "status", label: "Status" }],
         rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), proc: g.procedimento ?? "—", status: g.status })),
       });
-    } else if (kind === "grs_total" || kind === "grs_mens") {
+    } else if (kind === "grs_total" || kind === "grs_mens" || kind === "grs_outros") {
       const rowsMens = grMensLista.map(m => ({
         data: fmtDt(m.quando),
         paciente: m.paciente,
         proc: m.ficha ? `Mensalidade do cartão — GR MENS. Nº ${m.ficha}` : "Mensalidade do cartão",
         origem: "Mensalidade",
       }));
-      const rowsAg = rawAgs.filter(g => g.status === "realizado").map(g => ({
+      const mapAg = (g: RawAg) => ({
         data: fmtDt(g.inicio),
         paciente: pacNome(g.paciente_id),
         proc: g.procedimento ?? "—",
-        origem: "Agendamento",
-      }));
-      const rows = kind === "grs_mens" ? rowsMens : [...rowsAg, ...rowsMens];
+        origem: g.status === "realizado" ? "Atendido" : "Pago p/ outro dia",
+      });
+      const rowsAtendidos = rawAgs.filter(g => g.status === "realizado").map(mapAg);
+      const rowsOutros = rawAgs.filter(g => g.status !== "realizado" && pagosAgIds.has(g.id)).map(mapAg);
+      const rows = kind === "grs_mens" ? rowsMens
+        : kind === "grs_outros" ? rowsOutros
+        : [...rowsAtendidos, ...rowsOutros, ...rowsMens];
       setDrill({
-        title: `${kind === "grs_mens" ? "Mensalidades do cartão" : "Atendimentos no período (GRs)"} (${rows.length})`,
+        title: `${kind === "grs_mens" ? "Mensalidades do cartão" : kind === "grs_outros" ? "GRs pagas para outros dias" : "GRs pagas no período"} (${rows.length})`,
         columns: [
           { key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" },
           { key: "proc", label: "Procedimento" }, { key: "origem", label: "Origem" },
@@ -609,13 +638,14 @@ function DashboardPage() {
           ]} />
         </KpiCard>
 
-        <KpiCard icon={Receipt} title="Atendimentos no período (GRs)" value={data.grs.total} format={fmtInt} onClick={() => openDrill("grs_total")}>
+        <KpiCard icon={Receipt} title="GRs pagas no período" value={data.grs.total} format={fmtInt} onClick={() => openDrill("grs_total")}>
           <p className="text-[11px] text-muted-foreground mb-1">
             Segue o filtro de Período acima
           </p>
           <SubGrid items={[
             { label: "Atendidos", value: fmtInt(data.grs.agendamentos), onClick: () => openDrill("agend_atendidos") },
             { label: "Mensalidades do cartão", value: fmtInt(data.grs.mensalidades), onClick: () => openDrill("grs_mens") },
+            { label: "Pagas para outros dias", value: fmtInt(data.grs.outrosDias), onClick: () => openDrill("grs_outros") },
           ]} />
         </KpiCard>
 
