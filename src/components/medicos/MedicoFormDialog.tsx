@@ -356,6 +356,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           tipo_repasse: form.tipo_repasse,
           percentual: "",
           valor: "",
+          ...REPASSE_EXTRA_VAZIO,
           ativo: true,
         });
       }
@@ -367,6 +368,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           tipo_repasse: form.tipo_repasse,
           percentual: "",
           valor: "",
+          ...REPASSE_EXTRA_VAZIO,
           ativo: true,
         });
       }
