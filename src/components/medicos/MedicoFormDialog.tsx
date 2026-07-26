@@ -504,18 +504,32 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setMedicoUserId(med.user_id ?? null);
       const { data: convs } = await supabase
         .from("medico_convenios")
-        .select("id, nome, tipo_repasse, percentual, valor, ativo")
+        .select("id, nome, tipo_repasse, percentual, valor, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor, ativo")
         .eq("medico_id", med.id)
         .order("created_at");
       if (convs && convs.length) {
-        setConvenios(convs.map((c) => ({
+        setConvenios(convs.map((c) => {
+          const r = c as typeof c & {
+            convenio_tipo_repasse?: string | null;
+            convenio_percentual?: number | null;
+            convenio_valor?: number | null;
+            cartao_consulta_valor?: number | null;
+            cartao_desconto_valor?: number | null;
+          };
+          return {
           id: c.id,
           nome: c.nome,
           tipo_repasse: (c.tipo_repasse as "percentual" | "valor") ?? "percentual",
           percentual: c.percentual != null ? String(c.percentual) : "",
           valor: c.valor != null ? String(c.valor) : "",
+          convenio_tipo_repasse: (r.convenio_tipo_repasse as "percentual" | "valor") ?? "percentual",
+          convenio_percentual: r.convenio_percentual != null ? String(r.convenio_percentual) : "",
+          convenio_valor: r.convenio_valor != null ? String(r.convenio_valor) : "",
+          cartao_consulta_valor: r.cartao_consulta_valor != null ? String(r.cartao_consulta_valor) : "",
+          cartao_desconto_valor: r.cartao_desconto_valor != null ? String(r.cartao_desconto_valor) : "",
           ativo: c.ativo ?? true,
-        })));
+          };
+        }));
       } else {
         setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
       }
