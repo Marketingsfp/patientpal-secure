@@ -950,6 +950,20 @@ function AtendimentosPage() {
     if (isMedicoOnly && medicoLogadoId) setFMedico(medicoLogadoId);
   }, [isMedicoOnly, medicoLogadoId]);
 
+  // Carrega o vínculo de convênio (contrato ativo) de todos os pacientes.
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      const cid = clinicaAtual?.clinica_id;
+      if (!cid) return;
+      const m = await carregarMapaConvenioPacientes(cid);
+      if (!cancel) setMapaConvenio(m);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [clinicaAtual?.clinica_id]);
+
   const norm = (s: string) =>
     s
       .normalize("NFD")
