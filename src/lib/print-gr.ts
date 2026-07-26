@@ -374,17 +374,6 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
-  // Número próprio de GR da mensalidade (sequência diária por clínica).
-  const { data: grPrevRows } = await supabase
-    .from("gr_impressoes" as never)
-    .select("ficha_numero")
-    .eq("mensalidade_id", mensalidadeId)
-    .in("tipo", ["mensalidade", "taxa_adesao"])
-    .not("ficha_numero", "is", null)
-    .order("via_numero", { ascending: true })
-    .limit(1);
-  const grNumeroExistente = ((grPrevRows as Array<{ ficha_numero: number | null }> | null) ?? [])[0]?.ficha_numero ?? null;
-  const grNumero = grNumeroExistente ?? (reimpressao ? null : await proximoNumeroGRMensalidade(clinicaId));
   // "USUÁRIO:" da GR = quem FATUROU o atendimento (autor do lançamento
   // financeiro), tanto na 1ª via quanto em qualquer reimpressão. Nunca é o
   // operador logado que está imprimindo. Ordem de resolução:
@@ -1487,6 +1476,17 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
+  // Número próprio de GR da mensalidade (sequência diária por clínica).
+  const { data: grPrevRows } = await supabase
+    .from("gr_impressoes" as never)
+    .select("ficha_numero")
+    .eq("mensalidade_id", mensalidadeId)
+    .in("tipo", ["mensalidade", "taxa_adesao"])
+    .not("ficha_numero", "is", null)
+    .order("via_numero", { ascending: true })
+    .limit(1);
+  const grNumeroExistente = ((grPrevRows as Array<{ ficha_numero: number | null }> | null) ?? [])[0]?.ficha_numero ?? null;
+  const grNumero = grNumeroExistente ?? (reimpressao ? null : await proximoNumeroGRMensalidade(clinicaId));
   // "USUÁRIO:" = quem faturou (criador do lançamento), sempre — 1ª via e
   // reimpressões. Resolvido abaixo após carregar a mensalidade; caller fica
   // como último fallback.
