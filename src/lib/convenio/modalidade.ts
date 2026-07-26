@@ -143,3 +143,40 @@ export function resolverModalidade(params: {
   if (pacienteId && mapa) return mapa.get(pacienteId)?.modalidade ?? null;
   return null;
 }
+
+/**
+ * Carimba nos lançamentos financeiros dos agendamentos informados o convênio,
+ * o contrato e a modalidade do paciente. Assim o repasse e os relatórios
+ * passam a identificar o atendimento de convênio de forma estrutural, sem
+ * depender do texto da descrição.
+ */
+export async function carimbarConvenioNosLancamentos(
+  clinicaId: string,
+  agendamentoIds: Array<string | null | undefined>,
+): Promise<void> {
+  const ids = agendamentoIds.filter(Boolean) as string[];
+  if (!clinicaId || !ids.length) return;
+  try {
+    const { data: ags } = await supabase
+      .from("agendamentos")
+      .select("id, paciente_id")
+      .eq("clinica_id", clinicaId)
+      .in("id", ids);
+    for (const ag of (ags ?? []) as Array<{ id: string; paciente_id: string | null }>) {
+      const vinculo = await buscarVinculoConvenio(clinicaId, ag.paciente_id);
+      if (!vinculo) continue;
+      await supabase
+        .from("fin_lancamentos")
+        .update({
+          convenio_id: vinculo.convenioId,
+          contrato_id: vinculo.contratoId,
+          convenio_modalidade: vinculo.modalidade,
+        })
+        .eq("clinica_id", clinicaId)
+        .eq("agendamento_id", ag.id)
+        .is("convenio_modalidade", null);
+    }
+  } catch {
+    // Carimbo é complementar: nunca deve quebrar o fluxo de pagamento.
+  }
+}
