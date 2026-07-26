@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { carimbarConvenioNosLancamentos } from "@/lib/convenio/modalidade";
+import { FaturamentoRapidoMensalidadeDialog } from "@/components/cartao-beneficios/faturamento-rapido-dialog";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -6577,11 +6578,17 @@ function AgendaPage() {
         </DialogContent>
       </Dialog>
 
+      <FaturamentoRapidoMensalidadeDialog
+        open={fatRapidoOpen}
+        onOpenChange={setFatRapidoOpen}
+        clinicaId={clinicaAtual?.clinica_id ?? ""}
+        usuario={{ id: user?.id ?? null, nome: user?.user_metadata?.nome ?? user?.email ?? null }}
+      />
+
       <LancamentoDialog
         open={pagamentoOpen}
         onOpenChange={(v) => {
           setPagamentoOpen(v);
-          if (false) setFatRapidoOpen(false);
           if (!v) {
             setPagamentoAgId(null);
             setPagamentoExtraIds([]);
