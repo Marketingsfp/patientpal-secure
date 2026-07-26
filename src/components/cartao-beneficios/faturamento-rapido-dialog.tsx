@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Search, Receipt, BadgePercent } from "lucide-react";
+import { Loader2, Search, Receipt, BadgePercent, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -37,6 +37,26 @@ type MensalidadeAberta = {
   paciente_id: string | null;
 };
 
+type ContratoAtivo = {
+  id: string;
+  numero: number;
+  titular: string;
+  paciente_id: string | null;
+  valor_mensal: number;
+  dia_vencimento: number | null;
+};
+
+/** Soma 1 mês a uma data ISO (yyyy-mm-dd), preservando o dia quando possível. */
+function proximoVencimento(base: string, dia?: number | null) {
+  const d = new Date(`${base}T00:00:00`);
+  const alvoDia = dia && dia > 0 ? dia : d.getDate();
+  const ano = d.getFullYear();
+  const mes = d.getMonth() + 1;
+  const ultimoDia = new Date(ano, mes + 1, 0).getDate();
+  const novo = new Date(ano, mes, Math.min(alvoDia, ultimoDia));
+  return `${novo.getFullYear()}-${String(novo.getMonth() + 1).padStart(2, "0")}-${String(novo.getDate()).padStart(2, "0")}`;
+}
+
 /**
  * Faturamento rápido da mensalidade do Cartão Benefícios.
  *
@@ -63,6 +83,9 @@ export function FaturamentoRapidoMensalidadeDialog({
   const [isentar, setIsentar] = useState(false);
   const [pagando, setPagando] = useState<MensalidadeAberta | null>(null);
   const [lancOpen, setLancOpen] = useState(false);
+  const [contratosAtivos, setContratosAtivos] = useState<ContratoAtivo[]>([]);
+  const [gerando, setGerando] = useState<string | null>(null);
+  const [avulsoOpen, setAvulsoOpen] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -70,35 +93,39 @@ export function FaturamentoRapidoMensalidadeDialog({
       setItens([]);
       setIsentar(false);
       setPagando(null);
+      setContratosAtivos([]);
     }
   }, [open]);
 
   const buscar = async (pac: PatientOption | null) => {
     setPaciente(pac);
     setItens([]);
+    setContratosAtivos([]);
     if (!pac || !clinicaId) return;
     setLoading(true);
     try {
       // Contratos onde é titular
       const { data: tit } = await supabase
         .from("contratos_assinatura")
-        .select("id, numero, paciente_id, pacientes:paciente_id(nome)")
+        .select("id, numero, paciente_id, valor_mensal, dia_vencimento, pacientes:paciente_id(nome)")
         .eq("clinica_id", clinicaId)
         .eq("status", "ativo")
         .eq("paciente_id", pac.id);
       // Contratos onde é dependente ativo
       const { data: dep } = await supabase
         .from("contrato_dependentes")
-        .select("contrato_id, contratos_assinatura!inner(id, numero, status, clinica_id, paciente_id, pacientes:paciente_id(nome))")
+        .select("contrato_id, contratos_assinatura!inner(id, numero, status, clinica_id, paciente_id, valor_mensal, dia_vencimento, pacientes:paciente_id(nome))")
         .eq("paciente_id", pac.id)
         .eq("ativo", true);
 
-      const contratos = new Map<string, { numero: number; titular: string; paciente_id: string | null }>();
+      const contratos = new Map<string, { numero: number; titular: string; paciente_id: string | null; valor_mensal: number; dia_vencimento: number | null }>();
       for (const c of (tit ?? []) as Array<Record<string, unknown>>) {
         contratos.set(String(c.id), {
           numero: Number(c.numero),
           titular: (c.pacientes as { nome?: string } | null)?.nome ?? pac.nome,
           paciente_id: (c.paciente_id as string) ?? null,
+          valor_mensal: Number(c.valor_mensal) || 0,
+          dia_vencimento: (c.dia_vencimento as number) ?? null,
         });
       }
       for (const d of (dep ?? []) as Array<Record<string, unknown>>) {
@@ -108,8 +135,20 @@ export function FaturamentoRapidoMensalidadeDialog({
           numero: Number(c.numero),
           titular: (c.pacientes as { nome?: string } | null)?.nome ?? "Titular",
           paciente_id: (c.paciente_id as string) ?? null,
+          valor_mensal: Number(c.valor_mensal) || 0,
+          dia_vencimento: (c.dia_vencimento as number) ?? null,
         });
       }
+      setContratosAtivos(
+        Array.from(contratos.entries()).map(([id, c]) => ({
+          id,
+          numero: c.numero,
+          titular: c.titular,
+          paciente_id: c.paciente_id,
+          valor_mensal: c.valor_mensal,
+          dia_vencimento: c.dia_vencimento,
+        })),
+      );
       if (!contratos.size) {
         setItens([]);
         return;
@@ -152,6 +191,61 @@ export function FaturamentoRapidoMensalidadeDialog({
     }
   };
 
+  /** Gera a próxima parcela (antecipação) de um contrato ativo e já abre o recebimento. */
+  const gerarProximaParcela = async (c: ContratoAtivo) => {
+    setGerando(c.id);
+    try {
+      const { data: todas, error: errList } = await supabase
+        .from("contrato_mensalidades")
+        .select("numero_parcela, vencimento, valor")
+        .eq("contrato_id", c.id)
+        .order("numero_parcela", { ascending: false });
+      if (errList) throw errList;
+      const positivas = ((todas ?? []) as Array<{ numero_parcela: number; vencimento: string; valor: number }>)
+        .filter((m) => Number(m.numero_parcela) > 0);
+      const ultima = positivas[0];
+      const proximoNumero = (ultima?.numero_parcela ?? 0) + 1;
+      const baseVenc = ultima?.vencimento ?? new Date().toISOString().slice(0, 10);
+      const vencimento = proximoVencimento(baseVenc, c.dia_vencimento);
+      const valor = Number(ultima?.valor) || c.valor_mensal || 0;
+
+      const { data: nova, error } = await supabase
+        .from("contrato_mensalidades")
+        .insert({
+          contrato_id: c.id,
+          clinica_id: clinicaId,
+          numero_parcela: proximoNumero,
+          vencimento,
+          valor,
+          status: "pendente",
+          observacoes: "Parcela antecipada no faturamento rápido",
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+
+      const item: MensalidadeAberta = {
+        id: String(nova.id),
+        contrato_id: c.id,
+        contrato_numero: c.numero,
+        numero_parcela: proximoNumero,
+        total_parcelas: proximoNumero,
+        valor,
+        vencimento,
+        titular_nome: c.titular,
+        paciente_id: c.paciente_id,
+      };
+      setItens((prev) => [...prev, item]);
+      setPagando(item);
+      setIsentar(false);
+      setLancOpen(true);
+    } catch (err) {
+      mostrarErro(err, "falha ao gerar a próxima parcela");
+    } finally {
+      setGerando(null);
+    }
+  };
+
   const calc = pagando ? calcularValorMensalidade(pagando.valor, pagando.vencimento) : null;
   const valorCobrar = pagando ? (isentar ? pagando.valor : (calc?.valorFinal ?? pagando.valor)) : 0;
 
@@ -178,9 +272,33 @@ export function FaturamentoRapidoMensalidadeDialog({
             )}
 
             {!loading && paciente && !itens.length && (
-              <p className="text-sm text-muted-foreground flex items-center gap-2">
-                <Search className="h-4 w-4" /> Nenhuma mensalidade em aberto para este paciente.
-              </p>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Search className="h-4 w-4" /> Nenhuma mensalidade em aberto para este paciente.
+                </p>
+                {contratosAtivos.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between gap-3 rounded-md border p-3">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">Contrato #{c.numero} — em dia</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        Titular: {c.titular} · Mensalidade {BRL(c.valor_mensal)}
+                      </div>
+                    </div>
+                    <Button variant="outline" disabled={gerando === c.id} onClick={() => gerarProximaParcela(c)}>
+                      {gerando === c.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4 mr-1" /> Antecipar próxima parcela
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ))}
+                <Button variant="secondary" className="w-full" onClick={() => setAvulsoOpen(true)}>
+                  <Receipt className="h-4 w-4 mr-1" /> Pagamento avulso (sem contrato)
+                </Button>
+              </div>
             )}
 
             <div className="space-y-2 max-h-[50vh] overflow-auto">
@@ -289,6 +407,21 @@ export function FaturamentoRapidoMensalidadeDialog({
           toast.success("Mensalidade recebida e GR enviada para impressão.");
           setItens((prev) => prev.filter((x) => x.id !== m.id));
           setPagando(null);
+          onPago?.();
+        }}
+      />
+
+      <LancamentoDialog
+        open={avulsoOpen}
+        onOpenChange={setAvulsoOpen}
+        tipo="receita"
+        categoriaFixaNome="MENSALIDADE CARTAO CONSULTA"
+        initialDescricao={
+          paciente ? `Mensalidade Cartão (avulso) - ${paciente.nome}` : "Mensalidade Cartão (avulso)"
+        }
+        onSavedWithData={async () => {
+          toast.success("Pagamento avulso registrado no caixa.");
+          setAvulsoOpen(false);
           onPago?.();
         }}
       />
