@@ -348,7 +348,7 @@ function DashboardPage() {
       conf: { presencas: atendidos, ausencias: faltas },
       vendas: { total: vendasTotal, orcamentos: 0 },
       pagamentos: { realizado: pagRealizado, aPagar: pagAPagar },
-      recebimentos: { realizado: recebRealizado, aReceber: recebAReceber, qtdRealizado: qtdReceb, qtdAReceber, mensalidades: recebMensalidades, qtdMensalidades: recMens.length },
+      recebimentos: { realizado: recebRealizado, aReceber: recebAReceber, qtdRealizado: qtdReceb, qtdAReceber, mensalidades: recebMensalidades, qtdMensalidades: recMens.length, atendimentos: recebAtendimentos, qtdAtendimentos: qtdRecebAtendimentos },
       comissoes: { pagas: comissoesPagas, pendentes: 0, percentReceita: recebRealizado > 0 ? (comissoesPagas / recebRealizado) * 100 : 0 },
       porMedico,
     });
