@@ -446,10 +446,13 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
             <div className={cn(
               "grid items-center gap-3 border-b border-border/50 px-3",
               compact ? "h-8 text-[13px]" : "h-10 text-sm",
-              compact ? "grid-cols-[52px_100px_1fr_90px]" : "grid-cols-[60px_120px_1fr_100px_100px]",
+              compact ? "grid-cols-[92px_100px_1fr_90px]" : "grid-cols-[112px_120px_1fr_100px_100px]",
             )}>
-              <span className="tabular-nums text-muted-foreground">
-                {new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              <span className="tabular-nums text-muted-foreground whitespace-nowrap">
+                {new Date(m.created_at).toLocaleString("pt-BR", {
+                  day: "2-digit", month: "2-digit",
+                  hour: "2-digit", minute: "2-digit",
+                }).replace(",", "")}
               </span>
               <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium w-fit", TIPO_CLASS[m.tipo])}>
                 {TIPO_LABEL[m.tipo]}
