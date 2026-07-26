@@ -65,6 +65,11 @@ function DashboardPage() {
     pagamentos: { realizado: 0, aPagar: 0 },
     recebimentos: { realizado: 0, aReceber: 0, qtdRealizado: 0, qtdAReceber: 0 },
     comissoes: { pagas: 0, pendentes: 0, percentReceita: 0 },
+    // Atendimentos do dia = GRs de agendamento + GRs de mensalidade do cartão.
+    grs: { agendamentos: 0, mensalidades: 0, total: 0 },
+    // Pagamentos recebidos no período, separando o que é do próprio dia
+    // do que se refere a atendimentos/competências de outras datas.
+    caixaDia: { total: 0, doDia: 0, outrasDatas: 0, qtd: 0 },
     porMedico: [] as { nome: string; total: number; pagos: number; novos: number }[],
   });
   const [rawAgs, setRawAgs] = useState<RawAg[]>([]);
@@ -102,6 +107,19 @@ function DashboardPage() {
       supabase.from("especialidades").select("id,nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
       supabase.from("procedimentos").select("nome,tipo_procedimento").eq("clinica_id", cid).eq("ativo", true),
+    ]);
+
+    // GRs de mensalidade (cartão consulta / cartão desconto) impressas no período:
+    // cada pagamento de mensalidade conta como uma GR do dia.
+    const [grMensR, recebidoR] = await Promise.all([
+      supabase.from("gr_impressoes").select("id").eq("clinica_id", cid)
+        .in("tipo", ["mensalidade", "taxa_adesao"]).eq("via_numero", 1)
+        .gte("created_at", ini).lte("created_at", fim),
+      // Recebimentos efetivados no período (data de lançamento no caixa),
+      // independentemente da competência/data do atendimento.
+      supabase.from("fin_lancamentos").select("id,valor,data,tipo,status")
+        .eq("clinica_id", cid).eq("tipo", "receita").eq("status", "confirmado")
+        .gte("created_at", ini).lte("created_at", fim),
     ]);
 
     const medsAll = (medicosR.data ?? []) as { id: string; nome: string }[];
@@ -213,10 +231,29 @@ function DashboardPage() {
         pagos: contarGRs(agendados.filter(a => a.status === "realizado")),
         novos: pacIdsM.filter(p => !setExistentes.has(p)).length,
       };
-    }).sort((a, b) => b.total - a.total);
+    })
+      // "Médicos do dia": só entram profissionais com agenda no período ou
+      // com pagamento/atendimento lançado na data selecionada.
+      .filter(m => {
+        const med = meds.find(x => x.nome === m.nome);
+        const temMovimento = !!med && (
+          atends.some(at => at.medico_id === med.id) || lancs.some(l => l.medico_id === med.id)
+        );
+        return m.total > 0 || temMovimento;
+      })
+      .sort((a, b) => b.total - a.total);
+
+    const qtdMensGR = (grMensR.data ?? []).length;
+    const recebidos = (recebidoR.data ?? []) as Array<{ valor: number; data: string | null }>;
+    const caixaTotal = recebidos.reduce((s2, r) => s2 + Number(r.valor || 0), 0);
+    const caixaDoDia = recebidos
+      .filter(r => (r.data ?? "") >= periodo.de && (r.data ?? "") <= periodo.ate)
+      .reduce((s2, r) => s2 + Number(r.valor || 0), 0);
 
     setData({
       alertas: alertasR.data ?? [],
+      grs: { agendamentos: total, mensalidades: qtdMensGR, total: total + qtdMensGR },
+      caixaDia: { total: caixaTotal, doDia: caixaDoDia, outrasDatas: caixaTotal - caixaDoDia, qtd: recebidos.length },
       agend: { total, atendidos, faltas, pagos, naoPagos, novos, regulares, retornos, semAgenda },
       msgs: { enviadas: 0, respostas: 0, total: 0 },
       conf: { presencas: atendidos, ausencias: faltas },
@@ -497,6 +534,22 @@ function DashboardPage() {
           ]} />
         </KpiCard>
 
+        <KpiCard icon={Receipt} title="Atendimentos do Dia (GRs)" value={data.grs.total} format={fmtInt}>
+          <SubGrid items={[
+            { label: "Agendamentos", value: fmtInt(data.grs.agendamentos), onClick: () => openDrill("agend_total") },
+            { label: "Mensalidades do cartão", value: fmtInt(data.grs.mensalidades) },
+          ]} />
+        </KpiCard>
+
+        {podeVerFinanceiro && (
+        <KpiCard icon={Banknote} title="Pagamentos do Dia" value={data.caixaDia.total} format={fmtMoney}>
+          <SubGrid items={[
+            { label: "Pagos hoje (do dia)", value: fmtMoney(data.caixaDia.doDia) },
+            { label: "Pagos hoje (outras datas)", value: fmtMoney(data.caixaDia.outrasDatas) },
+          ]} />
+        </KpiCard>
+        )}
+
         <KpiCard icon={Users} title="Clientes Agendados" value={a.novos + a.regulares} format={fmtInt} onClick={() => openDrill("clientes_total")}>
           <SubGrid items={[
             { label: "Novos", value: fmtInt(a.novos), pct: pct(a.novos, a.novos + a.regulares), onClick: () => openDrill("clientes_novos") },
@@ -574,7 +627,7 @@ function DashboardPage() {
 
       {data.porMedico.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase mb-3">Total de Agendamentos por médico</h2>
+          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase mb-3">Médicos do dia — total de atendimentos</h2>
           <KpiAnimContext.Provider value={uxMelhorias}>
           <div className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-3", uxMelhorias && "kpi-stagger")}>
             {data.porMedico.map((m) => (
