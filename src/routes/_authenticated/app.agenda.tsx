@@ -1687,6 +1687,8 @@ function AgendaPage() {
   };
 
   const [pagamentoOpen, setPagamentoOpen] = useState(false);
+  // Faturamento rápido da mensalidade do Cartão Benefícios direto da agenda.
+  const [fatRapidoOpen, setFatRapidoOpen] = useState(false);
   const [pagamentoDesc, setPagamentoDesc] = useState("");
   const [pagamentoAgId, setPagamentoAgId] = useState<string | null>(null);
   const [pagamentoExtraIds, setPagamentoExtraIds] = useState<string[]>([]);
