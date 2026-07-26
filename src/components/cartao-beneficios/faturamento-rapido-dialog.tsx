@@ -169,7 +169,7 @@ export function FaturamentoRapidoMensalidadeDialog({
           </DialogHeader>
 
           <div className="space-y-3">
-            <PatientSearchInput value={paciente} onChange={buscar} clinicaId={clinicaId} />
+            <PatientSearchInput value={paciente} onSelect={buscar} clinicaIdsOverride={[clinicaId]} autoFocus />
 
             {loading && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
