@@ -217,9 +217,18 @@ function DashboardPage() {
     const recebAReceber = receitas.filter(l => l.status === "pendente").reduce((s, l) => s + Number(l.valor || 0), 0);
     const qtdReceb = receitas.filter(l => l.status === "confirmado").length;
     const qtdAReceber = receitas.filter(l => l.status === "pendente").length;
-    // Parte do recebido que vem de mensalidades do cartão (lançamento com contrato vinculado)
-    const recMens = receitas.filter(l => l.status === "confirmado" && (l as { contrato_id?: string | null }).contrato_id);
+    // Parte do recebido que vem de mensalidades do cartão.
+    // Alguns lançamentos antigos não gravam contrato_id — nesses casos
+    // identificamos pela descrição ("MENSALIDADE ..." / "TAXA DE ADESÃO ...").
+    const ehMensalidade = (l: { contrato_id?: string | null; descricao?: string | null }) => {
+      if (l.contrato_id) return true;
+      const d = (l.descricao ?? "").toUpperCase();
+      return d.startsWith("MENSALIDADE") || d.includes("TAXA DE ADES");
+    };
+    const recMens = receitas.filter(l => l.status === "confirmado" && ehMensalidade(l));
     const recebMensalidades = recMens.reduce((s, l) => s + Number(l.valor || 0), 0);
+    const recebAtendimentos = recebRealizado - recebMensalidades;
+    const qtdRecebAtendimentos = qtdReceb - recMens.length;
     const pagRealizado = despesas.filter(l => l.status === "confirmado").reduce((s, l) => s + Number(l.valor || 0), 0);
     const pagAPagar = despesas.filter(l => l.status === "pendente").reduce((s, l) => s + Number(l.valor || 0), 0);
 
