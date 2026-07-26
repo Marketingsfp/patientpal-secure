@@ -79,6 +79,9 @@ function DashboardPage() {
   const [pacNomes, setPacNomes] = useState<Map<string, string>>(new Map());
   const [medNomes, setMedNomes] = useState<Map<string, string>>(new Map());
   const [drill, setDrill] = useState<DrillSpec | null>(null);
+  const [drillBusca, setDrillBusca] = useState("");
+  // GRs de mensalidade do período (para o detalhamento com nome do paciente)
+  const [grMensLista, setGrMensLista] = useState<Array<{ ficha: number | null; quando: string | null; paciente: string }>>([]);
 
   // Conjunto efetivo de medico_ids após filtros (intersecção médicos x especialidades)
   const medicosFiltradosIds = useMemo(() => {
@@ -112,7 +115,7 @@ function DashboardPage() {
     // GRs de mensalidade (cartão consulta / cartão desconto) impressas no período:
     // cada pagamento de mensalidade conta como uma GR do dia.
     const [grMensR, recebidoR] = await Promise.all([
-      supabase.from("gr_impressoes").select("id").eq("clinica_id", cid)
+      supabase.from("gr_impressoes").select("id,mensalidade_id,ficha_numero,created_at").eq("clinica_id", cid)
         .in("tipo", ["mensalidade", "taxa_adesao"]).eq("via_numero", 1)
         .gte("created_at", ini).lte("created_at", fim),
       // Recebimentos efetivados no período (data de lançamento no caixa),
@@ -243,7 +246,32 @@ function DashboardPage() {
       })
       .sort((a, b) => b.total - a.total);
 
-    const qtdMensGR = (grMensR.data ?? []).length;
+    const grMensRows = (grMensR.data ?? []) as Array<{ id: string; mensalidade_id: string | null; ficha_numero: number | null; created_at: string | null }>;
+    const qtdMensGR = grMensRows.length;
+    // Nome do paciente de cada GR de mensalidade (mensalidade -> contrato -> titular)
+    const mensIds = Array.from(new Set(grMensRows.map(g => g.mensalidade_id).filter(Boolean) as string[]));
+    const nomePorMens = new Map<string, string>();
+    if (mensIds.length > 0) {
+      const { data: mens } = await supabase
+        .from("contrato_mensalidades").select("id,contrato_id").in("id", mensIds);
+      const contratoIds = Array.from(new Set(((mens ?? []) as Array<{ contrato_id: string | null }>).map(m => m.contrato_id).filter(Boolean) as string[]));
+      const nomePorContrato = new Map<string, string>();
+      if (contratoIds.length > 0) {
+        const { data: cts } = await supabase
+          .from("contratos_assinatura").select("id,paciente_nome").in("id", contratoIds);
+        for (const c of (cts ?? []) as Array<{ id: string; paciente_nome: string | null }>) {
+          nomePorContrato.set(c.id, c.paciente_nome ?? "—");
+        }
+      }
+      for (const m of (mens ?? []) as Array<{ id: string; contrato_id: string | null }>) {
+        nomePorMens.set(m.id, (m.contrato_id && nomePorContrato.get(m.contrato_id)) || "—");
+      }
+    }
+    setGrMensLista(grMensRows.map(g => ({
+      ficha: g.ficha_numero,
+      quando: g.created_at,
+      paciente: (g.mensalidade_id && nomePorMens.get(g.mensalidade_id)) || "—",
+    })));
     const recebidos = (recebidoR.data ?? []) as Array<{ valor: number; data: string | null }>;
     const caixaTotal = recebidos.reduce((s2, r) => s2 + Number(r.valor || 0), 0);
     const caixaDoDia = recebidos
@@ -252,7 +280,8 @@ function DashboardPage() {
 
     setData({
       alertas: alertasR.data ?? [],
-      grs: { agendamentos: total, mensalidades: qtdMensGR, total: total + qtdMensGR },
+      // Atendimentos REALIZADOS do dia (não o total agendado) + GRs de mensalidade.
+      grs: { agendamentos: atendidos, mensalidades: qtdMensGR, total: atendidos + qtdMensGR },
       caixaDia: { total: caixaTotal, doDia: caixaDoDia, outrasDatas: caixaTotal - caixaDoDia, qtd: recebidos.length },
       agend: { total, atendidos, faltas, pagos, naoPagos, novos, regulares, retornos, semAgenda },
       msgs: { enviadas: 0, respostas: 0, total: 0 },
@@ -308,6 +337,7 @@ function DashboardPage() {
   const moneyBRL = (n: number) => `R$ ${fmtMoney(Number(n || 0))}`;
 
   const openDrill = (kind: string, ctx?: Record<string, string>) => {
+    setDrillBusca("");
     if (kind === "alertas") {
       setDrill({
         title: `Central de alertas (${data.alertas.length})`,
@@ -345,6 +375,7 @@ function DashboardPage() {
         rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), medico: medNome(g.medico_id), proc: g.procedimento ?? "—", status: g.status })),
       });
     } else if (kind === "clientes_novos" || kind === "clientes_regulares" || kind === "clientes_total") {
+      // (mantido)
       const pacsAg = Array.from(new Set(rawAgs.map(g => g.paciente_id).filter(Boolean) as string[]));
       const lista = pacsAg.filter(p => kind === "clientes_total" ? true : (kind === "clientes_novos" ? novosIds.has(p) : !novosIds.has(p)));
       const titulos: Record<string, string> = { clientes_total: "Clientes agendados", clientes_novos: "Clientes novos", clientes_regulares: "Clientes regulares" };
@@ -409,6 +440,28 @@ function DashboardPage() {
         title: `Agendamentos — ${ctx.nome} (${lista.length})`,
         columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "proc", label: "Procedimento" }, { key: "status", label: "Status" }],
         rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), proc: g.procedimento ?? "—", status: g.status })),
+      });
+    } else if (kind === "grs_total" || kind === "grs_mens") {
+      const rowsMens = grMensLista.map(m => ({
+        data: fmtDt(m.quando),
+        paciente: m.paciente,
+        proc: m.ficha ? `Mensalidade do cartão — GR MENS. Nº ${m.ficha}` : "Mensalidade do cartão",
+        origem: "Mensalidade",
+      }));
+      const rowsAg = rawAgs.filter(g => g.status === "realizado").map(g => ({
+        data: fmtDt(g.inicio),
+        paciente: pacNome(g.paciente_id),
+        proc: g.procedimento ?? "—",
+        origem: "Agendamento",
+      }));
+      const rows = kind === "grs_mens" ? rowsMens : [...rowsAg, ...rowsMens];
+      setDrill({
+        title: `${kind === "grs_mens" ? "Mensalidades do cartão" : "Atendimentos do dia (GRs)"} (${rows.length})`,
+        columns: [
+          { key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" },
+          { key: "proc", label: "Procedimento" }, { key: "origem", label: "Origem" },
+        ],
+        rows,
       });
     }
   };
@@ -534,10 +587,10 @@ function DashboardPage() {
           ]} />
         </KpiCard>
 
-        <KpiCard icon={Receipt} title="Atendimentos do Dia (GRs)" value={data.grs.total} format={fmtInt}>
+        <KpiCard icon={Receipt} title="Atendimentos do Dia (GRs)" value={data.grs.total} format={fmtInt} onClick={() => openDrill("grs_total")}>
           <SubGrid items={[
-            { label: "Agendamentos", value: fmtInt(data.grs.agendamentos), onClick: () => openDrill("agend_total") },
-            { label: "Mensalidades do cartão", value: fmtInt(data.grs.mensalidades) },
+            { label: "Agendamentos realizados", value: fmtInt(data.grs.agendamentos), onClick: () => openDrill("agend_atendidos") },
+            { label: "Mensalidades do cartão", value: fmtInt(data.grs.mensalidades), onClick: () => openDrill("grs_mens") },
           ]} />
         </KpiCard>
 
@@ -643,13 +696,26 @@ function DashboardPage() {
         </div>
       )}
 
-      <Dialog open={drill !== null} onOpenChange={(o) => { if (!o) setDrill(null); }}>
+      <Dialog open={drill !== null} onOpenChange={(o) => { if (!o) { setDrill(null); setDrillBusca(""); } }}>
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader><DialogTitle>{drill?.title}</DialogTitle></DialogHeader>
+          <Input
+            value={drillBusca}
+            onChange={(e) => setDrillBusca(e.target.value)}
+            placeholder="Filtrar por nome do paciente, procedimento..."
+            className="mb-2"
+          />
           <div className="overflow-auto flex-1">
-            {drill && drill.rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">Nenhum registro.</p>
-            ) : drill ? (
+            {(() => {
+              if (!drill) return null;
+              const termo = drillBusca.trim().toLowerCase();
+              const linhas = termo
+                ? drill.rows.filter(r => Object.values(r).some(v => String(v ?? "").toLowerCase().includes(termo)))
+                : drill.rows;
+              if (linhas.length === 0) {
+                return <p className="text-sm text-muted-foreground py-6 text-center">Nenhum registro.</p>;
+              }
+              return (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -659,7 +725,7 @@ function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {drill.rows.map((r, i) => (
+                  {linhas.map((r, i) => (
                     <TableRow key={i}>
                       {drill.columns.map((c) => (
                         <TableCell key={c.key} className={c.align === "right" ? "text-right" : ""}>{r[c.key]}</TableCell>
@@ -668,7 +734,8 @@ function DashboardPage() {
                   ))}
                 </TableBody>
               </Table>
-            ) : null}
+              );
+            })()}
           </div>
         </DialogContent>
       </Dialog>
