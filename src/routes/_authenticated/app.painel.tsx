@@ -614,7 +614,7 @@ function DashboardPage() {
             Segue o filtro de Período acima
           </p>
           <SubGrid items={[
-            { label: "Agendamentos realizados", value: fmtInt(data.grs.agendamentos), onClick: () => openDrill("agend_atendidos") },
+            { label: "Atendidos", value: fmtInt(data.grs.agendamentos), onClick: () => openDrill("agend_atendidos") },
             { label: "Mensalidades do cartão", value: fmtInt(data.grs.mensalidades), onClick: () => openDrill("grs_mens") },
           ]} />
         </KpiCard>
@@ -631,9 +631,9 @@ function DashboardPage() {
         </KpiCard>
         )}
 
-        <KpiCard icon={Users} title="Clientes Agendados" value={a.novos + a.regulares} format={fmtInt} onClick={() => openDrill("clientes_total")}>
+        <KpiCard icon={Users} title="Pacientes distintos na agenda" value={a.novos + a.regulares} format={fmtInt} onClick={() => openDrill("clientes_total")}>
           <p className="text-[11px] text-muted-foreground mb-1">
-            Pacientes distintos no período (um paciente com várias fichas conta 1 vez)
+            Quantas pessoas diferentes foram atendidas/marcadas no período (o card "Agendamentos" conta fichas/GRs, por isso é maior)
           </p>
           <SubGrid items={[
             { label: "Novos", value: fmtInt(a.novos), pct: pct(a.novos, a.novos + a.regulares), onClick: () => openDrill("clientes_novos") },
