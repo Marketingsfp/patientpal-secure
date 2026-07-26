@@ -696,13 +696,26 @@ function DashboardPage() {
         </div>
       )}
 
-      <Dialog open={drill !== null} onOpenChange={(o) => { if (!o) setDrill(null); }}>
+      <Dialog open={drill !== null} onOpenChange={(o) => { if (!o) { setDrill(null); setDrillBusca(""); } }}>
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader><DialogTitle>{drill?.title}</DialogTitle></DialogHeader>
+          <Input
+            value={drillBusca}
+            onChange={(e) => setDrillBusca(e.target.value)}
+            placeholder="Filtrar por nome do paciente, procedimento..."
+            className="mb-2"
+          />
           <div className="overflow-auto flex-1">
-            {drill && drill.rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">Nenhum registro.</p>
-            ) : drill ? (
+            {(() => {
+              if (!drill) return null;
+              const termo = drillBusca.trim().toLowerCase();
+              const linhas = termo
+                ? drill.rows.filter(r => Object.values(r).some(v => String(v ?? "").toLowerCase().includes(termo)))
+                : drill.rows;
+              if (linhas.length === 0) {
+                return <p className="text-sm text-muted-foreground py-6 text-center">Nenhum registro.</p>;
+              }
+              return (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -712,7 +725,7 @@ function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {drill.rows.map((r, i) => (
+                  {linhas.map((r, i) => (
                     <TableRow key={i}>
                       {drill.columns.map((c) => (
                         <TableCell key={c.key} className={c.align === "right" ? "text-right" : ""}>{r[c.key]}</TableCell>
@@ -721,7 +734,8 @@ function DashboardPage() {
                   ))}
                 </TableBody>
               </Table>
-            ) : null}
+              );
+            })()}
           </div>
         </DialogContent>
       </Dialog>
