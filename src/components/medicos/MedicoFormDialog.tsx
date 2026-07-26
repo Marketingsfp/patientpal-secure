@@ -330,7 +330,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         const key = normalizarNome(nome);
         const isServicoCadastrado = procs.some((p) => normalizarNome(p.nome) === key);
         if (isServicoCadastrado && !nomesServicosSelecionados.has(key)) {
-          const vazio = !c.percentual && !c.valor;
+          const vazio = !c.percentual && !c.valor
+            && !c.convenio_percentual && !c.convenio_valor
+            && !c.cartao_consulta_valor && !c.cartao_desconto_valor;
           if (vazio) return false;
         }
         return true;
