@@ -61,6 +61,16 @@ interface LaudadorRow {
 // sentinela auto-gerada). Não há seed de linhas avulsas.
 const CONVENIOS_PADRAO: ConvenioRow[] = [];
 
+/** Campos de repasse extras (convênio e cartões) começam sempre vazios:
+ *  vazio = usa o repasse padrão do médico. */
+const REPASSE_EXTRA_VAZIO = {
+  convenio_tipo_repasse: "percentual" as "percentual" | "valor",
+  convenio_percentual: "",
+  convenio_valor: "",
+  cartao_consulta_valor: "",
+  cartao_desconto_valor: "",
+};
+
 const limparPrefixoMedico = (nome: string) =>
   nome.replace(/^(\s*(dr|dra)\.?\s+)+/i, "").trim();
 
