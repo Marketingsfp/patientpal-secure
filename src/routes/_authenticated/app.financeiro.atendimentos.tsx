@@ -188,10 +188,8 @@ function AtendimentosPage() {
   const [form, setForm] = useState(EMPTY);
   // Filtros do relatório
   const hoje = new Date().toISOString().slice(0, 10);
-  const primeiroDia = new Date();
-  primeiroDia.setDate(1);
   const [fMedico, setFMedico] = useState<string>("todos");
-  const [fIni, setFIni] = useState<string>(primeiroDia.toISOString().slice(0, 10));
+  const [fIni, setFIni] = useState<string>(hoje);
   const [fFim, setFFim] = useState<string>(hoje);
   const [fStatus, setFStatus] = useState<"todos" | "aberto" | "pago">("aberto");
   const [fPaciente, setFPaciente] = useState<string>("");
