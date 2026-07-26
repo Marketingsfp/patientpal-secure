@@ -374,6 +374,17 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     viaNumero = ultimaVia + 1;
   }
   const primeiraVia = existentes.length ? existentes[existentes.length - 1] : null;
+  // Número próprio de GR da mensalidade (sequência diária por clínica).
+  const { data: grPrevRows } = await supabase
+    .from("gr_impressoes" as never)
+    .select("ficha_numero")
+    .eq("mensalidade_id", mensalidadeId)
+    .in("tipo", ["mensalidade", "taxa_adesao"])
+    .not("ficha_numero", "is", null)
+    .order("via_numero", { ascending: true })
+    .limit(1);
+  const grNumeroExistente = ((grPrevRows as Array<{ ficha_numero: number | null }> | null) ?? [])[0]?.ficha_numero ?? null;
+  const grNumero = grNumeroExistente ?? (reimpressao ? null : await proximoNumeroGRMensalidade(clinicaId));
   // "USUÁRIO:" da GR = quem FATUROU o atendimento (autor do lançamento
   // financeiro), tanto na 1ª via quanto em qualquer reimpressão. Nunca é o
   // operador logado que está imprimindo. Ordem de resolução:
@@ -1424,6 +1435,32 @@ export interface PrintGRMensalidadeInput {
   };
 }
 
+
+// ============================================================================
+// NUMERAÇÃO PRÓPRIA DA GR DE MENSALIDADE (Cartão Consulta / Cartão Desconto)
+// ----------------------------------------------------------------------------
+// A mensalidade não usa a ficha posicional da agenda: ela recebe uma sequência
+// própria por clínica/dia (GR MENS. Nº 1, 2, 3…). Ainda assim, cada impressão
+// fica registrada em gr_impressoes, de modo que a contagem de GRs do dia soma
+// atendimentos + mensalidades.
+// ============================================================================
+async function proximoNumeroGRMensalidade(clinicaId: string): Promise<number> {
+  const hoje = new Date();
+  const ini = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0).toISOString();
+  const fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59).toISOString();
+  const { data } = await supabase
+    .from("gr_impressoes" as never)
+    .select("ficha_numero")
+    .eq("clinica_id", clinicaId)
+    .in("tipo", ["mensalidade", "taxa_adesao"])
+    .eq("via_numero", 1)
+    .gte("created_at", ini)
+    .lte("created_at", fim);
+  const rows = (data as Array<{ ficha_numero: number | null }> | null) ?? [];
+  const maior = rows.reduce((mx, r) => Math.max(mx, Number(r.ficha_numero ?? 0)), 0);
+  return Math.max(maior + 1, rows.length + 1);
+}
+
 export async function printGuiaMensalidade(input: PrintGRMensalidadeInput) {
   return printGuiaMensalidadeCore(input);
 }
@@ -1552,6 +1589,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
     <div class="sep"></div>
     <div class="center lg">GUIA DE RECEBIMENTO</div>
     <div class="center sm">${isAdesao ? "TAXA DE ADESAO" : "MENSALIDADE DE CONVÊNIO"}</div>
+    ${grNumero ? `<div class="center bold">GR MENS. Nº ${grNumero}</div>` : ""}
     <div class="sep"></div>
 
     <div class="center bold">${esc(tituloPac)}</div>
@@ -1635,6 +1673,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
         impresso_por: usuarioId ?? null,
         impresso_por_nome: usuarioNome ?? null,
         tipo: "mensalidade",
+        ficha_numero: grNumero,
       } as never);
     } catch (_) { /* falha silenciosa */ }
   } else if (reimpressoPorNome) {
@@ -1647,6 +1686,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
         impresso_por: reimpressoPorId ?? null,
         impresso_por_nome: reimpressoPorNome,
         tipo: "mensalidade",
+        ficha_numero: grNumero,
       } as never);
     } catch (_) { /* falha silenciosa */ }
   }
