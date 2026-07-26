@@ -34,9 +34,18 @@ interface EspecialidadeRow { especialidade_id: string; tem_rqe: boolean; rqe_num
 interface ConvenioRow {
   id?: string;
   nome: string;
+  /** Repasse PARTICULAR (campos legados) */
   tipo_repasse: "percentual" | "valor";
   percentual: string;
   valor: string;
+  /** Repasse quando o atendimento é por CONVÊNIO */
+  convenio_tipo_repasse: "percentual" | "valor";
+  convenio_percentual: string;
+  convenio_valor: string;
+  /** Repasse fixo quando o pagamento é via CARTÃO CONSULTA */
+  cartao_consulta_valor: string;
+  /** Repasse fixo quando o pagamento é via CARTÃO DESCONTO */
+  cartao_desconto_valor: string;
   ativo: boolean;
 }
 
