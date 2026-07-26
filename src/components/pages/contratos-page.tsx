@@ -78,6 +78,8 @@ import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { printGuiaMensalidade, printGuiaMensalidadeComTaxa, reimprimirGuiaMensalidade } from "@/lib/print-gr";
 import { gerarCarnePDF } from "@/lib/print-carne";
+import { Receipt } from "lucide-react";
+import { FaturamentoRapidoMensalidadeDialog } from "@/components/cartao-beneficios/faturamento-rapido-dialog";
 import { gerarBoletosContrato } from "@/lib/boleto.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Barcode, FileText } from "lucide-react";
@@ -296,6 +298,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
 
   // Fluxo "É renovação?" acionado antes de abrir a nova venda.
   const [perguntaRenovOpen, setPerguntaRenovOpen] = useState(false);
+  const [fatRapidoOpen, setFatRapidoOpen] = useState(false);
   const [escolhaContratoOpen, setEscolhaContratoOpen] = useState(false);
   const [pacRenov, setPacRenov] = useState<PatientOption | null>(null);
   const [contratosPac, setContratosPac] = useState<Contrato[]>([]);
