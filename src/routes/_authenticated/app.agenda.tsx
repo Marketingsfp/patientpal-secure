@@ -5857,6 +5857,15 @@ function AgendaPage() {
           </div>
           <EncerrarExpedienteButton />
           <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-[11px] px-2"
+            title="Receber mensalidade do Cartão Benefícios"
+            onClick={() => setFatRapidoOpen(true)}
+          >
+            💳 Mensalidade do cartão
+          </Button>
+          <Button
             asChild
             variant="outline"
             size="sm"
