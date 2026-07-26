@@ -152,7 +152,9 @@ function DashboardPage() {
     const medIdsPermitidos = new Set(medsFiltrados.map(m => m.id));
     const passaFiltro = (mid: string | null) => !filtroAtivo || (!!mid && medIdsPermitidos.has(mid));
 
-    const ags = (agendR.data ?? []).filter(a => passaFiltro(a.medico_id));
+    // Só contam fichas realmente ocupadas por um paciente — os slots vazios
+    // gerados na grade de horários (paciente_id nulo) não são agendamentos.
+    const ags = (agendR.data ?? []).filter(a => passaFiltro(a.medico_id) && !!a.paciente_id);
     const lancs = (lancR.data ?? []).filter(l => !filtroAtivo || passaFiltro(l.medico_id));
     const atends = (atendR.data ?? []).filter(a => passaFiltro(a.medico_id));
     const meds = medsFiltrados;
