@@ -5085,6 +5085,11 @@ export type Database = {
       medico_convenios: {
         Row: {
           ativo: boolean
+          cartao_consulta_valor: number | null
+          cartao_desconto_valor: number | null
+          convenio_percentual: number | null
+          convenio_tipo_repasse: string | null
+          convenio_valor: number | null
           created_at: string
           id: string
           medico_id: string
@@ -5096,6 +5101,11 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          cartao_consulta_valor?: number | null
+          cartao_desconto_valor?: number | null
+          convenio_percentual?: number | null
+          convenio_tipo_repasse?: string | null
+          convenio_valor?: number | null
           created_at?: string
           id?: string
           medico_id: string
@@ -5107,6 +5117,11 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          cartao_consulta_valor?: number | null
+          cartao_desconto_valor?: number | null
+          convenio_percentual?: number | null
+          convenio_tipo_repasse?: string | null
+          convenio_valor?: number | null
           created_at?: string
           id?: string
           medico_id?: string
