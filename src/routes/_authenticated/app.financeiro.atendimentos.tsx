@@ -1550,6 +1550,7 @@ function AtendimentosPage() {
       medicos.length,
       convenios.length,
       procValores.size,
+      mapaConvenio,
     ],
   );
 
