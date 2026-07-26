@@ -180,6 +180,9 @@ function AtendimentosPage() {
   const [procValores, setProcValores] = useState<Map<string, number>>(new Map());
   const [procTipos, setProcTipos] = useState<Map<string, string>>(new Map());
   const [procLaudo, setProcLaudo] = useState<Map<string, boolean>>(new Map());
+  // Vínculo de convênio por paciente (contrato ativo) — decide Cartão
+  // Consulta/Desconto pelo cadastro, não pelo texto do lançamento.
+  const [mapaConvenio, setMapaConvenio] = useState<MapaConvenioPaciente>(new Map());
   const [loading, setLoading] = useState(true);
   const [historicoAtend, setHistoricoAtend] = useState<Atend | null>(null);
   const [open, setOpen] = useState(false);
