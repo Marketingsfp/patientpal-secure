@@ -805,6 +805,21 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           tipo_repasse: c.tipo_repasse,
           percentual: c.tipo_repasse === "percentual" ? parseFloat(c.percentual || "0") : 0,
           valor: c.tipo_repasse === "valor" ? parseFloat(c.valor || "0") : null,
+          // Convênio / cartões: em branco = herda o repasse padrão do médico.
+          convenio_tipo_repasse:
+            (c.convenio_tipo_repasse === "percentual" ? c.convenio_percentual : c.convenio_valor)?.trim()
+              ? c.convenio_tipo_repasse
+              : null,
+          convenio_percentual:
+            c.convenio_tipo_repasse === "percentual" && c.convenio_percentual.trim()
+              ? parseFloat(c.convenio_percentual)
+              : null,
+          convenio_valor:
+            c.convenio_tipo_repasse === "valor" && c.convenio_valor.trim()
+              ? parseFloat(c.convenio_valor)
+              : null,
+          cartao_consulta_valor: c.cartao_consulta_valor.trim() ? parseFloat(c.cartao_consulta_valor) : null,
+          cartao_desconto_valor: c.cartao_desconto_valor.trim() ? parseFloat(c.cartao_desconto_valor) : null,
           ativo: c.ativo,
         }));
       if (convRows.length) {
