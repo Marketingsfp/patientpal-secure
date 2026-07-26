@@ -719,6 +719,10 @@ function DashboardPage() {
             { label: "Realizado", value: fmtMoney(data.recebimentos.realizado), onClick: () => openDrill("rec_real") },
             { label: "À receber", value: fmtMoney(data.recebimentos.aReceber), onClick: () => openDrill("rec_areceber") },
           ]} />
+          <p className="text-[11px] text-muted-foreground mt-2">
+            Sendo {fmtMoney(data.recebimentos.mensalidades)} de mensalidades do cartão
+            {data.recebimentos.qtdMensalidades > 0 ? ` (${fmtInt(data.recebimentos.qtdMensalidades)} lançamento${data.recebimentos.qtdMensalidades > 1 ? "s" : ""})` : ""}
+          </p>
         </KpiCard>
         )}
 
