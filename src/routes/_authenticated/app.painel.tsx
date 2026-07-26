@@ -441,6 +441,28 @@ function DashboardPage() {
         columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "proc", label: "Procedimento" }, { key: "status", label: "Status" }],
         rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), proc: g.procedimento ?? "—", status: g.status })),
       });
+    } else if (kind === "grs_total" || kind === "grs_mens") {
+      const rowsMens = grMensLista.map(m => ({
+        data: fmtDt(m.quando),
+        paciente: m.paciente,
+        proc: m.ficha ? `Mensalidade do cartão — GR MENS. Nº ${m.ficha}` : "Mensalidade do cartão",
+        origem: "Mensalidade",
+      }));
+      const rowsAg = rawAgs.filter(g => g.status === "realizado").map(g => ({
+        data: fmtDt(g.inicio),
+        paciente: pacNome(g.paciente_id),
+        proc: g.procedimento ?? "—",
+        origem: "Agendamento",
+      }));
+      const rows = kind === "grs_mens" ? rowsMens : [...rowsAg, ...rowsMens];
+      setDrill({
+        title: `${kind === "grs_mens" ? "Mensalidades do cartão" : "Atendimentos do dia (GRs)"} (${rows.length})`,
+        columns: [
+          { key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" },
+          { key: "proc", label: "Procedimento" }, { key: "origem", label: "Origem" },
+        ],
+        rows,
+      });
     }
   };
 
