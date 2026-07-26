@@ -22,7 +22,7 @@ import { detectarAlertas, type AlertaBadge } from "./alertas-fila";
 import { KpiBar, type KpiData } from "./kpi-bar";
 import { useCaixaShortcuts } from "./atalhos";
 
-type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento";
+type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento" | "estorno" | "reabertura";
 interface Sessao {
   id: string; clinica_id: string; user_id: string; user_nome: string | null;
   aberto_em: string; valor_abertura: number;
@@ -50,6 +50,7 @@ interface AggRow {
 const TIPO_LABEL: Record<MovTipo, string> = {
   abertura: "Abertura", suprimento: "Suprimento", recebimento: "Recebimento",
   sangria: "Sangria", despesa: "Despesa", fechamento: "Fechamento",
+  estorno: "Estorno", reabertura: "Reabertura",
 };
 const TIPO_CLASS: Record<MovTipo, string> = {
   abertura: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
@@ -58,6 +59,8 @@ const TIPO_CLASS: Record<MovTipo, string> = {
   sangria: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
   despesa: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
   fechamento: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
+  estorno: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  reabertura: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
 };
 const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
   abertura: 1, suprimento: 1, recebimento: 1, sangria: -1, despesa: -1, fechamento: 0,
