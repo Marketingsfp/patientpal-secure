@@ -61,7 +61,9 @@ const TIPO_CLASS: Record<MovTipo, string> = {
 };
 const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
   abertura: 1, suprimento: 1, recebimento: 1, sangria: -1, despesa: -1, fechamento: 0,
-};
+  // Estorno devolve dinheiro ao paciente: sempre reduz o total.
+  estorno: -1, reabertura: 0,
+} as Record<MovTipo, 1 | -1 | 0>;
 
 const TIPO_OPTS = [
   { value: "recebimento", label: "Recebimento" },
@@ -310,13 +312,17 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   // ===== Resumo agregado (client-side)
   const resumoData = useMemo<ResumoData>(() => {
     const recebimentos = aggRows.filter((m) => m.tipo === "recebimento");
+    const estornos = aggRows.filter((m) => m.tipo === "estorno");
+    const soma = (arr: typeof aggRows) => arr.reduce((s, m) => s + Number(m.valor || 0), 0);
+    const porForma = (arr: typeof aggRows, forma: string) =>
+      arr.filter((m) => (m.forma_pagamento ?? "").toLowerCase().includes(forma));
+    // Estornos abatem do recebido (não somam no total).
     const somaForma = (forma: string) =>
-      recebimentos
-        .filter((m) => (m.forma_pagamento ?? "").toLowerCase().includes(forma))
-        .reduce((s, m) => s + Number(m.valor || 0), 0);
-    const recebidoTotal = recebimentos.reduce((s, m) => s + Number(m.valor || 0), 0);
+      soma(porForma(recebimentos, forma)) - soma(porForma(estornos, forma));
+    const recebidoTotal = soma(recebimentos) - soma(estornos);
     const recebidoSessao = sessao
-      ? recebimentos.filter((m) => m.sessao_id === sessao.id).reduce((s, m) => s + Number(m.valor || 0), 0)
+      ? soma(recebimentos.filter((m) => m.sessao_id === sessao.id))
+        - soma(estornos.filter((m) => m.sessao_id === sessao.id))
       : 0;
     const saldo = aggRows.reduce((s, m) => s + Number(m.valor || 0) * (TIPO_SINAL[m.tipo] || 0), 0);
     const particular = fila.filter((f) => !f.valor_cartao).reduce((s, f) => s + f.valor, 0);
@@ -371,9 +377,12 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   // ===== KPIs derivados
   const kpiData = useMemo<KpiData>(() => {
     const recebimentos = aggRows.filter((m) => m.tipo === "recebimento");
-    const receitaHoje = recebimentos.reduce((s, m) => s + Number(m.valor || 0), 0);
+    const estornos = aggRows.filter((m) => m.tipo === "estorno");
+    const soma = (arr: typeof aggRows) => arr.reduce((s, m) => s + Number(m.valor || 0), 0);
+    const receitaHoje = soma(recebimentos) - soma(estornos);
     const receitaSessao = sessao
-      ? recebimentos.filter((m) => m.sessao_id === sessao.id).reduce((s, m) => s + Number(m.valor || 0), 0)
+      ? soma(recebimentos.filter((m) => m.sessao_id === sessao.id))
+        - soma(estornos.filter((m) => m.sessao_id === sessao.id))
       : 0;
     // Tempo médio de espera atual (min) — só quando há fila pendente
     const esperas = filaPend.map((f) => (Date.now() - new Date(f.inicio).getTime()) / 60000)
