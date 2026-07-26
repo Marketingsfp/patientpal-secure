@@ -6851,6 +6851,12 @@ function AgendaPage() {
               navigate({ to: "/app/nfse" });
             }
           }
+          };
+          try {
+            await executarPagamento();
+          } finally {
+            await carimbarConvenioNosLancamentos(clinicaIdCarimbo, idsCarimbo);
+          }
         }}
       />
 
