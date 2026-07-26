@@ -246,7 +246,32 @@ function DashboardPage() {
       })
       .sort((a, b) => b.total - a.total);
 
-    const qtdMensGR = (grMensR.data ?? []).length;
+    const grMensRows = (grMensR.data ?? []) as Array<{ id: string; mensalidade_id: string | null; ficha_numero: number | null; created_at: string | null }>;
+    const qtdMensGR = grMensRows.length;
+    // Nome do paciente de cada GR de mensalidade (mensalidade -> contrato -> titular)
+    const mensIds = Array.from(new Set(grMensRows.map(g => g.mensalidade_id).filter(Boolean) as string[]));
+    const nomePorMens = new Map<string, string>();
+    if (mensIds.length > 0) {
+      const { data: mens } = await supabase
+        .from("contrato_mensalidades").select("id,contrato_id").in("id", mensIds);
+      const contratoIds = Array.from(new Set(((mens ?? []) as Array<{ contrato_id: string | null }>).map(m => m.contrato_id).filter(Boolean) as string[]));
+      const nomePorContrato = new Map<string, string>();
+      if (contratoIds.length > 0) {
+        const { data: cts } = await supabase
+          .from("contratos_assinatura").select("id,paciente_nome").in("id", contratoIds);
+        for (const c of (cts ?? []) as Array<{ id: string; paciente_nome: string | null }>) {
+          nomePorContrato.set(c.id, c.paciente_nome ?? "—");
+        }
+      }
+      for (const m of (mens ?? []) as Array<{ id: string; contrato_id: string | null }>) {
+        nomePorMens.set(m.id, (m.contrato_id && nomePorContrato.get(m.contrato_id)) || "—");
+      }
+    }
+    setGrMensLista(grMensRows.map(g => ({
+      ficha: g.ficha_numero,
+      quando: g.created_at,
+      paciente: (g.mensalidade_id && nomePorMens.get(g.mensalidade_id)) || "—",
+    })));
     const recebidos = (recebidoR.data ?? []) as Array<{ valor: number; data: string | null }>;
     const caixaTotal = recebidos.reduce((s2, r) => s2 + Number(r.valor || 0), 0);
     const caixaDoDia = recebidos
@@ -255,7 +280,8 @@ function DashboardPage() {
 
     setData({
       alertas: alertasR.data ?? [],
-      grs: { agendamentos: total, mensalidades: qtdMensGR, total: total + qtdMensGR },
+      // Atendimentos REALIZADOS do dia (não o total agendado) + GRs de mensalidade.
+      grs: { agendamentos: atendidos, mensalidades: qtdMensGR, total: atendidos + qtdMensGR },
       caixaDia: { total: caixaTotal, doDia: caixaDoDia, outrasDatas: caixaTotal - caixaDoDia, qtd: recebidos.length },
       agend: { total, atendidos, faltas, pagos, naoPagos, novos, regulares, retornos, semAgenda },
       msgs: { enviadas: 0, respostas: 0, total: 0 },
