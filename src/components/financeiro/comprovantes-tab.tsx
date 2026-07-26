@@ -160,7 +160,7 @@ export function ComprovantesTab() {
         for (;;) {
           const { data: cv, error } = await supabase
             .from("medico_convenios")
-            .select("medico_id, nome, tipo_repasse, percentual, valor")
+            .select("medico_id, nome, tipo_repasse, percentual, valor, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor")
             .in("medico_id", ids)
             .eq("ativo", true)
             .range(offset, offset + CHUNK - 1);
