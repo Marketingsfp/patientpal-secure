@@ -309,7 +309,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
 
   // ===== Resumo agregado (client-side)
   const resumoData = useMemo<ResumoData>(() => {
-    const recebimentos = movs.filter((m) => m.tipo === "recebimento");
+    const recebimentos = aggRows.filter((m) => m.tipo === "recebimento");
     const somaForma = (forma: string) =>
       recebimentos
         .filter((m) => (m.forma_pagamento ?? "").toLowerCase().includes(forma))
@@ -318,7 +318,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     const recebidoSessao = sessao
       ? recebimentos.filter((m) => m.sessao_id === sessao.id).reduce((s, m) => s + Number(m.valor || 0), 0)
       : 0;
-    const saldo = movs.reduce((s, m) => s + Number(m.valor || 0) * (TIPO_SINAL[m.tipo] || 0), 0);
+    const saldo = aggRows.reduce((s, m) => s + Number(m.valor || 0) * (TIPO_SINAL[m.tipo] || 0), 0);
     const particular = fila.filter((f) => !f.valor_cartao).reduce((s, f) => s + f.valor, 0);
     const associado = fila.filter((f) => f.valor_cartao > 0).reduce((s, f) => s + f.valor_cartao, 0);
     return {
@@ -330,7 +330,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
       pendentesFila: filaPend.length,
       aguardandoPagamento: filaPend.filter((f) => !f.ja_pago).length,
     };
-  }, [movs, fila, filaPend, sessao]);
+  }, [aggRows, fila, filaPend, sessao]);
 
   // ===== Fila → cards (status + alertas)
   const filaCards = useMemo<FilaCardData[]>(() => {
@@ -370,7 +370,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
 
   // ===== KPIs derivados
   const kpiData = useMemo<KpiData>(() => {
-    const recebimentos = movs.filter((m) => m.tipo === "recebimento");
+    const recebimentos = aggRows.filter((m) => m.tipo === "recebimento");
     const receitaHoje = recebimentos.reduce((s, m) => s + Number(m.valor || 0), 0);
     const receitaSessao = sessao
       ? recebimentos.filter((m) => m.sessao_id === sessao.id).reduce((s, m) => s + Number(m.valor || 0), 0)
@@ -405,7 +405,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
       receitaSessao, receitaHoje,
       atendimentos: recebimentos.length,
     };
-  }, [movs, sessao, filaPend]);
+  }, [aggRows, sessao, filaPend]);
 
   const tabs: ReadonlyArray<StatusTab<TabKey>> = [
     { value: "hoje", label: "Hoje" },
@@ -443,7 +443,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
         {tab === "sessao" && sessao ? `Sessão #${sessao.id.slice(0, 8)}` : tab === "hoje" ? "Movimentos de hoje" : `Últimos ${periodo === "hoje" ? "hoje" : periodo}`}
       </div>}
       actions={novosCount > 0 ? (
-        <Button size="sm" variant="secondary" onClick={() => { setNovosCount(0); void loadMovs(); }}>
+        <Button size="sm" variant="secondary" onClick={() => { setNovosCount(0); void loadMovs(); void loadTotais(); }}>
           {novosCount} novo{novosCount > 1 ? "s" : ""} — atualizar
         </Button>
       ) : null}
@@ -455,7 +455,27 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
           <QuickFilters options={TIPO_OPTS as any} value={tipos as any} onChange={(v) => setTipos(v as any)} multi ariaLabel="Tipo" />
           <QuickFilters options={FORMA_OPTS as any} value={formas as any} onChange={(v) => setFormas(v as any)} multi ariaLabel="Forma de pagamento" />
           {tab === "todos" && (
-            <QuickFilters options={PERIODO_OPTS as any} value={[periodo] as any} onChange={(v) => setPeriodo(((v[0] as any) ?? "7d"))} ariaLabel="Período" />
+            <div className="flex flex-col gap-2">
+              <QuickFilters options={PERIODO_OPTS as any} value={[periodo] as any} onChange={(v) => setPeriodo(((v[0] as any) ?? "7d"))} ariaLabel="Período" />
+              {periodo === "custom" && (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <label className="flex items-center gap-1">
+                    De
+                    <input type="date" value={dataDe} onChange={(e) => setDataDe(e.target.value)}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs" />
+                  </label>
+                  <label className="flex items-center gap-1">
+                    Até
+                    <input type="date" value={dataAte} onChange={(e) => setDataAte(e.target.value)}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs" />
+                  </label>
+                  {(dataDe || dataAte) && (
+                    <Button size="sm" variant="ghost" className="h-8 px-2"
+                      onClick={() => { setDataDe(""); setDataAte(""); }}>Limpar datas</Button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
       }
