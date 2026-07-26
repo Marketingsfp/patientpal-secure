@@ -79,6 +79,9 @@ function DashboardPage() {
   const [pacNomes, setPacNomes] = useState<Map<string, string>>(new Map());
   const [medNomes, setMedNomes] = useState<Map<string, string>>(new Map());
   const [drill, setDrill] = useState<DrillSpec | null>(null);
+  const [drillBusca, setDrillBusca] = useState("");
+  // GRs de mensalidade do período (para o detalhamento com nome do paciente)
+  const [grMensLista, setGrMensLista] = useState<Array<{ ficha: number | null; quando: string | null; paciente: string }>>([]);
 
   // Conjunto efetivo de medico_ids após filtros (intersecção médicos x especialidades)
   const medicosFiltradosIds = useMemo(() => {
@@ -112,7 +115,7 @@ function DashboardPage() {
     // GRs de mensalidade (cartão consulta / cartão desconto) impressas no período:
     // cada pagamento de mensalidade conta como uma GR do dia.
     const [grMensR, recebidoR] = await Promise.all([
-      supabase.from("gr_impressoes").select("id").eq("clinica_id", cid)
+      supabase.from("gr_impressoes").select("id,mensalidade_id,ficha_numero,created_at").eq("clinica_id", cid)
         .in("tipo", ["mensalidade", "taxa_adesao"]).eq("via_numero", 1)
         .gte("created_at", ini).lte("created_at", fim),
       // Recebimentos efetivados no período (data de lançamento no caixa),
