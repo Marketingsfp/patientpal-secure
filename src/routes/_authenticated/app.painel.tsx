@@ -485,22 +485,26 @@ function DashboardPage() {
         columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "proc", label: "Procedimento" }, { key: "status", label: "Status" }],
         rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), proc: g.procedimento ?? "—", status: g.status })),
       });
-    } else if (kind === "grs_total" || kind === "grs_mens") {
+    } else if (kind === "grs_total" || kind === "grs_mens" || kind === "grs_outros") {
       const rowsMens = grMensLista.map(m => ({
         data: fmtDt(m.quando),
         paciente: m.paciente,
         proc: m.ficha ? `Mensalidade do cartão — GR MENS. Nº ${m.ficha}` : "Mensalidade do cartão",
         origem: "Mensalidade",
       }));
-      const rowsAg = rawAgs.filter(g => g.status === "realizado").map(g => ({
+      const mapAg = (g: RawAg) => ({
         data: fmtDt(g.inicio),
         paciente: pacNome(g.paciente_id),
         proc: g.procedimento ?? "—",
-        origem: "Agendamento",
-      }));
-      const rows = kind === "grs_mens" ? rowsMens : [...rowsAg, ...rowsMens];
+        origem: g.status === "realizado" ? "Atendido" : "Pago p/ outro dia",
+      });
+      const rowsAtendidos = rawAgs.filter(g => g.status === "realizado").map(mapAg);
+      const rowsOutros = rawAgs.filter(g => g.status !== "realizado" && pagosAgIds.has(g.id)).map(mapAg);
+      const rows = kind === "grs_mens" ? rowsMens
+        : kind === "grs_outros" ? rowsOutros
+        : [...rowsAtendidos, ...rowsOutros, ...rowsMens];
       setDrill({
-        title: `${kind === "grs_mens" ? "Mensalidades do cartão" : "Atendimentos no período (GRs)"} (${rows.length})`,
+        title: `${kind === "grs_mens" ? "Mensalidades do cartão" : kind === "grs_outros" ? "GRs pagas para outros dias" : "GRs pagas no período"} (${rows.length})`,
         columns: [
           { key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" },
           { key: "proc", label: "Procedimento" }, { key: "origem", label: "Origem" },
