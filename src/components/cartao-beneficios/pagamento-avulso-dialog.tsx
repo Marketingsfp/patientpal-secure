@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Receipt } from "lucide-react";
+import { AlertTriangle, Plus, Receipt, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -17,10 +17,13 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { printGuiaMensalidade } from "@/lib/print-gr";
 
 type Convenio = { id: string; nome: string; valor_mensal: number | null; num_parcelas: number | null };
+type Faixa = { convenio_id: string; vidas_de: number; vidas_ate: number | null; valor_mensal: number };
+type DependenteLinha = { key: string; paciente: PatientOption | null; parentesco: string };
 
 const TOTAL_PARCELAS = 12;
 
@@ -68,19 +71,25 @@ export function PagamentoAvulsoMensalidadeDialog({
 
   const [paciente, setPaciente] = useState<PatientOption | null>(pacienteInicial ?? null);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
+  const [faixas, setFaixas] = useState<Faixa[]>([]);
   const [convenioId, setConvenioId] = useState<string>("");
   const [refMes, setRefMes] = useState<string>(mesAtual);
+  const [parcelasPagas, setParcelasPagas] = useState<string>("");
   const [valor, setValor] = useState<string>("");
   const [diaVenc, setDiaVenc] = useState<string>("10");
   const [criarContrato, setCriarContrato] = useState(true);
   const [loading, setLoading] = useState(false);
   const [lancOpen, setLancOpen] = useState(false);
+  const [dependentes, setDependentes] = useState<DependenteLinha[]>([]);
+  const [quickOpen, setQuickOpen] = useState<{ alvo: "titular" | string; nome: string } | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setPaciente(pacienteInicial ?? null);
     setRefMes(mesAtual);
     setCriarContrato(true);
+    setParcelasPagas("");
+    setDependentes([]);
     (async () => {
       setLoading(true);
       const { data: cv } = await supabase
@@ -89,31 +98,73 @@ export function PagamentoAvulsoMensalidadeDialog({
         .eq("clinica_id", clinicaId)
         .eq("ativo", true)
         .order("nome");
-      setConvenios((cv ?? []) as Convenio[]);
+      const lista = (cv ?? []) as Convenio[];
+      setConvenios(lista);
+      if (lista.length) {
+        const { data: fx } = await supabase
+          .from("cb_convenio_faixas")
+          .select("convenio_id, vidas_de, vidas_ate, valor_mensal")
+          .in("convenio_id", lista.map((c) => c.id))
+          .order("vidas_de");
+        setFaixas((fx ?? []) as Faixa[]);
+      } else {
+        setFaixas([]);
+      }
       setLoading(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, clinicaId]);
 
   const valorNum = Number(String(valor).replace(/\./g, "").replace(",", ".")) || 0;
+  const pagasNum = Math.max(0, Math.min(TOTAL_PARCELAS - 1, Number(parcelasPagas) || 0));
+  const dependentesValidos = dependentes.filter((d) => !!d.paciente);
+  const vidas = 1 + dependentesValidos.length;
+
+  /** Faixa de vidas do convênio selecionado que cobre o nº de pessoas do contrato. */
+  const faixaAtual = useMemo(() => {
+    if (!convenioId) return null;
+    return (
+      faixas.find(
+        (f) =>
+          f.convenio_id === convenioId &&
+          vidas >= Number(f.vidas_de) &&
+          (f.vidas_ate == null || vidas <= Number(f.vidas_ate)),
+      ) ?? null
+    );
+  }, [faixas, convenioId, vidas]);
+
+  // Valor automático: faixa de vidas do convênio; sem faixa, valor_mensal do convênio.
+  useEffect(() => {
+    if (!criarContrato || !convenioId) return;
+    const conv = convenios.find((c) => c.id === convenioId);
+    const auto = faixaAtual ? Number(faixaAtual.valor_mensal) : Number(conv?.valor_mensal ?? 0);
+    if (auto > 0) setValor(auto.toFixed(2));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convenioId, faixaAtual, criarContrato]);
 
   const resumo = useMemo(() => {
     if (!criarContrato) return null;
     const dia = Math.max(1, Math.min(31, Number(diaVenc) || 10));
     return {
-      primeiro: vencimentoDe(refMes, 0, dia),
-      ultimo: vencimentoDe(refMes, TOTAL_PARCELAS - 1, dia),
-      pendentes: TOTAL_PARCELAS - 1,
+      primeiro: vencimentoDe(refMes, -pagasNum, dia),
+      ultimo: vencimentoDe(refMes, TOTAL_PARCELAS - 1 - pagasNum, dia),
+      pendentes: TOTAL_PARCELAS - 1 - pagasNum,
+      numeroAtual: pagasNum + 1,
     };
-  }, [criarContrato, refMes, diaVenc]);
+  }, [criarContrato, refMes, diaVenc, pagasNum]);
 
-  const podeAvancar = !!paciente && !!refMes && valorNum > 0 && (!criarContrato || !!convenioId);
+  const podeAvancar =
+    !!paciente &&
+    !!refMes &&
+    valorNum > 0 &&
+    (!criarContrato || (!!convenioId && dependentes.every((d) => !!d.paciente)));
 
   const escolherConvenio = (id: string) => {
     setConvenioId(id);
-    const p = convenios.find((x) => x.id === id);
-    if (p && Number(p.valor_mensal) > 0 && !valorNum) setValor(String(Number(p.valor_mensal).toFixed(2)));
   };
+
+  const addDependente = () =>
+    setDependentes((d) => [...d, { key: crypto.randomUUID(), paciente: null, parentesco: "" }]);
 
   /** Cria contrato + 12 parcelas; devolve o id da parcela do mês de referência. */
   const criarContratoEParcelas = async (dadosPagamento: {
@@ -124,7 +175,7 @@ export function PagamentoAvulsoMensalidadeDialog({
   }) => {
     if (!paciente) return null;
     const dia = Math.max(1, Math.min(31, Number(diaVenc) || 10));
-    const inicio = vencimentoDe(refMes, 0, 1);
+    const inicio = vencimentoDe(refMes, -pagasNum, 1);
     const { data: contrato, error: errC } = await supabase
       .from("contratos_assinatura")
       .insert({
@@ -133,33 +184,42 @@ export function PagamentoAvulsoMensalidadeDialog({
         paciente_id: paciente.id,
         paciente_nome: paciente.nome,
         data_inicio: inicio,
-        data_fim: vencimentoDe(refMes, TOTAL_PARCELAS, 1),
+        data_fim: vencimentoDe(refMes, TOTAL_PARCELAS - pagasNum, 1),
         dia_vencimento: dia,
         valor_mensal: valorNum,
         num_parcelas: TOTAL_PARCELAS,
         status: "ativo",
         criado_por: usuario?.id ?? null,
-        observacoes: `Contrato criado pelo pagamento avulso (regularização) — mês de referência ${rotuloMes(refMes)}.`,
+        observacoes:
+          `Contrato criado pelo pagamento avulso (regularização) — mês de referência ${rotuloMes(refMes)}.` +
+          (pagasNum > 0 ? ` ${pagasNum} parcela(s) informada(s) como já paga(s) antes do sistema.` : ""),
       } as never)
       .select("id, numero")
       .single();
     if (errC) throw errC;
 
+    const contratoId = (contrato as { id: string }).id;
+
     const rows = Array.from({ length: TOTAL_PARCELAS }, (_, i) => {
-      const venc = vencimentoDe(refMes, i, dia);
-      const paga = i === 0;
+      const venc = vencimentoDe(refMes, i - pagasNum, dia);
+      const paga = i === pagasNum;
+      const historico = i < pagasNum;
       return {
-        contrato_id: (contrato as { id: string }).id,
+        contrato_id: contratoId,
         clinica_id: clinicaId,
         numero_parcela: i + 1,
         vencimento: venc,
         valor: valorNum,
-        status: paga ? "pago" : "pendente",
-        pago_em: paga ? (dadosPagamento.data || new Date().toISOString().slice(0, 10)) : null,
-        valor_pago: paga ? dadosPagamento.valor : null,
+        status: paga || historico ? "pago" : "pendente",
+        pago_em: paga ? (dadosPagamento.data || new Date().toISOString().slice(0, 10)) : historico ? venc : null,
+        valor_pago: paga ? dadosPagamento.valor : historico ? valorNum : null,
         forma_pagamento: paga ? (dadosPagamento.forma_pagamento ?? "misto") : null,
         lancamento_id: paga ? (dadosPagamento.lancamento_id ?? null) : null,
-        observacoes: paga ? "Recebida no pagamento avulso (regularização)" : "Gerada na regularização do avulso",
+        observacoes: paga
+          ? "Recebida no pagamento avulso (regularização)"
+          : historico
+            ? "Regularização — parcela informada como paga anteriormente"
+            : "Gerada na regularização do avulso",
       };
     });
     const { data: inseridas, error: errM } = await supabase
@@ -167,16 +227,31 @@ export function PagamentoAvulsoMensalidadeDialog({
       .insert(rows as never)
       .select("id, numero_parcela");
     if (errM) throw errM;
-    const primeira = ((inseridas ?? []) as Array<{ id: string; numero_parcela: number }>).find(
-      (m) => m.numero_parcela === 1,
+    const atual = ((inseridas ?? []) as Array<{ id: string; numero_parcela: number }>).find(
+      (m) => m.numero_parcela === pagasNum + 1,
     );
-    return { contratoId: (contrato as { id: string }).id, mensalidadeId: primeira?.id ?? null };
+
+    // Dependentes informados na hora.
+    if (dependentesValidos.length) {
+      const { error: errD } = await supabase.from("contrato_dependentes").insert(
+        dependentesValidos.map((d) => ({
+          contrato_id: contratoId,
+          paciente_id: d.paciente!.id,
+          paciente_nome: d.paciente!.nome,
+          parentesco: d.parentesco || null,
+          tipo: "dependente",
+        })) as never,
+      );
+      if (errD) mostrarErro(errD, "contrato criado, mas os dependentes não foram vinculados");
+    }
+
+    return { contratoId, mensalidadeId: atual?.id ?? null };
   };
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5" /> Pagamento avulso — Mensalidade do Cartão
@@ -190,7 +265,12 @@ export function PagamentoAvulsoMensalidadeDialog({
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Paciente</Label>
-              <PatientSearchInput value={paciente} onSelect={setPaciente} clinicaIdsOverride={[clinicaId]} />
+              <PatientSearchInput
+                value={paciente}
+                onSelect={setPaciente}
+                clinicaIdsOverride={[clinicaId]}
+                onRequestCreate={(q) => setQuickOpen({ alvo: "titular", nome: q })}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -199,15 +279,25 @@ export function PagamentoAvulsoMensalidadeDialog({
                 <Input type="month" value={refMes} onChange={(e) => setRefMes(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Valor da mensalidade</Label>
+                <Label>Parcelas já pagas</Label>
                 <Input
-                  inputMode="decimal"
-                  placeholder="0,00"
-                  value={valor}
-                  onChange={(e) => setValor(e.target.value)}
+                  type="number"
+                  min={0}
+                  max={TOTAL_PARCELAS - 1}
+                  placeholder="0"
+                  value={parcelasPagas}
+                  onChange={(e) => setParcelasPagas(e.target.value)}
                 />
               </div>
             </div>
+
+            {criarContrato && pagasNum === 0 && (
+              <p className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                Nenhuma parcela paga informada: será criado um novo contrato com as 12 mensalidades, sendo a do
+                mês de referência baixada agora.
+              </p>
+            )}
 
             <label className="flex items-start gap-2 rounded-md border p-3 text-sm">
               <Checkbox checked={criarContrato} onCheckedChange={(v) => setCriarContrato(!!v)} />
@@ -248,13 +338,93 @@ export function PagamentoAvulsoMensalidadeDialog({
                     />
                   </div>
                 </div>
+
+                <div className="space-y-2 rounded-md border p-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">
+                      Dependentes ({dependentesValidos.length}) · {vidas} vida(s) no contrato
+                    </Label>
+                    <Button type="button" size="sm" variant="outline" onClick={addDependente}>
+                      <Plus className="mr-1 h-3.5 w-3.5" /> Adicionar dependente
+                    </Button>
+                  </div>
+                  {dependentes.map((d) => (
+                    <div key={d.key} className="grid grid-cols-[1fr_120px_32px] items-center gap-2">
+                      <PatientSearchInput
+                        value={d.paciente}
+                        onSelect={(p) =>
+                          setDependentes((arr) =>
+                            arr.map((x) => (x.key === d.key ? { ...x, paciente: p } : x)),
+                          )
+                        }
+                        clinicaIdsOverride={[clinicaId]}
+                        placeholder="Nome ou CPF do dependente"
+                        onRequestCreate={(q) => setQuickOpen({ alvo: d.key, nome: q })}
+                      />
+                      <Input
+                        placeholder="Parentesco"
+                        value={d.parentesco}
+                        onChange={(e) =>
+                          setDependentes((arr) =>
+                            arr.map((x) => (x.key === d.key ? { ...x, parentesco: e.target.value } : x)),
+                          )
+                        }
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setDependentes((arr) => arr.filter((x) => x.key !== d.key))}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                  {dependentes.length === 0 && (
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <UserPlus className="h-3.5 w-3.5" /> Somente o titular. Adicione dependentes para
+                      recalcular o valor por faixa de vidas.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Valor da mensalidade</Label>
+                  <Input
+                    inputMode="decimal"
+                    placeholder="0,00"
+                    value={valor}
+                    onChange={(e) => setValor(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {faixaAtual
+                      ? `Faixa ${faixaAtual.vidas_de} a ${faixaAtual.vidas_ate ?? "+"} vidas — ${Number(
+                          faixaAtual.valor_mensal,
+                        ).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`
+                      : "Sem faixa de vidas cadastrada — usando o valor mensal do convênio. Você pode ajustar."}
+                  </p>
+                </div>
+
                 {resumo && (
                   <p className="text-xs text-muted-foreground">
-                    Parcela 1/12 = {rotuloMes(refMes)} (será baixada como paga agora) · demais{" "}
+                    Parcela {resumo.numeroAtual}/12 = {rotuloMes(refMes)} (será baixada como paga agora)
+                    {pagasNum > 0 ? ` · ${pagasNum} parcela(s) anterior(es) já marcada(s) como paga(s)` : ""} · demais{" "}
                     {resumo.pendentes} parcelas ficam pendentes até{" "}
                     {new Date(`${resumo.ultimo}T00:00:00`).toLocaleDateString("pt-BR")}.
                   </p>
                 )}
+              </div>
+            )}
+
+            {!criarContrato && (
+              <div className="space-y-1">
+                <Label>Valor da mensalidade</Label>
+                <Input
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={valor}
+                  onChange={(e) => setValor(e.target.value)}
+                />
               </div>
             )}
           </div>
@@ -314,6 +484,22 @@ export function PagamentoAvulsoMensalidadeDialog({
           }
           onOpenChange(false);
           onPago?.();
+        }}
+      />
+
+      <QuickPatientDialog
+        open={!!quickOpen}
+        onOpenChange={(v) => !v && setQuickOpen(null)}
+        clinicaId={clinicaId}
+        nomeInicial={quickOpen?.nome}
+        onCreated={(p) => {
+          const alvo = quickOpen?.alvo;
+          if (alvo && alvo !== "titular") {
+            setDependentes((arr) => arr.map((x) => (x.key === alvo ? { ...x, paciente: p } : x)));
+          } else {
+            setPaciente(p);
+          }
+          setQuickOpen(null);
         }}
       />
     </>

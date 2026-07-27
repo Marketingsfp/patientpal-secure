@@ -1,46 +1,35 @@
-## Etapa B — exclusão definitiva de `planos_assinatura`
+## Objetivo
 
-Aplicação: **global (3 clínicas)** — é limpeza técnica, sem regra de negócio nova.
+Melhorar o diálogo "Pagamento avulso — Mensalidade do Cartão" (`src/components/cartao-beneficios/pagamento-avulso-dialog.tsx`) para as 3 clínicas. Alteração só de tela + gravação do contrato; nada de valores de Cartão Consulta é recalculado por automação (Regra 1.11 — os valores vêm do que já está cadastrado no convênio).
 
-### Vínculo com repasse: NÃO existe
+## O que muda
 
-Verifiquei no banco: `planos_assinatura` tem apenas nome, tipo, valor mensal, taxa de adesão, dependentes, fidelidade, vigência, parcelas, benefícios, template e ativo — **nenhum campo de repasse**.
+### 1. Parcelas já pagas
+- Novo campo "Quantas parcelas já foram pagas?" (0 a 11), exibido logo após o mês de referência.
+- Se ficar vazio ou 0: aviso visível no diálogo — "Será criado um novo contrato com as 12 mensalidades, sendo a do mês de referência baixada agora."
+- Se informar X: o contrato passa a começar X meses antes do mês de referência, as X parcelas anteriores entram já como **pagas** (histórico, sem lançamento no caixa, observação "Regularização — parcela informada como paga anteriormente"), a parcela do mês de referência é a baixada com o pagamento real, e as demais ficam pendentes até completar 12.
 
-O repasse do médico é calculado por outra via, já migrada: modalidade do convênio (`cb_convenios.modalidade` → cartão consulta / cartão desconto), regras por serviço em `medico_convenios` e o padrão do médico. Ou seja, excluir a tabela de planos **não afeta nenhum cálculo de repasse**. Nada a fazer nessa frente.
+### 2. Valor automático por número de vidas
+- Após escolher o convênio e definir o número de pessoas (titular + dependentes), o valor da mensalidade é preenchido automaticamente pela faixa de vidas do convênio (`cb_convenio_faixas`: vidas_de/vidas_ate → valor_mensal).
+- Sem faixa correspondente, cai no `valor_mensal` do convênio.
+- O campo continua editável, e mostra abaixo qual faixa foi usada (ex.: "Faixa 2 a 3 vidas — R$ 175,00").
 
-### O que precisa ser ajustado antes de excluir (descoberto agora)
+### 3. Dependentes na hora
+- Bloco "Dependentes" com botão "Adicionar dependente".
+- Cada linha usa a busca de pacientes existente; se o paciente não existir, abre o cadastro rápido já disponível no sistema (nome, CPF, nascimento) e devolve o paciente selecionado.
+- Campo de parentesco por dependente.
+- O número de vidas = 1 (titular) + dependentes ativos, e recalcula o valor automaticamente.
+- Ao salvar, os dependentes são gravados em `contrato_dependentes` vinculados ao contrato criado (as validações existentes de limite/parentesco continuam valendo — se o banco recusar, mostramos o motivo e o contrato/pagamento não se perdem).
 
-Seis funções do banco ainda citam plano, e três delas usam **JOIN obrigatório** com `planos_assinatura` — se a tabela sumir sem ajuste, essas telas quebram:
+## Detalhes técnicos
 
-- `contrato_publico` — link público do contrato (assinatura pelo paciente)
-- `meus_cartoes` — portal do paciente (cartões)
-- `pendencias_paciente` — pendências do paciente
-- `contrato_dependentes_validar` — limite de dependentes
-- `renovar_contrato_troca_plano` e `trocar_convenio_contrato` — copiam `plano_id` ao gerar o novo contrato
+- Arquivo principal: `src/components/cartao-beneficios/pagamento-avulso-dialog.tsx`.
+- Reuso: `PatientSearchInput` e o diálogo de cadastro rápido de paciente (`src/components/pacientes/quick-patient-dialog.tsx`).
+- Nova leitura: `cb_convenio_faixas` por `convenio_id` ao carregar convênios.
+- Geração de parcelas: offset de meses passa a começar em `-parcelasPagas`; `numero_parcela` continua 1..12; a parcela paga agora é a de índice `parcelasPagas` e é ela que recebe `lancamento_id` e a impressão da GR.
+- Sem migração de banco: as tabelas `cb_convenio_faixas` e `contrato_dependentes` já existem.
 
-Observação importante: como o JOIN é obrigatório, hoje **contratos sem plano já não aparecem** nessas telas. Trocar para convênio na prática corrige isso.
+## Fora do escopo
 
-### Passos
-
-1. **Reconferência final** (no momento da execução): nenhum contrato com plano e sem convênio. Se aparecer algum, paro e reporto antes de seguir.
-2. **Arquivo morto**: criar `planos_assinatura_arquivo` (cópia somente leitura do conteúdo atual, acessível só a administradores) — o CSV já foi exportado na Etapa A.
-3. **Reescrever as 6 funções** para lerem nome/tipo/vigência/limite de dependentes de `cb_convenios` (via `convenio_id`), e parar de copiar `plano_id` nas rotinas de renovação/troca.
-4. **Remover a coluna** `plano_id` de `contratos_assinatura` (derruba a chave estrangeira).
-5. **Excluir a tabela** `planos_assinatura`.
-6. **Código**: tirar `planos_assinatura` da lista da rotina de backup diário (`src/routes/api/public/hooks/backup-diario.ts`) e regenerar os tipos do banco.
-
-Os passos 2–5 vão em **uma migração única aprovada por você**; os itens de código entram logo depois.
-
-### Riscos e reversão
-
-- Áreas sensíveis: link público de contrato, portal do paciente, renovação e troca de convênio. Mudança é de **origem do nome/tipo**, nenhum valor financeiro é tocado.
-- Nenhum valor de Cartão Consulta é alterado (Regra 1.11).
-- Reversão: pelo arquivo morto + CSV da Etapa A.
-
-### Validação após aplicar
-
-- Abrir um link público de contrato (um antigo e um recente) e conferir nome do convênio.
-- Portal do paciente: aba de cartões.
-- Renovar um contrato de teste e trocar convênio de um contrato de teste, conferindo que o novo contrato nasce correto.
-- Adicionar dependente e conferir o limite.
-- Rodar o backup diário e confirmar que não acusa tabela ausente.
+- Não altera valores/regras de convênio (Regra 1.11).
+- Não mexe no fluxo de faturamento rápido de contratos existentes nem no caixa.
