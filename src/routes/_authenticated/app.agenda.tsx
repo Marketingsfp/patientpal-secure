@@ -4250,7 +4250,7 @@ function AgendaPage() {
       setForm((f) => ({
         ...f,
         orcamento_id: orc.id,
-        orcamento_numero: String(orc.numero),
+        orcamento_numero: formatNumeroOrcamento(orc.serie, orc.numero),
         orcamento_itens: nomes,
         paciente_id: pacId ?? f.paciente_id,
         paciente_nome: pacNome ?? f.paciente_nome,
