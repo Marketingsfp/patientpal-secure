@@ -496,6 +496,26 @@ export function NovoOrcamentoOdontoDialog({
                           <div className="text-xs text-muted-foreground">
                             Subtotal deste item: <span className="font-medium text-foreground">R$ {sub.toFixed(2)}</span>
                           </div>
+                          <div className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-2 items-center rounded-md bg-muted/30 p-2">
+                            <div className="space-y-0.5">
+                              <div className="text-[10px] text-muted-foreground">Sinal (entrada) R$</div>
+                              <CurrencyInput
+                                value={it.sinal_valor ? it.sinal_valor.toFixed(2) : ""}
+                                onChange={(v) => atualizarItem(idx, "sinal_valor", v === "" ? null : Number(v))}
+                              />
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {Number(it.sinal_valor ?? 0) > 0 ? (
+                                Number(it.sinal_valor) > sub ? (
+                                  <span className="text-destructive">Sinal maior que o total deste item</span>
+                                ) : (
+                                  <>Saldo ao final: <span className="font-medium text-foreground">R$ {(sub - Number(it.sinal_valor)).toFixed(2)}</span></>
+                                )
+                              ) : (
+                                <>Deixe vazio para pagamento único (sem sinal).</>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         <Button type="button" variant="ghost" size="icon" onClick={() => remover(idx)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
