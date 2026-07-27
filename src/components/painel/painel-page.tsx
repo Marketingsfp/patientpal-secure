@@ -295,11 +295,12 @@ export function PainelPage() {
 
     function fallbackSpeechSynth() {
       falandoRef.current = true;
+      const item = prox!;
     try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
     window.speechSynthesis.resume();
     tocarDing();
-    const primeira = criarFala(texto, prox.key);
-    const segunda = criarFala(texto, prox.key);
+    const primeira = criarFala(texto, item.key);
+    const segunda = criarFala(texto, item.key);
     // Fim da repetição = fim do anúncio; libera a próxima senha da fila.
     segunda.onend = () => {
       falandoRef.current = false;
