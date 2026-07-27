@@ -6514,6 +6514,9 @@ export type Database = {
           pago_em: string | null
           procedimento_id: string | null
           quantidade: number
+          saldo_pago_em: string | null
+          sinal_pago_em: string | null
+          sinal_valor: number | null
           status_alterado_em: string | null
           status_alterado_por: string | null
           status_fin_em: string | null
@@ -6521,6 +6524,7 @@ export type Database = {
           status_item: string
           status_op_em: string | null
           status_operacional: string
+          valor_pago: number
           valor_total: number
           valor_unitario: number
           valores_formas: Json | null
@@ -6541,6 +6545,9 @@ export type Database = {
           pago_em?: string | null
           procedimento_id?: string | null
           quantidade?: number
+          saldo_pago_em?: string | null
+          sinal_pago_em?: string | null
+          sinal_valor?: number | null
           status_alterado_em?: string | null
           status_alterado_por?: string | null
           status_fin_em?: string | null
@@ -6548,6 +6555,7 @@ export type Database = {
           status_item?: string
           status_op_em?: string | null
           status_operacional?: string
+          valor_pago?: number
           valor_total?: number
           valor_unitario?: number
           valores_formas?: Json | null
@@ -6568,6 +6576,9 @@ export type Database = {
           pago_em?: string | null
           procedimento_id?: string | null
           quantidade?: number
+          saldo_pago_em?: string | null
+          sinal_pago_em?: string | null
+          sinal_valor?: number | null
           status_alterado_em?: string | null
           status_alterado_por?: string | null
           status_fin_em?: string | null
@@ -6575,6 +6586,7 @@ export type Database = {
           status_item?: string
           status_op_em?: string | null
           status_operacional?: string
+          valor_pago?: number
           valor_total?: number
           valor_unitario?: number
           valores_formas?: Json | null
