@@ -220,7 +220,7 @@ export function PainelPage() {
   function criarFala(texto: string, key: string) {
     const utter = new SpeechSynthesisUtterance(texto);
     utter.lang = "pt-BR";
-    utter.rate = 0.9;
+    utter.rate = 0.75;
     const voz = vozFemininaRef.current ?? escolherVozFeminina();
     if (voz) utter.voice = voz;
     utter.onstart = () => {
