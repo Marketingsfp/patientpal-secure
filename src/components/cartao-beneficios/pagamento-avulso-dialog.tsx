@@ -170,6 +170,15 @@ export function PagamentoAvulsoMensalidadeDialog({
 
   const valorNum = parseValorBR(valor);
   const pagasNum = Math.max(0, Math.min(TOTAL_PARCELAS - 1, Number(parcelasPagas) || 0));
+
+  // Sugestão da data de início: 1º dia do mês da 1ª parcela (mês de
+  // referência menos as parcelas já pagas). O usuário pode ajustar o dia.
+  const dataInicioSugerida = refMes ? vencimentoDe(refMes, -pagasNum, 1) : "";
+  useEffect(() => {
+    if (dataInicioTocadaRef.current) return;
+    setDataInicio(dataInicioSugerida);
+  }, [dataInicioSugerida]);
+
   const dependentesValidos = dependentes.filter((d) => !!d.paciente);
   const vidas = 1 + dependentesValidos.length;
 
@@ -212,6 +221,7 @@ export function PagamentoAvulsoMensalidadeDialog({
     valorNum > 0 &&
     (!criarContrato ||
       (!!convenioId &&
+        !!dataInicio &&
         dependentes.every((d) => !!d.paciente) &&
         (!semCarencia || !!semCarenciaMotivo.trim())));
 
@@ -258,7 +268,7 @@ export function PagamentoAvulsoMensalidadeDialog({
   }) => {
     if (!paciente) return null;
     const dia = Math.max(1, Math.min(31, Number(diaVenc) || 10));
-    const inicio = vencimentoDe(refMes, -pagasNum, 1);
+    const inicio = dataInicio || vencimentoDe(refMes, -pagasNum, 1);
     const { data: contrato, error: errC } = await supabase
       .from("contratos_assinatura")
       .insert({
@@ -267,7 +277,7 @@ export function PagamentoAvulsoMensalidadeDialog({
         paciente_id: paciente.id,
         paciente_nome: paciente.nome,
         data_inicio: inicio,
-        data_fim: vencimentoDe(refMes, TOTAL_PARCELAS - pagasNum, 1),
+        data_fim: somarMeses(inicio, TOTAL_PARCELAS),
         dia_vencimento: dia,
         valor_mensal: valorNum,
         num_parcelas: TOTAL_PARCELAS,
