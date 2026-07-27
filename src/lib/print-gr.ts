@@ -387,7 +387,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
       .select("criado_por, created_at")
       .eq("agendamento_id", agendamentoId)
       .eq("tipo", "receita")
-      .eq("status", "confirmado")
+      .neq("status", "cancelado")
       .order("created_at", { ascending: true });
     const criadoPor = ((lancs ?? []) as Array<{ criado_por: string | null }>)
       .map((l) => l.criado_por)
@@ -1024,7 +1024,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       .select("criado_por, created_at")
       .in("agendamento_id", ids)
       .eq("tipo", "receita")
-      .eq("status", "confirmado")
+      .neq("status", "cancelado")
       .order("created_at", { ascending: true });
     const criadoPor = ((lancs ?? []) as Array<{ criado_por: string | null }>)
       .map((l) => l.criado_por)
