@@ -650,10 +650,6 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
         </h1>
         {podeEscrever && (
           <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setFatRapidoOpen(true)}>
-            <Receipt className="h-4 w-4 mr-2" />
-            Faturamento rápido
-          </Button>
           <Button onClick={() => setPerguntaRenovOpen(true)} disabled={convenios.length === 0}>
             <Plus className="h-4 w-4 mr-2" />
             Vendas
@@ -661,13 +657,6 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           </div>
         )}
       </div>
-      <FaturamentoRapidoMensalidadeDialog
-        open={fatRapidoOpen}
-        onOpenChange={setFatRapidoOpen}
-        clinicaId={clinicaAtual?.clinica_id ?? ""}
-        usuario={{ id: user?.id ?? null, nome: user?.user_metadata?.nome ?? user?.email ?? null }}
-        onPago={load}
-      />
       {convenios.length === 0 && !loading ? (
         <div className="rounded-md border bg-muted/40 p-3 text-sm">
           Cadastre um convênio antes em <strong>Cartão de Benefícios → Convênios</strong>.

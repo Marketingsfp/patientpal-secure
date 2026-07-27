@@ -2311,17 +2311,7 @@ function Page() {
             Abertura, sangria, suprimento, recebimentos e fechamento.
           </p>
         </div>
-        <Button variant="outline" onClick={() => setFatRapidoOpen(true)}>
-          💳 Mensalidade do cartão
-        </Button>
       </div>
-
-      <FaturamentoRapidoMensalidadeDialog
-        open={fatRapidoOpen}
-        onOpenChange={setFatRapidoOpen}
-        clinicaId={clinicaAtual?.clinica_id ?? ""}
-        usuario={{ id: user?.id ?? null, nome: user?.user_metadata?.nome ?? user?.email ?? null }}
-      />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as "meu" | "todos" | "repasse")}>
         <TabsList>

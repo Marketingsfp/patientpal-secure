@@ -56,7 +56,6 @@ export function PacienteCartoesBeneficios({
   const [parentesco, setParentesco] = useState("");
   const [saving, setSaving] = useState(false);
   const [histOpen, setHistOpen] = useState(false);
-  const [fatRapidoOpen, setFatRapidoOpen] = useState(false);
   const { user } = useAuth();
 
   const load = async () => {
@@ -185,17 +184,7 @@ export function PacienteCartoesBeneficios({
             <Badge variant="outline">{titularesAtivos.length + dependeDeAtivos.length} contrato(s) ativo(s)</Badge>
           )}
         </div>
-        <Button size="sm" variant="outline" onClick={() => setFatRapidoOpen(true)}>
-          Pagar mensalidade
-        </Button>
       </div>
-      <FaturamentoRapidoMensalidadeDialog
-        open={fatRapidoOpen}
-        onOpenChange={setFatRapidoOpen}
-        clinicaId={clinicaId}
-        usuario={{ id: user?.id ?? null, nome: user?.user_metadata?.nome ?? user?.email ?? null }}
-        onPago={load}
-      />
       <div className="p-4 space-y-4">
         {loading ? (
           <p className="text-sm text-muted-foreground">Carregando…</p>
