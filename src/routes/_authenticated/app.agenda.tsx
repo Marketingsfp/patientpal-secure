@@ -3977,25 +3977,44 @@ function AgendaPage() {
 
   const buscarOrcamento = async (numeroOverride?: number) => {
     if (!clinicaAtual) return;
-    const num = numeroOverride ?? parseInt(form.orcamento_numero.replace(/\D/g, ""), 10);
-    if (!num || num <= 0) {
-      toast.error("Informe o nº do orçamento.");
+    const digitado = form.orcamento_numero.trim();
+    const parsed = numeroOverride
+      ? { serie: null as string | null, numero: numeroOverride, numeroAlternativo: null as number | null }
+      : parseNumeroOrcamento(digitado);
+    const candidatos = [parsed.numero, parsed.numeroAlternativo].filter(
+      (n): n is number => typeof n === "number" && n > 0,
+    );
+    if (candidatos.length === 0) {
+      toast.error("Informe o nº do orçamento (ex.: 123 ou D-2026-00001).");
       return;
     }
     setBuscandoOrc(true);
     try {
-      const { data: orc, error } = await supabase
-        .from("orcamentos")
-        .select("id, numero, paciente_id, paciente_nome, status, especialidade_id, validade_dias, created_at")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("numero", num)
-        .maybeSingle();
-      if (error) {
-        mostrarErro(error);
-        return;
+      type OrcBusca = {
+        id: string; numero: number; serie: string | null;
+        paciente_id: string | null; paciente_nome: string | null;
+        status: string | null; especialidade_id: string | null;
+        validade_dias: number | null; created_at: string | null;
+      };
+      let orc: OrcBusca | null = null;
+      for (const cand of candidatos) {
+        let q = supabase
+          .from("orcamentos")
+          .select(
+            "id, numero, serie, paciente_id, paciente_nome, status, especialidade_id, validade_dias, created_at",
+          )
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("numero", cand);
+        if (parsed.serie) q = q.eq("serie", parsed.serie);
+        const { data, error } = await q.limit(1).maybeSingle();
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+        if (data) { orc = data as unknown as OrcBusca; break; }
       }
       if (!orc) {
-        toast.error(`Orçamento nº ${num} não encontrado.`);
+        toast.error(`Orçamento ${digitado || candidatos[0]} não encontrado.`);
         return;
       }
       if (orc.status === "cancelado") {
