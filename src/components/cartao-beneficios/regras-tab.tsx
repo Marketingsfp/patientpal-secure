@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, RefreshCw, Timer, Pencil } from "lucide-react";
+import { Plus, Trash2, Timer, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
+import { computeValor, type CbRegra } from "@/lib/cb-regras";
 
 type EspOpt = { id: string; nome: string };
 type ProcOpt = { id: string; nome: string; codigo: string | null; tipo: string | null };
