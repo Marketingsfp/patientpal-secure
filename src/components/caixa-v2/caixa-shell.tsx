@@ -425,7 +425,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   // ===== Actions (delegam à tela clássica; não altera regras)
   const goCaixa = (msg?: string) => {
     if (msg) toast.info(msg);
-    window.location.href = "/app/caixa";
+    window.location.href = "/app/caixa?classico=1";
   };
 
   // Ação primária "Receber" — 1 clique. Se houver único item pendente,
@@ -434,7 +434,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   const receberFila = useCallback((filaId?: string) => {
     const id = filaId ?? filaCards[0]?.id;
     if (!id) { toast.info("Nenhum paciente na fila."); return; }
-    window.location.href = `/app/caixa?receber=${encodeURIComponent(id)}`;
+    window.location.href = `/app/caixa?classico=1&receber=${encodeURIComponent(id)}`;
   }, [filaCards]);
 
   // Atalhos F2/F3/F4/Esc
@@ -629,9 +629,9 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
         <Button size="sm" variant="ghost" onClick={() => goCaixa()}>
           <FileDown className="h-4 w-4" /> Exportar
         </Button>
-        <Link to="/app/caixa" className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 self-center">
+        <a href="/app/caixa?classico=1" className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 self-center">
           Ir para o caixa clássico <ChevronRight className="h-3 w-3" />
-        </Link>
+        </a>
       </div>
     </div>
   );
