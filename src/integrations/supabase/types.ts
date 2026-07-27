@@ -2776,7 +2776,6 @@ export type Database = {
           origem: string
           paciente_id: string
           paciente_nome: string
-          plano_id: string | null
           renovado_em: string | null
           sem_carencia: boolean
           sem_carencia_em: string | null
@@ -2814,7 +2813,6 @@ export type Database = {
           origem?: string
           paciente_id: string
           paciente_nome: string
-          plano_id?: string | null
           renovado_em?: string | null
           sem_carencia?: boolean
           sem_carencia_em?: string | null
@@ -2852,7 +2850,6 @@ export type Database = {
           origem?: string
           paciente_id?: string
           paciente_nome?: string
-          plano_id?: string | null
           renovado_em?: string | null
           sem_carencia?: boolean
           sem_carencia_em?: string | null
@@ -2879,13 +2876,6 @@ export type Database = {
             columns: ["convenio_id"]
             isOneToOne: false
             referencedRelation: "cb_convenios"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contratos_assinatura_plano_id_fkey"
-            columns: ["plano_id"]
-            isOneToOne: false
-            referencedRelation: "planos_assinatura"
             referencedColumns: ["id"]
           },
         ]
@@ -7101,60 +7091,60 @@ export type Database = {
         }
         Relationships: []
       }
-      planos_assinatura: {
+      planos_assinatura_arquivo: {
         Row: {
-          ativo: boolean
-          clinica_id: string
-          created_at: string
+          ativo: boolean | null
+          clinica_id: string | null
+          created_at: string | null
           descricao_beneficios: string | null
-          fidelidade_meses: number
-          id: string
-          max_agregados: number
-          max_dependentes: number
-          nome: string
-          num_parcelas: number
-          taxa_adesao: number
+          fidelidade_meses: number | null
+          id: string | null
+          max_agregados: number | null
+          max_dependentes: number | null
+          nome: string | null
+          num_parcelas: number | null
+          taxa_adesao: number | null
           template_contrato: string | null
-          tipo: string
-          updated_at: string
-          valor_mensal: number
-          vigencia_meses: number
+          tipo: string | null
+          updated_at: string | null
+          valor_mensal: number | null
+          vigencia_meses: number | null
         }
         Insert: {
-          ativo?: boolean
-          clinica_id: string
-          created_at?: string
+          ativo?: boolean | null
+          clinica_id?: string | null
+          created_at?: string | null
           descricao_beneficios?: string | null
-          fidelidade_meses?: number
-          id?: string
-          max_agregados?: number
-          max_dependentes?: number
-          nome: string
-          num_parcelas?: number
-          taxa_adesao?: number
+          fidelidade_meses?: number | null
+          id?: string | null
+          max_agregados?: number | null
+          max_dependentes?: number | null
+          nome?: string | null
+          num_parcelas?: number | null
+          taxa_adesao?: number | null
           template_contrato?: string | null
-          tipo?: string
-          updated_at?: string
-          valor_mensal?: number
-          vigencia_meses?: number
+          tipo?: string | null
+          updated_at?: string | null
+          valor_mensal?: number | null
+          vigencia_meses?: number | null
         }
         Update: {
-          ativo?: boolean
-          clinica_id?: string
-          created_at?: string
+          ativo?: boolean | null
+          clinica_id?: string | null
+          created_at?: string | null
           descricao_beneficios?: string | null
-          fidelidade_meses?: number
-          id?: string
-          max_agregados?: number
-          max_dependentes?: number
-          nome?: string
-          num_parcelas?: number
-          taxa_adesao?: number
+          fidelidade_meses?: number | null
+          id?: string | null
+          max_agregados?: number | null
+          max_dependentes?: number | null
+          nome?: string | null
+          num_parcelas?: number | null
+          taxa_adesao?: number | null
           template_contrato?: string | null
-          tipo?: string
-          updated_at?: string
-          valor_mensal?: number
-          vigencia_meses?: number
+          tipo?: string | null
+          updated_at?: string | null
+          valor_mensal?: number | null
+          vigencia_meses?: number | null
         }
         Relationships: []
       }
