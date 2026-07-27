@@ -855,6 +855,46 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
+  // Odontologia (e demais serviços com cobrança em duas etapas): quando o
+  // atendimento está vinculado a itens de orçamento com SINAL, a guia mostra
+  // SINAL / SALDO FINAL / TOTAL. Sem itens com sinal, nada muda na guia.
+  let sinalBloco = { sinal: 0, saldo: 0, total: 0 };
+  try {
+    const { data: links } = await supabase
+      .from("agendamento_orcamento_itens")
+      .select("orcamento_item_id")
+      .eq("agendamento_id", agendamentoId);
+    const itemIds = ((links ?? []) as Array<{ orcamento_item_id: string | null }>)
+      .map((l) => l.orcamento_item_id)
+      .filter((v): v is string => !!v);
+    if (itemIds.length > 0) {
+      const { data: itensOrc } = await supabase
+        .from("orcamento_itens")
+        .select("quantidade, valor_unitario, valor_total, sinal_valor")
+        .in("id", itemIds);
+      for (const it of ((itensOrc ?? []) as Array<{
+        quantidade: number | null; valor_unitario: number | null;
+        valor_total: number | null; sinal_valor: number | null;
+      }>)) {
+        const sinalIt = Number(it.sinal_valor ?? 0);
+        if (sinalIt <= 0) continue;
+        const q = Number(it.quantidade ?? 1) || 1;
+        const totalIt = Number(it.valor_total ?? q * Number(it.valor_unitario ?? 0));
+        sinalBloco.sinal += sinalIt;
+        sinalBloco.total += totalIt;
+        sinalBloco.saldo += Math.max(0, totalIt - sinalIt);
+      }
+    }
+  } catch { /* sem bloco de sinal */ }
+  const temSinal = sinalBloco.sinal > 0;
+  const sinalHtml = temSinal ? `
+    <div class="sep"></div>
+    <table>
+      <tr><td class="label">SINAL:</td><td class="v right">${fmtBRL(sinalBloco.sinal)}</td></tr>
+      <tr><td class="label">SALDO FINAL:</td><td class="v right">${fmtBRL(sinalBloco.saldo)}</td></tr>
+      <tr class="bold"><td class="label">TOTAL:</td><td class="v right">${fmtBRL(sinalBloco.total)}</td></tr>
+    </table>` : "";
+
   let convLabel = await resolveConvLabel(
     (a as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
     a.paciente_id ?? null,
@@ -927,6 +967,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         <td>${esc(procNome)}</td>
       </tr>
     </table>
+    ${sinalHtml}
 
     ${valor > 0 ? `
     <div class="row" style="margin-top:8px">
