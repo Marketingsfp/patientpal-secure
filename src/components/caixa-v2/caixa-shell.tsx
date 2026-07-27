@@ -230,11 +230,27 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     if (!clinicaAtual) { setAggRows([]); return; }
     if (tab === "sessao" && !sessao) { setAggRows([]); return; }
     let q = supabase.from("caixa_movimentos")
-      .select("id, sessao_id, tipo, valor, forma_pagamento, created_at");
+      .select("id, sessao_id, tipo, valor, forma_pagamento, created_at, lancamento_id");
     q = applyFilters(q);
     q = q.order("created_at", { ascending: false }).range(0, 9999);
     const { data, error } = await q;
-    setAggRows(error ? [] : ((data ?? []) as AggRow[]));
+    const rows = error ? [] : ((data ?? []) as AggRow[]);
+    setAggRows(rows);
+
+    // Classificação Particular x Associado do período filtrado: um recebimento
+    // é "Associado" quando o lançamento de origem tem convênio/contrato ligado.
+    const ids = Array.from(new Set(rows.map((r) => r.lancamento_id).filter(Boolean))) as string[];
+    if (ids.length === 0) { setAssocIds(new Set()); return; }
+    const assoc = new Set<string>();
+    for (let i = 0; i < ids.length; i += 400) {
+      const chunk = ids.slice(i, i + 400);
+      const { data: lancs } = await supabase.from("fin_lancamentos")
+        .select("id, convenio_id, contrato_id").in("id", chunk);
+      for (const l of (lancs ?? []) as Array<{ id: string; convenio_id: string | null; contrato_id: string | null }>) {
+        if (l.convenio_id || l.contrato_id) assoc.add(l.id);
+      }
+    }
+    setAssocIds(assoc);
   }, [clinicaAtual, tab, sessao, applyFilters]);
 
   useEffect(() => { void loadTotais(); }, [loadTotais]);
