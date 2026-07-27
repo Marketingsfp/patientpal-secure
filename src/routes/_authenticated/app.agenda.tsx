@@ -95,6 +95,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
+import { obterEtapaSinal, registrarPagamentoEtapaSinal } from "@/lib/agenda/sinal-orcamento";
 import { IdadeIcon } from "@/components/idade-icon";
 import { ClienteForm, type Paciente as PacienteFull } from "@/components/clientes/cliente-form";
 
@@ -5029,15 +5030,19 @@ function AgendaPage() {
       return;
     }
     if (!clinicaAtual) return;
-    if (pagosSet.has(a.id)) {
-      toast.info("Este agendamento já foi pago.");
-      return;
-    }
     try {
       // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
       // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
       // que não bate com a tabela de procedimentos e zeraria as opções).
       const opcoesOrc = a.orcamento_id ? await opcoesPagamentoDeOrcamento(a.orcamento_id) : null;
+      // Pagamento em duas etapas (sinal + saldo) — itens de orçamento com
+      // `sinal_valor` definido (Odontologia). A 1ª cobrança sugere o sinal,
+      // a 2ª o saldo restante.
+      const etapaSinal = await obterEtapaSinal(a.id);
+      if (pagosSet.has(a.id) && !etapaSinal) {
+        toast.info("Este agendamento já foi pago.");
+        return;
+      }
       // Verificação fresca no banco: impede faturar duas vezes mesmo se o cache
       // local estiver desatualizado (ex.: outro usuário pagou em outra aba, ou
       // o pagamento foi transferido de uma ficha reagendada).
@@ -5078,7 +5083,7 @@ function AgendaPage() {
             dataRef: a.inicio ?? null,
           }),
       ]);
-      if ((jaPagos ?? []).length > 0) {
+      if ((jaPagos ?? []).length > 0 && !etapaSinal) {
         toast.info("Este agendamento já foi pago.");
         setPagosSet((prev) => {
           const n = new Set(prev);
@@ -5181,6 +5186,20 @@ function AgendaPage() {
             });
           }
         }
+      }
+      // Sinal/saldo: quando o(s) item(ns) do orçamento têm sinal definido,
+      // a cobrança da agenda passa a sugerir o valor da etapa pendente.
+      if (etapaSinal) {
+        const rotulo = etapaSinal.etapa === "sinal" ? "SINAL (entrada)" : "SALDO FINAL";
+        opcoes = opcoes.map((o) => ({ ...o, valor: etapaSinal.valor }));
+        descSuffix += ` — ${rotulo}`;
+        setAvisoConvenio({
+          tom: "warning",
+          mensagem:
+            etapaSinal.etapa === "sinal"
+              ? `Pagamento em duas etapas: cobrando o sinal de R$ ${etapaSinal.valor.toFixed(2)}. Saldo de R$ ${(etapaSinal.total - etapaSinal.valor).toFixed(2)} fica para o final do tratamento.`
+              : `Cobrando o saldo final de R$ ${etapaSinal.valor.toFixed(2)} (sinal de R$ ${etapaSinal.pago.toFixed(2)} já pago).`,
+        });
       }
       // Procedimento sem valor (ex.: REVISÃO / retorno gratuito). Não abre o
       // fluxo de cobrança — registra um lançamento de valor 0 (linha-sombra),
@@ -6653,6 +6672,12 @@ function AgendaPage() {
           const agId = pagamentoAgId;
           const clinicaIdCarimbo = clinicaAtual.clinica_id;
           const idsCarimbo = [agId, ...pagamentoExtraIds];
+          // Sinal/saldo dos itens de orçamento: marca a etapa quitada.
+          try {
+            await registrarPagamentoEtapaSinal(agId);
+          } catch (err) {
+            console.error("[sinal-orcamento]", err);
+          }
           // Fluxo original do pagamento — encapsulado para que o carimbo do
           // convênio (convenio_id/contrato_id/modalidade) rode sempre no fim,
           // inclusive quando o fluxo sai mais cedo.

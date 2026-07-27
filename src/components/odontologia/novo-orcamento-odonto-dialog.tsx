@@ -36,6 +36,8 @@ interface Item {
   procedimento_id: string | null;
   dentes: number[];
   valores_formas: Record<string, number> | null;
+  /** Sinal (entrada) em R$ deste item. 0/null = pagamento único. */
+  sinal_valor: number | null;
 }
 
 interface Props {
@@ -170,6 +172,7 @@ export function NovoOrcamentoOdontoDialog({
           procedimento_id: p.id,
           dentes: d != null ? [d] : [],
           valores_formas: valores,
+          sinal_valor: null,
         });
         if (p.valor_variavel) algumVariavel = true;
       }
@@ -240,6 +243,10 @@ export function NovoOrcamentoOdontoDialog({
       const vu = Number(it.valor_unitario);
       if (!Number.isFinite(vu) || vu <= 0) return toast.error(`Item ${i + 1}: valor deve ser > 0 (procedimento sem valor cadastrado)`);
       if (it.dentes.length > 32) return toast.error(`Item ${i + 1}: máximo 32 dentes`);
+      const sinal = Number(it.sinal_valor ?? 0);
+      const totalItem = (Number(it.quantidade) || 0) * vu;
+      if (sinal < 0) return toast.error(`Item ${i + 1}: sinal não pode ser negativo`);
+      if (sinal > totalItem) return toast.error(`Item ${i + 1}: sinal não pode ser maior que o total do item`);
     }
     if (Number(desconto) < 0) return toast.error("Desconto não pode ser negativo");
     if (Number(desconto) > subtotal) return toast.error("Desconto não pode ser maior que o subtotal");
@@ -282,6 +289,7 @@ export function NovoOrcamentoOdontoDialog({
       ordem: idx,
       valores_formas: i.valores_formas ?? null,
       dentes: i.dentes.length ? i.dentes : null,
+      sinal_valor: Number(i.sinal_valor ?? 0) > 0 ? Number(i.sinal_valor) : null,
     }));
     const { error: e2 } = await supabase.from("orcamento_itens").insert(payload);
     setSaving(false);
@@ -487,6 +495,26 @@ export function NovoOrcamentoOdontoDialog({
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Subtotal deste item: <span className="font-medium text-foreground">R$ {sub.toFixed(2)}</span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-[160px_1fr] gap-2 items-center rounded-md bg-muted/30 p-2">
+                            <div className="space-y-0.5">
+                              <div className="text-[10px] text-muted-foreground">Sinal (entrada) R$</div>
+                              <CurrencyInput
+                                value={it.sinal_valor ? it.sinal_valor.toFixed(2) : ""}
+                                onChange={(v) => atualizarItem(idx, "sinal_valor", v === "" ? null : Number(v))}
+                              />
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {Number(it.sinal_valor ?? 0) > 0 ? (
+                                Number(it.sinal_valor) > sub ? (
+                                  <span className="text-destructive">Sinal maior que o total deste item</span>
+                                ) : (
+                                  <>Saldo ao final: <span className="font-medium text-foreground">R$ {(sub - Number(it.sinal_valor)).toFixed(2)}</span></>
+                                )
+                              ) : (
+                                <>Deixe vazio para pagamento único (sem sinal).</>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <Button type="button" variant="ghost" size="icon" onClick={() => remover(idx)}>

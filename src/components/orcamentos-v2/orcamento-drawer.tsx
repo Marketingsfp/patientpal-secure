@@ -14,6 +14,10 @@ type Item = {
   quantidade: number;
   valor_unitario: number;
   valores_formas: Record<string, number> | null;
+  sinal_valor: number | null;
+  valor_pago: number | null;
+  valor_total: number | null;
+  status_financeiro: string | null;
 };
 
 function splitFormas(i: Item): { din: number; cart: number } | null {
@@ -53,7 +57,7 @@ export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistoric
     void (async () => {
       const { data } = await supabase
         .from("orcamento_itens")
-        .select("id, descricao, quantidade, valor_unitario, valores_formas")
+        .select("id, descricao, quantidade, valor_unitario, valores_formas, sinal_valor, valor_pago, valor_total, status_financeiro")
         .eq("orcamento_id", orc.id)
         .order("created_at", { ascending: true });
       if (cancel) return;
@@ -153,6 +157,23 @@ export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistoric
                               </div>
                             </div>
                           )}
+                          {Number(i.sinal_valor ?? 0) > 0 && (() => {
+                            const totalItem = Number(i.valor_total ?? q * Number(i.valor_unitario));
+                            const pago = Number(i.valor_pago ?? 0);
+                            const saldo = Math.max(0, totalItem - pago);
+                            const quitado = i.status_financeiro === "pago" || saldo <= 0.004;
+                            return (
+                              <div className="mt-1 text-xs">
+                                <Badge variant={quitado ? "secondary" : "outline"} className="font-normal">
+                                  {quitado
+                                    ? "Quitado"
+                                    : pago > 0
+                                      ? `Sinal pago — saldo ${BRL(saldo)}`
+                                      : `Sinal pendente ${BRL(Number(i.sinal_valor))}`}
+                                </Badge>
+                              </div>
+                            );
+                          })()}
                         </li>
                       );
                     })}
