@@ -51,7 +51,7 @@ export async function incluirDependenteContrato(params: {
 
   const { data: contrato, error: eContrato } = await supabase
     .from("contratos_assinatura")
-    .select("id, paciente_id, status, convenio_id, plano_id, clinica_id")
+    .select("id, paciente_id, status, convenio_id, clinica_id")
     .eq("id", contratoId)
     .maybeSingle();
   if (eContrato) return { ok: false, mensagem: "Falha ao buscar o contrato.", error: eContrato };
@@ -82,18 +82,11 @@ export async function incluirDependenteContrato(params: {
       .eq("id", contrato.convenio_id)
       .maybeSingle();
     maxDep = Number((conv as { max_dependentes?: number } | null)?.max_dependentes ?? 0) || 0;
-  } else if (contrato.plano_id) {
-    const { data: plano } = await supabase
-      .from("planos_assinatura")
-      .select("max_dependentes")
-      .eq("id", contrato.plano_id)
-      .maybeSingle();
-    maxDep = Number((plano as { max_dependentes?: number } | null)?.max_dependentes ?? 0) || 0;
   }
   if (ativosRows.length >= maxDep) {
     return {
       ok: false,
-      mensagem: maxDep === 0 ? "Este plano/convênio não permite dependentes." : `Limite de ${maxDep} dependentes atingido.`,
+      mensagem: maxDep === 0 ? "Este convênio não permite dependentes." : `Limite de ${maxDep} dependentes atingido.`,
     };
   }
 

@@ -76,8 +76,12 @@ export async function printCartoes(contratoId: string) {
   if (error || !c) throw new Error(error?.message ?? "Contrato não encontrado");
 
   const [{ data: pl }, { data: cl }, { data: pa }] = await Promise.all([
-    c.plano_id
-      ? supabase.from("planos_assinatura").select("nome, tipo, vigencia_meses").eq("id", c.plano_id).maybeSingle()
+    c.convenio_id
+      ? supabase
+          .from("cb_convenios")
+          .select("nome, modalidade, vigencia_meses")
+          .eq("id", c.convenio_id)
+          .maybeSingle()
       : Promise.resolve({ data: null as any }),
     c.clinica_id
       ? supabase.from("clinicas").select("nome, cidade, estado, telefone").eq("id", c.clinica_id).maybeSingle()
@@ -163,7 +167,7 @@ export async function printCartoes(contratoId: string) {
   @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 </style></head>
 <body>
-  <div class="sheet">${items.map((i) => renderCard(i, _pl.tipo ?? "outro")).join("")}</div>
+  <div class="sheet">${items.map((i) => renderCard(i, _pl.modalidade ?? "outro")).join("")}</div>
   <script>window.onload = () => { setTimeout(() => { window.print(); }, 200); };</script>
 </body></html>`;
 

@@ -1533,15 +1533,15 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
 
   const { data: contratoRow, error: errC } = await supabase
     .from("contratos_assinatura")
-    .select("id, numero, paciente_id, paciente_nome, plano_id, num_parcelas")
+    .select("id, numero, paciente_id, paciente_nome, convenio_id, num_parcelas")
     .eq("id", m.contrato_id)
     .maybeSingle();
   if (errC || !contratoRow) throw new Error(errC?.message ?? "Contrato não encontrado");
-  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; plano_id: string | null; num_parcelas: number | null };
+  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; convenio_id: string | null; num_parcelas: number | null };
 
   const [planoRes, pacRes] = await Promise.all([
-    contrato.plano_id
-      ? supabase.from("planos_assinatura").select("nome").eq("id", contrato.plano_id).maybeSingle()
+    contrato.convenio_id
+      ? supabase.from("cb_convenios").select("nome").eq("id", contrato.convenio_id).maybeSingle()
       : Promise.resolve({ data: null }),
     contrato.paciente_id
       ? supabase.from("pacientes").select("nome, cpf, telefone, data_nascimento").eq("id", contrato.paciente_id).maybeSingle()
@@ -1756,15 +1756,15 @@ async function printGuiaTaxaAdesaoCore({ mensalidadeId, clinicaId, valorTaxa, us
 
   const { data: contratoRow, error: errC } = await supabase
     .from("contratos_assinatura")
-    .select("id, numero, paciente_id, paciente_nome, plano_id")
+    .select("id, numero, paciente_id, paciente_nome, convenio_id")
     .eq("id", m.contrato_id)
     .maybeSingle();
   if (errC || !contratoRow) throw new Error(errC?.message ?? "Contrato não encontrado");
-  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; plano_id: string | null };
+  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; convenio_id: string | null };
 
   const [planoRes, pacRes] = await Promise.all([
-    contrato.plano_id
-      ? supabase.from("planos_assinatura").select("nome").eq("id", contrato.plano_id).maybeSingle()
+    contrato.convenio_id
+      ? supabase.from("cb_convenios").select("nome").eq("id", contrato.convenio_id).maybeSingle()
       : Promise.resolve({ data: null }),
     contrato.paciente_id
       ? supabase.from("pacientes").select("nome, cpf, telefone").eq("id", contrato.paciente_id).maybeSingle()
@@ -1940,15 +1940,15 @@ export async function printGuiaMensalidadeComTaxa(input: PrintGRMensalidadeComTa
 
   const { data: contratoRow, error: errC } = await supabase
     .from("contratos_assinatura")
-    .select("id, numero, paciente_id, paciente_nome, plano_id, num_parcelas")
+    .select("id, numero, paciente_id, paciente_nome, convenio_id, num_parcelas")
     .eq("id", m.contrato_id)
     .maybeSingle();
   if (errC || !contratoRow) throw new Error(errC?.message ?? "Contrato não encontrado");
-  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; plano_id: string | null; num_parcelas: number | null };
+  const contrato = contratoRow as { id: string; numero: number; paciente_id: string | null; paciente_nome: string; convenio_id: string | null; num_parcelas: number | null };
 
   const [planoRes, pacRes] = await Promise.all([
-    contrato.plano_id
-      ? supabase.from("planos_assinatura").select("nome").eq("id", contrato.plano_id).maybeSingle()
+    contrato.convenio_id
+      ? supabase.from("cb_convenios").select("nome").eq("id", contrato.convenio_id).maybeSingle()
       : Promise.resolve({ data: null }),
     contrato.paciente_id
       ? supabase.from("pacientes").select("nome, cpf, telefone, data_nascimento").eq("id", contrato.paciente_id).maybeSingle()
