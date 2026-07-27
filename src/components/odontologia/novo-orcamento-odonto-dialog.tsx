@@ -13,6 +13,8 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
+import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 import { DentePicker } from "./dente-picker";
 
 interface Procedimento {
@@ -44,9 +46,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   clinicaId: string;
-  pacienteId: string;
-  pacienteNome: string;
-  pacienteTelefone: string | null;
+  /** Paciente pré-selecionado (opcional) — pode ser trocado dentro do diálogo. */
+  pacienteId?: string | null;
+  pacienteNome?: string | null;
+  pacienteTelefone?: string | null;
   especialidadeOdontoId: string;
   userId: string | null;
   onCreated: (id: string) => void;
@@ -66,6 +69,12 @@ export function NovoOrcamentoOdontoDialog({
   open, onClose, clinicaId, pacienteId, pacienteNome, pacienteTelefone,
   especialidadeOdontoId, userId, onCreated,
 }: Props) {
+  // Paciente do orçamento — inicia com o filtro da tela, mas é editável aqui.
+  const [paciente, setPaciente] = useState<PatientOption | null>(
+    pacienteId ? ({ id: pacienteId, nome: pacienteNome ?? "", telefone: pacienteTelefone ?? null } as PatientOption) : null,
+  );
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickInitial, setQuickInitial] = useState("");
   const [medicoNome, setMedicoNome] = useState("");
   const [medicos, setMedicos] = useState<{ id: string; nome: string }[]>([]);
   const [medicoId, setMedicoId] = useState("");
@@ -88,6 +97,9 @@ export function NovoOrcamentoOdontoDialog({
 
   useEffect(() => {
     if (!open) return;
+    setPaciente(
+      pacienteId ? ({ id: pacienteId, nome: pacienteNome ?? "", telefone: pacienteTelefone ?? null } as PatientOption) : null,
+    );
     void (async () => {
       // Médicos que atendem Odontologia (join via medico_especialidades)
       const { data: medRows } = await supabase
