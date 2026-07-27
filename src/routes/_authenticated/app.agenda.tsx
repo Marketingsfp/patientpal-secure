@@ -6672,6 +6672,12 @@ function AgendaPage() {
           const agId = pagamentoAgId;
           const clinicaIdCarimbo = clinicaAtual.clinica_id;
           const idsCarimbo = [agId, ...pagamentoExtraIds];
+          // Sinal/saldo dos itens de orçamento: marca a etapa quitada.
+          try {
+            await registrarPagamentoEtapaSinal(agId);
+          } catch (err) {
+            console.error("[sinal-orcamento]", err);
+          }
           // Fluxo original do pagamento — encapsulado para que o carimbo do
           // convênio (convenio_id/contrato_id/modalidade) rode sempre no fim,
           // inclusive quando o fluxo sai mais cedo.
