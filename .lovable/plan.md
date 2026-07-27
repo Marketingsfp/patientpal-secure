@@ -1,43 +1,49 @@
-## Objetivo
+# Repasse de laudo para o exame ITB
 
-Permitir remover **juros + multa** de uma mensalidade atrasada do Cartão Benefícios sem usar valor manual (que continua bloqueado). A ação exige **senha de gestor** e fica registrada em auditoria.
+Vamos habilitar exatamente o mesmo fluxo que hoje existe para o Eletrocardiograma (ECG), agora também para o exame **ITB**, em todas as clínicas (SFP, Menino Jesus e Consulta Hoje). Os médicos laudadores continuam sendo todos os cardiologistas ativos da clínica — igual ao ECG.
 
-**Escopo:** todas as clínicas. Apenas a tela de contrato (aba Mensalidades). Somente a linha visual/UX de pagamento — motor de cálculo e RLS permanecem intactos.
+## O que existe hoje (verificado)
 
-## Comportamento
+- Cada clínica tem um "médico agenda" chamado **ELETROCARDIOGRAMA**. Ao editá-lo, aparece a seção **"REPASSE LAUDO TERCEIRO"**, onde se lista os cardiologistas ativos e o % ou valor fixo que cada um recebe por laudo. Essa seção **só aparece hoje quando o nome do cadastro é exatamente "ELETROCARDIOGRAMA"** (regra fixa no código).
+- No procedimento **ELETROCARDIOGRAMA (ECG)** o campo `requer_laudo` está marcado como *true*, o que faz aparecer no menu **Financeiro → Atendimentos** o botão **"Vincular laudo"** (individual e em lote).
+- O motor de repasse (`medico_repasse_laudo`) e a aba **Comprovantes / Repasse** já são genéricos e não dependem do nome — funcionam para qualquer agenda de exame.
+- Já existe o "médico agenda" **ITB** cadastrado em SFP e Menino Jesus. Em Consulta Hoje ele ainda **não existe**.
+- Já existe o **procedimento ITB** nas 3 clínicas, mas hoje ele está com `requer_laudo = false` e sem tipo.
 
-No diálogo "Forma de pagamento" (que aparece ao clicar em **Pagar** numa mensalidade), quando a parcela estiver com mais de 5 dias de atraso (`pagDiasAtraso > 5`, é a mesma condição que hoje mostra o box vermelho de multa + juros):
+## O que muda
 
-1. Aparece um botão secundário **"Isentar juros e multa"** logo acima da grade de formas de pagamento.
-2. Ao clicar, abre o `SupervisorAuthDialog` existente (`acao="isentar juros e multa"`, roles `admin` e `gestor`).
-3. Autorizado: a tela passa a mostrar o valor da parcela **sem encargos** (`Number(m.valor)`), o box vermelho de encargos é substituído por um aviso amarelo "Juros e multa isentados por {nome do gestor}", e todos os botões de forma de pagamento passam a cobrar o valor original. Um botão pequeno "Reaplicar juros" permite desfazer antes de escolher a forma.
-4. A isenção vale só para aquele pagamento; ao fechar o diálogo, some.
-5. Ao efetivar o lançamento (via `LancamentoDialog`), o `valor_manual` continua bloqueado — o valor já sai correto porque `initialValor` passa a ser o valor original da parcela.
+### 1. Frontend — liberar a seção de repasse de laudo para ITB
+Arquivo: `src/components/medicos/MedicoFormDialog.tsx`
 
-## Auditoria
+- Trocar a condição atual que só exibe a seção "REPASSE LAUDO TERCEIRO" para o cadastro chamado `ELETROCARDIOGRAMA`, passando a exibi-la também quando o cadastro se chamar `ITB`.
+- Ajustar o texto do bloco para citar os dois exames como exemplo, mantendo a mesma explicação (cardiologistas ativos, % ou valor fixo, sem lançamento automático).
+- Nenhuma outra tela é alterada — a aba **Convênio**, o cadastro geral do médico e o fluxo do financeiro continuam iguais.
 
-Como o pedido foi "só auditoria automática", registra-se um insert em `audit_log` no momento da autorização (antes de abrir a forma de pagamento) com:
+### 2. Banco — marcar o procedimento ITB como "requer laudo"
+Nas 3 clínicas (Consulta Hoje, Menino Jesus, SFP):
+- Atualizar o procedimento **ITB** para `requer_laudo = true` e `tipo_procedimento = 'equipamento'` (mesmo padrão do ECG). Isso faz o botão **"Vincular laudo"** aparecer em Financeiro → Atendimentos para atendimentos de ITB.
 
-- `acao = 'isentar_juros_multa_mensalidade'`
-- `entidade = 'contrato_mensalidades'`, `entidade_id = pagMens.id`
-- `payload` com: `contrato_id`, `numero_parcela`, `valor_original`, `valor_com_encargos`, `dias_atraso`, `autorizado_por_user_id`, `autorizado_por_nome`, `executado_por_user_id` (usuário logado).
+### 3. Banco — criar o médico agenda "ITB" onde falta
+- Criar o cadastro de agenda de exame chamado **ITB** na **CLINICA CONSULTA HOJE** (SFP e Menino Jesus já têm). Sem essa agenda não é possível configurar os laudadores nem vincular o laudo no financeiro.
 
-Sem migration nova — a tabela `audit_log` já existe e é usada pelo projeto.
+## Como o time vai usar depois
 
-## Arquivos
+1. Menu **Médicos** → editar o cadastro **ITB** → aparece a seção **REPASSE LAUDO TERCEIRO** com todos os cardiologistas ativos da clínica → define % ou valor fixo para cada um → **Salvar**.
+2. Menu **Financeiro → Atendimentos** → localizar o atendimento de ITB → botão **"Vincular laudo"** (individual ou em lote) → escolher o cardiologista → sistema sugere o valor conforme regra cadastrada.
+3. Aba **Comprovantes / Repasse** do cardiologista passa a somar o `valor_laudo` do ITB da mesma forma que já soma o do ECG.
 
-- `src/components/pages/contratos-page.tsx`
-  - Novo estado local `isencaoEncargos: { autorizadoPor: string } | null`.
-  - Ajustar `pagValorFinal` para retornar o valor base quando `isencaoEncargos` estiver ativo.
-  - Renderizar o botão "Isentar juros e multa" e o `SupervisorAuthDialog` (já importado no projeto).
-  - Ao autorizar: `insert` em `audit_log` e set do estado.
-  - Reset do estado quando `formaPagOpen` fecha ou `pagMens` muda.
+## Fora do escopo
 
-Nenhuma outra tela é afetada. Nenhum arquivo gerado (`types.ts`, `client.ts` etc.) é tocado. Sem alteração no banco.
+- Não altera o motor de cálculo de repasse (já genérico).
+- Não altera Comprovantes/Repasse, Convênios, NF-e nem regras de cartão benefícios.
+- Não mexe em outras clínicas nem em outros exames.
+- Não cria lançamento automático — o financeiro continua decidindo quando lançar.
 
-## Fora de escopo
+## Riscos e validação
 
-- Isenção em lote (várias parcelas de uma vez).
-- Isenção parcial (só multa, ou só juros).
-- Alteração no template do contrato ou no cálculo de juros.
-- Fluxos fora da tela de contrato (Financeiro avulso, Agenda).
+- Risco baixo: mudança de front é apenas ampliar uma condição de exibição; mudança de banco é limitada aos registros ITB.
+- Validação após aplicar:
+  1. Abrir cadastro do médico **ITB** em cada clínica → confirmar que a seção de laudadores aparece e que lista os cardiologistas ativos.
+  2. Cadastrar um laudador de teste com % e salvar → reabrir e conferir persistência.
+  3. Em um atendimento de ITB no Financeiro → confirmar que o botão "Vincular laudo" aparece e sugere o valor configurado.
+  4. Conferir na aba Comprovantes que o valor entra no repasse do cardiologista escolhido.

@@ -1598,12 +1598,12 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     </div>
                   )}
                 </div>
-                {form.nome.trim().toUpperCase() === "ELETROCARDIOGRAMA" && (
+                {(() => { const _n = form.nome.trim().toUpperCase(); return _n === "ELETROCARDIOGRAMA" || _n === "ITB"; })() && (
                 <div className="space-y-3 pt-4 border-t mt-4">
                   <div>
                     <Label>REPASSE LAUDO TERCEIRO</Label>
                     <p className="text-xs text-muted-foreground">
-                      Use quando este cadastro representa uma <b>agenda de exame</b> (ex.: ELETROCARDIOGRAMA) e o laudo é feito por <b>outro médico</b>.
+                      Use quando este cadastro representa uma <b>agenda de exame</b> (ex.: ELETROCARDIOGRAMA, ITB) e o laudo é feito por <b>outro médico</b>.
                       Liste abaixo os cardiologistas ativos da clínica e defina o repasse (percentual ou valor fixo por exame) que cada um recebe pelo laudo.
                       O financeiro vincula este repasse em <b>Financeiro → Atendimentos</b>, filtrando pelo nome do médico da agenda.
                     </p>
