@@ -4257,7 +4257,7 @@ function AgendaPage() {
         procedimento: procStr,
         procedimentos: procStr ? [procStr] : [],
       }));
-      toast.success(`Orçamento #${String(orc.numero).padStart(5, "0")} vinculado.`);
+      toast.success(`Orçamento ${formatNumeroOrcamento(orc.serie, orc.numero)} vinculado.`);
     } finally {
       setBuscandoOrc(false);
     }
