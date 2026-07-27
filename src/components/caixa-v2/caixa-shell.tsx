@@ -323,15 +323,12 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     const somaForma = (forma: string) =>
       soma(porForma(recebimentos, forma)) - soma(porForma(estornos, forma));
     const recebidoTotal = soma(recebimentos) - soma(estornos);
-    const recebidoSessao = sessao
-      ? soma(recebimentos.filter((m) => m.sessao_id === sessao.id))
-        - soma(estornos.filter((m) => m.sessao_id === sessao.id))
-      : 0;
-    const saldo = aggRows.reduce((s, m) => s + Number(m.valor || 0) * (TIPO_SINAL[m.tipo] || 0), 0);
     const particular = fila.filter((f) => !f.valor_cartao).reduce((s, f) => s + f.valor, 0);
     const associado = fila.filter((f) => f.valor_cartao > 0).reduce((s, f) => s + f.valor_cartao, 0);
     return {
-      saldo, recebidoHoje: recebidoTotal, recebidoSessao,
+      recebidoHoje: recebidoTotal,
+      estornos: soma(estornos),
+      estornosQtd: estornos.length,
       particular, associado,
       dinheiro: somaForma("dinheiro"),
       pix: somaForma("pix"),
