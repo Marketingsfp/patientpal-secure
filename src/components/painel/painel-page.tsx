@@ -220,7 +220,13 @@ export function PainelPage() {
   function criarFala(texto: string, key: string) {
     const utter = new SpeechSynthesisUtterance(texto);
     utter.lang = "pt-BR";
-    utter.rate = 0.75;
+    // Usa a mesma velocidade configurada para o TTS Piper (fallback nativo).
+    try {
+      const { getUserTtsRate } = require("@/lib/tts-service") as typeof import("@/lib/tts-service");
+      utter.rate = getUserTtsRate();
+    } catch {
+      utter.rate = 0.75;
+    }
     const voz = vozFemininaRef.current ?? escolherVozFeminina();
     if (voz) utter.voice = voz;
     utter.onstart = () => {
