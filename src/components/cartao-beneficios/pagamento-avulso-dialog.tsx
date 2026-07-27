@@ -311,8 +311,7 @@ export function PagamentoAvulsoMensalidadeDialog({
 
             {criarContrato && (
               <div className="space-y-3 rounded-md border p-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
+                <div className="space-y-1">
                     <Label>Convênio</Label>
                     <Select value={convenioId} onValueChange={escolherConvenio} disabled={loading}>
                       <SelectTrigger>
@@ -326,17 +325,6 @@ export function PagamentoAvulsoMensalidadeDialog({
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Dia de vencimento</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={31}
-                      value={diaVenc}
-                      onChange={(e) => setDiaVenc(e.target.value)}
-                    />
-                  </div>
                 </div>
 
                 <div className="space-y-2 rounded-md border p-2">
@@ -392,17 +380,30 @@ export function PagamentoAvulsoMensalidadeDialog({
                   <Label>Valor da mensalidade</Label>
                   <Input
                     inputMode="decimal"
-                    placeholder="0,00"
+                    placeholder="Selecione o convênio e as pessoas do contrato"
                     value={valor}
-                    onChange={(e) => setValor(e.target.value)}
+                    readOnly
+                    disabled
+                    className="bg-muted"
                   />
                   <p className="text-xs text-muted-foreground">
                     {faixaAtual
                       ? `Faixa ${faixaAtual.vidas_de} a ${faixaAtual.vidas_ate ?? "+"} vidas — ${Number(
                           faixaAtual.valor_mensal,
-                        ).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`
-                      : "Sem faixa de vidas cadastrada — usando o valor mensal do convênio. Você pode ajustar."}
+                        ).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} — definido pela tabela do convênio.`
+                      : "Valor definido automaticamente pelo convênio e pelo número de vidas do contrato."}
                   </p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Dia de vencimento</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={diaVenc}
+                    onChange={(e) => setDiaVenc(e.target.value)}
+                  />
                 </div>
 
                 {resumo && (
