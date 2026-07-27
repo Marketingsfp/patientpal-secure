@@ -1,40 +1,56 @@
-## Objetivo
+## Situação verificada
 
-Remover o acionador de pagamento rápido de mensalidade do cartão de três telas onde ele é redundante, mantendo-o apenas na Agenda.
+O contrato 20261032 (CARTÃO CONSULTA + SEGUROS) da MARIA HOSANA foi cancelado em 22/07/2026 por uma rotina em lote, com o motivo "Duplicata da importação legada — mantido contrato irmão". Não foi ação da equipe na tela.
 
-## Situação atual (verificada no código)
+O lote atingiu **153 contratos, todos da POLICLINICA MENINO JESUS**. Nenhum dos contratos cancelados tem mensalidade paga.
 
-O mesmo diálogo (`FaturamentoRapidoMensalidadeDialog`) é aberto em 4 telas:
+Composição dos pares (contrato cancelado x contrato irmão que ficou ativo):
 
-| Tela | Rótulo do botão | Ação |
-| --- | --- | --- |
-| Caixa | 💳 Mensalidade do cartão | **remover** |
-| Ficha do cliente › bloco Cartão Benefícios | Pagar mensalidade | **remover** |
-| Cartão Benefícios › Contratos | Faturamento rápido | **remover** |
-| Agenda | 💳 Mensalidade do cartão | manter |
+| Cancelado | Irmão ativo | Pares | Irmão com mensalidade paga |
+|---|---|---|---|
+| CARTÃO CONSULTA + SEGUROS | CARTÃO CONSULTA | 97 | 2 |
+| CARTÃO CONSULTA | CARTÃO CONSULTA + SEGUROS | 32 | 32 |
+| (sem convênio) | CARTÃO CONSULTA + SEGUROS | 14 | 2 |
+| (sem convênio) | CARTÃO CONSULTA | 8 | 2 |
+| sem irmão ativo | — | 2 | — |
 
-## O que será feito
+## Regra aprovada por você
 
-1. **Caixa** — remover o botão do cabeçalho, o diálogo e o estado que só existia para ele.
-2. **Ficha do cliente** — remover o botão do cabeçalho do bloco "Cartão Benefícios", o diálogo e o estado.
-3. **Contratos** — remover o botão "Faturamento rápido"; o botão **"Vendas"** (nova venda) continua no mesmo lugar.
-4. Limpar imports/ícones que ficarem sem uso nesses três arquivos.
+Havendo duplicidade, **fica o contrato de CARTÃO CONSULTA + SEGUROS**; o outro é **excluído do sistema**, sem gravar cancelamento. Se o contrato tiver sido alterado manualmente **e** tiver mensalidade paga, não se mexe nele.
 
-Aplicado para as 3 clínicas (mudança de interface, sem flag).
+## Plano
 
-## O que NÃO será alterado
+1. **Lista de conferência primeiro**: gerar planilha com os 153 casos — nº, paciente, prontuário, convênio, início/fim, valor, contrato irmão, se tem mensalidade paga e a ação proposta (manter / excluir / não mexer). Nada é executado antes da sua conferência.
 
-- Nenhuma regra financeira, de contrato, mensalidade ou caixa.
-- O diálogo em si (`faturamento-rapido-dialog.tsx` e `pagamento-avulso-dialog.tsx`) permanece intacto e continua funcionando pela Agenda.
-- A Agenda segue exatamente como está.
+2. **Grupo A — 97 pares "+ SEGUROS cancelado x CARTÃO CONSULTA ativo"**
+   - Reativar o contrato "+ SEGUROS" (limpar situação, data e motivo de cancelamento).
+   - Excluir o contrato CARTÃO CONSULTA irmão, junto com suas parcelas em aberto.
+   - Exceção: os **2 pares em que o irmão tem mensalidade paga** ficam intocados e entram na lista de conferência manual.
+
+3. **Grupo B — 32 pares "CARTÃO CONSULTA cancelado x + SEGUROS ativo"**
+   - O contrato correto já está ativo. O cancelado seria excluído, mas nos 32 casos o irmão tem pagamento; a regra é sobre o contrato a excluir, que não tem pagamento — então excluir os 32 cancelados e manter o "+ SEGUROS" como está.
+
+4. **Grupo C — 22 pares com contrato sem convênio definido**
+   - Excluir o contrato cancelado sem convênio e manter o irmão ativo.
+   - Se o cancelado tiver qualquer parcela paga ou edição manual, fica na lista de exceções e não é tocado.
+
+5. **Grupo D — 2 contratos cancelados sem irmão ativo**
+   - Apenas reativar, pois não havia duplicidade.
+
+6. **Rastreabilidade**: as exclusões e reativações ficam registradas no log de auditoria, com um relatório final em arquivo listando exatamente o que foi feito em cada contrato.
+
+7. **Prevenção**: nenhuma nova rotina de cancelamento ou exclusão em massa será executada sem lista aprovada antes.
+
+## Escopo e limites
+- Clínica alvo: **POLICLINICA MENINO JESUS** apenas. As outras duas clínicas não são tocadas.
+- Não altero valores, convênios, datas, carência nem regras de Cartão Consulta.
+- Nenhum contrato novo é criado.
+- Contratos com mensalidade paga não são excluídos em nenhuma hipótese.
 
 ## Detalhes técnicos
+- Tabela principal: `contratos_assinatura`; parcelas em `contrato_mensalidades`.
+- Seleção do lote: `cancelamento_motivo LIKE 'Duplicata da importa%'` + `clinica_id = 7570ddde-…`.
+- Exclusão física com verificação prévia de ausência de `pago_em` e de lançamentos financeiros vinculados; execução em transação única e idempotente.
+- Reativação por atualização de `status`, `cancelado_em`, `cancelamento_motivo`; trigger `fn_audit_trigger` grava antes/depois em `audit_log`.
 
-- `src/routes/_authenticated/app.caixa.tsx`: remover `<Button>` (~2314-2316), `<FaturamentoRapidoMensalidadeDialog>` (~2319), `useState fatRapidoOpen` (~349) e o import (linha 12).
-- `src/components/clientes/paciente-cartoes-beneficios.tsx`: remover `<Button>` (~188-190), o diálogo (~192-198), o `useState` (~59) e o import (linha 16).
-- `src/components/pages/contratos-page.tsx`: remover o `<Button>` "Faturamento rápido" (~653-656), o diálogo (~664-670), o `useState` (~300) e o import (linha 82); manter o botão "Vendas".
-- Rodar checagem de tipos ao final.
-
-## Risco / rollback
-
-Baixo: alteração apenas de apresentação. Rollback = reverter a versão pelo histórico.
+Confirmo a execução gerando primeiro a lista (passo 1) e só depois aplicando os passos 2 a 5.
