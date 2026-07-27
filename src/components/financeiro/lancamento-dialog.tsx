@@ -617,7 +617,19 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         const catEhConvenio = !!(catEscolhida && convenioNome && norm(catEscolhida.nome) === norm(convenioNome));
         const formaEhConvenio = !pagamentoMisto && formaPagamento === "convenio";
         const mistoTemConvenio = pagamentoMisto && pagamentos.some((p) => p.forma === "convenio" && Number(p.recebido || 0) > 0);
-        const pagouComoConvenio = catEhConvenio || formaEhConvenio || mistoTemConvenio;
+        // Um atendimento com desconto aplicado do convênio consome o benefício
+        // mesmo quando a taxa é paga em dinheiro/PIX/cartão. Antes, só forma
+        // "convenio" ou categoria do convênio marcavam o agendamento como
+        // `convenio`, e ele ficava gravado como "particular" — não consumindo
+        // a cota diária (ex.: 1 consulta R$ 9,99/dia) e liberando o mesmo
+        // desconto de novo no segundo atendimento do dia. A descrição do
+        // lançamento contém o nome do convênio quando a Agenda aplicou o
+        // desconto, então usamos isso como sinal adicional.
+        const descNorm = norm(descricao ?? "");
+        const descIndicaConvenio =
+          !!convenioNome && descNorm.includes(norm(convenioNome));
+        const pagouComoConvenio =
+          catEhConvenio || formaEhConvenio || mistoTemConvenio || descIndicaConvenio;
         const novoTipo = pagouComoConvenio ? "convenio" : "particular";
         if (novoTipo !== tipoAgendamento) {
           await supabase
