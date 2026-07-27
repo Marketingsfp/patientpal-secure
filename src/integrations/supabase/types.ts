@@ -6006,13 +6006,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "nfse_emitente_id_fkey"
-            columns: ["emitente_id"]
-            isOneToOne: false
-            referencedRelation: "nfse_emitentes_publico"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "nfse_orcamento_id_fkey"
             columns: ["orcamento_id"]
             isOneToOne: false
@@ -8404,89 +8397,7 @@ export type Database = {
           updated_at: string | null
           usar_ambiente_nacional: boolean | null
         }
-        Insert: {
-          aliquota_iss?: number | null
-          ativo?: boolean | null
-          bairro?: string | null
-          cep?: string | null
-          certificado_validade?: string | null
-          clinica_id?: string | null
-          cnpj?: string | null
-          codigo_cnae?: string | null
-          codigo_municipio?: string | null
-          codigo_tributario_municipio?: string | null
-          complemento?: string | null
-          created_at?: string | null
-          descricao_servico_padrao?: string | null
-          email?: string | null
-          focus_ambiente?: string | null
-          id?: string | null
-          incentivador_cultural?: boolean | null
-          inscricao_estadual?: string | null
-          inscricao_municipal?: string | null
-          item_lista_servico?: string | null
-          logradouro?: string | null
-          municipio?: string | null
-          nome?: string | null
-          nome_fantasia?: string | null
-          numero?: string | null
-          optante_simples?: boolean | null
-          padrao?: boolean | null
-          razao_social?: string | null
-          regime_tributario?: string | null
-          rps_proximo_numero?: number | null
-          rps_serie?: string | null
-          telefone?: string | null
-          uf?: string | null
-          updated_at?: string | null
-          usar_ambiente_nacional?: boolean | null
-        }
-        Update: {
-          aliquota_iss?: number | null
-          ativo?: boolean | null
-          bairro?: string | null
-          cep?: string | null
-          certificado_validade?: string | null
-          clinica_id?: string | null
-          cnpj?: string | null
-          codigo_cnae?: string | null
-          codigo_municipio?: string | null
-          codigo_tributario_municipio?: string | null
-          complemento?: string | null
-          created_at?: string | null
-          descricao_servico_padrao?: string | null
-          email?: string | null
-          focus_ambiente?: string | null
-          id?: string | null
-          incentivador_cultural?: boolean | null
-          inscricao_estadual?: string | null
-          inscricao_municipal?: string | null
-          item_lista_servico?: string | null
-          logradouro?: string | null
-          municipio?: string | null
-          nome?: string | null
-          nome_fantasia?: string | null
-          numero?: string | null
-          optante_simples?: boolean | null
-          padrao?: boolean | null
-          razao_social?: string | null
-          regime_tributario?: string | null
-          rps_proximo_numero?: number | null
-          rps_serie?: string | null
-          telefone?: string | null
-          uf?: string | null
-          updated_at?: string | null
-          usar_ambiente_nacional?: boolean | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "nfse_emitentes_clinica_id_fkey"
-            columns: ["clinica_id"]
-            isOneToOne: false
-            referencedRelation: "clinicas"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       v_pacientes_duplicados_suspeitos: {
         Row: {
@@ -9057,6 +8968,46 @@ export type Database = {
           pacientes: Json
           qtd: number
           tipo: string
+        }[]
+      }
+      listar_nfse_emitentes_publico: {
+        Args: never
+        Returns: {
+          aliquota_iss: number
+          ativo: boolean
+          bairro: string
+          cep: string
+          certificado_validade: string
+          clinica_id: string
+          cnpj: string
+          codigo_cnae: string
+          codigo_municipio: string
+          codigo_tributario_municipio: string
+          complemento: string
+          created_at: string
+          descricao_servico_padrao: string
+          email: string
+          focus_ambiente: string
+          id: string
+          incentivador_cultural: boolean
+          inscricao_estadual: string
+          inscricao_municipal: string
+          item_lista_servico: string
+          logradouro: string
+          municipio: string
+          nome: string
+          nome_fantasia: string
+          numero: string
+          optante_simples: boolean
+          padrao: boolean
+          razao_social: string
+          regime_tributario: string
+          rps_proximo_numero: number
+          rps_serie: string
+          telefone: string
+          uf: string
+          updated_at: string
+          usar_ambiente_nacional: boolean
         }[]
       }
       log_action: {
