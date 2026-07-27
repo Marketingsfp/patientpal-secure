@@ -6076,14 +6076,22 @@ function AgendaPage() {
                         Nº do orçamento
                       </Label>
                       <Input
-                        inputMode="numeric"
-                        placeholder="Ex.: 123"
+                        placeholder="Ex.: 123 ou D-2026-00001"
                         value={form.orcamento_numero}
                         onChange={(e) =>
-                          setForm((f) => ({ ...f, orcamento_numero: e.target.value.replace(/\D/g, "") }))
+                          setForm((f) => ({
+                            ...f,
+                            orcamento_numero: e.target.value.replace(/[^0-9A-Za-z\-\s]/g, "").toUpperCase(),
+                          }))
                         }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !form.orcamento_id) {
+                            e.preventDefault();
+                            void buscarOrcamento();
+                          }
+                        }}
                         disabled={!!form.orcamento_id || (editing ? pagosSet.has(editing.id) : false)}
-                        className="max-w-[110px] h-8 bg-white"
+                        className="max-w-[170px] h-8 bg-white"
                       />
                       {form.orcamento_id ? (
                         <Button
@@ -6108,7 +6116,8 @@ function AgendaPage() {
                       )}
                       {!form.orcamento_id && (
                         <span className="text-[11px] text-slate-500 leading-snug flex-1 min-w-[140px]">
-                          Opcional — vincula qualquer orçamento (exames, consultas, procedimentos) em uma única ficha.
+                          Opcional — vincula qualquer orçamento (exames, consultas, procedimentos, odontologia) em uma
+                          única ficha. Aceita o nº simples ou o código completo (ex.: D-2026-00001).
                         </span>
                       )}
                     </div>
