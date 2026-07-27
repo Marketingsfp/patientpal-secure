@@ -1,43 +1,41 @@
-## Diagnóstico
+## Objetivo
 
-Verifiquei no banco: a Quedima (`73c7e395-…`) é **admin nas 3 clínicas** tanto em `user_roles` quanto em `clinica_memberships`. Pelo código de `usePermissoes`, admin recebe `allowed = null` (sem filtro), então **não é a matriz de permissões que está cortando** o menu dela.
+Tornar visíveis no menu páginas que hoje só são alcançadas por URL direta ou pela busca global. Aplicação **global (3 clínicas)**, conforme confirmado.
 
-O que corta é outra coisa: o **"Subsystem" salvo no navegador** (`localStorage.appshell:subsystem`). Quando o usuário entra em `/app` e escolhe um perfil de trabalho (Gestor Clínico = `recepcao`, ou Gestão de Pessoas = `gestao-pessoas`), o `app-shell.tsx` passa a esconder grupos inteiros do menu, **inclusive para admin**:
+## Escopo
 
-- `recepcao` → só mostra: Operação, Cartão Benefícios, Inteligência, Marketing, Cadastros, RH, Gestão, Configurações. **Esconde** grupos como "Financeiro", "Clínico", etc.
-- `gestao-pessoas` → só mostra: RH, Gestão, Configurações.
+### 1. Aba "Modelos" no Cartão Benefícios
+Hoje as abas são: Vendas, Convênios, Dependentes, Relatórios (BI). A página `/app/cartao-beneficios/modelos` existe mas não está listada.
 
-Hoje, só o e-mail do Rodrigo tem bypass desse filtro (`isRodrigoFullAccess` no `app-shell.tsx`). Por isso a Quedima, mesmo sendo admin, vê o menu recortado — provavelmente escolheu "Gestor Clínico" no seletor `/app` em algum momento e a escolha ficou gravada no navegador dela.
+- Acrescentar a aba **"Modelos"** (ícone de arquivo/cartão) na barra de abas do Cartão Benefícios, após "Dependentes".
+- Ela abre o cadastro de modelos de plano/contrato: nome, tipo, valor mensal, taxa de adesão, limite de dependentes/agregados, fidelidade, vigência, nº de parcelas, benefícios e template de impressão do contrato.
+- Nada muda na tela em si nem nos dados; é só exposição de navegação.
 
-Classificação: **erro de UX/permissão de visualização** (não é regra de negócio, não é dado, não é RLS).
+### 2. Páginas órfãs úteis ganham item de menu
+- **Anamneses** (`/app/anamneses`) → grupo Clínico/Atendimento.
+- **Clínicas** (`/app/clinicas`) → grupo Configurações.
+- **Backups** (`/app/backups`) → grupo Configurações.
 
-## Correções propostas (escolha a que preferir)
+Cada uma continua respeitando as permissões já definidas em `permissoes-rotas.ts` — quem não tem o módulo liberado segue sem ver o item.
 
-Preciso da sua confirmação antes de aplicar. Duas alternativas:
+### 3. Fora do escopo (não mexer agora)
+- Telas internas de teste `dev-caixa-shell`, `dev-clientes-shell`, `dev-list-shell`, `dev-orcamentos-shell`, `dev-hhp` — permanecem como estão.
+- Página antiga `/app/medicos` (substituída por `/app/equipe`) — permanece como está.
+- Páginas que já têm navegação própria dentro do módulo pai: abas do Financeiro, `cartao-beneficios/beneficios`, `nfse/testar`, `orcamentos-agenda`, `agenda-v2`.
+- Nenhuma alteração de valores, regras de negócio, banco ou permissões.
 
-**Opção A — Admin sempre vê tudo (recomendado)**
-Estender o bypass que hoje existe só para o Rodrigo: qualquer usuário com `role = admin` na clínica atual passa a ignorar o filtro de subsystem e sempre enxerga o menu completo. Muda 1 arquivo (`src/components/app-shell.tsx`), sem tocar em banco.
+## Detalhes técnicos
 
-**Opção B — Botão "Ver menu completo" quando um subsystem está ativo**
-Manter o filtro (é útil para usuários operacionais que querem foco), mas mostrar um botão/label ao lado do "Gestor Clínico" que limpa o subsystem (`setSubsystem(null)`) e devolve o menu inteiro. Serve para todos, não só admin.
+- `src/routes/_authenticated/app.cartao-beneficios.tsx`: adicionar entrada `{ to: "/app/cartao-beneficios/modelos", label: "Modelos", icon: ... }` no array de abas.
+- `src/components/app-shell.tsx`: adicionar os três itens nos grupos correspondentes do array de navegação.
+- Sem migração de banco. Sem mudança em `permissoes-rotas.ts` (as rotas já estão mapeadas).
 
-As duas soluções resolvem o caso da Quedima. A **A** é automática; a **B** exige que ela clique uma vez.
+## Riscos
 
-## Escopo (Regra 1.10)
+Baixo. Mudança puramente de navegação/frontend, reversível. Impacto: itens novos passam a aparecer para usuários com permissão nos módulos correspondentes nas 3 clínicas.
 
-A mudança é de **frontend puro (comportamento do menu)**, sem impacto por clínica — mas confirme mesmo assim:
-- Aplicar nas **3 clínicas** (SFP, Menino Jesus, SÃO Policlínica)?
-- Ou só onde a Quedima trabalha primariamente?
+## Validação após implementar
 
-## Fora do escopo
-
-- Não vou alterar nenhum papel, permissão ou dado.
-- Não vou mexer em `perfil_permissoes` / `perfis_acesso`.
-- Não vou tocar no bypass existente do Rodrigo.
-
-## Pendências / validação após aplicar
-
-- Pedir à Quedima para dar **F5** (o `localStorage` do subsystem é do navegador dela; qualquer opção acima só passa a valer no próximo carregamento da página).
-- Se preferir uma correção imediata **sem deploy**, ela pode abrir o Console do navegador e rodar `localStorage.removeItem('appshell:subsystem')` + F5 — resolve o caso pontual dela agora, mas não previne repetição.
-
-Me diga qual opção (A ou B) e o escopo de clínicas para eu implementar.
+- Abrir Cartão Benefícios e confirmar a aba "Modelos" listando os modelos da clínica ativa.
+- Conferir que Anamneses, Clínicas e Backups abrem pelo menu.
+- Conferir que usuário sem permissão no módulo continua sem ver o item.
