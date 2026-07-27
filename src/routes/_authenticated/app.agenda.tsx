@@ -5029,10 +5029,6 @@ function AgendaPage() {
       return;
     }
     if (!clinicaAtual) return;
-    if (pagosSet.has(a.id)) {
-      toast.info("Este agendamento já foi pago.");
-      return;
-    }
     try {
       // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
       // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
@@ -5042,6 +5038,10 @@ function AgendaPage() {
       // `sinal_valor` definido (Odontologia). A 1ª cobrança sugere o sinal,
       // a 2ª o saldo restante.
       const etapaSinal = await obterEtapaSinal(a.id);
+      if (pagosSet.has(a.id) && !etapaSinal) {
+        toast.info("Este agendamento já foi pago.");
+        return;
+      }
       // Verificação fresca no banco: impede faturar duas vezes mesmo se o cache
       // local estiver desatualizado (ex.: outro usuário pagou em outra aba, ou
       // o pagamento foi transferido de uma ficha reagendada).
