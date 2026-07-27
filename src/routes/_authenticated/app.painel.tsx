@@ -696,10 +696,6 @@ function DashboardPage() {
             Recebimentos lançados no caixa dentro do período filtrado
           </p>
           <SubGrid items={[
-            { label: "Com data do período", value: fmtMoney(data.caixaDia.doDia) },
-            { label: "De outras datas (retroativos)", value: fmtMoney(data.caixaDia.outrasDatas) },
-          ]} />
-          <SubGrid items={[
             { label: `Atendimentos (${fmtInt(data.recebimentos.qtdAtendimentos)})`, value: fmtMoney(data.recebimentos.atendimentos) },
             { label: `Mensalidades do cartão (${fmtInt(data.recebimentos.qtdMensalidades)})`, value: fmtMoney(data.recebimentos.mensalidades) },
           ]} />
