@@ -96,6 +96,7 @@ import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { obterEtapaSinal, registrarPagamentoEtapaSinal } from "@/lib/agenda/sinal-orcamento";
+import { formatNumeroOrcamento, parseNumeroOrcamento } from "@/lib/orcamento-numero";
 import { IdadeIcon } from "@/components/idade-icon";
 import { ClienteForm, type Paciente as PacienteFull } from "@/components/clientes/cliente-form";
 
