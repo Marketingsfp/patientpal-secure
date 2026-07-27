@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Printer } from "lucide-react";
+import { Printer, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -54,6 +54,7 @@ export function OrcamentoTab({
   const [list, setList] = useState<Linha[]>([]);
   const [loading, setLoading] = useState(true);
   const [drawerOrc, setDrawerOrc] = useState<OrcV2 | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!clinicaAtual || !especialidadeOdontoId) return;
@@ -236,6 +237,15 @@ export function OrcamentoTab({
                       <Button
                         size="icon"
                         variant="ghost"
+                        title={o.itens_pagos > 0 ? "Orçamento com itens pagos — não pode ser editado" : "Editar orçamento"}
+                        disabled={o.itens_pagos > 0}
+                        onClick={(e) => { e.stopPropagation(); setEditId(o.id); }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         title="Imprimir 2ª via"
                         onClick={(e) => { e.stopPropagation(); void imprimir(o.id); }}
                       >
@@ -269,6 +279,19 @@ export function OrcamentoTab({
           especialidadeOdontoId={especialidadeOdontoId}
           userId={user?.id ?? null}
           onCreated={() => { onNovoOpenChange(false); void load(); }}
+        />
+      )}
+
+      {editId && clinicaAtual && especialidadeOdontoId && (
+        <NovoOrcamentoOdontoDialog
+          key={editId}
+          open
+          onClose={() => setEditId(null)}
+          clinicaId={clinicaAtual.clinica_id}
+          especialidadeOdontoId={especialidadeOdontoId}
+          userId={user?.id ?? null}
+          orcamentoId={editId}
+          onCreated={() => { setEditId(null); void load(); }}
         />
       )}
     </div>
