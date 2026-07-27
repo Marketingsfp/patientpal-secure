@@ -9,6 +9,7 @@ import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-quer
 import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useMedicoContext } from "@/hooks/use-medico-context";
@@ -680,7 +681,7 @@ export function AgendaV2Shell() {
         data: { agendamento_ids: agendamentoIds, novo_status: novoStatus, cascatear_pacote: cascatear },
       });
       if (cascatear && result.count > 1) {
-        toast.success(`${result.count} agendamentos do pacote cancelados.`);
+        notify.success(`${result.count} agendamentos do pacote cancelados.`);
       } else {
         const label: Record<string, string> = {
           confirmado: "Presença confirmada",
@@ -690,12 +691,12 @@ export function AgendaV2Shell() {
           faltou: "Marcado como faltou",
           agendado: "Status atualizado",
         };
-        toast.success(label[novoStatus] ?? "Status atualizado");
+        notify.success(label[novoStatus] ?? "Status atualizado");
       }
       await queryClient.invalidateQueries({ queryKey: ["agenda-v2", "ags"] });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Falha ao atualizar status.";
-      toast.error(msg);
+      notify.error(msg);
     }
   };
 

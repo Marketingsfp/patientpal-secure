@@ -3,6 +3,7 @@ import { Loader2, CalendarClock } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,14 +74,14 @@ export function ReagendarModal({ open, onOpenChange, sessao, clinicaId, medicoOp
 
   const handleConfirmar = async () => {
     if (!novaData || !novaHora) {
-      toast.error("Escolha data e hora.");
+      notify.error("Escolha data e hora.");
       return;
     }
     const [hh, mm] = novaHora.split(":").map((x) => Number(x));
     const [yyyy, mmm, dd] = novaData.split("-").map((x) => Number(x));
     const novoInicio = new Date(yyyy, (mmm ?? 1) - 1, dd ?? 1, hh ?? 0, mm ?? 0, 0);
     if (Number.isNaN(novoInicio.getTime())) {
-      toast.error("Horário inválido.");
+      notify.error("Horário inválido.");
       return;
     }
     const novoFim = new Date(novoInicio.getTime() + duracaoMin * 60000);
@@ -97,18 +98,18 @@ export function ReagendarModal({ open, onOpenChange, sessao, clinicaId, medicoOp
       });
       if (!res.ok) {
         if ("validation_error" in res) {
-          toast.error(res.validation_error.message, { duration: res.validation_error.toast_duration });
+          notify.error(res.validation_error.message, { duration: res.validation_error.toast_duration });
         } else {
-          toast.error(res.pg_error.message);
+          notify.error(res.pg_error.message);
         }
         return;
       }
-      toast.success(`Reagendado para ${novoInicio.toLocaleString("pt-BR")}.`);
+      notify.success(`Reagendado para ${novoInicio.toLocaleString("pt-BR")}.`);
       await queryClient.invalidateQueries({ queryKey: ["agenda-v2", "ags"] });
       onSuccess?.();
       onOpenChange(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao reagendar.");
+      notify.error(e instanceof Error ? e.message : "Falha ao reagendar.");
     } finally {
       setSaving(false);
     }

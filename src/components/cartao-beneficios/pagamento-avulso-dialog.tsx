@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Plus, Receipt, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Button } from "@/components/ui/button";
@@ -623,7 +624,7 @@ export function PagamentoAvulsoMensalidadeDialog({
           setLancOpen(false);
           if (!criarContrato) {
             concluidoRef.current = true;
-            toast.success("Pagamento avulso registrado no caixa.");
+            notify.success("Pagamento avulso registrado no caixa.");
             onOpenChange(false);
             onPago?.();
             return;
@@ -649,7 +650,7 @@ export function PagamentoAvulsoMensalidadeDialog({
                   },
                 });
             }
-            toast.success(
+            notify.success(
               `Pagamento registrado. Contrato criado com 12 parcelas — ${rotuloMes(refMes)} baixada como paga.`,
             );
           } catch (err) {
