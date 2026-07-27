@@ -846,11 +846,52 @@ async function obterInfoConvenioPaciente(params: {
       if (janelaFim) q = q.lte("inicio", janelaFim.toISOString());
       if (agendamentoId) q = q.neq("id", agendamentoId);
       const { data: agsDiaRaw } = await q;
-      // Atendimentos "particular" não consomem a cota do convênio — o
-      // paciente escolheu pagar fora do benefício de propósito. Registros
-      // legados sem tipo_atendimento (null) continuam contando, para não
-      // quebrar a contagem de dados antigos.
-      const agsDia = (agsDiaRaw ?? []).filter((a: any) => a.tipo_atendimento !== "particular");
+      // Atendimentos "particular" normalmente não consomem a cota do convênio
+      // — o paciente escolheu pagar fora do benefício de propósito. Mas se
+      // existir um lançamento financeiro confirmado do próprio agendamento
+      // cuja descrição indica o nome do convênio, é sinal de que o desconto
+      // do convênio foi aplicado (paciente pagou a taxa de R$ 9,99 em
+      // dinheiro, por exemplo) — nesse caso a cota FOI consumida, mesmo que
+      // o agendamento tenha ficado gravado como "particular" por bug antigo
+      // de sincronização. Buscamos esses lançamentos e reincluímos os
+      // agendamentos correspondentes.
+      const rawList = (agsDiaRaw ?? []) as Array<{
+        id: string;
+        medico_id: string | null;
+        procedimento?: string | null;
+        paciente_id?: string | null;
+        status?: string | null;
+        inicio?: string | null;
+        tipo_atendimento?: string | null;
+      }>;
+      const idsParticular = rawList
+        .filter((a) => a.tipo_atendimento === "particular")
+        .map((a) => a.id);
+      const idsReincluir = new Set<string>();
+      const nomeConvNorm = (convenioNome ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .trim();
+      if (idsParticular.length && nomeConvNorm) {
+        const { data: lancsConv } = await supabase
+          .from("fin_lancamentos")
+          .select("agendamento_id, descricao")
+          .in("agendamento_id", idsParticular)
+          .eq("tipo", "receita")
+          .eq("status", "confirmado");
+        for (const l of (lancsConv ?? []) as Array<{ agendamento_id: string | null; descricao: string | null }>) {
+          if (!l.agendamento_id) continue;
+          const d = (l.descricao ?? "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toUpperCase();
+          if (d.includes(nomeConvNorm)) idsReincluir.add(l.agendamento_id);
+        }
+      }
+      const agsDia = rawList.filter(
+        (a: any) => a.tipo_atendimento !== "particular" || idsReincluir.has(a.id),
+      );
 
       // Se o benefício é por especialidade, filtra pelos agendamentos cujo
       // médico tem a mesma especialidade.

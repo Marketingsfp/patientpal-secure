@@ -199,6 +199,39 @@ async function resolveVinculoConvenio(
   return null;
 }
 
+/**
+ * Verifica se algum lançamento financeiro confirmado dos agendamentos
+ * indicados aplica o desconto do convênio informado (nome aparece na
+ * descrição). Usado para corrigir a impressão da GR quando o agendamento
+ * ficou gravado como "particular" mas a taxa do convênio foi cobrada — o
+ * campo CONV. deve mostrar o nome do convênio, não PARTICULAR.
+ */
+async function agendamentoUsouConvenio(
+  agendamentoIds: Array<string | null | undefined>,
+  convenioNome: string | null | undefined,
+): Promise<boolean> {
+  if (!convenioNome) return false;
+  const ids = agendamentoIds.filter((x): x is string => !!x);
+  if (!ids.length) return false;
+  try {
+    const { data } = await supabase
+      .from("fin_lancamentos")
+      .select("descricao")
+      .in("agendamento_id", ids)
+      .eq("tipo", "receita")
+      .eq("status", "confirmado");
+    const alvo = convenioNome
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase();
+    for (const r of (data ?? []) as Array<{ descricao: string | null }>) {
+      const d = (r.descricao ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+      if (d.includes(alvo)) return true;
+    }
+  } catch { /* ignora */ }
+  return false;
+}
+
 function renderLinhaVinculo(v: { convenioNome: string; vinculo: "titular" | "dependente"; titularNome?: string } | null): string {
   if (!v) return "";
   const suf = v.vinculo === "titular"
@@ -822,12 +855,20 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
-  const convLabel = await resolveConvLabel(
+  let convLabel = await resolveConvLabel(
     (a as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
     a.paciente_id ?? null,
     clinicaId,
   );
   const vinculoConv = await resolveVinculoConvenio(a.paciente_id ?? null, clinicaId);
+  // Corrige o rótulo quando o agendamento ficou gravado como "particular"
+  // mas o desconto do convênio foi aplicado no caixa (paciente pagou a taxa
+  // do convênio em dinheiro/PIX/cartão). Nesse caso a GR deve exibir o
+  // nome do convênio, não PARTICULAR.
+  if (convLabel === "PARTICULAR" && vinculoConv?.convenioNome) {
+    const usouConv = await agendamentoUsouConvenio([a.id], vinculoConv.convenioNome);
+    if (usouConv) convLabel = vinculoConv.convenioNome.toUpperCase();
+  }
 
   const ticketHtml = `
   <div class="ticket">
@@ -1262,12 +1303,19 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
-  const convLabelAgrupada = await resolveConvLabel(
+  let convLabelAgrupada = await resolveConvLabel(
     (ags[0] as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
     pacIdRef ?? null,
     clinicaId,
   );
   const vinculoConvAgrupada = await resolveVinculoConvenio(pacIdRef ?? null, clinicaId);
+  if (convLabelAgrupada === "PARTICULAR" && vinculoConvAgrupada?.convenioNome) {
+    const usouConv = await agendamentoUsouConvenio(
+      ags.map((x) => x.id),
+      vinculoConvAgrupada.convenioNome,
+    );
+    if (usouConv) convLabelAgrupada = vinculoConvAgrupada.convenioNome.toUpperCase();
+  }
 
   // Cabeçalho da clínica (reutilizado em cada GR)
   const headerClinica = `
