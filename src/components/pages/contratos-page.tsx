@@ -472,8 +472,11 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
   }, [initialContratoId, loading, list, detail]);
 
   const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    const base = !s ? list : list.filter((c) => `${c.numero} ${c.paciente_nome}`.toLowerCase().includes(s));
+    // Filtro local de texto foi desativado — a busca por nome/CPF/prontuário
+    // já é feita no servidor com JOIN em pacientes (nome atualizado). O
+    // `paciente_nome` do contrato é um snapshot histórico e às vezes vem
+    // truncado, então filtrar por ele aqui esconderia resultados válidos.
+    const base = list;
     const hojeStr = new Date().toISOString().slice(0, 10);
     const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
     const in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
