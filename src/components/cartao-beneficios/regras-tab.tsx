@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, RefreshCw, Timer, Pencil } from "lucide-react";
+import { Plus, Trash2, Timer, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { findRegra, computeValor, type CbRegra } from "@/lib/cb-regras";
+import { computeValor, type CbRegra } from "@/lib/cb-regras";
 
 type EspOpt = { id: string; nome: string };
 type ProcOpt = { id: string; nome: string; codigo: string | null; tipo: string | null };
@@ -74,8 +74,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [especialidades, setEspecialidades] = useState<EspOpt[]>([]);
   const [procedimentos, setProcedimentos] = useState<ProcOpt[]>([]);
   const [loading, setLoading] = useState(false);
-  const [reapplying, setReapplying] = useState(false);
-  const [progress, setProgress] = useState<string>("");
   const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
   const [novoOpen, setNovoOpen] = useState(false);
   const [editRegra, setEditRegra] = useState<CbRegra | null>(null);
@@ -342,135 +340,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     setLoading(false);
     toast.success("Regras salvas.");
     await load();
-    // A sincronização do cache procedimento_cb_convenio_valores NÃO roda mais
-    // em silêncio: ela sobrescreve valores digitados manualmente, então agora
-    // exige confirmação explícita do usuário (reaplicar() já pede confirmação).
-    await reaplicar();
+    // Não há mais reaplicação em massa: os valores por serviço são mantidos
+    // manualmente e a Agenda/Caixa calculam sempre pela regra viva.
   };
 
-  /**
-   * Reaplica as regras do convênio a todos os serviços da clínica:
-   * para cada serviço, resolve a especialidade (via procedimento_especialidades
-   * para consultas N:N, ou via campo grupo) e o tipo, calcula o valor e
-   * faz upsert em procedimento_cb_convenio_valores.
-   */
-  const reaplicar = async (opts?: { silent?: boolean }) => {
-    const silent = !!opts?.silent;
-    if (!convenioId) return;
-    if (!silent && !confirm(`Reaplicar as regras de "${convenioNome}" a todos os serviços? Valores manuais serão sobrescritos onde houver regra correspondente, e valores calculados por regras antigas (removidas ou alteradas) serão limpos.`)) return;
-    if (!silent) {
-      setReapplying(true);
-      setProgress("Carregando serviços…");
-    }
-    try {
-      // 1) carrega procedimentos (paginado, db-max-rows = 1000)
-      const PAGE = 1000;
-      const procs: any[] = [];
-      for (let from = 0; ; from += PAGE) {
-        const { data, error } = await supabase
-          .from("procedimentos")
-          .select("id,grupo,tipo,valor_dinheiro,valor_dinheiro_pix,valor_padrao,valor_pix,valor_cartao_credito,valor_cartao_debito,valor_cartao")
-          .eq("clinica_id", clinicaId)
-          .range(from, from + PAGE - 1);
-        if (error) throw error;
-        const page = data ?? [];
-        procs.push(...page);
-        if (page.length < PAGE) break;
-      }
-
-      // 2) carrega vínculos N:N de especialidades
-      const { data: vinc, error: errVinc } = await supabase
-        .from("procedimento_especialidades")
-        .select("procedimento_id,especialidade_id")
-        .eq("clinica_id", clinicaId);
-      if (errVinc) throw errVinc;
-      const vincMap = new Map<string, string[]>();
-      (vinc ?? []).forEach((v: any) => {
-        const arr = vincMap.get(v.procedimento_id) ?? [];
-        arr.push(v.especialidade_id);
-        vincMap.set(v.procedimento_id, arr);
-      });
-
-      // 3) índice especialidade por nome (normalizado)
-      const norm = (s: string) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-      const espByName = new Map<string, string>();
-      especialidades.forEach(e => espByName.set(norm(e.nome), e.id));
-
-      // 4) calcula valores
-      if (!silent) setProgress(`Processando ${procs.length} serviços…`);
-      const upserts: any[] = [];
-      for (const p of procs) {
-        const baseDin = Number(p.valor_dinheiro ?? p.valor_dinheiro_pix ?? p.valor_padrao) || 0;
-        const baseOut = Number(
-          p.valor_pix ?? p.valor_cartao_credito ?? p.valor_cartao_debito ?? p.valor_cartao,
-        ) || 0;
-        const tipo = (p.tipo ?? "").toLowerCase() || null;
-        // tenta cada especialidade possível e usa a melhor regra
-        const possibleEspIds: (string | null)[] = [];
-        const nn = vincMap.get(p.id) ?? [];
-        possibleEspIds.push(...nn);
-        if (p.grupo) {
-          const id = espByName.get(norm(p.grupo));
-          if (id && !possibleEspIds.includes(id)) possibleEspIds.push(id);
-        }
-        if (possibleEspIds.length === 0) possibleEspIds.push(null);
-        let best: ReturnType<typeof computeValor> = null;
-        let bestScore = -1;
-        for (const eid of possibleEspIds) {
-          const r = findRegra(regras, eid, tipo, p.id);
-          if (!r) continue;
-          const sc = (r.procedimento_id ? 100 : 0) + (r.especialidade_id ? 10 : 0) + (r.tipo ? 5 : 0) + (r.prioridade || 0) * 0.01;
-          if (sc > bestScore) {
-            const v = computeValor(r, baseDin, baseOut);
-            if (v) { best = v; bestScore = sc; }
-          }
-        }
-        if (best) {
-          upserts.push({
-            clinica_id: clinicaId,
-            procedimento_id: p.id,
-            convenio_id: convenioId,
-            valor_dinheiro: best.dinheiro,
-            valor_outros: best.outros,
-            origem: "regra",
-          });
-        }
-      }
-
-      // 4.5) Limpa valores calculados por regra na rodada anterior — sem
-      // isso, um procedimento que deixou de casar com qualquer regra (regra
-      // removida ou alterada) ficava com o preço antigo indefinidamente.
-      // Valores digitados manualmente (origem='manual') não são tocados.
-      if (!silent) setProgress("Limpando valores calculados anteriores…");
-      const { error: errClear } = await (supabase as any)
-        .from("procedimento_cb_convenio_valores")
-        .delete()
-        .eq("clinica_id", clinicaId)
-        .eq("convenio_id", convenioId)
-        .eq("origem", "regra");
-      if (errClear) throw errClear;
-
-      // 5) upsert em lotes
-      const BATCH = 500;
-      for (let i = 0; i < upserts.length; i += BATCH) {
-        const slice = upserts.slice(i, i + BATCH);
-        if (!silent) setProgress(`Gravando ${i + slice.length}/${upserts.length}…`);
-        const { error } = await (supabase as any)
-          .from("procedimento_cb_convenio_valores")
-          .upsert(slice, { onConflict: "procedimento_id,convenio_id" });
-        if (error) throw error;
-      }
-      if (!silent) toast.success(`Regras aplicadas a ${upserts.length} serviços.`);
-    } catch (err: any) {
-      if (!silent) mostrarErro(err);
-      else console.warn("[reaplicar silent]", err);
-    } finally {
-      if (!silent) {
-        setReapplying(false);
-        setProgress("");
-      }
-    }
-  };
 
   if (!convenioId) {
     return (
@@ -540,10 +413,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         <div className="flex flex-col items-end gap-2">
           <Button variant="ghost" size="sm" onClick={addRegra}>
             <Plus className="h-4 w-4 mr-1" /> Adicionar regra
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => reaplicar()} disabled={reapplying || regras.length === 0}>
-            <RefreshCw className={`h-4 w-4 mr-1 ${reapplying ? "animate-spin" : ""}`} />
-            {reapplying ? (progress || "Aplicando…") : "Reaplicar a todos os serviços"}
           </Button>
         </div>
       </div>

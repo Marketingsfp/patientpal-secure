@@ -1,49 +1,40 @@
-## Problema
+## Objetivo
 
-Na GR do "FRANCISCO NOE" (Foto 1) o exame foi lançado como **gratuidade** (paciente não pagou nada). Hoje, quando `valor pago = 0`, o `src/lib/print-gr.ts` **oculta o bloco inteiro** de "VALOR RECEBIDO" + "CLINICA" + "PRESTADOR" (linhas 832 e 1275 do arquivo, controladas pelo `${valor > 0 ? ... : ""}`).
+Remover, nas 3 clínicas, o botão **"Reaplicar a todos os serviços"** da aba Regras de Preço (Cartão Benefícios > Convênio) e também a rotina que ele executa, que regrava em massa a tabela de valores por serviço e sobrescreve valores digitados manualmente.
 
-Consequência: a GR sai sem valor de clínica nem de prestador — mas a clínica e o médico têm direito a receber normalmente na gratuidade. Só o paciente é isento.
+## Por que é seguro
 
-## Escopo
+Verifiquei no código:
+- A **Agenda** e o **Caixa** calculam o valor do convênio lendo a **regra viva** (`cb_convenio_regras`), não a tabela de cache.
+- A **grade de Serviços** também já calcula pela regra viva — há inclusive um comentário no código dizendo que o cache "nunca é lido aqui".
+- A tabela de cache `procedimento_cb_convenio_valores` continua existindo e continua sendo gravada quando um serviço é cadastrado/editado individualmente (fluxo manual, que permanece intacto).
 
-- Aplica-se a **todas as clínicas** (regra 1.10: correção puramente técnica, sem regra de negócio nova). Só ajusta a impressão da GR — não altera cálculo de repasse, caixa, financeiro nem lançamentos.
-- Afeta apenas `src/lib/print-gr.ts`, nas duas funções que imprimem GR de atendimento:
-  - `printGuiaAtendimentoCore` (GR individual — linhas ~520–856)
-  - `printGuiaAtendimentoAgrupada` (GR agrupada por médico — linhas ~1080–1300)
-- **Não** mexe na GR de mensalidade (`printGRMensalidade`), pois mensalidade sem valor não existe nesse fluxo.
+Ou seja: sem o botão, nenhum preço deixa de funcionar — apenas nada mais sobrescreve valores em massa.
 
-## Solução
+## O que muda na tela
 
-1. Detectar gratuidade: `valorPago === 0` (nenhum `fin_lancamentos` confirmado para o agendamento).
-2. Quando for gratuidade, usar como **valor base** o `procedimentos.valor_dinheiro_pix` (já lido em `procData`) para calcular **clínica** e **prestador** com as mesmas regras atuais (convênio do médico → convênio do paciente → padrão do médico). Nada de novo no motor de cálculo — só troca a entrada.
-3. Renderizar o bloco inferior da GR mesmo com `valor pago = 0`, com este layout:
-   - Substituir "VALOR RECEBIDO (FORMA)" por um selo **"GRATUIDADE"** em destaque (bold, mesma tipografia grande).
-   - Manter as linhas **CLINICA: R$ x,xx** e **PRESTADOR: R$ y,yy** com os valores calculados a partir do valor de tabela.
-   - Não mostrar bandeira/parcelamento (não há pagamento).
-4. Espelhar o mesmo comportamento na variante agrupada: se `g.subtotal === 0`, imprimir "GRATUIDADE" e manter `CLINICA` / `PRESTADOR` calculados pela soma dos valores de tabela dos itens do grupo.
-5. Preservar comportamento atual quando houver pagamento (nada muda).
+**Antes:** existia o botão "Reaplicar a todos os serviços", e o "Salvar" das regras chamava essa mesma rotina pedindo confirmação.
+
+**Depois:**
+- O botão some da barra da aba Regras de Preço.
+- O "Salvar" apenas grava as regras e recarrega a lista — sem confirmação extra e sem tocar em valores de serviços.
+- O cadastro/edição de valores por serviço continua igual, feito manualmente.
 
 ## Detalhes técnicos
 
-- Em `printGuiaAtendimentoCore` (após linha ~580):
-  - Guardar `valorPago` como está.
-  - Introduzir `const isGratuidade = valorPago === 0 && !pagamento;`
-  - Definir `const valorBase = isGratuidade ? Number(procData?.valor_dinheiro_pix ?? 0) : valor;` e usar `valorBase` no bloco de cálculo de `prestador`/`clinica` (linhas ~700–758) **apenas** quando `isGratuidade` — caso contrário mantém `valor` como hoje.
-  - No template (linha 832), trocar `${valor > 0 ? ... : ""}` por lógica que:
-    - se `pago`, imprime o bloco atual;
-    - se `gratuidade` e (`clinica > 0 || prestador > 0`), imprime `<div class="bold lg center">GRATUIDADE</div>` + tabela CLINICA/PRESTADOR.
-- Em `printGuiaAtendimentoAgrupada`, replicar: para cada item, se `valorPago == null`, usa `proc.valor_dinheiro_pix` como `valorBase` para calcular prestador/clínica; e no render (linha 1275) trocar `g.subtotal > 0` pela mesma lógica de gratuidade quando `g.subtotal === 0 && (g.clinica > 0 || g.prestador > 0)`.
-- Nenhuma nova consulta ao banco — os campos já são lidos.
-- Não altera `numViasGR`, registros em `gr_impressoes` nem regras de repasse.
+Arquivo único: `src/components/cartao-beneficios/regras-tab.tsx`
+1. Remover o `<Button ... onClick={() => reaplicar()}>` do cabeçalho da aba.
+2. Remover a chamada `await reaplicar()` ao final da função de salvar.
+3. Remover a função `reaplicar()` inteira e os estados/auxiliares que só ela usa (`reapplying`, `progress` e imports que ficarem órfãos).
+4. Sem migração de banco, sem alteração de schema, sem alteração de dados.
+
+## Fora do escopo
+
+- Não altero nenhum valor de Cartão Consulta ou de qualquer convênio (regra 1.11 do AGENTS.md).
+- Não mexo na tabela de cache nem em dados já gravados.
+- Não mexo em outros botões de "reaplicar" do sistema (ex.: "Reaplicar juros e multa" em Contratos).
 
 ## Validação
 
-1. Reimprimir a GR do Francisco Noe (ECG 23/07 11:15 — Menino Jesus) e conferir se sai "GRATUIDADE" + CLINICA e PRESTADOR corretos.
-2. Reimprimir uma GR paga comum (qualquer clínica) para garantir que o layout com "VALOR RECEBIDO" continua idêntico.
-3. Reimprimir uma GR agrupada (paciente com múltiplos exames no mesmo médico) tanto paga quanto gratuita.
-
-## Fora de escopo
-
-- Não altera regras de cálculo de repasse, caixa, NFS-e, contratos ou financeiro.
-- Não introduz botão/menu novo — a mudança é apenas no HTML impresso.
-- Não altera GR de mensalidade.
+- Abrir Cartão Benefícios > Convênio > Regras de Preço e confirmar que o botão sumiu e que "Salvar" grava normalmente.
+- Conferir na Agenda que o valor de um serviço com regra continua sendo aplicado corretamente.
