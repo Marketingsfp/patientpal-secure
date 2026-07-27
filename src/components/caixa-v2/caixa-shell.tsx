@@ -44,7 +44,7 @@ type PeriodoKey = "hoje" | "7d" | "30d" | "custom";
 interface AggRow {
   id: string; sessao_id: string; tipo: MovTipo;
   valor: number; forma_pagamento: string | null; created_at: string;
-  lancamento_id: string | null;
+  lancamento_id: string | null; descricao: string | null;
 }
 
 const TIPO_LABEL: Record<MovTipo, string> = {
@@ -231,7 +231,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     if (!clinicaAtual) { setAggRows([]); return; }
     if (tab === "sessao" && !sessao) { setAggRows([]); return; }
     let q = supabase.from("caixa_movimentos")
-      .select("id, sessao_id, tipo, valor, forma_pagamento, created_at, lancamento_id");
+      .select("id, sessao_id, tipo, valor, forma_pagamento, created_at, lancamento_id, descricao");
     q = applyFilters(q);
     q = q.order("created_at", { ascending: false }).range(0, 9999);
     const { data, error } = await q;
@@ -342,7 +342,12 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     const recebidoTotal = soma(recebimentos) - soma(estornos);
     // Particular x Associado seguem o mesmo filtro do card "Recebido no filtro"
     // (estornos abatem), classificando pelo lançamento de origem.
-    const ehAssoc = (m: AggRow) => !!m.lancamento_id && assocIds.has(m.lancamento_id);
+    const ehMensalidade = (m: AggRow) => {
+      const d = (m.descricao ?? "").toUpperCase();
+      return d.includes("MENSALIDADE") || d.includes("TAXA DE ADESAO") || d.includes("TAXA DE ADESÃO");
+    };
+    const ehAssoc = (m: AggRow) =>
+      (!!m.lancamento_id && assocIds.has(m.lancamento_id)) || ehMensalidade(m);
     const particular =
       soma(recebimentos.filter((m) => !ehAssoc(m))) - soma(estornos.filter((m) => !ehAssoc(m)));
     const associado =

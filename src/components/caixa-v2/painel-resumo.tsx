@@ -46,7 +46,7 @@ export function PainelResumo({ data, sessaoInfo }: { data: ResumoData; sessaoInf
         </div>
         <Card label="Estornos no filtro" value={`${brl(data.estornos)}${data.estornosQtd ? ` (${data.estornosQtd})` : ""}`} tone="danger" testId="kpi-estornos" />
         <Card label="Particular"      value={brl(data.particular)}     testId="kpi-particular" />
-        <Card label="Associado"       value={brl(data.associado)}      testId="kpi-associado" />
+        <Card label="Associado / Mensalidades" value={brl(data.associado)} testId="kpi-associado" />
         <Card label="Dinheiro"        value={brl(data.dinheiro)}       testId="kpi-dinheiro" />
         <Card label="PIX"             value={brl(data.pix)}            testId="kpi-pix" />
         <Card label="Cartão"          value={brl(data.cartao)}         testId="kpi-cartao" />
