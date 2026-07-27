@@ -16,6 +16,7 @@ import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
 import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
 import { EstornosBell } from "@/components/EstornosBell";
 import { UniversalSearchBar } from "@/components/universal-search-bar";
+import { TTSToggle } from "@/components/tts/tts-toggle";
 import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useTheme } from "@/hooks/use-theme";
 import { useMenuOrdem } from "@/hooks/use-menu-ordem";
@@ -986,6 +987,7 @@ export function AppShell() {
               <span className="text-base font-semibold">?</span>
             </Button>
             <EstornosBell />
+            <TTSToggle />
           </div>
         </header>
         <main
