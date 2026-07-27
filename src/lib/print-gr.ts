@@ -870,6 +870,24 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     if (usouConv) convLabel = vinculoConv.convenioNome.toUpperCase();
   }
 
+  // Sufixo (TITULAR) / (DEPENDENTE DE X) direto na linha CONV quando o rótulo
+  // já é o nome de um convênio real (não PARTICULAR nem o genérico CONVÊNIO).
+  if (
+    convLabel &&
+    convLabel !== "PARTICULAR" &&
+    convLabel !== "CONVÊNIO" &&
+    convLabel !== "CONVÊNIO GRATUIDADE" &&
+    vinculoConv?.convenioNome &&
+    convLabel.toUpperCase() === vinculoConv.convenioNome.toUpperCase()
+  ) {
+    const suf = vinculoConv.vinculo === "titular"
+      ? "(TITULAR)"
+      : vinculoConv.titularNome
+        ? `(DEPENDENTE DE ${vinculoConv.titularNome})`
+        : "(DEPENDENTE)";
+    convLabel = `${convLabel} ${suf}`;
+  }
+
   const ticketHtml = `
   <div class="ticket">
     <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
@@ -887,7 +905,6 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
     ${convLabel ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabel)}</span></div>` : ""}
-    ${renderLinhaVinculo(vinculoConv)}
 
     <div class="sep"></div>
 
