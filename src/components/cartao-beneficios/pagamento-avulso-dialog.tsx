@@ -197,6 +197,33 @@ export function PagamentoAvulsoMensalidadeDialog({
     setConvenioId(id);
   };
 
+  /**
+   * Verifica se já existe contrato criado hoje pelo pagamento avulso para o
+   * mesmo paciente e mês de referência. Retorna true quando pode prosseguir.
+   */
+  const confirmarSeJaExiste = async () => {
+    if (!criarContrato || !paciente) return true;
+    const hojeISO = new Date().toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from("contratos_assinatura")
+      .select("numero, observacoes, created_at")
+      .eq("clinica_id", clinicaId)
+      .eq("paciente_id", paciente.id)
+      .gte("created_at", `${hojeISO}T00:00:00`)
+      .limit(20);
+    const dup = ((data ?? []) as Array<{ numero: number | null; observacoes: string | null }>).find(
+      (c) =>
+        (c.observacoes ?? "").toUpperCase().includes("PAGAMENTO AVULSO") &&
+        (c.observacoes ?? "").toUpperCase().includes(rotuloMes(refMes).toUpperCase()),
+    );
+    if (!dup) return true;
+    return window.confirm(
+      `Já existe um pagamento avulso registrado hoje para ${paciente.nome} referente a ${rotuloMes(refMes)}` +
+        (dup.numero ? ` (contrato #${dup.numero})` : "") +
+        `.\n\nDeseja mesmo registrar outro? Isso criará um novo contrato e um novo lançamento no caixa.`,
+    );
+  };
+
   const addDependente = () =>
     setDependentes((d) => [...d, { key: crypto.randomUUID(), paciente: null, parentesco: "" }]);
 
