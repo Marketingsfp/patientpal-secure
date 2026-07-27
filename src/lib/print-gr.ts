@@ -1303,12 +1303,19 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
-  const convLabelAgrupada = await resolveConvLabel(
+  let convLabelAgrupada = await resolveConvLabel(
     (ags[0] as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
     pacIdRef ?? null,
     clinicaId,
   );
   const vinculoConvAgrupada = await resolveVinculoConvenio(pacIdRef ?? null, clinicaId);
+  if (convLabelAgrupada === "PARTICULAR" && vinculoConvAgrupada?.convenioNome) {
+    const usouConv = await agendamentoUsouConvenio(
+      ags.map((x) => x.id),
+      vinculoConvAgrupada.convenioNome,
+    );
+    if (usouConv) convLabelAgrupada = vinculoConvAgrupada.convenioNome.toUpperCase();
+  }
 
   // Cabeçalho da clínica (reutilizado em cada GR)
   const headerClinica = `
