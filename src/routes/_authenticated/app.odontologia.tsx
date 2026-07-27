@@ -537,7 +537,23 @@ function OdontologiaPage() {
           <TabsContent value="orcamento">
             <Card>
               <CardContent className="pt-6 space-y-3">
-                <Label>Paciente</Label>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <h2 className="text-lg font-semibold">Orçamentos odontológicos</h2>
+                    <p className="text-xs text-muted-foreground">
+                      Todos os orçamentos com procedimentos da especialidade Odontologia. Use a pesquisa para filtrar por paciente.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => setNovoOrcOpen(true)}
+                    disabled={!podeEscrever || !especialidadeOdontoId || !clinicaAtual}
+                    title={!especialidadeOdontoId ? "Especialidade Odontologia não encontrada" : undefined}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Novo orçamento
+                  </Button>
+                </div>
+                <Label>Filtrar por paciente</Label>
                 <PatientSearchInput
                   value={pacienteSelOrc}
                   onSelect={(p) => { setPacienteSelOrc(p); setPacienteIdOrc(p?.id ?? null); }}
@@ -545,20 +561,18 @@ function OdontologiaPage() {
                 />
               </CardContent>
             </Card>
-            {!pacienteIdOrc ? (
-              <p className="text-sm text-muted-foreground mt-4">Selecione um paciente para começar.</p>
-            ) : (
             <Card>
               <CardContent className="pt-6 mt-4">
                 <OrcamentoTab
                   pacienteId={pacienteIdOrc}
-                  pacienteNome={pacienteSelOrc?.nome ?? ""}
+                  pacienteNome={pacienteSelOrc?.nome ?? null}
                   pacienteTelefone={pacienteSelOrc?.telefone ?? null}
                   especialidadeOdontoId={especialidadeOdontoId}
+                  novoOpen={novoOrcOpen}
+                  onNovoOpenChange={setNovoOrcOpen}
                 />
               </CardContent>
             </Card>
-            )}
             {clinicaAtual && (
               <QuickPatientDialog
                 open={quickOpen}
