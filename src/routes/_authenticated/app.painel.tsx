@@ -63,7 +63,7 @@ function DashboardPage() {
     conf: { presencas: 0, ausencias: 0 },
     vendas: { total: 0, orcamentos: 0 },
     pagamentos: { realizado: 0, aPagar: 0 },
-    recebimentos: { realizado: 0, aReceber: 0, qtdRealizado: 0, qtdAReceber: 0, mensalidades: 0, qtdMensalidades: 0, atendimentos: 0, qtdAtendimentos: 0 },
+    recebimentos: { realizado: 0, aReceber: 0, qtdRealizado: 0, qtdAReceber: 0, mensalidades: 0, qtdMensalidades: 0, atendimentos: 0, qtdAtendimentos: 0, mensConsulta: 0, qtdMensConsulta: 0, mensDesconto: 0, qtdMensDesconto: 0, mensOutros: 0, qtdMensOutros: 0 },
     comissoes: { pagas: 0, pendentes: 0, percentReceita: 0 },
     // Atendimentos do dia = GRs de agendamento + GRs de mensalidade do cartão.
     grs: { agendamentos: 0, mensalidades: 0, outrosDias: 0, total: 0 },
@@ -227,6 +227,35 @@ function DashboardPage() {
     };
     const recMens = receitas.filter(l => l.status === "confirmado" && ehMensalidade(l));
     const recebMensalidades = recMens.reduce((s, l) => s + Number(l.valor || 0), 0);
+    // Separa as mensalidades por tipo de cartão (Consulta x Desconto),
+    // olhando o convênio do contrato de cada lançamento.
+    const contratoIds = Array.from(new Set(recMens.map(l => l.contrato_id).filter(Boolean) as string[]));
+    const tipoPorContrato = new Map<string, string>();
+    if (contratoIds.length > 0) {
+      const { data: ctrRows } = await supabase
+        .from("contratos_assinatura").select("id,convenio_id").in("id", contratoIds);
+      const convIds = Array.from(new Set(((ctrRows ?? []) as Array<{ convenio_id: string | null }>)
+        .map(c => c.convenio_id).filter(Boolean) as string[]));
+      const nomePorConv = new Map<string, string>();
+      if (convIds.length > 0) {
+        const { data: convRows } = await supabase.from("cb_convenios").select("id,nome").in("id", convIds);
+        for (const c of (convRows ?? []) as Array<{ id: string; nome: string | null }>) {
+          nomePorConv.set(c.id, (c.nome ?? "").toUpperCase());
+        }
+      }
+      for (const c of (ctrRows ?? []) as Array<{ id: string; convenio_id: string | null }>) {
+        const nome = c.convenio_id ? (nomePorConv.get(c.convenio_id) ?? "") : "";
+        tipoPorContrato.set(c.id, nome.includes("DESCONTO") ? "desconto" : nome.includes("CONSULTA") ? "consulta" : "outros");
+      }
+    }
+    let mensConsulta = 0, qtdMensConsulta = 0, mensDesconto = 0, qtdMensDesconto = 0, mensOutros = 0, qtdMensOutros = 0;
+    for (const l of recMens) {
+      const v = Number(l.valor || 0);
+      const tipo = l.contrato_id ? (tipoPorContrato.get(l.contrato_id) ?? "outros") : "outros";
+      if (tipo === "desconto") { mensDesconto += v; qtdMensDesconto++; }
+      else if (tipo === "consulta") { mensConsulta += v; qtdMensConsulta++; }
+      else { mensOutros += v; qtdMensOutros++; }
+    }
     const recebAtendimentos = recebRealizado - recebMensalidades;
     const qtdRecebAtendimentos = qtdReceb - recMens.length;
     const pagRealizado = despesas.filter(l => l.status === "confirmado").reduce((s, l) => s + Number(l.valor || 0), 0);
@@ -348,7 +377,7 @@ function DashboardPage() {
       conf: { presencas: atendidos, ausencias: faltas },
       vendas: { total: vendasTotal, orcamentos: 0 },
       pagamentos: { realizado: pagRealizado, aPagar: pagAPagar },
-      recebimentos: { realizado: recebRealizado, aReceber: recebAReceber, qtdRealizado: qtdReceb, qtdAReceber, mensalidades: recebMensalidades, qtdMensalidades: recMens.length, atendimentos: recebAtendimentos, qtdAtendimentos: qtdRecebAtendimentos },
+      recebimentos: { realizado: recebRealizado, aReceber: recebAReceber, qtdRealizado: qtdReceb, qtdAReceber, mensalidades: recebMensalidades, qtdMensalidades: recMens.length, atendimentos: recebAtendimentos, qtdAtendimentos: qtdRecebAtendimentos, mensConsulta, qtdMensConsulta, mensDesconto, qtdMensDesconto, mensOutros, qtdMensOutros },
       comissoes: { pagas: comissoesPagas, pendentes: 0, percentReceita: recebRealizado > 0 ? (comissoesPagas / recebRealizado) * 100 : 0 },
       porMedico,
     });
@@ -672,6 +701,11 @@ function DashboardPage() {
           ]} />
           <p className="text-[11px] text-muted-foreground mt-1">
             Sendo {fmtMoney(data.recebimentos.mensalidades)} de mensalidades do cartão ({fmtInt(data.recebimentos.qtdMensalidades)}) e {fmtMoney(data.recebimentos.atendimentos)} de atendimentos ({fmtInt(data.recebimentos.qtdAtendimentos)})
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            Mensalidades por cartão — Consulta: {fmtMoney(data.recebimentos.mensConsulta)} ({fmtInt(data.recebimentos.qtdMensConsulta)})
+            {" · "}Desconto: {fmtMoney(data.recebimentos.mensDesconto)} ({fmtInt(data.recebimentos.qtdMensDesconto)})
+            {data.recebimentos.qtdMensOutros > 0 && <> {" · "}Outros: {fmtMoney(data.recebimentos.mensOutros)} ({fmtInt(data.recebimentos.qtdMensOutros)})</>}
           </p>
         </KpiCard>
         )}
