@@ -274,9 +274,9 @@ export function NovoOrcamentoOdontoDialog({
         numero: 0,
         categoria: "demais",
         especialidade_id: especialidadeOdontoId,
-        paciente_id: pacienteId,
-        paciente_nome: pacienteNome,
-        paciente_telefone: pacienteTelefone,
+        paciente_id: paciente!.id,
+        paciente_nome: paciente!.nome,
+        paciente_telefone: paciente?.telefone ?? null,
         medico_id: medicoId || null,
         medico_nome: medicoNome.trim() || null,
         forma_pagamento: formasPagamento.join(" + "),
@@ -321,8 +321,15 @@ export function NovoOrcamentoOdontoDialog({
         <div className="space-y-4">
           {/* Cabeçalho compacto */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="space-y-1"><Label>Paciente</Label><Input value={pacienteNome} disabled /></div>
-            <div className="space-y-1"><Label>Telefone</Label><Input value={pacienteTelefone ?? ""} disabled /></div>
+            <div className="space-y-1">
+              <Label>Paciente</Label>
+              <PatientSearchInput
+                value={paciente}
+                onSelect={(p) => setPaciente(p)}
+                onRequestCreate={(q) => { setQuickInitial(q); setQuickOpen(true); }}
+              />
+            </div>
+            <div className="space-y-1"><Label>Telefone</Label><Input value={paciente?.telefone ?? ""} disabled /></div>
             <div className="space-y-1">
               <Label>Dentista</Label>
               <select
