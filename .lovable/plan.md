@@ -1,55 +1,36 @@
 ## Objetivo
 
-Na aba **Orçamento** de Odontologia, trocar a lista de cartões por uma **tabela** com todos os orçamentos odontológicos da clínica, e mover o botão **Novo orçamento** para cima do campo de pesquisa do paciente.
+Orçamentos de Odontologia passam a ter numeração própria, no formato **D-2026-00001**, independente da numeração dos demais orçamentos. Vale para as 3 clínicas.
 
-Vale para as **3 clínicas** (sem feature flag). Tipo de pedido: ajuste visual/UX + leitura de dados (sem mudança de regra de negócio nem de banco).
+## Como é hoje (verificado)
+
+- A tabela de orçamentos tem um campo `numero` inteiro preenchido por um gatilho no banco.
+- O formato atual é ano + 5 dígitos por clínica (ex.: `202600086`), compartilhado por todos os orçamentos, inclusive os de Odontologia.
+- A tela "Orçamento" de Odontologia não mostra o número hoje; a impressão mostra "ORÇAMENTO Nº".
 
 ## O que muda
 
-### 1. Cabeçalho da aba Orçamento
-```text
-[ Orçamentos odontológicos ]                    [ + Novo orçamento ]
-[ Pesquisar paciente ................................ ]  (filtro opcional)
-```
-- O botão fica acima do campo de pesquisa e **sempre habilitado** (respeitando permissão de edição).
-- A pesquisa de paciente passa a ser apenas **filtro da tabela** — não é mais obrigatório selecionar paciente para ver a lista.
+1. **Série de numeração**
+   - Novo campo de "série" no orçamento: vazio para os orçamentos normais e `D` para os de Odontologia.
+   - Nova contagem: o primeiro orçamento odontológico de cada clínica em 2026 será `D-2026-00001`, o seguinte `00002`, e assim por diante — sem interferir na contagem atual.
+   - Quando a faixa de 5 dígitos de um ano se esgotar (99999), a contagem continua de onde parou no ano seguinte, em vez de reiniciar.
+   - Trava de concorrência e índice único por clínica + série + número, para nunca sair número repetido.
+   - Orçamentos odontológicos já existentes mantêm o número antigo (nada é renumerado).
 
-### 2. Novo orçamento com paciente escolhido no diálogo
-- O diálogo `NovoOrcamentoOdontoDialog` ganha, no topo, o mesmo campo de busca de paciente já usado na tela (com cadastro rápido quando o paciente não existe).
-- Se um paciente estiver filtrado na tela, ele vem pré-selecionado; ainda assim pode ser trocado.
-- O restante do fluxo (itens, dentes, sinal/entrada) continua igual.
+2. **Tela de Odontologia > aba Orçamento**
+   - Nova coluna **Nº** como primeira coluna da tabela, exibindo `D-2026-00001`.
+   - A busca por número passa a aceitar tanto `D-2026-00001` quanto só os dígitos.
 
-### 3. Tabela de orçamentos
-
-Colunas, nesta ordem:
-
-| Coluna | Origem |
-|---|---|
-| Data e hora | `orcamentos.created_at` (dd/mm/aaaa hh:mm) |
-| Paciente | `paciente_nome` |
-| Médico | `medico_nome` |
-| Itens | contagem de linhas em `orcamento_itens` |
-| Total dinheiro | soma por forma "Dinheiro" |
-| Total cartão/Pix | soma por forma cartão/Pix |
-| Pagos | "x/y" itens quitados, com destaque quando parcial |
-| Ações | botão de impressora (2ª via) |
-
-- Clicar na linha abre o **drawer** de detalhe já existente (com sinal/saldo por item).
-- A impressora chama o `printOrcamento` atual, sem mudança de layout.
-- Ordenação padrão: mais recentes primeiro; limite de 200 registros, com o filtro por paciente aplicado na consulta.
-
-### 4. Regras de leitura dos valores e do "pagos"
-- **Dinheiro / Cartão-Pix**: usa os valores por forma já gravados no orçamento; quando o orçamento não tiver valores por forma, as duas colunas mostram o valor total (comportamento igual ao da cobrança na agenda hoje).
-- **Itens pagos**: item conta como pago quando estiver quitado no financeiro do orçamento **ou** quando o agendamento vinculado a ele tiver recebimento confirmado — mesma definição usada hoje na agenda. Item com apenas o sinal pago aparece como parcial, não como pago.
+3. **Detalhe e impressão**
+   - O painel lateral do orçamento e a 2ª via impressa passam a mostrar o número formatado com a série (`D-2026-00001`) quando for odontológico; nos demais, segue como hoje.
 
 ## Detalhes técnicos
 
-- `src/components/odontologia/orcamento-tab.tsx`: passa a receber `pacienteId` opcional (filtro) em vez de obrigatório; consulta `orcamentos` por `clinica_id` + `especialidade_id` (Odontologia), com `.eq("paciente_id", ...)` condicional; agrega `orcamento_itens` (contagem, `valores_formas`, `status_financeiro`, `valor_pago`) e `agendamento_orcamento_itens` + `fin_lancamentos` confirmados para o contador de pagos; renderiza `Table` do shadcn no lugar dos `OrcamentoCard`.
-- `src/routes/_authenticated/app.odontologia.tsx`: na `TabsContent value="orcamento"`, remove o gate `!pacienteIdOrc`, move o botão para cima do `PatientSearchInput` e sempre renderiza `OrcamentoTab`.
-- `src/components/odontologia/novo-orcamento-odonto-dialog.tsx`: props de paciente viram opcionais e o diálogo passa a ter `PatientSearchInput` + `QuickPatientDialog` internos, com validação antes de salvar.
-- Sem migração de banco; `OrcamentoCard` continua existindo para o módulo global de Orçamentos.
+- Migração: coluna `serie text` em `orcamentos` (default vazio), backfill deixando os existentes na série atual, índice único `(clinica_id, serie, numero)` e ajuste da função `orcamentos_set_numero` para numerar por `(clinica_id, serie, ano)` com carry-over ao estourar a faixa.
+- `novo-orcamento-odonto-dialog.tsx`: envia `serie: 'D'` no insert.
+- Helper de formatação compartilhado (`formatNumeroOrcamento(serie, numero)`) usado em `orcamento-tab.tsx`, `orcamento-drawer.tsx`, `orcamento-card.tsx` e `print-orcamento.ts`.
 
 ## Fora do escopo
 
-- Módulo global `/app/orcamentos` permanece inalterado.
-- Nenhuma alteração em regras de preço, convênios ou valores do Cartão Consulta.
+- Renumerar orçamentos antigos.
+- Alterar a numeração dos orçamentos não odontológicos.
