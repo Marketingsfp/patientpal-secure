@@ -90,7 +90,7 @@ export async function speak(text: string, opts: SpeakOptions = {}): Promise<void
     const audio = new Audio(url);
     audio.preload = "auto";
     // Fala bem mais lenta para melhor compreensão (mantém o pitch).
-    audio.playbackRate = 0.7;
+    audio.playbackRate = 0.55;
     // preservesPitch é padrão true em navegadores modernos; garante mesmo assim.
     (audio as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
     currentAudio = audio;
