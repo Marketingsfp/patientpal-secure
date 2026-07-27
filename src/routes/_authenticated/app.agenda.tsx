@@ -5038,6 +5038,10 @@ function AgendaPage() {
       // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
       // que não bate com a tabela de procedimentos e zeraria as opções).
       const opcoesOrc = a.orcamento_id ? await opcoesPagamentoDeOrcamento(a.orcamento_id) : null;
+      // Pagamento em duas etapas (sinal + saldo) — itens de orçamento com
+      // `sinal_valor` definido (Odontologia). A 1ª cobrança sugere o sinal,
+      // a 2ª o saldo restante.
+      const etapaSinal = await obterEtapaSinal(a.id);
       // Verificação fresca no banco: impede faturar duas vezes mesmo se o cache
       // local estiver desatualizado (ex.: outro usuário pagou em outra aba, ou
       // o pagamento foi transferido de uma ficha reagendada).
@@ -5078,7 +5082,7 @@ function AgendaPage() {
             dataRef: a.inicio ?? null,
           }),
       ]);
-      if ((jaPagos ?? []).length > 0) {
+      if ((jaPagos ?? []).length > 0 && !etapaSinal) {
         toast.info("Este agendamento já foi pago.");
         setPagosSet((prev) => {
           const n = new Set(prev);
