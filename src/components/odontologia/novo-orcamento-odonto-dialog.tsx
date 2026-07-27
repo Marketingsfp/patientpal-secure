@@ -273,6 +273,7 @@ export function NovoOrcamentoOdontoDialog({
       .insert({
         clinica_id: clinicaId,
         numero: 0,
+        serie: "D",
         categoria: "demais",
         especialidade_id: especialidadeOdontoId,
         paciente_id: paciente!.id,
