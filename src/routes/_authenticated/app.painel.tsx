@@ -227,6 +227,35 @@ function DashboardPage() {
     };
     const recMens = receitas.filter(l => l.status === "confirmado" && ehMensalidade(l));
     const recebMensalidades = recMens.reduce((s, l) => s + Number(l.valor || 0), 0);
+    // Separa as mensalidades por tipo de cartão (Consulta x Desconto),
+    // olhando o convênio do contrato de cada lançamento.
+    const contratoIds = Array.from(new Set(recMens.map(l => l.contrato_id).filter(Boolean) as string[]));
+    const tipoPorContrato = new Map<string, string>();
+    if (contratoIds.length > 0) {
+      const { data: ctrRows } = await supabase
+        .from("contratos_assinatura").select("id,convenio_id").in("id", contratoIds);
+      const convIds = Array.from(new Set(((ctrRows ?? []) as Array<{ convenio_id: string | null }>)
+        .map(c => c.convenio_id).filter(Boolean) as string[]));
+      const nomePorConv = new Map<string, string>();
+      if (convIds.length > 0) {
+        const { data: convRows } = await supabase.from("cb_convenios").select("id,nome").in("id", convIds);
+        for (const c of (convRows ?? []) as Array<{ id: string; nome: string | null }>) {
+          nomePorConv.set(c.id, (c.nome ?? "").toUpperCase());
+        }
+      }
+      for (const c of (ctrRows ?? []) as Array<{ id: string; convenio_id: string | null }>) {
+        const nome = c.convenio_id ? (nomePorConv.get(c.convenio_id) ?? "") : "";
+        tipoPorContrato.set(c.id, nome.includes("DESCONTO") ? "desconto" : nome.includes("CONSULTA") ? "consulta" : "outros");
+      }
+    }
+    let mensConsulta = 0, qtdMensConsulta = 0, mensDesconto = 0, qtdMensDesconto = 0, mensOutros = 0, qtdMensOutros = 0;
+    for (const l of recMens) {
+      const v = Number(l.valor || 0);
+      const tipo = l.contrato_id ? (tipoPorContrato.get(l.contrato_id) ?? "outros") : "outros";
+      if (tipo === "desconto") { mensDesconto += v; qtdMensDesconto++; }
+      else if (tipo === "consulta") { mensConsulta += v; qtdMensConsulta++; }
+      else { mensOutros += v; qtdMensOutros++; }
+    }
     const recebAtendimentos = recebRealizado - recebMensalidades;
     const qtdRecebAtendimentos = qtdReceb - recMens.length;
     const pagRealizado = despesas.filter(l => l.status === "confirmado").reduce((s, l) => s + Number(l.valor || 0), 0);
