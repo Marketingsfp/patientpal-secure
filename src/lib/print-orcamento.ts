@@ -148,7 +148,7 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
         <div class="item-nome">${esc(i.descricao)}</div>
         <div class="row sm">
           <div>${Number(i.quantidade)} x ${fmtBRL(Number(i.valor_unitario))}</div>
-          <div class="bold">${fmtBRL(Number(i.valor_total))}</div>
+          ${splitFormas(i) ? "" : `<div class="bold">${fmtBRL(Number(i.valor_total))}</div>`}
         </div>
         ${(() => {
           const sp = splitFormas(i);
