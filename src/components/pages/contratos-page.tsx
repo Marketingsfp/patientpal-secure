@@ -332,14 +332,32 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       .order("created_at", { ascending: false });
     const s = termo.trim();
     if (s.length >= 2) {
-      // Busca no servidor: por nome do paciente (ilike) e, quando o termo for
-      // numérico, também pelo número do contrato. Isso evita perder registros
-      // fora dos 500 mais recentes (clínicas com >500 contratos).
+      // Busca no servidor. O campo `paciente_nome` no contrato é um snapshot
+      // histórico e em vários contratos antigos veio truncado (ex.: "MARIA
+      // CRISTINA DE SOUZA D"). Para o nome completo funcionar, buscamos
+      // também os pacientes atuais por nome/CPF/prontuário/pasta e incluímos
+      // seus IDs no OR.
       const soDigitos = /^\d+$/.test(s);
-      const orExpr = soDigitos
-        ? `paciente_nome.ilike.%${s}%,numero.eq.${s}`
-        : `paciente_nome.ilike.%${s}%`;
-      contratosQuery = contratosQuery.or(orExpr).limit(200);
+      const digits = s.replace(/\D/g, "");
+      const escLike = s.replace(/[,()]/g, " ");
+      const pacFilters: string[] = [`nome.ilike.%${escLike}%`];
+      if (digits.length >= 2) {
+        pacFilters.push(`cpf.ilike.%${digits}%`);
+        pacFilters.push(`codigo_prontuario.eq.${digits}`);
+        pacFilters.push(`codigo_prontuario_anterior.eq.${digits}`);
+        pacFilters.push(`numero_pasta.eq.${digits}`);
+      }
+      const { data: pacMatch } = await supabase
+        .from("pacientes")
+        .select("id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .or(pacFilters.join(","))
+        .limit(200);
+      const pacIdsMatch = ((pacMatch ?? []) as Array<{ id: string }>).map((p) => p.id);
+      const orParts: string[] = [`paciente_nome.ilike.%${escLike}%`];
+      if (soDigitos) orParts.push(`numero.eq.${s}`);
+      if (pacIdsMatch.length > 0) orParts.push(`paciente_id.in.(${pacIdsMatch.join(",")})`);
+      contratosQuery = contratosQuery.or(orParts.join(",")).limit(200);
     } else {
       contratosQuery = contratosQuery.limit(500);
     }
