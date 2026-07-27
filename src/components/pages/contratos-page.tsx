@@ -2705,6 +2705,37 @@ function DetalheContrato({
     setCancelObs("");
   };
 
+  const [revertendoCancelamento, setRevertendoCancelamento] = useState(false);
+  const reverterCancelamento = async () => {
+    if (roleAtual !== "admin") {
+      toast.error("Apenas Admin pode reverter cancelamento.");
+      return;
+    }
+    if (!cancelado) return;
+    const ok = window.confirm(
+      "Reverter o cancelamento deste contrato?\n\nO status voltará para ATIVO e o plano/benefícios serão reativados. As mensalidades canceladas NÃO serão reabertas automaticamente — reabra manualmente se necessário.",
+    );
+    if (!ok) return;
+    setRevertendoCancelamento(true);
+    const { error } = await supabase
+      .from("contratos_assinatura")
+      .update({
+        status: "ativo",
+        cancelado_em: null,
+        cancelamento_motivo: null,
+      } as any)
+      .eq("id", contrato.id);
+    setRevertendoCancelamento(false);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    toast.success("Cancelamento revertido — contrato reativado.");
+    setCanceladoEm(null);
+    setCancelMotivoAtual(null);
+    await load();
+  };
+
   // Diálogo de forma de pagamento (espelha o da agenda)
   const [pagMens, setPagMens] = useState<Mens | null>(null);
   const [formaPagOpen, setFormaPagOpen] = useState(false);
@@ -3964,6 +3995,18 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <Ban className="h-4 w-4 mr-1" /> Cancelar contrato
               </Button>
             </div>
+          ) : cancelado && roleAtual === "admin" ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={reverterCancelamento}
+              disabled={revertendoCancelamento}
+              className="border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+              title="Reverter o cancelamento e reativar o contrato (somente Admin)."
+            >
+              <RefreshCw className="h-4 w-4 mr-1" />
+              {revertendoCancelamento ? "Revertendo..." : "Reverter cancelamento"}
+            </Button>
           ) : (
             <div className="w-[160px]" />
           )}
