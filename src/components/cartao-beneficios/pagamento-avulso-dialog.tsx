@@ -566,6 +566,7 @@ export function PagamentoAvulsoMensalidadeDialog({
         onOpenChange={setLancOpen}
         tipo="receita"
         categoriaFixaNome="MENSALIDADE CARTAO CONSULTA"
+        pacienteIdFixo={paciente?.id ?? null}
         initialDescricao={
           paciente
             ? `Mensalidade Cartão ${rotuloMes(refMes)} (avulso) - ${paciente.nome}`

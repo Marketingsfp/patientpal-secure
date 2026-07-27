@@ -5356,6 +5356,7 @@ h1, h2, h3 { margin: 0 0 6mm; }
           }
         }}
         tipo="receita"
+        pacienteIdFixo={((contrato as any).paciente_id as string | null) ?? null}
         initialDescricao={
           pagMens
             ? isAdesao(pagMens)
