@@ -1,40 +1,43 @@
-## Objetivo
+## Diagnóstico
 
-Remover, nas 3 clínicas, o botão **"Reaplicar a todos os serviços"** da aba Regras de Preço (Cartão Benefícios > Convênio) e também a rotina que ele executa, que regrava em massa a tabela de valores por serviço e sobrescreve valores digitados manualmente.
+Verifiquei no banco: a Quedima (`73c7e395-…`) é **admin nas 3 clínicas** tanto em `user_roles` quanto em `clinica_memberships`. Pelo código de `usePermissoes`, admin recebe `allowed = null` (sem filtro), então **não é a matriz de permissões que está cortando** o menu dela.
 
-## Por que é seguro
+O que corta é outra coisa: o **"Subsystem" salvo no navegador** (`localStorage.appshell:subsystem`). Quando o usuário entra em `/app` e escolhe um perfil de trabalho (Gestor Clínico = `recepcao`, ou Gestão de Pessoas = `gestao-pessoas`), o `app-shell.tsx` passa a esconder grupos inteiros do menu, **inclusive para admin**:
 
-Verifiquei no código:
-- A **Agenda** e o **Caixa** calculam o valor do convênio lendo a **regra viva** (`cb_convenio_regras`), não a tabela de cache.
-- A **grade de Serviços** também já calcula pela regra viva — há inclusive um comentário no código dizendo que o cache "nunca é lido aqui".
-- A tabela de cache `procedimento_cb_convenio_valores` continua existindo e continua sendo gravada quando um serviço é cadastrado/editado individualmente (fluxo manual, que permanece intacto).
+- `recepcao` → só mostra: Operação, Cartão Benefícios, Inteligência, Marketing, Cadastros, RH, Gestão, Configurações. **Esconde** grupos como "Financeiro", "Clínico", etc.
+- `gestao-pessoas` → só mostra: RH, Gestão, Configurações.
 
-Ou seja: sem o botão, nenhum preço deixa de funcionar — apenas nada mais sobrescreve valores em massa.
+Hoje, só o e-mail do Rodrigo tem bypass desse filtro (`isRodrigoFullAccess` no `app-shell.tsx`). Por isso a Quedima, mesmo sendo admin, vê o menu recortado — provavelmente escolheu "Gestor Clínico" no seletor `/app` em algum momento e a escolha ficou gravada no navegador dela.
 
-## O que muda na tela
+Classificação: **erro de UX/permissão de visualização** (não é regra de negócio, não é dado, não é RLS).
 
-**Antes:** existia o botão "Reaplicar a todos os serviços", e o "Salvar" das regras chamava essa mesma rotina pedindo confirmação.
+## Correções propostas (escolha a que preferir)
 
-**Depois:**
-- O botão some da barra da aba Regras de Preço.
-- O "Salvar" apenas grava as regras e recarrega a lista — sem confirmação extra e sem tocar em valores de serviços.
-- O cadastro/edição de valores por serviço continua igual, feito manualmente.
+Preciso da sua confirmação antes de aplicar. Duas alternativas:
 
-## Detalhes técnicos
+**Opção A — Admin sempre vê tudo (recomendado)**
+Estender o bypass que hoje existe só para o Rodrigo: qualquer usuário com `role = admin` na clínica atual passa a ignorar o filtro de subsystem e sempre enxerga o menu completo. Muda 1 arquivo (`src/components/app-shell.tsx`), sem tocar em banco.
 
-Arquivo único: `src/components/cartao-beneficios/regras-tab.tsx`
-1. Remover o `<Button ... onClick={() => reaplicar()}>` do cabeçalho da aba.
-2. Remover a chamada `await reaplicar()` ao final da função de salvar.
-3. Remover a função `reaplicar()` inteira e os estados/auxiliares que só ela usa (`reapplying`, `progress` e imports que ficarem órfãos).
-4. Sem migração de banco, sem alteração de schema, sem alteração de dados.
+**Opção B — Botão "Ver menu completo" quando um subsystem está ativo**
+Manter o filtro (é útil para usuários operacionais que querem foco), mas mostrar um botão/label ao lado do "Gestor Clínico" que limpa o subsystem (`setSubsystem(null)`) e devolve o menu inteiro. Serve para todos, não só admin.
+
+As duas soluções resolvem o caso da Quedima. A **A** é automática; a **B** exige que ela clique uma vez.
+
+## Escopo (Regra 1.10)
+
+A mudança é de **frontend puro (comportamento do menu)**, sem impacto por clínica — mas confirme mesmo assim:
+- Aplicar nas **3 clínicas** (SFP, Menino Jesus, SÃO Policlínica)?
+- Ou só onde a Quedima trabalha primariamente?
 
 ## Fora do escopo
 
-- Não altero nenhum valor de Cartão Consulta ou de qualquer convênio (regra 1.11 do AGENTS.md).
-- Não mexo na tabela de cache nem em dados já gravados.
-- Não mexo em outros botões de "reaplicar" do sistema (ex.: "Reaplicar juros e multa" em Contratos).
+- Não vou alterar nenhum papel, permissão ou dado.
+- Não vou mexer em `perfil_permissoes` / `perfis_acesso`.
+- Não vou tocar no bypass existente do Rodrigo.
 
-## Validação
+## Pendências / validação após aplicar
 
-- Abrir Cartão Benefícios > Convênio > Regras de Preço e confirmar que o botão sumiu e que "Salvar" grava normalmente.
-- Conferir na Agenda que o valor de um serviço com regra continua sendo aplicado corretamente.
+- Pedir à Quedima para dar **F5** (o `localStorage` do subsystem é do navegador dela; qualquer opção acima só passa a valer no próximo carregamento da página).
+- Se preferir uma correção imediata **sem deploy**, ela pode abrir o Console do navegador e rodar `localStorage.removeItem('appshell:subsystem')` + F5 — resolve o caso pontual dela agora, mas não previne repetição.
+
+Me diga qual opção (A ou B) e o escopo de clínicas para eu implementar.
