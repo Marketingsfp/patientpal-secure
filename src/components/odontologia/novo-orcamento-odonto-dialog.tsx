@@ -245,6 +245,7 @@ export function NovoOrcamentoOdontoDialog({
   }, [formasPagamento, itens, desconto]);
 
   const salvar = async () => {
+    if (!paciente?.id) return toast.error("Selecione o paciente");
     if (itens.length === 0) return toast.error("Adicione ao menos um serviço");
     if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
     for (let i = 0; i < itens.length; i++) {
@@ -581,6 +582,14 @@ export function NovoOrcamentoOdontoDialog({
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button onClick={salvar} disabled={saving}>{saving ? "Salvando…" : "Salvar orçamento"}</Button>
         </DialogFooter>
+
+        <QuickPatientDialog
+          open={quickOpen}
+          onOpenChange={setQuickOpen}
+          clinicaId={clinicaId}
+          nomeInicial={quickInitial}
+          onCreated={(p) => { setPaciente(p); setQuickOpen(false); }}
+        />
       </DialogContent>
     </Dialog>
   );
