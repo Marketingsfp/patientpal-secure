@@ -265,7 +265,12 @@ export function PagamentoAvulsoMensalidadeDialog({
           <div className="space-y-3">
             <div className="space-y-1">
               <Label>Paciente</Label>
-              <PatientSearchInput value={paciente} onSelect={setPaciente} clinicaIdsOverride={[clinicaId]} />
+              <PatientSearchInput
+                value={paciente}
+                onSelect={setPaciente}
+                clinicaIdsOverride={[clinicaId]}
+                onRequestCreate={(q) => setQuickOpen({ alvo: "titular", nome: q })}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
