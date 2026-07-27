@@ -154,12 +154,13 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     return m;
   }, [especialidades]);
 
-  // ---- Exceções (apenas convênio FUNCIONARIO) ---------------------------
+  // ---- Exceções às regras (todos os convênios) --------------------------
   // Uma exceção é um procedimento que NÃO recebe desconto neste convênio.
   // Gravamos como regra específica por procedimento com percentual = 0 e
   // prioridade alta — o motor (cb-regras.ts) já dá preferência a regras
   // com procedimento_id, então a exceção vence sobre regras por categoria.
   const isFuncionario = isConvenioFuncionario(convenioNome);
+  void isFuncionario;
   const [excSel, setExcSel] = useState<string[]>([]);
   const [excSaving, setExcSaving] = useState(false);
   const excecoes = useMemo(
@@ -223,9 +224,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     const items = regras
       .map((r, idx) => ({ r, idx }))
       .filter(({ r }) => {
-        // Exceções do convênio FUNCIONARIO ficam apenas no bloco próprio.
+        // Exceções ficam apenas no bloco próprio "Exceção às regras".
         if (
-          isFuncionario &&
           r.procedimento_id &&
           r.modo === "percentual_desconto" &&
           Number(r.percentual) === 0 &&
@@ -267,7 +267,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
       return 0;
     });
     return items;
-  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, filtroEspecialidade, filtroTipo, filtroProcedimento, filtroModo, filtroPrioridade, procById, espById, isFuncionario]);
+  }, [regras, filtroGratuito, filtroCarencia, filtroLimite, filtroEspecialidade, filtroTipo, filtroProcedimento, filtroModo, filtroPrioridade, procById, espById]);
 
   const prioridadesUsadas = useMemo(() => {
     const s = new Set<number>();
@@ -355,12 +355,12 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
 
   return (
     <div className="space-y-3">
-      {isFuncionario && (
+      {(
         <div className="border rounded-md p-3 bg-muted/30 space-y-3">
           <div>
-            <div className="font-medium">Exceções (sem desconto)</div>
+            <div className="font-medium">Exceção às regras (sem desconto)</div>
             <p className="text-xs text-muted-foreground">
-              Serviços listados aqui são cobrados como <strong>particular</strong> para este convênio, ignorando qualquer regra por categoria ou especialidade.
+              Serviços listados aqui são cobrados como <strong>particular</strong> para este convênio, ignorando qualquer regra por categoria, tipo ou especialidade. Serviços que não estão nas regras nem nas exceções também são cobrados como particular.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
