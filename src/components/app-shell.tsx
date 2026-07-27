@@ -119,6 +119,7 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/triagem-enfermagem", label: "Triagem - Enfermagem", icon: HeartPulse },
     { to: "/app/cartao-beneficios/contratos", label: "Cartão Benefícios", icon: CreditCard },
     { to: "/app/documentos", label: "Documentos do paciente", icon: FileText },
+    { to: "/app/anamneses", label: "Anamneses", icon: FileHeart },
     ],
   },
   {
@@ -208,6 +209,8 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     label: "Configurações",
     items: [
     { to: "/app/configuracoes/painel-totem", label: "Painel & Totem", icon: KeyRound },
+    { to: "/app/clinicas", label: "Clínicas", icon: Building2 },
+    { to: "/app/backups", label: "Backups", icon: ShieldCheck },
     ],
   },
 ];
