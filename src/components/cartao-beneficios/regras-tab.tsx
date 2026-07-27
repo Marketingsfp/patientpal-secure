@@ -353,10 +353,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     );
   }
 
-  return (
-    <div className="space-y-3">
-      {(
-        <div className="border rounded-md p-3 bg-muted/30 space-y-3">
+  const blocoExcecoes = (
+    <div className="border rounded-md p-3 bg-muted/30 space-y-3">
           <div>
             <div className="font-medium">Exceção às regras (sem desconto)</div>
             <p className="text-xs text-muted-foreground">
@@ -401,8 +399,11 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
               ))}
             </ul>
           )}
-        </div>
-      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="font-medium">Regras de preço automáticas</div>
@@ -715,6 +716,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           {loading ? "Salvando…" : "Salvar regras"}
         </Button>
       </div>
+
+      {blocoExcecoes}
 
       <LimiteDialog
         idx={limiteIdx}
