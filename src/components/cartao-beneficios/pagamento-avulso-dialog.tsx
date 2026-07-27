@@ -488,6 +488,37 @@ export function PagamentoAvulsoMensalidadeDialog({
                   />
                 </div>
 
+                {/* Isenção de carência: perguntada já no pagamento avulso. */}
+                <div className="space-y-2 rounded-md border p-3">
+                  <label className="flex items-start gap-2 text-sm">
+                    <Checkbox
+                      checked={semCarencia}
+                      onCheckedChange={(v) => {
+                        const marcado = !!v;
+                        setSemCarencia(marcado);
+                        if (!marcado) setSemCarenciaMotivo("");
+                      }}
+                    />
+                    <span>
+                      Isento de carência
+                      <span className="block text-xs text-muted-foreground">
+                        Marque quando o paciente já cumpriu carência em contrato anterior (renovação,
+                        migração ou troca de convênio). Fica registrado quem marcou e quando.
+                      </span>
+                    </span>
+                  </label>
+                  {semCarencia && (
+                    <div className="space-y-1 pl-6">
+                      <Label className="text-xs">Motivo da isenção (obrigatório)</Label>
+                      <Input
+                        value={semCarenciaMotivo}
+                        onChange={(e) => setSemCarenciaMotivo(e.target.value)}
+                        placeholder="Ex.: Já cumpriu carência no contrato anterior"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 {resumo && (
                   <p className="text-xs text-muted-foreground">
                     Parcela {resumo.numeroAtual}/12 = {rotuloMes(refMes)} (será baixada como paga agora)
