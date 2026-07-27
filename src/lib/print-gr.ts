@@ -660,7 +660,8 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         .from("fin_lancamentos")
         .select("descricao")
         .eq("agendamento_id", agendamentoId)
-        .eq("tipo", "receita");
+        .eq("tipo", "receita")
+        .neq("status", "cancelado");
       for (const l of ((lancs ?? []) as Array<{ descricao: string | null }>)) {
         if (detectCartaoConsulta(l.descricao)) { isCartaoConsulta = true; break; }
       }
