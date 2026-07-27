@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Loader2 } from "lucide-react";
-import { speak as ttsSpeak, isUserTtsEnabled } from "@/lib/tts-service";
+import { speak as ttsSpeak, isUserTtsEnabled, getUserTtsRate } from "@/lib/tts-service";
 type Senha = {
   id: string;
   codigo: string;
@@ -220,7 +220,8 @@ export function PainelPage() {
   function criarFala(texto: string, key: string) {
     const utter = new SpeechSynthesisUtterance(texto);
     utter.lang = "pt-BR";
-    utter.rate = 0.75;
+    // Usa a mesma velocidade configurada para o TTS Piper (fallback nativo).
+    utter.rate = getUserTtsRate();
     const voz = vozFemininaRef.current ?? escolherVozFeminina();
     if (voz) utter.voice = voz;
     utter.onstart = () => {

@@ -16,6 +16,24 @@
 
 const PROXY_URL = "/api/public/tts";
 const STORAGE_KEY = "tts:enabled";
+const RATE_STORAGE_KEY = "tts:rate";
+export const DEFAULT_TTS_RATE = 0.55;
+export const MIN_TTS_RATE = 0.3;
+export const MAX_TTS_RATE = 1.5;
+
+export function getUserTtsRate(): number {
+  if (typeof window === "undefined") return DEFAULT_TTS_RATE;
+  const raw = window.localStorage.getItem(RATE_STORAGE_KEY);
+  const n = raw ? Number(raw) : NaN;
+  if (!Number.isFinite(n)) return DEFAULT_TTS_RATE;
+  return Math.min(MAX_TTS_RATE, Math.max(MIN_TTS_RATE, n));
+}
+
+export function setUserTtsRate(rate: number) {
+  if (typeof window === "undefined") return;
+  const clamped = Math.min(MAX_TTS_RATE, Math.max(MIN_TTS_RATE, rate));
+  window.localStorage.setItem(RATE_STORAGE_KEY, String(clamped));
+}
 
 let currentAudio: HTMLAudioElement | null = null;
 let currentUrl: string | null = null;
@@ -89,8 +107,8 @@ export async function speak(text: string, opts: SpeakOptions = {}): Promise<void
     const url = await fetchAudioUrl(t);
     const audio = new Audio(url);
     audio.preload = "auto";
-    // Fala bem mais lenta para melhor compreensão (mantém o pitch).
-    audio.playbackRate = 0.55;
+    // Velocidade configurável pelo usuário (mantém o pitch).
+    audio.playbackRate = getUserTtsRate();
     // preservesPitch é padrão true em navegadores modernos; garante mesmo assim.
     (audio as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
     currentAudio = audio;
