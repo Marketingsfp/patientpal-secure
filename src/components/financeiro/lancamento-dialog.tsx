@@ -60,11 +60,15 @@ interface Props {
   initialValor?: string;
   agendamentoId?: string | null;
   initialFormaPagamento?: string;
+  /** Paciente (titular) a vincular quando o recebimento não vem de um
+   *  agendamento — ex.: mensalidade do cartão e pagamento avulso. Garante que
+   *  a coluna "Paciente" do Caixa mostre o nome. */
+  pacienteIdFixo?: string | null;
   /** Nome exato da categoria a fixar (ex.: "MENSALIDADE CARTAO CONSULTA"). Quando setado, o select fica desabilitado. */
   categoriaFixaNome?: string;
 }
 
-export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento, categoriaFixaNome }: Props) {
+export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento, pacienteIdFixo, categoriaFixaNome }: Props) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const role = clinicaAtual?.role ?? null;
@@ -511,6 +515,8 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       medicoId = agPrefetch.medico_id ?? null;
       pacienteId = agPrefetch.paciente_id ?? null;
     }
+    // Sem agendamento (mensalidade / pagamento avulso): usa o titular informado.
+    if (!pacienteId && pacienteIdFixo) pacienteId = pacienteIdFixo;
     // Quando misto tem linha de Cartão Crédito, propagamos bandeira/parcelas
     // da primeira linha de crédito para os campos de topo do lançamento
     // (usados por relatórios e pela impressão da GR).

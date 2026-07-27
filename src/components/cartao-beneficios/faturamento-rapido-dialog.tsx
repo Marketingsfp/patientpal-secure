@@ -381,6 +381,7 @@ export function FaturamentoRapidoMensalidadeDialog({
         }}
         tipo="receita"
         categoriaFixaNome="MENSALIDADE CARTAO CONSULTA"
+        pacienteIdFixo={pagando?.paciente_id ?? null}
         initialDescricao={
           pagando
             ? `Mensalidade ${pagando.numero_parcela}/${pagando.total_parcelas} - Contrato #${pagando.contrato_numero} - ${pagando.titular_nome}`
