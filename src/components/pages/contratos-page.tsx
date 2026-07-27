@@ -181,7 +181,6 @@ type Contrato = {
   numero: number;
   paciente_nome: string;
   convenio_id: string | null;
-  plano_id: string | null;
   valor_mensal: number;
   status: string;
   data_inicio: string;

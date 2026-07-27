@@ -321,7 +321,7 @@ const TABELAS_COM_CLINICA_ARR = [
   "modelos_documentos", "nfse", "nfse_emitentes", "odonto_dentes",
   "odonto_prontuarios", "orcamento_itens", "orcamentos",
   "paciente_biometria", "pacientes", "pagamento_splits", "pagamentos",
-  "perfil_permissoes", "perfis_acesso", "planos_assinatura",
+  "perfil_permissoes", "perfis_acesso",
   "prestadores", "procedimento_cb_convenio_valores",
   "procedimento_especialidades", "procedimento_split_regras",
   "procedimento_unidade_regras", "procedimentos", "prontuario_modelos",

@@ -27,7 +27,6 @@ type Contrato = {
   paciente_id: string;
   paciente_nome: string;
   status: string;
-  plano_id: string | null;
   convenio_id: string | null;
 };
 type Dep = {
@@ -66,7 +65,7 @@ function DependentesPage() {
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabase
         .from("contratos_assinatura")
-        .select("id, numero, paciente_id, paciente_nome, status, plano_id, convenio_id")
+        .select("id, numero, paciente_id, paciente_nome, status, convenio_id")
         .eq("clinica_id", cid)
         .neq("status", "cancelado")
         .order("paciente_nome")
