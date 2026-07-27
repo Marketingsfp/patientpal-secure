@@ -44,6 +44,7 @@ type PeriodoKey = "hoje" | "7d" | "30d" | "custom";
 interface AggRow {
   id: string; sessao_id: string; tipo: MovTipo;
   valor: number; forma_pagamento: string | null; created_at: string;
+  lancamento_id: string | null;
 }
 
 const TIPO_LABEL: Record<MovTipo, string> = {
