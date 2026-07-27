@@ -20,8 +20,7 @@ import { PatientSearchInput, type PatientOption } from "@/components/patient-sea
 import { LancamentoDialog } from "@/components/financeiro/lancamento-dialog";
 import { printGuiaMensalidade } from "@/lib/print-gr";
 
-type Plano = { id: string; nome: string; valor_mensal: number; num_parcelas: number };
-type Convenio = { id: string; nome: string };
+type Convenio = { id: string; nome: string; valor_mensal: number | null; num_parcelas: number | null };
 
 const TOTAL_PARCELAS = 12;
 
@@ -68,9 +67,7 @@ export function PagamentoAvulsoMensalidadeDialog({
   const mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
 
   const [paciente, setPaciente] = useState<PatientOption | null>(pacienteInicial ?? null);
-  const [planos, setPlanos] = useState<Plano[]>([]);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
-  const [planoId, setPlanoId] = useState<string>("");
   const [convenioId, setConvenioId] = useState<string>("");
   const [refMes, setRefMes] = useState<string>(mesAtual);
   const [valor, setValor] = useState<string>("");
@@ -86,21 +83,12 @@ export function PagamentoAvulsoMensalidadeDialog({
     setCriarContrato(true);
     (async () => {
       setLoading(true);
-      const [{ data: pl }, { data: cv }] = await Promise.all([
-        supabase
-          .from("planos_assinatura")
-          .select("id, nome, valor_mensal, num_parcelas")
-          .eq("clinica_id", clinicaId)
-          .eq("ativo", true)
-          .order("nome"),
-        supabase
-          .from("cb_convenios")
-          .select("id, nome")
-          .eq("clinica_id", clinicaId)
-          .eq("ativo", true)
-          .order("nome"),
-      ]);
-      setPlanos((pl ?? []) as Plano[]);
+      const { data: cv } = await supabase
+        .from("cb_convenios")
+        .select("id, nome, valor_mensal, num_parcelas")
+        .eq("clinica_id", clinicaId)
+        .eq("ativo", true)
+        .order("nome");
       setConvenios((cv ?? []) as Convenio[]);
       setLoading(false);
     })();
@@ -119,11 +107,11 @@ export function PagamentoAvulsoMensalidadeDialog({
     };
   }, [criarContrato, refMes, diaVenc]);
 
-  const podeAvancar = !!paciente && !!refMes && valorNum > 0 && (!criarContrato || !!planoId);
+  const podeAvancar = !!paciente && !!refMes && valorNum > 0 && (!criarContrato || !!convenioId);
 
-  const escolherPlano = (id: string) => {
-    setPlanoId(id);
-    const p = planos.find((x) => x.id === id);
+  const escolherConvenio = (id: string) => {
+    setConvenioId(id);
+    const p = convenios.find((x) => x.id === id);
     if (p && Number(p.valor_mensal) > 0 && !valorNum) setValor(String(Number(p.valor_mensal).toFixed(2)));
   };
 
@@ -141,7 +129,6 @@ export function PagamentoAvulsoMensalidadeDialog({
       .from("contratos_assinatura")
       .insert({
         clinica_id: clinicaId,
-        plano_id: planoId,
         convenio_id: convenioId || null,
         paciente_id: paciente.id,
         paciente_nome: paciente.nome,
@@ -234,27 +221,12 @@ export function PagamentoAvulsoMensalidadeDialog({
 
             {criarContrato && (
               <div className="space-y-3 rounded-md border p-3">
-                <div className="space-y-1">
-                  <Label>Plano</Label>
-                  <Select value={planoId} onValueChange={escolherPlano} disabled={loading}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={loading ? "Carregando…" : "Selecione o plano"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {planos.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label>Convênio (opcional)</Label>
-                    <Select value={convenioId} onValueChange={setConvenioId}>
+                    <Label>Convênio</Label>
+                    <Select value={convenioId} onValueChange={escolherConvenio} disabled={loading}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Sem convênio" />
+                        <SelectValue placeholder={loading ? "Carregando…" : "Selecione o convênio"} />
                       </SelectTrigger>
                       <SelectContent>
                         {convenios.map((c) => (

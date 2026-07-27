@@ -1,41 +1,59 @@
 ## Objetivo
 
-Tornar visíveis no menu páginas que hoje só são alcançadas por URL direta ou pela busca global. Aplicação **global (3 clínicas)**, conforme confirmado.
+Unificar as telas duplicadas do Cartão Benefícios: a aba **Modelos** deixa de existir e tudo passa a ser feito em **Convênios > Informações**. Aplicação **global (3 clínicas)**.
+
+## Situação atual (verificada)
+
+- **Modelos** grava em `planos_assinatura`; **Convênios** grava em `cb_convenios`.
+- `cb_convenios` já é superconjunto: nome, descrição, valor mensal, taxa de adesão, parcelas, máx. dependentes, fidelidade, vigência, modelo de contrato, informativo, termo de inclusão, taxa de inclusão de dependente, acréscimo cartão/pix e **modalidade** (equivale ao "tipo" de Modelos).
+- Único campo exclusivo de Modelos é **"Máx. agregados"**, que não é lido em nenhum outro ponto do sistema.
+- **1.623 contratos** apontam para um plano, e **todos eles** também já apontam para um convênio. Nenhum contrato tem plano sem convênio.
+- Contratos novos criados pela tela de Vendas já não gravam plano; só o Pagamento Avulso ainda grava.
 
 ## Escopo
 
-### 1. Aba "Modelos" no Cartão Benefícios
-Hoje as abas são: Vendas, Convênios, Dependentes, Relatórios (BI). A página `/app/cartao-beneficios/modelos` existe mas não está listada.
+### 1. Migrar as leituras de "plano" para "convênio"
+Passar a ler nome/tipo/vigência de `cb_convenios` pelo convênio do contrato:
 
-- Acrescentar a aba **"Modelos"** (ícone de arquivo/cartão) na barra de abas do Cartão Benefícios, após "Dependentes".
-- Ela abre o cadastro de modelos de plano/contrato: nome, tipo, valor mensal, taxa de adesão, limite de dependentes/agregados, fidelidade, vigência, nº de parcelas, benefícios e template de impressão do contrato.
-- Nada muda na tela em si nem nos dados; é só exposição de navegação.
+- Impressão do contrato, do carnê, da GR (3 pontos) e do cartão do paciente
+- Regra de limite de dependentes
+- Lista de Clientes (coluna do plano) e ficha do cliente
+- Relatórios gerais e Relatórios BI do Cartão
+- Consulta da Nina
+- Pagamento Avulso: passa a trabalhar com convênio e deixa de gravar plano
 
-### 2. Páginas órfãs úteis ganham item de menu
-- **Anamneses** (`/app/anamneses`) → grupo Clínico/Atendimento.
-- **Clínicas** (`/app/clinicas`) → grupo Configurações.
-- **Backups** (`/app/backups`) → grupo Configurações.
+### 2. Remover as telas duplicadas
+- Excluir a aba **Modelos** e a página `/app/cartao-beneficios/modelos` (redireciona para Convênios, para não quebrar links salvos).
+- Remover **"Planos / Convênios"** do menu Cadastros e a página `/app/planos` (mesmo redirecionamento).
+- Remover o componente da tela de planos e o atalho de busca que apontava para ela.
 
-Cada uma continua respeitando as permissões já definidas em `permissoes-rotas.ts` — quem não tem o módulo liberado segue sem ver o item.
+### 3. Convênios > Informações
+Nenhum campo novo é necessário. Apenas ajuste de rótulo deixando claro que ali se define o modelo do convênio. "Máx. agregados" é descontinuado por não ter uso.
 
-### 3. Fora do escopo (não mexer agora)
-- Telas internas de teste `dev-caixa-shell`, `dev-clientes-shell`, `dev-list-shell`, `dev-orcamentos-shell`, `dev-hhp` — permanecem como estão.
-- Página antiga `/app/medicos` (substituída por `/app/equipe`) — permanece como está.
-- Páginas que já têm navegação própria dentro do módulo pai: abas do Financeiro, `cartao-beneficios/beneficios`, `nfse/testar`, `orcamentos-agenda`, `agenda-v2`.
-- Nenhuma alteração de valores, regras de negócio, banco ou permissões.
+### 4. Banco de dados — exclusão definitiva (autorizada)
 
-## Detalhes técnicos
+Como você autorizou excluir, faremos em **duas etapas separadas e aprovadas uma por vez**, para não perder histórico por engano:
 
-- `src/routes/_authenticated/app.cartao-beneficios.tsx`: adicionar entrada `{ to: "/app/cartao-beneficios/modelos", label: "Modelos", icon: ... }` no array de abas.
-- `src/components/app-shell.tsx`: adicionar os três itens nos grupos correspondentes do array de navegação.
-- Sem migração de banco. Sem mudança em `permissoes-rotas.ts` (as rotas já estão mapeadas).
+**Etapa A — antes de excluir (obrigatória):**
+1. Conferir novamente, no momento da execução, que **nenhum** contrato tem plano sem convênio. Se aparecer algum, ele é corrigido/apontado antes de seguir.
+2. Copiar o conteúdo atual de `planos_assinatura` para uma tabela de arquivo morto (`planos_assinatura_arquivo`), somente leitura, apenas para consulta histórica.
+3. Exportar também um CSV do conteúdo para você guardar fora do sistema.
 
-## Riscos
+**Etapa B — exclusão:**
+4. Remover a ligação de plano nos contratos (a coluna `plano_id` de `contratos_assinatura`), já que 100% dos contratos têm convênio.
+5. Excluir a tabela `planos_assinatura`.
 
-Baixo. Mudança puramente de navegação/frontend, reversível. Impacto: itens novos passam a aparecer para usuários com permissão nos módulos correspondentes nas 3 clínicas.
+Nenhum valor de Cartão Consulta é tocado (Regra 1.11). A Etapa B só roda depois que a Etapa A e as validações da seção seguinte estiverem OK.
 
-## Validação após implementar
+## Riscos e cuidados
 
-- Abrir Cartão Benefícios e confirmar a aba "Modelos" listando os modelos da clínica ativa.
-- Conferir que Anamneses, Clínicas e Backups abrem pelo menu.
-- Conferir que usuário sem permissão no módulo continua sem ver o item.
+- Área crítica: impressão de contrato, carnê, GR e cartão do paciente. A mudança é de **origem do nome/tipo**, não de valores financeiros.
+- A exclusão é destrutiva e só é reversível pela tabela de arquivo morto e pelo CSV da Etapa A — por isso ela é feita depois, em migração separada.
+
+## Validação (entre a Etapa A e a Etapa B)
+
+- Imprimir contrato, carnê, GR e cartão de um contrato antigo e de um recente, e conferir nome/tipo em ambos.
+- Conferir a coluna de plano na lista de Clientes e na ficha do cliente.
+- Conferir Relatórios BI do Cartão e o relatório geral de contratos.
+- Fazer um Pagamento Avulso de teste e conferir o vínculo com o convênio.
+- Conferir que `/app/cartao-beneficios/modelos` e `/app/planos` redirecionam sem erro.

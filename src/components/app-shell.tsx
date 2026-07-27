@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, FileBarChart2, Moon, Sun, Pin, PinOff, Menu as MenuIcon } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, FileBarChart2, Moon, Sun, Pin, PinOff, Menu as MenuIcon } from "lucide-react";
 import { Tooth } from "@/components/icons/tooth";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -172,7 +172,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
     { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
     { to: "/app/unidades", label: "Unidades", icon: MapPin },
-    { to: "/app/planos", label: "Planos / Convênios", icon: Gift },
     { to: "/app/modelos-documentos", label: "Modelos de Documentos", icon: FileText },
     { to: "/app/estoque", label: "Estoque", icon: LayoutGrid },
     { to: "/app/clientes/duplicados", label: "Duplicados / Merge", icon: Users },
@@ -368,7 +367,7 @@ export function AppShell() {
       /servico|procediment|exame/.test(t) ? "/app/procedimentos" :
       /or[çc]amento/.test(t) ? "/app/orcamentos" :
       /plano|assinatura|cart[ãa]o|benef[ií]cio|contrato/.test(t) ? "/app/cartao-beneficios/contratos" :
-      /modelo|template/.test(t) ? "/app/cartao-beneficios/modelos" :
+      /modelo|template/.test(t) ? "/app/cartao-beneficios/convenios" :
       /relat[óo]rio.*cart[ãa]o|cart[ãa]o.*relat[óo]rio/.test(t) ? "/app/cartao-beneficios/relatorios" :
       /financ|caixa|conta|boleto/.test(t) ? "/app/financeiro" :
       /cl[ií]nica/.test(t) ? "/app/unidades" :

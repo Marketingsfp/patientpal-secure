@@ -276,14 +276,6 @@ export async function printContrato(contratoId: string) {
     .eq("id", (c as any).clinica_id)
     .maybeSingle();
 
-  const { data: pl } = (c as any).plano_id
-    ? await supabase
-        .from("planos_assinatura")
-        .select("template_contrato")
-        .eq("id", (c as any).plano_id)
-        .maybeSingle()
-    : { data: null as any };
-
   const { data: cv } = (c as any).convenio_id
     ? await supabase
         .from("cb_convenios")
@@ -340,13 +332,12 @@ export async function printContrato(contratoId: string) {
     depSlotVars[`DEPENDENTE_${idx}_TELEFONE`] = fmtTelefone(pac?.telefone ?? d?.telefone);
   }
 
-  const plTpl = (pl as any)?.template_contrato;
   const cvTpl = (cv as any)?.modelo_contrato;
   const pick = (v: any) => (v && String(v).replace(/<[^>]+>/g, "").trim().length > 0 ? v : null);
   const overrideTpl = (c as any).convenio_id
     ? CONVENIO_TEMPLATE_OVERRIDES[(c as any).convenio_id]
     : null;
-  const templateBody = overrideTpl ?? pick(plTpl) ?? pick(cvTpl) ?? TEXTO_CONTRATO_HTML;
+  const templateBody = overrideTpl ?? pick(cvTpl) ?? TEXTO_CONTRATO_HTML;
 
   const corpo = applyTemplate(templateBody, {
     PACIENTE_NOME: c.paciente_nome ?? "",

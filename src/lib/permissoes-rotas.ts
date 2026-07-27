@@ -38,7 +38,6 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/cartao-beneficios/beneficios": "cartao-beneficios",
   "/app/cartao-beneficios/convenios": "cartao-beneficios",
   "/app/cartao-beneficios/dependentes": "cartao-beneficios",
-  "/app/cartao-beneficios/modelos": "cartao-beneficios",
   "/app/cartao-beneficios/relatorios": "cartao-beneficios",
   "/app/imprimir": "agenda",
   "/app/documentos": "documentos",
@@ -73,7 +72,6 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/perfis": "perfis",
   "/app/unidades": "unidades",
   "/app/medicos": "medicos",
-  "/app/planos": "planos",
   "/app/estoque": "estoque",
   "/app/clinicas": "clinicas",
 

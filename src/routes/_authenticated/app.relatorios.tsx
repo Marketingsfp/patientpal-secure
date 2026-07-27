@@ -147,11 +147,11 @@ const RELATORIOS: Relatorio[] = [
     icon: CreditCard, cor: "#22d3ee",
     carregar: async ({ clinicaId }) => {
       const { data } = await supabase.from("contratos_assinatura")
-        .select("numero, status, valor_mensal, data_inicio, data_fim, pacientes(nome), planos_assinatura(nome)")
+        .select("numero, status, valor_mensal, data_inicio, data_fim, pacientes(nome), cb_convenios(nome)")
         .eq("clinica_id", clinicaId).order("data_inicio", { ascending: false });
       return (data ?? []).map((r: any) => ({
         Numero: r.numero, Status: r.status, Paciente: r.pacientes?.nome ?? "",
-        Plano: r.planos_assinatura?.nome ?? "", ValorMensal: r.valor_mensal,
+        Plano: r.cb_convenios?.nome ?? "", ValorMensal: r.valor_mensal,
         Inicio: r.data_inicio, Fim: r.data_fim,
       }));
     },
