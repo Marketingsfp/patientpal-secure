@@ -27,6 +27,9 @@ type DependenteLinha = { key: string; paciente: PatientOption | null; parentesco
 
 const TOTAL_PARCELAS = 12;
 
+/** Mesma lista de graus de parentesco usada na venda do convênio (contratos). */
+const PARENTESCOS = ["Filho(a)", "Cônjuge", "Pai", "Mãe", "Irmão(ã)", "Outro"] as const;
+
 /** Vencimento (yyyy-mm-dd) do mês de referência + offset, respeitando o último dia do mês. */
 function vencimentoDe(refMes: string, offset: number, dia: number) {
   const [ano, mes] = refMes.split("-").map(Number);
@@ -349,15 +352,25 @@ export function PagamentoAvulsoMensalidadeDialog({
                         placeholder="Nome ou CPF do dependente"
                         onRequestCreate={(q) => setQuickOpen({ alvo: d.key, nome: q })}
                       />
-                      <Input
-                        placeholder="Parentesco"
+                      <Select
                         value={d.parentesco}
-                        onChange={(e) =>
+                        onValueChange={(v) =>
                           setDependentes((arr) =>
-                            arr.map((x) => (x.key === d.key ? { ...x, parentesco: e.target.value } : x)),
+                            arr.map((x) => (x.key === d.key ? { ...x, parentesco: v } : x)),
                           )
                         }
-                      />
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Parentesco" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PARENTESCOS.map((p) => (
+                            <SelectItem key={p} value={p}>
+                              {p}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Button
                         type="button"
                         size="icon"
