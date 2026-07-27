@@ -192,9 +192,6 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
             <div style="display:flex; justify-content:space-between">
               <span>SALDO FINAL</span><span>${fmtBRL(saldoIt)}</span>
             </div>
-            <div style="display:flex; justify-content:space-between" class="bold">
-              <span>TOTAL</span><span>${fmtBRL(totalIt)}</span>
-            </div>
           </div>`;
         })()}
       </div>
