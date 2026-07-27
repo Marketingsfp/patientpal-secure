@@ -199,6 +199,39 @@ async function resolveVinculoConvenio(
   return null;
 }
 
+/**
+ * Verifica se algum lançamento financeiro confirmado dos agendamentos
+ * indicados aplica o desconto do convênio informado (nome aparece na
+ * descrição). Usado para corrigir a impressão da GR quando o agendamento
+ * ficou gravado como "particular" mas a taxa do convênio foi cobrada — o
+ * campo CONV. deve mostrar o nome do convênio, não PARTICULAR.
+ */
+async function agendamentoUsouConvenio(
+  agendamentoIds: Array<string | null | undefined>,
+  convenioNome: string | null | undefined,
+): Promise<boolean> {
+  if (!convenioNome) return false;
+  const ids = agendamentoIds.filter((x): x is string => !!x);
+  if (!ids.length) return false;
+  try {
+    const { data } = await supabase
+      .from("fin_lancamentos")
+      .select("descricao")
+      .in("agendamento_id", ids)
+      .eq("tipo", "receita")
+      .eq("status", "confirmado");
+    const alvo = convenioNome
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase();
+    for (const r of (data ?? []) as Array<{ descricao: string | null }>) {
+      const d = (r.descricao ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+      if (d.includes(alvo)) return true;
+    }
+  } catch { /* ignora */ }
+  return false;
+}
+
 function renderLinhaVinculo(v: { convenioNome: string; vinculo: "titular" | "dependente"; titularNome?: string } | null): string {
   if (!v) return "";
   const suf = v.vinculo === "titular"
