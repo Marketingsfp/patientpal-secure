@@ -14,19 +14,19 @@ export const INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML = `
 <table style="width:100%;border-collapse:collapse;border:1.5pt solid ${NAVY};${FONT}">
   <tbody>
     <tr>
-      <th colspan="2" style="background-color:${NAVY};${TD}"><span style="color:#ffffff;font-size:14pt"><strong>CARTÃO CONSULTA + SEGUROS</strong></span></th>
+      <th colspan="2" style="background-color:${NAVY};${TD}"><span style="color:#ffffff;font-size:14pt"><strong>CARTÃO CONSULTA</strong></span></th>
       <th rowspan="8" style="background-color:#ffffff;${TD};vertical-align:middle;width:32%"><p style="margin:0;font-size:13pt"><strong>TAXA DE ADESÃO ÚNICA</strong></p><p style="margin:8px 0 0 0;font-size:14pt"><strong>R$ 30,00</strong></p></th>
     </tr>
     <tr>
       <th style="${TD}"><strong>MODALIDADE</strong></th>
       <th style="${TD}"><strong>VALOR</strong></th>
     </tr>
-    <tr><td style="${BD}">1 PESSOA</td><td style="${BD}">R$ 120,00</td></tr>
-    <tr><td style="${BD}">2 PESSOAS</td><td style="${BD}">R$ 175,00</td></tr>
-    <tr><td style="${BD}">3 PESSOAS</td><td style="${BD}">R$ 210,00</td></tr>
-    <tr><td style="${BD}">4 PESSOAS</td><td style="${BD}">R$ 245,00</td></tr>
-    <tr><td style="${BD}">5 PESSOAS</td><td style="${BD}">R$ 280,00</td></tr>
-    <tr><td style="${BD}">6 PESSOAS</td><td style="${BD}">R$ 295,00</td></tr>
+    <tr><td style="${BD}">1 PESSOA</td><td style="${BD}">R$ 110,00</td></tr>
+    <tr><td style="${BD}">2 PESSOAS</td><td style="${BD}">R$ 155,00</td></tr>
+    <tr><td style="${BD}">3 PESSOAS</td><td style="${BD}">R$ 180,00</td></tr>
+    <tr><td style="${BD}">4 PESSOAS</td><td style="${BD}">R$ 205,00</td></tr>
+    <tr><td style="${BD}">5 PESSOAS</td><td style="${BD}">R$ 230,00</td></tr>
+    <tr><td style="${BD}">6 PESSOAS</td><td style="${BD}">R$ 255,00</td></tr>
   </tbody>
 </table>
 <ul style="margin-top:10px">
@@ -38,7 +38,10 @@ export const INFORMATIVO_CARTAO_CONSULTA_SEGUROS_HTML = `
 <h3><span style="color:${RED}"><strong><u>I. APÓS O PAGAMENTO DA 1ª MENSALIDADE E TAXA DE INSCRIÇÃO</u></strong></span></h3>
 <ul>
   <li><strong>Gratuidade</strong> para verificação de peso e pressão;</li>
-  <li><strong>CONSULTAS CLÍNICAS SEM CARÊNCIA</strong>, referentes às especialidades: Angiologia, Cardiologia, Clínica Médica, Dermatologia, Endocrinologia, Gastroenterologia, Geriatria, Ginecologia, Ortopedia, Otorrinolaringologia, Obstetrícia, Pediatria e Urologia. Para essas especialidades o associado pagará <span style="color:${RED}"><strong>o valor de R$ 9,99</strong></span> no ato de cada consulta e haverá o <span style="color:${RED}"><strong>limite de uma utilização por dia por contrato (titular ou dependente)</strong></span>. Caso o associado queira usar mais de uma, <span style="color:${RED}"><strong>será cobrado 50% do preço do valor particular</strong></span>;</li>
+  <li><strong>Os ASSOCIADOS farão o pagamento mensal das parcelas, bem como, <span style="color:${RED}">o valor de R$ 8,00 em dinheiro ou R$ 8,00 no PIX/cartão</span> sendo pago no ato de cada consulta realizada referente às especialidades clínicas;</strong></li>
+  <li><span style="color:${RED}"><strong>Atendimento em todas as especialidades médicas (consultas) sem carência;</strong></span></li>
+  <li><span style="color:${RED}"><strong>Haverá limite de (1) uma consulta diária por contrato;</strong></span></li>
+  <li><strong>CONSULTAS CLÍNICAS SEM CARÊNCIA</strong>: referentes às especialidades de: Angiologia, Cardiologia, Clínica Médica, Dermatologia, Endocrinologia, Gastroenterologia, Geriatria, Ginecologia, Ortopedia, Otorrinolaringologia, Obstetrícia, Pediatria e Urologia;</li>
   <li><strong>SEGURO DE VIDA POR ACIDENTE:</strong> O titular e seus dependentes terão suas vidas asseguradas por morte por acidente. O acionamento do auxílio pode ser feito pelo telefone 0800 016 6633, na opção 6; <span style="color:${RED}"><strong>OBS: O seguro está disponível apenas para titulares e dependentes com faixa etária entre 14 e 69 anos.</strong></span></li>
   <li><strong>AUXÍLIO FUNERAL:</strong> O titular e seus dependentes terão auxílio funeral; incluindo translado, urna ornamentada, coroa de flores, além de profissionais especializados e a prestação de um serviço de qualidade e personalizado. O acionamento do auxílio pode ser feito pelo telefone 0800 016 6633, na opção 6; <span style="color:${RED}"><strong>OBS: O auxílio funeral está disponível apenas para titulares e dependentes até 69 anos.</strong></span></li>
   <li><strong>CONSULTA DE TELEMEDICINA:</strong> O titular e seus dependentes poderão realizar consultas virtuais em Telemedicina, disponíveis em duas modalidades de atendimento:

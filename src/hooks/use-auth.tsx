@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { limparCacheMedicoOnly } from "@/lib/medico-only";
 
 interface AuthContextValue {
   user: User | null;
@@ -42,11 +41,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       if (cancelled) return;
-      // O papel "só médico" é memoizado por usuário (ver lib/medico-only.ts).
-      // Descarta ao entrar/sair para não vazar entre contas na mesma aba.
-      if (event === "SIGNED_OUT" || event === "SIGNED_IN") limparCacheMedicoOnly();
       setSession(s);
       setLoading(false);
     });

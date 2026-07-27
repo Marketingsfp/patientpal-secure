@@ -178,19 +178,6 @@ const STATUS_COR: Record<Status, string> = {
 const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const PAGE_SIZE = 100;
 
-// Janela padrão do modo "a partir de" quando o usuário não define uma data
-// final no picker de intervalo. Sem teto, a consulta pedia todos os
-// agendamentos futuros da clínica (limitados só pelo `.range(0, 9999)` do
-// PostgREST) — dezenas de milhares de linhas com dois embeds, refeitas a cada
-// entrada na aba. Definir `dataFim` continua sobrescrevendo esta janela.
-const JANELA_PADRAO_DIAS = 90;
-
-function somarDias(isoDate: string, dias: number): string {
-  const d = new Date(`${isoDate}T00:00:00`);
-  d.setDate(d.getDate() + dias);
-  return d.toLocaleDateString("en-CA");
-}
-
 // ID fixo da especialidade "Odontologia" no cadastro de especialidades.
 // Usado para restringir orçamentos odonto a médicos odontologistas.
 const ODONTO_ESPECIALIDADE_ID = "f0cfaa0a-2a67-4176-97de-a7072c37077c";
@@ -2259,14 +2246,16 @@ function AgendaPage() {
       const fim = new Date(`${dataRef}T23:59:59`).toISOString();
       q = q.gte("inicio", inicio).lte("inicio", fim);
     } else if (!statusEspecifico) {
-      // Padrão "a partir de": mostra o dia selecionado em diante. Se o usuário
-      // definiu uma data final no picker de intervalo, respeita o intervalo;
-      // caso contrário aplica a janela padrão de JANELA_PADRAO_DIAS dias.
+      // Padrão "a partir de": mostra tudo do dia selecionado em diante.
+      // Se o usuário definiu uma data final no picker de intervalo,
+      // respeita o intervalo; caso contrário, não aplica limite superior.
+      // O `.range(0, 9999)` do PostgREST já protege contra volume excessivo.
       const inicio = new Date(`${dataRef}T00:00:00`).toISOString();
       q = q.gte("inicio", inicio);
-      const fimEfetivo = dataFim ?? somarDias(dataRef, JANELA_PADRAO_DIAS);
-      const f = new Date(`${fimEfetivo}T23:59:59`).toISOString();
-      q = q.lte("inicio", f);
+      if (dataFim) {
+        const f = new Date(`${dataFim}T23:59:59`).toISOString();
+        q = q.lte("inicio", f);
+      }
     }
     if (!statusEspecifico) {
       q = q.range(0, 9999);
