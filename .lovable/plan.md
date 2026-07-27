@@ -1,59 +1,46 @@
-## Objetivo
+## Etapa B — exclusão definitiva de `planos_assinatura`
 
-Unificar as telas duplicadas do Cartão Benefícios: a aba **Modelos** deixa de existir e tudo passa a ser feito em **Convênios > Informações**. Aplicação **global (3 clínicas)**.
+Aplicação: **global (3 clínicas)** — é limpeza técnica, sem regra de negócio nova.
 
-## Situação atual (verificada)
+### Vínculo com repasse: NÃO existe
 
-- **Modelos** grava em `planos_assinatura`; **Convênios** grava em `cb_convenios`.
-- `cb_convenios` já é superconjunto: nome, descrição, valor mensal, taxa de adesão, parcelas, máx. dependentes, fidelidade, vigência, modelo de contrato, informativo, termo de inclusão, taxa de inclusão de dependente, acréscimo cartão/pix e **modalidade** (equivale ao "tipo" de Modelos).
-- Único campo exclusivo de Modelos é **"Máx. agregados"**, que não é lido em nenhum outro ponto do sistema.
-- **1.623 contratos** apontam para um plano, e **todos eles** também já apontam para um convênio. Nenhum contrato tem plano sem convênio.
-- Contratos novos criados pela tela de Vendas já não gravam plano; só o Pagamento Avulso ainda grava.
+Verifiquei no banco: `planos_assinatura` tem apenas nome, tipo, valor mensal, taxa de adesão, dependentes, fidelidade, vigência, parcelas, benefícios, template e ativo — **nenhum campo de repasse**.
 
-## Escopo
+O repasse do médico é calculado por outra via, já migrada: modalidade do convênio (`cb_convenios.modalidade` → cartão consulta / cartão desconto), regras por serviço em `medico_convenios` e o padrão do médico. Ou seja, excluir a tabela de planos **não afeta nenhum cálculo de repasse**. Nada a fazer nessa frente.
 
-### 1. Migrar as leituras de "plano" para "convênio"
-Passar a ler nome/tipo/vigência de `cb_convenios` pelo convênio do contrato:
+### O que precisa ser ajustado antes de excluir (descoberto agora)
 
-- Impressão do contrato, do carnê, da GR (3 pontos) e do cartão do paciente
-- Regra de limite de dependentes
-- Lista de Clientes (coluna do plano) e ficha do cliente
-- Relatórios gerais e Relatórios BI do Cartão
-- Consulta da Nina
-- Pagamento Avulso: passa a trabalhar com convênio e deixa de gravar plano
+Seis funções do banco ainda citam plano, e três delas usam **JOIN obrigatório** com `planos_assinatura` — se a tabela sumir sem ajuste, essas telas quebram:
 
-### 2. Remover as telas duplicadas
-- Excluir a aba **Modelos** e a página `/app/cartao-beneficios/modelos` (redireciona para Convênios, para não quebrar links salvos).
-- Remover **"Planos / Convênios"** do menu Cadastros e a página `/app/planos` (mesmo redirecionamento).
-- Remover o componente da tela de planos e o atalho de busca que apontava para ela.
+- `contrato_publico` — link público do contrato (assinatura pelo paciente)
+- `meus_cartoes` — portal do paciente (cartões)
+- `pendencias_paciente` — pendências do paciente
+- `contrato_dependentes_validar` — limite de dependentes
+- `renovar_contrato_troca_plano` e `trocar_convenio_contrato` — copiam `plano_id` ao gerar o novo contrato
 
-### 3. Convênios > Informações
-Nenhum campo novo é necessário. Apenas ajuste de rótulo deixando claro que ali se define o modelo do convênio. "Máx. agregados" é descontinuado por não ter uso.
+Observação importante: como o JOIN é obrigatório, hoje **contratos sem plano já não aparecem** nessas telas. Trocar para convênio na prática corrige isso.
 
-### 4. Banco de dados — exclusão definitiva (autorizada)
+### Passos
 
-Como você autorizou excluir, faremos em **duas etapas separadas e aprovadas uma por vez**, para não perder histórico por engano:
+1. **Reconferência final** (no momento da execução): nenhum contrato com plano e sem convênio. Se aparecer algum, paro e reporto antes de seguir.
+2. **Arquivo morto**: criar `planos_assinatura_arquivo` (cópia somente leitura do conteúdo atual, acessível só a administradores) — o CSV já foi exportado na Etapa A.
+3. **Reescrever as 6 funções** para lerem nome/tipo/vigência/limite de dependentes de `cb_convenios` (via `convenio_id`), e parar de copiar `plano_id` nas rotinas de renovação/troca.
+4. **Remover a coluna** `plano_id` de `contratos_assinatura` (derruba a chave estrangeira).
+5. **Excluir a tabela** `planos_assinatura`.
+6. **Código**: tirar `planos_assinatura` da lista da rotina de backup diário (`src/routes/api/public/hooks/backup-diario.ts`) e regenerar os tipos do banco.
 
-**Etapa A — antes de excluir (obrigatória):**
-1. Conferir novamente, no momento da execução, que **nenhum** contrato tem plano sem convênio. Se aparecer algum, ele é corrigido/apontado antes de seguir.
-2. Copiar o conteúdo atual de `planos_assinatura` para uma tabela de arquivo morto (`planos_assinatura_arquivo`), somente leitura, apenas para consulta histórica.
-3. Exportar também um CSV do conteúdo para você guardar fora do sistema.
+Os passos 2–5 vão em **uma migração única aprovada por você**; os itens de código entram logo depois.
 
-**Etapa B — exclusão:**
-4. Remover a ligação de plano nos contratos (a coluna `plano_id` de `contratos_assinatura`), já que 100% dos contratos têm convênio.
-5. Excluir a tabela `planos_assinatura`.
+### Riscos e reversão
 
-Nenhum valor de Cartão Consulta é tocado (Regra 1.11). A Etapa B só roda depois que a Etapa A e as validações da seção seguinte estiverem OK.
+- Áreas sensíveis: link público de contrato, portal do paciente, renovação e troca de convênio. Mudança é de **origem do nome/tipo**, nenhum valor financeiro é tocado.
+- Nenhum valor de Cartão Consulta é alterado (Regra 1.11).
+- Reversão: pelo arquivo morto + CSV da Etapa A.
 
-## Riscos e cuidados
+### Validação após aplicar
 
-- Área crítica: impressão de contrato, carnê, GR e cartão do paciente. A mudança é de **origem do nome/tipo**, não de valores financeiros.
-- A exclusão é destrutiva e só é reversível pela tabela de arquivo morto e pelo CSV da Etapa A — por isso ela é feita depois, em migração separada.
-
-## Validação (entre a Etapa A e a Etapa B)
-
-- Imprimir contrato, carnê, GR e cartão de um contrato antigo e de um recente, e conferir nome/tipo em ambos.
-- Conferir a coluna de plano na lista de Clientes e na ficha do cliente.
-- Conferir Relatórios BI do Cartão e o relatório geral de contratos.
-- Fazer um Pagamento Avulso de teste e conferir o vínculo com o convênio.
-- Conferir que `/app/cartao-beneficios/modelos` e `/app/planos` redirecionam sem erro.
+- Abrir um link público de contrato (um antigo e um recente) e conferir nome do convênio.
+- Portal do paciente: aba de cartões.
+- Renovar um contrato de teste e trocar convênio de um contrato de teste, conferindo que o novo contrato nasce correto.
+- Adicionar dependente e conferir o limite.
+- Rodar o backup diário e confirmar que não acusa tabela ausente.
