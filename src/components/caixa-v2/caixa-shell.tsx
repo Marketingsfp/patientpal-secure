@@ -4,6 +4,7 @@ import {
   Lock, Unlock, ChevronRight, Users, Wallet, AlertTriangle, HandCoins,
 } from "lucide-react";
 import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -215,7 +216,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     q = applyFilters(q);
     q = q.order("created_at", { ascending: false }).range(0, FIRST_BATCH - 1);
     const { data, error } = await q;
-    if (error) { toast.error("Erro ao carregar movimentos"); setMovs([]); setHasMore(false); }
+    if (error) { notify.error("Erro ao carregar movimentos"); setMovs([]); setHasMore(false); }
     else {
       const rows = (data ?? []) as Mov[];
       setMovs(rows);

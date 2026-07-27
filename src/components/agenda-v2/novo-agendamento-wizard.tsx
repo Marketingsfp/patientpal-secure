@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { Check, ChevronRight, User, Stethoscope, UserRound, Clock, CheckCircle2, Loader2, UserPlus, X } from "lucide-react";
 import { HhpWizardShell } from "@/design-system/hhp";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
@@ -274,10 +275,10 @@ export function NovoAgendamentoWizard({
     const nasc = qcNasc.trim();
     const telDigits = qcTel.replace(/\D/g, "");
     const cpfDigits = qcCpf.replace(/\D/g, "");
-    if (nome.length < 3) { toast.error("Informe o nome completo"); return; }
-    if (!nasc) { toast.error("Data de nascimento é obrigatória"); return; }
-    if (telDigits.length < 10) { toast.error("Telefone com DDD é obrigatório"); return; }
-    if (cpfDigits && cpfDigits.length !== 11) { toast.error("CPF inválido"); return; }
+    if (nome.length < 3) { notify.error("Informe o nome completo"); return; }
+    if (!nasc) { notify.error("Data de nascimento é obrigatória"); return; }
+    if (telDigits.length < 10) { notify.error("Telefone com DDD é obrigatório"); return; }
+    if (cpfDigits && cpfDigits.length !== 11) { notify.error("CPF inválido"); return; }
     setQcSaving(true);
     try {
       const { data, error } = await supabase
@@ -304,10 +305,10 @@ export function NovoAgendamentoWizard({
       };
       setPaciente(novo);
       resetQuickCreate();
-      toast.success("Paciente cadastrado");
+      notify.success("Paciente cadastrado");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Falha ao cadastrar paciente";
-      toast.error(msg);
+      notify.error(msg);
       setQcSaving(false);
     }
   }
@@ -366,7 +367,7 @@ export function NovoAgendamentoWizard({
           const opts = result.validation_error.toast_duration
             ? { duration: result.validation_error.toast_duration }
             : undefined;
-          toast.error(result.validation_error.message, opts);
+          notify.error(result.validation_error.message, opts);
         } else {
           mostrarErro(result.pg_error);
         }
@@ -377,7 +378,7 @@ export function NovoAgendamentoWizard({
         mostrarErro(result.vinculo_warning.pg_error, "agendamento salvo, mas vínculo com itens do orçamento falhou");
       }
 
-      toast.success("Salvo");
+      notify.success("Salvo");
       // Invalida todas as views do dia da Agenda V2 (prefix match).
       await queryClient.invalidateQueries({ queryKey: ["agenda-v2", "ags"] });
       reset();
@@ -385,7 +386,7 @@ export function NovoAgendamentoWizard({
     } catch (e) {
       setSaving(false);
       const msg = e instanceof Error ? e.message : "Erro ao salvar agendamento";
-      toast.error(msg);
+      notify.error(msg);
     }
   }
 

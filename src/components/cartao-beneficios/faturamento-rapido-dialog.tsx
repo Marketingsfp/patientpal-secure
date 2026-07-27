@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Search, Receipt, BadgePercent, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { notify } from "@/lib/notify";
 import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Button } from "@/components/ui/button";
@@ -422,7 +423,7 @@ export function FaturamentoRapidoMensalidadeDialog({
           } catch (err) {
             mostrarErro(err);
           }
-          toast.success("Mensalidade recebida e GR enviada para impressão.");
+          notify.success("Mensalidade recebida e GR enviada para impressão.");
           setItens((prev) => prev.filter((x) => x.id !== m.id));
           setPagando(null);
           onPago?.();
