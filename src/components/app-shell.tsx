@@ -436,8 +436,14 @@ export function AppShell() {
   // Bypass exclusivo do Rodrigo: vê todas as telas criadas, sem filtro de
   // permissão nem de subsystem. Não afeta nenhum outro usuário.
   const isRodrigoFullAccess = (user?.email ?? "").toLowerCase() === "rodrigorss2301@gmail.com";
+  // Admin também ignora o filtro de subsystem: um admin já tem allowed=null em
+  // usePermissoes, então não faz sentido esconder grupos inteiros porque ele
+  // clicou uma vez em "Gestor Clínico" / "Gestão de Pessoas" no seletor /app.
+  // (O filtro de subsystem segue valendo para papéis operacionais.)
+  const isAdminFullMenu = clinicaAtual?.role === "admin";
+  const bypassSubsystem = isRodrigoFullAccess || isAdminFullMenu;
 
-  const filteredByGroup = isRodrigoFullAccess
+  const filteredByGroup = bypassSubsystem
     ? navRows
     : subsystem
       ? navRows.filter((r) => SUBSYSTEMS[subsystem].groups.includes(r.label))
@@ -445,7 +451,7 @@ export function AppShell() {
   const scopedNavRows = filteredByGroup.map((row) => {
     if (row.label !== "Gestão") return row;
     const gestaoPessoasItems = new Set(["/app/cargos", "/app/setores"]);
-    const items = !isRodrigoFullAccess && subsystem === "gestao-pessoas"
+    const items = !bypassSubsystem && subsystem === "gestao-pessoas"
       ? row.items.filter((it) => !isParent(it) && gestaoPessoasItems.has(it.to))
       : row.items.filter((it) => isParent(it) || !gestaoPessoasItems.has(it.to));
     return { ...row, items };
