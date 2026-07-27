@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Plus, Receipt, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -103,14 +103,27 @@ export function PagamentoAvulsoMensalidadeDialog({
   const [lancOpen, setLancOpen] = useState(false);
   const [dependentes, setDependentes] = useState<DependenteLinha[]>([]);
   const [quickOpen, setQuickOpen] = useState<{ alvo: "titular" | string; nome: string } | null>(null);
+  // Guardas contra duplicidade: impedem que o mesmo pagamento avulso gere
+  // dois lançamentos/contratos (tela reaberta ou clique repetido).
+  const processandoRef = useRef(false);
+  const concluidoRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
+    // Reset completo a cada abertura: evita reaproveitar dados de um
+    // pagamento anterior já concluído.
     setPaciente(pacienteInicial ?? null);
     setRefMes(mesAtual);
     setCriarContrato(true);
     setParcelasPagas("");
     setDependentes([]);
+    setConvenioId("");
+    setValor("");
+    setDiaVenc("10");
+    setLancOpen(false);
+    setQuickOpen(null);
+    processandoRef.current = false;
+    concluidoRef.current = false;
     (async () => {
       setLoading(true);
       const { data: cv } = await supabase
