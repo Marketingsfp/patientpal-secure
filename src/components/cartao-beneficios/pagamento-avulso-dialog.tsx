@@ -99,6 +99,9 @@ export function PagamentoAvulsoMensalidadeDialog({
   const [valor, setValor] = useState<string>("");
   const [diaVenc, setDiaVenc] = useState<string>("10");
   const [criarContrato, setCriarContrato] = useState(true);
+  // Isenção de carência perguntada no próprio pagamento avulso.
+  const [semCarencia, setSemCarencia] = useState(false);
+  const [semCarenciaMotivo, setSemCarenciaMotivo] = useState("");
   const [loading, setLoading] = useState(false);
   const [lancOpen, setLancOpen] = useState(false);
   const [dependentes, setDependentes] = useState<DependenteLinha[]>([]);
@@ -116,6 +119,8 @@ export function PagamentoAvulsoMensalidadeDialog({
     setRefMes(mesAtual);
     setCriarContrato(true);
     setParcelasPagas("");
+    setSemCarencia(false);
+    setSemCarenciaMotivo("");
     setDependentes([]);
     setConvenioId("");
     setValor("");
@@ -191,7 +196,10 @@ export function PagamentoAvulsoMensalidadeDialog({
     !!paciente &&
     !!refMes &&
     valorNum > 0 &&
-    (!criarContrato || (!!convenioId && dependentes.every((d) => !!d.paciente)));
+    (!criarContrato ||
+      (!!convenioId &&
+        dependentes.every((d) => !!d.paciente) &&
+        (!semCarencia || !!semCarenciaMotivo.trim())));
 
   const escolherConvenio = (id: string) => {
     setConvenioId(id);
@@ -251,9 +259,12 @@ export function PagamentoAvulsoMensalidadeDialog({
         num_parcelas: TOTAL_PARCELAS,
         status: "ativo",
         criado_por: usuario?.id ?? null,
+        sem_carencia: semCarencia,
+        sem_carencia_motivo: semCarencia ? semCarenciaMotivo.trim() : null,
         observacoes:
           `Contrato criado pelo pagamento avulso (regularização) — mês de referência ${rotuloMes(refMes)}.` +
-          (pagasNum > 0 ? ` ${pagasNum} parcela(s) informada(s) como já paga(s) antes do sistema.` : ""),
+          (pagasNum > 0 ? ` ${pagasNum} parcela(s) informada(s) como já paga(s) antes do sistema.` : "") +
+          (semCarencia ? ` Isento de carência: ${semCarenciaMotivo.trim()}.` : ""),
       } as never)
       .select("id, numero")
       .single();
