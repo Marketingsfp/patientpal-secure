@@ -10,7 +10,6 @@ import { printOrcamento } from "@/lib/print-orcamento";
 import { Button } from "@/components/ui/button";
 import { OrcamentoCard, type OrcV2 } from "@/components/orcamentos-v2/orcamento-card";
 import { OrcamentoDrawer } from "@/components/orcamentos-v2/orcamento-drawer";
-import { ConversaoOrcamentoDialog } from "@/components/orcamentos/conversao-orcamento-dialog";
 import { NovoOrcamentoOdontoDialog } from "./novo-orcamento-odonto-dialog";
 
 interface Props {
@@ -34,7 +33,6 @@ export function OrcamentoTab({ pacienteId, pacienteNome, pacienteTelefone, espec
   const [loading, setLoading] = useState(true);
   const [novoOpen, setNovoOpen] = useState(false);
   const [drawerOrc, setDrawerOrc] = useState<OrcV2 | null>(null);
-  const [conversaoId, setConversaoId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!clinicaAtual || !especialidadeOdontoId || !pacienteId) return;
@@ -128,7 +126,8 @@ export function OrcamentoTab({ pacienteId, pacienteNome, pacienteTelefone, espec
               o={o}
               onOpen={() => setDrawerOrc(o)}
               onPrint={() => void imprimir(o.id)}
-              onConverter={() => setConversaoId(o.id)}
+              onConverter={() => {}}
+              ocultarConversao
             />
           ))}
         </div>
@@ -138,17 +137,9 @@ export function OrcamentoTab({ pacienteId, pacienteNome, pacienteTelefone, espec
         orc={drawerOrc}
         onClose={() => setDrawerOrc(null)}
         onPrint={(id) => void imprimir(id)}
-        onConverter={(id) => setConversaoId(id)}
+        onConverter={() => {}}
+        ocultarConversao
       />
-
-      {conversaoId && (
-        <ConversaoOrcamentoDialog
-          open={!!conversaoId}
-          onClose={() => setConversaoId(null)}
-          orcamentoId={conversaoId}
-          onChanged={() => void load()}
-        />
-      )}
 
       {novoOpen && clinicaAtual && especialidadeOdontoId && (
         <NovoOrcamentoOdontoDialog

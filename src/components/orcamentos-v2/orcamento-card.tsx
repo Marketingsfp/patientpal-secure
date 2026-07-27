@@ -55,11 +55,13 @@ interface Props {
   onOpen: () => void;
   onPrint: () => void;
   onConverter: () => void;
+  /** Oculta a ação de conversão em pagamento (ex.: aba Odontologia) */
+  ocultarConversao?: boolean;
   onHistorico?: () => void;
   podeHistorico?: boolean;
 }
 
-export function OrcamentoCard({ o, compact, onOpen, onPrint, onConverter, onHistorico, podeHistorico }: Props) {
+export function OrcamentoCard({ o, compact, onOpen, onPrint, onConverter, onHistorico, podeHistorico, ocultarConversao }: Props) {
   const pagador = pagadorLabel(o.forma_pagamento);
   const status = deriveStatus(o);
   const meta = STATUS_META[status];
@@ -144,9 +146,11 @@ export function OrcamentoCard({ o, compact, onOpen, onPrint, onConverter, onHist
             <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onPrint(); }} title="Imprimir">
               <Printer className="h-4 w-4" />
             </Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onConverter(); }} title="Converter em pagamento" data-testid="card-converter">
-              <ArrowRightLeft className="h-4 w-4" />
-            </Button>
+            {!ocultarConversao && (
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onConverter(); }} title="Converter em pagamento" data-testid="card-converter">
+                <ArrowRightLeft className="h-4 w-4" />
+              </Button>
+            )}
             {podeHistorico && onHistorico && (
               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onHistorico(); }} title="Histórico">
                 <HistoryIcon className="h-4 w-4" />

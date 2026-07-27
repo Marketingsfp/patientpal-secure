@@ -36,11 +36,13 @@ interface Props {
   onClose: () => void;
   onPrint: (id: string) => void;
   onConverter: (id: string) => void;
+  /** Oculta a ação de conversão em pagamento (ex.: aba Odontologia) */
+  ocultarConversao?: boolean;
   onHistorico?: (id: string) => void;
   podeHistorico?: boolean;
 }
 
-export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistorico, podeHistorico }: Props) {
+export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistorico, podeHistorico, ocultarConversao }: Props) {
   const [itens, setItens] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -162,9 +164,11 @@ export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistoric
               })()}
 
               <div className="flex flex-wrap gap-2 pt-2">
-                <Button size="sm" onClick={() => onConverter(orc.id)}>
-                  <ArrowRightLeft className="h-4 w-4" /> Converter
-                </Button>
+                {!ocultarConversao && (
+                  <Button size="sm" onClick={() => onConverter(orc.id)}>
+                    <ArrowRightLeft className="h-4 w-4" /> Converter
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" onClick={() => onPrint(orc.id)}>
                   <Printer className="h-4 w-4" /> Imprimir
                 </Button>
