@@ -118,7 +118,7 @@ export function PagamentoAvulsoMensalidadeDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, clinicaId]);
 
-  const valorNum = Number(String(valor).replace(/\./g, "").replace(",", ".")) || 0;
+  const valorNum = parseValorBR(valor);
   const pagasNum = Math.max(0, Math.min(TOTAL_PARCELAS - 1, Number(parcelasPagas) || 0));
   const dependentesValidos = dependentes.filter((d) => !!d.paciente);
   const vidas = 1 + dependentesValidos.length;
@@ -141,7 +141,7 @@ export function PagamentoAvulsoMensalidadeDialog({
     if (!criarContrato || !convenioId) return;
     const conv = convenios.find((c) => c.id === convenioId);
     const auto = faixaAtual ? Number(faixaAtual.valor_mensal) : Number(conv?.valor_mensal ?? 0);
-    if (auto > 0) setValor(auto.toFixed(2));
+    if (auto > 0) setValor(formatValorBR(auto));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convenioId, faixaAtual, criarContrato]);
 
