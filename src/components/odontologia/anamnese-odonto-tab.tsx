@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { TTSButton } from "@/components/tts/tts-button";
 
 interface Row {
   id?: string;
@@ -95,6 +96,21 @@ export function AnamneseOdontoTab({ pacienteId, readOnly = false }: { pacienteId
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <TTSButton
+          text={[
+            row.motivo_consulta && `Motivo da consulta: ${row.motivo_consulta}.`,
+            row.medicamentos && `Medicamentos: ${row.medicamentos}.`,
+            row.alergias && `Alergias: ${row.alergias}.`,
+            row.doencas && `Doenças: ${row.doencas}.`,
+            row.cirurgias && `Cirurgias: ${row.cirurgias}.`,
+            row.observacoes && `Observações: ${row.observacoes}.`,
+          ].filter(Boolean).join(" ") || "Anamnese vazia."}
+          size="sm"
+          variant="outline"
+          label="Ouvir anamnese"
+        />
+      </div>
       <div>
         <Label>Motivo da consulta</Label>
         <Textarea disabled={readOnly} rows={2} value={row.motivo_consulta ?? ""} onChange={e => set("motivo_consulta", e.target.value)} />

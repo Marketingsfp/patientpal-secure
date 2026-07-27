@@ -36,6 +36,7 @@ import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticat
 import { Route as TotemTTokenRouteImport } from './routes/totem_.t.$token'
 import { Route as PainelTTokenRouteImport } from './routes/painel_.t.$token'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
+import { Route as ApiPublicTtsRouteImport } from './routes/api/public/tts'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
 import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
 import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
@@ -271,6 +272,11 @@ const PainelTTokenRoute = PainelTTokenRouteImport.update({
 const PContratoTokenRoute = PContratoTokenRouteImport.update({
   id: '/p/contrato/$token',
   path: '/p/contrato/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicTtsRoute = ApiPublicTtsRouteImport.update({
+  id: '/api/public/tts',
+  path: '/api/public/tts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppUnidadesRoute =
@@ -951,6 +957,7 @@ export interface FileRoutesByFullPath {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/api/public/tts': typeof ApiPublicTtsRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/painel/t/$token': typeof PainelTTokenRoute
   '/totem/t/$token': typeof TotemTTokenRoute
@@ -1077,6 +1084,7 @@ export interface FileRoutesByTo {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/api/public/tts': typeof ApiPublicTtsRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/painel/t/$token': typeof PainelTTokenRoute
   '/totem/t/$token': typeof TotemTTokenRoute
@@ -1209,6 +1217,7 @@ export interface FileRoutesById {
   '/_authenticated/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/_authenticated/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
+  '/api/public/tts': typeof ApiPublicTtsRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/painel_/t/$token': typeof PainelTTokenRoute
   '/totem_/t/$token': typeof TotemTTokenRoute
@@ -1341,6 +1350,7 @@ export interface FileRouteTypes {
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
+    | '/api/public/tts'
     | '/p/contrato/$token'
     | '/painel/t/$token'
     | '/totem/t/$token'
@@ -1467,6 +1477,7 @@ export interface FileRouteTypes {
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
+    | '/api/public/tts'
     | '/p/contrato/$token'
     | '/painel/t/$token'
     | '/totem/t/$token'
@@ -1598,6 +1609,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/treinamentos'
     | '/_authenticated/app/triagem-enfermagem'
     | '/_authenticated/app/unidades'
+    | '/api/public/tts'
     | '/p/contrato/$token'
     | '/painel_/t/$token'
     | '/totem_/t/$token'
@@ -1666,6 +1678,7 @@ export interface RootRouteChildren {
   TotemClinicaIdRoute: typeof TotemClinicaIdRoute
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
+  ApiPublicTtsRoute: typeof ApiPublicTtsRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
   PainelTTokenRoute: typeof PainelTTokenRoute
   TotemTTokenRoute: typeof TotemTTokenRoute
@@ -1863,6 +1876,13 @@ declare module '@tanstack/react-router' {
       path: '/p/contrato/$token'
       fullPath: '/p/contrato/$token'
       preLoaderRoute: typeof PContratoTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/tts': {
+      id: '/api/public/tts'
+      path: '/api/public/tts'
+      fullPath: '/api/public/tts'
+      preLoaderRoute: typeof ApiPublicTtsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app/unidades': {
@@ -2920,6 +2940,7 @@ const rootRouteChildren: RootRouteChildren = {
   TotemClinicaIdRoute: TotemClinicaIdRoute,
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
+  ApiPublicTtsRoute: ApiPublicTtsRoute,
   PContratoTokenRoute: PContratoTokenRoute,
   PainelTTokenRoute: PainelTTokenRoute,
   TotemTTokenRoute: TotemTTokenRoute,

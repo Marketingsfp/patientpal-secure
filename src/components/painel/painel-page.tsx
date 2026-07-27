@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Loader2 } from "lucide-react";
+import { speak as ttsSpeak, isUserTtsEnabled } from "@/lib/tts-service";
 type Senha = {
   id: string;
   codigo: string;
@@ -262,11 +263,44 @@ export function PainelPage() {
     if (!prox) return;
     falandoRef.current = true;
     const texto = textoDaSenha(prox.senha);
+
+    // Piper TTS local (Menino Jesus): usa o backend de IA quando habilitado,
+    // com fallback silencioso para SpeechSynthesis nativo se falhar.
+    const nomeClinica = (clinicaAtual?.clinica?.nome ?? "").toLowerCase();
+    const usarPiper = nomeClinica.includes("menino jesus") && isUserTtsEnabled();
+    if (usarPiper) {
+      try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
+      tocarDing();
+      const liberar = () => {
+        falandoRef.current = false;
+        processarFilaFala();
+      };
+      // primeira leitura → intervalo → repetição → libera fila
+      void ttsSpeak(texto, {
+        onEnd: () => {
+          window.setTimeout(() => {
+            void ttsSpeak(texto, { onEnd: liberar, onError: liberar, interrupt: false });
+          }, 800);
+        },
+        onError: () => {
+          // fallback: se Piper falhou, cai no SpeechSynthesis do navegador
+          falandoRef.current = false;
+          filaFalaRef.current.unshift(prox);
+          fallbackSpeechSynth();
+        },
+      });
+      return;
+    }
+    fallbackSpeechSynth();
+
+    function fallbackSpeechSynth() {
+      falandoRef.current = true;
+      const item = prox!;
     try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
     window.speechSynthesis.resume();
     tocarDing();
-    const primeira = criarFala(texto, prox.key);
-    const segunda = criarFala(texto, prox.key);
+    const primeira = criarFala(texto, item.key);
+    const segunda = criarFala(texto, item.key);
     // Fim da repetição = fim do anúncio; libera a próxima senha da fila.
     segunda.onend = () => {
       falandoRef.current = false;
@@ -279,6 +313,7 @@ export function PainelPage() {
       window.speechSynthesis.resume();
       window.speechSynthesis.speak(segunda);
     }, 3800);
+    }
   }
 
   function tocarDing() {
