@@ -855,12 +855,20 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
-  const convLabel = await resolveConvLabel(
+  let convLabel = await resolveConvLabel(
     (a as { tipo_atendimento?: string | null }).tipo_atendimento ?? null,
     a.paciente_id ?? null,
     clinicaId,
   );
   const vinculoConv = await resolveVinculoConvenio(a.paciente_id ?? null, clinicaId);
+  // Corrige o rótulo quando o agendamento ficou gravado como "particular"
+  // mas o desconto do convênio foi aplicado no caixa (paciente pagou a taxa
+  // do convênio em dinheiro/PIX/cartão). Nesse caso a GR deve exibir o
+  // nome do convênio, não PARTICULAR.
+  if (convLabel === "PARTICULAR" && vinculoConv?.convenioNome) {
+    const usouConv = await agendamentoUsouConvenio([a.id], vinculoConv.convenioNome);
+    if (usouConv) convLabel = vinculoConv.convenioNome.toUpperCase();
+  }
 
   const ticketHtml = `
   <div class="ticket">
