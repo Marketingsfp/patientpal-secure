@@ -21,6 +21,21 @@ export const DEFAULT_TTS_RATE = 0.55;
 export const MIN_TTS_RATE = 0.3;
 export const MAX_TTS_RATE = 1.5;
 
+/**
+ * Evento disparado sempre que a configuração de TTS mudar (mesma aba).
+ * Cross-tab é coberto pelo `storage` event nativo.
+ */
+export const TTS_CHANGED_EVENT = "tts:changed";
+
+function emitTtsChanged() {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent(TTS_CHANGED_EVENT));
+  } catch {
+    /* noop */
+  }
+}
+
 export function getUserTtsRate(): number {
   if (typeof window === "undefined") return DEFAULT_TTS_RATE;
   const raw = window.localStorage.getItem(RATE_STORAGE_KEY);
@@ -33,6 +48,16 @@ export function setUserTtsRate(rate: number) {
   if (typeof window === "undefined") return;
   const clamped = Math.min(MAX_TTS_RATE, Math.max(MIN_TTS_RATE, rate));
   window.localStorage.setItem(RATE_STORAGE_KEY, String(clamped));
+  // Aplica ao áudio em reprodução, se houver, para refletir em tempo real.
+  if (currentAudio) {
+    try {
+      currentAudio.playbackRate = clamped;
+      (currentAudio as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
+    } catch {
+      /* noop */
+    }
+  }
+  emitTtsChanged();
 }
 
 let currentAudio: HTMLAudioElement | null = null;
@@ -47,6 +72,8 @@ export function isUserTtsEnabled(): boolean {
 export function setUserTtsEnabled(on: boolean) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, on ? "1" : "0");
+  if (!on) stopSpeaking();
+  emitTtsChanged();
 }
 
 export function stopSpeaking() {
