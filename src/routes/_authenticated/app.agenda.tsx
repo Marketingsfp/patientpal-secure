@@ -96,6 +96,7 @@ import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { obterEtapaSinal, registrarPagamentoEtapaSinal } from "@/lib/agenda/sinal-orcamento";
+import { formatNumeroOrcamento, parseNumeroOrcamento } from "@/lib/orcamento-numero";
 import { IdadeIcon } from "@/components/idade-icon";
 import { ClienteForm, type Paciente as PacienteFull } from "@/components/clientes/cliente-form";
 
@@ -3976,25 +3977,44 @@ function AgendaPage() {
 
   const buscarOrcamento = async (numeroOverride?: number) => {
     if (!clinicaAtual) return;
-    const num = numeroOverride ?? parseInt(form.orcamento_numero.replace(/\D/g, ""), 10);
-    if (!num || num <= 0) {
-      toast.error("Informe o nº do orçamento.");
+    const digitado = form.orcamento_numero.trim();
+    const parsed = numeroOverride
+      ? { serie: null as string | null, numero: numeroOverride, numeroAlternativo: null as number | null }
+      : parseNumeroOrcamento(digitado);
+    const candidatos = [parsed.numero, parsed.numeroAlternativo].filter(
+      (n): n is number => typeof n === "number" && n > 0,
+    );
+    if (candidatos.length === 0) {
+      toast.error("Informe o nº do orçamento (ex.: 123 ou D-2026-00001).");
       return;
     }
     setBuscandoOrc(true);
     try {
-      const { data: orc, error } = await supabase
-        .from("orcamentos")
-        .select("id, numero, paciente_id, paciente_nome, status, especialidade_id, validade_dias, created_at")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("numero", num)
-        .maybeSingle();
-      if (error) {
-        mostrarErro(error);
-        return;
+      type OrcBusca = {
+        id: string; numero: number; serie: string | null;
+        paciente_id: string | null; paciente_nome: string | null;
+        status: string | null; especialidade_id: string | null;
+        validade_dias: number | null; created_at: string | null;
+      };
+      let orc: OrcBusca | null = null;
+      for (const cand of candidatos) {
+        let q = supabase
+          .from("orcamentos")
+          .select(
+            "id, numero, serie, paciente_id, paciente_nome, status, especialidade_id, validade_dias, created_at",
+          )
+          .eq("clinica_id", clinicaAtual.clinica_id)
+          .eq("numero", cand);
+        if (parsed.serie) q = q.eq("serie", parsed.serie);
+        const { data, error } = await q.limit(1).maybeSingle();
+        if (error) {
+          mostrarErro(error);
+          return;
+        }
+        if (data) { orc = data as unknown as OrcBusca; break; }
       }
       if (!orc) {
-        toast.error(`Orçamento nº ${num} não encontrado.`);
+        toast.error(`Orçamento ${digitado || candidatos[0]} não encontrado.`);
         return;
       }
       if (orc.status === "cancelado") {
@@ -4230,14 +4250,14 @@ function AgendaPage() {
       setForm((f) => ({
         ...f,
         orcamento_id: orc.id,
-        orcamento_numero: String(orc.numero),
+        orcamento_numero: formatNumeroOrcamento(orc.serie, orc.numero),
         orcamento_itens: nomes,
         paciente_id: pacId ?? f.paciente_id,
         paciente_nome: pacNome ?? f.paciente_nome,
         procedimento: procStr,
         procedimentos: procStr ? [procStr] : [],
       }));
-      toast.success(`Orçamento #${String(orc.numero).padStart(5, "0")} vinculado.`);
+      toast.success(`Orçamento ${formatNumeroOrcamento(orc.serie, orc.numero)} vinculado.`);
     } finally {
       setBuscandoOrc(false);
     }
@@ -6056,14 +6076,22 @@ function AgendaPage() {
                         Nº do orçamento
                       </Label>
                       <Input
-                        inputMode="numeric"
-                        placeholder="Ex.: 123"
+                        placeholder="Ex.: 123 ou D-2026-00001"
                         value={form.orcamento_numero}
                         onChange={(e) =>
-                          setForm((f) => ({ ...f, orcamento_numero: e.target.value.replace(/\D/g, "") }))
+                          setForm((f) => ({
+                            ...f,
+                            orcamento_numero: e.target.value.replace(/[^0-9A-Za-z\-\s]/g, "").toUpperCase(),
+                          }))
                         }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !form.orcamento_id) {
+                            e.preventDefault();
+                            void buscarOrcamento();
+                          }
+                        }}
                         disabled={!!form.orcamento_id || (editing ? pagosSet.has(editing.id) : false)}
-                        className="max-w-[110px] h-8 bg-white"
+                        className="max-w-[170px] h-8 bg-white"
                       />
                       {form.orcamento_id ? (
                         <Button
@@ -6088,7 +6116,8 @@ function AgendaPage() {
                       )}
                       {!form.orcamento_id && (
                         <span className="text-[11px] text-slate-500 leading-snug flex-1 min-w-[140px]">
-                          Opcional — vincula qualquer orçamento (exames, consultas, procedimentos) em uma única ficha.
+                          Opcional — vincula qualquer orçamento (exames, consultas, procedimentos, odontologia) em uma
+                          única ficha. Aceita o nº simples ou o código completo (ex.: D-2026-00001).
                         </span>
                       )}
                     </div>
