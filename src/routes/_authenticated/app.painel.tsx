@@ -699,9 +699,10 @@ function DashboardPage() {
             { label: "Com data do período", value: fmtMoney(data.caixaDia.doDia) },
             { label: "De outras datas (retroativos)", value: fmtMoney(data.caixaDia.outrasDatas) },
           ]} />
-          <p className="text-[11px] text-muted-foreground mt-1">
-            Sendo {fmtMoney(data.recebimentos.mensalidades)} de mensalidades do cartão ({fmtInt(data.recebimentos.qtdMensalidades)}) e {fmtMoney(data.recebimentos.atendimentos)} de atendimentos ({fmtInt(data.recebimentos.qtdAtendimentos)})
-          </p>
+          <SubGrid items={[
+            { label: `Atendimentos (${fmtInt(data.recebimentos.qtdAtendimentos)})`, value: fmtMoney(data.recebimentos.atendimentos) },
+            { label: `Mensalidades do cartão (${fmtInt(data.recebimentos.qtdMensalidades)})`, value: fmtMoney(data.recebimentos.mensalidades) },
+          ]} />
           <p className="text-[11px] text-muted-foreground">
             Mensalidades por cartão — Consulta: {fmtMoney(data.recebimentos.mensConsulta)} ({fmtInt(data.recebimentos.qtdMensConsulta)})
             {" · "}Desconto: {fmtMoney(data.recebimentos.mensDesconto)} ({fmtInt(data.recebimentos.qtdMensDesconto)})
