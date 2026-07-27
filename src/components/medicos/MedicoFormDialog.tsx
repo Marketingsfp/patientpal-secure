@@ -34,9 +34,18 @@ interface EspecialidadeRow { especialidade_id: string; tem_rqe: boolean; rqe_num
 interface ConvenioRow {
   id?: string;
   nome: string;
+  /** Repasse PARTICULAR (campos legados) */
   tipo_repasse: "percentual" | "valor";
   percentual: string;
   valor: string;
+  /** Repasse quando o atendimento é por CONVÊNIO */
+  convenio_tipo_repasse: "percentual" | "valor";
+  convenio_percentual: string;
+  convenio_valor: string;
+  /** Repasse fixo quando o pagamento é via CARTÃO CONSULTA */
+  cartao_consulta_valor: string;
+  /** Repasse fixo quando o pagamento é via CARTÃO DESCONTO */
+  cartao_desconto_valor: string;
   ativo: boolean;
 }
 
@@ -51,6 +60,16 @@ interface LaudadorRow {
 // Repasse individual agora é sempre vinculado a um serviço (ou categoria
 // sentinela auto-gerada). Não há seed de linhas avulsas.
 const CONVENIOS_PADRAO: ConvenioRow[] = [];
+
+/** Campos de repasse extras (convênio e cartões) começam sempre vazios:
+ *  vazio = usa o repasse padrão do médico. */
+const REPASSE_EXTRA_VAZIO = {
+  convenio_tipo_repasse: "percentual" as "percentual" | "valor",
+  convenio_percentual: "",
+  convenio_valor: "",
+  cartao_consulta_valor: "",
+  cartao_desconto_valor: "",
+};
 
 const limparPrefixoMedico = (nome: string) =>
   nome.replace(/^(\s*(dr|dra)\.?\s+)+/i, "").trim();
@@ -311,7 +330,9 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
         const key = normalizarNome(nome);
         const isServicoCadastrado = procs.some((p) => normalizarNome(p.nome) === key);
         if (isServicoCadastrado && !nomesServicosSelecionados.has(key)) {
-          const vazio = !c.percentual && !c.valor;
+          const vazio = !c.percentual && !c.valor
+            && !c.convenio_percentual && !c.convenio_valor
+            && !c.cartao_consulta_valor && !c.cartao_desconto_valor;
           if (vazio) return false;
         }
         return true;
@@ -337,6 +358,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           tipo_repasse: form.tipo_repasse,
           percentual: "",
           valor: "",
+          ...REPASSE_EXTRA_VAZIO,
           ativo: true,
         });
       }
@@ -348,6 +370,7 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           tipo_repasse: form.tipo_repasse,
           percentual: "",
           valor: "",
+          ...REPASSE_EXTRA_VAZIO,
           ativo: true,
         });
       }
@@ -483,18 +506,32 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
       setMedicoUserId(med.user_id ?? null);
       const { data: convs } = await supabase
         .from("medico_convenios")
-        .select("id, nome, tipo_repasse, percentual, valor, ativo")
+        .select("id, nome, tipo_repasse, percentual, valor, convenio_tipo_repasse, convenio_percentual, convenio_valor, cartao_consulta_valor, cartao_desconto_valor, ativo")
         .eq("medico_id", med.id)
         .order("created_at");
       if (convs && convs.length) {
-        setConvenios(convs.map((c) => ({
+        setConvenios(convs.map((c) => {
+          const r = c as typeof c & {
+            convenio_tipo_repasse?: string | null;
+            convenio_percentual?: number | null;
+            convenio_valor?: number | null;
+            cartao_consulta_valor?: number | null;
+            cartao_desconto_valor?: number | null;
+          };
+          return {
           id: c.id,
           nome: c.nome,
           tipo_repasse: (c.tipo_repasse as "percentual" | "valor") ?? "percentual",
           percentual: c.percentual != null ? String(c.percentual) : "",
           valor: c.valor != null ? String(c.valor) : "",
+          convenio_tipo_repasse: (r.convenio_tipo_repasse as "percentual" | "valor") ?? "percentual",
+          convenio_percentual: r.convenio_percentual != null ? String(r.convenio_percentual) : "",
+          convenio_valor: r.convenio_valor != null ? String(r.convenio_valor) : "",
+          cartao_consulta_valor: r.cartao_consulta_valor != null ? String(r.cartao_consulta_valor) : "",
+          cartao_desconto_valor: r.cartao_desconto_valor != null ? String(r.cartao_desconto_valor) : "",
           ativo: c.ativo ?? true,
-        })));
+          };
+        }));
       } else {
         setConvenios(CONVENIOS_PADRAO.map((c) => ({ ...c })));
       }
@@ -770,6 +807,21 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
           tipo_repasse: c.tipo_repasse,
           percentual: c.tipo_repasse === "percentual" ? parseFloat(c.percentual || "0") : 0,
           valor: c.tipo_repasse === "valor" ? parseFloat(c.valor || "0") : null,
+          // Convênio / cartões: em branco = herda o repasse padrão do médico.
+          convenio_tipo_repasse:
+            (c.convenio_tipo_repasse === "percentual" ? c.convenio_percentual : c.convenio_valor)?.trim()
+              ? c.convenio_tipo_repasse
+              : null,
+          convenio_percentual:
+            c.convenio_tipo_repasse === "percentual" && c.convenio_percentual.trim()
+              ? parseFloat(c.convenio_percentual)
+              : null,
+          convenio_valor:
+            c.convenio_tipo_repasse === "valor" && c.convenio_valor.trim()
+              ? parseFloat(c.convenio_valor)
+              : null,
+          cartao_consulta_valor: c.cartao_consulta_valor.trim() ? parseFloat(c.cartao_consulta_valor) : null,
+          cartao_desconto_valor: c.cartao_desconto_valor.trim() ? parseFloat(c.cartao_desconto_valor) : null,
           ativo: c.ativo,
         }));
       if (convRows.length) {
@@ -1511,24 +1563,30 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                     <div>
                       <Label>REPASSE INDIVIDUAL</Label>
                       <p className="text-xs text-muted-foreground">
-                        As <b>categorias</b> dos serviços selecionados na aba <b>Especialidades</b> aparecem aqui automaticamente (Consulta, Exame, Procedimento). Defina o tipo e o valor de repasse por categoria — vale para todos os serviços daquela categoria. Use <b>Manual</b> para sobrescrever o repasse de um <b>serviço específico</b> (prevalece sobre a categoria).
+                        Escolha o <b>serviço</b> e defina o repasse em cada forma de atendimento: <b>Particular</b>, <b>Convênio</b>, <b>Cartão Consulta</b> e <b>Cartão Desconto</b>.
+                        As <b>categorias</b> dos serviços selecionados na aba <b>Especialidades</b> aparecem aqui automaticamente (Consulta, Exame, Procedimento) e valem para todos os serviços daquela categoria; a linha do <b>serviço específico</b> prevalece sobre a categoria.
+                        Campo em branco = usa o <b>repasse padrão</b> do médico. A cobrança do paciente não muda — continua seguindo as regras do contrato/convênio.
                       </p>
                     </div>
                     <Button type="button" size="sm" variant="outline"
-                      onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ativo: true }])}>
+                      onClick={() => setConvenios((cs) => [...cs, { nome: "", tipo_repasse: "percentual", percentual: "50", valor: "", ...REPASSE_EXTRA_VAZIO, ativo: true }])}>
                       <Plus className="h-4 w-4 mr-1" /> Manual
                     </Button>
                   </div>
                   {convenios.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">Nenhum repasse individual. Clique em "Manual" para sobrescrever o repasse de um serviço específico.</p>
                   ) : (
-                    <div className="border rounded-md overflow-hidden">
-                      <table className="w-full text-sm">
+                    <div className="border rounded-md overflow-x-auto">
+                      <table className="w-full min-w-[900px] text-sm">
                         <thead className="bg-muted/50">
                           <tr className="text-left">
-                            <th className="px-2 py-2 font-medium">Nome</th>
-                            <th className="px-2 py-2 font-medium w-40">Tipo</th>
-                            <th className="px-2 py-2 font-medium w-32">Valor</th>
+                            <th className="px-2 py-2 font-medium">Serviço</th>
+                            <th className="px-2 py-2 font-medium w-32">Tipo (particular)</th>
+                            <th className="px-2 py-2 font-medium w-28">Particular</th>
+                            <th className="px-2 py-2 font-medium w-32">Tipo (convênio)</th>
+                            <th className="px-2 py-2 font-medium w-28">Convênio</th>
+                            <th className="px-2 py-2 font-medium w-28">Cartão Consulta</th>
+                            <th className="px-2 py-2 font-medium w-28">Cartão Desconto</th>
                             <th className="px-2 py-2 w-10"></th>
                           </tr>
                         </thead>
@@ -1581,6 +1639,38 @@ export function MedicoFormDialog({ open, onOpenChange, clinicaId, editingMedicoI
                                     onChange={(v) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, valor: v } : x))}
                                   />
                                 )}
+                              </td>
+                              <td className="px-2 py-1">
+                                <select className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                  value={c.convenio_tipo_repasse}
+                                  onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, convenio_tipo_repasse: e.target.value as "percentual" | "valor" } : x))}>
+                                  <option value="percentual">% Percentual</option>
+                                  <option value="valor">R$ Valor</option>
+                                </select>
+                              </td>
+                              <td className="px-2 py-1">
+                                {c.convenio_tipo_repasse === "percentual" ? (
+                                  <Input type="number" step="0.01" min={0} placeholder="padrão"
+                                    value={c.convenio_percentual}
+                                    onChange={(e) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, convenio_percentual: e.target.value } : x))} />
+                                ) : (
+                                  <CurrencyInput
+                                    value={c.convenio_valor}
+                                    onChange={(v) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, convenio_valor: v } : x))}
+                                  />
+                                )}
+                              </td>
+                              <td className="px-2 py-1">
+                                <CurrencyInput
+                                  value={c.cartao_consulta_valor}
+                                  onChange={(v) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, cartao_consulta_valor: v } : x))}
+                                />
+                              </td>
+                              <td className="px-2 py-1">
+                                <CurrencyInput
+                                  value={c.cartao_desconto_valor}
+                                  onChange={(v) => setConvenios((cs) => cs.map((x, j) => j === i ? { ...x, cartao_desconto_valor: v } : x))}
+                                />
                               </td>
                               <td className="px-2 py-1 text-right">
                                 {catLbl || servicoLbl ? null : (

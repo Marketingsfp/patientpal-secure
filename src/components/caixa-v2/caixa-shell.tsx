@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
 import {
   PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Printer, FileDown,
   Lock, Unlock, ChevronRight, Users, Wallet, AlertTriangle, HandCoins,
@@ -22,7 +21,7 @@ import { detectarAlertas, type AlertaBadge } from "./alertas-fila";
 import { KpiBar, type KpiData } from "./kpi-bar";
 import { useCaixaShortcuts } from "./atalhos";
 
-type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento";
+type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento" | "estorno" | "reabertura";
 interface Sessao {
   id: string; clinica_id: string; user_id: string; user_nome: string | null;
   aberto_em: string; valor_abertura: number;
@@ -40,11 +39,18 @@ interface FilaItem {
 }
 
 type TabKey = "hoje" | "sessao" | "todos";
-type PeriodoKey = "hoje" | "7d" | "30d";
+type PeriodoKey = "hoje" | "7d" | "30d" | "custom";
+/** Linha mínima usada apenas para somar os totais do período filtrado. */
+interface AggRow {
+  id: string; sessao_id: string; tipo: MovTipo;
+  valor: number; forma_pagamento: string | null; created_at: string;
+  lancamento_id: string | null; descricao: string | null;
+}
 
 const TIPO_LABEL: Record<MovTipo, string> = {
   abertura: "Abertura", suprimento: "Suprimento", recebimento: "Recebimento",
   sangria: "Sangria", despesa: "Despesa", fechamento: "Fechamento",
+  estorno: "Estorno", reabertura: "Reabertura",
 };
 const TIPO_CLASS: Record<MovTipo, string> = {
   abertura: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
@@ -53,10 +59,14 @@ const TIPO_CLASS: Record<MovTipo, string> = {
   sangria: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
   despesa: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
   fechamento: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
+  estorno: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+  reabertura: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
 };
 const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
   abertura: 1, suprimento: 1, recebimento: 1, sangria: -1, despesa: -1, fechamento: 0,
-};
+  // Estorno devolve dinheiro ao paciente: sempre reduz o total.
+  estorno: -1, reabertura: 0,
+} as Record<MovTipo, 1 | -1 | 0>;
 
 const TIPO_OPTS = [
   { value: "recebimento", label: "Recebimento" },
@@ -75,6 +85,7 @@ const FORMA_OPTS = [
 
 const PERIODO_OPTS: ReadonlyArray<{ value: PeriodoKey; label: string }> = [
   { value: "hoje", label: "Hoje" }, { value: "7d", label: "7 dias" }, { value: "30d", label: "30 dias" },
+  { value: "custom", label: "Personalizado" },
 ];
 
 const BATCH = 40;
@@ -115,6 +126,10 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   const [tipos, setTipos] = useState<string[]>([]);
   const [formas, setFormas] = useState<string[]>([]);
   const [periodo, setPeriodo] = useState<PeriodoKey>("7d");
+  const [dataDe, setDataDe] = useState("");
+  const [dataAte, setDataAte] = useState("");
+  const [aggRows, setAggRows] = useState<AggRow[]>([]);
+  const [assocIds, setAssocIds] = useState<Set<string>>(new Set());
   const [fila, setFila] = useState<FilaItem[]>([]);
   const [filaLoading, setFilaLoading] = useState(true);
 
@@ -147,11 +162,16 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     const end = now.toISOString();
     let start = new Date(now); start.setHours(0, 0, 0, 0);
     if (tab === "todos") {
+      if (periodo === "custom" && (dataDe || dataAte)) {
+        const s = dataDe ? new Date(`${dataDe}T00:00:00`) : new Date(0);
+        const e = dataAte ? new Date(`${dataAte}T23:59:59.999`) : now;
+        return { from: s.toISOString(), to: e.toISOString() };
+      }
       const days = periodo === "hoje" ? 0 : periodo === "7d" ? 7 : 30;
       start = new Date(now.getTime() - days * 86400000);
     }
     return { from: start.toISOString(), to: end };
-  }, [tab, periodo]);
+  }, [tab, periodo, dataDe, dataAte]);
 
   const applyFilters = useCallback((qb: any): any => {
     let q: any = qb;
@@ -205,6 +225,36 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   }, [clinicaAtual, tab, sessao, applyFilters]);
 
   useEffect(() => { void loadMovs(); }, [loadMovs]);
+
+  // Totais do período/filtro inteiro (independente da paginação da lista)
+  const loadTotais = useCallback(async () => {
+    if (!clinicaAtual) { setAggRows([]); return; }
+    if (tab === "sessao" && !sessao) { setAggRows([]); return; }
+    let q = supabase.from("caixa_movimentos")
+      .select("id, sessao_id, tipo, valor, forma_pagamento, created_at, lancamento_id, descricao");
+    q = applyFilters(q);
+    q = q.order("created_at", { ascending: false }).range(0, 9999);
+    const { data, error } = await q;
+    const rows = error ? [] : ((data ?? []) as AggRow[]);
+    setAggRows(rows);
+
+    // Classificação Particular x Associado do período filtrado: um recebimento
+    // é "Associado" quando o lançamento de origem tem convênio/contrato ligado.
+    const ids = Array.from(new Set(rows.map((r) => r.lancamento_id).filter(Boolean))) as string[];
+    if (ids.length === 0) { setAssocIds(new Set()); return; }
+    const assoc = new Set<string>();
+    for (let i = 0; i < ids.length; i += 400) {
+      const chunk = ids.slice(i, i + 400);
+      const { data: lancs } = await supabase.from("fin_lancamentos")
+        .select("id, convenio_id, contrato_id").in("id", chunk);
+      for (const l of (lancs ?? []) as Array<{ id: string; convenio_id: string | null; contrato_id: string | null }>) {
+        if (l.convenio_id || l.contrato_id) assoc.add(l.id);
+      }
+    }
+    setAssocIds(assoc);
+  }, [clinicaAtual, tab, sessao, applyFilters]);
+
+  useEffect(() => { void loadTotais(); }, [loadTotais]);
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || !clinicaAtual) return;
@@ -281,20 +331,31 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
 
   // ===== Resumo agregado (client-side)
   const resumoData = useMemo<ResumoData>(() => {
-    const recebimentos = movs.filter((m) => m.tipo === "recebimento");
+    const recebimentos = aggRows.filter((m) => m.tipo === "recebimento");
+    const estornos = aggRows.filter((m) => m.tipo === "estorno");
+    const soma = (arr: typeof aggRows) => arr.reduce((s, m) => s + Number(m.valor || 0), 0);
+    const porForma = (arr: typeof aggRows, forma: string) =>
+      arr.filter((m) => (m.forma_pagamento ?? "").toLowerCase().includes(forma));
+    // Estornos abatem do recebido (não somam no total).
     const somaForma = (forma: string) =>
-      recebimentos
-        .filter((m) => (m.forma_pagamento ?? "").toLowerCase().includes(forma))
-        .reduce((s, m) => s + Number(m.valor || 0), 0);
-    const recebidoTotal = recebimentos.reduce((s, m) => s + Number(m.valor || 0), 0);
-    const recebidoSessao = sessao
-      ? recebimentos.filter((m) => m.sessao_id === sessao.id).reduce((s, m) => s + Number(m.valor || 0), 0)
-      : 0;
-    const saldo = movs.reduce((s, m) => s + Number(m.valor || 0) * (TIPO_SINAL[m.tipo] || 0), 0);
-    const particular = fila.filter((f) => !f.valor_cartao).reduce((s, f) => s + f.valor, 0);
-    const associado = fila.filter((f) => f.valor_cartao > 0).reduce((s, f) => s + f.valor_cartao, 0);
+      soma(porForma(recebimentos, forma)) - soma(porForma(estornos, forma));
+    const recebidoTotal = soma(recebimentos) - soma(estornos);
+    // Particular x Associado seguem o mesmo filtro do card "Recebido no filtro"
+    // (estornos abatem), classificando pelo lançamento de origem.
+    const ehMensalidade = (m: AggRow) => {
+      const d = (m.descricao ?? "").toUpperCase();
+      return d.includes("MENSALIDADE") || d.includes("TAXA DE ADESAO") || d.includes("TAXA DE ADESÃO");
+    };
+    const ehAssoc = (m: AggRow) =>
+      (!!m.lancamento_id && assocIds.has(m.lancamento_id)) || ehMensalidade(m);
+    const particular =
+      soma(recebimentos.filter((m) => !ehAssoc(m))) - soma(estornos.filter((m) => !ehAssoc(m)));
+    const associado =
+      soma(recebimentos.filter(ehAssoc)) - soma(estornos.filter(ehAssoc));
     return {
-      saldo, recebidoHoje: recebidoTotal, recebidoSessao,
+      recebidoHoje: recebidoTotal,
+      estornos: soma(estornos),
+      estornosQtd: estornos.length,
       particular, associado,
       dinheiro: somaForma("dinheiro"),
       pix: somaForma("pix"),
@@ -302,7 +363,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
       pendentesFila: filaPend.length,
       aguardandoPagamento: filaPend.filter((f) => !f.ja_pago).length,
     };
-  }, [movs, fila, filaPend, sessao]);
+  }, [aggRows, assocIds, filaPend]);
 
   // ===== Fila → cards (status + alertas)
   const filaCards = useMemo<FilaCardData[]>(() => {
@@ -342,10 +403,13 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
 
   // ===== KPIs derivados
   const kpiData = useMemo<KpiData>(() => {
-    const recebimentos = movs.filter((m) => m.tipo === "recebimento");
-    const receitaHoje = recebimentos.reduce((s, m) => s + Number(m.valor || 0), 0);
+    const recebimentos = aggRows.filter((m) => m.tipo === "recebimento");
+    const estornos = aggRows.filter((m) => m.tipo === "estorno");
+    const soma = (arr: typeof aggRows) => arr.reduce((s, m) => s + Number(m.valor || 0), 0);
+    const receitaHoje = soma(recebimentos) - soma(estornos);
     const receitaSessao = sessao
-      ? recebimentos.filter((m) => m.sessao_id === sessao.id).reduce((s, m) => s + Number(m.valor || 0), 0)
+      ? soma(recebimentos.filter((m) => m.sessao_id === sessao.id))
+        - soma(estornos.filter((m) => m.sessao_id === sessao.id))
       : 0;
     // Tempo médio de espera atual (min) — só quando há fila pendente
     const esperas = filaPend.map((f) => (Date.now() - new Date(f.inicio).getTime()) / 60000)
@@ -377,7 +441,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
       receitaSessao, receitaHoje,
       atendimentos: recebimentos.length,
     };
-  }, [movs, sessao, filaPend]);
+  }, [aggRows, sessao, filaPend]);
 
   const tabs: ReadonlyArray<StatusTab<TabKey>> = [
     { value: "hoje", label: "Hoje" },
@@ -388,7 +452,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   // ===== Actions (delegam à tela clássica; não altera regras)
   const goCaixa = (msg?: string) => {
     if (msg) toast.info(msg);
-    window.location.href = "/app/caixa";
+    window.location.href = "/app/caixa?classico=1";
   };
 
   // Ação primária "Receber" — 1 clique. Se houver único item pendente,
@@ -397,7 +461,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   const receberFila = useCallback((filaId?: string) => {
     const id = filaId ?? filaCards[0]?.id;
     if (!id) { toast.info("Nenhum paciente na fila."); return; }
-    window.location.href = `/app/caixa?receber=${encodeURIComponent(id)}`;
+    window.location.href = `/app/caixa?classico=1&receber=${encodeURIComponent(id)}`;
   }, [filaCards]);
 
   // Atalhos F2/F3/F4/Esc
@@ -415,7 +479,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
         {tab === "sessao" && sessao ? `Sessão #${sessao.id.slice(0, 8)}` : tab === "hoje" ? "Movimentos de hoje" : `Últimos ${periodo === "hoje" ? "hoje" : periodo}`}
       </div>}
       actions={novosCount > 0 ? (
-        <Button size="sm" variant="secondary" onClick={() => { setNovosCount(0); void loadMovs(); }}>
+        <Button size="sm" variant="secondary" onClick={() => { setNovosCount(0); void loadMovs(); void loadTotais(); }}>
           {novosCount} novo{novosCount > 1 ? "s" : ""} — atualizar
         </Button>
       ) : null}
@@ -427,7 +491,27 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
           <QuickFilters options={TIPO_OPTS as any} value={tipos as any} onChange={(v) => setTipos(v as any)} multi ariaLabel="Tipo" />
           <QuickFilters options={FORMA_OPTS as any} value={formas as any} onChange={(v) => setFormas(v as any)} multi ariaLabel="Forma de pagamento" />
           {tab === "todos" && (
-            <QuickFilters options={PERIODO_OPTS as any} value={[periodo] as any} onChange={(v) => setPeriodo(((v[0] as any) ?? "7d"))} ariaLabel="Período" />
+            <div className="flex flex-col gap-2">
+              <QuickFilters options={PERIODO_OPTS as any} value={[periodo] as any} onChange={(v) => setPeriodo(((v[0] as any) ?? "7d"))} ariaLabel="Período" />
+              {periodo === "custom" && (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <label className="flex items-center gap-1">
+                    De
+                    <input type="date" value={dataDe} onChange={(e) => setDataDe(e.target.value)}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs" />
+                  </label>
+                  <label className="flex items-center gap-1">
+                    Até
+                    <input type="date" value={dataAte} onChange={(e) => setDataAte(e.target.value)}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs" />
+                  </label>
+                  {(dataDe || dataAte) && (
+                    <Button size="sm" variant="ghost" className="h-8 px-2"
+                      onClick={() => { setDataDe(""); setDataAte(""); }}>Limpar datas</Button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
       }
@@ -446,10 +530,13 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
             <div className={cn(
               "grid items-center gap-3 border-b border-border/50 px-3",
               compact ? "h-8 text-[13px]" : "h-10 text-sm",
-              compact ? "grid-cols-[52px_100px_1fr_90px]" : "grid-cols-[60px_120px_1fr_100px_100px]",
+              compact ? "grid-cols-[118px_100px_1fr_90px]" : "grid-cols-[140px_120px_1fr_100px_100px]",
             )}>
-              <span className="tabular-nums text-muted-foreground">
-                {new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              <span className="tabular-nums text-muted-foreground whitespace-nowrap">
+                {new Date(m.created_at).toLocaleString("pt-BR", {
+                  day: "2-digit", month: "2-digit", year: "numeric",
+                  hour: "2-digit", minute: "2-digit",
+                }).replace(",", "")}
               </span>
               <span className={cn("inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium w-fit", TIPO_CLASS[m.tipo])}>
                 {TIPO_LABEL[m.tipo]}
@@ -569,9 +656,9 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
         <Button size="sm" variant="ghost" onClick={() => goCaixa()}>
           <FileDown className="h-4 w-4" /> Exportar
         </Button>
-        <Link to="/app/caixa" className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 self-center">
+        <a href="/app/caixa?classico=1" className="ml-auto text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 self-center">
           Ir para o caixa clássico <ChevronRight className="h-3 w-3" />
-        </Link>
+        </a>
       </div>
     </div>
   );

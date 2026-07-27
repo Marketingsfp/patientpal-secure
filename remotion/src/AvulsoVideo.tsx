@@ -3,30 +3,30 @@ import { AbsoluteFill } from "remotion";
 import { TransitionSeries, springTiming } from "@remotion/transitions";
 import { wipe } from "@remotion/transitions/wipe";
 import { fade } from "@remotion/transitions/fade";
-import { S1Hook } from "./scenes/S1Hook";
-import { S2Onde } from "./scenes/S2Onde";
-import { S3Busca } from "./scenes/S3Busca";
-import { S4Parcelas } from "./scenes/S4Parcelas";
-import { S5Pagar } from "./scenes/S5Pagar";
-import { S6Close } from "./scenes/S6Close";
+import { A1Hook } from "./avulso/A1Hook";
+import { A2Onde } from "./avulso/A2Onde";
+import { A3SemParcela } from "./avulso/A3SemParcela";
+import { A4Preencher } from "./avulso/A4Preencher";
+import { A5Desconto } from "./avulso/A5Desconto";
+import { A6Close } from "./avulso/A6Close";
 import { C } from "./theme";
 
 const T = springTiming({ config: { damping: 200 }, durationInFrames: 18 });
 
-export const MainVideo: React.FC = () => (
+export const AvulsoVideo: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: C.bgDeep }}>
     <TransitionSeries>
-      <TransitionSeries.Sequence durationInFrames={110}><S1Hook /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={115}><A1Hook /></TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-bottom" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={130}><S2Onde /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={125}><A2Onde /></TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-right" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={130}><S3Busca /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={145}><A3SemParcela /></TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-right" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={140}><S4Parcelas /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={150}><A4Preencher /></TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={wipe({ direction: "from-right" })} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={140}><S5Pagar /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={140}><A5Desconto /></TransitionSeries.Sequence>
       <TransitionSeries.Transition presentation={fade()} timing={T} />
-      <TransitionSeries.Sequence durationInFrames={110}><S6Close /></TransitionSeries.Sequence>
+      <TransitionSeries.Sequence durationInFrames={115}><A6Close /></TransitionSeries.Sequence>
     </TransitionSeries>
   </AbsoluteFill>
 );

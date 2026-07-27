@@ -1,49 +1,41 @@
-# Repasse de laudo para o exame ITB
+## Objetivo
 
-Vamos habilitar exatamente o mesmo fluxo que hoje existe para o Eletrocardiograma (ECG), agora também para o exame **ITB**, em todas as clínicas (SFP, Menino Jesus e Consulta Hoje). Os médicos laudadores continuam sendo todos os cardiologistas ativos da clínica — igual ao ECG.
+Tornar visíveis no menu páginas que hoje só são alcançadas por URL direta ou pela busca global. Aplicação **global (3 clínicas)**, conforme confirmado.
 
-## O que existe hoje (verificado)
+## Escopo
 
-- Cada clínica tem um "médico agenda" chamado **ELETROCARDIOGRAMA**. Ao editá-lo, aparece a seção **"REPASSE LAUDO TERCEIRO"**, onde se lista os cardiologistas ativos e o % ou valor fixo que cada um recebe por laudo. Essa seção **só aparece hoje quando o nome do cadastro é exatamente "ELETROCARDIOGRAMA"** (regra fixa no código).
-- No procedimento **ELETROCARDIOGRAMA (ECG)** o campo `requer_laudo` está marcado como *true*, o que faz aparecer no menu **Financeiro → Atendimentos** o botão **"Vincular laudo"** (individual e em lote).
-- O motor de repasse (`medico_repasse_laudo`) e a aba **Comprovantes / Repasse** já são genéricos e não dependem do nome — funcionam para qualquer agenda de exame.
-- Já existe o "médico agenda" **ITB** cadastrado em SFP e Menino Jesus. Em Consulta Hoje ele ainda **não existe**.
-- Já existe o **procedimento ITB** nas 3 clínicas, mas hoje ele está com `requer_laudo = false` e sem tipo.
+### 1. Aba "Modelos" no Cartão Benefícios
+Hoje as abas são: Vendas, Convênios, Dependentes, Relatórios (BI). A página `/app/cartao-beneficios/modelos` existe mas não está listada.
 
-## O que muda
+- Acrescentar a aba **"Modelos"** (ícone de arquivo/cartão) na barra de abas do Cartão Benefícios, após "Dependentes".
+- Ela abre o cadastro de modelos de plano/contrato: nome, tipo, valor mensal, taxa de adesão, limite de dependentes/agregados, fidelidade, vigência, nº de parcelas, benefícios e template de impressão do contrato.
+- Nada muda na tela em si nem nos dados; é só exposição de navegação.
 
-### 1. Frontend — liberar a seção de repasse de laudo para ITB
-Arquivo: `src/components/medicos/MedicoFormDialog.tsx`
+### 2. Páginas órfãs úteis ganham item de menu
+- **Anamneses** (`/app/anamneses`) → grupo Clínico/Atendimento.
+- **Clínicas** (`/app/clinicas`) → grupo Configurações.
+- **Backups** (`/app/backups`) → grupo Configurações.
 
-- Trocar a condição atual que só exibe a seção "REPASSE LAUDO TERCEIRO" para o cadastro chamado `ELETROCARDIOGRAMA`, passando a exibi-la também quando o cadastro se chamar `ITB`.
-- Ajustar o texto do bloco para citar os dois exames como exemplo, mantendo a mesma explicação (cardiologistas ativos, % ou valor fixo, sem lançamento automático).
-- Nenhuma outra tela é alterada — a aba **Convênio**, o cadastro geral do médico e o fluxo do financeiro continuam iguais.
+Cada uma continua respeitando as permissões já definidas em `permissoes-rotas.ts` — quem não tem o módulo liberado segue sem ver o item.
 
-### 2. Banco — marcar o procedimento ITB como "requer laudo"
-Nas 3 clínicas (Consulta Hoje, Menino Jesus, SFP):
-- Atualizar o procedimento **ITB** para `requer_laudo = true` e `tipo_procedimento = 'equipamento'` (mesmo padrão do ECG). Isso faz o botão **"Vincular laudo"** aparecer em Financeiro → Atendimentos para atendimentos de ITB.
+### 3. Fora do escopo (não mexer agora)
+- Telas internas de teste `dev-caixa-shell`, `dev-clientes-shell`, `dev-list-shell`, `dev-orcamentos-shell`, `dev-hhp` — permanecem como estão.
+- Página antiga `/app/medicos` (substituída por `/app/equipe`) — permanece como está.
+- Páginas que já têm navegação própria dentro do módulo pai: abas do Financeiro, `cartao-beneficios/beneficios`, `nfse/testar`, `orcamentos-agenda`, `agenda-v2`.
+- Nenhuma alteração de valores, regras de negócio, banco ou permissões.
 
-### 3. Banco — criar o médico agenda "ITB" onde falta
-- Criar o cadastro de agenda de exame chamado **ITB** na **CLINICA CONSULTA HOJE** (SFP e Menino Jesus já têm). Sem essa agenda não é possível configurar os laudadores nem vincular o laudo no financeiro.
+## Detalhes técnicos
 
-## Como o time vai usar depois
+- `src/routes/_authenticated/app.cartao-beneficios.tsx`: adicionar entrada `{ to: "/app/cartao-beneficios/modelos", label: "Modelos", icon: ... }` no array de abas.
+- `src/components/app-shell.tsx`: adicionar os três itens nos grupos correspondentes do array de navegação.
+- Sem migração de banco. Sem mudança em `permissoes-rotas.ts` (as rotas já estão mapeadas).
 
-1. Menu **Médicos** → editar o cadastro **ITB** → aparece a seção **REPASSE LAUDO TERCEIRO** com todos os cardiologistas ativos da clínica → define % ou valor fixo para cada um → **Salvar**.
-2. Menu **Financeiro → Atendimentos** → localizar o atendimento de ITB → botão **"Vincular laudo"** (individual ou em lote) → escolher o cardiologista → sistema sugere o valor conforme regra cadastrada.
-3. Aba **Comprovantes / Repasse** do cardiologista passa a somar o `valor_laudo` do ITB da mesma forma que já soma o do ECG.
+## Riscos
 
-## Fora do escopo
+Baixo. Mudança puramente de navegação/frontend, reversível. Impacto: itens novos passam a aparecer para usuários com permissão nos módulos correspondentes nas 3 clínicas.
 
-- Não altera o motor de cálculo de repasse (já genérico).
-- Não altera Comprovantes/Repasse, Convênios, NF-e nem regras de cartão benefícios.
-- Não mexe em outras clínicas nem em outros exames.
-- Não cria lançamento automático — o financeiro continua decidindo quando lançar.
+## Validação após implementar
 
-## Riscos e validação
-
-- Risco baixo: mudança de front é apenas ampliar uma condição de exibição; mudança de banco é limitada aos registros ITB.
-- Validação após aplicar:
-  1. Abrir cadastro do médico **ITB** em cada clínica → confirmar que a seção de laudadores aparece e que lista os cardiologistas ativos.
-  2. Cadastrar um laudador de teste com % e salvar → reabrir e conferir persistência.
-  3. Em um atendimento de ITB no Financeiro → confirmar que o botão "Vincular laudo" aparece e sugere o valor configurado.
-  4. Conferir na aba Comprovantes que o valor entra no repasse do cardiologista escolhido.
+- Abrir Cartão Benefícios e confirmar a aba "Modelos" listando os modelos da clínica ativa.
+- Conferir que Anamneses, Clínicas e Backups abrem pelo menu.
+- Conferir que usuário sem permissão no módulo continua sem ver o item.

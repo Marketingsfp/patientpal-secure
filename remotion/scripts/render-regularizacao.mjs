@@ -9,7 +9,7 @@ const browser = await openBrowser("chrome", {
   chromiumOptions: { args: ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"] },
   chromeMode: "chrome-for-testing",
 });
-const composition = await selectComposition({ serveUrl: bundled, id: "main", puppeteerInstance: browser });
-await renderMedia({ composition, serveUrl: bundled, codec: "h264", outputLocation: "/mnt/documents/pagamento-mensalidade-cartao-consulta.mp4", puppeteerInstance: browser, muted: true, concurrency: 1 });
+const composition = await selectComposition({ serveUrl: bundled, id: "regularizacao", puppeteerInstance: browser });
+await renderMedia({ composition, serveUrl: bundled, codec: "h264", outputLocation: "/mnt/documents/pagamento-avulso-regularizacao-12-meses.mp4", puppeteerInstance: browser, muted: true, concurrency: 1 });
 await browser.close({ silent: false });
 console.log("done");

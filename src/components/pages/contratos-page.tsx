@@ -78,6 +78,8 @@ import { fmtDataExtenso } from "@/lib/print-contrato";
 import { printCartoes } from "@/lib/print-cartao";
 import { printGuiaMensalidade, printGuiaMensalidadeComTaxa, reimprimirGuiaMensalidade } from "@/lib/print-gr";
 import { gerarCarnePDF } from "@/lib/print-carne";
+import { Receipt } from "lucide-react";
+import { FaturamentoRapidoMensalidadeDialog } from "@/components/cartao-beneficios/faturamento-rapido-dialog";
 import { gerarBoletosContrato } from "@/lib/boleto.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Barcode, FileText } from "lucide-react";
@@ -296,6 +298,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
 
   // Fluxo "É renovação?" acionado antes de abrir a nova venda.
   const [perguntaRenovOpen, setPerguntaRenovOpen] = useState(false);
+  const [fatRapidoOpen, setFatRapidoOpen] = useState(false);
   const [escolhaContratoOpen, setEscolhaContratoOpen] = useState(false);
   const [pacRenov, setPacRenov] = useState<PatientOption | null>(null);
   const [contratosPac, setContratosPac] = useState<Contrato[]>([]);
@@ -329,14 +332,32 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       .order("created_at", { ascending: false });
     const s = termo.trim();
     if (s.length >= 2) {
-      // Busca no servidor: por nome do paciente (ilike) e, quando o termo for
-      // numérico, também pelo número do contrato. Isso evita perder registros
-      // fora dos 500 mais recentes (clínicas com >500 contratos).
+      // Busca no servidor. O campo `paciente_nome` no contrato é um snapshot
+      // histórico e em vários contratos antigos veio truncado (ex.: "MARIA
+      // CRISTINA DE SOUZA D"). Para o nome completo funcionar, buscamos
+      // também os pacientes atuais por nome/CPF/prontuário/pasta e incluímos
+      // seus IDs no OR.
       const soDigitos = /^\d+$/.test(s);
-      const orExpr = soDigitos
-        ? `paciente_nome.ilike.%${s}%,numero.eq.${s}`
-        : `paciente_nome.ilike.%${s}%`;
-      contratosQuery = contratosQuery.or(orExpr).limit(200);
+      const digits = s.replace(/\D/g, "");
+      const escLike = s.replace(/[,()]/g, " ");
+      const pacFilters: string[] = [`nome.ilike.%${escLike}%`];
+      if (digits.length >= 2) {
+        pacFilters.push(`cpf.ilike.%${digits}%`);
+        pacFilters.push(`codigo_prontuario.eq.${digits}`);
+        pacFilters.push(`codigo_prontuario_anterior.eq.${digits}`);
+        pacFilters.push(`numero_pasta.eq.${digits}`);
+      }
+      const { data: pacMatch } = await supabase
+        .from("pacientes")
+        .select("id")
+        .eq("clinica_id", clinicaAtual.clinica_id)
+        .or(pacFilters.join(","))
+        .limit(200);
+      const pacIdsMatch = ((pacMatch ?? []) as Array<{ id: string }>).map((p) => p.id);
+      const orParts: string[] = [`paciente_nome.ilike.%${escLike}%`];
+      if (soDigitos) orParts.push(`numero.eq.${s}`);
+      if (pacIdsMatch.length > 0) orParts.push(`paciente_id.in.(${pacIdsMatch.join(",")})`);
+      contratosQuery = contratosQuery.or(orParts.join(",")).limit(200);
     } else {
       contratosQuery = contratosQuery.limit(500);
     }
@@ -451,8 +472,11 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
   }, [initialContratoId, loading, list, detail]);
 
   const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    const base = !s ? list : list.filter((c) => `${c.numero} ${c.paciente_nome}`.toLowerCase().includes(s));
+    // Filtro local de texto foi desativado — a busca por nome/CPF/prontuário
+    // já é feita no servidor com JOIN em pacientes (nome atualizado). O
+    // `paciente_nome` do contrato é um snapshot histórico e às vezes vem
+    // truncado, então filtrar por ele aqui esconderia resultados válidos.
+    const base = list;
     const hojeStr = new Date().toISOString().slice(0, 10);
     const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
     const in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
@@ -626,12 +650,25 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
           Contratos
         </h1>
         {podeEscrever && (
+          <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setFatRapidoOpen(true)}>
+            <Receipt className="h-4 w-4 mr-2" />
+            Faturamento rápido
+          </Button>
           <Button onClick={() => setPerguntaRenovOpen(true)} disabled={convenios.length === 0}>
             <Plus className="h-4 w-4 mr-2" />
             Vendas
           </Button>
+          </div>
         )}
       </div>
+      <FaturamentoRapidoMensalidadeDialog
+        open={fatRapidoOpen}
+        onOpenChange={setFatRapidoOpen}
+        clinicaId={clinicaAtual?.clinica_id ?? ""}
+        usuario={{ id: user?.id ?? null, nome: user?.user_metadata?.nome ?? user?.email ?? null }}
+        onPago={load}
+      />
       {convenios.length === 0 && !loading ? (
         <div className="rounded-md border bg-muted/40 p-3 text-sm">
           Cadastre um convênio antes em <strong>Cartão de Benefícios → Convênios</strong>.

@@ -9,6 +9,7 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
+import { FaturamentoRapidoMensalidadeDialog } from "@/components/cartao-beneficios/faturamento-rapido-dialog";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
@@ -159,12 +160,17 @@ function formatarFormaPagamento(
 function CaixaRouteDispatcher() {
   const { clinicaAtual } = useClinica();
   const { enabled, loading } = useCaixaV2Flag();
+  // `?classico=1` força a tela clássica (usado pelos botões do caixa novo
+  // que delegam ações ao clássico). Sem isso, navegar para /app/caixa
+  // continuava caindo no caixa novo e "nada acontecia".
+  const forcaClassico = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("classico") === "1";
   // Detecta novo bundle publicado enquanto a tela do Caixa está aberta e
   // recarrega automaticamente — evita a necessidade de Ctrl+Shift+R.
   useAutoReloadOnNewBuild(true);
   const role = clinicaAtual?.role ?? null;
   const v2Allowed = role === "admin" || role === "gestor";
-  if (!loading && enabled && v2Allowed) return <CaixaV2Mount />;
+  if (!forcaClassico && !loading && enabled && v2Allowed) return <CaixaV2Mount />;
   return <Page />;
 }
 
@@ -340,6 +346,7 @@ function montarSufixoCartao(forma: string, bandeira: string, parcelas: string): 
 function Page() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
+  const [fatRapidoOpen, setFatRapidoOpen] = useState(false);
   const podeEscrever = usePodeEscrever("caixa");
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
   const podeLancarRecebDespesa =
@@ -2304,7 +2311,17 @@ function Page() {
             Abertura, sangria, suprimento, recebimentos e fechamento.
           </p>
         </div>
+        <Button variant="outline" onClick={() => setFatRapidoOpen(true)}>
+          💳 Mensalidade do cartão
+        </Button>
       </div>
+
+      <FaturamentoRapidoMensalidadeDialog
+        open={fatRapidoOpen}
+        onOpenChange={setFatRapidoOpen}
+        clinicaId={clinicaAtual?.clinica_id ?? ""}
+        usuario={{ id: user?.id ?? null, nome: user?.user_metadata?.nome ?? user?.email ?? null }}
+      />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as "meu" | "todos" | "repasse")}>
         <TabsList>

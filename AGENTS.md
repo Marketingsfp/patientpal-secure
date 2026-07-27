@@ -170,6 +170,27 @@ perguntar ao colaborador em qual(is) clínica(s) a alteração deve ser aplicada
 - Correções puramente técnicas (bug de código sem regra de negócio) podem ser
   globais, mas o agente ainda deve confirmar antes de aplicar.
 
+### 1.11 Valores do Cartão Consulta — alteração manual obrigatória
+
+Os valores de serviços/regras do **Cartão Consulta** (e variantes como
+"Cartão Consulta + Seguros") **devem ser alterados exclusivamente pelo time,
+de forma manual, pela interface do sistema**. O agente **não deve alterar,
+recalcular, reaplicar em massa, importar, migrar ou "corrigir" esses valores
+via prompt, script, migração, RPC, seed ou qualquer automação**, mesmo quando
+o pedido parecer trivial ou quando houver aparente inconsistência.
+
+- Vale para as tabelas `procedimento_cb_convenio_valores`,
+  `procedimento_convenio_valores` e regras de preço em `convenios` /
+  `cb_regras` relativas a convênios do tipo Cartão Consulta.
+- Se o colaborador pedir alteração de valor do Cartão Consulta por prompt, o
+  agente deve **recusar a execução** e orientar a fazer manualmente na tela
+  correspondente (Cartão Benefícios > Convênio > Regras/Valores).
+- Se identificar inconsistência, o agente pode **apenas relatar** (o que está
+  gravado, quando foi gravado, provável causa) — nunca corrigir sozinho.
+- O botão "Reaplicar a todos os serviços" continua sendo uma ação manual do
+  usuário na interface; o agente não deve dispará-lo por automação nem
+  sugerir rodá-lo como parte de uma correção de dados.
+
 ---
 
 ## 2. Outras regras herdadas
