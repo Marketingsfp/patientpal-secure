@@ -160,12 +160,17 @@ function formatarFormaPagamento(
 function CaixaRouteDispatcher() {
   const { clinicaAtual } = useClinica();
   const { enabled, loading } = useCaixaV2Flag();
+  // `?classico=1` força a tela clássica (usado pelos botões do caixa novo
+  // que delegam ações ao clássico). Sem isso, navegar para /app/caixa
+  // continuava caindo no caixa novo e "nada acontecia".
+  const forcaClassico = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("classico") === "1";
   // Detecta novo bundle publicado enquanto a tela do Caixa está aberta e
   // recarrega automaticamente — evita a necessidade de Ctrl+Shift+R.
   useAutoReloadOnNewBuild(true);
   const role = clinicaAtual?.role ?? null;
   const v2Allowed = role === "admin" || role === "gestor";
-  if (!loading && enabled && v2Allowed) return <CaixaV2Mount />;
+  if (!forcaClassico && !loading && enabled && v2Allowed) return <CaixaV2Mount />;
   return <Page />;
 }
 
