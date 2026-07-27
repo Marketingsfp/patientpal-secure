@@ -702,6 +702,11 @@ function DashboardPage() {
           <p className="text-[11px] text-muted-foreground mt-1">
             Sendo {fmtMoney(data.recebimentos.mensalidades)} de mensalidades do cartão ({fmtInt(data.recebimentos.qtdMensalidades)}) e {fmtMoney(data.recebimentos.atendimentos)} de atendimentos ({fmtInt(data.recebimentos.qtdAtendimentos)})
           </p>
+          <p className="text-[11px] text-muted-foreground">
+            Mensalidades por cartão — Consulta: {fmtMoney(data.recebimentos.mensConsulta)} ({fmtInt(data.recebimentos.qtdMensConsulta)})
+            {" · "}Desconto: {fmtMoney(data.recebimentos.mensDesconto)} ({fmtInt(data.recebimentos.qtdMensDesconto)})
+            {data.recebimentos.qtdMensOutros > 0 && <> {" · "}Outros: {fmtMoney(data.recebimentos.mensOutros)} ({fmtInt(data.recebimentos.qtdMensOutros)})</>}
+          </p>
         </KpiCard>
         )}
 
