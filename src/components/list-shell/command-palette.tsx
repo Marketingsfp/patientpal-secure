@@ -144,7 +144,7 @@ export function useDefaultScreenEntries(): CommandEntry[] {
       mk("Cartão de Benefícios", "/app/cartao-beneficios", "Associados, regras e planos"),
       mk("Associados", "/app/cartao-beneficios/dependentes", "Titulares e dependentes"),
       mk("Regras do Cartão", "/app/cartao-beneficios/beneficios", "Regras dos benefícios"),
-      mk("Modelos de Cartão", "/app/cartao-beneficios/modelos"),
+      mk("Modelos de Cartão", "/app/cartao-beneficios/convenios"),
       mk("Contratos do Cartão", "/app/cartao-beneficios/contratos"),
       mk("Empresas associadas", "/app/cartao-beneficios/convenios", "Empresas / entidades associadas", ["empresa","associada","grupos"]),
       mk("Financeiro — Movimento", "/app/financeiro/movimento"),
