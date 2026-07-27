@@ -172,7 +172,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
     { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
     { to: "/app/unidades", label: "Unidades", icon: MapPin },
-    { to: "/app/planos", label: "Planos / Convênios", icon: Gift },
     { to: "/app/modelos-documentos", label: "Modelos de Documentos", icon: FileText },
     { to: "/app/estoque", label: "Estoque", icon: LayoutGrid },
     { to: "/app/clientes/duplicados", label: "Duplicados / Merge", icon: Users },
@@ -368,7 +367,7 @@ export function AppShell() {
       /servico|procediment|exame/.test(t) ? "/app/procedimentos" :
       /or[çc]amento/.test(t) ? "/app/orcamentos" :
       /plano|assinatura|cart[ãa]o|benef[ií]cio|contrato/.test(t) ? "/app/cartao-beneficios/contratos" :
-      /modelo|template/.test(t) ? "/app/cartao-beneficios/modelos" :
+      /modelo|template/.test(t) ? "/app/cartao-beneficios/convenios" :
       /relat[óo]rio.*cart[ãa]o|cart[ãa]o.*relat[óo]rio/.test(t) ? "/app/cartao-beneficios/relatorios" :
       /financ|caixa|conta|boleto/.test(t) ? "/app/financeiro" :
       /cl[ií]nica/.test(t) ? "/app/unidades" :
