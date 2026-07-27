@@ -3995,6 +3995,18 @@ h1, h2, h3 { margin: 0 0 6mm; }
                 <Ban className="h-4 w-4 mr-1" /> Cancelar contrato
               </Button>
             </div>
+          ) : cancelado && roleAtual === "admin" ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={reverterCancelamento}
+              disabled={revertendoCancelamento}
+              className="border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+              title="Reverter o cancelamento e reativar o contrato (somente Admin)."
+            >
+              <RefreshCw className="h-4 w-4 mr-1" />
+              {revertendoCancelamento ? "Revertendo..." : "Reverter cancelamento"}
+            </Button>
           ) : (
             <div className="w-[160px]" />
           )}
