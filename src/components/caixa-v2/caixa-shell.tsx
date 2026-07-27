@@ -340,8 +340,13 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     const somaForma = (forma: string) =>
       soma(porForma(recebimentos, forma)) - soma(porForma(estornos, forma));
     const recebidoTotal = soma(recebimentos) - soma(estornos);
-    const particular = fila.filter((f) => !f.valor_cartao).reduce((s, f) => s + f.valor, 0);
-    const associado = fila.filter((f) => f.valor_cartao > 0).reduce((s, f) => s + f.valor_cartao, 0);
+    // Particular x Associado seguem o mesmo filtro do card "Recebido no filtro"
+    // (estornos abatem), classificando pelo lançamento de origem.
+    const ehAssoc = (m: AggRow) => !!m.lancamento_id && assocIds.has(m.lancamento_id);
+    const particular =
+      soma(recebimentos.filter((m) => !ehAssoc(m))) - soma(estornos.filter((m) => !ehAssoc(m)));
+    const associado =
+      soma(recebimentos.filter(ehAssoc)) - soma(estornos.filter(ehAssoc));
     return {
       recebidoHoje: recebidoTotal,
       estornos: soma(estornos),
@@ -353,7 +358,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
       pendentesFila: filaPend.length,
       aguardandoPagamento: filaPend.filter((f) => !f.ja_pago).length,
     };
-  }, [aggRows, fila, filaPend, sessao]);
+  }, [aggRows, assocIds, filaPend]);
 
   // ===== Fila → cards (status + alertas)
   const filaCards = useMemo<FilaCardData[]>(() => {
