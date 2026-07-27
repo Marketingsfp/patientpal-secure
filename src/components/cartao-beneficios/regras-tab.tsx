@@ -74,8 +74,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [especialidades, setEspecialidades] = useState<EspOpt[]>([]);
   const [procedimentos, setProcedimentos] = useState<ProcOpt[]>([]);
   const [loading, setLoading] = useState(false);
-  const [reapplying, setReapplying] = useState(false);
-  const [progress, setProgress] = useState<string>("");
   const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
   const [novoOpen, setNovoOpen] = useState(false);
   const [editRegra, setEditRegra] = useState<CbRegra | null>(null);
@@ -342,10 +340,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     setLoading(false);
     toast.success("Regras salvas.");
     await load();
-    // A sincronização do cache procedimento_cb_convenio_valores NÃO roda mais
-    // em silêncio: ela sobrescreve valores digitados manualmente, então agora
-    // exige confirmação explícita do usuário (reaplicar() já pede confirmação).
-    await reaplicar();
+    // Não há mais reaplicação em massa: os valores por serviço são mantidos
+    // manualmente e a Agenda/Caixa calculam sempre pela regra viva.
   };
 
 
@@ -417,10 +413,6 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
         <div className="flex flex-col items-end gap-2">
           <Button variant="ghost" size="sm" onClick={addRegra}>
             <Plus className="h-4 w-4 mr-1" /> Adicionar regra
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => reaplicar()} disabled={reapplying || regras.length === 0}>
-            <RefreshCw className={`h-4 w-4 mr-1 ${reapplying ? "animate-spin" : ""}`} />
-            {reapplying ? (progress || "Aplicando…") : "Reaplicar a todos os serviços"}
           </Button>
         </div>
       </div>
