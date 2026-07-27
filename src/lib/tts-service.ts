@@ -168,3 +168,30 @@ export function disposeCurrent() {
   }
   currentAudio = null;
 }
+
+// ---------------------------------------------------------------------------
+// Sincronização em tempo real (mesma aba e cross-tab).
+// Ao mudar a velocidade em qualquer aba, o áudio Piper que estiver tocando
+// em outra aba (ex.: painel de chamadas) atualiza o playbackRate no ato.
+// A habilitação (ligar/desligar) é aplicada interrompendo a fala em curso.
+// ---------------------------------------------------------------------------
+if (typeof window !== "undefined") {
+  const applyLive = () => {
+    if (!isUserTtsEnabled()) {
+      stopSpeaking();
+      return;
+    }
+    if (currentAudio) {
+      try {
+        currentAudio.playbackRate = getUserTtsRate();
+        (currentAudio as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
+      } catch {
+        /* noop */
+      }
+    }
+  };
+  window.addEventListener("storage", (e) => {
+    if (e.key === RATE_STORAGE_KEY || e.key === STORAGE_KEY) applyLive();
+  });
+  window.addEventListener(TTS_CHANGED_EVENT, applyLive);
+}
