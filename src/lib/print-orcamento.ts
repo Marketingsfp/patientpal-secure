@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { formatNumeroOrcamento } from "@/lib/orcamento-numero";
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
@@ -88,7 +89,7 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
 
   const html = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"/>
-<title>Orçamento #${o.numero} - ${esc(o.paciente_nome)}</title>
+<title>Orçamento #${esc(formatNumeroOrcamento(o.serie, o.numero))} - ${esc(o.paciente_nome)}</title>
 <style>
   @page { size: 80mm auto; margin: 0; }
   * { box-sizing: border-box; }
@@ -118,7 +119,7 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
 
     <div class="sep"></div>
-    <div class="center lg">ORÇAMENTO Nº ${String(o.numero).padStart(5, "0")}</div>
+    <div class="center lg">ORÇAMENTO Nº ${o.serie ? esc(formatNumeroOrcamento(o.serie, o.numero)) : String(o.numero).padStart(5, "0")}</div>
     <div class="center sm">${fmtData(o.created_at)}</div>
     <div class="sep"></div>
 
