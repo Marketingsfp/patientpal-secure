@@ -44,6 +44,7 @@ type PeriodoKey = "hoje" | "7d" | "30d" | "custom";
 interface AggRow {
   id: string; sessao_id: string; tipo: MovTipo;
   valor: number; forma_pagamento: string | null; created_at: string;
+  lancamento_id: string | null;
 }
 
 const TIPO_LABEL: Record<MovTipo, string> = {
@@ -128,6 +129,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   const [dataDe, setDataDe] = useState("");
   const [dataAte, setDataAte] = useState("");
   const [aggRows, setAggRows] = useState<AggRow[]>([]);
+  const [assocIds, setAssocIds] = useState<Set<string>>(new Set());
   const [fila, setFila] = useState<FilaItem[]>([]);
   const [filaLoading, setFilaLoading] = useState(true);
 
@@ -229,11 +231,27 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     if (!clinicaAtual) { setAggRows([]); return; }
     if (tab === "sessao" && !sessao) { setAggRows([]); return; }
     let q = supabase.from("caixa_movimentos")
-      .select("id, sessao_id, tipo, valor, forma_pagamento, created_at");
+      .select("id, sessao_id, tipo, valor, forma_pagamento, created_at, lancamento_id");
     q = applyFilters(q);
     q = q.order("created_at", { ascending: false }).range(0, 9999);
     const { data, error } = await q;
-    setAggRows(error ? [] : ((data ?? []) as AggRow[]));
+    const rows = error ? [] : ((data ?? []) as AggRow[]);
+    setAggRows(rows);
+
+    // Classificação Particular x Associado do período filtrado: um recebimento
+    // é "Associado" quando o lançamento de origem tem convênio/contrato ligado.
+    const ids = Array.from(new Set(rows.map((r) => r.lancamento_id).filter(Boolean))) as string[];
+    if (ids.length === 0) { setAssocIds(new Set()); return; }
+    const assoc = new Set<string>();
+    for (let i = 0; i < ids.length; i += 400) {
+      const chunk = ids.slice(i, i + 400);
+      const { data: lancs } = await supabase.from("fin_lancamentos")
+        .select("id, convenio_id, contrato_id").in("id", chunk);
+      for (const l of (lancs ?? []) as Array<{ id: string; convenio_id: string | null; contrato_id: string | null }>) {
+        if (l.convenio_id || l.contrato_id) assoc.add(l.id);
+      }
+    }
+    setAssocIds(assoc);
   }, [clinicaAtual, tab, sessao, applyFilters]);
 
   useEffect(() => { void loadTotais(); }, [loadTotais]);
@@ -322,8 +340,13 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
     const somaForma = (forma: string) =>
       soma(porForma(recebimentos, forma)) - soma(porForma(estornos, forma));
     const recebidoTotal = soma(recebimentos) - soma(estornos);
-    const particular = fila.filter((f) => !f.valor_cartao).reduce((s, f) => s + f.valor, 0);
-    const associado = fila.filter((f) => f.valor_cartao > 0).reduce((s, f) => s + f.valor_cartao, 0);
+    // Particular x Associado seguem o mesmo filtro do card "Recebido no filtro"
+    // (estornos abatem), classificando pelo lançamento de origem.
+    const ehAssoc = (m: AggRow) => !!m.lancamento_id && assocIds.has(m.lancamento_id);
+    const particular =
+      soma(recebimentos.filter((m) => !ehAssoc(m))) - soma(estornos.filter((m) => !ehAssoc(m)));
+    const associado =
+      soma(recebimentos.filter(ehAssoc)) - soma(estornos.filter(ehAssoc));
     return {
       recebidoHoje: recebidoTotal,
       estornos: soma(estornos),
@@ -335,7 +358,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
       pendentesFila: filaPend.length,
       aguardandoPagamento: filaPend.filter((f) => !f.ja_pago).length,
     };
-  }, [aggRows, fila, filaPend, sessao]);
+  }, [aggRows, assocIds, filaPend]);
 
   // ===== Fila → cards (status + alertas)
   const filaCards = useMemo<FilaCardData[]>(() => {
