@@ -890,7 +890,7 @@ function ConveniosPage() {
                       : undefined
                 }
               >
-                {saving ? "Salvando…" : "Salvar"}
+                {saving ? "Salvando…" : "Salvar convênio"}
               </Button>
             </div>
           </CardContent>
