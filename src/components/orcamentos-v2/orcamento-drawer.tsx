@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Printer, ArrowRightLeft, History as HistoryIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { pagadorLabel, type OrcV2 } from "./orcamento-card";
+import { formatNumeroOrcamento } from "@/lib/orcamento-numero";
 
 const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -73,7 +74,7 @@ export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistoric
         {orc && (
           <>
             <SheetHeader>
-              <SheetTitle>#ORC-{orc.numero} · {orc.paciente_nome}</SheetTitle>
+              <SheetTitle>#ORC-{formatNumeroOrcamento(orc.serie, orc.numero)} · {orc.paciente_nome}</SheetTitle>
             </SheetHeader>
             <div className="mt-4 space-y-4 text-sm">
               <div className="flex flex-wrap gap-2">

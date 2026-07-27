@@ -7,6 +7,7 @@ import { deriveStatus, computeAlertas, STATUS_META } from "./status-utils";
 export type OrcV2 = {
   id: string;
   numero: number;
+  serie?: string | null;
   paciente_id?: string | null;
   paciente_nome: string;
   paciente_telefone: string | null;

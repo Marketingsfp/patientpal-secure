@@ -6635,6 +6635,7 @@ export type Database = {
           paciente_id: string | null
           paciente_nome: string
           paciente_telefone: string | null
+          serie: string
           status: string
           updated_at: string
           validade_dias: number
@@ -6660,6 +6661,7 @@ export type Database = {
           paciente_id?: string | null
           paciente_nome: string
           paciente_telefone?: string | null
+          serie?: string
           status?: string
           updated_at?: string
           validade_dias?: number
@@ -6685,6 +6687,7 @@ export type Database = {
           paciente_id?: string | null
           paciente_nome?: string
           paciente_telefone?: string | null
+          serie?: string
           status?: string
           updated_at?: string
           validade_dias?: number
