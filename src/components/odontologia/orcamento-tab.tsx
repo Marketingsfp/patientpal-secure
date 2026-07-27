@@ -6,6 +6,7 @@ import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { printOrcamento } from "@/lib/print-orcamento";
+import { formatNumeroOrcamento } from "@/lib/orcamento-numero";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -59,7 +60,7 @@ export function OrcamentoTab({
     setLoading(true);
     let q = supabase
       .from("orcamentos")
-      .select("id, numero, paciente_id, paciente_nome, paciente_telefone, medico_nome, forma_pagamento, valor_total, valores_pagamento, desconto, status, created_at, categoria, validade_dias")
+      .select("id, numero, serie, paciente_id, paciente_nome, paciente_telefone, medico_nome, forma_pagamento, valor_total, valores_pagamento, desconto, status, created_at, categoria, validade_dias")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("especialidade_id", especialidadeOdontoId)
       .order("created_at", { ascending: false })
@@ -196,6 +197,7 @@ export function OrcamentoTab({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="whitespace-nowrap">Nº</TableHead>
                 <TableHead className="whitespace-nowrap">Data / hora</TableHead>
                 <TableHead>Paciente</TableHead>
                 <TableHead>Dentista</TableHead>
@@ -216,6 +218,9 @@ export function OrcamentoTab({
                     className="cursor-pointer"
                     onClick={() => setDrawerOrc(o)}
                   >
+                    <TableCell className="whitespace-nowrap text-sm font-medium tabular-nums">
+                      {formatNumeroOrcamento(o.serie, o.numero)}
+                    </TableCell>
                     <TableCell className="whitespace-nowrap text-sm">{dataHora(o.created_at)}</TableCell>
                     <TableCell className="text-sm font-medium">{o.paciente_nome ?? "—"}</TableCell>
                     <TableCell className="text-sm">{o.medico_nome ?? "—"}</TableCell>
