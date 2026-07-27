@@ -342,10 +342,10 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     setLoading(false);
     toast.success("Regras salvas.");
     await load();
-    // Sincroniza automaticamente o cache procedimento_cb_convenio_valores
-    // para outros consumidores (backup, relatórios). Não bloqueia o toast:
-    // roda em background silencioso — sem confirm() e sem toast final.
-    void reaplicar({ silent: true }).catch(() => {});
+    // A sincronização do cache procedimento_cb_convenio_valores NÃO roda mais
+    // em silêncio: ela sobrescreve valores digitados manualmente, então agora
+    // exige confirmação explícita do usuário (reaplicar() já pede confirmação).
+    await reaplicar();
   };
 
   /**
