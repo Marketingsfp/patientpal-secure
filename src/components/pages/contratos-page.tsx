@@ -2705,6 +2705,37 @@ function DetalheContrato({
     setCancelObs("");
   };
 
+  const [revertendoCancelamento, setRevertendoCancelamento] = useState(false);
+  const reverterCancelamento = async () => {
+    if (roleAtual !== "admin") {
+      toast.error("Apenas Admin pode reverter cancelamento.");
+      return;
+    }
+    if (!cancelado) return;
+    const ok = window.confirm(
+      "Reverter o cancelamento deste contrato?\n\nO status voltará para ATIVO e o plano/benefícios serão reativados. As mensalidades canceladas NÃO serão reabertas automaticamente — reabra manualmente se necessário.",
+    );
+    if (!ok) return;
+    setRevertendoCancelamento(true);
+    const { error } = await supabase
+      .from("contratos_assinatura")
+      .update({
+        status: "ativo",
+        cancelado_em: null,
+        cancelamento_motivo: null,
+      } as any)
+      .eq("id", contrato.id);
+    setRevertendoCancelamento(false);
+    if (error) {
+      mostrarErro(error);
+      return;
+    }
+    toast.success("Cancelamento revertido — contrato reativado.");
+    setCanceladoEm(null);
+    setCancelMotivoAtual(null);
+    await load();
+  };
+
   // Diálogo de forma de pagamento (espelha o da agenda)
   const [pagMens, setPagMens] = useState<Mens | null>(null);
   const [formaPagOpen, setFormaPagOpen] = useState(false);
