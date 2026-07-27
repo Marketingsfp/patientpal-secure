@@ -1,35 +1,39 @@
-# Ajustar linha de convênio/plano na GR
+## Problema (confirmado no banco)
 
-**Aplicação:** todas as 3 clínicas (SFP, Menino Jesus, São Francisco de Paula).
+Contrato **20261906** (MARLEIDE, CARTÃO CONSULTA + SEGUROS, Menino Jesus):
+- Está **ativo** e é **renovação** do contrato 20261093 → carência é dispensada, ou seja, a carência **não** foi o motivo do bloqueio.
+- No convênio existem **duas regras ativas** para o mesmo serviço ELETROCARDIOGRAMA (ECG):
+  - gratuidade (1x/ano, carência 6) — **prioridade 10**
+  - 10% de desconto (carência 2) — **prioridade 100**
+- O desempate do motor soma especificidade + prioridade, então a regra de 10% (prioridade maior) vence a gratuidade. Resultado: R$ 51,00 − 10% = **R$ 45,90** em vez de gratuito.
 
-## Problema
+Tipo do pedido: **regra de negócio + comportamento do motor de preços** (não é erro de dados isolado).
 
-A GR imprime duas linhas hoje:
-- `CONV: PARTICULAR`
-- `PLANO: CARTÃO CONSULTA + SEGUROS (TITULAR)`
+## O que será feito
 
-O sistema não usa o conceito de "plano" — o cliente pediu que apareça apenas uma linha de convênio, com a regra correta.
+Alterar o critério de desempate para que, entre regras que se aplicam ao **mesmo nível de especificidade**, a regra de **gratuidade sempre vença** a regra de desconto — independentemente da prioridade cadastrada. Vale para **as 3 clínicas** (comportamento global, sem feature flag).
 
-## Regra final na GR
+A especificidade continua mandando: regra por **serviço** > por **especialidade** > por **tipo**. A prioridade continua desempatando entre regras do mesmo tipo (duas gratuitas ou duas de desconto).
 
-Uma única linha (a atual `CONV:`), decidida assim:
+## Arquivos afetados
 
-- Atendimento **particular** (valor cheio, sem desconto de convênio) → `CONV: PARTICULAR`, **mesmo que o paciente tenha convênio ativo**.
-- Atendimento **convênio** (ou particular gravado indevidamente mas com desconto de convênio comprovado no caixa — caso Zilma) → `CONV: <NOME DO CONVÊNIO> (TITULAR)` ou `CONV: <NOME DO CONVÊNIO> (DEPENDENTE DE <NOME DO TITULAR>)`.
-- Gratuidade continua como hoje (`CONV: <CONVÊNIO> — GRATUIDADE`).
+1. `src/lib/cb-regras.ts` — função `findRegra`: nova pontuação
+   `serviço 1000 + especialidade 100 + tipo 50 + gratuito 10 + prioridade × 0,001`.
+2. `src/routes/_authenticated/app.agenda.tsx` (~linha 664) — `scoreRegra` local, usado no laço de escolha entre especialidades, alinhado à mesma pontuação.
 
-Sem linha `PLANO:` em nenhum caso.
+Nada mais é tocado: carência, limites de uso (1x/ano), excedente e fallback continuam exatamente como estão. Se a gratuidade estiver em carência não cumprida ou com cota esgotada, o sistema continua caindo automaticamente para a regra de desconto seguinte.
 
-## Alterações (apenas frontend/impressão)
+## O que NÃO será feito
 
-`src/lib/print-gr.ts`:
-1. Remover a chamada `renderLinhaVinculo(vinculoConv)` do template da GR (linha ~890) — elimina a linha `PLANO:`.
-2. Concatenar o sufixo `(TITULAR)` / `(DEPENDENTE DE X)` diretamente no `convLabel` quando ele já for o nome de um convênio (não `PARTICULAR` e não `CONVÊNIO` genérico), usando o `vinculoConv` já resolvido.
-3. Não alterar a heurística que promove `PARTICULAR → nome do convênio` quando há evidência de desconto (mantém o fix da Zilma).
-4. Remover a função `renderLinhaVinculo` se ficar sem uso.
+- Nenhum valor, prioridade ou regra do Cartão Consulta será alterado por prompt/script (Regra 1.11 do AGENTS.md). Se vocês quiserem, a regra de 10% do ECG pode ser desativada manualmente na tela — mas com esta correção isso deixa de ser necessário.
+- Nenhum contrato, mensalidade ou lançamento será alterado.
 
-## Validação
+## Validação prevista
 
-- Reimprimir GR da Zilma (Dr. Sandro, R$9,99) → deve sair `CONV: CARTÃO CONSULTA + SEGUROS (TITULAR)`, sem linha PLANO.
-- Reimprimir uma GR particular de paciente com convênio ativo → `CONV: PARTICULAR`, sem linha PLANO.
-- Reimprimir uma GR de dependente → `CONV: <CONVÊNIO> (DEPENDENTE DE <TITULAR>)`.
+- Simular o cálculo do ECG para o contrato 20261906 e confirmar retorno **gratuito**.
+- Conferir alguns serviços onde só existe regra de desconto (ex.: consultas R$ 9,99) para garantir que nada mudou.
+- Conferir um caso de gratuidade já usada no ano, para confirmar que o fallback para desconto continua funcionando.
+
+## Pendência para o time
+
+O atendimento do ECG de Marleide já faturado com R$ 45,90 precisa ser decidido: estorno/reemissão é ação manual de vocês no caixa — não faço isso sozinho.
