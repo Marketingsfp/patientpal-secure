@@ -354,9 +354,9 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   }
 
   const blocoExcecoes = (
-    <div className="border rounded-md p-3 bg-muted/30 space-y-3">
+    <div className="border border-destructive/30 rounded-md p-3 bg-destructive/5 space-y-3">
           <div>
-            <div className="font-medium">Exceção às regras (sem desconto)</div>
+            <div className="font-medium text-destructive">Exceção às regras (sem desconto)</div>
             <p className="text-xs text-muted-foreground">
               Serviços listados aqui são cobrados como <strong>particular</strong> para este convênio, ignorando qualquer regra por categoria, tipo ou especialidade. Serviços que não estão nas regras nem nas exceções também são cobrados como particular.
             </p>
@@ -383,7 +383,7 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
           {excecoes.length === 0 ? (
             <p className="text-xs text-muted-foreground italic">Nenhuma exceção cadastrada.</p>
           ) : (
-            <ul className="divide-y border rounded-md bg-background">
+             <ul className="divide-y divide-destructive/20 border border-destructive/20 rounded-md bg-background">
               {excecoes.map(e => (
                 <li key={e.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                   <span className="truncate">{procById.get(e.procedimento_id as string) ?? "(serviço removido)"}</span>
