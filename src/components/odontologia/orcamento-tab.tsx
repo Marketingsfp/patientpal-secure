@@ -33,7 +33,6 @@ export function OrcamentoTab({ pacienteId, pacienteNome, pacienteTelefone, espec
   const [loading, setLoading] = useState(true);
   const [novoOpen, setNovoOpen] = useState(false);
   const [drawerOrc, setDrawerOrc] = useState<OrcV2 | null>(null);
-  const [conversaoId, setConversaoId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!clinicaAtual || !especialidadeOdontoId || !pacienteId) return;
