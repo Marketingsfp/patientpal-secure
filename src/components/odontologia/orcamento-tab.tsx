@@ -73,7 +73,7 @@ export function OrcamentoTab({
       agendamentos_total: 0, agendamentos_realizados: 0,
       itens_total: 0, itens_consumidos: 0,
       itens_qtd: 0, total_dinheiro: 0, total_cartao: 0, itens_pagos: 0,
-    })) as (Linha & { valores_pagamento: Record<string, number> | null })[];
+    })) as (Linha & { valores_pagamento: Record<string, number> | null; desconto: number | null })[];
 
     if (orcs.length > 0) {
       const ids = orcs.map((o) => o.id);
