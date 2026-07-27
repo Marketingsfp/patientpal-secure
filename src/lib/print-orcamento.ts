@@ -62,6 +62,19 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
     return { din, cart };
   };
   const temSplit = its.some((i) => splitFormas(i));
+
+  // Sinal (entrada) + saldo final: usado nos serviços de Odontologia com
+  // cobrança em duas etapas. Itens sem sinal seguem impressos como hoje.
+  const sinalDoItem = (i: any) => Number(i.sinal_valor ?? 0);
+  const totalDoItem = (i: any) =>
+    Number(i.valor_total ?? Number(i.quantidade || 1) * Number(i.valor_unitario || 0));
+  const itensComSinal = its.filter((i) => sinalDoItem(i) > 0);
+  const temSinal = itensComSinal.length > 0;
+  const totalSinal = itensComSinal.reduce((s, i) => s + sinalDoItem(i), 0);
+  const totalSaldo = itensComSinal.reduce(
+    (s, i) => s + Math.max(0, totalDoItem(i) - sinalDoItem(i)),
+    0,
+  );
   const totalDinheiro = its.reduce((s, i) => {
     const sp = splitFormas(i);
     const v = sp ? sp.din : Number(i.valor_unitario || 0);
@@ -166,6 +179,24 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
           </div>
         ` : "";
         })()}
+        ${(() => {
+          const sinalIt = sinalDoItem(i);
+          if (sinalIt <= 0) return "";
+          const totalIt = totalDoItem(i);
+          const saldoIt = Math.max(0, totalIt - sinalIt);
+          return `
+          <div class="sm" style="margin-top:2px; padding-left:4px">
+            <div style="display:flex; justify-content:space-between">
+              <span>SINAL</span><span>${fmtBRL(sinalIt)}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between">
+              <span>SALDO FINAL</span><span>${fmtBRL(saldoIt)}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between" class="bold">
+              <span>TOTAL</span><span>${fmtBRL(totalIt)}</span>
+            </div>
+          </div>`;
+        })()}
       </div>
     `).join("")}
 
@@ -178,6 +209,10 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
         : `<tr><td>SUBTOTAL</td><td class="right">${fmtBRL(subtotal)}</td></tr>
            ${desconto > 0 ? `<tr><td>DESCONTO</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
            <tr class="bold lg"><td>TOTAL</td><td class="right">${fmtBRL(total)}</td></tr>`}
+      ${temSinal
+        ? `<tr><td>TOTAL SINAL</td><td class="right">${fmtBRL(totalSinal)}</td></tr>
+           <tr><td>TOTAL SALDO FINAL</td><td class="right">${fmtBRL(totalSaldo)}</td></tr>`
+        : ""}
     </table>
 
     ${o.forma_pagamento ? (() => {
