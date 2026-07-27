@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Plus, Receipt, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -103,14 +103,27 @@ export function PagamentoAvulsoMensalidadeDialog({
   const [lancOpen, setLancOpen] = useState(false);
   const [dependentes, setDependentes] = useState<DependenteLinha[]>([]);
   const [quickOpen, setQuickOpen] = useState<{ alvo: "titular" | string; nome: string } | null>(null);
+  // Guardas contra duplicidade: impedem que o mesmo pagamento avulso gere
+  // dois lançamentos/contratos (tela reaberta ou clique repetido).
+  const processandoRef = useRef(false);
+  const concluidoRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
+    // Reset completo a cada abertura: evita reaproveitar dados de um
+    // pagamento anterior já concluído.
     setPaciente(pacienteInicial ?? null);
     setRefMes(mesAtual);
     setCriarContrato(true);
     setParcelasPagas("");
     setDependentes([]);
+    setConvenioId("");
+    setValor("");
+    setDiaVenc("10");
+    setLancOpen(false);
+    setQuickOpen(null);
+    processandoRef.current = false;
+    concluidoRef.current = false;
     (async () => {
       setLoading(true);
       const { data: cv } = await supabase
@@ -182,6 +195,33 @@ export function PagamentoAvulsoMensalidadeDialog({
 
   const escolherConvenio = (id: string) => {
     setConvenioId(id);
+  };
+
+  /**
+   * Verifica se já existe contrato criado hoje pelo pagamento avulso para o
+   * mesmo paciente e mês de referência. Retorna true quando pode prosseguir.
+   */
+  const confirmarSeJaExiste = async () => {
+    if (!criarContrato || !paciente) return true;
+    const hojeISO = new Date().toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from("contratos_assinatura")
+      .select("numero, observacoes, created_at")
+      .eq("clinica_id", clinicaId)
+      .eq("paciente_id", paciente.id)
+      .gte("created_at", `${hojeISO}T00:00:00`)
+      .limit(20);
+    const dup = ((data ?? []) as Array<{ numero: number | null; observacoes: string | null }>).find(
+      (c) =>
+        (c.observacoes ?? "").toUpperCase().includes("PAGAMENTO AVULSO") &&
+        (c.observacoes ?? "").toUpperCase().includes(rotuloMes(refMes).toUpperCase()),
+    );
+    if (!dup) return true;
+    return window.confirm(
+      `Já existe um pagamento avulso registrado hoje para ${paciente.nome} referente a ${rotuloMes(refMes)}` +
+        (dup.numero ? ` (contrato #${dup.numero})` : "") +
+        `.\n\nDeseja mesmo registrar outro? Isso criará um novo contrato e um novo lançamento no caixa.`,
+    );
   };
 
   const addDependente = () =>
@@ -465,7 +505,14 @@ export function PagamentoAvulsoMensalidadeDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button disabled={!podeAvancar} onClick={() => setLancOpen(true)}>
+            <Button
+              disabled={!podeAvancar || lancOpen}
+              onClick={async () => {
+                if (processandoRef.current || concluidoRef.current) return;
+                if (!(await confirmarSeJaExiste())) return;
+                setLancOpen(true);
+              }}
+            >
               Continuar para o recebimento
             </Button>
           </DialogFooter>
@@ -484,38 +531,56 @@ export function PagamentoAvulsoMensalidadeDialog({
         }
         initialValor={valorNum ? valorNum.toFixed(2) : ""}
         onSavedWithData={async (dados) => {
+          // Trava: um pagamento avulso só pode ser efetivado uma vez.
+          if (processandoRef.current || concluidoRef.current) return;
+          processandoRef.current = true;
           setLancOpen(false);
           if (!criarContrato) {
+            concluidoRef.current = true;
             toast.success("Pagamento avulso registrado no caixa.");
             onOpenChange(false);
             onPago?.();
             return;
           }
+          let impressao: (() => Promise<void>) | null = null;
           try {
             const res = await criarContratoEParcelas(dados);
+            concluidoRef.current = true;
             if (res?.mensalidadeId) {
-              await printGuiaMensalidade({
-                mensalidadeId: res.mensalidadeId,
-                clinicaId,
-                usuarioNome: usuario?.nome ?? undefined,
-                usuarioId: usuario?.id ?? null,
-                pagamento: {
-                  valor: dados.valor,
-                  forma_pagamento: dados.forma_pagamento,
-                  parcelas: dados.parcelas,
-                  bandeira_cartao: dados.bandeira_cartao,
-                  detalhe: dados.pagamentos_detalhe,
-                },
-              });
+              const mensalidadeId = res.mensalidadeId;
+              impressao = () =>
+                printGuiaMensalidade({
+                  mensalidadeId,
+                  clinicaId,
+                  usuarioNome: usuario?.nome ?? undefined,
+                  usuarioId: usuario?.id ?? null,
+                  pagamento: {
+                    valor: dados.valor,
+                    forma_pagamento: dados.forma_pagamento,
+                    parcelas: dados.parcelas,
+                    bandeira_cartao: dados.bandeira_cartao,
+                    detalhe: dados.pagamentos_detalhe,
+                  },
+                });
             }
             toast.success(
               `Pagamento registrado. Contrato criado com 12 parcelas — ${rotuloMes(refMes)} baixada como paga.`,
             );
           } catch (err) {
+            concluidoRef.current = true;
             mostrarErro(err, "pagamento registrado no caixa, mas o contrato não foi criado");
           }
+          // Fecha as telas ANTES de imprimir: falha ou demora na impressão não
+          // pode deixar o formulário aberto e reaproveitável.
           onOpenChange(false);
           onPago?.();
+          if (impressao) {
+            try {
+              await impressao();
+            } catch (err) {
+              mostrarErro(err, "pagamento registrado, mas a GR não foi impressa");
+            }
+          }
         }}
       />
 
