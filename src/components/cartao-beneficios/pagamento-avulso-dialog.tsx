@@ -46,6 +46,15 @@ function rotuloMes(refMes: string) {
     .replace(/^./, (c) => c.toUpperCase());
 }
 
+/** Soma meses a uma data yyyy-mm-dd, respeitando o último dia do mês destino. */
+function somarMeses(iso: string, meses: number) {
+  const [a, m, d] = iso.split("-").map(Number);
+  const base = new Date(a, m - 1 + meses, 1);
+  const ultimo = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+  const dia = Math.min(d || 1, ultimo);
+  return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+}
+
 /** Formata número em moeda brasileira (ex.: 210 -> "R$ 210,00"). */
 function formatValorBR(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -96,6 +105,9 @@ export function PagamentoAvulsoMensalidadeDialog({
   const [convenioId, setConvenioId] = useState<string>("");
   const [refMes, setRefMes] = useState<string>(mesAtual);
   const [parcelasPagas, setParcelasPagas] = useState<string>("");
+  // Data base do contrato (não é mais fixa no dia 1): define início e término.
+  const [dataInicio, setDataInicio] = useState<string>("");
+  const dataInicioTocadaRef = useRef(false);
   const [valor, setValor] = useState<string>("");
   const [diaVenc, setDiaVenc] = useState<string>("10");
   const [criarContrato, setCriarContrato] = useState(true);
@@ -119,6 +131,8 @@ export function PagamentoAvulsoMensalidadeDialog({
     setRefMes(mesAtual);
     setCriarContrato(true);
     setParcelasPagas("");
+    setDataInicio("");
+    dataInicioTocadaRef.current = false;
     setSemCarencia(false);
     setSemCarenciaMotivo("");
     setDependentes([]);
