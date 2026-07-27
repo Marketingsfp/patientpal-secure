@@ -9,7 +9,6 @@ import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
-import { FaturamentoRapidoMensalidadeDialog } from "@/components/cartao-beneficios/faturamento-rapido-dialog";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
@@ -346,7 +345,6 @@ function montarSufixoCartao(forma: string, bandeira: string, parcelas: string): 
 function Page() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
-  const [fatRapidoOpen, setFatRapidoOpen] = useState(false);
   const podeEscrever = usePodeEscrever("caixa");
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
   const podeLancarRecebDespesa =

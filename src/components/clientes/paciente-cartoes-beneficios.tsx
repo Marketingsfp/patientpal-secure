@@ -13,7 +13,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
-import { FaturamentoRapidoMensalidadeDialog } from "@/components/cartao-beneficios/faturamento-rapido-dialog";
 import { useAuth } from "@/hooks/use-auth";
 
 interface Contrato {
