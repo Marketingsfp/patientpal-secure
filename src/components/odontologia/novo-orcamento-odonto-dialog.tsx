@@ -13,6 +13,8 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
+import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
+import { QuickPatientDialog } from "@/components/pacientes/quick-patient-dialog";
 import { DentePicker } from "./dente-picker";
 
 interface Procedimento {
@@ -44,9 +46,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   clinicaId: string;
-  pacienteId: string;
-  pacienteNome: string;
-  pacienteTelefone: string | null;
+  /** Paciente pré-selecionado (opcional) — pode ser trocado dentro do diálogo. */
+  pacienteId?: string | null;
+  pacienteNome?: string | null;
+  pacienteTelefone?: string | null;
   especialidadeOdontoId: string;
   userId: string | null;
   onCreated: (id: string) => void;
@@ -66,6 +69,12 @@ export function NovoOrcamentoOdontoDialog({
   open, onClose, clinicaId, pacienteId, pacienteNome, pacienteTelefone,
   especialidadeOdontoId, userId, onCreated,
 }: Props) {
+  // Paciente do orçamento — inicia com o filtro da tela, mas é editável aqui.
+  const [paciente, setPaciente] = useState<PatientOption | null>(
+    pacienteId ? ({ id: pacienteId, nome: pacienteNome ?? "", telefone: pacienteTelefone ?? null } as PatientOption) : null,
+  );
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickInitial, setQuickInitial] = useState("");
   const [medicoNome, setMedicoNome] = useState("");
   const [medicos, setMedicos] = useState<{ id: string; nome: string }[]>([]);
   const [medicoId, setMedicoId] = useState("");
@@ -88,6 +97,9 @@ export function NovoOrcamentoOdontoDialog({
 
   useEffect(() => {
     if (!open) return;
+    setPaciente(
+      pacienteId ? ({ id: pacienteId, nome: pacienteNome ?? "", telefone: pacienteTelefone ?? null } as PatientOption) : null,
+    );
     void (async () => {
       // Médicos que atendem Odontologia (join via medico_especialidades)
       const { data: medRows } = await supabase
@@ -233,6 +245,7 @@ export function NovoOrcamentoOdontoDialog({
   }, [formasPagamento, itens, desconto]);
 
   const salvar = async () => {
+    if (!paciente?.id) return toast.error("Selecione o paciente");
     if (itens.length === 0) return toast.error("Adicione ao menos um serviço");
     if (formasPagamento.length === 0) return toast.error("Selecione ao menos uma forma de pagamento");
     for (let i = 0; i < itens.length; i++) {
@@ -262,9 +275,9 @@ export function NovoOrcamentoOdontoDialog({
         numero: 0,
         categoria: "demais",
         especialidade_id: especialidadeOdontoId,
-        paciente_id: pacienteId,
-        paciente_nome: pacienteNome,
-        paciente_telefone: pacienteTelefone,
+        paciente_id: paciente!.id,
+        paciente_nome: paciente!.nome,
+        paciente_telefone: paciente?.telefone ?? null,
         medico_id: medicoId || null,
         medico_nome: medicoNome.trim() || null,
         forma_pagamento: formasPagamento.join(" + "),
@@ -309,8 +322,15 @@ export function NovoOrcamentoOdontoDialog({
         <div className="space-y-4">
           {/* Cabeçalho compacto */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="space-y-1"><Label>Paciente</Label><Input value={pacienteNome} disabled /></div>
-            <div className="space-y-1"><Label>Telefone</Label><Input value={pacienteTelefone ?? ""} disabled /></div>
+            <div className="space-y-1">
+              <Label>Paciente</Label>
+              <PatientSearchInput
+                value={paciente}
+                onSelect={(p) => setPaciente(p)}
+                onRequestCreate={(q) => { setQuickInitial(q); setQuickOpen(true); }}
+              />
+            </div>
+            <div className="space-y-1"><Label>Telefone</Label><Input value={paciente?.telefone ?? ""} disabled /></div>
             <div className="space-y-1">
               <Label>Dentista</Label>
               <select
@@ -562,6 +582,14 @@ export function NovoOrcamentoOdontoDialog({
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button onClick={salvar} disabled={saving}>{saving ? "Salvando…" : "Salvar orçamento"}</Button>
         </DialogFooter>
+
+        <QuickPatientDialog
+          open={quickOpen}
+          onOpenChange={setQuickOpen}
+          clinicaId={clinicaId}
+          nomeInicial={quickInitial}
+          onCreated={(p) => { setPaciente(p); setQuickOpen(false); }}
+        />
       </DialogContent>
     </Dialog>
   );
