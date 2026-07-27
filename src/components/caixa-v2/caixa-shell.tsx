@@ -129,6 +129,7 @@ export function CaixaShellV2({ compactPref, onToggleCompact }: {
   const [dataDe, setDataDe] = useState("");
   const [dataAte, setDataAte] = useState("");
   const [aggRows, setAggRows] = useState<AggRow[]>([]);
+  const [assocIds, setAssocIds] = useState<Set<string>>(new Set());
   const [fila, setFila] = useState<FilaItem[]>([]);
   const [filaLoading, setFilaLoading] = useState(true);
 
