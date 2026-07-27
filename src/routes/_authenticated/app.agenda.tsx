@@ -857,6 +857,11 @@ async function obterInfoConvenioPaciente(params: {
       // agendamentos correspondentes.
       const rawList = (agsDiaRaw ?? []) as Array<{
         id: string;
+        medico_id: string | null;
+        procedimento?: string | null;
+        paciente_id?: string | null;
+        status?: string | null;
+        inicio?: string | null;
         tipo_atendimento?: string | null;
       }>;
       const idsParticular = rawList
