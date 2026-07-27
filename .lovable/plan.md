@@ -1,31 +1,28 @@
-## Problema
+## Escopo
 
-No Caixa, a coluna **Paciente** fica com "—" nos recebimentos de mensalidade feitos pelo pagamento avulso. A tela do caixa mostra o nome a partir do campo `paciente_id` do lançamento financeiro, e hoje esse campo só é preenchido quando o pagamento vem de um agendamento. No pagamento avulso não há agendamento, então o lançamento nasce sem paciente.
+Clínica-alvo: POLICLINICA MENINO JESUS (contratos de teste identificados nela). Item 2 (UI do pagamento avulso) — confirmar se aplico nas 3 clínicas ou só Menino Jesus; por padrão aplico nas 3, pois é correção de comportamento (data de início sempre dia 1).
 
-Tipo do pedido: erro de código / preenchimento de dado (não é regra de negócio nova).
+## 1. Excluir contratos de teste
 
-## O que será feito (nas 3 clínicas)
+Verificado no banco:
+- 20261930 — QUEDIMA SUELEN, R$ 175,00, já **cancelado**
+- 20261931 — JEAN XAVIER, R$ 120,00, já **cancelado**
+- 20261933 — QUEDIMA SUELEN, R$ 120,00, ainda **ativo**
 
-1. **Tela de recebimento (`lancamento-dialog.tsx`)**
-   - Novo parâmetro opcional para receber o paciente titular.
-   - Ao salvar, se não houver agendamento, grava esse paciente no lançamento (`paciente_id`).
+Ação: excluir definitivamente os 3 contratos, suas mensalidades, dependentes e cancelar/remover lançamentos financeiros e recebimentos de caixa vinculados (para não somarem no fechamento). Antes de apagar, listo o que será removido e reporto o resultado.
 
-2. **Pagamento avulso (`pagamento-avulso-dialog.tsx`)**
-   - Passa o titular selecionado para a tela de recebimento.
+## 2. Data de início no pagamento avulso de mensalidade
 
-3. **Faturamento rápido de mensalidade (`faturamento-rapido-dialog.tsx`) e mensalidades em Contratos (`contratos-page.tsx`)**
-   - Mesmo ajuste: passam o titular do contrato, para que todo recebimento de mensalidade apareça com nome.
+Hoje, no diálogo de pagamento avulso, ao escolher o mês de referência o contrato é criado sempre com **dia 1** (`data_inicio` fixo no dia 1 do mês calculado, e `data_fim` um ano depois na mesma regra).
 
-4. **Correção dos registros antigos**
-   - Vincular o paciente titular aos lançamentos de mensalidade já existentes que estão sem paciente, usando o contrato/mensalidade de origem quando houver e, na falta disso, o nome do titular presente na descrição do lançamento.
-   - Será feito por atualização de dados, sem apagar nada.
+Mudança:
+- Novo campo **"Data de início do contrato"**, exibido logo após o mês de referência.
+- Pré-preenchido com o 1º dia do mês de referência (ajustado pelas parcelas já pagas), mas editável.
+- Passa a ser a data base: `data_inicio` = data informada; `data_fim` = data informada + 1 ano.
+- O dia de vencimento das mensalidades continua vindo do campo "Dia de vencimento" (comportamento atual preservado).
+- Campo obrigatório; valida que a data é coerente com o mês/parcelas informados (aviso, não bloqueio rígido).
 
-## Fora do escopo
-
-- Nenhuma alteração em valores, regras de convênio, carência ou repasse.
-- Nenhuma mudança no visual do caixa além do nome passar a aparecer.
-
-## Validação
-
-- Conferir no banco que os lançamentos avulsos de hoje ficaram com titular vinculado.
-- Teste prático seu: um novo pagamento avulso deve aparecer no Caixa já com o nome do titular na coluna Paciente.
+### Detalhes técnicos
+- Arquivo: `src/components/cartao-beneficios/pagamento-avulso-dialog.tsx`
+- Substituir `vencimentoDe(refMes, -pagasNum, 1)` por estado `dataInicio` e derivar `data_fim` com +12 meses sobre essa data.
+- Sem alteração de regras de valor, carência, juros ou repasse.

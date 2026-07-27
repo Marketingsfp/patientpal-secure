@@ -46,6 +46,15 @@ function rotuloMes(refMes: string) {
     .replace(/^./, (c) => c.toUpperCase());
 }
 
+/** Soma meses a uma data yyyy-mm-dd, respeitando o último dia do mês destino. */
+function somarMeses(iso: string, meses: number) {
+  const [a, m, d] = iso.split("-").map(Number);
+  const base = new Date(a, m - 1 + meses, 1);
+  const ultimo = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+  const dia = Math.min(d || 1, ultimo);
+  return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+}
+
 /** Formata número em moeda brasileira (ex.: 210 -> "R$ 210,00"). */
 function formatValorBR(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -96,6 +105,9 @@ export function PagamentoAvulsoMensalidadeDialog({
   const [convenioId, setConvenioId] = useState<string>("");
   const [refMes, setRefMes] = useState<string>(mesAtual);
   const [parcelasPagas, setParcelasPagas] = useState<string>("");
+  // Data base do contrato (não é mais fixa no dia 1): define início e término.
+  const [dataInicio, setDataInicio] = useState<string>("");
+  const dataInicioTocadaRef = useRef(false);
   const [valor, setValor] = useState<string>("");
   const [diaVenc, setDiaVenc] = useState<string>("10");
   const [criarContrato, setCriarContrato] = useState(true);
@@ -119,6 +131,8 @@ export function PagamentoAvulsoMensalidadeDialog({
     setRefMes(mesAtual);
     setCriarContrato(true);
     setParcelasPagas("");
+    setDataInicio("");
+    dataInicioTocadaRef.current = false;
     setSemCarencia(false);
     setSemCarenciaMotivo("");
     setDependentes([]);
@@ -156,6 +170,15 @@ export function PagamentoAvulsoMensalidadeDialog({
 
   const valorNum = parseValorBR(valor);
   const pagasNum = Math.max(0, Math.min(TOTAL_PARCELAS - 1, Number(parcelasPagas) || 0));
+
+  // Sugestão da data de início: 1º dia do mês da 1ª parcela (mês de
+  // referência menos as parcelas já pagas). O usuário pode ajustar o dia.
+  const dataInicioSugerida = refMes ? vencimentoDe(refMes, -pagasNum, 1) : "";
+  useEffect(() => {
+    if (dataInicioTocadaRef.current) return;
+    setDataInicio(dataInicioSugerida);
+  }, [dataInicioSugerida]);
+
   const dependentesValidos = dependentes.filter((d) => !!d.paciente);
   const vidas = 1 + dependentesValidos.length;
 
@@ -198,6 +221,7 @@ export function PagamentoAvulsoMensalidadeDialog({
     valorNum > 0 &&
     (!criarContrato ||
       (!!convenioId &&
+        !!dataInicio &&
         dependentes.every((d) => !!d.paciente) &&
         (!semCarencia || !!semCarenciaMotivo.trim())));
 
@@ -244,7 +268,7 @@ export function PagamentoAvulsoMensalidadeDialog({
   }) => {
     if (!paciente) return null;
     const dia = Math.max(1, Math.min(31, Number(diaVenc) || 10));
-    const inicio = vencimentoDe(refMes, -pagasNum, 1);
+    const inicio = dataInicio || vencimentoDe(refMes, -pagasNum, 1);
     const { data: contrato, error: errC } = await supabase
       .from("contratos_assinatura")
       .insert({
@@ -253,7 +277,7 @@ export function PagamentoAvulsoMensalidadeDialog({
         paciente_id: paciente.id,
         paciente_nome: paciente.nome,
         data_inicio: inicio,
-        data_fim: vencimentoDe(refMes, TOTAL_PARCELAS - pagasNum, 1),
+        data_fim: somarMeses(inicio, TOTAL_PARCELAS),
         dia_vencimento: dia,
         valor_mensal: valorNum,
         num_parcelas: TOTAL_PARCELAS,
@@ -362,6 +386,25 @@ export function PagamentoAvulsoMensalidadeDialog({
                 />
               </div>
             </div>
+
+            {criarContrato && (
+              <div className="space-y-1">
+                <Label>Data de início do contrato</Label>
+                <Input
+                  type="date"
+                  value={dataInicio}
+                  onChange={(e) => {
+                    dataInicioTocadaRef.current = true;
+                    setDataInicio(e.target.value);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Data base do contrato: o término é calculado 12 meses depois
+                  {dataInicio ? ` (${somarMeses(dataInicio, TOTAL_PARCELAS).split("-").reverse().join("/")})` : ""}.
+                  Sugerida pelo mês de referência, mas pode ser ajustada.
+                </p>
+              </div>
+            )}
 
             {criarContrato && pagasNum === 0 && (
               <p className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
