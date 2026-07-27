@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Volume2, Play, Square, RotateCcw } from "lucide-react";
+import { Volume2, Play, Square, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,24 +40,41 @@ const FRASE_PADRAO =
 function VozConfigPage() {
   const [rate, setRate] = useState<number>(DEFAULT_TTS_RATE);
   const [enabled, setEnabled] = useState<boolean>(true);
+  const [savedRate, setSavedRate] = useState<number>(DEFAULT_TTS_RATE);
+  const [savedEnabled, setSavedEnabled] = useState<boolean>(true);
   const [texto, setTexto] = useState<string>(FRASE_PADRAO);
   const [testando, setTestando] = useState(false);
 
   useEffect(() => {
-    setRate(getUserTtsRate());
-    setEnabled(isUserTtsEnabled());
+    const r = getUserTtsRate();
+    const e = isUserTtsEnabled();
+    setRate(r);
+    setSavedRate(r);
+    setEnabled(e);
+    setSavedEnabled(e);
   }, []);
 
-  function aplicarRate(next: number) {
+  function alterarRate(next: number) {
     const clamped = Math.min(MAX_TTS_RATE, Math.max(MIN_TTS_RATE, next));
     setRate(clamped);
-    setUserTtsRate(clamped);
   }
 
-  function aplicarEnabled(on: boolean) {
+  function alterarEnabled(on: boolean) {
     setEnabled(on);
-    setUserTtsEnabled(on);
     if (!on) stopSpeaking();
+  }
+
+  function salvar() {
+    setUserTtsRate(rate);
+    setUserTtsEnabled(enabled);
+    setSavedRate(rate);
+    setSavedEnabled(enabled);
+    toast.success(`Preferências salvas (${Math.round(rate * 100)}%).`);
+  }
+
+  function descartar() {
+    setRate(savedRate);
+    setEnabled(savedEnabled);
   }
 
   async function testar() {
@@ -65,31 +82,40 @@ function VozConfigPage() {
       toast.warning("Ative a voz antes de testar.");
       return;
     }
+    // Aplica temporariamente a velocidade em edição só para o teste,
+    // sem persistir — o Salvar continua responsável por gravar.
+    setUserTtsRate(rate);
     setTestando(true);
     try {
       await speak(texto || FRASE_PADRAO, {
-        onEnd: () => setTestando(false),
+        onEnd: () => {
+          setTestando(false);
+          setUserTtsRate(savedRate);
+        },
         onError: () => {
           setTestando(false);
+          setUserTtsRate(savedRate);
           toast.error("Falha ao reproduzir. Verifique o servidor de TTS.");
         },
       });
     } catch {
       setTestando(false);
+      setUserTtsRate(savedRate);
     }
   }
 
   function parar() {
     stopSpeaking();
     setTestando(false);
+    setUserTtsRate(savedRate);
   }
 
   function resetar() {
-    aplicarRate(DEFAULT_TTS_RATE);
-    toast.success("Velocidade restaurada para o padrão.");
+    alterarRate(DEFAULT_TTS_RATE);
   }
 
   const percent = Math.round(rate * 100);
+  const dirty = rate !== savedRate || enabled !== savedEnabled;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 md:p-6">
@@ -115,7 +141,7 @@ function VozConfigPage() {
                 Quando desligada, o sistema não reproduz nenhuma fala automática.
               </div>
             </div>
-            <Switch checked={enabled} onCheckedChange={aplicarEnabled} />
+            <Switch checked={enabled} onCheckedChange={alterarEnabled} />
           </div>
 
           <div className="space-y-3">
@@ -133,7 +159,7 @@ function VozConfigPage() {
               min={Math.round(MIN_TTS_RATE * 100)}
               max={Math.round(MAX_TTS_RATE * 100)}
               step={5}
-              onValueChange={(v) => aplicarRate((v[0] ?? 55) / 100)}
+              onValueChange={(v) => alterarRate((v[0] ?? 55) / 100)}
             />
             <div className="flex justify-between text-[10px] uppercase tracking-wide text-muted-foreground">
               <span>{Math.round(MIN_TTS_RATE * 100)}% (bem lento)</span>
@@ -146,7 +172,7 @@ function VozConfigPage() {
                   key={v}
                   size="sm"
                   variant={Math.abs(rate - v) < 0.01 ? "default" : "outline"}
-                  onClick={() => aplicarRate(v)}
+                  onClick={() => alterarRate(v)}
                 >
                   {Math.round(v * 100)}%
                 </Button>
@@ -170,6 +196,32 @@ function VozConfigPage() {
               </Button>
               <Button onClick={parar} variant="outline" className="gap-2">
                 <Square className="h-4 w-4" /> Parar
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-background p-3">
+            <div className="text-xs text-muted-foreground">
+              {dirty
+                ? "Você tem alterações não salvas. Clique em Salvar para aplicar."
+                : "Preferências salvas — todas as telas usarão esta configuração."}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={descartar}
+                disabled={!dirty}
+              >
+                Descartar
+              </Button>
+              <Button
+                size="sm"
+                onClick={salvar}
+                disabled={!dirty}
+                className="gap-2"
+              >
+                <Save className="h-4 w-4" /> Salvar
               </Button>
             </div>
           </div>
