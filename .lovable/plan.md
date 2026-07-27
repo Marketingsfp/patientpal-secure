@@ -1,28 +1,40 @@
-## Escopo
+## Objetivo
 
-Clínica-alvo: POLICLINICA MENINO JESUS (contratos de teste identificados nela). Item 2 (UI do pagamento avulso) — confirmar se aplico nas 3 clínicas ou só Menino Jesus; por padrão aplico nas 3, pois é correção de comportamento (data de início sempre dia 1).
+Remover o acionador de pagamento rápido de mensalidade do cartão de três telas onde ele é redundante, mantendo-o apenas na Agenda.
 
-## 1. Excluir contratos de teste
+## Situação atual (verificada no código)
 
-Verificado no banco:
-- 20261930 — QUEDIMA SUELEN, R$ 175,00, já **cancelado**
-- 20261931 — JEAN XAVIER, R$ 120,00, já **cancelado**
-- 20261933 — QUEDIMA SUELEN, R$ 120,00, ainda **ativo**
+O mesmo diálogo (`FaturamentoRapidoMensalidadeDialog`) é aberto em 4 telas:
 
-Ação: excluir definitivamente os 3 contratos, suas mensalidades, dependentes e cancelar/remover lançamentos financeiros e recebimentos de caixa vinculados (para não somarem no fechamento). Antes de apagar, listo o que será removido e reporto o resultado.
+| Tela | Rótulo do botão | Ação |
+| --- | --- | --- |
+| Caixa | 💳 Mensalidade do cartão | **remover** |
+| Ficha do cliente › bloco Cartão Benefícios | Pagar mensalidade | **remover** |
+| Cartão Benefícios › Contratos | Faturamento rápido | **remover** |
+| Agenda | 💳 Mensalidade do cartão | manter |
 
-## 2. Data de início no pagamento avulso de mensalidade
+## O que será feito
 
-Hoje, no diálogo de pagamento avulso, ao escolher o mês de referência o contrato é criado sempre com **dia 1** (`data_inicio` fixo no dia 1 do mês calculado, e `data_fim` um ano depois na mesma regra).
+1. **Caixa** — remover o botão do cabeçalho, o diálogo e o estado que só existia para ele.
+2. **Ficha do cliente** — remover o botão do cabeçalho do bloco "Cartão Benefícios", o diálogo e o estado.
+3. **Contratos** — remover o botão "Faturamento rápido"; o botão **"Vendas"** (nova venda) continua no mesmo lugar.
+4. Limpar imports/ícones que ficarem sem uso nesses três arquivos.
 
-Mudança:
-- Novo campo **"Data de início do contrato"**, exibido logo após o mês de referência.
-- Pré-preenchido com o 1º dia do mês de referência (ajustado pelas parcelas já pagas), mas editável.
-- Passa a ser a data base: `data_inicio` = data informada; `data_fim` = data informada + 1 ano.
-- O dia de vencimento das mensalidades continua vindo do campo "Dia de vencimento" (comportamento atual preservado).
-- Campo obrigatório; valida que a data é coerente com o mês/parcelas informados (aviso, não bloqueio rígido).
+Aplicado para as 3 clínicas (mudança de interface, sem flag).
 
-### Detalhes técnicos
-- Arquivo: `src/components/cartao-beneficios/pagamento-avulso-dialog.tsx`
-- Substituir `vencimentoDe(refMes, -pagasNum, 1)` por estado `dataInicio` e derivar `data_fim` com +12 meses sobre essa data.
-- Sem alteração de regras de valor, carência, juros ou repasse.
+## O que NÃO será alterado
+
+- Nenhuma regra financeira, de contrato, mensalidade ou caixa.
+- O diálogo em si (`faturamento-rapido-dialog.tsx` e `pagamento-avulso-dialog.tsx`) permanece intacto e continua funcionando pela Agenda.
+- A Agenda segue exatamente como está.
+
+## Detalhes técnicos
+
+- `src/routes/_authenticated/app.caixa.tsx`: remover `<Button>` (~2314-2316), `<FaturamentoRapidoMensalidadeDialog>` (~2319), `useState fatRapidoOpen` (~349) e o import (linha 12).
+- `src/components/clientes/paciente-cartoes-beneficios.tsx`: remover `<Button>` (~188-190), o diálogo (~192-198), o `useState` (~59) e o import (linha 16).
+- `src/components/pages/contratos-page.tsx`: remover o `<Button>` "Faturamento rápido" (~653-656), o diálogo (~664-670), o `useState` (~300) e o import (linha 82); manter o botão "Vendas".
+- Rodar checagem de tipos ao final.
+
+## Risco / rollback
+
+Baixo: alteração apenas de apresentação. Rollback = reverter a versão pelo histórico.
