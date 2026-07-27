@@ -125,6 +125,12 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     if (initialDescricao !== undefined) setDescricao(initialDescricao);
     if (initialValor !== undefined) setValor(initialValor);
     if (initialValor !== undefined) setValorOriginal(initialValor);
+    // Reset defensivo do campo "data": o useState inicial só roda uma vez
+    // por ciclo de vida do componente, então sem este reset uma data
+    // retroativa escolhida em um lançamento anterior permanecia gravada e
+    // era enviada como data do próximo lançamento (bug: pagamento saía
+    // com data de dias atrás mesmo tendo sido feito hoje).
+    setData(new Date().toISOString().slice(0, 10));
     // Reseta desconto a cada abertura
     setDescontoAtivo(false); setDescontoTipo("valor");
     setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
@@ -178,12 +184,24 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         try {
           const { data: ag } = await supabase
             .from("agendamentos")
-            .select("paciente_id, tipo_atendimento")
+            .select("paciente_id, tipo_atendimento, inicio")
             .eq("id", agendamentoId)
             .maybeSingle();
           const pid = ag?.paciente_id ?? null;
           const tipoAg = (ag as { tipo_atendimento?: string | null } | null)?.tipo_atendimento ?? null;
           setTipoAgendamento(tipoAg);
+          // Quando o pagamento é feito para um agendamento, a "data" do
+          // lançamento passa a ser a data do atendimento (não a data em
+          // que o operador clicou em faturar). O movimento de caixa
+          // continua caindo na sessão de hoje via forcar_sessao_hoje.
+          const inicioAg = (ag as { inicio?: string | null } | null)?.inicio ?? null;
+          if (inicioAg) {
+            const d = new Date(inicioAg);
+            if (!Number.isNaN(d.getTime())) {
+              const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+              setData(iso);
+            }
+          }
           if (pid) {
             const { data: contrato } = await supabase
               .from("contratos_assinatura")
