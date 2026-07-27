@@ -48,6 +48,7 @@ function OdontologiaPage() {
   const [pacienteIdOrc, setPacienteIdOrc] = useState<string | null>(null);
   const [pacienteSelOrc, setPacienteSelOrc] = useState<PatientOption | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [novoOrcOpen, setNovoOrcOpen] = useState(false);
   const [quickInitial, setQuickInitial] = useState("");
   const [dentes, setDentes] = useState<DenteRow[]>([]);
   const [prontuario, setProntuario] = useState<ProntuarioOdonto | null>(null);
