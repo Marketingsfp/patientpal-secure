@@ -1,56 +1,41 @@
-## Situação verificada
+## Diagnóstico confirmado (com dados do banco)
 
-O contrato 20261032 (CARTÃO CONSULTA + SEGUROS) da MARIA HOSANA foi cancelado em 22/07/2026 por uma rotina em lote, com o motivo "Duplicata da importação legada — mantido contrato irmão". Não foi ação da equipe na tela.
+Paciente **ZILMA CARNEIRO DE SOUZA DE ARAUJO** (contrato 20261605, CARTÃO CONSULTA + SEGUROS), 27/07/2026:
 
-O lote atingiu **153 contratos, todos da POLICLINICA MENINO JESUS**. Nenhum dos contratos cancelados tem mensalidade paga.
-
-Composição dos pares (contrato cancelado x contrato irmão que ficou ativo):
-
-| Cancelado | Irmão ativo | Pares | Irmão com mensalidade paga |
+| Ficha | Médico / Especialidade | `tipo_atendimento` gravado | Pagamento |
 |---|---|---|---|
-| CARTÃO CONSULTA + SEGUROS | CARTÃO CONSULTA | 97 | 2 |
-| CARTÃO CONSULTA | CARTÃO CONSULTA + SEGUROS | 32 | 32 |
-| (sem convênio) | CARTÃO CONSULTA + SEGUROS | 14 | 2 |
-| (sem convênio) | CARTÃO CONSULTA | 8 | 2 |
-| sem irmão ativo | — | 2 | — |
+| 007 | Sandro — Clínico Geral | **particular** | R$ 9,99, descrição "CONVENIO CARTAO CONSULTA + SEGUROS", forma: dinheiro |
+| 006 | André Luis — Angiologia | convenio | ainda não pago |
 
-## Regra aprovada por você
+As regras do convênio estão corretas: as 13 especialidades de consulta compartilham o grupo `consulta-diaria-cartao-consulta-seguro`, limite **1/dia por titular_ou_dependente**, excedente **50% do particular**.
 
-Havendo duplicidade, **fica o contrato de CARTÃO CONSULTA + SEGUROS**; o outro é **excluído do sistema**, sem gravar cancelamento. Se o contrato tiver sido alterado manualmente **e** tiver mensalidade paga, não se mexe nele.
+**Causa raiz única (gera os 2 sintomas):** a sincronização do `tipo_atendimento` após o pagamento (`src/components/financeiro/lancamento-dialog.tsx`, ~linha 611) só marca "convenio" quando a **forma de pagamento** é "Convênio" ou a **categoria** é a do convênio. Como a taxa de R$ 9,99 foi paga **em dinheiro**, o agendamento permaneceu `particular`. Disso decorre:
 
-## Plano
+1. A GR imprimiu **PARTICULAR** — `resolveConvLabel` em `src/lib/print-gr.ts` lê apenas o `tipo_atendimento`.
+2. A cota diária não foi consumida — a contagem na Agenda (`src/routes/_authenticated/app.agenda.tsx`, linha 853) descarta atendimentos `particular` —, então o segundo atendimento do dia voltou a receber R$ 9,99 em vez dos 50%.
 
-1. **Lista de conferência primeiro**: gerar planilha com os 153 casos — nº, paciente, prontuário, convênio, início/fim, valor, contrato irmão, se tem mensalidade paga e a ação proposta (manter / excluir / não mexer). Nada é executado antes da sua conferência.
+Não foi erro da funcionária: o formulário da agenda nasce com "Particular" por padrão e o caixa aplicou o desconto corretamente.
 
-2. **Grupo A — 97 pares "+ SEGUROS cancelado x CARTÃO CONSULTA ativo"**
-   - Reativar o contrato "+ SEGUROS" (limpar situação, data e motivo de cancelamento).
-   - Excluir o contrato CARTÃO CONSULTA irmão, junto com suas parcelas em aberto.
-   - Exceção: os **2 pares em que o irmão tem mensalidade paga** ficam intocados e entram na lista de conferência manual.
+## Correção proposta (3 camadas)
 
-3. **Grupo B — 32 pares "CARTÃO CONSULTA cancelado x + SEGUROS ativo"**
-   - O contrato correto já está ativo. O cancelado seria excluído, mas nos 32 casos o irmão tem pagamento; a regra é sobre o contrato a excluir, que não tem pagamento — então excluir os 32 cancelados e manter o "+ SEGUROS" como está.
+### 1. Gravar corretamente o tipo do atendimento (causa)
+`src/components/financeiro/lancamento-dialog.tsx` — considerar que o atendimento foi pelo convênio também quando a **descrição do lançamento contém o nome do convênio** (é assim que a Agenda monta a descrição ao aplicar o desconto). Pagar a taxa em dinheiro/PIX/cartão passa a marcar `tipo_atendimento = "convenio"`.
 
-4. **Grupo C — 22 pares com contrato sem convênio definido**
-   - Excluir o contrato cancelado sem convênio e manter o irmão ativo.
-   - Se o cancelado tiver qualquer parcela paga ou edição manual, fica na lista de exceções e não é tocado.
+### 2. Contar a cota pelo pagamento real (rede de proteção + registros antigos)
+`src/routes/_authenticated/app.agenda.tsx` (bloco do limite, ~linhas 838-855) — ao montar a lista que consome a cota, buscar os `fin_lancamentos` confirmados desses agendamentos e **também contar** os que indicam o convênio na descrição, mesmo com o agendamento marcado como `particular`. Corrige inclusive os registros já gravados errados, sem alterar dados históricos.
 
-5. **Grupo D — 2 contratos cancelados sem irmão ativo**
-   - Apenas reativar, pois não havia duplicidade.
+### 3. GR mostrar o convênio quando o desconto foi do convênio
+`src/lib/print-gr.ts` — quando o lançamento do atendimento indica desconto do convênio, imprimir o nome do convênio no campo "CONV." em vez de "PARTICULAR" (a função `resolveVinculoConvenio` já existe e resolve o nome do plano do paciente).
 
-6. **Rastreabilidade**: as exclusões e reativações ficam registradas no log de auditoria, com um relatório final em arquivo listando exatamente o que foi feito em cada contrato.
+Sem alterar valores, regras ou tabelas do Cartão Consulta (Regra 1.11 preservada) — apenas lógica de gravação, contagem e impressão.
 
-7. **Prevenção**: nenhuma nova rotina de cancelamento ou exclusão em massa será executada sem lista aprovada antes.
+## Escopo e confirmação necessária
 
-## Escopo e limites
-- Clínica alvo: **POLICLINICA MENINO JESUS** apenas. As outras duas clínicas não são tocadas.
-- Não altero valores, convênios, datas, carência nem regras de Cartão Consulta.
-- Nenhum contrato novo é criado.
-- Contratos com mensalidade paga não são excluídos em nenhuma hipótese.
+- Fora do escopo: regras/valores de convênio, contratos, migrations de dados.
+- É correção técnica, mas muda comportamento de cobrança e impressão: **confirmar se aplico nas 3 clínicas ou só na Policlínica São Francisco de Paula** (Regra 1.10 do AGENTS.md).
 
-## Detalhes técnicos
-- Tabela principal: `contratos_assinatura`; parcelas em `contrato_mensalidades`.
-- Seleção do lote: `cancelamento_motivo LIKE 'Duplicata da importa%'` + `clinica_id = 7570ddde-…`.
-- Exclusão física com verificação prévia de ausência de `pago_em` e de lançamentos financeiros vinculados; execução em transação única e idempotente.
-- Reativação por atualização de `status`, `cancelado_em`, `cancelamento_motivo`; trigger `fn_audit_trigger` grava antes/depois em `audit_log`.
+## Validação após implementar
 
-Confirmo a execução gerando primeiro a lista (passo 1) e só depois aplicando os passos 2 a 5.
+1. Reabrir o faturamento da Ficha 006 (Dr. André) da Zilma → deve mostrar **50% do valor particular** com o aviso "Limite de 1/dia atingido".
+2. Faturar a 1ª consulta do dia de outro paciente com convênio pagando em **dinheiro** → agendamento deve ficar como `convenio` e a GR sair com o nome do convênio.
+3. A 1ª consulta do dia continua saindo R$ 9,99 normalmente.
