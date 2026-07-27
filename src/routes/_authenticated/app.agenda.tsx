@@ -661,11 +661,15 @@ async function obterInfoConvenioPaciente(params: {
           null,
         ]),
       );
+  // Mesma pontuação de findRegra (src/lib/cb-regras.ts): especificidade manda
+  // e, no mesmo nível, gratuidade vence desconto independentemente da
+  // prioridade cadastrada.
   const scoreRegra = (r: any) =>
-    (r.procedimento_id ? 100 : 0)
-    + (r.especialidade_id ? 10 : 0)
-    + (r.tipo ? 5 : 0)
-    + (Number(r.prioridade) || 0) * 0.01;
+    (r.procedimento_id ? 1000 : 0)
+    + (r.especialidade_id ? 100 : 0)
+    + (r.tipo ? 50 : 0)
+    + (r.gratuito ? 10 : 0)
+    + (Number(r.prioridade) || 0) * 0.001;
   let regraMatch: any = null;
   for (const eid of espsTentativa) {
     const r = findRegra(regrasCb as any, eid, procedimentoTipo, procedimentoId);
