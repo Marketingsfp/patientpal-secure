@@ -46,6 +46,24 @@ function rotuloMes(refMes: string) {
     .replace(/^./, (c) => c.toUpperCase());
 }
 
+/** Formata número em moeda brasileira (ex.: 210 -> "R$ 210,00"). */
+function formatValorBR(n: number) {
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+/**
+ * Converte texto de valor em número, aceitando "R$ 210,00", "210,00" e "210.00".
+ * Só trata o ponto como separador de milhar quando há também vírgula decimal.
+ */
+function parseValorBR(txt: string) {
+  const limpo = String(txt).replace(/[^\d.,-]/g, "");
+  if (!limpo) return 0;
+  const normalizado = limpo.includes(",")
+    ? limpo.replace(/\./g, "").replace(",", ".")
+    : limpo;
+  return Number(normalizado) || 0;
+}
+
 /**
  * Pagamento avulso da mensalidade do Cartão (Consulta / Desconto).
  *
