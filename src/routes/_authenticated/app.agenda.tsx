@@ -69,6 +69,7 @@ import {
   Clock,
   DollarSign,
   ShieldCheck,
+  Building2,
   BadgeCheck,
   IdCard,
   Play,
