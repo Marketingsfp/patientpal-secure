@@ -1760,7 +1760,12 @@ function AgendaPage() {
   type DescontoPendente = { tipo: "valor" | "percentual"; input: string; autorizadoPor: string; motivo: string };
   const [descontoPendente, setDescontoPendente] = useState<DescontoPendente | null>(null);
   /** Orçamento odontológico com entrada: resumo pago/falta para o caixa. */
-  const [saldoOrcResumo, setSaldoOrcResumo] = useState<{ total: number; pago: number; restante: number } | null>(null);
+  const [saldoOrcResumo, setSaldoOrcResumo] = useState<{
+    total: number;
+    pago: number;
+    restante: number;
+    itens: Array<{ id: string; descricao: string; total: number; sinal: number; pago: number; restante: number }>;
+  } | null>(null);
   const [descontoDlgOpen, setDescontoDlgOpen] = useState(false);
   const [supervisorOpen, setSupervisorOpen] = useState(false);
   const [descForm, setDescForm] = useState<{
@@ -4037,7 +4042,7 @@ function AgendaPage() {
       }
       const { data: itens, error: e2 } = await supabase
         .from("orcamento_itens")
-        .select("id, descricao, procedimento_id, valor_total, dentes, status_financeiro")
+        .select("id, descricao, procedimento_id, valor_total, dentes, status_financeiro, sinal_valor")
         .eq("orcamento_id", orc.id)
         .order("ordem");
       if (e2) {
@@ -4051,6 +4056,7 @@ function AgendaPage() {
         valor_total: number | null;
         dentes: string[] | null;
         status_financeiro: string | null;
+        sinal_valor: number | null;
       }[];
       if (itsAll.length === 0) {
         toast.error("Orçamento sem itens.");
@@ -4202,6 +4208,7 @@ function AgendaPage() {
             descricao: i.descricao,
             valor_total: i.valor_total,
             dentes: i.dentes,
+            sinal_valor: i.sinal_valor,
           })),
           totalItens: itsAll.length,
           itensRaw: its.map((i) => ({ id: i.id, descricao: i.descricao, procedimento_id: i.procedimento_id })),
@@ -5215,7 +5222,12 @@ function AgendaPage() {
         const rotulo = etapaSinal.etapa === "sinal" ? "SINAL (entrada)" : "SALDO FINAL";
         opcoes = opcoes.map((o) => ({ ...o, valor: etapaSinal.valor }));
         descSuffix += ` — ${rotulo}`;
-        setSaldoOrcResumo({ total: etapaSinal.total, pago: etapaSinal.pago, restante: etapaSinal.restante });
+        setSaldoOrcResumo({
+          total: etapaSinal.total,
+          pago: etapaSinal.pago,
+          restante: etapaSinal.restante,
+          itens: etapaSinal.itens,
+        });
         setAvisoConvenio({
           tom: "warning",
           mensagem:
