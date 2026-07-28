@@ -369,9 +369,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       }
     }
     // ------------------------------------------------------------------
-    // Data retroativa: avisa o operador e força o movimento no caixa de HOJE
-    // (evita que o valor caia em uma sessão de caixa já fechada e "suma"
-    // do fechamento do dia). O lançamento contábil mantém a data escolhida.
+    // Data retroativa: avisa o operador e envia o movimento para o caixa
+    // do dia escolhido (não para o de hoje). Se a sessão daquele dia já
+    // estiver fechada, o backend soma o valor ao fechamento existente e
+    // registra observação de "retroativo lançado em ...".
     // ------------------------------------------------------------------
     const _hojeISO = hojeBR();
     const _ehRetroativo = tipo === "receita" && !!data && data < _hojeISO;
@@ -379,9 +380,9 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       const [aaaa, mm, dd] = data.split("-");
       const ok = window.confirm(
         `Atenção: a data escolhida é retroativa (${dd}/${mm}/${aaaa}).\n\n` +
-        `Para não cair em uma sessão de caixa já fechada, o movimento será ` +
-        `registrado no SEU caixa aberto de HOJE.\n\n` +
-        `A data contábil do lançamento continuará ${dd}/${mm}/${aaaa}.\n\n` +
+        `O movimento será registrado no caixa do dia ${dd}/${mm}/${aaaa} ` +
+        `(não no caixa de hoje). Se o caixa daquele dia já estiver fechado, ` +
+        `o valor será somado ao fechamento com observação de retroativo.\n\n` +
         `Deseja continuar?`,
       );
       if (!ok) return;
@@ -608,10 +609,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           valor: Number(valor),
           descricao: descricao.trim(),
           forma_pagamento: formaFinal,
-          // Sempre lança o movimento no caixa aberto de hoje do operador,
-          // mesmo quando a data do lançamento é retroativa (evita cair em
-          // sessão fechada e sumir do relatório do dia).
-          forcar_sessao_hoje: true,
+          // Lançamento retroativo cai no caixa do dia escolhido — não no
+          // caixa de hoje. Quando a data é hoje, o backend usa a sessão
+          // aberta atual normalmente.
+          forcar_sessao_hoje: false,
         }
       : null;
 
