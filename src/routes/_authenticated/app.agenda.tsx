@@ -2112,6 +2112,12 @@ function AgendaPage() {
   // Aviso do convênio (limite/gratuidade/bloqueio) — modal persistente que
   // o atendente precisa fechar para continuar o atendimento.
   const [avisoConvenio, setAvisoConvenio] = useState<{ tom: "warning" | "error"; mensagem: string } | null>(null);
+  /**
+   * Fator de desconto do convênio apurado na cobrança atual, por item do
+   * orçamento e forma de pagamento. Usado para ajustar sinal/saldo e a baixa
+   * do item depois que o pagamento é gravado.
+   */
+  const orcFatoresRef = useRef<Record<string, Record<string, number>>>({});
   // Modal de confirmação da gratuidade — pergunta "usar agora ou depois"
   // antes de aplicar o benefício. Se "depois", cobra particular.
   const [gratuidadePrompt, setGratuidadePrompt] = useState<{
