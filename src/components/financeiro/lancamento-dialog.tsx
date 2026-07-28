@@ -369,6 +369,15 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // registra observação de "retroativo lançado em ...".
     // ------------------------------------------------------------------
     const _hojeISO = hojeBR();
+    // Data futura nunca é válida em caixa: bloqueia antes de gravar.
+    if (data && data > _hojeISO) {
+      const [aaaa, mm, dd] = data.split("-");
+      toast.error(
+        `Data inválida: ${dd}/${mm}/${aaaa} está no futuro. O lançamento deve usar a data do recebimento (hoje).`,
+        { duration: 8000 },
+      );
+      return;
+    }
     const _ehRetroativo = tipo === "receita" && !!data && data < _hojeISO;
     if (_ehRetroativo) {
       const [aaaa, mm, dd] = data.split("-");
