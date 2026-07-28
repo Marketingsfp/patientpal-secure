@@ -5220,7 +5220,12 @@ function AgendaPage() {
         const rotulo = etapaSinal.etapa === "sinal" ? "SINAL (entrada)" : "SALDO FINAL";
         opcoes = opcoes.map((o) => ({ ...o, valor: etapaSinal.valor }));
         descSuffix += ` — ${rotulo}`;
-        setSaldoOrcResumo({ total: etapaSinal.total, pago: etapaSinal.pago, restante: etapaSinal.restante });
+        setSaldoOrcResumo({
+          total: etapaSinal.total,
+          pago: etapaSinal.pago,
+          restante: etapaSinal.restante,
+          itens: etapaSinal.itens,
+        });
         setAvisoConvenio({
           tom: "warning",
           mensagem:
