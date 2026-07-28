@@ -217,6 +217,27 @@ export function PainelPage() {
     processarFilaFala();
   }
 
+  // Quando a velocidade/habilitação do TTS mudar (mesma aba OU outra aba
+  // via storage event), interrompemos a fala nativa em curso e a próxima
+  // criação de utterance pegará a nova velocidade automaticamente.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const reagir = () => {
+      try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
+      // Libera a fila para o próximo processamento com a nova velocidade.
+      falandoRef.current = false;
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "tts:rate" || e.key === "tts:enabled") reagir();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("tts:changed", reagir);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("tts:changed", reagir);
+    };
+  }, []);
+
   function criarFala(texto: string, key: string) {
     const utter = new SpeechSynthesisUtterance(texto);
     utter.lang = "pt-BR";
@@ -301,17 +322,18 @@ export function PainelPage() {
     window.speechSynthesis.resume();
     tocarDing();
     const primeira = criarFala(texto, item.key);
-    const segunda = criarFala(texto, item.key);
-    // Fim da repetição = fim do anúncio; libera a próxima senha da fila.
-    segunda.onend = () => {
-      falandoRef.current = false;
-      processarFilaFala();
-    };
-    segunda.onerror = segunda.onend;
     // Se a primeira falhar, ainda tocamos a segunda depois do intervalo.
     window.speechSynthesis.speak(primeira);
     window.setTimeout(() => {
       window.speechSynthesis.resume();
+      // Cria a segunda leitura só agora para pegar a velocidade ATUAL
+      // (caso o usuário tenha alterado o slider entre a 1ª e a 2ª chamada).
+      const segunda = criarFala(texto, item.key);
+      segunda.onend = () => {
+        falandoRef.current = false;
+        processarFilaFala();
+      };
+      segunda.onerror = segunda.onend;
       window.speechSynthesis.speak(segunda);
     }, 3800);
     }
