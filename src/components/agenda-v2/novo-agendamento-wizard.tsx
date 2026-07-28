@@ -698,7 +698,7 @@ export function NovoAgendamentoWizard({
           <div className="pt-3 border-t border-slate-200">
             <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Tipo de atendimento</div>
             <div className="flex gap-2">
-              {(["particular", "convenio"] as const).map((t) => (
+              {(["particular", "convenio", "externo"] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -710,10 +710,53 @@ export function NovoAgendamentoWizard({
                       : "border-slate-200 text-slate-600 hover:bg-slate-50",
                   )}
                 >
-                  {t === "particular" ? "Particular" : "Convênio (cartão benefícios)"}
+                  {t === "particular"
+                    ? "Particular"
+                    : t === "convenio"
+                    ? "Convênio (cartão benefícios)"
+                    : "Externo (outra clínica)"}
                 </button>
               ))}
             </div>
+
+            {tipoAtendimento === "externo" && (
+              <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50/60 p-3 space-y-2">
+                <p className="text-[11px] text-orange-800">
+                  Faturado em outra clínica. Este agendamento <b>não entra no caixa</b> daqui —
+                  gera apenas o registro de repasse para o médico.
+                </p>
+                <div>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Clínica de origem</label>
+                  <input
+                    value={externoClinicaNome}
+                    onChange={(e) => setExternoClinicaNome(e.target.value)}
+                    placeholder="Ex.: Policlínica Menino Jesus"
+                    className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Nº da GR</label>
+                    <input
+                      value={externoGrNumero}
+                      onChange={(e) => setExternoGrNumero(e.target.value)}
+                      placeholder="Ex.: 20260123"
+                      className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Valor (opcional)</label>
+                    <input
+                      value={externoValor}
+                      onChange={(e) => setExternoValor(e.target.value.replace(/[^0-9.,]/g, ""))}
+                      placeholder="0,00"
+                      inputMode="decimal"
+                      className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm tabular-nums"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <p className="text-[11px] text-slate-400 pt-3 border-t border-slate-200">
