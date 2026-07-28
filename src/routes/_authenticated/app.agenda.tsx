@@ -9387,8 +9387,8 @@ function AgendaPage() {
         open={!!externoAg}
         onOpenChange={(v) => { if (!v) setExternoAg(null); }}
         agendamentoId={externoAg?.id ?? null}
-        clinicaId={clinicaId}
         pacienteNome={externoAg?.paciente_nome ?? null}
+        clinicaId={clinicaAtual?.clinica_id ?? null}
         procedimento={externoAg?.procedimento ?? null}
         onDone={() => { void load(); }}
       />
