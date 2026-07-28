@@ -4819,6 +4819,11 @@ function AgendaPage() {
           }
         }
       }
+      // Sinal/saldo: mesma regra do fluxo "Agendar > Pagar" — quando o(s)
+      // item(ns) do orçamento têm entrada, sugere a etapa pendente.
+      const etapaNovo = await aplicarEtapaSinal(opcoes, novoId);
+      opcoes = etapaNovo.opcoes;
+      descSuffix += etapaNovo.descSuffix;
       setFormaPagOpcoes(opcoes);
       setFormaPagCtx({
         // Agrupa o principal + irmãos (imagem multi-exame) para que a mesma
