@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
+import { hojeBR } from "@/lib/date-utils";
 
 import { DateInputBR } from "@/components/ui/date-input-br";
 type Tipo = "receita" | "despesa";
@@ -85,7 +86,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const ehSupervisor = role === "admin" || role === "gestor" || role === "financeiro";
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
-  const [data, setData] = useState(() => new Date().toISOString().slice(0, 10));
+  const [data, setData] = useState(() => hojeBR());
   const [categoriaId, setCategoriaId] = useState<string>("");
   const [contaId, setContaId] = useState<string>("");
   const [formaPagamento, setFormaPagamento] = useState<string>("");
@@ -137,7 +138,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // retroativa escolhida em um lançamento anterior permanecia gravada e
     // era enviada como data do próximo lançamento (bug: pagamento saía
     // com data de dias atrás mesmo tendo sido feito hoje).
-    setData(new Date().toISOString().slice(0, 10));
+    setData(hojeBR());
     // Reseta desconto a cada abertura
     setDescontoAtivo(false); setDescontoTipo("valor");
     setDescontoInput(""); setDescontoAutorizado(""); setDescontoMotivo("");
@@ -372,7 +373,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     // (evita que o valor caia em uma sessão de caixa já fechada e "suma"
     // do fechamento do dia). O lançamento contábil mantém a data escolhida.
     // ------------------------------------------------------------------
-    const _hojeISO = new Date().toISOString().slice(0, 10);
+    const _hojeISO = hojeBR();
     const _ehRetroativo = tipo === "receita" && !!data && data < _hojeISO;
     if (_ehRetroativo) {
       const [aaaa, mm, dd] = data.split("-");
