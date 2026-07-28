@@ -3552,6 +3552,11 @@ function AgendaPage() {
         { forma: "cartao_debito", label: "Cartão de Débito", valor: totalDebito },
         { forma: "cartao_credito", label: "Cartão de Crédito", valor: totalCredito },
       ];
+      // Sinal/saldo: mesma regra do fluxo "Agendar > Pagar" — quando o(s)
+      // item(ns) do orçamento têm entrada, sugere a etapa pendente.
+      const sinalNovo = await aplicarEtapaSinal(opcoes, novoId);
+      opcoes = sinalNovo.opcoes;
+      descSuffix += sinalNovo.descSuffix;
       setFormaPagOpcoes(opcoes);
       setFormaPagCtx({
         agId: itens.map((i) => i.id).join(","),
