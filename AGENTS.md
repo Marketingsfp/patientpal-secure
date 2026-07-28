@@ -155,15 +155,7 @@ O agente deve preferir mudanças pequenas, rastreáveis e reversíveis. Quando a
 correção tiver risco de impacto operacional, deve propor validação antes de
 ampliar o escopo.
 
-### 1.10 Alterações valem para todas as clínicas
-
-Toda alteração de sistema (código, UI, regra, banco, permissão, dado ou teste
-operacional) é aplicada **globalmente para todas as clínicas**. O agente **não
-deve perguntar em qual clínica aplicar** nem escopar mudanças por `clinica_id`
-por padrão. Ajustes específicos por clínica só ocorrem quando o colaborador
-pedir explicitamente.
-
-### 1.11 Valores do Cartão Consulta — alteração manual obrigatória
+### 1.10 Valores do Cartão Consulta — alteração manual obrigatória
 
 Os valores de serviços/regras do **Cartão Consulta** (e variantes como
 "Cartão Consulta + Seguros") **devem ser alterados exclusivamente pelo time,
