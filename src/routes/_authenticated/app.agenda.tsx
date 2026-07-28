@@ -5350,7 +5350,11 @@ function AgendaPage() {
       // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
       // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
       // que não bate com a tabela de procedimentos e zeraria as opções).
-      const opcoesOrc = a.orcamento_id ? await opcoesPagamentoDeOrcamento(a.orcamento_id, a.id) : null;
+      const orcCobranca = a.orcamento_id
+        ? await opcoesPagamentoDeOrcamento(a.orcamento_id, a.id, a.medico_id)
+        : null;
+      const opcoesOrc = orcCobranca?.opcoes ?? null;
+      orcFatoresRef.current = orcCobranca?.fatores ?? {};
       // Pagamento em duas etapas (sinal + saldo) — itens de orçamento com
       // `sinal_valor` definido (Odontologia). A 1ª cobrança sugere o sinal,
       // a 2ª o saldo restante.
@@ -5417,6 +5421,8 @@ function AgendaPage() {
       if (isMulti) {
         if (opcoesOrc) {
           opcoes = opcoesOrc;
+          descSuffix += orcCobranca?.descSuffix ?? "";
+          if (orcCobranca?.aviso) setAvisoConvenio(orcCobranca.aviso);
         } else {
           const resultado = await calcularOpcoesMultiExame({
             clinicaId: clinicaAtual.clinica_id,
@@ -5458,9 +5464,15 @@ function AgendaPage() {
           if (escolha === "depois") info = { ...info, desconto: null };
         }
         if (opcoesOrc) {
-          // Valores do orçamento já consideram desconto/convênio definidos na hora
-          // de gerar o orçamento — não aplicamos nada por cima.
+          // O orçamento é gravado sempre em valor particular; o benefício do
+          // convênio é apurado agora, na hora do pagamento (ver
+          // `calcularBeneficioOrcamento`).
           opcoes = opcoesOrc;
+          descSuffix += orcCobranca?.descSuffix ?? "";
+          if (orcCobranca?.aviso) setAvisoConvenio(orcCobranca.aviso);
+          else if (orcCobranca?.temBeneficio) {
+            toast.success(`Desconto do convênio aplicado neste pagamento.`);
+          }
         } else if (info) {
           if (!info.emDia) {
             setAvisoConvenio({
