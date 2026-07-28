@@ -9385,6 +9385,7 @@ function AgendaPage() {
       )}
       {selecItensCtx && (
         <SelecionarItensOrcamentoDialog
+          
           open={selecItensOpen}
           onOpenChange={(v) => {
             setSelecItensOpen(v);
