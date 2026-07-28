@@ -10,6 +10,7 @@ import { ProcedimentoPicker, type ProcedimentoOption } from "@/components/agenda
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
+import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { cn } from "@/lib/utils";
 
@@ -46,7 +47,7 @@ type MedicoLite = {
 
 type SlotLivre = { id: string; inicio: string; fim: string };
 
-type TipoAtendimento = "particular" | "convenio";
+type TipoAtendimento = "particular" | "convenio" | "externo";
 
 type EspecialidadeOpt = { id: string; nome: string; isPrincipal: boolean };
 
@@ -87,6 +88,7 @@ export function NovoAgendamentoWizard({
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const queryClient = useQueryClient();
   const criarAgendamentoFn = useServerFn(criarAgendamento);
+  const marcarExternoFn = useServerFn(marcarAtendimentoExterno);
 
   const [stepIdx, setStepIdx] = useState(0);
   const step: StepKey = STEPS[stepIdx].key;
@@ -97,6 +99,10 @@ export function NovoAgendamentoWizard({
   const [dataDia, setDataDia] = useState<string>(toLocalDateKey(new Date()));
   const [slot, setSlot] = useState<SlotLivre | null>(null);
   const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento>("particular");
+  // Atendimento externo — faturado em outra clínica (ver AGENTS.md §1.9).
+  const [externoClinicaNome, setExternoClinicaNome] = useState<string>("");
+  const [externoGrNumero, setExternoGrNumero] = useState<string>("");
+  const [externoValor, setExternoValor] = useState<string>("");
   const [especialidadeId, setEspecialidadeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -134,6 +140,9 @@ export function NovoAgendamentoWizard({
     setDataDia(toLocalDateKey(new Date()));
     setSlot(null);
     setTipoAtendimento("particular");
+    setExternoClinicaNome("");
+    setExternoGrNumero("");
+    setExternoValor("");
     setEspecialidadeId(null);
     setSaving(false);
     resetQuickCreate();
@@ -348,7 +357,9 @@ export function NovoAgendamentoWizard({
             observacoes: "[V2]",
             data_pagamento: null,
             orcamento_id: null,
-            tipo_atendimento: tipoAtendimento,
+            // criarAgendamento só aceita "particular"|"convenio". O modo
+            // "externo" é armazenado depois via marcarAtendimentoExterno.
+            tipo_atendimento: tipoAtendimento === "externo" ? "particular" : tipoAtendimento,
             forma_pagamento_prevista: null,
             especialidade_id: especialidadeId,
           },
@@ -376,6 +387,36 @@ export function NovoAgendamentoWizard({
 
       if (result.vinculo_warning) {
         mostrarErro(result.vinculo_warning.pg_error, "agendamento salvo, mas vínculo com itens do orçamento falhou");
+      }
+
+      if (tipoAtendimento === "externo" && result.id) {
+        const grTrim = externoGrNumero.trim();
+        if (!grTrim) {
+          notify.error("Informe o número da GR da clínica de origem.");
+          setSaving(false);
+          return;
+        }
+        if (!externoClinicaNome.trim()) {
+          notify.error("Informe a clínica de origem.");
+          setSaving(false);
+          return;
+        }
+        const valorNum = externoValor ? Number(externoValor.replace(",", ".")) : null;
+        const mkRes = await marcarExternoFn({
+          data: {
+            agendamento_id: result.id,
+            clinica_id: clinicaId,
+            origem_clinica_id: null,
+            origem_clinica_nome: externoClinicaNome.trim(),
+            origem_gr_numero: grTrim,
+            origem_valor: valorNum,
+          },
+        });
+        if (!mkRes.ok) {
+          notify.error(mkRes.message);
+          setSaving(false);
+          return;
+        }
       }
 
       notify.success("Salvo");
@@ -657,7 +698,7 @@ export function NovoAgendamentoWizard({
           <div className="pt-3 border-t border-slate-200">
             <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Tipo de atendimento</div>
             <div className="flex gap-2">
-              {(["particular", "convenio"] as const).map((t) => (
+              {(["particular", "convenio", "externo"] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -669,10 +710,53 @@ export function NovoAgendamentoWizard({
                       : "border-slate-200 text-slate-600 hover:bg-slate-50",
                   )}
                 >
-                  {t === "particular" ? "Particular" : "Convênio (cartão benefícios)"}
+                  {t === "particular"
+                    ? "Particular"
+                    : t === "convenio"
+                    ? "Convênio (cartão benefícios)"
+                    : "Externo (outra clínica)"}
                 </button>
               ))}
             </div>
+
+            {tipoAtendimento === "externo" && (
+              <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50/60 p-3 space-y-2">
+                <p className="text-[11px] text-orange-800">
+                  Faturado em outra clínica. Este agendamento <b>não entra no caixa</b> daqui —
+                  gera apenas o registro de repasse para o médico.
+                </p>
+                <div>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Clínica de origem</label>
+                  <input
+                    value={externoClinicaNome}
+                    onChange={(e) => setExternoClinicaNome(e.target.value)}
+                    placeholder="Ex.: Policlínica Menino Jesus"
+                    className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Nº da GR</label>
+                    <input
+                      value={externoGrNumero}
+                      onChange={(e) => setExternoGrNumero(e.target.value)}
+                      placeholder="Ex.: 20260123"
+                      className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Valor (opcional)</label>
+                    <input
+                      value={externoValor}
+                      onChange={(e) => setExternoValor(e.target.value.replace(/[^0-9.,]/g, ""))}
+                      placeholder="0,00"
+                      inputMode="decimal"
+                      className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm tabular-nums"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <p className="text-[11px] text-slate-400 pt-3 border-t border-slate-200">

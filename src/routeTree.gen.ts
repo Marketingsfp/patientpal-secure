@@ -123,6 +123,7 @@ import { Route as AuthenticatedAppFinanceiroEmpresasRouteImport } from './routes
 import { Route as AuthenticatedAppFinanceiroContasRouteImport } from './routes/_authenticated/app.financeiro.contas'
 import { Route as AuthenticatedAppFinanceiroCategoriasRouteImport } from './routes/_authenticated/app.financeiro.categorias'
 import { Route as AuthenticatedAppFinanceiroBiRouteImport } from './routes/_authenticated/app.financeiro.bi'
+import { Route as AuthenticatedAppFinanceiroAtendimentosExternosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos-externos'
 import { Route as AuthenticatedAppFinanceiroAtendimentosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos'
 import { Route as AuthenticatedAppFinanceiroAnaliticoRouteImport } from './routes/_authenticated/app.financeiro.analitico'
 import { Route as AuthenticatedAppFinanceiroAlertasRouteImport } from './routes/_authenticated/app.financeiro.alertas'
@@ -776,6 +777,12 @@ const AuthenticatedAppFinanceiroBiRoute =
     path: '/bi',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
+const AuthenticatedAppFinanceiroAtendimentosExternosRoute =
+  AuthenticatedAppFinanceiroAtendimentosExternosRouteImport.update({
+    id: '/atendimentos-externos',
+    path: '/atendimentos-externos',
+    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
+  } as any)
 const AuthenticatedAppFinanceiroAtendimentosRoute =
   AuthenticatedAppFinanceiroAtendimentosRouteImport.update({
     id: '/atendimentos',
@@ -983,6 +990,7 @@ export interface FileRoutesByFullPath {
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
+  '/app/financeiro/atendimentos-externos': typeof AuthenticatedAppFinanceiroAtendimentosExternosRoute
   '/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
@@ -1111,6 +1119,7 @@ export interface FileRoutesByTo {
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
+  '/app/financeiro/atendimentos-externos': typeof AuthenticatedAppFinanceiroAtendimentosExternosRoute
   '/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
@@ -1245,6 +1254,7 @@ export interface FileRoutesById {
   '/_authenticated/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/_authenticated/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/_authenticated/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
+  '/_authenticated/app/financeiro/atendimentos-externos': typeof AuthenticatedAppFinanceiroAtendimentosExternosRoute
   '/_authenticated/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/_authenticated/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/_authenticated/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
@@ -1379,6 +1389,7 @@ export interface FileRouteTypes {
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
     | '/app/financeiro/atendimentos'
+    | '/app/financeiro/atendimentos-externos'
     | '/app/financeiro/bi'
     | '/app/financeiro/categorias'
     | '/app/financeiro/contas'
@@ -1507,6 +1518,7 @@ export interface FileRouteTypes {
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
     | '/app/financeiro/atendimentos'
+    | '/app/financeiro/atendimentos-externos'
     | '/app/financeiro/bi'
     | '/app/financeiro/categorias'
     | '/app/financeiro/contas'
@@ -1640,6 +1652,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/financeiro/alertas'
     | '/_authenticated/app/financeiro/analitico'
     | '/_authenticated/app/financeiro/atendimentos'
+    | '/_authenticated/app/financeiro/atendimentos-externos'
     | '/_authenticated/app/financeiro/bi'
     | '/_authenticated/app/financeiro/categorias'
     | '/_authenticated/app/financeiro/contas'
@@ -2500,6 +2513,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroBiRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
+    '/_authenticated/app/financeiro/atendimentos-externos': {
+      id: '/_authenticated/app/financeiro/atendimentos-externos'
+      path: '/atendimentos-externos'
+      fullPath: '/app/financeiro/atendimentos-externos'
+      preLoaderRoute: typeof AuthenticatedAppFinanceiroAtendimentosExternosRouteImport
+      parentRoute: typeof AuthenticatedAppFinanceiroRoute
+    }
     '/_authenticated/app/financeiro/atendimentos': {
       id: '/_authenticated/app/financeiro/atendimentos'
       path: '/atendimentos'
@@ -2691,6 +2711,7 @@ interface AuthenticatedAppFinanceiroRouteChildren {
   AuthenticatedAppFinanceiroAlertasRoute: typeof AuthenticatedAppFinanceiroAlertasRoute
   AuthenticatedAppFinanceiroAnaliticoRoute: typeof AuthenticatedAppFinanceiroAnaliticoRoute
   AuthenticatedAppFinanceiroAtendimentosRoute: typeof AuthenticatedAppFinanceiroAtendimentosRoute
+  AuthenticatedAppFinanceiroAtendimentosExternosRoute: typeof AuthenticatedAppFinanceiroAtendimentosExternosRoute
   AuthenticatedAppFinanceiroBiRoute: typeof AuthenticatedAppFinanceiroBiRoute
   AuthenticatedAppFinanceiroCategoriasRoute: typeof AuthenticatedAppFinanceiroCategoriasRoute
   AuthenticatedAppFinanceiroContasRoute: typeof AuthenticatedAppFinanceiroContasRoute
@@ -2713,6 +2734,8 @@ const AuthenticatedAppFinanceiroRouteChildren: AuthenticatedAppFinanceiroRouteCh
       AuthenticatedAppFinanceiroAnaliticoRoute,
     AuthenticatedAppFinanceiroAtendimentosRoute:
       AuthenticatedAppFinanceiroAtendimentosRoute,
+    AuthenticatedAppFinanceiroAtendimentosExternosRoute:
+      AuthenticatedAppFinanceiroAtendimentosExternosRoute,
     AuthenticatedAppFinanceiroBiRoute: AuthenticatedAppFinanceiroBiRoute,
     AuthenticatedAppFinanceiroCategoriasRoute:
       AuthenticatedAppFinanceiroCategoriasRoute,
