@@ -217,6 +217,27 @@ export function PainelPage() {
     processarFilaFala();
   }
 
+  // Quando a velocidade/habilitação do TTS mudar (mesma aba OU outra aba
+  // via storage event), interrompemos a fala nativa em curso e a próxima
+  // criação de utterance pegará a nova velocidade automaticamente.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const reagir = () => {
+      try { window.speechSynthesis.cancel(); } catch { /* ignore */ }
+      // Libera a fila para o próximo processamento com a nova velocidade.
+      falandoRef.current = false;
+    };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "tts:rate" || e.key === "tts:enabled") reagir();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("tts:changed", reagir);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("tts:changed", reagir);
+    };
+  }, []);
+
   function criarFala(texto: string, key: string) {
     const utter = new SpeechSynthesisUtterance(texto);
     utter.lang = "pt-BR";
