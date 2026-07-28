@@ -5058,10 +5058,10 @@ function AgendaPage() {
   const opcoesPagamentoDeOrcamento = async (
     orcamentoId: string,
     agendamentoId?: string | null,
-  ): Promise<FormaOpcao[] | null> => {
+  ): Promise<OrcamentoCobranca | null> => {
     const { data, error } = await supabase
       .from("orcamentos")
-      .select("valor_total, valores_pagamento")
+      .select("valor_total, valores_pagamento, paciente_id")
       .eq("id", orcamentoId)
       .maybeSingle();
     if (error || !data) return null;
@@ -5074,6 +5074,7 @@ function AgendaPage() {
     // demais itens continuam livres para outros agendamentos/pagamentos.
     let totalLiquido = totalOrcamento;
     let proporcao = 1;
+    let itensCobranca: ItemOrcamentoCobranca[] = [];
     if (agendamentoId) {
       const { data: links } = await supabase
         .from("agendamento_orcamento_itens")
@@ -5083,14 +5084,10 @@ function AgendaPage() {
       if (ids.length) {
         const { data: itens } = await supabase
           .from("orcamento_itens")
-          .select("valor_total, quantidade, valor_unitario, valor_pago")
+          .select("id, descricao, valor_total, quantidade, valor_unitario, valor_pago, valores_formas")
           .in("id", ids);
-        const rows = (itens ?? []) as Array<{
-          valor_total: number | null;
-          quantidade: number | null;
-          valor_unitario: number | null;
-          valor_pago: number | null;
-        }>;
+        const rows = (itens ?? []) as ItemOrcamentoCobranca[];
+        itensCobranca = rows;
         if (rows.length) {
           const subtotal = rows.reduce(
             (s, i) =>
@@ -5103,18 +5100,62 @@ function AgendaPage() {
         }
       }
     }
+    if (itensCobranca.length === 0) {
+      const { data: todos } = await supabase
+        .from("orcamento_itens")
+        .select("id, descricao, valor_total, quantidade, valor_unitario, valor_pago, valores_formas")
+        .eq("orcamento_id", orcamentoId);
+      itensCobranca = (todos ?? []) as ItemOrcamentoCobranca[];
+    }
     const vals = (data.valores_pagamento ?? {}) as Record<string, number> | null;
     const pegar = (label: string) => {
       const v = vals ? Number(vals[label] ?? 0) : 0;
       if (v <= 0) return totalLiquido;
       return proporcao >= 1 ? v : Math.round(v * proporcao * 100) / 100;
     };
-    return [
+    const opcoesBase: FormaOpcao[] = [
       { forma: "dinheiro", label: "Dinheiro", valor: pegar("Dinheiro") },
       { forma: "pix", label: "Pix", valor: pegar("Pix") },
       { forma: "cartao_debito", label: "Cartão de Débito", valor: pegar("Cartão de Débito") },
       { forma: "cartao_credito", label: "Cartão de Crédito", valor: pegar("Cartão de Crédito") },
     ];
+    // Benefício do convênio: o orçamento é sempre gravado em valor PARTICULAR.
+    // O desconto é apurado agora, no momento do pagamento, porque a situação do
+    // contrato pode ter mudado desde que o orçamento foi feito (mensalidade em
+    // atraso, carência, contrato cancelado).
+    const beneficio = await calcularBeneficioOrcamento({
+      pacienteId: (data as { paciente_id?: string | null }).paciente_id ?? null,
+      itens: itensCobranca,
+      agendamentoId: agendamentoId ?? null,
+    });
+    if (!beneficio || !beneficio.temBeneficio) {
+      return {
+        opcoes: opcoesBase,
+        descSuffix: "",
+        aviso: beneficio?.aviso ?? null,
+        fatores: {},
+        temBeneficio: false,
+      };
+    }
+    const opcoes = opcoesBase.map((o) => {
+      const soma = itensCobranca.reduce((s, i) => {
+        const saldo = saldoItemOrcamento(i);
+        const f = beneficio.fatores[i.id]?.[o.forma] ?? 1;
+        return s + saldo * f;
+      }, 0);
+      return {
+        ...o,
+        valor: Math.round(Math.max(0, soma) * 100) / 100,
+        memoria: beneficio.memoriaPorForma[o.forma],
+      };
+    });
+    return {
+      opcoes,
+      descSuffix: ` — Convênio ${beneficio.convenioNome} (aplicado no pagamento)`,
+      aviso: beneficio.aviso,
+      fatores: beneficio.fatores,
+      temBeneficio: true,
+    };
   };
 
   /**
