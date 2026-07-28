@@ -180,6 +180,13 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     return m;
   }, [especialidades]);
 
+  /** Regra por especialidade+tipo que não corresponde a nenhum serviço ativo. */
+  const regraSemServico = (r: CbRegra) => {
+    if (r.procedimento_id || !r.especialidade_id || !r.tipo) return false;
+    if (paresEspTipo.size === 0) return false;
+    return !paresEspTipo.has(`${r.especialidade_id}|${(r.tipo ?? "").toLowerCase()}`);
+  };
+
   // ---- Exceções às regras (todos os convênios) --------------------------
   // Uma exceção é um procedimento que NÃO recebe desconto neste convênio.
   // Gravamos como regra específica por procedimento com percentual = 0 e
