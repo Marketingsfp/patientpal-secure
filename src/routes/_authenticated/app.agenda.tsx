@@ -426,6 +426,132 @@ function memoriaDescontoPorForma(baseValor: number, forma: string, d: DescontoCo
   return `${fmt(baseValor)} − ${fmt(Number(d.valor) || 0)}`;
 }
 
+/** Item do orçamento usado no cálculo da cobrança na agenda. */
+type ItemOrcamentoCobranca = {
+  id: string;
+  descricao: string | null;
+  valor_total: number | null;
+  quantidade: number | null;
+  valor_unitario: number | null;
+  valor_pago: number | null;
+  valores_formas?: Record<string, number> | null;
+};
+
+/** Resultado da leitura de um orçamento para cobrança na agenda. */
+type OrcamentoCobranca = {
+  opcoes: FormaOpcao[];
+  descSuffix: string;
+  aviso: { tom: "warning" | "error"; mensagem: string } | null;
+  /** Fator de desconto (0..1) por item do orçamento e por forma de pagamento. */
+  fatores: Record<string, Record<string, number>>;
+  temBeneficio: boolean;
+};
+
+/** Valor total (particular) gravado no item do orçamento. */
+function totalItemOrcamento(i: ItemOrcamentoCobranca): number {
+  return Number(i.valor_total ?? Number(i.quantidade ?? 1) * Number(i.valor_unitario ?? 0)) || 0;
+}
+
+/** Saldo ainda devido do item, em valor particular. */
+function saldoItemOrcamento(i: ItemOrcamentoCobranca): number {
+  return Math.max(0, totalItemOrcamento(i) - (Number(i.valor_pago ?? 0) || 0));
+}
+
+/**
+ * Apura o benefício do convênio no MOMENTO DO PAGAMENTO para os itens de um
+ * orçamento. O orçamento continua gravado em valor particular; aqui só
+ * calculamos o fator de desconto por item/forma e a mensagem de transparência.
+ */
+async function calcularBeneficioOrcamento(params: {
+  clinicaId: string | null | undefined;
+  pacienteId: string | null | undefined;
+  itens: ItemOrcamentoCobranca[];
+  agendamentoId?: string | null;
+  medicoId?: string | null;
+}): Promise<{
+  temBeneficio: boolean;
+  convenioNome: string;
+  fatores: Record<string, Record<string, number>>;
+  memoriaPorForma: Record<string, string | undefined>;
+  aviso: { tom: "warning" | "error"; mensagem: string } | null;
+} | null> {
+  const { clinicaId, pacienteId, itens, agendamentoId, medicoId } = params;
+  if (!clinicaId || !pacienteId || itens.length === 0) return null;
+  const formas = ["dinheiro", "pix", "cartao_debito", "cartao_credito"] as const;
+  const fatores: Record<string, Record<string, number>> = {};
+  const memoriaPorForma: Record<string, string | undefined> = {};
+  let convenioNome = "";
+  let temBeneficio = false;
+  const motivos = new Set<string>();
+
+  // Uma consulta por serviço distinto — itens repetidos reaproveitam o cálculo.
+  const cache = new Map<string, ConvenioInfo | null>();
+  for (const item of itens) {
+    const nome = (item.descricao ?? "").trim();
+    if (!nome) continue;
+    let info = cache.get(nome);
+    if (info === undefined) {
+      info = await obterInfoConvenioPaciente({
+        clinicaId,
+        pacienteId,
+        medicoId: medicoId ?? null,
+        procedimentoNome: nome,
+        agendamentoId: agendamentoId ?? null,
+        dataRef: null,
+      });
+      cache.set(nome, info);
+    }
+    if (!info) continue;
+    convenioNome = convenioNome || info.convenioNome;
+    if (!info.emDia) {
+      motivos.add(`mensalidade em atraso (${info.parcelasAtrasadas} parcela(s))`);
+      continue;
+    }
+    if (info.bloquear) {
+      motivos.add(info.avisoLimite ?? "limite do convênio atingido");
+      continue;
+    }
+    if (!info.desconto) {
+      motivos.add(`sem regra cadastrada para "${nome}"`);
+      continue;
+    }
+    const base = totalItemOrcamento(item);
+    if (base <= 0) continue;
+    const desc = info.desconto;
+    const porForma: Record<string, number> = {};
+    for (const f of formas) {
+      const baseForma =
+        f === "dinheiro"
+          ? Number(item.valores_formas?.["Dinheiro"] ?? base) || base
+          : Number(item.valores_formas?.["Cartão de Crédito"] ?? base) || base;
+      const final = aplicarDescontoPorForma(baseForma, f, desc);
+      porForma[f] = base > 0 ? Math.max(0, final / base) : 1;
+      if (!memoriaPorForma[f]) memoriaPorForma[f] = memoriaDescontoPorForma(baseForma, f, desc);
+    }
+    fatores[item.id] = porForma;
+    temBeneficio = true;
+  }
+
+  if (!convenioNome) return null;
+  let aviso: { tom: "warning" | "error"; mensagem: string } | null = null;
+  if (!temBeneficio && motivos.size > 0) {
+    aviso = {
+      tom: "warning",
+      mensagem:
+        `Paciente possui o convênio ${convenioNome}, mas o desconto NÃO foi aplicado a este orçamento.\n\n` +
+        `Motivo: ${Array.from(motivos).join("; ")}.\n\nA cobrança sai pelo valor particular.`,
+    };
+  } else if (temBeneficio && motivos.size > 0) {
+    aviso = {
+      tom: "warning",
+      mensagem:
+        `Convênio ${convenioNome} aplicado apenas em parte dos itens.\n\n` +
+        `Itens sem desconto: ${Array.from(motivos).join("; ")}.`,
+    };
+  }
+  return { temBeneficio, convenioNome, fatores, memoriaPorForma, aviso };
+}
+
 async function obterInfoConvenioPaciente(params: {
   clinicaId: string;
   pacienteId: string | null | undefined;
