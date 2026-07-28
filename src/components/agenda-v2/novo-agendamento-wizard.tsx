@@ -356,7 +356,9 @@ export function NovoAgendamentoWizard({
             observacoes: "[V2]",
             data_pagamento: null,
             orcamento_id: null,
-            tipo_atendimento: tipoAtendimento,
+            // criarAgendamento só aceita "particular"|"convenio". O modo
+            // "externo" é armazenado depois via marcarAtendimentoExterno.
+            tipo_atendimento: tipoAtendimento === "externo" ? "particular" : tipoAtendimento,
             forma_pagamento_prevista: null,
             especialidade_id: especialidadeId,
           },
@@ -384,6 +386,36 @@ export function NovoAgendamentoWizard({
 
       if (result.vinculo_warning) {
         mostrarErro(result.vinculo_warning.pg_error, "agendamento salvo, mas vínculo com itens do orçamento falhou");
+      }
+
+      if (tipoAtendimento === "externo" && result.id) {
+        const grTrim = externoGrNumero.trim();
+        if (!grTrim) {
+          notify.error("Informe o número da GR da clínica de origem.");
+          setSaving(false);
+          return;
+        }
+        if (!externoClinicaNome.trim()) {
+          notify.error("Informe a clínica de origem.");
+          setSaving(false);
+          return;
+        }
+        const valorNum = externoValor ? Number(externoValor.replace(",", ".")) : null;
+        const mkRes = await marcarExternoFn({
+          data: {
+            agendamento_id: result.id,
+            clinica_id: clinicaId,
+            origem_clinica_id: null,
+            origem_clinica_nome: externoClinicaNome.trim(),
+            origem_gr_numero: grTrim,
+            origem_valor: valorNum,
+          },
+        });
+        if (!mkRes.ok) {
+          notify.error(mkRes.message);
+          setSaving(false);
+          return;
+        }
       }
 
       notify.success("Salvo");
