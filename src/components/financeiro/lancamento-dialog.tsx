@@ -66,9 +66,11 @@ interface Props {
   pacienteIdFixo?: string | null;
   /** Nome exato da categoria a fixar (ex.: "MENSALIDADE CARTAO CONSULTA"). Quando setado, o select fica desabilitado. */
   categoriaFixaNome?: string;
+  /** Orçamento com entrada (sinal): mostra Já pago / Pagando agora / Falta pagar. */
+  resumoSaldo?: { total: number; pago: number; restante: number } | null;
 }
 
-export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento, pacienteIdFixo, categoriaFixaNome }: Props) {
+export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento, pacienteIdFixo, categoriaFixaNome, resumoSaldo }: Props) {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
   const role = clinicaAtual?.role ?? null;
