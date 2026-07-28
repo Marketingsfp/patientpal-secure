@@ -21,10 +21,20 @@ export type EtapaSinal = {
   /** Quanto ainda falta pagar. */
   restante: number;
   itemIds: string[];
+  /** Detalhe por item — permite mostrar qual item tem entrada e de quanto. */
+  itens: Array<{
+    id: string;
+    descricao: string;
+    total: number;
+    sinal: number;
+    pago: number;
+    restante: number;
+  }>;
 };
 
 type ItemRow = {
   id: string;
+  descricao: string | null;
   quantidade: number | null;
   valor_unitario: number | null;
   valor_total: number | null;
@@ -45,7 +55,7 @@ async function itensComSinal(agendamentoId: string): Promise<ItemRow[]> {
   if (!ids.length) return [];
   const { data } = await supabase
     .from("orcamento_itens")
-    .select("id, quantidade, valor_unitario, valor_total, sinal_valor, valor_pago, status_financeiro")
+    .select("id, descricao, quantidade, valor_unitario, valor_total, sinal_valor, valor_pago, status_financeiro")
     .in("id", ids);
   return ((data ?? []) as ItemRow[]).filter((i) => Number(i.sinal_valor ?? 0) > 0);
 }
@@ -59,11 +69,23 @@ export async function obterEtapaSinal(agendamentoId: string): Promise<EtapaSinal
   const sinal = itens.reduce((s, i) => s + Number(i.sinal_valor ?? 0), 0);
   const itemIds = itens.map((i) => i.id);
   const restante = Math.round(Math.max(0, total - pago) * 100) / 100;
+  const detalhe = itens.map((i) => {
+    const t = totalItem(i);
+    const p = Number(i.valor_pago ?? 0);
+    return {
+      id: i.id,
+      descricao: i.descricao ?? "Item do orçamento",
+      total: t,
+      sinal: Number(i.sinal_valor ?? 0),
+      pago: p,
+      restante: Math.round(Math.max(0, t - p) * 100) / 100,
+    };
+  });
   if (pago < sinal - 0.004) {
-    return { etapa: "sinal", valor: Math.round((sinal - pago) * 100) / 100, total, pago, restante, itemIds };
+    return { etapa: "sinal", valor: Math.round((sinal - pago) * 100) / 100, total, pago, restante, itemIds, itens: detalhe };
   }
   if (pago < total - 0.004) {
-    return { etapa: "saldo", valor: restante, total, pago, restante, itemIds };
+    return { etapa: "saldo", valor: restante, total, pago, restante, itemIds, itens: detalhe };
   }
   return null;
 }
