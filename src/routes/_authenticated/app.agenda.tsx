@@ -4072,13 +4072,15 @@ function AgendaPage() {
       // pagamento-status.ts).
       const { data: consumidosRows } = await supabase
         .from("agendamento_orcamento_itens")
-        .select("orcamento_item_id, agendamento_id, agendamentos!inner(status)")
+        .select("orcamento_item_id, agendamento_id, agendamentos!inner(status,paciente_id)")
         .eq("orcamento_id", orc.id);
       const linkRows = ((consumidosRows ?? []) as Array<{
         orcamento_item_id: string;
         agendamento_id: string;
-        agendamentos: { status: string } | null;
-      }>).filter((r) => r.agendamentos?.status !== "cancelado");
+        agendamentos: { status: string; paciente_id: string | null } | null;
+        // Ficha sem paciente (desmarcada) não consome item — o vínculo pode
+        // ter ficado órfão de um "Desmarcar paciente" antigo.
+      }>).filter((r) => r.agendamentos?.status !== "cancelado" && !!r.agendamentos?.paciente_id);
       const agendaIds = Array.from(new Set(linkRows.map((r) => r.agendamento_id)));
       let pagosAgendaSet = new Set<string>();
       if (agendaIds.length) {
