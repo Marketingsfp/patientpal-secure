@@ -4072,13 +4072,15 @@ function AgendaPage() {
       // pagamento-status.ts).
       const { data: consumidosRows } = await supabase
         .from("agendamento_orcamento_itens")
-        .select("orcamento_item_id, agendamento_id, agendamentos!inner(status)")
+        .select("orcamento_item_id, agendamento_id, agendamentos!inner(status,paciente_id)")
         .eq("orcamento_id", orc.id);
       const linkRows = ((consumidosRows ?? []) as Array<{
         orcamento_item_id: string;
         agendamento_id: string;
-        agendamentos: { status: string } | null;
-      }>).filter((r) => r.agendamentos?.status !== "cancelado");
+        agendamentos: { status: string; paciente_id: string | null } | null;
+        // Ficha sem paciente (desmarcada) não consome item — o vínculo pode
+        // ter ficado órfão de um "Desmarcar paciente" antigo.
+      }>).filter((r) => r.agendamentos?.status !== "cancelado" && !!r.agendamentos?.paciente_id);
       const agendaIds = Array.from(new Set(linkRows.map((r) => r.agendamento_id)));
       let pagosAgendaSet = new Set<string>();
       if (agendaIds.length) {
@@ -4604,7 +4606,7 @@ function AgendaPage() {
       const { data: dupLinks } = await supabase
         .from("agendamento_orcamento_itens")
         .select(
-          "orcamento_item_id, agendamento_id, agendamentos!inner(id,status,inicio,medico_id,ficha_numero,procedimento)",
+          "orcamento_item_id, agendamento_id, agendamentos!inner(id,status,inicio,medico_id,ficha_numero,procedimento,paciente_id)",
         )
         .in("orcamento_item_id", pendingOrcItemIds);
       type DupRow = {
@@ -4617,10 +4619,12 @@ function AgendaPage() {
           medico_id: string | null;
           ficha_numero: number | null;
           procedimento: string | null;
+          paciente_id: string | null;
         } | null;
       };
       const candidatos = ((dupLinks ?? []) as DupRow[])
-        .filter((r) => r.agendamentos && r.agendamentos.status !== "cancelado")
+        // Ignora cancelados e fichas já desmarcadas (sem paciente).
+        .filter((r) => r.agendamentos && r.agendamentos.status !== "cancelado" && !!r.agendamentos.paciente_id)
         .filter((r) => !editing?.id || r.agendamento_id !== editing.id);
       if (candidatos.length > 0) {
         const agIds = Array.from(new Set(candidatos.map((r) => r.agendamento_id)));
@@ -4868,6 +4872,10 @@ function AgendaPage() {
       !confirm(`Liberar este horário? O cliente ${a.paciente_nome} será removido, mas a ficha continuará disponível.`)
     )
       return;
+    // Ao desmarcar, o item de orçamento precisa voltar a ficar livre: remove
+    // os vínculos desta ficha em agendamento_orcamento_itens. Sem isso, o
+    // vínculo órfão dispara o falso aviso de "paciente já agendado".
+    await supabase.from("agendamento_orcamento_itens").delete().eq("agendamento_id", a.id);
     // Existe um índice único parcial (uq_agend_slot_vazio) que impede dois slots
     // livres no mesmo (clínica, médico, agenda, início). Se já houver um slot
     // livre neste horário, apagamos esta linha (o horário já está disponível
