@@ -2474,6 +2474,38 @@ export type Database = {
           },
         ]
       }
+      clinica_tts_config: {
+        Row: {
+          clinica_id: string
+          enabled: boolean
+          rate: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          clinica_id: string
+          enabled?: boolean
+          rate?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          enabled?: boolean
+          rate?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinica_tts_config_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: true
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinicas: {
         Row: {
           ativo: boolean
