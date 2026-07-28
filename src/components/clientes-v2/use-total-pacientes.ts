@@ -23,5 +23,5 @@ export function useTotalPacientes(clinicaId: string | null | undefined) {
       return count ?? 0;
     },
   });
-  return { total: q.data ?? null, loading: q.isLoading };
+  return { total: q.data ?? null, loading: q.isLoading, refetch: q.refetch };
 }
