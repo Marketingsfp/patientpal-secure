@@ -75,19 +75,6 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const { total: totalLive, refetch: refetchTotal } = useTotalPacientes(clinicaAtual?.clinica_id ?? null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await Promise.all([
-        refetchTotal(),
-        Promise.resolve(kpis.refresh()),
-        modoBusca ? loadBusca(q.trim()) : loadRecentes(),
-      ]);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [refetchTotal, kpis, modoBusca, q, loadBusca, loadRecentes]);
-
   const modoBusca = q.trim().length >= 2;
   const scope = useMemo(
     () => (clinicaIds.length ? clinicaIds : clinicaAtual ? [clinicaAtual.clinica_id] : []),
@@ -167,6 +154,19 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     if (modoBusca) void loadBusca(q.trim());
     else void loadRecentes();
   }, [modoBusca, q, loadBusca, loadRecentes]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refetchTotal(),
+        Promise.resolve(kpis.refresh()),
+        modoBusca ? loadBusca(q.trim()) : loadRecentes(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchTotal, kpis, modoBusca, q, loadBusca, loadRecentes]);
 
   const filtrados = useMemo(() => {
     let r = rows;
