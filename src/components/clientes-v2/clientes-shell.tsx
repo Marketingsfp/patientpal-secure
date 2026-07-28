@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Info, Plus, Rows3, LayoutList } from "lucide-react";
+import { Info, Plus, Rows3, LayoutList, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -72,7 +72,21 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const reqRef = useRef(0);
 
   const kpis = useClientesKpis(clinicaAtual?.clinica_id ?? null);
-  const { total: totalLive } = useTotalPacientes(clinicaAtual?.clinica_id ?? null);
+  const { total: totalLive, refetch: refetchTotal } = useTotalPacientes(clinicaAtual?.clinica_id ?? null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refetchTotal(),
+        Promise.resolve(kpis.refresh()),
+        modoBusca ? loadBusca(q.trim()) : loadRecentes(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchTotal, kpis, modoBusca, q, loadBusca, loadRecentes]);
 
   const modoBusca = q.trim().length >= 2;
   const scope = useMemo(
@@ -234,6 +248,16 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
           }
           actions={
             <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                title="Atualizar contagem e lista"
+              >
+                <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} />
+                Atualizar
+              </Button>
               <div className="hidden sm:flex items-center gap-1.5">
                 <Label className="text-xs flex items-center gap-1.5">
                   {compactPref ? <Rows3 className="h-3.5 w-3.5" /> : <LayoutList className="h-3.5 w-3.5" />}
