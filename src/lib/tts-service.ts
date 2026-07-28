@@ -21,6 +21,108 @@ export const DEFAULT_TTS_RATE = 0.55;
 export const MIN_TTS_RATE = 0.3;
 export const MAX_TTS_RATE = 1.5;
 
+// ---------------------------------------------------------------------------
+// Sincronização por clínica (fonte de verdade: tabela `clinica_tts_config`).
+// O painel público da TV escuta esta tabela via Realtime para aplicar mudanças
+// imediatamente ao salvar na tela de configuração — mesmo em outro navegador
+// ou dispositivo. LocalStorage segue como cache/preferência local do usuário.
+// ---------------------------------------------------------------------------
+import { supabase } from "@/integrations/supabase/client";
+
+export interface ClinicaTtsConfig {
+  rate: number;
+  enabled: boolean;
+}
+
+/** Aplica a config recebida no cache local e notifica todas as abas/hooks. */
+export function applyClinicaTtsConfig(cfg: Partial<ClinicaTtsConfig>) {
+  if (typeof window === "undefined") return;
+  if (typeof cfg.rate === "number" && Number.isFinite(cfg.rate)) {
+    const clamped = Math.min(MAX_TTS_RATE, Math.max(MIN_TTS_RATE, cfg.rate));
+    window.localStorage.setItem(RATE_STORAGE_KEY, String(clamped));
+    if (currentAudio) {
+      try {
+        currentAudio.playbackRate = clamped;
+        (currentAudio as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
+      } catch { /* noop */ }
+    }
+  }
+  if (typeof cfg.enabled === "boolean") {
+    window.localStorage.setItem(STORAGE_KEY, cfg.enabled ? "1" : "0");
+    if (!cfg.enabled) stopSpeaking();
+  }
+  emitTtsChanged();
+}
+
+/** Busca a configuração atual da clínica no banco. */
+export async function fetchClinicaTtsConfig(
+  clinicaId: string,
+): Promise<ClinicaTtsConfig | null> {
+  const { data, error } = await supabase
+    .from("clinica_tts_config")
+    .select("rate, enabled")
+    .eq("clinica_id", clinicaId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return { rate: Number(data.rate), enabled: !!data.enabled };
+}
+
+/** Grava a configuração da clínica no banco (dispara Realtime). */
+export async function saveClinicaTtsConfig(
+  clinicaId: string,
+  cfg: ClinicaTtsConfig,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from("clinica_tts_config")
+    .upsert(
+      {
+        clinica_id: clinicaId,
+        rate: cfg.rate,
+        enabled: cfg.enabled,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "clinica_id" },
+    );
+  return { error: error?.message ?? null };
+}
+
+/**
+ * Escuta em tempo real a configuração de voz de uma clínica.
+ * Sempre que houver INSERT/UPDATE, aplica localmente (cache + evento).
+ * Retorna função para cancelar a inscrição.
+ */
+export function subscribeClinicaTtsConfig(clinicaId: string): () => void {
+  // Primeiro carrega o estado atual (para sincronizar ao montar).
+  void fetchClinicaTtsConfig(clinicaId).then((cfg) => {
+    if (cfg) applyClinicaTtsConfig(cfg);
+  });
+  const ch = supabase
+    .channel(`tts-config-${clinicaId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "clinica_tts_config",
+        filter: `clinica_id=eq.${clinicaId}`,
+      },
+      (payload) => {
+        const row = (payload.new ?? payload.old) as
+          | { rate?: number; enabled?: boolean }
+          | null;
+        if (!row) return;
+        applyClinicaTtsConfig({
+          rate: typeof row.rate === "number" ? row.rate : Number(row.rate),
+          enabled: row.enabled,
+        });
+      },
+    )
+    .subscribe();
+  return () => {
+    void supabase.removeChannel(ch);
+  };
+}
+
 /**
  * Evento disparado sempre que a configuração de TTS mudar (mesma aba).
  * Cross-tab é coberto pelo `storage` event nativo.
