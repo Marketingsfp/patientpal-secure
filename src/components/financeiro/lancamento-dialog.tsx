@@ -198,18 +198,12 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           const pid = ag?.paciente_id ?? null;
           const tipoAg = (ag as { tipo_atendimento?: string | null } | null)?.tipo_atendimento ?? null;
           setTipoAgendamento(tipoAg);
-          // Quando o pagamento é feito para um agendamento, a "data" do
-          // lançamento passa a ser a data do atendimento (não a data em
-          // que o operador clicou em faturar). O movimento de caixa
-          // continua caindo na sessão de hoje via forcar_sessao_hoje.
-          const inicioAg = (ag as { inicio?: string | null } | null)?.inicio ?? null;
-          if (inicioAg) {
-            const d = new Date(inicioAg);
-            if (!Number.isNaN(d.getTime())) {
-              const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-              setData(iso);
-            }
-          }
+          // IMPORTANTE: a "data" do lançamento é a data do RECEBIMENTO
+          // (hoje), nunca a data do atendimento. Sobrescrever com
+          // `agendamentos.inicio` fazia pagamentos nascerem com data futura
+          // (agendamento à frente) ou falsamente retroativa, jogando o
+          // movimento no caixa de outro dia. A data do atendimento continua
+          // rastreável pelo vínculo `agendamento_id`.
           if (pid) {
             const { data: contrato } = await supabase
               .from("contratos_assinatura")
