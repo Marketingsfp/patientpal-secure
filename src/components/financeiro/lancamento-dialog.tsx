@@ -832,6 +832,31 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
             <Label>Descrição *</Label>
             <Input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Ex: Consulta João Silva" />
           </div>
+          {resumoSaldo && (
+            <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm space-y-1">
+              <div className="font-medium">Orçamento com entrada — pagamento parcelado</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 sm:grid-cols-4">
+                <span className="text-muted-foreground">Total:</span>
+                <span className="font-medium tabular-nums">{formatBRL(resumoSaldo.total)}</span>
+                <span className="text-muted-foreground">Já pago:</span>
+                <span className="font-medium tabular-nums">{formatBRL(resumoSaldo.pago)}</span>
+                <span className="text-muted-foreground">Pagando agora:</span>
+                <span className="font-medium tabular-nums">
+                  {formatBRL(Math.min(valorNum, resumoSaldo.restante))}
+                </span>
+                <span className="text-muted-foreground">Falta pagar:</span>
+                <span className="font-semibold tabular-nums">
+                  {formatBRL(Math.max(0, resumoSaldo.restante - valorNum))}
+                </span>
+              </div>
+              {valorNum > resumoSaldo.restante + 0.004 && (
+                <p className="text-xs text-destructive">
+                  O valor informado é maior que o saldo do orçamento. O excedente
+                  ({formatBRL(valorNum - resumoSaldo.restante)}) não será abatido do orçamento.
+                </p>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Valor *</Label>
