@@ -13,7 +13,11 @@ const fmtData = (iso: string) => {
 const esc = (s: string | null | undefined) =>
   (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
 
-export async function printOrcamento(orcamentoId: string, clinicaId: string) {
+export async function printOrcamento(
+  orcamentoId: string,
+  clinicaId: string,
+  formato: "cupom" | "a4" = "cupom",
+) {
   const [orc, itens, cli] = await Promise.all([
     supabase.from("orcamentos").select("*").eq("id", orcamentoId).maybeSingle(),
     supabase.from("orcamento_itens").select("*").eq("orcamento_id", orcamentoId).order("ordem"),
