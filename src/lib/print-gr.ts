@@ -921,23 +921,10 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     if (usouConv) convLabel = vinculoConv.convenioNome.toUpperCase();
   }
 
-  // Sufixo (TITULAR) / (DEPENDENTE DE X) direto na linha CONV quando o rótulo
-  // já é o nome de um convênio real (não PARTICULAR nem o genérico CONVÊNIO).
-  if (
-    convLabel &&
-    convLabel !== "PARTICULAR" &&
-    convLabel !== "CONVÊNIO" &&
-    convLabel !== "CONVÊNIO GRATUIDADE" &&
-    vinculoConv?.convenioNome &&
-    convLabel.toUpperCase() === vinculoConv.convenioNome.toUpperCase()
-  ) {
-    const suf = vinculoConv.vinculo === "titular"
-      ? "(TITULAR)"
-      : vinculoConv.titularNome
-        ? `(DEPENDENTE DE ${vinculoConv.titularNome})`
-        : "(DEPENDENTE)";
-    convLabel = `${convLabel} ${suf}`;
-  }
+  // Sufixo (TITULAR)/(DEPENDENTE DE X) foi removido: causava quebra de
+  // layout na impressão térmica (linha muito longa). Mantém apenas o nome
+  // do convênio na linha CONV.
+  void vinculoConv;
 
   const ticketHtml = `
   <div class="ticket">
@@ -955,7 +942,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
-    ${convLabel ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabel)}</span></div>` : ""}
+    ${convLabel ? `<div class="center sm">CONV: <span class="v">${esc(convLabel)}</span></div>` : ""}
 
     <div class="sep"></div>
 
@@ -1399,8 +1386,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
     ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
     ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
-    ${convLabelAgrupada ? `<div class="center sm" style="white-space: nowrap">CONV: <span class="v">${esc(convLabelAgrupada)}</span></div>` : ""}
-    ${renderLinhaVinculo(vinculoConvAgrupada)}
+    ${convLabelAgrupada ? `<div class="center sm">CONV: <span class="v">${esc(convLabelAgrupada)}</span></div>` : ""}
   `;
 
   const gruposArr = Array.from(grupos.values());
