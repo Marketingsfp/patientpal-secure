@@ -1,11 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Pagamento em duas etapas (sinal + saldo) para itens de orçamento.
+ * Pagamento parcelado (entrada/sinal + saldo em várias vezes) para itens de orçamento.
  *
  * Regra (Odontologia, válida para as 3 clínicas):
  *  - O item do orçamento pode ter `sinal_valor` (entrada em R$).
- *  - A 1ª cobrança na agenda sugere o SINAL; a 2ª sugere o SALDO restante.
+ *  - A 1ª cobrança na agenda sugere o SINAL; as seguintes sugerem o SALDO
+ *    restante, mas o caixa pode informar qualquer valor (pagamento parcial).
  *  - Pagar o sinal já libera o atendimento (status_financeiro = 'parcial').
  */
 
@@ -17,6 +18,8 @@ export type EtapaSinal = {
   total: number;
   /** Quanto já foi pago desses itens. */
   pago: number;
+  /** Quanto ainda falta pagar. */
+  restante: number;
   itemIds: string[];
 };
 
@@ -55,39 +58,59 @@ export async function obterEtapaSinal(agendamentoId: string): Promise<EtapaSinal
   const pago = itens.reduce((s, i) => s + Number(i.valor_pago ?? 0), 0);
   const sinal = itens.reduce((s, i) => s + Number(i.sinal_valor ?? 0), 0);
   const itemIds = itens.map((i) => i.id);
+  const restante = Math.round(Math.max(0, total - pago) * 100) / 100;
   if (pago < sinal - 0.004) {
-    return { etapa: "sinal", valor: Math.round((sinal - pago) * 100) / 100, total, pago, itemIds };
+    return { etapa: "sinal", valor: Math.round((sinal - pago) * 100) / 100, total, pago, restante, itemIds };
   }
   if (pago < total - 0.004) {
-    return { etapa: "saldo", valor: Math.round((total - pago) * 100) / 100, total, pago, itemIds };
+    return { etapa: "saldo", valor: restante, total, pago, restante, itemIds };
   }
   return null;
 }
 
 /**
- * Registra o pagamento da etapa nos itens do orçamento.
+ * Registra o valor efetivamente recebido nos itens do orçamento, distribuindo-o
+ * proporcionalmente ao saldo de cada item. Nunca sobrescreve o que já foi pago
+ * nem ultrapassa o total do item.
  * Chamado depois que o lançamento financeiro foi gravado com sucesso.
  */
 export async function registrarPagamentoEtapaSinal(
   agendamentoId: string,
-  etapa?: "sinal" | "saldo",
+  valorPago?: number,
 ): Promise<void> {
   const itens = await itensComSinal(agendamentoId);
   if (!itens.length) return;
   const agora = new Date().toISOString();
-  const pagoTotal = itens.reduce((s, i) => s + Number(i.valor_pago ?? 0), 0);
-  const sinalTotal = itens.reduce((s, i) => s + Number(i.sinal_valor ?? 0), 0);
-  const alvo = etapa ?? (pagoTotal < sinalTotal - 0.004 ? "sinal" : "saldo");
-  for (const i of itens) {
-    const t = totalItem(i);
-    const patch =
-      alvo === "sinal"
-        ? {
-          valor_pago: Number(i.sinal_valor ?? 0),
-          sinal_pago_em: agora,
-          status_financeiro: Number(i.sinal_valor ?? 0) >= t - 0.004 ? "pago" : "parcial",
-        }
-        : { valor_pago: t, saldo_pago_em: agora, status_financeiro: "pago" };
-    await supabase.from("orcamento_itens").update(patch as never).eq("id", i.id);
+  const saldos = itens.map((i) => ({
+    item: i,
+    total: totalItem(i),
+    pagoAtual: Number(i.valor_pago ?? 0),
+    saldo: Math.max(0, totalItem(i) - Number(i.valor_pago ?? 0)),
+  }));
+  const saldoTotal = saldos.reduce((s, x) => s + x.saldo, 0);
+  if (saldoTotal <= 0.004) return;
+  // Sem valor informado (compatibilidade): quita o saldo restante.
+  const bruto = valorPago == null || !isFinite(valorPago) || valorPago <= 0 ? saldoTotal : valorPago;
+  let restanteDistribuir = Math.round(Math.min(bruto, saldoTotal) * 100) / 100;
+
+  for (let idx = 0; idx < saldos.length; idx++) {
+    const s = saldos[idx];
+    if (s.saldo <= 0.004 || restanteDistribuir <= 0.004) continue;
+    const ultimo = idx === saldos.length - 1;
+    const cota = ultimo
+      ? Math.min(s.saldo, restanteDistribuir)
+      : Math.min(s.saldo, Math.round((restanteDistribuir * (s.saldo / saldoTotal)) * 100) / 100);
+    const aplicar = Math.round(cota * 100) / 100;
+    if (aplicar <= 0) continue;
+    const novoPago = Math.min(s.total, Math.round((s.pagoAtual + aplicar) * 100) / 100);
+    const quitado = novoPago >= s.total - 0.004;
+    const patch: Record<string, unknown> = {
+      valor_pago: novoPago,
+      status_financeiro: quitado ? "pago" : "parcial",
+    };
+    if (s.pagoAtual <= 0.004) patch.sinal_pago_em = agora;
+    if (quitado) patch.saldo_pago_em = agora;
+    await supabase.from("orcamento_itens").update(patch as never).eq("id", s.item.id);
+    restanteDistribuir = Math.round((restanteDistribuir - aplicar) * 100) / 100;
   }
 }
