@@ -4872,6 +4872,10 @@ function AgendaPage() {
       !confirm(`Liberar este horário? O cliente ${a.paciente_nome} será removido, mas a ficha continuará disponível.`)
     )
       return;
+    // Ao desmarcar, o item de orçamento precisa voltar a ficar livre: remove
+    // os vínculos desta ficha em agendamento_orcamento_itens. Sem isso, o
+    // vínculo órfão dispara o falso aviso de "paciente já agendado".
+    await supabase.from("agendamento_orcamento_itens").delete().eq("agendamento_id", a.id);
     // Existe um índice único parcial (uq_agend_slot_vazio) que impede dois slots
     // livres no mesmo (clínica, médico, agenda, início). Se já houver um slot
     // livre neste horário, apagamos esta linha (o horário já está disponível
