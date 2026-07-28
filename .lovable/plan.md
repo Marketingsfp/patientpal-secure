@@ -1,64 +1,44 @@
-## Regra de precedência (confirmada com você)
+## Diagnóstico (confirmado no banco e no código)
 
-Tipo do pedido: **regra de negócio + erro de código**.
+**Tipo:** erro de código + regra de negócio (financeiro/caixa).
 
-Como o sistema deve escolher a regra de preço, do mais específico para o mais genérico:
+O problema **não é o operador escolhendo data errada** — o sistema está trocando a data sozinho.
 
-```text
-1. Regra do serviço específico (procedimento)     ← vence tudo
-2. Regra da especialidade + tipo                  ← ex.: Odontologia + procedimento
-3. Regra só da especialidade                      ← vale para toda a Odontologia
-4. Regra só do tipo
-5. Regra genérica do convênio
-```
+Em `src/components/financeiro/lancamento-dialog.tsx` (linhas 201-212), quando o pagamento vem de um agendamento, o campo "data" é sobrescrito com a **data do atendimento**, ignorando o `hojeBR()` definido logo acima (linha 141).
 
-Se o tipo estiver preenchido, ele **filtra de verdade**: uma regra "Odontologia + procedimento" nunca se aplica a um serviço de outro tipo. Existindo as duas (com tipo e sem tipo), a com tipo vence. Isso já é o comportamento atual do código e será **preservado sem alterações** — a proposta anterior de afrouxar esse casamento está descartada.
+Evidência nos lançamentos da Nicolle Frota (criados hoje, 28/07/2026):
 
-Empate de especificidade continua com as regras atuais: gratuidade vence desconto, e a prioridade cadastrada só desempata entre regras do mesmo tipo.
+| Paciente | Criado em | Data gravada |
+|---|---|---|
+| ELIANA ARAUJO GOMES (2 itens) | 28/07 12:11 | **03/08/2026 (futuro)** |
+| EVELYN SOUZA BARCELOS (2 itens) | 28/07 11:44 e 12:06 | **23/07/2026 (passado)** |
+| Demais atendimentos | 28/07 | 28/07 (corretos) |
 
-## Diretriz do orçamento
-
-O orçamento permanece **sempre no valor particular**. O desconto do convênio é decidido só no momento do pagamento, porque a situação do contrato pode mudar entre o orçamento e a cobrança (mensalidade em atraso, contrato cancelado) — e um orçamento com desconto já embutido não teria como ser ajustado.
-
-Com isso, a causa do caso do JEAN XAVIER é uma só: **a agenda não reavalia o convênio quando o valor vem de um orçamento**. Ela usa exclusivamente os valores gravados (particular), e por isso saiu R$ 190,00 sem os 5%.
+Ou seja: agendamento marcado para outro dia (antes ou depois) faz o recebimento nascer com data errada — e, com a mudança do turno anterior (`forcar_sessao_hoje: false`), esse "falso retroativo" ainda tenta jogar o movimento no caixa de outro dia, podendo criar sessão de caixa retroativa fantasma.
 
 ## O que será feito
 
-**1. Orçamento continua 100% particular**
-Nada muda no valor gravado: nenhum campo de convênio, nenhuma pré-seleção de preço, nenhum desconto salvo. Único acréscimo, apenas informativo: quando o paciente tem convênio ativo, uma nota discreta "Paciente possui CARTÃO CONSULTA + SEGUROS — desconto será aplicado no pagamento".
+1. **Data do lançamento = data do recebimento (hoje).**
+   Remover a sobrescrita automática pela data do agendamento em `lancamento-dialog.tsx`. O caixa registra quando o dinheiro entrou, não quando o atendimento aconteceu. A data do atendimento continua rastreável pelo vínculo `agendamento_id`.
 
-**2. Desconto calculado no faturamento da agenda**
-Quando o pagamento vem de um orçamento, a agenda passa a rodar a mesma avaliação de benefício dos atendimentos comuns, no momento da cobrança:
-- busca o contrato ativo do paciente na clínica;
-- valida elegibilidade naquele instante (carência, situação da mensalidade, tolerância de 5 dias já existentes);
-- aplica a regra vencedora pela precedência acima sobre o valor particular do item;
-- sem contrato válido, sem regra aplicável ou mensalidade em atraso além da tolerância → cobra particular.
+2. **Nunca permitir data futura.**
+   Bloquear no diálogo qualquer data maior que hoje (São Paulo), com aviso claro. Hoje isso passa silenciosamente.
 
-O desconto respeita a forma de pagamento (dinheiro x cartão/PIX), como no resto do sistema.
+3. **Retroativo só quando o operador escolher de propósito.**
+   O campo de data continua editável; ao escolher data anterior, mantém-se o aviso já existente e o movimento vai para o caixa daquele dia (regra atual, que é a desejada).
 
-**3. Transparência no modal de pagamento**
-Havendo benefício: valor do orçamento (particular), desconto aplicado, valor a cobrar e nome do convênio. Havendo convênio mas **sem** benefício aplicado: motivo em destaque — "mensalidade em atraso", "dentro da carência", "serviço sem regra cadastrada" — para o caixa conferir antes de receber.
-
-**4. Compatibilidade com sinal/saldo e seleção parcial**
-O desconto incide só sobre os itens efetivamente selecionados no agendamento. Em cobranças por etapas, o desconto é aplicado sobre o item e as parcelas de sinal/saldo são recalculadas proporcionalmente, sem alterar o total do orçamento original.
-
-**5. Aviso de cadastro na aba Regras de Preço (sem afetar cobrança)**
-Selo de alerta na regra cuja combinação especialidade + tipo não corresponde a nenhum serviço ativo — ex.: regra "Odontologia + exame" quando não existe serviço de Odontologia com esse tipo. Puramente informativo, para a equipe corrigir no cadastro antes de virar preço errado no caixa. Nenhuma regra é desativada nem alterada automaticamente.
-
-## Fora do escopo
-
-- Não altero, recalculo nem reaplico valores de Cartão Consulta / + Seguros por script ou migração (regra 1.10 do AGENTS.md). Relato apenas: dos 180 serviços de Odontologia da clínica, os 180 têm valor no CARTÃO CONSULTA, mas só 27 no CARTÃO CONSULTA + SEGUROS. A reaplicação é manual, pela tela do convênio.
-- Não altero a lógica de precedência/casamento de regras (`findRegra`) — fica como está.
-- Não reprocesso o pagamento de R$ 190,00 já feito; seria estorno/refaturamento manual, posso orientar o passo a passo.
-- Nenhuma alteração de banco.
+4. **Corrigir os registros já gravados errado (com sua confirmação).**
+   - ELIANA (R$ 130 + R$ 60): 03/08 → 28/07
+   - EVELYN (R$ 152 + R$ 152): 23/07 → 28/07, se de fato foram recebidos hoje
+   Antes de mexer, apresento a lista completa dos lançamentos da clínica com `data` diferente do dia em que foram criados, para você validar quais são recebimento real do dia e quais foram retroativos legítimos.
 
 ## Detalhes técnicos
 
-- Sem migração. `orcamentos` / `orcamento_itens` inalterados.
-- `src/routes/_authenticated/app.agenda.tsx` (`opcoesPagamentoDeOrcamento`): após somar os itens vinculados ao agendamento, avaliar o benefício por item via `cb-regras` (`procedimento_id`, especialidade, tipo, contrato ativo, forma de pagamento) e devolver `valorParticular`, `valorComBeneficio`, `convenioNome`, `motivoNaoAplicado`.
-- `src/lib/agenda/sinal-orcamento.ts`: aplicar o fator de desconto por item antes de dividir em sinal/saldo.
-- `src/components/financeiro/lancamento-dialog.tsx`: bloco "Convênio aplicado / não aplicado" com os três valores.
-- `src/lib/cb-regras.ts`: **sem mudanças** na função de casamento.
-- `src/components/odontologia/add-to-orcamento-dialog.tsx`: apenas a nota informativa; `salvar` inalterado.
-- `src/components/cartao-beneficios/regras-tab.tsx`: selo "sem serviço correspondente".
-- Validação: typecheck + teste prático — faturar um item odontológico do JEAN XAVIER (contrato 20261933) e conferir os 5% na cobrança, com o orçamento permanecendo em valor cheio.
+- Arquivo: `src/components/financeiro/lancamento-dialog.tsx` — remover o bloco que faz `setData(iso)` a partir de `agendamentos.inicio`; adicionar guarda `data > hojeBR()` no submit.
+- Sem alteração na função `fn_registrar_lancamento_e_caixa`: ela já usa `America/Sao_Paulo` e trata corretamente o ramo retroativo. A causa raiz era exclusivamente de front-end.
+- Correção de dados: migração/UPDATE pontual apenas nas linhas confirmadas por você (`fin_lancamentos.data`), sem tocar em `caixa_movimentos`, já que os movimentos caíram no caixa correto de hoje.
+
+## Fora do escopo
+
+- Regras de desconto, convênio e emissão de NFS-e.
+- Sessões de caixa já fechadas de dias anteriores.
