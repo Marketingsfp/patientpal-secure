@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { useClinica } from "@/hooks/use-clinica";
 import {
   DEFAULT_TTS_RATE,
   MAX_TTS_RATE,
@@ -18,6 +19,9 @@ import {
   setUserTtsEnabled,
   speak,
   stopSpeaking,
+  fetchClinicaTtsConfig,
+  saveClinicaTtsConfig,
+  applyClinicaTtsConfig,
 } from "@/lib/tts-service";
 
 export const Route = createFileRoute("/_authenticated/app/configuracoes/voz")({
@@ -38,21 +42,41 @@ const FRASE_PADRAO =
   "Senha número 27, guichê 3. Boa tarde, dirija-se ao atendimento.";
 
 function VozConfigPage() {
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id ?? null;
   const [rate, setRate] = useState<number>(DEFAULT_TTS_RATE);
   const [enabled, setEnabled] = useState<boolean>(true);
   const [savedRate, setSavedRate] = useState<number>(DEFAULT_TTS_RATE);
   const [savedEnabled, setSavedEnabled] = useState<boolean>(true);
   const [texto, setTexto] = useState<string>(FRASE_PADRAO);
   const [testando, setTestando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
-    const r = getUserTtsRate();
-    const e = isUserTtsEnabled();
-    setRate(r);
-    setSavedRate(r);
-    setEnabled(e);
-    setSavedEnabled(e);
-  }, []);
+    // Fonte de verdade: banco por clínica (para propagar em Realtime ao
+    // painel). Se não houver linha ainda, usa o cache local como fallback.
+    let cancelado = false;
+    (async () => {
+      let r = getUserTtsRate();
+      let e = isUserTtsEnabled();
+      if (clinicaId) {
+        const cfg = await fetchClinicaTtsConfig(clinicaId);
+        if (cfg) {
+          r = cfg.rate;
+          e = cfg.enabled;
+          applyClinicaTtsConfig(cfg);
+        }
+      }
+      if (cancelado) return;
+      setRate(r);
+      setSavedRate(r);
+      setEnabled(e);
+      setSavedEnabled(e);
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [clinicaId]);
 
   function alterarRate(next: number) {
     const clamped = Math.min(MAX_TTS_RATE, Math.max(MIN_TTS_RATE, next));
@@ -64,12 +88,30 @@ function VozConfigPage() {
     if (!on) stopSpeaking();
   }
 
-  function salvar() {
-    setUserTtsRate(rate);
-    setUserTtsEnabled(enabled);
-    setSavedRate(rate);
-    setSavedEnabled(enabled);
-    toast.success(`Preferências salvas (${Math.round(rate * 100)}%).`);
+  async function salvar() {
+    setSalvando(true);
+    try {
+      // Cache local + evento (aplica na mesma aba imediatamente).
+      setUserTtsRate(rate);
+      setUserTtsEnabled(enabled);
+      // Fonte de verdade compartilhada com o painel (Realtime).
+      if (clinicaId) {
+        const { error } = await saveClinicaTtsConfig(clinicaId, { rate, enabled });
+        if (error) {
+          toast.error(`Falha ao sincronizar com o painel: ${error}`);
+          return;
+        }
+      }
+      setSavedRate(rate);
+      setSavedEnabled(enabled);
+      toast.success(
+        clinicaId
+          ? `Preferências salvas (${Math.round(rate * 100)}%) — painel atualizado.`
+          : `Preferências salvas (${Math.round(rate * 100)}%).`,
+      );
+    } finally {
+      setSalvando(false);
+    }
   }
 
   function descartar() {
@@ -218,10 +260,10 @@ function VozConfigPage() {
               <Button
                 size="sm"
                 onClick={salvar}
-                disabled={!dirty}
+                disabled={!dirty || salvando}
                 className="gap-2"
               >
-                <Save className="h-4 w-4" /> Salvar
+                <Save className="h-4 w-4" /> {salvando ? "Salvando…" : "Salvar"}
               </Button>
             </div>
           </div>
