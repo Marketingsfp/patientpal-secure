@@ -11,6 +11,8 @@ export type SelectItemOrc = {
   descricao: string;
   valor_total: number | null;
   dentes: string[] | null;
+  /** Entrada (sinal) definida no item, quando houver. */
+  sinal_valor?: number | null;
 };
 
 const fmtBRL = (v: number) =>
@@ -121,6 +123,11 @@ export function SelecionarItensOrcamentoDialog(props: {
                 </div>
                 <div className="text-sm font-semibold whitespace-nowrap">
                   {fmtBRL(Number(it.valor_total || 0))}
+                  {Number(it.sinal_valor || 0) > 0 && (
+                    <div className="mt-0.5 text-[10px] font-semibold text-primary">
+                      Entrada {fmtBRL(Number(it.sinal_valor))}
+                    </div>
+                  )}
                 </div>
               </label>
             );
