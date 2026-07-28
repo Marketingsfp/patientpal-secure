@@ -294,6 +294,12 @@ export function OrcamentoTab({
       )}
 
       <OrcamentoDrawer
+        orc={drawerOrc}
+        onClose={() => setDrawerOrc(null)}
+        onPrint={(id) => void imprimir(id)}
+        onConverter={() => {}}
+        ocultarConversao
+      />
 
       <AlertDialog open={!!excluir} onOpenChange={(v) => { if (!v) setExcluir(null); }}>
         <AlertDialogContent>
@@ -315,12 +321,6 @@ export function OrcamentoTab({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-        orc={drawerOrc}
-        onClose={() => setDrawerOrc(null)}
-        onPrint={(id) => void imprimir(id)}
-        onConverter={() => {}}
-        ocultarConversao
-      />
 
       {novoOpen && clinicaAtual && especialidadeOdontoId && (
         <NovoOrcamentoOdontoDialog
