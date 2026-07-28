@@ -736,7 +736,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const ficha = fichaNum > 0
     ? String(fichaNum).padStart(3, "0")
     : String(inicioDt.getHours() * 60 + inicioDt.getMinutes()).padStart(3, "0");
-  const prontuario = paciente?.codigo_prontuario || paciente?.numero_pasta || "";
+  const prontuario = paciente?.numero_pasta || paciente?.codigo_prontuario || "";
 
   // Repasse conforme cadastro: tenta primeiro medico_convenios pelo nome do procedimento,
   // senão usa o padrão do médico (tipo_repasse / percentual / valor).
@@ -1208,7 +1208,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
     : { data: null };
   const paciente = pacienteRes.data as { nome: string; cpf: string | null; telefone: string | null; data_nascimento: string | null; codigo_prontuario: string | null; numero_pasta: string | null } | null;
   const pacienteNome = paciente?.nome ?? ags[0].paciente_nome ?? "—";
-  const prontuarioPac = paciente?.codigo_prontuario || paciente?.numero_pasta || "";
+  const prontuarioPac = paciente?.numero_pasta || paciente?.codigo_prontuario || "";
 
   // Busca dados de todos os médicos envolvidos + seus convênios
   const medicoIds = Array.from(new Set(ags.map((a) => a.medico_id).filter((x): x is string => !!x)));
