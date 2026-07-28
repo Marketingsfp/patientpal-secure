@@ -185,7 +185,7 @@ export function OrcamentoTab({
 
   const imprimir = async (id: string) => {
     if (!clinicaAtual) return;
-    try { await printOrcamento(id, clinicaAtual.clinica_id); }
+    try { await printOrcamento(id, clinicaAtual.clinica_id, "a4"); }
     catch (e) { toast.error((e as Error).message); }
   };
 

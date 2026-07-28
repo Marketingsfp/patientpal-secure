@@ -13,7 +13,11 @@ const fmtData = (iso: string) => {
 const esc = (s: string | null | undefined) =>
   (s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
 
-export async function printOrcamento(orcamentoId: string, clinicaId: string) {
+export async function printOrcamento(
+  orcamentoId: string,
+  clinicaId: string,
+  formato: "cupom" | "a4" = "cupom",
+) {
   const [orc, itens, cli] = await Promise.all([
     supabase.from("orcamentos").select("*").eq("id", orcamentoId).maybeSingle(),
     supabase.from("orcamento_itens").select("*").eq("orcamento_id", orcamentoId).order("ordem"),
@@ -100,7 +104,143 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
   const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado]
     .filter(Boolean).join("<br/>");
 
-  const html = `<!doctype html>
+  const htmlA4 = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"/>
+<title>Orçamento #${esc(formatNumeroOrcamento(o.serie, o.numero))} - ${esc(o.paciente_nome)}</title>
+<style>
+  @page { size: A4 portrait; margin: 15mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #111; }
+  body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
+          border-bottom: 2px solid #111; padding-bottom: 8px; }
+  .clin-nome { font-size: 15pt; font-weight: 700; }
+  .sm { font-size: 9.5pt; color: #444; }
+  .doc-num { font-size: 14pt; font-weight: 700; text-align: right; white-space: nowrap; }
+  .box { border: 1px solid #ccc; border-radius: 4px; padding: 8px 10px; margin-top: 12px; }
+  .box h3 { margin: 0 0 4px; font-size: 10pt; text-transform: uppercase; letter-spacing: .06em; color: #555; }
+  table.itens { width: 100%; border-collapse: collapse; margin-top: 14px; }
+  table.itens th { background: #f1f1f1; border: 1px solid #ccc; padding: 6px; font-size: 9.5pt;
+                   text-transform: uppercase; letter-spacing: .04em; }
+  table.itens td { border: 1px solid #ddd; padding: 6px; font-size: 10.5pt; vertical-align: top; }
+  .right { text-align: right; }
+  .center { text-align: center; }
+  .bold { font-weight: 700; }
+  .totais { width: 60%; margin-left: auto; margin-top: 12px; border-collapse: collapse; }
+  .totais td { padding: 4px 6px; }
+  .totais tr.total td { border-top: 2px solid #111; font-size: 12.5pt; font-weight: 700; }
+  .assin { display: flex; justify-content: space-between; gap: 40px; margin-top: 46px; }
+  .assin div { flex: 1; border-top: 1px solid #111; padding-top: 4px; text-align: center; font-size: 9.5pt; }
+  .footer { margin-top: 18px; text-align: center; font-size: 9.5pt; color: #444; }
+  .preparo { margin-top: 14px; border: 1px solid #111; padding: 8px 10px; }
+  @media print { .noprint { display: none; } }
+</style></head>
+<body>
+  <div class="head">
+    <div>
+      <div class="clin-nome">${esc(c?.nome ?? "")}</div>
+      <div class="sm">${endereco}</div>
+      <div class="sm">${[c?.telefone ? `Fone: ${esc(c.telefone)}` : "", c?.cnpj ? `CNPJ: ${esc(c.cnpj)}` : ""].filter(Boolean).join(" &nbsp;•&nbsp; ")}</div>
+    </div>
+    <div>
+      <div class="doc-num">ORÇAMENTO Nº ${o.serie ? esc(formatNumeroOrcamento(o.serie, o.numero)) : String(o.numero).padStart(5, "0")}</div>
+      <div class="sm right">${fmtData(o.created_at)}</div>
+      <div class="sm right">Válido até ${validadeStr}</div>
+    </div>
+  </div>
+
+  <div class="box">
+    <h3>Paciente</h3>
+    <div class="bold">${esc(o.paciente_nome)}</div>
+    <div class="sm">
+      ${o.paciente_telefone ? `Fone: ${esc(o.paciente_telefone)}` : ""}
+      ${o.medico_nome ? `${o.paciente_telefone ? " &nbsp;•&nbsp; " : ""}Profissional: ${esc(o.medico_nome)}` : ""}
+    </div>
+  </div>
+
+  <table class="itens">
+    <thead>
+      <tr>
+        <th style="text-align:left">Serviço</th>
+        <th style="width:8%">Qtd</th>
+        <th style="width:15%">Valor unit.</th>
+        ${temSplit ? `<th style="width:15%">Dinheiro</th><th style="width:15%">Cartão/PIX</th>` : `<th style="width:15%">Total</th>`}
+        ${temSinal ? `<th style="width:14%">Sinal</th><th style="width:14%">Saldo final</th>` : ""}
+      </tr>
+    </thead>
+    <tbody>
+      ${its.map((i) => {
+        const qtd = Number(i.quantidade) || 1;
+        const sp = splitFormas(i);
+        const sinalIt = sinalDoItem(i);
+        const saldoIt = sinalIt > 0 ? Math.max(0, totalDoItem(i) - sinalIt) : 0;
+        return `
+      <tr>
+        <td>${esc(i.descricao)}</td>
+        <td class="center">${qtd}</td>
+        <td class="right">${fmtBRL(Number(i.valor_unitario))}</td>
+        ${temSplit
+          ? `<td class="right">${fmtBRL(qtd * (sp ? sp.din : Number(i.valor_unitario || 0)))}</td>
+             <td class="right">${fmtBRL(qtd * (sp ? sp.cart : Number(i.valor_unitario || 0)))}</td>`
+          : `<td class="right bold">${fmtBRL(Number(i.valor_total))}</td>`}
+        ${temSinal
+          ? `<td class="right">${sinalIt > 0 ? fmtBRL(sinalIt) : "-"}</td>
+             <td class="right">${sinalIt > 0 ? fmtBRL(saldoIt) : "-"}</td>`
+          : ""}
+      </tr>`;
+      }).join("")}
+    </tbody>
+  </table>
+
+  <table class="totais">
+    ${temSplit
+      ? `${desconto > 0 ? `<tr><td>Desconto</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
+         <tr class="total"><td>Dinheiro</td><td class="right">${fmtBRL(totalDinheiro)}</td></tr>
+         <tr class="total"><td>Cartão/PIX</td><td class="right">${fmtBRL(totalCartao)}</td></tr>`
+      : `<tr><td>Subtotal</td><td class="right">${fmtBRL(subtotal)}</td></tr>
+         ${desconto > 0 ? `<tr><td>Desconto</td><td class="right">- ${fmtBRL(desconto)}</td></tr>` : ""}
+         <tr class="total"><td>Total</td><td class="right">${fmtBRL(total)}</td></tr>`}
+    ${temSinal
+      ? `<tr><td>Total sinal</td><td class="right">${fmtBRL(totalSinal)}</td></tr>
+         <tr><td>Total saldo final</td><td class="right">${fmtBRL(totalSaldo)}</td></tr>`
+      : ""}
+  </table>
+
+  ${o.forma_pagamento ? `<div class="box"><h3>Pagamento</h3>${
+    formasList.length <= 1
+      ? `<div class="bold">${esc(o.forma_pagamento)}</div>`
+      : `<table class="itens" style="margin-top:4px">
+           <tr>${formasList.map((f: string) => `<th>${esc(f)}</th>`).join("")}</tr>
+           <tr>${formasList.map((f: string) => `<td class="center bold">${fmtBRL(Number(((o.valores_pagamento ?? {}) as Record<string, number>)[f] ?? 0))}</td>`).join("")}</tr>
+         </table>`
+  }</div>` : ""}
+
+  ${o.observacoes ? `<div class="box"><h3>Observações</h3><div style="white-space:pre-wrap">${esc(o.observacoes)}</div></div>` : ""}
+
+  ${preparos.length > 0 ? `
+  <div class="preparo">
+    <div class="bold center">ATENÇÃO: PREPARO</div>
+    ${preparos.map((p) => `
+      <div style="margin-top:6px">
+        <div class="bold">${esc(p.nome)}</div>
+        <div class="sm" style="white-space:pre-wrap">${esc(p.preparo)}</div>
+      </div>`).join("")}
+  </div>` : ""}
+
+  <div class="assin">
+    <div>Assinatura do paciente</div>
+    <div>Assinatura do profissional</div>
+  </div>
+  <div class="footer">Orçamento válido até ${validadeStr} — Obrigado pela preferência!</div>
+
+  <script>
+    window.addEventListener("load", function () {
+      setTimeout(function () { window.print(); }, 150);
+    });
+  </script>
+</body></html>`;
+
+  const htmlCupom = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"/>
 <title>Orçamento #${esc(formatNumeroOrcamento(o.serie, o.numero))} - ${esc(o.paciente_nome)}</title>
 <style>
@@ -257,7 +397,12 @@ export async function printOrcamento(orcamentoId: string, clinicaId: string) {
   </script>
 </body></html>`;
 
-  const w = window.open("", "_blank", "width=420,height=720");
+  const html = formato === "a4" ? htmlA4 : htmlCupom;
+  const w = window.open(
+    "",
+    "_blank",
+    formato === "a4" ? "width=900,height=1000" : "width=420,height=720",
+  );
   if (!w) throw new Error("O navegador bloqueou a janela de impressão. Permita pop-ups e tente novamente.");
   w.document.open();
   w.document.write(html);
