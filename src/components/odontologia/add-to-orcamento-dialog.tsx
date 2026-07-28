@@ -227,7 +227,7 @@ export function AddToOrcamentoDialog({
       if (regra.gratuito) {
         linhas.push({
           chave: `conv-${c.convenioId}`,
-          rotulo: `${c.convenioNome} — gratuito`,
+        rotulo: `${c.convenioNome} — gratuito (aplicado no pagamento)`,
           valorDinheiro: 0,
           valorCartao: 0,
           gratuito: true,
@@ -242,7 +242,7 @@ export function AddToOrcamentoDialog({
         : applyAcrescimoCartao(v.outros, c.acrescimo, c.convenioNome);
       linhas.push({
         chave: `conv-${c.convenioId}`,
-        rotulo: c.convenioNome,
+        rotulo: `${c.convenioNome} (aplicado no pagamento)`,
         valorDinheiro: v.dinheiro,
         valorCartao: acrCartao,
         destaque: true,
@@ -419,7 +419,9 @@ export function AddToOrcamentoDialog({
                 ))}
               </div>
               <p className="text-[11px] text-muted-foreground pt-1">
-                O item é lançado no orçamento pelo valor cheio; a forma de pagamento é escolhida no fechamento.
+                O item é lançado no orçamento sempre pelo <strong>valor particular</strong>. O desconto do
+                convênio é apurado na hora do pagamento, conforme a situação do contrato naquele momento
+                (mensalidade em dia, carência). Os valores de convênio acima são apenas uma referência.
               </p>
             </div>
           )}
