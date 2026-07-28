@@ -397,7 +397,7 @@ export function NovoOrcamentoOdontoDialog({
     setSaving(false);
     if (e2) return mostrarErro(e2);
     toast.success("Orçamento odontológico criado");
-    try { await printOrcamento(orc.id, clinicaId); } catch (e) { toast.error((e as Error).message); }
+    try { await printOrcamento(orc.id, clinicaId, "a4"); } catch (e) { toast.error((e as Error).message); }
     onCreated(orc.id);
   };
 
