@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Loader2 } from "lucide-react";
-import { speak as ttsSpeak, isUserTtsEnabled, getUserTtsRate } from "@/lib/tts-service";
+import {
+  speak as ttsSpeak,
+  isUserTtsEnabled,
+  getUserTtsRate,
+  subscribeClinicaTtsConfig,
+} from "@/lib/tts-service";
 type Senha = {
   id: string;
   codigo: string;
@@ -237,6 +242,16 @@ export function PainelPage() {
       window.removeEventListener("tts:changed", reagir);
     };
   }, []);
+
+  // Escuta em tempo real (Realtime) a configuração de voz salva por qualquer
+  // navegador. Quando a velocidade/habilitação mudar em outro dispositivo,
+  // interrompemos a fala corrente e a próxima criação de utterance/áudio
+  // já usará a nova velocidade — sem precisar recarregar o painel.
+  useEffect(() => {
+    const clinicaId = clinicaAtual?.clinica_id;
+    if (!clinicaId) return;
+    return subscribeClinicaTtsConfig(clinicaId);
+  }, [clinicaAtual?.clinica_id]);
 
   function criarFala(texto: string, key: string) {
     const utter = new SpeechSynthesisUtterance(texto);
