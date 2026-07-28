@@ -5321,21 +5321,36 @@ function AgendaPage() {
       return { opcoes, descSuffix: "" };
     }
     const rotulo = etapaSinal.etapa === "sinal" ? "SINAL (entrada)" : "SALDO FINAL";
+    // Desconto do convênio apurado nesta cobrança (o orçamento guarda o valor
+    // particular). Cada forma de pagamento pode ter um fator diferente.
+    const fatoresForma = (forma: string): Record<string, number> => {
+      const out: Record<string, number> = {};
+      for (const [itemId, porForma] of Object.entries(orcFatoresRef.current ?? {})) {
+        const f = porForma?.[forma];
+        if (Number.isFinite(f)) out[itemId] = Number(f);
+      }
+      return out;
+    };
+    const etapaExibicao = aplicarFatoresEtapa(etapaSinal, fatoresForma("dinheiro"));
+    const etapaSinalExib = etapaExibicao;
+    const etapaPorForma = new Map<string, EtapaSinal>(
+      opcoes.map((o) => [o.forma, aplicarFatoresEtapa(etapaSinal, fatoresForma(o.forma))]),
+    );
     setSaldoOrcResumo({
-      total: etapaSinal.total,
-      pago: etapaSinal.pago,
-      restante: etapaSinal.restante,
-      itens: etapaSinal.itens,
+      total: etapaSinalExib.total,
+      pago: etapaSinalExib.pago,
+      restante: etapaSinalExib.restante,
+      itens: etapaSinalExib.itens,
     });
     setAvisoConvenio({
       tom: "warning",
       mensagem:
-        etapaSinal.etapa === "sinal"
-          ? `Orçamento com entrada — Total R$ ${etapaSinal.total.toFixed(2)} • Já pago R$ ${etapaSinal.pago.toFixed(2)} • Falta pagar R$ ${etapaSinal.restante.toFixed(2)}. Sugerido agora: sinal de R$ ${etapaSinal.valor.toFixed(2)} (o valor pode ser alterado).`
-          : `Saldo do orçamento — Total R$ ${etapaSinal.total.toFixed(2)} • Já pago R$ ${etapaSinal.pago.toFixed(2)} • Falta pagar R$ ${etapaSinal.restante.toFixed(2)}. Informe o valor que o paciente está pagando agora (pode ser parcial).`,
+        etapaSinalExib.etapa === "sinal"
+          ? `Orçamento com entrada — Total R$ ${etapaSinalExib.total.toFixed(2)} • Já pago R$ ${etapaSinalExib.pago.toFixed(2)} • Falta pagar R$ ${etapaSinalExib.restante.toFixed(2)}. Sugerido agora: sinal de R$ ${etapaSinalExib.valor.toFixed(2)} (o valor pode ser alterado).`
+          : `Saldo do orçamento — Total R$ ${etapaSinalExib.total.toFixed(2)} • Já pago R$ ${etapaSinalExib.pago.toFixed(2)} • Falta pagar R$ ${etapaSinalExib.restante.toFixed(2)}. Informe o valor que o paciente está pagando agora (pode ser parcial).`,
     });
     return {
-      opcoes: opcoes.map((o) => ({ ...o, valor: etapaSinal.valor })),
+      opcoes: opcoes.map((o) => ({ ...o, valor: (etapaPorForma.get(o.forma) ?? etapaSinal).valor })),
       descSuffix: ` — ${rotulo}`,
     };
   };
