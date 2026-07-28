@@ -5184,6 +5184,7 @@ function AgendaPage() {
   const opcoesPagamentoDeOrcamento = async (
     orcamentoId: string,
     agendamentoId?: string | null,
+    medicoId?: string | null,
   ): Promise<OrcamentoCobranca | null> => {
     const { data, error } = await supabase
       .from("orcamentos")
@@ -5250,9 +5251,11 @@ function AgendaPage() {
     // contrato pode ter mudado desde que o orçamento foi feito (mensalidade em
     // atraso, carência, contrato cancelado).
     const beneficio = await calcularBeneficioOrcamento({
+      clinicaId: clinicaAtual?.clinica_id ?? null,
       pacienteId: (data as { paciente_id?: string | null }).paciente_id ?? null,
       itens: itensCobranca,
       agendamentoId: agendamentoId ?? null,
+      medicoId: medicoId ?? null,
     });
     if (!beneficio || !beneficio.temBeneficio) {
       return {
