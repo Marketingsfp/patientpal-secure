@@ -3276,7 +3276,15 @@ function Page() {
             <DialogDescription>
               Fechando o dia <strong>{dataFechamento ? new Date(`${dataFechamento}T00:00:00`).toLocaleDateString("pt-BR") : "—"}</strong>
               {" · "}Saldo calculado do dia: <strong>{fmt(saldoDoDiaFechamento)}</strong>
+              {" · "}Esperado em espécie: <strong>{fmt(porFormaDoDiaFechamento.dinheiro ?? 0)}</strong>
             </DialogDescription>
+            {Math.abs(porFormaDoDiaFechamento.indeterminado ?? 0) > 0.005 && (
+              <p className="text-xs text-destructive">
+                Atenção: {fmt(porFormaDoDiaFechamento.indeterminado ?? 0)} sem forma de pagamento
+                identificada (pagamento misto sem composição registrada). Esse valor NÃO foi somado
+                ao esperado em espécie — confira manualmente antes de fechar.
+              </p>
+            )}
           </DialogHeader>
           <form onSubmit={fecharCaixa} className="space-y-3">
             <div>
