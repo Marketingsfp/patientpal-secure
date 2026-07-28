@@ -858,7 +858,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   // Odontologia (e demais serviços com cobrança em duas etapas): quando o
   // atendimento está vinculado a itens de orçamento com SINAL, a guia mostra
   // SINAL / SALDO FINAL / TOTAL. Sem itens com sinal, nada muda na guia.
-  let sinalBloco = { sinal: 0, saldo: 0, total: 0 };
+  let sinalBloco = { sinal: 0, saldo: 0, total: 0, pago: 0 };
   try {
     const { data: links } = await supabase
       .from("agendamento_orcamento_itens")
@@ -870,11 +870,11 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     if (itemIds.length > 0) {
       const { data: itensOrc } = await supabase
         .from("orcamento_itens")
-        .select("quantidade, valor_unitario, valor_total, sinal_valor")
+        .select("quantidade, valor_unitario, valor_total, sinal_valor, valor_pago")
         .in("id", itemIds);
       for (const it of ((itensOrc ?? []) as Array<{
         quantidade: number | null; valor_unitario: number | null;
-        valor_total: number | null; sinal_valor: number | null;
+        valor_total: number | null; sinal_valor: number | null; valor_pago: number | null;
       }>)) {
         const sinalIt = Number(it.sinal_valor ?? 0);
         if (sinalIt <= 0) continue;
@@ -883,15 +883,23 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         sinalBloco.sinal += sinalIt;
         sinalBloco.total += totalIt;
         sinalBloco.saldo += Math.max(0, totalIt - sinalIt);
+        sinalBloco.pago += Number(it.valor_pago ?? 0);
       }
     }
   } catch { /* sem bloco de sinal */ }
   const temSinal = sinalBloco.sinal > 0;
+  // O que já estava pago ANTES desta guia = total pago registrado menos o valor
+  // recebido agora. "Falta pagar" considera todos os pagamentos do item.
+  const pagoTotalSinal = Math.round(Math.min(sinalBloco.total, sinalBloco.pago) * 100) / 100;
+  const pagoAnteriorSinal = Math.round(Math.max(0, pagoTotalSinal - Number(valor || 0)) * 100) / 100;
+  const faltaPagarSinal = Math.round(Math.max(0, sinalBloco.total - pagoTotalSinal) * 100) / 100;
   const sinalHtml = temSinal ? `
     <div class="sep"></div>
     <table>
       <tr><td class="label">SINAL:</td><td class="v right">${fmtBRL(sinalBloco.sinal)}</td></tr>
-      <tr><td class="label">SALDO FINAL:</td><td class="v right">${fmtBRL(sinalBloco.saldo)}</td></tr>
+      ${pagoAnteriorSinal > 0 ? `<tr><td class="label">JÁ PAGO ANTES:</td><td class="v right">${fmtBRL(pagoAnteriorSinal)}</td></tr>` : ""}
+      <tr><td class="label">PAGAMENTO ATUAL:</td><td class="v right">${fmtBRL(Number(valor || 0))}</td></tr>
+      <tr><td class="label">FALTA PAGAR:</td><td class="v right">${faltaPagarSinal <= 0.004 ? "QUITADO" : fmtBRL(faltaPagarSinal)}</td></tr>
       <tr class="bold"><td class="label">TOTAL:</td><td class="v right">${fmtBRL(sinalBloco.total)}</td></tr>
     </table>` : "";
 
