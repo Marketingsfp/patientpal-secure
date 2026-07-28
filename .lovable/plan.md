@@ -1,43 +1,49 @@
 ## Problema
 
-Na GR da foto, o item ODONTOLOGIA - IMPLANTE tem sinal de R$ 340,00 e total de R$ 2.200,00. O paciente pagou agora R$ 1.000,00, mas a guia imprimiu "SALDO FINAL: 1.860,00", que é apenas `total - sinal` — ou seja, ignora o que já foi pago e o pagamento atual.
-
-Causa confirmada: em `src/lib/print-gr.ts` (bloco de sinal, ~linhas 858-896), o cálculo lê apenas `quantidade`, `valor_unitario`, `valor_total` e `sinal_valor` dos itens do orçamento. A coluna `valor_pago` (que já existe e é atualizada em `src/lib/agenda/sinal-orcamento.ts`) não é consultada.
-
-Classificação: erro de código/apresentação (a regra de negócio de sinal/saldo já existe e está correta no motor de pagamento).
-
-## O que será alterado
-
-Apenas `src/lib/print-gr.ts`, no bloco que monta SINAL / SALDO FINAL / TOTAL:
-
-1. Incluir `valor_pago` na consulta de `orcamento_itens`.
-2. Somar `pagoTotal` (o que já está registrado nos itens, incluindo o pagamento que acabou de ser feito).
-3. Calcular:
-   - `pagoAnterior = pagoTotal − valor recebido nesta guia` (não menor que zero)
-   - `faltaPagar = total − pagoTotal` (não menor que zero)
-4. Trocar as linhas impressas por:
+Na GR da foto, aparecem duas linhas com o mesmo valor:
 
 ```text
-SINAL:              340,00
-JÁ PAGO ANTES:      340,00
+SINAL:            340,00
+JÁ PAGO ANTES:    340,00
+```
+
+Isso acontece porque o único pagamento anterior foi justamente o sinal, então as duas linhas informam a mesma coisa e a guia fica redundante.
+
+Classificação: ajuste visual/apresentação. Nenhuma regra de negócio ou valor muda.
+
+## Ajuste
+
+Somente em `src/lib/print-gr.ts`, no bloco SINAL / JÁ PAGO ANTES / PAGAMENTO ATUAL / FALTA PAGAR / TOTAL:
+
+1. Quando o valor já pago antes for igual ao sinal (mesma quantia), imprimir uma única linha:
+
+```text
+SINAL (JÁ PAGO):    340,00
 PAGAMENTO ATUAL:  1.000,00
 FALTA PAGAR:        860,00
 TOTAL:            2.200,00
 ```
 
-- "JÁ PAGO ANTES" só aparece quando maior que zero.
-- Quando `faltaPagar` for zero, imprimir "FALTA PAGAR: 0,00" com destaque de quitado (texto "QUITADO").
-- Quando o pagamento é justamente o sinal (primeira etapa), o resultado continua correto: SINAL 340 / PAGAMENTO ATUAL 340 / FALTA PAGAR 1.860 / TOTAL 2.200.
+2. Quando o já pago antes for maior que o sinal (o paciente já pagou o sinal e mais alguma parcela do saldo), continuar com as duas linhas separadas:
 
-O restante da guia (cabeçalho, serviços, VALOR RECEBIDO, clínica/prestador) não muda.
+```text
+SINAL:              340,00
+JÁ PAGO ANTES:      840,00
+PAGAMENTO ATUAL:    500,00
+FALTA PAGAR:        860,00
+TOTAL:            2.200,00
+```
 
-## Escopo e riscos
+3. Quando ainda não houve pagamento anterior (o pagamento atual é o próprio sinal), manter como está hoje: SINAL / PAGAMENTO ATUAL / FALTA PAGAR / TOTAL, sem a linha "já pago antes".
 
-- Fora do escopo: cupom 80mm de orçamento (`print-orcamento.ts`), telas da agenda e regra de distribuição de pagamento — nenhuma alteração.
-- Nenhuma migração de banco; nenhum dado alterado.
-- Reimpressão (2ª via) mostrará o estado atual do item, que pode ser diferente do momento da 1ª impressão — comportamento esperado e consistente com o restante da guia.
+A comparação usa tolerância de centavos para evitar diferença por arredondamento.
+
+## Escopo
+
+- Fora do escopo: cálculo de valores, distribuição de pagamento, orçamento e telas da agenda — nada muda.
+- Sem migração de banco e sem alteração de dados.
 
 ## Validação
 
 - Typecheck.
-- Conferência dos números para o orçamento D-2026-00002 (item IMPLANTE), comparando com os valores gravados em `orcamento_itens`.
+- Conferência visual reimprimindo a GR do atendimento do JEAN XAVIER (implante).

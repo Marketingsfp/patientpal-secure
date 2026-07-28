@@ -893,11 +893,14 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const pagoTotalSinal = Math.round(Math.min(sinalBloco.total, sinalBloco.pago) * 100) / 100;
   const pagoAnteriorSinal = Math.round(Math.max(0, pagoTotalSinal - Number(valor || 0)) * 100) / 100;
   const faltaPagarSinal = Math.round(Math.max(0, sinalBloco.total - pagoTotalSinal) * 100) / 100;
+  // Se o único pagamento anterior foi o próprio sinal, as duas linhas seriam
+  // idênticas — nesse caso imprime uma linha só: "SINAL (JÁ PAGO)".
+  const sinalJaPago = pagoAnteriorSinal > 0 && Math.abs(pagoAnteriorSinal - sinalBloco.sinal) <= 0.004;
   const sinalHtml = temSinal ? `
     <div class="sep"></div>
     <table>
-      <tr><td class="label">SINAL:</td><td class="v right">${fmtBRL(sinalBloco.sinal)}</td></tr>
-      ${pagoAnteriorSinal > 0 ? `<tr><td class="label">JÁ PAGO ANTES:</td><td class="v right">${fmtBRL(pagoAnteriorSinal)}</td></tr>` : ""}
+      <tr><td class="label">SINAL${sinalJaPago ? " (JÁ PAGO)" : ""}:</td><td class="v right">${fmtBRL(sinalBloco.sinal)}</td></tr>
+      ${pagoAnteriorSinal > 0 && !sinalJaPago ? `<tr><td class="label">JÁ PAGO ANTES:</td><td class="v right">${fmtBRL(pagoAnteriorSinal)}</td></tr>` : ""}
       <tr><td class="label">PAGAMENTO ATUAL:</td><td class="v right">${fmtBRL(Number(valor || 0))}</td></tr>
       <tr><td class="label">FALTA PAGAR:</td><td class="v right">${faltaPagarSinal <= 0.004 ? "QUITADO" : fmtBRL(faltaPagarSinal)}</td></tr>
       <tr class="bold"><td class="label">TOTAL:</td><td class="v right">${fmtBRL(sinalBloco.total)}</td></tr>
