@@ -100,24 +100,75 @@ export async function obterEtapaSinal(agendamentoId: string): Promise<EtapaSinal
 }
 
 /**
+ * Reaplica a etapa de sinal/saldo usando um FATOR por item (0..1) — o desconto
+ * do convênio apurado no momento do pagamento. Os valores gravados no
+ * orçamento continuam sendo os particulares; o fator só ajusta o que o
+ * paciente paga agora. Função pura: não consulta o banco.
+ */
+export function aplicarFatoresEtapa(
+  etapa: EtapaSinal,
+  fatores: Record<string, number> | null | undefined,
+): EtapaSinal {
+  if (!fatores || Object.keys(fatores).length === 0) return etapa;
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const itens = etapa.itens.map((i) => {
+    const f = Number.isFinite(fatores[i.id]) ? Math.max(0, Number(fatores[i.id])) : 1;
+    const total = r2(i.total * f);
+    const pago = r2(i.pago * f);
+    return {
+      ...i,
+      total,
+      sinal: r2(i.sinal * f),
+      pago,
+      restante: r2(Math.max(0, total - pago)),
+    };
+  });
+  const total = r2(itens.reduce((s, i) => s + i.total, 0));
+  const pago = r2(itens.reduce((s, i) => s + i.pago, 0));
+  const sinal = r2(itens.reduce((s, i) => s + i.sinal, 0));
+  const restante = r2(Math.max(0, total - pago));
+  const valor = pago < sinal - 0.004 ? r2(sinal - pago) : restante;
+  return { ...etapa, itens, total, pago, restante, valor };
+}
+
+/**
  * Registra o valor efetivamente recebido nos itens do orçamento, distribuindo-o
  * proporcionalmente ao saldo de cada item. Nunca sobrescreve o que já foi pago
  * nem ultrapassa o total do item.
  * Chamado depois que o lançamento financeiro foi gravado com sucesso.
+ *
+ * `fatores` (opcional) é o desconto de convênio aplicado na cobrança, por item.
+ * O valor recebido chega já com desconto; para que `valor_pago` continue na
+ * mesma moeda do orçamento (valor particular), a baixa é convertida de volta
+ * dividindo pelo fator do item.
  */
 export async function registrarPagamentoEtapaSinal(
   agendamentoId: string,
   valorPago?: number,
+  fatores?: Record<string, number> | null,
 ): Promise<void> {
   const itens = await itensComSinal(agendamentoId);
   if (!itens.length) return;
   const agora = new Date().toISOString();
-  const saldos = itens.map((i) => ({
-    item: i,
-    total: totalItem(i),
-    pagoAtual: Number(i.valor_pago ?? 0),
-    saldo: Math.max(0, totalItem(i) - Number(i.valor_pago ?? 0)),
-  }));
+  const fatorDe = (id: string) => {
+    const f = fatores ? Number(fatores[id]) : NaN;
+    return Number.isFinite(f) && f > 0 ? f : 1;
+  };
+  const saldos = itens.map((i) => {
+    const total = totalItem(i);
+    const pagoAtual = Number(i.valor_pago ?? 0);
+    const saldoBruto = Math.max(0, total - pagoAtual);
+    return {
+      item: i,
+      total,
+      pagoAtual,
+      fator: fatorDe(i.id),
+      /** Saldo bruto (valor particular gravado no orçamento). */
+      saldoBruto,
+      /** Saldo com o desconto do convênio — é o que o paciente efetivamente paga. */
+      saldo: Math.round(saldoBruto * fatorDe(i.id) * 100) / 100,
+    };
+  });
   const saldoTotal = saldos.reduce((s, x) => s + x.saldo, 0);
   if (saldoTotal <= 0.004) return;
   // Sem valor informado (compatibilidade): quita o saldo restante.
@@ -133,7 +184,10 @@ export async function registrarPagamentoEtapaSinal(
       : Math.min(s.saldo, Math.round((restanteDistribuir * (s.saldo / saldoTotal)) * 100) / 100);
     const aplicar = Math.round(cota * 100) / 100;
     if (aplicar <= 0) continue;
-    const novoPago = Math.min(s.total, Math.round((s.pagoAtual + aplicar) * 100) / 100);
+    // Converte a cota recebida (com desconto) de volta para o valor
+    // particular gravado no item, para que a quitação feche corretamente.
+    const aplicarBruto = Math.round((aplicar / s.fator) * 100) / 100;
+    const novoPago = Math.min(s.total, Math.round((s.pagoAtual + aplicarBruto) * 100) / 100);
     const quitado = novoPago >= s.total - 0.004;
     const patch: Record<string, unknown> = {
       valor_pago: novoPago,
