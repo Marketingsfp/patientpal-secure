@@ -67,7 +67,12 @@ interface Props {
   /** Nome exato da categoria a fixar (ex.: "MENSALIDADE CARTAO CONSULTA"). Quando setado, o select fica desabilitado. */
   categoriaFixaNome?: string;
   /** Orçamento com entrada (sinal): mostra Já pago / Pagando agora / Falta pagar. */
-  resumoSaldo?: { total: number; pago: number; restante: number } | null;
+  resumoSaldo?: {
+    total: number;
+    pago: number;
+    restante: number;
+    itens?: Array<{ id: string; descricao: string; total: number; sinal: number; pago: number; restante: number }>;
+  } | null;
 }
 
 export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWithData, initialDescricao, initialValor, agendamentoId, initialFormaPagamento, pacienteIdFixo, categoriaFixaNome, resumoSaldo }: Props) {
