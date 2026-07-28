@@ -1176,6 +1176,19 @@ async function obterInfoConvenioPaciente(params: {
       // como uso da consulta do dia e o paciente perdia o benefício.
       const tipoRegra = (beneficioEscolhido.tipo ?? "").toString().trim().toLowerCase() || null;
       if (tipoRegra && agsFiltrados.length > 0) {
+        const removerSufixoEspecialidade = (s: string | null | undefined) =>
+          (s ?? "").replace(/\s*\([^()]*\)\s*$/, "").trim();
+        const inferirTipoPeloTexto = (s: string | null | undefined): string | null => {
+          const n = normProcServico(s).replace(/\s+/g, " ").trim();
+          if (!n) return null;
+          if (/\bCONSULTA\b/.test(n)) return "consulta";
+          if (
+            /\b(ECG|ELETROCARDIOGRAMA|ECOCARDIOGRAMA|RX|RAIO\s*-?\s*X|RADIOGRAFIA|USG|ULTRASSONOGRAFIA|ULTRA\s*-?\s*SOM|TOMOGRAFIA|MAMOGRAFIA|DENSITOMETRIA|MAPA|HOLTER|ENDOSCOPIA|COLONOSCOPIA|LABORATORIO|LABORATORIAL|HEMOGRAMA|EXAME)\b/.test(n)
+          ) {
+            return "exame";
+          }
+          return null;
+        };
         const nomesAgs = Array.from(
           new Set(
             (agsFiltrados as Array<{ procedimento?: string | null }>)
@@ -1184,11 +1197,19 @@ async function obterInfoConvenioPaciente(params: {
           ),
         );
         if (nomesAgs.length > 0) {
+          const nomesBusca = Array.from(
+            new Set(
+              nomesAgs
+                .flatMap((n) => [n, removerSufixoEspecialidade(n)])
+                .map((n) => n.trim())
+                .filter(Boolean),
+            ),
+          );
           const { data: procsTipo } = await supabase
             .from("procedimentos")
             .select("nome,tipo")
             .eq("clinica_id", clinicaId)
-            .in("nome", nomesAgs);
+            .in("nome", nomesBusca);
           const tipoPorNome = new Map<string, string>();
           ((procsTipo ?? []) as Array<{ nome: string | null; tipo: string | null }>).forEach((p) => {
             const k = normProcServico(p.nome);
@@ -1196,10 +1217,13 @@ async function obterInfoConvenioPaciente(params: {
             if (k && t && !tipoPorNome.has(k)) tipoPorNome.set(k, t);
           });
           agsFiltrados = (agsFiltrados as Array<{ procedimento?: string | null }>).filter((a) => {
-            const t = tipoPorNome.get(normProcServico(a.procedimento));
-            // Serviço não encontrado no cadastro: mantém o comportamento
-            // anterior (conta como uso) para não afrouxar o limite.
-            if (!t) return true;
+            const nomeOriginal = normProcServico(a.procedimento);
+            const nomeSemSufixo = normProcServico(removerSufixoEspecialidade(a.procedimento));
+            const t = tipoPorNome.get(nomeOriginal) ?? tipoPorNome.get(nomeSemSufixo) ?? inferirTipoPeloTexto(a.procedimento);
+            // Para cota de consulta, só conta outro atendimento quando ele é
+            // claramente consulta. Se o serviço não casa no cadastro, exames
+            // como ECG/RX/Ecocardiograma não podem queimar a consulta diária.
+            if (!t) return tipoRegra !== "consulta";
             return t === tipoRegra;
           }) as typeof agsFiltrados;
         }
