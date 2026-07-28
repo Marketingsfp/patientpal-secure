@@ -1,42 +1,39 @@
-## O que você precisa
+## O que está acontecendo (verificado no banco)
 
-Paciente foi faturado na clínica parceira (GR emitida lá), mas é atendido aqui. Aqui ele precisa: entrar na agenda, passar pelo fluxo normal (recepção, triagem, atendimento) e **não** passar pelo caixa. O médico que atende aqui, porém, geralmente tem repasse a receber.
+Paciente **SIDICLEI MARCIANO NISTALDO**, contrato **20261413** (CARTÃO CONSULTA + SEGUROS, ativo).
 
-Hoje o sistema só conhece dois tipos de atendimento (`particular` e `convenio`) e todo agendamento tende a cair no caixa. Não existe hoje nenhum campo que marque "já faturado fora" — isso é o que vamos criar.
+Atendimentos dele **hoje (28/07/2026)** já faturados:
 
-## A dinâmica proposta (simples, em 3 passos)
+| Serviço | Tipo do serviço | Médico | Valor |
+|---|---|---|---|
+| ELETROCARDIOGRAMA (ECG) | exame | cardiologia | R$ 0,00 (gratuidade) |
+| RX TÓRAX AP/PERFIL | exame | — | R$ 0,00 (gratuidade) |
+| ECOCARDIOGRAMA (ADULTO) | exame | cardiologia | R$ 144,40 (-5%) |
 
-**Passo 1 — Agendar como "Externo"**
-No wizard de novo agendamento, ao lado de Particular / Convênio, entra a opção **"Externo (faturado em outra clínica)"**. Ao escolher, aparecem 3 campos:
-- Clínica de origem (lista: as 3 clínicas + "Outra")
-- Nº da GR da clínica parceira (obrigatório — é a rastreabilidade)
-- Valor cobrado lá (opcional, só para conferência/acerto entre clínicas)
+Nenhum deles é **consulta**. A consulta de R$ 9,99 realmente **não foi usada hoje**.
 
-**Passo 2 — Atendimento sem caixa**
-O agendamento nasce com a etapa de caixa pulada e um selo laranja **"EXTERNO — GR nº ..."** no card da agenda. Os botões "Pagar" / "Salvar e Pagar" ficam ocultos para esse agendamento; no lugar aparece "Confirmar chegada". Nada é lançado em caixa nem em nota fiscal daqui.
+## Causa raiz (erro de código, não regra de negócio)
 
-**Passo 3 — Repasse do médico local**
-O atendimento é registrado em Atendimentos/Repasse com valor recebido pela clínica = R$ 0 e o valor do médico calculado pela regra normal dele. Assim o repasse sai automático (fim do controle manual no sistema antigo) e o relatório mostra claramente "custo de atendimento externo".
+A regra do convênio para CARDIOLOGIA é: `tipo = consulta`, limite `1/dia` por titular-ou-dependente.
 
-## Relatório de acerto entre clínicas
+Na hora de contar quantas vezes o benefício já foi usado, o código da agenda filtra os atendimentos **apenas pela especialidade do médico** — ele nunca verifica se o atendimento era de fato uma **consulta**. Como ECG e Ecocardiograma foram feitos com médicos de cardiologia e estão pagos, o sistema contou 2 usos e disse "limite de 1/dia atingido", aplicando 50% em vez de R$ 9,99.
 
-Nova aba em Financeiro → **Atendimentos Externos**: lista por período e por clínica de origem, com paciente, GR de origem, médico, valor cobrado lá e repasse pago aqui. É esse relatório que fecha o acerto com a clínica parceira — hoje feito de cabeça/planilha.
+Ou seja: qualquer exame feito com um médico da mesma especialidade "queima" a consulta do dia do paciente. Isso afeta **todos os pacientes do Cartão Consulta**, não só o Sidiclei.
 
-## Quando as 3 clínicas estiverem no ClinicOS
+## Correção proposta
 
-A mesma tela, sem retrabalho: como a clínica de origem já é uma clínica do sistema, o campo "Nº da GR" passa a ser uma **busca do atendimento real** na clínica de origem. Escolhido o atendimento, o vínculo é feito por ID (não por número digitado), e o relatório de acerto vira automático nas duas pontas: na origem aparece "atendimento executado em outra unidade", aqui aparece "recebido de outra unidade". Nada muda no dia a dia da recepção.
+Arquivo: `src/routes/_authenticated/app.agenda.tsx`, no bloco que apura o consumo do limite.
 
-## Detalhes técnicos
+1. Quando a regra escolhida tiver `tipo` definido (ex.: `consulta`), passar a considerar como consumo **somente** os atendimentos cujo serviço é do mesmo tipo. O tipo vem de `procedimentos.tipo` (`consulta` / `exame`), casando pelo nome do procedimento gravado no agendamento (normalizado, como já é feito em outros filtros do arquivo).
+2. Esse filtro entra **em conjunto** com o filtro por especialidade e o de grupo de gratuidade que já existem — não substitui nenhum deles.
+3. Sem alteração de valores, de regras cadastradas ou de dados do Cartão Consulta — apenas a contagem de uso.
 
-- Migração: novas colunas em `agendamentos` — `origem_externa` (bool), `origem_clinica_id` (uuid, nullable, FK `clinicas`), `origem_clinica_nome` (texto livre, para parceiras fora do sistema), `origem_gr_numero` (texto), `origem_valor` (numeric). Índice por `(clinica_id, origem_externa, inicio)`.
-- `fin_atendimentos`: registro com `forma_pagamento = 'externo'`, `valor_total = origem_valor`, `valor_clinica = 0`, `valor_medico` pela regra do médico, `lancamento_id` nulo — entra no repasse sem tocar em `fin_lancamentos` nem `caixa_movimentos`.
-- Frontend: `novo-agendamento-wizard.tsx` (nova opção + campos), `app.agenda.tsx` (selo, ocultar pagamento, pular etapa caixa), `criar-agendamento.functions.ts` (validação: GR obrigatória, bloquear vínculo com orçamento/CB), nova rota `app.financeiro.atendimentos-externos.tsx`.
-- Permissão: só recepção/gestor/admin podem marcar um agendamento como externo; alteração fica registrada na auditoria.
+## Verificação após a correção
 
-## Fora do escopo / a confirmar antes de eu implementar
+- Reabrir o faturamento do Sidiclei hoje: a consulta de cardiologia deve sair **R$ 9,99 dinheiro / R$ 9,99 cartão**, sem o aviso "Limite de 1/dia atingido".
+- Depois de faturar essa consulta, uma **segunda** consulta no mesmo dia deve voltar a mostrar o aviso e cobrar 50% — o limite continua funcionando.
+- Um exame no mesmo dia deve continuar seguindo a própria regra (gratuidade / desconto), sem consumir a consulta.
 
-1. O repasse ao médico local deve mesmo sair daqui, ou a clínica parceira também paga o médico? (assumi: **sai daqui**)
-2. O valor cobrado na parceira deve ser obrigatório ou opcional? (assumi: **opcional**, só para conferência)
-3. Esses atendimentos devem contar nos indicadores de produção do Painel (volume), mesmo com receita zero? (assumi: **sim no volume, zero na receita**)
+## Fora do escopo (apenas relato)
 
-Não vou mexer em caixa, NFS-e, valores de Cartão Consulta nem em contratos.
+Notei que a regra de CARDIOLOGIA está no grupo `consulta-diaria-cartao-consulta`, enquanto as outras 12 especialidades estão em `consulta-diaria-cartao-consulta-seguro`. Isso significa que hoje a cota da cardiologia **não** é compartilhada com as demais especialidades. Pode ser intencional ou erro de digitação no cadastro — **não vou alterar**; se quiser, o ajuste é manual na tela de regras do convênio.
