@@ -3632,6 +3632,7 @@ export type Database = {
           bandeira_cartao: string | null
           categoria_id: string | null
           clinica_id: string
+          composicao_pagamento: Json | null
           conta_id: string | null
           contrato_id: string | null
           convenio_id: string | null
@@ -3678,6 +3679,7 @@ export type Database = {
           bandeira_cartao?: string | null
           categoria_id?: string | null
           clinica_id: string
+          composicao_pagamento?: Json | null
           conta_id?: string | null
           contrato_id?: string | null
           convenio_id?: string | null
@@ -3724,6 +3726,7 @@ export type Database = {
           bandeira_cartao?: string | null
           categoria_id?: string | null
           clinica_id?: string
+          composicao_pagamento?: Json | null
           conta_id?: string | null
           contrato_id?: string | null
           convenio_id?: string | null
@@ -8459,6 +8462,13 @@ export type Database = {
     }
     Functions: {
       __actor_set_trocar_convenio: { Args: never; Returns: undefined }
+      _composicao_partes: {
+        Args: { p_comp: Json }
+        Returns: {
+          forma: string
+          valor: number
+        }[]
+      }
       _do_fix_phones_prontuarios_mj: {
         Args: never
         Returns: {
