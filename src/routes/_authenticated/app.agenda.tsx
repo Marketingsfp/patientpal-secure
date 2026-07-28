@@ -46,6 +46,7 @@ import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
 import { useTurboDisabled } from "@/hooks/use-turbo-disabled";
 import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/dividir-orcamento-dialog";
 import { SelecionarItensOrcamentoDialog, type SelectItemOrc } from "@/components/agenda/selecionar-itens-orcamento-dialog";
+import { AtendimentoExternoDialog } from "@/components/agenda/atendimento-externo-dialog";
 import { calcularAvisoLimitePendentes, deveBloquearPorLimitePendente } from "@/lib/agenda/aviso-limite-pendentes";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
@@ -1717,6 +1718,8 @@ function AgendaPage() {
   // Dialog de seleção de itens (Odontologia: usuário escolhe quais itens
   // do orçamento entram neste agendamento; o restante fica disponível).
   const [selecItensOpen, setSelecItensOpen] = useState(false);
+  // Atendimento faturado em outra clínica (não gera caixa/NFS-e aqui).
+  const [externoAg, setExternoAg] = useState<Agendamento | null>(null);
   const [selecItensCtx, setSelecItensCtx] = useState<{
     orcamento: { id: string; numero: number; paciente_id: string | null; paciente_nome: string | null };
     itensRestantes: SelectItemOrc[];
@@ -9056,6 +9059,13 @@ function AgendaPage() {
                               <DropdownMenuItem onClick={() => abrirAuditoria(a)}>
                                 <ShieldCheck className="h-4 w-4 mr-2" /> Histórico
                               </DropdownMenuItem>
+
+                              {/* Atendimento externo (faturado em outra clínica) */}
+                              {podeEscrever && !ehLivre && (
+                                <DropdownMenuItem onClick={() => setExternoAg(a)} className="text-orange-600">
+                                  <Building2 className="h-4 w-4 mr-2" /> Atendimento externo (outra clínica)
+                                </DropdownMenuItem>
+                              )}
 
                               {/* Reabrir (apenas realizado) */}
                               {podeEscrever && a.status === "realizado" && (
