@@ -372,6 +372,11 @@ export type Database = {
           observacoes: string | null
           orcamento_id: string | null
           orcamento_item_id: string | null
+          origem_clinica_id: string | null
+          origem_clinica_nome: string | null
+          origem_externa: boolean
+          origem_gr_numero: string | null
+          origem_valor: number | null
           paciente_id: string | null
           paciente_nome: string
           pacote_id: string | null
@@ -408,6 +413,11 @@ export type Database = {
           observacoes?: string | null
           orcamento_id?: string | null
           orcamento_item_id?: string | null
+          origem_clinica_id?: string | null
+          origem_clinica_nome?: string | null
+          origem_externa?: boolean
+          origem_gr_numero?: string | null
+          origem_valor?: number | null
           paciente_id?: string | null
           paciente_nome: string
           pacote_id?: string | null
@@ -444,6 +454,11 @@ export type Database = {
           observacoes?: string | null
           orcamento_id?: string | null
           orcamento_item_id?: string | null
+          origem_clinica_id?: string | null
+          origem_clinica_nome?: string | null
+          origem_externa?: boolean
+          origem_gr_numero?: string | null
+          origem_valor?: number | null
           paciente_id?: string | null
           paciente_nome?: string
           pacote_id?: string | null
@@ -489,6 +504,13 @@ export type Database = {
             columns: ["orcamento_item_id"]
             isOneToOne: false
             referencedRelation: "orcamento_itens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_origem_clinica_id_fkey"
+            columns: ["origem_clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
             referencedColumns: ["id"]
           },
         ]
