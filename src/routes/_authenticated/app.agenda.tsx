@@ -5297,26 +5297,9 @@ function AgendaPage() {
       }
       // Sinal/saldo: quando o(s) item(ns) do orçamento têm sinal definido,
       // a cobrança da agenda passa a sugerir o valor da etapa pendente.
-      if (etapaSinal) {
-        const rotulo = etapaSinal.etapa === "sinal" ? "SINAL (entrada)" : "SALDO FINAL";
-        opcoes = opcoes.map((o) => ({ ...o, valor: etapaSinal.valor }));
-        descSuffix += ` — ${rotulo}`;
-        setSaldoOrcResumo({
-          total: etapaSinal.total,
-          pago: etapaSinal.pago,
-          restante: etapaSinal.restante,
-          itens: etapaSinal.itens,
-        });
-        setAvisoConvenio({
-          tom: "warning",
-          mensagem:
-            etapaSinal.etapa === "sinal"
-              ? `Orçamento com entrada — Total R$ ${etapaSinal.total.toFixed(2)} • Já pago R$ ${etapaSinal.pago.toFixed(2)} • Falta pagar R$ ${etapaSinal.restante.toFixed(2)}. Sugerido agora: sinal de R$ ${etapaSinal.valor.toFixed(2)} (o valor pode ser alterado).`
-              : `Saldo do orçamento — Total R$ ${etapaSinal.total.toFixed(2)} • Já pago R$ ${etapaSinal.pago.toFixed(2)} • Falta pagar R$ ${etapaSinal.restante.toFixed(2)}. Informe o valor que o paciente está pagando agora (pode ser parcial).`,
-        });
-      } else {
-        setSaldoOrcResumo(null);
-      }
+      const etapaAplicada = await aplicarEtapaSinal(opcoes, a.id, etapaSinal);
+      opcoes = etapaAplicada.opcoes;
+      descSuffix += etapaAplicada.descSuffix;
       // Procedimento sem valor (ex.: REVISÃO / retorno gratuito). Não abre o
       // fluxo de cobrança — registra um lançamento de valor 0 (linha-sombra),
       // marca como pago e avança o fluxo, do mesmo modo que um pagamento normal.
