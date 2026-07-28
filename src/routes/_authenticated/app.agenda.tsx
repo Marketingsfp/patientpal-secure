@@ -4098,8 +4098,19 @@ function AgendaPage() {
       const consumidos = new Set<string>();
       for (const r of linkRows) {
         const it = itensPorId.get(r.orcamento_item_id);
-        const pagoItem = it?.status_financeiro === "pago";
-        const pagoAgenda = pagosAgendaSet.has(r.agendamento_id);
+        // Regra (2026-07-28): item com ENTRADA (sinal) paga continua disponível
+        // enquanto houver saldo. Só some do seletor quando estiver quitado.
+        const total = Number(it?.valor_total ?? 0);
+        const pago = Number(it?.valor_pago ?? 0);
+        const quitadoPorValor = total > 0 && pago >= total - 0.004;
+        const parcial =
+          Number(it?.sinal_valor ?? 0) > 0 ||
+          it?.status_financeiro === "parcial" ||
+          (pago > 0 && !quitadoPorValor);
+        const pagoItem = it?.status_financeiro === "pago" || quitadoPorValor;
+        // Lançamento confirmado no agendamento só consome o item quando ele
+        // NÃO for de pagamento em etapas (entrada + saldo).
+        const pagoAgenda = !parcial && pagosAgendaSet.has(r.agendamento_id);
         if (pagoItem || pagoAgenda) consumidos.add(r.orcamento_item_id);
       }
       const editingItemIdsLiberar = editing?.id
