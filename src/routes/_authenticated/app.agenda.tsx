@@ -95,7 +95,12 @@ import { useServerFn } from "@tanstack/react-start";
 import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
-import { obterEtapaSinal, registrarPagamentoEtapaSinal, type EtapaSinal } from "@/lib/agenda/sinal-orcamento";
+import {
+  obterEtapaSinal,
+  registrarPagamentoEtapaSinal,
+  aplicarFatoresEtapa,
+  type EtapaSinal,
+} from "@/lib/agenda/sinal-orcamento";
 import { formatNumeroOrcamento, parseNumeroOrcamento } from "@/lib/orcamento-numero";
 import { IdadeIcon } from "@/components/idade-icon";
 import { ClienteForm, type Paciente as PacienteFull } from "@/components/clientes/cliente-form";
@@ -424,6 +429,132 @@ function memoriaDescontoPorForma(baseValor: number, forma: string, d: DescontoCo
     return `${fmt(baseValor)} − ${pct}% = ${fmt(final)}`;
   }
   return `${fmt(baseValor)} − ${fmt(Number(d.valor) || 0)}`;
+}
+
+/** Item do orçamento usado no cálculo da cobrança na agenda. */
+type ItemOrcamentoCobranca = {
+  id: string;
+  descricao: string | null;
+  valor_total: number | null;
+  quantidade: number | null;
+  valor_unitario: number | null;
+  valor_pago: number | null;
+  valores_formas?: Record<string, number> | null;
+};
+
+/** Resultado da leitura de um orçamento para cobrança na agenda. */
+type OrcamentoCobranca = {
+  opcoes: FormaOpcao[];
+  descSuffix: string;
+  aviso: { tom: "warning" | "error"; mensagem: string } | null;
+  /** Fator de desconto (0..1) por item do orçamento e por forma de pagamento. */
+  fatores: Record<string, Record<string, number>>;
+  temBeneficio: boolean;
+};
+
+/** Valor total (particular) gravado no item do orçamento. */
+function totalItemOrcamento(i: ItemOrcamentoCobranca): number {
+  return Number(i.valor_total ?? Number(i.quantidade ?? 1) * Number(i.valor_unitario ?? 0)) || 0;
+}
+
+/** Saldo ainda devido do item, em valor particular. */
+function saldoItemOrcamento(i: ItemOrcamentoCobranca): number {
+  return Math.max(0, totalItemOrcamento(i) - (Number(i.valor_pago ?? 0) || 0));
+}
+
+/**
+ * Apura o benefício do convênio no MOMENTO DO PAGAMENTO para os itens de um
+ * orçamento. O orçamento continua gravado em valor particular; aqui só
+ * calculamos o fator de desconto por item/forma e a mensagem de transparência.
+ */
+async function calcularBeneficioOrcamento(params: {
+  clinicaId: string | null | undefined;
+  pacienteId: string | null | undefined;
+  itens: ItemOrcamentoCobranca[];
+  agendamentoId?: string | null;
+  medicoId?: string | null;
+}): Promise<{
+  temBeneficio: boolean;
+  convenioNome: string;
+  fatores: Record<string, Record<string, number>>;
+  memoriaPorForma: Record<string, string | undefined>;
+  aviso: { tom: "warning" | "error"; mensagem: string } | null;
+} | null> {
+  const { clinicaId, pacienteId, itens, agendamentoId, medicoId } = params;
+  if (!clinicaId || !pacienteId || itens.length === 0) return null;
+  const formas = ["dinheiro", "pix", "cartao_debito", "cartao_credito"] as const;
+  const fatores: Record<string, Record<string, number>> = {};
+  const memoriaPorForma: Record<string, string | undefined> = {};
+  let convenioNome = "";
+  let temBeneficio = false;
+  const motivos = new Set<string>();
+
+  // Uma consulta por serviço distinto — itens repetidos reaproveitam o cálculo.
+  const cache = new Map<string, ConvenioInfo | null>();
+  for (const item of itens) {
+    const nome = (item.descricao ?? "").trim();
+    if (!nome) continue;
+    let info = cache.get(nome);
+    if (info === undefined) {
+      info = await obterInfoConvenioPaciente({
+        clinicaId,
+        pacienteId,
+        medicoId: medicoId ?? null,
+        procedimentoNome: nome,
+        agendamentoId: agendamentoId ?? null,
+        dataRef: null,
+      });
+      cache.set(nome, info);
+    }
+    if (!info) continue;
+    convenioNome = convenioNome || info.convenioNome;
+    if (!info.emDia) {
+      motivos.add(`mensalidade em atraso (${info.parcelasAtrasadas} parcela(s))`);
+      continue;
+    }
+    if (info.bloquear) {
+      motivos.add(info.avisoLimite ?? "limite do convênio atingido");
+      continue;
+    }
+    if (!info.desconto) {
+      motivos.add(`sem regra cadastrada para "${nome}"`);
+      continue;
+    }
+    const base = totalItemOrcamento(item);
+    if (base <= 0) continue;
+    const desc = info.desconto;
+    const porForma: Record<string, number> = {};
+    for (const f of formas) {
+      const baseForma =
+        f === "dinheiro"
+          ? Number(item.valores_formas?.["Dinheiro"] ?? base) || base
+          : Number(item.valores_formas?.["Cartão de Crédito"] ?? base) || base;
+      const final = aplicarDescontoPorForma(baseForma, f, desc);
+      porForma[f] = base > 0 ? Math.max(0, final / base) : 1;
+      if (!memoriaPorForma[f]) memoriaPorForma[f] = memoriaDescontoPorForma(baseForma, f, desc);
+    }
+    fatores[item.id] = porForma;
+    temBeneficio = true;
+  }
+
+  if (!convenioNome) return null;
+  let aviso: { tom: "warning" | "error"; mensagem: string } | null = null;
+  if (!temBeneficio && motivos.size > 0) {
+    aviso = {
+      tom: "warning",
+      mensagem:
+        `Paciente possui o convênio ${convenioNome}, mas o desconto NÃO foi aplicado a este orçamento.\n\n` +
+        `Motivo: ${Array.from(motivos).join("; ")}.\n\nA cobrança sai pelo valor particular.`,
+    };
+  } else if (temBeneficio && motivos.size > 0) {
+    aviso = {
+      tom: "warning",
+      mensagem:
+        `Convênio ${convenioNome} aplicado apenas em parte dos itens.\n\n` +
+        `Itens sem desconto: ${Array.from(motivos).join("; ")}.`,
+    };
+  }
+  return { temBeneficio, convenioNome, fatores, memoriaPorForma, aviso };
 }
 
 async function obterInfoConvenioPaciente(params: {
@@ -1986,6 +2117,12 @@ function AgendaPage() {
   // Aviso do convênio (limite/gratuidade/bloqueio) — modal persistente que
   // o atendente precisa fechar para continuar o atendimento.
   const [avisoConvenio, setAvisoConvenio] = useState<{ tom: "warning" | "error"; mensagem: string } | null>(null);
+  /**
+   * Fator de desconto do convênio apurado na cobrança atual, por item do
+   * orçamento e forma de pagamento. Usado para ajustar sinal/saldo e a baixa
+   * do item depois que o pagamento é gravado.
+   */
+  const orcFatoresRef = useRef<Record<string, Record<string, number>>>({});
   // Modal de confirmação da gratuidade — pergunta "usar agora ou depois"
   // antes de aplicar o benefício. Se "depois", cobra particular.
   const [gratuidadePrompt, setGratuidadePrompt] = useState<{
@@ -4747,11 +4884,17 @@ function AgendaPage() {
       );
       let opcoes: FormaOpcao[];
       let descSuffix = "";
-      const opcoesOrc = payload.orcamento_id ? await opcoesPagamentoDeOrcamento(payload.orcamento_id, novoId) : null;
+      const orcCobranca = payload.orcamento_id
+        ? await opcoesPagamentoDeOrcamento(payload.orcamento_id, novoId, payload.medico_id)
+        : null;
+      const opcoesOrc = orcCobranca?.opcoes ?? null;
+      orcFatoresRef.current = orcCobranca?.fatores ?? {};
 
       if (isMulti) {
         if (opcoesOrc) {
           opcoes = opcoesOrc;
+          descSuffix += orcCobranca?.descSuffix ?? "";
+          if (orcCobranca?.aviso) setAvisoConvenio(orcCobranca.aviso);
         } else {
           const resultado = await calcularOpcoesMultiExame({
             clinicaId: clinicaAtual.clinica_id,
@@ -4794,6 +4937,11 @@ function AgendaPage() {
         }
         if (opcoesOrc) {
           opcoes = opcoesOrc;
+          descSuffix += orcCobranca?.descSuffix ?? "";
+          if (orcCobranca?.aviso) setAvisoConvenio(orcCobranca.aviso);
+          else if (orcCobranca?.temBeneficio) {
+            toast.success(`Desconto do convênio aplicado neste pagamento.`);
+          }
         } else if (info) {
           if (!info.emDia) {
             setAvisoConvenio({
@@ -5058,10 +5206,11 @@ function AgendaPage() {
   const opcoesPagamentoDeOrcamento = async (
     orcamentoId: string,
     agendamentoId?: string | null,
-  ): Promise<FormaOpcao[] | null> => {
+    medicoId?: string | null,
+  ): Promise<OrcamentoCobranca | null> => {
     const { data, error } = await supabase
       .from("orcamentos")
-      .select("valor_total, valores_pagamento")
+      .select("valor_total, valores_pagamento, paciente_id")
       .eq("id", orcamentoId)
       .maybeSingle();
     if (error || !data) return null;
@@ -5074,6 +5223,7 @@ function AgendaPage() {
     // demais itens continuam livres para outros agendamentos/pagamentos.
     let totalLiquido = totalOrcamento;
     let proporcao = 1;
+    let itensCobranca: ItemOrcamentoCobranca[] = [];
     if (agendamentoId) {
       const { data: links } = await supabase
         .from("agendamento_orcamento_itens")
@@ -5083,14 +5233,10 @@ function AgendaPage() {
       if (ids.length) {
         const { data: itens } = await supabase
           .from("orcamento_itens")
-          .select("valor_total, quantidade, valor_unitario, valor_pago")
+          .select("id, descricao, valor_total, quantidade, valor_unitario, valor_pago, valores_formas")
           .in("id", ids);
-        const rows = (itens ?? []) as Array<{
-          valor_total: number | null;
-          quantidade: number | null;
-          valor_unitario: number | null;
-          valor_pago: number | null;
-        }>;
+        const rows = (itens ?? []) as ItemOrcamentoCobranca[];
+        itensCobranca = rows;
         if (rows.length) {
           const subtotal = rows.reduce(
             (s, i) =>
@@ -5103,18 +5249,64 @@ function AgendaPage() {
         }
       }
     }
+    if (itensCobranca.length === 0) {
+      const { data: todos } = await supabase
+        .from("orcamento_itens")
+        .select("id, descricao, valor_total, quantidade, valor_unitario, valor_pago, valores_formas")
+        .eq("orcamento_id", orcamentoId);
+      itensCobranca = (todos ?? []) as ItemOrcamentoCobranca[];
+    }
     const vals = (data.valores_pagamento ?? {}) as Record<string, number> | null;
     const pegar = (label: string) => {
       const v = vals ? Number(vals[label] ?? 0) : 0;
       if (v <= 0) return totalLiquido;
       return proporcao >= 1 ? v : Math.round(v * proporcao * 100) / 100;
     };
-    return [
+    const opcoesBase: FormaOpcao[] = [
       { forma: "dinheiro", label: "Dinheiro", valor: pegar("Dinheiro") },
       { forma: "pix", label: "Pix", valor: pegar("Pix") },
       { forma: "cartao_debito", label: "Cartão de Débito", valor: pegar("Cartão de Débito") },
       { forma: "cartao_credito", label: "Cartão de Crédito", valor: pegar("Cartão de Crédito") },
     ];
+    // Benefício do convênio: o orçamento é sempre gravado em valor PARTICULAR.
+    // O desconto é apurado agora, no momento do pagamento, porque a situação do
+    // contrato pode ter mudado desde que o orçamento foi feito (mensalidade em
+    // atraso, carência, contrato cancelado).
+    const beneficio = await calcularBeneficioOrcamento({
+      clinicaId: clinicaAtual?.clinica_id ?? null,
+      pacienteId: (data as { paciente_id?: string | null }).paciente_id ?? null,
+      itens: itensCobranca,
+      agendamentoId: agendamentoId ?? null,
+      medicoId: medicoId ?? null,
+    });
+    if (!beneficio || !beneficio.temBeneficio) {
+      return {
+        opcoes: opcoesBase,
+        descSuffix: "",
+        aviso: beneficio?.aviso ?? null,
+        fatores: {},
+        temBeneficio: false,
+      };
+    }
+    const opcoes = opcoesBase.map((o) => {
+      const soma = itensCobranca.reduce((s, i) => {
+        const saldo = saldoItemOrcamento(i);
+        const f = beneficio.fatores[i.id]?.[o.forma] ?? 1;
+        return s + saldo * f;
+      }, 0);
+      return {
+        ...o,
+        valor: Math.round(Math.max(0, soma) * 100) / 100,
+        memoria: beneficio.memoriaPorForma[o.forma],
+      };
+    });
+    return {
+      opcoes,
+      descSuffix: ` — Convênio ${beneficio.convenioNome} (aplicado no pagamento)`,
+      aviso: beneficio.aviso,
+      fatores: beneficio.fatores,
+      temBeneficio: true,
+    };
   };
 
   /**
@@ -5134,21 +5326,36 @@ function AgendaPage() {
       return { opcoes, descSuffix: "" };
     }
     const rotulo = etapaSinal.etapa === "sinal" ? "SINAL (entrada)" : "SALDO FINAL";
+    // Desconto do convênio apurado nesta cobrança (o orçamento guarda o valor
+    // particular). Cada forma de pagamento pode ter um fator diferente.
+    const fatoresForma = (forma: string): Record<string, number> => {
+      const out: Record<string, number> = {};
+      for (const [itemId, porForma] of Object.entries(orcFatoresRef.current ?? {})) {
+        const f = porForma?.[forma];
+        if (Number.isFinite(f)) out[itemId] = Number(f);
+      }
+      return out;
+    };
+    const etapaExibicao = aplicarFatoresEtapa(etapaSinal, fatoresForma("dinheiro"));
+    const etapaSinalExib = etapaExibicao;
+    const etapaPorForma = new Map<string, EtapaSinal>(
+      opcoes.map((o) => [o.forma, aplicarFatoresEtapa(etapaSinal, fatoresForma(o.forma))]),
+    );
     setSaldoOrcResumo({
-      total: etapaSinal.total,
-      pago: etapaSinal.pago,
-      restante: etapaSinal.restante,
-      itens: etapaSinal.itens,
+      total: etapaSinalExib.total,
+      pago: etapaSinalExib.pago,
+      restante: etapaSinalExib.restante,
+      itens: etapaSinalExib.itens,
     });
     setAvisoConvenio({
       tom: "warning",
       mensagem:
-        etapaSinal.etapa === "sinal"
-          ? `Orçamento com entrada — Total R$ ${etapaSinal.total.toFixed(2)} • Já pago R$ ${etapaSinal.pago.toFixed(2)} • Falta pagar R$ ${etapaSinal.restante.toFixed(2)}. Sugerido agora: sinal de R$ ${etapaSinal.valor.toFixed(2)} (o valor pode ser alterado).`
-          : `Saldo do orçamento — Total R$ ${etapaSinal.total.toFixed(2)} • Já pago R$ ${etapaSinal.pago.toFixed(2)} • Falta pagar R$ ${etapaSinal.restante.toFixed(2)}. Informe o valor que o paciente está pagando agora (pode ser parcial).`,
+        etapaSinalExib.etapa === "sinal"
+          ? `Orçamento com entrada — Total R$ ${etapaSinalExib.total.toFixed(2)} • Já pago R$ ${etapaSinalExib.pago.toFixed(2)} • Falta pagar R$ ${etapaSinalExib.restante.toFixed(2)}. Sugerido agora: sinal de R$ ${etapaSinalExib.valor.toFixed(2)} (o valor pode ser alterado).`
+          : `Saldo do orçamento — Total R$ ${etapaSinalExib.total.toFixed(2)} • Já pago R$ ${etapaSinalExib.pago.toFixed(2)} • Falta pagar R$ ${etapaSinalExib.restante.toFixed(2)}. Informe o valor que o paciente está pagando agora (pode ser parcial).`,
     });
     return {
-      opcoes: opcoes.map((o) => ({ ...o, valor: etapaSinal.valor })),
+      opcoes: opcoes.map((o) => ({ ...o, valor: (etapaPorForma.get(o.forma) ?? etapaSinal).valor })),
       descSuffix: ` — ${rotulo}`,
     };
   };
@@ -5163,7 +5370,11 @@ function AgendaPage() {
       // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
       // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
       // que não bate com a tabela de procedimentos e zeraria as opções).
-      const opcoesOrc = a.orcamento_id ? await opcoesPagamentoDeOrcamento(a.orcamento_id, a.id) : null;
+      const orcCobranca = a.orcamento_id
+        ? await opcoesPagamentoDeOrcamento(a.orcamento_id, a.id, a.medico_id)
+        : null;
+      const opcoesOrc = orcCobranca?.opcoes ?? null;
+      orcFatoresRef.current = orcCobranca?.fatores ?? {};
       // Pagamento em duas etapas (sinal + saldo) — itens de orçamento com
       // `sinal_valor` definido (Odontologia). A 1ª cobrança sugere o sinal,
       // a 2ª o saldo restante.
@@ -5230,6 +5441,8 @@ function AgendaPage() {
       if (isMulti) {
         if (opcoesOrc) {
           opcoes = opcoesOrc;
+          descSuffix += orcCobranca?.descSuffix ?? "";
+          if (orcCobranca?.aviso) setAvisoConvenio(orcCobranca.aviso);
         } else {
           const resultado = await calcularOpcoesMultiExame({
             clinicaId: clinicaAtual.clinica_id,
@@ -5271,9 +5484,15 @@ function AgendaPage() {
           if (escolha === "depois") info = { ...info, desconto: null };
         }
         if (opcoesOrc) {
-          // Valores do orçamento já consideram desconto/convênio definidos na hora
-          // de gerar o orçamento — não aplicamos nada por cima.
+          // O orçamento é gravado sempre em valor particular; o benefício do
+          // convênio é apurado agora, na hora do pagamento (ver
+          // `calcularBeneficioOrcamento`).
           opcoes = opcoesOrc;
+          descSuffix += orcCobranca?.descSuffix ?? "";
+          if (orcCobranca?.aviso) setAvisoConvenio(orcCobranca.aviso);
+          else if (orcCobranca?.temBeneficio) {
+            toast.success(`Desconto do convênio aplicado neste pagamento.`);
+          }
         } else if (info) {
           if (!info.emDia) {
             setAvisoConvenio({
@@ -6805,7 +7024,16 @@ function AgendaPage() {
           const idsCarimbo = [agId, ...pagamentoExtraIds];
           // Sinal/saldo dos itens de orçamento: abate o valor efetivamente pago.
           try {
-            await registrarPagamentoEtapaSinal(agId, Number(dados.valor) || 0);
+            // O valor recebido pode estar com desconto do convênio; a baixa no
+            // item usa o fator da forma escolhida para voltar ao valor
+            // particular gravado no orçamento.
+            const formaEscolhida = String(dados.forma_pagamento ?? "dinheiro");
+            const fatoresItem: Record<string, number> = {};
+            for (const [itemId, porForma] of Object.entries(orcFatoresRef.current ?? {})) {
+              const f = porForma?.[formaEscolhida];
+              if (Number.isFinite(f) && Number(f) > 0) fatoresItem[itemId] = Number(f);
+            }
+            await registrarPagamentoEtapaSinal(agId, Number(dados.valor) || 0, fatoresItem);
           } catch (err) {
             console.error("[sinal-orcamento]", err);
           }

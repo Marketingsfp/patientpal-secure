@@ -73,6 +73,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [regras, setRegras] = useState<CbRegra[]>([]);
   const [especialidades, setEspecialidades] = useState<EspOpt[]>([]);
   const [procedimentos, setProcedimentos] = useState<ProcOpt[]>([]);
+  /** Combinações "especialidadeId|tipo" existentes em serviços ativos. */
+  const [paresEspTipo, setParesEspTipo] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
   const [novoOpen, setNovoOpen] = useState(false);
@@ -122,6 +124,30 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     setRegras((r ?? []) as CbRegra[]);
     setEspecialidades((e ?? []) as EspOpt[]);
     setProcedimentos(allProcs);
+
+    // Combinações especialidade+tipo que realmente existem em serviços ativos.
+    // Serve só para avisar quando uma regra foi cadastrada com um tipo que não
+    // corresponde a nenhum serviço (ex.: Odontologia + "exame").
+    try {
+      const tipoDe = new Map(allProcs.map(p => [p.id, (p.tipo ?? "").toLowerCase()]));
+      const pares = new Set<string>();
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from("procedimento_especialidades")
+          .select("procedimento_id, especialidade_id")
+          .range(from, from + PAGE - 1);
+        if (error) break;
+        const page = data ?? [];
+        for (const row of page as Array<{ procedimento_id: string; especialidade_id: string }>) {
+          const t = tipoDe.get(row.procedimento_id);
+          if (t === undefined) continue; // serviço inativo/de outra clínica
+          pares.add(`${row.especialidade_id}|${t}`);
+          pares.add(`${row.especialidade_id}|`);
+        }
+        if (page.length < PAGE) break;
+      }
+      setParesEspTipo(pares);
+    } catch { /* aviso é opcional */ }
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [convenioId]);
@@ -153,6 +179,13 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     especialidades.forEach(e => m.set(e.id, e.nome));
     return m;
   }, [especialidades]);
+
+  /** Regra por especialidade+tipo que não corresponde a nenhum serviço ativo. */
+  const regraSemServico = (r: CbRegra) => {
+    if (r.procedimento_id || !r.especialidade_id || !r.tipo) return false;
+    if (paresEspTipo.size === 0) return false;
+    return !paresEspTipo.has(`${r.especialidade_id}|${(r.tipo ?? "").toLowerCase()}`);
+  };
 
   // ---- Exceções às regras (todos os convênios) --------------------------
   // Uma exceção é um procedimento que NÃO recebe desconto neste convênio.
@@ -592,6 +625,14 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
                       {TIPOS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  {regraSemServico(r) && (
+                    <span
+                      className="ml-1 inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                      title="Nenhum serviço ativo desta especialidade tem esse tipo. Esta regra não será aplicada em nenhum atendimento."
+                    >
+                      sem serviço
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <SearchableSelect
