@@ -301,17 +301,18 @@ export function PainelPage() {
     window.speechSynthesis.resume();
     tocarDing();
     const primeira = criarFala(texto, item.key);
-    const segunda = criarFala(texto, item.key);
-    // Fim da repetição = fim do anúncio; libera a próxima senha da fila.
-    segunda.onend = () => {
-      falandoRef.current = false;
-      processarFilaFala();
-    };
-    segunda.onerror = segunda.onend;
     // Se a primeira falhar, ainda tocamos a segunda depois do intervalo.
     window.speechSynthesis.speak(primeira);
     window.setTimeout(() => {
       window.speechSynthesis.resume();
+      // Cria a segunda leitura só agora para pegar a velocidade ATUAL
+      // (caso o usuário tenha alterado o slider entre a 1ª e a 2ª chamada).
+      const segunda = criarFala(texto, item.key);
+      segunda.onend = () => {
+        falandoRef.current = false;
+        processarFilaFala();
+      };
+      segunda.onerror = segunda.onend;
       window.speechSynthesis.speak(segunda);
     }, 3800);
     }
