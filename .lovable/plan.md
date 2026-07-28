@@ -1,63 +1,36 @@
-## Problema (confirmado no código)
+## O que está acontecendo (causa confirmada)
 
-Na agenda, ao faturar um agendamento vindo de orçamento, a função que monta as
-formas de pagamento (`opcoesPagamentoDeOrcamento`, em
-`src/routes/_authenticated/app.agenda.tsx`) lê **apenas** `orcamentos.valor_total`
-e `orcamentos.valores_pagamento` — ou seja, o valor **cheio do orçamento inteiro**,
-sem olhar quais itens foram vinculados àquele agendamento na tabela
-`agendamento_orcamento_itens`.
+Existem dois caminhos de cobrança na agenda, em `src/routes/_authenticated/app.agenda.tsx`:
 
-Por isso, escolhendo 1 item de um orçamento de 3 itens, o caixa vê o total de todos.
+1. **Agendar > depois Pagar** — função `cobrarAgendamento` (linha ~5093). Ela chama `obterEtapaSinal(a.id)` e, no bloco da linha ~5259, substitui os valores das formas de pagamento pelo valor da etapa (sinal ou saldo), mostra o aviso "Orçamento com entrada — Total / Já pago / Falta pagar" e preenche o resumo `setSaldoOrcResumo`.
+2. **Salvar e pagar** (criar agendamento já indo para o caixa) — bloco `if (irParaPagamento && novoId)` (linha ~4701). Esse caminho monta as opções via `opcoesPagamentoDeOrcamento(...)`, mas **nunca chama `obterEtapaSinal`**. Por isso vem o valor cheio do item, sem o selo "SINAL (entrada)" e sem o resumo.
 
-Segundo ponto confirmado: `src/lib/agenda/sinal-orcamento.ts` filtra apenas itens
-com `sinal_valor > 0`. Quando o agendamento mistura um item com entrada e outro sem,
-o resumo (Total / Já pago / Falta) ignora o item sem entrada.
+Ou seja: não é problema de dado nem do orçamento — é lógica que existe em um fluxo e não no outro.
 
-## O que muda
+Classificação do pedido: **erro de código** (regra de negócio já definida, só não aplicada em um dos caminhos).
 
-Somente o cálculo do valor sugerido no faturamento da agenda. Nada de regra de
-preço, desconto, impressão ou banco de dados.
+## Correção proposta
 
-1. **Valor por itens escolhidos**
-   `opcoesPagamentoDeOrcamento` passa a receber também o `agendamento_id`.
-   - Busca os itens vinculados em `agendamento_orcamento_itens`.
-   - Se houver vínculos: soma o `valor_total` **apenas desses itens**, descontando
-     o que já foi pago (`valor_pago`), e usa esse valor nas 4 formas.
-   - Se o orçamento tiver `valores_pagamento` por forma (Dinheiro/Pix/Débito/
-     Crédito), aplica a mesma proporção (itens escolhidos ÷ total do orçamento)
-     sobre cada forma, preservando diferenças de preço por forma.
-   - Sem vínculos (orçamento inteiro): comportamento atual, sem mudança.
+Espelhar no fluxo "Salvar e pagar" o mesmo tratamento já usado no "Agendar > Pagar":
 
-2. **Resumo de entrada com itens mistos**
-   `obterEtapaSinal` passa a considerar **todos** os itens vinculados ao
-   agendamento, e não só os que têm entrada:
-   - "Total" = soma dos itens escolhidos; "Já pago" e "Falta pagar" idem.
-   - A etapa continua sendo "sinal" enquanto o pago for menor que a soma das
-     entradas dos itens que têm entrada; depois vira "saldo".
-   - Itens sem entrada aparecem na lista com o selo "sem entrada" (já existente).
+- Depois de calcular `opcoes` (e depois de `opcoesOrc`), chamar `obterEtapaSinal(novoId)`.
+- Se houver etapa pendente:
+  - aplicar `etapaSinal.valor` em todas as formas de pagamento;
+  - acrescentar ao rótulo ` — SINAL (entrada)` ou ` — SALDO FINAL`;
+  - preencher `setSaldoOrcResumo({ total, pago, restante, itens })`;
+  - exibir o mesmo aviso com Total / Já pago / Falta pagar.
+- Se não houver, `setSaldoOrcResumo(null)` (como já é feito no outro fluxo).
 
-3. **Baixa do pagamento**
-   `registrarPagamentoEtapaSinal` passa a distribuir o valor recebido entre os
-   itens vinculados ao agendamento (com ou sem entrada), proporcional ao saldo de
-   cada um, nunca ultrapassando o total do item. Itens de outros agendamentos
-   ou não escolhidos **não são tocados** e continuam livres para agendar/pagar
-   depois — a regra de consumo por item já existente na agenda é preservada.
+Para não duplicar código, extraio esse trecho em uma pequena função local (ex.: `aplicarEtapaSinal(opcoes, agendamentoId)`) e uso nos dois pontos, mantendo o comportamento atual do fluxo já correto.
 
-## Arquivos afetados
+O registro do pagamento (`registrarPagamentoEtapaSinal`, linha ~6763) já é comum aos dois fluxos e não muda.
 
-- `src/routes/_authenticated/app.agenda.tsx` — assinatura e chamada de
-  `opcoesPagamentoDeOrcamento` (3 pontos de chamada: salvar-e-cobrar, cobrar
-  agendamento existente).
-- `src/lib/agenda/sinal-orcamento.ts` — seleção dos itens do agendamento.
+## Escopo
 
-## Fora do escopo
+- Arquivo alterado: `src/routes/_authenticated/app.agenda.tsx` (somente o fluxo de cobrança da agenda).
+- Não serão alterados: `src/lib/agenda/sinal-orcamento.ts`, banco de dados, valores de orçamento, regras de convênio.
 
-- Preços, descontos, convênios e Cartão Consulta.
-- Impressão (GR / orçamento) e migrações de banco.
+## Validação
 
-## Validação prevista
-
-- Orçamento com 3 itens, agendar só 1: faturamento deve trazer o valor daquele item.
-- Item com entrada + item sem entrada no mesmo agendamento: resumo deve somar os dois.
-- Após pagar, os itens não escolhidos continuam disponíveis para novo agendamento.
-- Checagem de tipos.
+- Checagem de tipos com `tsgo`.
+- Conferência prática sugerida (feita por você, sem gerar pagamento real): abrir um orçamento de odontologia com item com entrada, usar "Salvar e pagar" e confirmar que aparece o valor do sinal + o aviso, igual ao fluxo "Agendar > Pagar".

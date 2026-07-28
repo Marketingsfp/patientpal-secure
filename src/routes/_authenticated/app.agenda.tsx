@@ -95,7 +95,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
-import { obterEtapaSinal, registrarPagamentoEtapaSinal } from "@/lib/agenda/sinal-orcamento";
+import { obterEtapaSinal, registrarPagamentoEtapaSinal, type EtapaSinal } from "@/lib/agenda/sinal-orcamento";
 import { formatNumeroOrcamento, parseNumeroOrcamento } from "@/lib/orcamento-numero";
 import { IdadeIcon } from "@/components/idade-icon";
 import { ClienteForm, type Paciente as PacienteFull } from "@/components/clientes/cliente-form";
@@ -4819,6 +4819,11 @@ function AgendaPage() {
           }
         }
       }
+      // Sinal/saldo: mesma regra do fluxo "Agendar > Pagar" — quando o(s)
+      // item(ns) do orçamento têm entrada, sugere a etapa pendente.
+      const etapaNovo = await aplicarEtapaSinal(opcoes, novoId);
+      opcoes = etapaNovo.opcoes;
+      descSuffix += etapaNovo.descSuffix;
       setFormaPagOpcoes(opcoes);
       setFormaPagCtx({
         // Agrupa o principal + irmãos (imagem multi-exame) para que a mesma
@@ -5091,6 +5096,42 @@ function AgendaPage() {
     ];
   };
 
+  /**
+   * Aplica a etapa de sinal/saldo (orçamento de Odontologia com entrada) nas
+   * opções de forma de pagamento. Usado tanto no fluxo "Agendar > Pagar"
+   * quanto no "Salvar e pagar", para que os dois se comportem igual.
+   */
+  const aplicarEtapaSinal = async (
+    opcoes: FormaOpcao[],
+    agendamentoId: string,
+    etapaPreCarregada?: EtapaSinal | null,
+  ): Promise<{ opcoes: FormaOpcao[]; descSuffix: string }> => {
+    const etapaSinal =
+      etapaPreCarregada !== undefined ? etapaPreCarregada : await obterEtapaSinal(agendamentoId);
+    if (!etapaSinal) {
+      setSaldoOrcResumo(null);
+      return { opcoes, descSuffix: "" };
+    }
+    const rotulo = etapaSinal.etapa === "sinal" ? "SINAL (entrada)" : "SALDO FINAL";
+    setSaldoOrcResumo({
+      total: etapaSinal.total,
+      pago: etapaSinal.pago,
+      restante: etapaSinal.restante,
+      itens: etapaSinal.itens,
+    });
+    setAvisoConvenio({
+      tom: "warning",
+      mensagem:
+        etapaSinal.etapa === "sinal"
+          ? `Orçamento com entrada — Total R$ ${etapaSinal.total.toFixed(2)} • Já pago R$ ${etapaSinal.pago.toFixed(2)} • Falta pagar R$ ${etapaSinal.restante.toFixed(2)}. Sugerido agora: sinal de R$ ${etapaSinal.valor.toFixed(2)} (o valor pode ser alterado).`
+          : `Saldo do orçamento — Total R$ ${etapaSinal.total.toFixed(2)} • Já pago R$ ${etapaSinal.pago.toFixed(2)} • Falta pagar R$ ${etapaSinal.restante.toFixed(2)}. Informe o valor que o paciente está pagando agora (pode ser parcial).`,
+    });
+    return {
+      opcoes: opcoes.map((o) => ({ ...o, valor: etapaSinal.valor })),
+      descSuffix: ` — ${rotulo}`,
+    };
+  };
+
   const cobrarAgendamento = async (a: Agendamento) => {
     if (!podeEscrever) {
       toast.error("Você não tem permissão de edição neste módulo.");
@@ -5256,26 +5297,9 @@ function AgendaPage() {
       }
       // Sinal/saldo: quando o(s) item(ns) do orçamento têm sinal definido,
       // a cobrança da agenda passa a sugerir o valor da etapa pendente.
-      if (etapaSinal) {
-        const rotulo = etapaSinal.etapa === "sinal" ? "SINAL (entrada)" : "SALDO FINAL";
-        opcoes = opcoes.map((o) => ({ ...o, valor: etapaSinal.valor }));
-        descSuffix += ` — ${rotulo}`;
-        setSaldoOrcResumo({
-          total: etapaSinal.total,
-          pago: etapaSinal.pago,
-          restante: etapaSinal.restante,
-          itens: etapaSinal.itens,
-        });
-        setAvisoConvenio({
-          tom: "warning",
-          mensagem:
-            etapaSinal.etapa === "sinal"
-              ? `Orçamento com entrada — Total R$ ${etapaSinal.total.toFixed(2)} • Já pago R$ ${etapaSinal.pago.toFixed(2)} • Falta pagar R$ ${etapaSinal.restante.toFixed(2)}. Sugerido agora: sinal de R$ ${etapaSinal.valor.toFixed(2)} (o valor pode ser alterado).`
-              : `Saldo do orçamento — Total R$ ${etapaSinal.total.toFixed(2)} • Já pago R$ ${etapaSinal.pago.toFixed(2)} • Falta pagar R$ ${etapaSinal.restante.toFixed(2)}. Informe o valor que o paciente está pagando agora (pode ser parcial).`,
-        });
-      } else {
-        setSaldoOrcResumo(null);
-      }
+      const etapaAplicada = await aplicarEtapaSinal(opcoes, a.id, etapaSinal);
+      opcoes = etapaAplicada.opcoes;
+      descSuffix += etapaAplicada.descSuffix;
       // Procedimento sem valor (ex.: REVISÃO / retorno gratuito). Não abre o
       // fluxo de cobrança — registra um lançamento de valor 0 (linha-sombra),
       // marca como pago e avança o fluxo, do mesmo modo que um pagamento normal.
