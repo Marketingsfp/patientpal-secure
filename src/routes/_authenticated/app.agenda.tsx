@@ -7024,7 +7024,16 @@ function AgendaPage() {
           const idsCarimbo = [agId, ...pagamentoExtraIds];
           // Sinal/saldo dos itens de orçamento: abate o valor efetivamente pago.
           try {
-            await registrarPagamentoEtapaSinal(agId, Number(dados.valor) || 0);
+            // O valor recebido pode estar com desconto do convênio; a baixa no
+            // item usa o fator da forma escolhida para voltar ao valor
+            // particular gravado no orçamento.
+            const formaEscolhida = String(dados.forma_pagamento ?? "dinheiro");
+            const fatoresItem: Record<string, number> = {};
+            for (const [itemId, porForma] of Object.entries(orcFatoresRef.current ?? {})) {
+              const f = porForma?.[formaEscolhida];
+              if (Number.isFinite(f) && Number(f) > 0) fatoresItem[itemId] = Number(f);
+            }
+            await registrarPagamentoEtapaSinal(agId, Number(dados.valor) || 0, fatoresItem);
           } catch (err) {
             console.error("[sinal-orcamento]", err);
           }
