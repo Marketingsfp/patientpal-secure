@@ -46,6 +46,7 @@ import { TurboModeToggle } from "@/components/agenda/turbo-mode-toggle";
 import { useTurboDisabled } from "@/hooks/use-turbo-disabled";
 import { DividirOrcamentoDialog, type DividirItem } from "@/components/agenda/dividir-orcamento-dialog";
 import { SelecionarItensOrcamentoDialog, type SelectItemOrc } from "@/components/agenda/selecionar-itens-orcamento-dialog";
+import { AtendimentoExternoDialog } from "@/components/agenda/atendimento-externo-dialog";
 import { calcularAvisoLimitePendentes, deveBloquearPorLimitePendente } from "@/lib/agenda/aviso-limite-pendentes";
 import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
@@ -68,6 +69,7 @@ import {
   Clock,
   DollarSign,
   ShieldCheck,
+  Building2,
   BadgeCheck,
   IdCard,
   Play,
@@ -1717,6 +1719,8 @@ function AgendaPage() {
   // Dialog de seleção de itens (Odontologia: usuário escolhe quais itens
   // do orçamento entram neste agendamento; o restante fica disponível).
   const [selecItensOpen, setSelecItensOpen] = useState(false);
+  // Atendimento faturado em outra clínica (não gera caixa/NFS-e aqui).
+  const [externoAg, setExternoAg] = useState<Agendamento | null>(null);
   const [selecItensCtx, setSelecItensCtx] = useState<{
     orcamento: { id: string; numero: number; paciente_id: string | null; paciente_nome: string | null };
     itensRestantes: SelectItemOrc[];
@@ -2435,7 +2439,7 @@ function AgendaPage() {
     const reqId = ++loadReqId.current;
     setLoading(true);
     const agendaSelect =
-      "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,medico:medicos(nome,sexo),paciente:pacientes(nome),orcamento:orcamentos(numero)" as const;
+      "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
     let q = supabase
       .from("agendamentos")
       .select(agendaSelect as never)
@@ -2529,11 +2533,9 @@ function AgendaPage() {
     ): Agendamento[] =>
       rows.map((a) => ({
         ...a,
-        // Nome sempre vem do cadastro atual do paciente quando há vínculo;
-        // a cópia gravada no agendamento é só fallback (slots livres/sem id).
-        paciente_nome: isSlotLivre(a.paciente_nome)
-          ? "DISPONÍVEL"
-          : (a.paciente_id ? (a.paciente?.nome ?? a.paciente_nome) : a.paciente_nome),
+        // O nome gravado no agendamento é mantido em dia pelo gatilho
+        // trg_sync_paciente_nome_agendamentos (não há FK para embed).
+        paciente_nome: isSlotLivre(a.paciente_nome) ? "DISPONÍVEL" : a.paciente_nome,
         medico_id: a.medico_id ?? null,
         medico_nome: a.medico_nome ?? a.medico?.nome ?? null,
         medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
@@ -9059,6 +9061,13 @@ function AgendaPage() {
                                 <ShieldCheck className="h-4 w-4 mr-2" /> Histórico
                               </DropdownMenuItem>
 
+                              {/* Atendimento externo (faturado em outra clínica) */}
+                              {podeEscrever && !ehLivre && (
+                                <DropdownMenuItem onClick={() => setExternoAg(a)} className="text-orange-600">
+                                  <Building2 className="h-4 w-4 mr-2" /> Atendimento externo (outra clínica)
+                                </DropdownMenuItem>
+                              )}
+
                               {/* Reabrir (apenas realizado) */}
                               {podeEscrever && a.status === "realizado" && (
                                 <DropdownMenuItem onClick={() => reabrirAtendimento(a)}>
@@ -9374,6 +9383,15 @@ function AgendaPage() {
           }}
         />
       )}
+      <AtendimentoExternoDialog
+        open={!!externoAg}
+        onOpenChange={(v) => { if (!v) setExternoAg(null); }}
+        agendamentoId={externoAg?.id ?? null}
+        pacienteNome={externoAg?.paciente_nome ?? null}
+        clinicaId={clinicaAtual?.clinica_id ?? null}
+        procedimento={externoAg?.procedimento ?? null}
+        onDone={() => { void load(); }}
+      />
       {selecItensCtx && (
         <SelecionarItensOrcamentoDialog
           open={selecItensOpen}
