@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Printer, Pencil } from "lucide-react";
+import { Printer, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
@@ -10,6 +10,10 @@ import { formatNumeroOrcamento } from "@/lib/orcamento-numero";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { type OrcV2 } from "@/components/orcamentos-v2/orcamento-card";
 import { OrcamentoDrawer } from "@/components/orcamentos-v2/orcamento-drawer";
 import { NovoOrcamentoOdontoDialog } from "./novo-orcamento-odonto-dialog";
@@ -55,6 +59,8 @@ export function OrcamentoTab({
   const [loading, setLoading] = useState(true);
   const [drawerOrc, setDrawerOrc] = useState<OrcV2 | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+  const [excluir, setExcluir] = useState<Linha | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
 
   const load = useCallback(async () => {
     if (!clinicaAtual || !especialidadeOdontoId) return;
@@ -183,6 +189,17 @@ export function OrcamentoTab({
     catch (e) { toast.error((e as Error).message); }
   };
 
+  const confirmarExclusao = async () => {
+    if (!excluir) return;
+    setExcluindo(true);
+    const { error } = await supabase.from("orcamentos").delete().eq("id", excluir.id);
+    setExcluindo(false);
+    if (error) { mostrarErro(error); return; }
+    toast.success("Orçamento excluído");
+    setExcluir(null);
+    void load();
+  };
+
   return (
     <div className="space-y-4">
       {loading ? (
@@ -251,6 +268,22 @@ export function OrcamentoTab({
                       >
                         <Printer className="h-4 w-4" />
                       </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        title={
+                          o.itens_pagos > 0
+                            ? "Orçamento com itens pagos — não pode ser excluído"
+                            : (o.agendamentos_total ?? 0) > 0
+                              ? "Orçamento com agendamento vinculado — cancele o agendamento antes de excluir"
+                              : "Excluir orçamento"
+                        }
+                        disabled={o.itens_pagos > 0 || (o.agendamentos_total ?? 0) > 0}
+                        onClick={(e) => { e.stopPropagation(); setExcluir(o); }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -261,6 +294,27 @@ export function OrcamentoTab({
       )}
 
       <OrcamentoDrawer
+
+      <AlertDialog open={!!excluir} onOpenChange={(v) => { if (!v) setExcluir(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir orçamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Excluir o orçamento {excluir ? formatNumeroOrcamento(excluir.serie, excluir.numero) : ""}
+              {excluir?.paciente_nome ? ` de ${excluir.paciente_nome}` : ""}? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluindo}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={excluindo}
+              onClick={(e) => { e.preventDefault(); void confirmarExclusao(); }}
+            >
+              {excluindo ? "Excluindo…" : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
         orc={drawerOrc}
         onClose={() => setDrawerOrc(null)}
         onPrint={(id) => void imprimir(id)}
