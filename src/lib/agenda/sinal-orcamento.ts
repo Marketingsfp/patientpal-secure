@@ -46,6 +46,13 @@ type ItemRow = {
 const totalItem = (i: ItemRow) =>
   Number(i.valor_total ?? (Number(i.quantidade ?? 1) * Number(i.valor_unitario ?? 0)));
 
+/**
+ * Itens do orçamento vinculados a ESTE agendamento.
+ * Retorna vazio quando nenhum deles tem entrada (`sinal_valor`), mantendo o
+ * fluxo de sinal/saldo restrito a orçamentos odontológicos com entrada.
+ * Quando há entrada em pelo menos um item, TODOS os itens escolhidos entram
+ * no cálculo — inclusive os sem entrada.
+ */
 async function itensComSinal(agendamentoId: string): Promise<ItemRow[]> {
   const { data: links } = await supabase
     .from("agendamento_orcamento_itens")
@@ -57,7 +64,9 @@ async function itensComSinal(agendamentoId: string): Promise<ItemRow[]> {
     .from("orcamento_itens")
     .select("id, descricao, quantidade, valor_unitario, valor_total, sinal_valor, valor_pago, status_financeiro")
     .in("id", ids);
-  return ((data ?? []) as ItemRow[]).filter((i) => Number(i.sinal_valor ?? 0) > 0);
+  const itens = (data ?? []) as ItemRow[];
+  const temSinal = itens.some((i) => Number(i.sinal_valor ?? 0) > 0);
+  return temSinal ? itens : [];
 }
 
 /** Etapa pendente de cobrança, ou null quando não há sinal ou já está quitado. */

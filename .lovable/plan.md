@@ -1,40 +1,63 @@
-## Objetivo
+## Problema (confirmado no código)
 
-Hoje, ao faturar na agenda um agendamento vindo de orçamento odontológico com entrada, o sistema mostra apenas números somados (Total • Já pago • Falta pagar). Não dá para saber **qual item** tem entrada nem **quanto** é a entrada de cada um.
+Na agenda, ao faturar um agendamento vindo de orçamento, a função que monta as
+formas de pagamento (`opcoesPagamentoDeOrcamento`, em
+`src/routes/_authenticated/app.agenda.tsx`) lê **apenas** `orcamentos.valor_total`
+e `orcamentos.valores_pagamento` — ou seja, o valor **cheio do orçamento inteiro**,
+sem olhar quais itens foram vinculados àquele agendamento na tabela
+`agendamento_orcamento_itens`.
 
-A mudança é só de exibição: passar a listar item a item.
+Por isso, escolhendo 1 item de um orçamento de 3 itens, o caixa vê o total de todos.
 
-## O que vai aparecer
+Segundo ponto confirmado: `src/lib/agenda/sinal-orcamento.ts` filtra apenas itens
+com `sinal_valor > 0`. Quando o agendamento mistura um item com entrada e outro sem,
+o resumo (Total / Já pago / Falta) ignora o item sem entrada.
 
-Na janela de faturamento (lançamento no caixa), dentro do bloco "Orçamento com entrada", uma lista com uma linha por item:
+## O que muda
 
-```text
-RESTAURACAO RESINA FOTOPOLIMERIZAVEL   [Entrada R$ 60,00]
-Total R$ 120,00 · Já pago R$ 60,00 · Falta R$ 60,00
+Somente o cálculo do valor sugerido no faturamento da agenda. Nada de regra de
+preço, desconto, impressão ou banco de dados.
 
-ACESSO PULPAR                          [sem entrada]
-Total R$ 140,00 · Já pago R$ 0,00 · Falta R$ 140,00
-```
+1. **Valor por itens escolhidos**
+   `opcoesPagamentoDeOrcamento` passa a receber também o `agendamento_id`.
+   - Busca os itens vinculados em `agendamento_orcamento_itens`.
+   - Se houver vínculos: soma o `valor_total` **apenas desses itens**, descontando
+     o que já foi pago (`valor_pago`), e usa esse valor nas 4 formas.
+   - Se o orçamento tiver `valores_pagamento` por forma (Dinheiro/Pix/Débito/
+     Crédito), aplica a mesma proporção (itens escolhidos ÷ total do orçamento)
+     sobre cada forma, preservando diferenças de preço por forma.
+   - Sem vínculos (orçamento inteiro): comportamento atual, sem mudança.
 
-Itens com entrada ganham um selo destacado "Entrada R$ X". Abaixo da lista permanecem os totais gerais e o campo "Pagando agora / Falta pagar" já existente.
+2. **Resumo de entrada com itens mistos**
+   `obterEtapaSinal` passa a considerar **todos** os itens vinculados ao
+   agendamento, e não só os que têm entrada:
+   - "Total" = soma dos itens escolhidos; "Já pago" e "Falta pagar" idem.
+   - A etapa continua sendo "sinal" enquanto o pago for menor que a soma das
+     entradas dos itens que têm entrada; depois vira "saldo".
+   - Itens sem entrada aparecem na lista com o selo "sem entrada" (já existente).
 
-Além disso, na janela "Escolher itens do orçamento" (usada ao agendar), cada item com entrada passa a exibir o selo "Entrada R$ X" ao lado do valor, para o atendente já saber o que será cobrado como entrada.
+3. **Baixa do pagamento**
+   `registrarPagamentoEtapaSinal` passa a distribuir o valor recebido entre os
+   itens vinculados ao agendamento (com ou sem entrada), proporcional ao saldo de
+   cada um, nunca ultrapassando o total do item. Itens de outros agendamentos
+   ou não escolhidos **não são tocados** e continuam livres para agendar/pagar
+   depois — a regra de consumo por item já existente na agenda é preservada.
 
-## Como será feito (parte técnica)
+## Arquivos afetados
 
-1. `src/lib/agenda/sinal-orcamento.ts`
-   - `obterEtapaSinal` passa a retornar também `itens: { id, descricao, total, sinal, pago, restante }[]`, buscando `descricao` junto na consulta de `orcamento_itens`.
-   - Nenhuma mudança na regra de cálculo ou de gravação de pagamento.
-
-2. `src/routes/_authenticated/app.agenda.tsx`
-   - O estado `saldoOrcResumo` passa a carregar a lista de itens vinda de `obterEtapaSinal`.
-
-3. `src/components/financeiro/lancamento-dialog.tsx`
-   - A prop `resumoSaldo` recebe o array de itens e renderiza a lista descrita acima acima dos totais.
-
-4. `src/components/agenda/selecionar-itens-orcamento-dialog.tsx`
-   - `SelectItemOrc` ganha `sinal_valor`; a agenda passa esse campo ao montar `itensRestantes`; o item exibe o selo "Entrada R$ X".
+- `src/routes/_authenticated/app.agenda.tsx` — assinatura e chamada de
+  `opcoesPagamentoDeOrcamento` (3 pontos de chamada: salvar-e-cobrar, cobrar
+  agendamento existente).
+- `src/lib/agenda/sinal-orcamento.ts` — seleção dos itens do agendamento.
 
 ## Fora do escopo
 
-- Nenhuma alteração em regras de cobrança, distribuição de valores, impressão (GR/orçamento) ou banco de dados.
+- Preços, descontos, convênios e Cartão Consulta.
+- Impressão (GR / orçamento) e migrações de banco.
+
+## Validação prevista
+
+- Orçamento com 3 itens, agendar só 1: faturamento deve trazer o valor daquele item.
+- Item com entrada + item sem entrada no mesmo agendamento: resumo deve somar os dois.
+- Após pagar, os itens não escolhidos continuam disponíveis para novo agendamento.
+- Checagem de tipos.
