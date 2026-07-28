@@ -4873,11 +4873,17 @@ function AgendaPage() {
       );
       let opcoes: FormaOpcao[];
       let descSuffix = "";
-      const opcoesOrc = payload.orcamento_id ? await opcoesPagamentoDeOrcamento(payload.orcamento_id, novoId) : null;
+      const orcCobranca = payload.orcamento_id
+        ? await opcoesPagamentoDeOrcamento(payload.orcamento_id, novoId, payload.medico_id)
+        : null;
+      const opcoesOrc = orcCobranca?.opcoes ?? null;
+      orcFatoresRef.current = orcCobranca?.fatores ?? {};
 
       if (isMulti) {
         if (opcoesOrc) {
           opcoes = opcoesOrc;
+          descSuffix += orcCobranca?.descSuffix ?? "";
+          if (orcCobranca?.aviso) setAvisoConvenio(orcCobranca.aviso);
         } else {
           const resultado = await calcularOpcoesMultiExame({
             clinicaId: clinicaAtual.clinica_id,
@@ -4920,6 +4926,11 @@ function AgendaPage() {
         }
         if (opcoesOrc) {
           opcoes = opcoesOrc;
+          descSuffix += orcCobranca?.descSuffix ?? "";
+          if (orcCobranca?.aviso) setAvisoConvenio(orcCobranca.aviso);
+          else if (orcCobranca?.temBeneficio) {
+            toast.success(`Desconto do convênio aplicado neste pagamento.`);
+          }
         } else if (info) {
           if (!info.emDia) {
             setAvisoConvenio({
