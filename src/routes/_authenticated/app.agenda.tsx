@@ -1169,6 +1169,41 @@ async function obterInfoConvenioPaciente(params: {
           agsFiltrados = agsWithProc.filter((a) => nomesSet.has(normProc(a.procedimento)));
         }
       }
+      // Filtro por TIPO do serviço (consulta x exame). A regra do convênio
+      // pode ser específica de um tipo (ex.: "consulta" a R$ 9,99, 1/dia).
+      // Sem este filtro, qualquer EXAME feito com um médico da mesma
+      // especialidade (ex.: ECG/Ecocardiograma com cardiologista) era contado
+      // como uso da consulta do dia e o paciente perdia o benefício.
+      const tipoRegra = (beneficioEscolhido.tipo ?? "").toString().trim().toLowerCase() || null;
+      if (tipoRegra && agsFiltrados.length > 0) {
+        const nomesAgs = Array.from(
+          new Set(
+            (agsFiltrados as Array<{ procedimento?: string | null }>)
+              .map((a) => (a.procedimento ?? "").trim())
+              .filter((n) => !!n),
+          ),
+        );
+        if (nomesAgs.length > 0) {
+          const { data: procsTipo } = await supabase
+            .from("procedimentos")
+            .select("nome,tipo")
+            .eq("clinica_id", clinicaId)
+            .in("nome", nomesAgs);
+          const tipoPorNome = new Map<string, string>();
+          ((procsTipo ?? []) as Array<{ nome: string | null; tipo: string | null }>).forEach((p) => {
+            const k = normProcServico(p.nome);
+            const t = (p.tipo ?? "").toString().trim().toLowerCase();
+            if (k && t && !tipoPorNome.has(k)) tipoPorNome.set(k, t);
+          });
+          agsFiltrados = (agsFiltrados as Array<{ procedimento?: string | null }>).filter((a) => {
+            const t = tipoPorNome.get(normProcServico(a.procedimento));
+            // Serviço não encontrado no cadastro: mantém o comportamento
+            // anterior (conta como uso) para não afrouxar o limite.
+            if (!t) return true;
+            return t === tipoRegra;
+          }) as typeof agsFiltrados;
+        }
+      }
       // Regra: o limite só é consumido quando o agendamento efetivamente foi
       // pago. O status na tabela `agendamentos` nem sempre muda para
       // "realizado" após a cobrança no caixa — o sinal mais confiável é a
