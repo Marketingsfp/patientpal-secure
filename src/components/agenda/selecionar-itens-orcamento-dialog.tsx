@@ -13,6 +13,8 @@ export type SelectItemOrc = {
   dentes: string[] | null;
   /** Entrada (sinal) definida no item, quando houver. */
   sinal_valor?: number | null;
+  /** Quanto já foi pago deste item (entrada e/ou parcelas do saldo). */
+  valor_pago?: number | null;
 };
 
 const fmtBRL = (v: number) =>
@@ -40,7 +42,11 @@ export function SelecionarItensOrcamentoDialog(props: {
   const total = useMemo(
     () => itensRestantes
       .filter((i) => selecionados.has(i.id))
-      .reduce((s, i) => s + Number(i.valor_total || 0), 0),
+      .reduce(
+        (s, i) =>
+          s + Math.max(0, Number(i.valor_total || 0) - Number(i.valor_pago || 0)),
+        0,
+      ),
     [itensRestantes, selecionados],
   );
 
