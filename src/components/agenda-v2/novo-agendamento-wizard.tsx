@@ -10,6 +10,7 @@ import { ProcedimentoPicker, type ProcedimentoOption } from "@/components/agenda
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
+import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { cn } from "@/lib/utils";
 
@@ -46,7 +47,7 @@ type MedicoLite = {
 
 type SlotLivre = { id: string; inicio: string; fim: string };
 
-type TipoAtendimento = "particular" | "convenio";
+type TipoAtendimento = "particular" | "convenio" | "externo";
 
 type EspecialidadeOpt = { id: string; nome: string; isPrincipal: boolean };
 
@@ -97,6 +98,10 @@ export function NovoAgendamentoWizard({
   const [dataDia, setDataDia] = useState<string>(toLocalDateKey(new Date()));
   const [slot, setSlot] = useState<SlotLivre | null>(null);
   const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento>("particular");
+  // Atendimento externo — faturado em outra clínica (ver AGENTS.md §1.9).
+  const [externoClinicaNome, setExternoClinicaNome] = useState<string>("");
+  const [externoGrNumero, setExternoGrNumero] = useState<string>("");
+  const [externoValor, setExternoValor] = useState<string>("");
   const [especialidadeId, setEspecialidadeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -134,6 +139,9 @@ export function NovoAgendamentoWizard({
     setDataDia(toLocalDateKey(new Date()));
     setSlot(null);
     setTipoAtendimento("particular");
+    setExternoClinicaNome("");
+    setExternoGrNumero("");
+    setExternoValor("");
     setEspecialidadeId(null);
     setSaving(false);
     resetQuickCreate();
