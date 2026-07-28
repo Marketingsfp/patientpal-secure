@@ -6694,6 +6694,7 @@ function AgendaPage() {
             setPagamentoRotulos({});
             setPagamentoPacienteNome("");
             setDescontoPendente(null);
+            setSaldoOrcResumo(null);
           }
         }}
         tipo="receita"
@@ -6701,14 +6702,15 @@ function AgendaPage() {
         initialValor={pagamentoValor}
         initialFormaPagamento={pagamentoForma}
         agendamentoId={pagamentoAgId}
+        resumoSaldo={saldoOrcResumo}
         onSavedWithData={async (dados) => {
           if (!pagamentoAgId || !clinicaAtual) return;
           const agId = pagamentoAgId;
           const clinicaIdCarimbo = clinicaAtual.clinica_id;
           const idsCarimbo = [agId, ...pagamentoExtraIds];
-          // Sinal/saldo dos itens de orçamento: marca a etapa quitada.
+          // Sinal/saldo dos itens de orçamento: abate o valor efetivamente pago.
           try {
-            await registrarPagamentoEtapaSinal(agId);
+            await registrarPagamentoEtapaSinal(agId, Number(dados.valor) || 0);
           } catch (err) {
             console.error("[sinal-orcamento]", err);
           }
