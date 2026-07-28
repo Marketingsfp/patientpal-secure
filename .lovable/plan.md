@@ -1,28 +1,34 @@
 ## Objetivo
 
-Adicionar, na aba **Orçamento** de Odontologia, um botão para excluir um orçamento — ao lado dos botões de editar e imprimir.
+Hoje o orçamento sai em formato de cupom (bobina de 80mm, fonte monoespaçada), como na imagem enviada. A mudança é fazer os orçamentos **de Odontologia** saírem em **folha A4**, mantendo os demais orçamentos (menu "Orçamentos") como estão.
 
-## O que muda na tela
+## Tipo de pedido
 
-- Nova ação em cada linha da tabela: ícone de lixeira (vermelho), depois do lápis e da impressora.
-- Ao clicar, abre uma confirmação mostrando o número do orçamento e o nome do paciente ("Excluir o orçamento D-2026-00001 de FULANO? Esta ação não pode ser desfeita.").
-- Depois de confirmar: mensagem de sucesso e a lista recarrega automaticamente.
+Ajuste visual / de layout de impressão. Não altera regra de negócio, valores, sinal/saldo, descontos ou banco de dados.
 
-## Regras de segurança (para não quebrar o financeiro)
+## O que muda
 
-- **Bloqueado quando o orçamento já tem item pago** (mesma regra usada hoje para bloquear a edição). O botão fica desabilitado com a explicação no tooltip.
-- **Bloqueado quando existe agendamento vinculado** ainda não cancelado — o tooltip avisa que é preciso desvincular/cancelar o agendamento antes.
-- Orçamentos com situação "convertido/finalizado" continuam protegidos pela trava que já existe no banco: só Administrador ou Gestor conseguem excluir, e tentativas negadas continuam registradas na auditoria. Nada dessa trava é alterado.
-- Se o banco recusar, a mensagem de erro é traduzida e exibida ao usuário, sem sumir a linha da tela.
+1. A função de impressão passa a aceitar um formato: `cupom` (padrão, atual) ou `a4`.
+2. Nos dois pontos de Odontologia (botão de impressão na tabela da aba "Orçamento" e impressão logo após salvar o orçamento novo/editado), a chamada passa a usar `a4`.
+3. O menu "Orçamentos" e o shell v2 continuam usando `cupom` — nada muda para eles.
+
+## Como fica o A4
+
+- Página A4 retrato com margens de ~15mm, fonte de leitura (sem monoespaçada de cupom).
+- Cabeçalho: nome da clínica, endereço, telefone/CNPJ à esquerda; número do orçamento e data à direita.
+- Bloco "Paciente": nome, telefone, profissional.
+- **Tabela de serviços** com colunas: Serviço | Qtd | Valor unit. | Dinheiro | Cartão/PIX | Sinal | Saldo final. As colunas de Dinheiro/Cartão só aparecem quando o orçamento tem valores separados por forma; as de Sinal/Saldo só aparecem quando existe algum item com sinal — mesma lógica de exibição de hoje, só reorganizada em tabela.
+- Bloco de totais alinhado à direita (Subtotal/Desconto/Total, ou Dinheiro e Cartão/PIX quando houver split; Total Sinal e Total Saldo Final quando houver sinal).
+- Forma de pagamento, observações e o bloco de "Preparo" mantidos.
+- Rodapé: validade, linha de assinatura do paciente e do profissional, "Obrigado pela preferência!".
+- Todos os valores, regras de sinal/saldo e cálculos permanecem exatamente os de hoje — apenas a apresentação muda.
 
 ## Detalhes técnicos
 
-- Arquivo único: `src/components/odontologia/orcamento-tab.tsx`.
-- Reaproveita o mesmo padrão do módulo de Orçamentos (`app.orcamentos.tsx`): `supabase.from("orcamentos").delete().eq("id", id)` + `mostrarErro` + `toast` + `load()`.
-- Confirmação com `AlertDialog` do shadcn (em vez do `confirm()` nativo) para ficar consistente com o restante da tela.
-- Os itens (`orcamento_itens`) e vínculos saem junto por cascade do próprio registro; nenhuma migração de banco é necessária.
+- `src/lib/print-orcamento.ts`: adicionar parâmetro opcional `formato: "cupom" | "a4"`; extrair o cálculo (itens, split de formas, sinal, totais, preparos) para reuso e gerar dois templates HTML. `@page { size: A4; margin: 15mm }` no modo A4 e janela de impressão maior.
+- `src/components/odontologia/orcamento-tab.tsx` e `src/components/odontologia/novo-orcamento-odonto-dialog.tsx`: passar `"a4"`.
 
-## Fora do escopo
+## Fora de escopo
 
-- Não altero o módulo geral de Orçamentos nem a impressão.
-- Não crio "cancelamento" (status cancelado) — o pedido é exclusão.
+- Orçamentos não odontológicos, GR de atendimento, contratos.
+- Qualquer alteração de valores, descontos ou dados gravados.
