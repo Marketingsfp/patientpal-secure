@@ -5029,7 +5029,10 @@ function AgendaPage() {
   // Lê os valores fechados de um orçamento e devolve as 4 opções de pagamento.
   // Quando o orçamento tem `valores_pagamento` por forma, usa cada um;
   // caso contrário aplica o (valor_total - desconto) em todas as formas.
-  const opcoesPagamentoDeOrcamento = async (orcamentoId: string): Promise<FormaOpcao[] | null> => {
+  const opcoesPagamentoDeOrcamento = async (
+    orcamentoId: string,
+    agendamentoId?: string | null,
+  ): Promise<FormaOpcao[] | null> => {
     const { data, error } = await supabase
       .from("orcamentos")
       .select("valor_total, valores_pagamento")
@@ -5039,11 +5042,46 @@ function AgendaPage() {
     // `valor_total` do orçamento JÁ é líquido (subtotal - desconto).
     // Não subtrair `desconto` de novo aqui — isso causava desconto duplicado
     // ao converter o orçamento em cobrança na agenda.
-    const totalLiquido = Math.max(0, Number(data.valor_total ?? 0));
+    const totalOrcamento = Math.max(0, Number(data.valor_total ?? 0));
+    // Quando o agendamento consome apenas ALGUNS itens do orçamento, o valor
+    // cobrado é o dos itens escolhidos (menos o que já foi pago neles). Os
+    // demais itens continuam livres para outros agendamentos/pagamentos.
+    let totalLiquido = totalOrcamento;
+    let proporcao = 1;
+    if (agendamentoId) {
+      const { data: links } = await supabase
+        .from("agendamento_orcamento_itens")
+        .select("orcamento_item_id")
+        .eq("agendamento_id", agendamentoId);
+      const ids = ((links ?? []) as Array<{ orcamento_item_id: string }>).map((r) => r.orcamento_item_id);
+      if (ids.length) {
+        const { data: itens } = await supabase
+          .from("orcamento_itens")
+          .select("valor_total, quantidade, valor_unitario, valor_pago")
+          .in("id", ids);
+        const rows = (itens ?? []) as Array<{
+          valor_total: number | null;
+          quantidade: number | null;
+          valor_unitario: number | null;
+          valor_pago: number | null;
+        }>;
+        if (rows.length) {
+          const subtotal = rows.reduce(
+            (s, i) =>
+              s + Number(i.valor_total ?? Number(i.quantidade ?? 1) * Number(i.valor_unitario ?? 0)),
+            0,
+          );
+          const pago = rows.reduce((s, i) => s + Number(i.valor_pago ?? 0), 0);
+          totalLiquido = Math.round(Math.max(0, subtotal - pago) * 100) / 100;
+          proporcao = totalOrcamento > 0 ? Math.min(1, totalLiquido / totalOrcamento) : 1;
+        }
+      }
+    }
     const vals = (data.valores_pagamento ?? {}) as Record<string, number> | null;
     const pegar = (label: string) => {
       const v = vals ? Number(vals[label] ?? 0) : 0;
-      return v > 0 ? v : totalLiquido;
+      if (v <= 0) return totalLiquido;
+      return proporcao >= 1 ? v : Math.round(v * proporcao * 100) / 100;
     };
     return [
       { forma: "dinheiro", label: "Dinheiro", valor: pegar("Dinheiro") },
