@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Pencil, Users, Download, Eye, IdCard } from "lucide-react";
+import { Plus, Search, Pencil, Users, Download, Eye, IdCard, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
@@ -430,6 +430,9 @@ function ClientesPage() {
           {podeEscrever && (
             <Button onClick={() => setOpenNovo(true)}><Plus className="h-4 w-4 mr-2" /> Novo cliente</Button>
           )}
+          <Button variant="outline" onClick={refrescar} disabled={loading} title="Atualizar contagem e lista">
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Atualizar
+          </Button>
         </div>
       </div>
 
