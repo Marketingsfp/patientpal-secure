@@ -122,6 +122,30 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
     setRegras((r ?? []) as CbRegra[]);
     setEspecialidades((e ?? []) as EspOpt[]);
     setProcedimentos(allProcs);
+
+    // Combinações especialidade+tipo que realmente existem em serviços ativos.
+    // Serve só para avisar quando uma regra foi cadastrada com um tipo que não
+    // corresponde a nenhum serviço (ex.: Odontologia + "exame").
+    try {
+      const tipoDe = new Map(allProcs.map(p => [p.id, (p.tipo ?? "").toLowerCase()]));
+      const pares = new Set<string>();
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from("procedimento_especialidades")
+          .select("procedimento_id, especialidade_id")
+          .range(from, from + PAGE - 1);
+        if (error) break;
+        const page = data ?? [];
+        for (const row of page as Array<{ procedimento_id: string; especialidade_id: string }>) {
+          const t = tipoDe.get(row.procedimento_id);
+          if (t === undefined) continue; // serviço inativo/de outra clínica
+          pares.add(`${row.especialidade_id}|${t}`);
+          pares.add(`${row.especialidade_id}|`);
+        }
+        if (page.length < PAGE) break;
+      }
+      setParesEspTipo(pares);
+    } catch { /* aviso é opcional */ }
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [convenioId]);
