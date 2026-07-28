@@ -1,0 +1,7 @@
+# Normaliza quebra de linha para LF no repositório, independente do
+# `core.autocrlf` de cada máquina de desenvolvimento (Windows costuma
+# converter para CRLF no checkout). O Prettier deste projeto (.prettierrc)
+# não define `endOfLine`, então usa o padrão "lf" — sem isto, qualquer clone
+# em Windows com autocrlf=true reporta milhares de erros falsos de
+# `prettier/prettier` (delete ␍) que não existem no conteúdo versionado.
+* text=auto eol=lf

@@ -20,6 +20,11 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Scratch/geração local — nunca deve ser versionado nem entrar no lint/CI
+/tmp/
+/output/
+/outputs/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
