@@ -16,6 +16,7 @@ import { ClienteDrawer } from "./cliente-drawer";
 import { ClientesKpiBar, type ClientesKpi } from "./kpi-bar";
 import { ResumoBar } from "./resumo-bar";
 import { useClientesKpis } from "./use-kpis";
+import { useTotalPacientes } from "./use-total-pacientes";
 import {
   cadastroIncompleto, isAniversarianteHoje, isNovo30d,
   marcarDuplicados, pagadorLabel, semCpf, semTelefone,
@@ -71,6 +72,7 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const reqRef = useRef(0);
 
   const kpis = useClientesKpis(clinicaAtual?.clinica_id ?? null);
+  const { total: totalLive } = useTotalPacientes(clinicaAtual?.clinica_id ?? null);
 
   const modoBusca = q.trim().length >= 2;
   const scope = useMemo(
@@ -207,8 +209,22 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
       <div className="flex-1 min-h-0 p-3 sm:p-4">
         <ListShell<TabV>
           title={
-            <div className="flex items-baseline gap-2">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <h1 className="text-lg font-semibold">Clientes</h1>
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 px-2 py-0.5 text-xs text-muted-foreground"
+                title="Total de pacientes na clínica — atualiza a cada 15s"
+                aria-live="polite"
+              >
+                <span className="relative inline-flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                </span>
+                Pacientes:{" "}
+                <b className="tabular-nums text-foreground">
+                  {totalLive === null ? "…" : totalLive.toLocaleString("pt-BR")}
+                </b>
+              </span>
               {totalBase !== null && !modoBusca && (
                 <span className="text-xs text-muted-foreground">
                   base ~{totalBase.toLocaleString("pt-BR")}
