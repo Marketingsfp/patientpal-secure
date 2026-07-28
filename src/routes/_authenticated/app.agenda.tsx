@@ -1759,6 +1759,8 @@ function AgendaPage() {
   // ── Desconto aplicado ANTES de "Salvar e Pagar" (com autorização da supervisão).
   type DescontoPendente = { tipo: "valor" | "percentual"; input: string; autorizadoPor: string; motivo: string };
   const [descontoPendente, setDescontoPendente] = useState<DescontoPendente | null>(null);
+  /** Orçamento odontológico com entrada: resumo pago/falta para o caixa. */
+  const [saldoOrcResumo, setSaldoOrcResumo] = useState<{ total: number; pago: number; restante: number } | null>(null);
   const [descontoDlgOpen, setDescontoDlgOpen] = useState(false);
   const [supervisorOpen, setSupervisorOpen] = useState(false);
   const [descForm, setDescForm] = useState<{
