@@ -9383,9 +9383,17 @@ function AgendaPage() {
           }}
         />
       )}
+      <AtendimentoExternoDialog
+        open={!!externoAg}
+        onOpenChange={(v) => { if (!v) setExternoAg(null); }}
+        agendamentoId={externoAg?.id ?? null}
+        clinicaId={clinicaId}
+        pacienteNome={externoAg?.paciente_nome ?? null}
+        procedimento={externoAg?.procedimento ?? null}
+        onDone={() => { void load(); }}
+      />
       {selecItensCtx && (
         <SelecionarItensOrcamentoDialog
-          
           open={selecItensOpen}
           onOpenChange={(v) => {
             setSelecItensOpen(v);
