@@ -840,6 +840,27 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           {resumoSaldo && (
             <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm space-y-1">
               <div className="font-medium">Orçamento com entrada — pagamento parcelado</div>
+              {resumoSaldo.itens && resumoSaldo.itens.length > 0 && (
+                <div className="divide-y rounded-md border bg-background">
+                  {resumoSaldo.itens.map((it) => (
+                    <div key={it.id} className="px-2 py-1.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs font-medium">{it.descricao}</span>
+                        {it.sinal > 0 ? (
+                          <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                            Entrada {formatBRL(it.sinal)}
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-[10px] text-muted-foreground">sem entrada</span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground tabular-nums">
+                        Total {formatBRL(it.total)} · Já pago {formatBRL(it.pago)} · Falta {formatBRL(it.restante)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 sm:grid-cols-4">
                 <span className="text-muted-foreground">Total:</span>
                 <span className="font-medium tabular-nums">{formatBRL(resumoSaldo.total)}</span>
