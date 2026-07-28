@@ -4730,7 +4730,7 @@ function AgendaPage() {
       );
       let opcoes: FormaOpcao[];
       let descSuffix = "";
-      const opcoesOrc = payload.orcamento_id ? await opcoesPagamentoDeOrcamento(payload.orcamento_id) : null;
+      const opcoesOrc = payload.orcamento_id ? await opcoesPagamentoDeOrcamento(payload.orcamento_id, novoId) : null;
 
       if (isMulti) {
         if (opcoesOrc) {
@@ -5101,7 +5101,7 @@ function AgendaPage() {
       // Se o agendamento veio de um orçamento, usa SEMPRE os valores do orçamento
       // (o procedimento pode ser texto livre tipo "LABORATÓRIO (4 EXAMES): ..."
       // que não bate com a tabela de procedimentos e zeraria as opções).
-      const opcoesOrc = a.orcamento_id ? await opcoesPagamentoDeOrcamento(a.orcamento_id) : null;
+      const opcoesOrc = a.orcamento_id ? await opcoesPagamentoDeOrcamento(a.orcamento_id, a.id) : null;
       // Pagamento em duas etapas (sinal + saldo) — itens de orçamento com
       // `sinal_valor` definido (Odontologia). A 1ª cobrança sugere o sinal,
       // a 2ª o saldo restante.
