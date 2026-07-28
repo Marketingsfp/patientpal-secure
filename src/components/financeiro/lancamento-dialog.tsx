@@ -278,23 +278,33 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
   const trocoDinheiro = formaPagamento === "dinheiro" && recebidoNum > valorNum
     ? recebidoNum - valorNum
     : 0;
-  // Compute "pago" (effective amount applied to total) and "troco" per row.
-  // Cash: pago = min(recebido, remaining-before-this-row); excess = troco.
-  // Other forms: pago = recebido, troco = 0.
+  // Compute "pago" (valor aplicado ao total) e "troco" por linha.
+  //
+  // Correção 2.6/2.7: a alocação NÃO pode depender da ordem das linhas.
+  // Antes, "Dinheiro" na 1ª linha absorvia todo o total (min(recebido,
+  // restante)) e a forma seguinte virava excedente → "Soma difere do total"
+  // num pagamento correto. Agora as formas eletrônicas (pix/cartão/etc.) são
+  // aplicadas primeiro — elas nunca geram troco — e o dinheiro fica como
+  // forma residual, absorvendo o que falta e gerando troco do excedente.
   const linhasCalc = (() => {
+    const out = pagamentos.map(() => ({ pago: 0, troco: 0 }));
     let restante = valorNum;
-    return pagamentos.map((p) => {
+    // 1ª passada: formas sem troco.
+    pagamentos.forEach((p, i) => {
+      if (!p.forma || p.forma === "dinheiro") return;
       const rec = Number(p.recebido || 0);
-      let pago = 0, troco = 0;
-      if (p.forma === "dinheiro") {
-        pago = Math.min(rec, Math.max(0, restante));
-        troco = Math.max(0, rec - pago);
-      } else {
-        pago = rec;
-      }
-      restante = Math.max(0, restante - pago);
-      return { pago, troco };
+      out[i] = { pago: rec, troco: 0 };
+      restante = restante - rec;
     });
+    // 2ª passada: dinheiro (residual, na ordem em que aparece).
+    pagamentos.forEach((p, i) => {
+      if (p.forma !== "dinheiro") return;
+      const rec = Number(p.recebido || 0);
+      const pago = Math.min(rec, Math.max(0, restante));
+      out[i] = { pago, troco: Math.max(0, rec - pago) };
+      restante = restante - pago;
+    });
+    return out;
   })();
   const totalPagoMisto = linhasCalc.reduce((s, l) => s + l.pago, 0);
   const restanteMisto = Math.max(0, valorNum - totalPagoMisto);
@@ -464,10 +474,19 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
     }
     let formaFinal: string | null = formaPagamento || null;
     let obsExtra = "";
+    // Composição estruturada do pagamento (fonte de verdade para o caixa).
+    // A observação em texto passa a ser apenas exibição / fallback legado.
+    let composicao: { versao: number; origem: string; troco: number; partes: Array<{ forma: string; valor: number }> } | null = null;
     if (pagamentoMisto) {
+      // Linhas com valor aplicado (compõem o total) e linhas só com troco
+      // (dinheiro recebido acima do restante) — estas últimas não somam ao
+      // total, mas precisam existir para o troco não sumir (falha 2.7).
       const validIdx = pagamentos
         .map((p, i) => ({ p, i }))
         .filter(({ p, i }) => p.forma && linhasCalc[i].pago > 0);
+      const trocoIdx = pagamentos
+        .map((p, i) => ({ p, i }))
+        .filter(({ p, i }) => p.forma === "dinheiro" && linhasCalc[i].pago <= 0 && linhasCalc[i].troco > 0);
       if (validIdx.length === 0) {
         toast.error("Adicione ao menos uma forma de pagamento");
         setSaving(false); return;
@@ -486,11 +505,22 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
         toast.error("Selecione a bandeira do cartão em todas as linhas de Cartão Crédito.");
         setSaving(false); return;
       }
+      // Compara o valor APLICADO (líquido de troco) com o total — nunca o
+      // valor bruto recebido, e independente da ordem das linhas.
       const total = validIdx.reduce((s, { i }) => s + linhasCalc[i].pago, 0);
       if (Math.abs(total - valorNum) > 0.01) {
-        toast.error(`Soma das formas (${formatBRL(total)}) difere do valor (${formatBRL(valorNum)})`);
+        toast.error(`Soma aplicada (${formatBRL(total)}) difere do valor (${formatBRL(valorNum)})`);
         setSaving(false); return;
       }
+      composicao = {
+        versao: 1,
+        origem: "lancamento_dialog",
+        troco: Math.round(trocoMisto * 100) / 100,
+        partes: validIdx.map(({ p, i }) => ({
+          forma: p.forma,
+          valor: Math.round(linhasCalc[i].pago * 100) / 100,
+        })),
+      };
       // Se o modo misto tem só 1 linha válida, salva como aquela forma direta
       // (evita marcar como "misto" quando na prática só houve uma forma).
       if (validIdx.length === 1) {
@@ -520,8 +550,24 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           return base;
         }).join("; ");
       }
+      // Troco de linhas de dinheiro que não aplicaram valor (excedente puro)
+      // — antes eram descartadas silenciosamente.
+      if (trocoIdx.length > 0) {
+        const somaTroco = trocoIdx.reduce((s, { i }) => s + linhasCalc[i].troco, 0);
+        obsExtra += `${obsExtra ? " " : ""}| Troco em dinheiro: ${formatBRL(somaTroco)} (recebido a mais)`;
+      }
     } else if (formaPagamento === "dinheiro" && recebidoNum > 0) {
       obsExtra = `Recebido ${formatBRL(recebidoNum)}, troco ${formatBRL(trocoDinheiro)}`;
+      composicao = {
+        versao: 1, origem: "lancamento_dialog",
+        troco: Math.round(trocoDinheiro * 100) / 100,
+        partes: [{ forma: "dinheiro", valor: Math.round(valorNum * 100) / 100 }],
+      };
+    } else if (formaPagamento) {
+      composicao = {
+        versao: 1, origem: "lancamento_dialog", troco: 0,
+        partes: [{ forma: formaPagamento, valor: Math.round(valorNum * 100) / 100 }],
+      };
     }
     let descontoObs = "";
     if (descontoAtivo && descontoNum > 0) {
@@ -598,6 +644,9 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
       parcelas: parcelasFinal,
       emitir_nfse: emitirNfse,
       observacoes: obsFinal,
+      // Dado estruturado (falha 2.8): o caixa passa a ler daqui em vez de
+      // interpretar o texto da observação.
+      composicao_pagamento: composicao,
       agendamento_id: agendamentoId ?? null,
       medico_id: medicoId,
       paciente_id: pacienteId,

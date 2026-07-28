@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useAuth } from "@/hooks/use-auth";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { exportToExcel } from "@/lib/export-csv";
@@ -56,7 +57,7 @@ export const Route = createFileRoute("/_authenticated/app/caixa")({
  * `outros` como residual.
  */
 const FORMA_BUCKETS = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio"] as const;
-type FormaBucket = typeof FORMA_BUCKETS[number] | "misto" | "outros";
+type FormaBucket = typeof FORMA_BUCKETS[number] | "misto" | "outros" | "indeterminado";
 
 function normalizarForma(f: string | null | undefined): FormaBucket {
   const k = (f ?? "").toLowerCase().trim();
@@ -129,8 +130,28 @@ function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaB
 const FORMA_LABEL: Record<FormaBucket, string> = {
   dinheiro: "Dinheiro", pix: "PIX", debito: "Cartão débito", credito: "Cartão crédito",
   boleto: "Boleto", transferencia: "Transferência", convenio: "Convênio",
-  misto: "Misto", outros: "Outros",
+  misto: "Misto", outros: "Outros", indeterminado: "Indeterminado (conferir)",
 };
+
+/**
+ * Falha 2.8 — decomposição do "misto" a partir de DADO ESTRUTURADO
+ * (`fin_lancamentos.composicao_pagamento`). O texto da observação vira
+ * apenas fallback legado. Retorna `null` quando não há fonte confiável —
+ * nesse caso o valor NUNCA deve ser contabilizado como Dinheiro.
+ */
+function partesDaComposicao(comp: unknown): Partial<Record<FormaBucket, number>> | null {
+  if (!comp || typeof comp !== "object") return null;
+  const arr = (comp as { partes?: unknown }).partes;
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+  const out: Partial<Record<FormaBucket, number>> = {};
+  for (const p of arr as Array<{ forma?: string; valor?: number | string }>) {
+    const b = normalizarForma(p?.forma);
+    const v = Number(p?.valor ?? 0);
+    if (!v || b === "misto") continue;
+    out[b] = (out[b] ?? 0) + v;
+  }
+  return Object.keys(out).length ? out : null;
+}
 function formatarFormaPagamento(
   m: { forma_pagamento: string | null; lancamento_id?: string | null },
   mistoObs: Record<string, string>,
@@ -1390,6 +1411,23 @@ function Page() {
   // Decomposição de pagamentos "misto" — busca observações dos lançamentos
   // vinculados às movimentações da sessão atual. Chave = lancamento_id.
   const [mistoObs, setMistoObs] = useState<Record<string, string>>({});
+  // Composição estruturada por lançamento (falha 2.8). `null` = legado/sem dado.
+  const [mistoComp, setMistoComp] = useState<Record<string, Partial<Record<FormaBucket, number>> | null>>({});
+  // Flag por clínica: quando ligada, a decomposição usa o dado estruturado e
+  // o resíduo sem fonte confiável vai para "Indeterminado" em vez de Dinheiro.
+  // Desligar a flag restaura o comportamento antigo (rollback sem deploy).
+  const { enabled: mistoEstruturado } = useClinicFeatureFlag("caixa_misto_estruturado");
+  const residualBucket: FormaBucket = mistoEstruturado ? "indeterminado" : "dinheiro";
+  /** Partes decompostas de um movimento "misto": estruturado → observação. */
+  const partesDoMov = useCallback((m: { lancamento_id?: string | null }): Partial<Record<FormaBucket, number>> => {
+    const id = m.lancamento_id ?? undefined;
+    if (!id) return {};
+    if (mistoEstruturado) {
+      const est = mistoComp[id];
+      if (est) return est;
+    }
+    return decomporMistoObs(mistoObs[id]);
+  }, [mistoComp, mistoObs, mistoEstruturado]);
   const mistoLancIds = useMemo(() => {
     const ids = new Set<string>();
     const scan = (arr: Mov[]) => arr.forEach((m) => {
@@ -1408,8 +1446,16 @@ function Page() {
     if (pendentes.length === 0) return;
     (async () => {
       const { data } = await supabase.from("fin_lancamentos")
-        .select("id, observacoes").in("id", pendentes);
+        .select("id, observacoes, composicao_pagamento").in("id", pendentes);
       if (!alive || !data) return;
+      setMistoComp((prev) => {
+        const next = { ...prev };
+        for (const row of data as Array<{ id: string; composicao_pagamento?: unknown }>) {
+          next[row.id] = partesDaComposicao(row.composicao_pagamento);
+        }
+        for (const id of pendentes) if (!(id in next)) next[id] = null;
+        return next;
+      });
       setMistoObs((prev) => {
         const next = { ...prev };
         for (const row of data) next[row.id as string] = (row.observacoes as string | null) ?? "";
@@ -1471,7 +1517,7 @@ function Page() {
   const entradasPorForma = useMemo(() => {
     const r: Record<string, number> & { total: number } = {
       dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0, total: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0, total: 0,
     };
     minhasMovs.forEach((m) => {
       if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
@@ -1479,8 +1525,7 @@ function Page() {
       r.total += v;
       const bucket = bucketDeMov(m);
       if (bucket === "misto") {
-        const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-        const partes = decomporMistoObs(obs);
+        const partes = partesDoMov(m);
         let somado = 0;
         for (const [k, val] of Object.entries(partes)) {
           r[k] = (r[k] ?? 0) + (val ?? 0);
@@ -1489,13 +1534,13 @@ function Page() {
         // Diferença (ex.: obs ainda não carregada, ou parcela sem label
         // reconhecido) vai para "outros" para preservar o total.
         const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
+        if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
       } else {
         r[bucket] += v;
       }
     });
     return r;
-  }, [minhasMovs, mistoObs]);
+  }, [minhasMovs, partesDoMov, residualBucket]);
 
   // Quebra do "Saldo" por dia (com base em created_at das movimentações
   // da sessão atual). Cada dia mostra entradas, saídas, saldo do dia e
@@ -1512,7 +1557,7 @@ function Page() {
     const mapa = new Map<string, DiaResumo>();
     const bucketInit = (): Record<string, number> => ({
       dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
     });
     for (const m of minhasMovs) {
       const d = new Date(m.created_at);
@@ -1529,15 +1574,14 @@ function Page() {
         r.entradas += v;
         const bucket = bucketDeMov(m);
         if (bucket === "misto") {
-          const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-          const partes = decomporMistoObs(obs);
+          const partes = partesDoMov(m);
           let somado = 0;
           for (const [k, val] of Object.entries(partes)) {
             r.porForma[k] = (r.porForma[k] ?? 0) + (val ?? 0);
             somado += val ?? 0;
           }
           const resto = v - somado;
-          if (Math.abs(resto) > 0.005) r.porForma.dinheiro += resto;
+          if (Math.abs(resto) > 0.005) r.porForma[residualBucket] = (r.porForma[residualBucket] ?? 0) + resto;
         } else {
           r.porForma[bucket] = (r.porForma[bucket] ?? 0) + v;
         }
@@ -1546,7 +1590,7 @@ function Page() {
       }
     }
     return Array.from(mapa.values()).sort((a, b) => b.dia.localeCompare(a.dia));
-  }, [minhasMovs, mistoObs]);
+  }, [minhasMovs, partesDoMov, residualBucket]);
 
   // Helper: converte `created_at` para "YYYY-MM-DD" no fuso local, para casar
   // com o `<DateInputBR>` do modal de fechamento.
@@ -1569,7 +1613,7 @@ function Page() {
   const porFormaDoDiaFechamento = useMemo<Record<string, number>>(() => {
     const r: Record<string, number> = {
       dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
     };
     movsDoDiaFechamento.forEach((m) => {
       // "Esperado por forma" deve refletir o SALDO LÍQUIDO por forma no dia,
@@ -1588,8 +1632,7 @@ function Page() {
       const v = Number(m.valor || 0) * sinal;
       const bucket = bucketDeMov(m);
       if (bucket === "misto") {
-        const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-        const partes = decomporMistoObs(obs);
+        const partes = partesDoMov(m);
         let somado = 0;
         for (const [k, val] of Object.entries(partes)) {
           r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
@@ -1599,13 +1642,13 @@ function Page() {
         // Sem decomposição (pagamento agrupado, obs sem "Pagamento misto:"),
         // o resto cai em Dinheiro — a UI não deve exibir "Outros" para
         // recebimentos reais. O operador pode ajustar no modal de fechamento.
-        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
+        if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
       } else {
         r[bucket] = (r[bucket] ?? 0) + v;
       }
     });
     return r;
-  }, [movsDoDiaFechamento, mistoObs]);
+  }, [movsDoDiaFechamento, partesDoMov, residualBucket]);
 
   // Calculo por sessao (todos)
   const calcSaldoSessao = useCallback((sid: string) => {
@@ -1724,7 +1767,7 @@ function Page() {
   const entradasPorFormaSessao = useCallback((sid: string) => {
     const r: Record<string, number> = {
       dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0,
+      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
     };
     todosMovs.forEach((m) => {
       if (m.sessao_id !== sid) return;
@@ -1742,21 +1785,20 @@ function Page() {
       const v = Number(m.valor || 0) * sinal;
       const bucket = bucketDeMov(m);
       if (bucket === "misto") {
-        const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-        const partes = decomporMistoObs(obs);
+        const partes = partesDoMov(m);
         let somado = 0;
         for (const [k, val] of Object.entries(partes)) {
           r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
           somado += (val ?? 0) * sinal;
         }
         const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r.dinheiro += resto;
+        if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
       } else {
         r[bucket] = (r[bucket] ?? 0) + v;
       }
     });
     return r;
-  }, [todosMovs, mistoObs]);
+  }, [todosMovs, partesDoMov, residualBucket]);
 
   // Acoes
   const abrirCaixa = async (e: FormEvent) => {
@@ -2165,8 +2207,7 @@ function Page() {
       // (mesma lógica exibida em tela) para que o "Resumo por tipo de moeda"
       // some cada parte na forma real (Dinheiro, PIX, Crédito, etc.) em vez
       // de agrupar tudo em "MISTO".
-      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-      const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+      const partes = bucket === "misto" ? partesDoMov(m) : {};
       const entradas = Object.entries(partes).filter(([, val]) => (val ?? 0) > 0) as Array<[FormaBucket, number]>;
       const totalPartes = entradas.reduce((s, [, val]) => s + (val ?? 0), 0);
       if (bucket === "misto" && entradas.length > 0 && totalPartes > 0) {
@@ -2673,8 +2714,7 @@ function Page() {
                          const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
                          const usuario = usuarioNomeFor(m);
                          const bucket = bucketDeMov(m);
-                         const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-                         const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+                         const partes = bucket === "misto" ? partesDoMov(m) : {};
                          const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
                          if (bucket === "misto" && entradas.length > 0) {
                            return entradas.map(([k, v], idx) => (
@@ -3259,14 +3299,13 @@ function Page() {
                     const v = Number(m.valor || 0) * sinal;
                     const bucket = bucketDeMov(m);
                     if (bucket === "misto") {
-                      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-                      const partes = decomporMistoObs(obs);
+                      const partes = partesDoMov(m);
                       let somado = 0;
                       for (const [k, val] of Object.entries(partes)) {
                         pf[k] = (pf[k] ?? 0) + (val ?? 0) * sinal; somado += (val ?? 0) * sinal;
                       }
                       const resto = v - somado;
-                      if (Math.abs(resto) > 0.005) pf.dinheiro = (pf.dinheiro ?? 0) + resto;
+                      if (Math.abs(resto) > 0.005) pf[residualBucket] = (pf[residualBucket] ?? 0) + resto;
                     } else {
                       pf[bucket] = (pf[bucket] ?? 0) + v;
                     }
@@ -3287,11 +3326,11 @@ function Page() {
             </div>
             {minhaSessao && (() => {
               const porForma = porFormaDoDiaFechamento;
-              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
+              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros", "indeterminado"];
               // "Outros" só aparece se realmente houver saldo residual (ex.: parcela
               // de pagamento misto ainda não decomposta). Sangria/suprimento/despesa
               // agora contam em "Dinheiro" via bucketDeMov.
-              const chaves = ordem.filter((k) => k !== "outros" || Math.abs(porForma[k] ?? 0) > 0.005);
+              const chaves = ordem.filter((k) => (k !== "outros" && k !== "indeterminado") || Math.abs(porForma[k] ?? 0) > 0.005);
               const totalConferido = Object.values(conferidoOwn)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
@@ -3400,8 +3439,8 @@ function Page() {
           <form onSubmit={fecharSessaoTerceiro} className="space-y-3">
             {openFecharTerceiro && (() => {
               const porForma = entradasPorFormaSessao(openFecharTerceiro.id);
-              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros"];
-              const chaves = ordem.filter((k) => k !== "outros" || Math.abs(porForma[k] ?? 0) > 0.005);
+              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros", "indeterminado"];
+              const chaves = ordem.filter((k) => (k !== "outros" && k !== "indeterminado") || Math.abs(porForma[k] ?? 0) > 0.005);
               const totalConferido = Object.values(conferidoTerceiro)
                 .reduce((acc, v) => acc + (Number(v) || 0), 0);
               return (
@@ -3779,8 +3818,7 @@ function Page() {
                   <TableBody>
                     {detalheMovs.flatMap((m) => {
                       const bucket = bucketDeMov(m);
-                      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-                      const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+                      const partes = bucket === "misto" ? partesDoMov(m) : {};
                       const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
                       if (bucket === "misto" && entradas.length > 0) {
                         return entradas.map(([k, v], idx) => (
@@ -3879,8 +3917,7 @@ function Page() {
                     })
                     .flatMap((m) => {
                       const bucket = bucketDeMov(m);
-                      const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-                      const partes = bucket === "misto" ? decomporMistoObs(obs) : {};
+                      const partes = bucket === "misto" ? partesDoMov(m) : {};
                       const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
                       if (bucket === "misto" && entradas.length > 0) {
                         return entradas.map(([k, v], idx) => (
