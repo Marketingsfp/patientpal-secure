@@ -609,10 +609,10 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
           valor: Number(valor),
           descricao: descricao.trim(),
           forma_pagamento: formaFinal,
-          // Sempre lança o movimento no caixa aberto de hoje do operador,
-          // mesmo quando a data do lançamento é retroativa (evita cair em
-          // sessão fechada e sumir do relatório do dia).
-          forcar_sessao_hoje: true,
+          // Lançamento retroativo cai no caixa do dia escolhido — não no
+          // caixa de hoje. Quando a data é hoje, o backend usa a sessão
+          // aberta atual normalmente.
+          forcar_sessao_hoje: false,
         }
       : null;
 
