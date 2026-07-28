@@ -4042,7 +4042,7 @@ function AgendaPage() {
       }
       const { data: itens, error: e2 } = await supabase
         .from("orcamento_itens")
-        .select("id, descricao, procedimento_id, valor_total, dentes, status_financeiro, sinal_valor")
+        .select("id, descricao, procedimento_id, valor_total, dentes, status_financeiro, sinal_valor, valor_pago")
         .eq("orcamento_id", orc.id)
         .order("ordem");
       if (e2) {
@@ -4057,6 +4057,7 @@ function AgendaPage() {
         dentes: string[] | null;
         status_financeiro: string | null;
         sinal_valor: number | null;
+        valor_pago: number | null;
       }[];
       if (itsAll.length === 0) {
         toast.error("Orçamento sem itens.");
