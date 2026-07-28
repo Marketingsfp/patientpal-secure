@@ -2435,7 +2435,7 @@ function AgendaPage() {
     const reqId = ++loadReqId.current;
     setLoading(true);
     const agendaSelect =
-      "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
+      "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,medico:medicos(nome,sexo),paciente:pacientes(nome),orcamento:orcamentos(numero)" as const;
     let q = supabase
       .from("agendamentos")
       .select(agendaSelect as never)
@@ -2522,13 +2522,18 @@ function AgendaPage() {
       rows: Array<
         Agendamento & {
           medico?: { nome: string | null; sexo: string | null } | null;
+          paciente?: { nome: string | null } | null;
           orcamento?: { numero: number | null } | null;
         }
       >,
     ): Agendamento[] =>
       rows.map((a) => ({
         ...a,
-        paciente_nome: isSlotLivre(a.paciente_nome) ? "DISPONÍVEL" : a.paciente_nome,
+        // Nome sempre vem do cadastro atual do paciente quando há vínculo;
+        // a cópia gravada no agendamento é só fallback (slots livres/sem id).
+        paciente_nome: isSlotLivre(a.paciente_nome)
+          ? "DISPONÍVEL"
+          : (a.paciente_id ? (a.paciente?.nome ?? a.paciente_nome) : a.paciente_nome),
         medico_id: a.medico_id ?? null,
         medico_nome: a.medico_nome ?? a.medico?.nome ?? null,
         medico_sexo: a.medico_sexo ?? a.medico?.sexo ?? null,
@@ -2539,6 +2544,7 @@ function AgendaPage() {
       (data ?? []) as unknown as Array<
         Agendamento & {
           medico?: { nome: string | null; sexo: string | null } | null;
+          paciente?: { nome: string | null } | null;
           orcamento?: { numero: number | null } | null;
         }
       >,

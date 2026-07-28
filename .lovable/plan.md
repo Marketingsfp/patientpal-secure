@@ -1,13 +1,30 @@
-**Tipo do problema:** regra de negócio + erro de código no cálculo de limite do convênio.
+## O que está acontecendo (verificado no banco)
 
-**Fato confirmado agora:** no contrato **20261413**, o Sidiclei tem hoje quatro agendamentos: ECG, RX, Ecocardiograma e Consulta Cardiologia. Já existem lançamentos confirmados para ECG, RX e Ecocardiograma, mas **não existe lançamento confirmado da consulta**. Mesmo assim, a consulta está sendo tratada como se a cota de 1 consulta/dia já tivesse sido usada.
+- Cadastro do prontuário **2656128** está correto: `TATIANE MAIA MARINS DOS SANTOS` (atualizado em 28/07).
+- Os 2 agendamentos dela de 28/07 (CONSULTA e ECG) guardam uma **cópia antiga** do nome: `TATIANE MAIA MARIA DOS SANTOS`.
+- Motivo: a tabela `agendamentos` tem uma coluna `paciente_nome` que é preenchida no momento do agendamento e **nunca é atualizada** quando o cadastro do paciente muda. A GR sai certa porque ela lê o cadastro atual.
 
-**Problema provável no código:** a regra atual ainda conta procedimentos que não são consulta quando o cadastro do serviço não casa perfeitamente com o nome gravado na agenda, ou quando o filtro por tipo/especialidade cai no caminho genérico. Isso faz exames/serviços pagos do mesmo contrato queimarem a cota diária da consulta de R$ 9,99.
+Classificação: **inconsistência de dados** (cópia desatualizada), não erro de regra de negócio.
 
-**Plano de correção:**
-1. Ajustar a função de apuração do convênio na Agenda para que uma regra com `tipo = consulta` só conte como uso da cota quando o agendamento anterior também for consulta.
-2. Tornar esse filtro independente de casamento exato do nome do procedimento: além do cadastro, usar o texto do procedimento da agenda como fallback seguro, tratando nomes com “ECG”, “ELETRO”, “RX”, “RAIO-X”, “ECOCARDIOGRAMA” etc. como não consulta.
-3. Manter a regra de que cota só é consumida por atendimento efetivamente pago/confirmado, sem alterar valores do Cartão Consulta e sem mexer nos contratos.
-4. Validar diretamente no caso do Sidiclei: a consulta de Cardiologia deve voltar a sugerir o valor do benefício do contrato, e ECG/RX/Ecocardiograma não devem consumir a cota de consulta.
+## Correção proposta
 
-**Escopo:** somente cálculo/validação da cota na Agenda. Não vou alterar valores de Cartão Consulta, contratos, mensalidades, caixa ou regras cadastradas.
+1. **Gatilho no banco**: quando o nome de um paciente for alterado, atualizar automaticamente o `paciente_nome` de todos os agendamentos ligados àquele paciente (`paciente_id`). Slots livres (sem paciente vinculado) não são tocados — a agenda usa esse campo para marcar "DISPONÍVEL".
+2. **Correção do histórico**: uma única atualização que realinha os agendamentos cujo nome gravado está diferente do cadastro atual (inclui os 2 da Tatiane).
+3. **Reforço na tela**: na Agenda, exibir o nome vindo do cadastro do paciente quando houver vínculo, usando o campo gravado apenas como fallback (slots livres e registros sem `paciente_id`).
+
+## Impacto e riscos
+
+- Áreas afetadas: **Agenda** (exibição e busca por nome) e a coluna `paciente_nome` de agendamentos.
+- Não altera valores, faturamento, repasse, convênios ou Cartão Consulta.
+- Reversível: o gatilho pode ser removido; a correção de histórico apenas alinha nomes ao cadastro oficial.
+
+## Detalhe técnico
+
+- Nova função + trigger `AFTER UPDATE OF nome ON public.pacientes` → `UPDATE public.agendamentos SET paciente_nome = NEW.nome WHERE paciente_id = NEW.id AND paciente_nome IS DISTINCT FROM NEW.nome`.
+- Backfill: `UPDATE agendamentos a SET paciente_nome = p.nome FROM pacientes p WHERE a.paciente_id = p.id AND a.paciente_nome IS DISTINCT FROM p.nome`.
+- Front: em `src/routes/_authenticated/app.agenda.tsx`, a query já seleciona relações; incluir `paciente:pacientes(nome)` e usar `a.paciente?.nome ?? a.paciente_nome` na normalização das linhas (linha ~2531), mantendo a lógica de slot livre intacta.
+
+## Validação
+
+- Conferir que os 2 agendamentos da Tatiane passam a exibir "MARINS" na agenda.
+- Alterar o nome de um paciente de teste e confirmar reflexo imediato na agenda.
