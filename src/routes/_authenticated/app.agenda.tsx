@@ -4221,6 +4221,7 @@ function AgendaPage() {
             valor_total: i.valor_total,
             dentes: i.dentes,
             sinal_valor: i.sinal_valor,
+            valor_pago: i.valor_pago,
           })),
           totalItens: itsAll.length,
           itensRaw: its.map((i) => ({ id: i.id, descricao: i.descricao, procedimento_id: i.procedimento_id })),
