@@ -88,6 +88,7 @@ export function NovoAgendamentoWizard({
   const clinicaId = clinicaAtual?.clinica_id ?? null;
   const queryClient = useQueryClient();
   const criarAgendamentoFn = useServerFn(criarAgendamento);
+  const marcarExternoFn = useServerFn(marcarAtendimentoExterno);
 
   const [stepIdx, setStepIdx] = useState(0);
   const step: StepKey = STEPS[stepIdx].key;
