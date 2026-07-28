@@ -4606,7 +4606,7 @@ function AgendaPage() {
       const { data: dupLinks } = await supabase
         .from("agendamento_orcamento_itens")
         .select(
-          "orcamento_item_id, agendamento_id, agendamentos!inner(id,status,inicio,medico_id,ficha_numero,procedimento)",
+          "orcamento_item_id, agendamento_id, agendamentos!inner(id,status,inicio,medico_id,ficha_numero,procedimento,paciente_id)",
         )
         .in("orcamento_item_id", pendingOrcItemIds);
       type DupRow = {
@@ -4619,10 +4619,12 @@ function AgendaPage() {
           medico_id: string | null;
           ficha_numero: number | null;
           procedimento: string | null;
+          paciente_id: string | null;
         } | null;
       };
       const candidatos = ((dupLinks ?? []) as DupRow[])
-        .filter((r) => r.agendamentos && r.agendamentos.status !== "cancelado")
+        // Ignora cancelados e fichas já desmarcadas (sem paciente).
+        .filter((r) => r.agendamentos && r.agendamentos.status !== "cancelado" && !!r.agendamentos.paciente_id)
         .filter((r) => !editing?.id || r.agendamento_id !== editing.id);
       if (candidatos.length > 0) {
         const agIds = Array.from(new Set(candidatos.map((r) => r.agendamento_id)));
