@@ -1,34 +1,43 @@
-## O que está acontecendo (causa confirmada no banco)
+## Problema
 
-No orçamento D-2026-00002 (JEAN XAVIER FERREIRA PINHO) o item **IMPLANTE — R$ 2.200,00** tem entrada de R$ 340,00 já paga:
+Na GR da foto, o item ODONTOLOGIA - IMPLANTE tem sinal de R$ 340,00 e total de R$ 2.200,00. O paciente pagou agora R$ 1.000,00, mas a guia imprimiu "SALDO FINAL: 1.860,00", que é apenas `total - sinal` — ou seja, ignora o que já foi pago e o pagamento atual.
 
-- `valor_pago = 340`, `status_financeiro = 'parcial'`, saldo de R$ 1.860,00
-- está vinculado a um agendamento com status `agendado` que tem 1 lançamento de receita confirmado (a entrada)
+Causa confirmada: em `src/lib/print-gr.ts` (bloco de sinal, ~linhas 858-896), o cálculo lê apenas `quantidade`, `valor_unitario`, `valor_total` e `sinal_valor` dos itens do orçamento. A coluna `valor_pago` (que já existe e é atualizada em `src/lib/agenda/sinal-orcamento.ts`) não é consultada.
 
-O seletor "Escolher itens do orçamento" (na Agenda) marca um item como **consumido** quando o agendamento vinculado tem qualquer lançamento de receita confirmado. Como a entrada gerou um lançamento confirmado, o item foi tratado como quitado e sumiu da lista — restando só os dois itens sem entrada (foto 1).
-
-Classificação: **erro de código / regra de consumo de item**, não erro de dados.
+Classificação: erro de código/apresentação (a regra de negócio de sinal/saldo já existe e está correta no motor de pagamento).
 
 ## O que será alterado
 
-Um único ponto de regra, em `src/routes/_authenticated/app.agenda.tsx` (bloco que monta `itensRestantes`):
+Apenas `src/lib/print-gr.ts`, no bloco que monta SINAL / SALDO FINAL / TOTAL:
 
-1. Um item só é considerado consumido quando estiver **realmente quitado**:
-   - `status_financeiro = 'pago'`, **ou**
-   - `valor_pago >= valor_total` (com tolerância de centavos).
-2. O "pago via agendamento vinculado" (lançamento confirmado) deixa de consumir sozinho itens que tenham entrada/pagamento parcial: se `sinal_valor > 0` ou `valor_pago > 0` e ainda houver saldo, o item continua disponível para novo agendamento.
-3. A consulta de itens passa a trazer também `valor_pago`, necessário para essa checagem.
-4. Ajuste do texto/contagem: itens parciais entram como disponíveis, e o rótulo do item no seletor mostrará o saldo (ex.: "Entrada paga R$ 340,00 · Falta R$ 1.860,00") para o caixa saber que aquela seleção cobrará o saldo — ajuste em `src/components/agenda/selecionar-itens-orcamento-dialog.tsx`, usando os campos já disponíveis.
+1. Incluir `valor_pago` na consulta de `orcamento_itens`.
+2. Somar `pagoTotal` (o que já está registrado nos itens, incluindo o pagamento que acabou de ser feito).
+3. Calcular:
+   - `pagoAnterior = pagoTotal − valor recebido nesta guia` (não menor que zero)
+   - `faltaPagar = total − pagoTotal` (não menor que zero)
+4. Trocar as linhas impressas por:
 
-Nada muda no cálculo financeiro em si: ao selecionar o item parcial, `obterEtapaSinal` já retorna a etapa "saldo" com o valor restante correto (R$ 1.860,00), tanto no "Salvar e pagar" quanto no "Agendar > Pagar".
+```text
+SINAL:              340,00
+JÁ PAGO ANTES:      340,00
+PAGAMENTO ATUAL:  1.000,00
+FALTA PAGAR:        860,00
+TOTAL:            2.200,00
+```
 
-## Fora do escopo
+- "JÁ PAGO ANTES" só aparece quando maior que zero.
+- Quando `faltaPagar` for zero, imprimir "FALTA PAGAR: 0,00" com destaque de quitado (texto "QUITADO").
+- Quando o pagamento é justamente o sinal (primeira etapa), o resultado continua correto: SINAL 340 / PAGAMENTO ATUAL 340 / FALTA PAGAR 1.860 / TOTAL 2.200.
 
-- Nenhuma alteração em valores, lançamentos ou registros existentes do orçamento D-2026-00002 (não vou "corrigir" dados).
-- Nenhuma mudança em GR, NFS-e, caixa ou nas regras de sinal/saldo.
+O restante da guia (cabeçalho, serviços, VALOR RECEBIDO, clínica/prestador) não muda.
+
+## Escopo e riscos
+
+- Fora do escopo: cupom 80mm de orçamento (`print-orcamento.ts`), telas da agenda e regra de distribuição de pagamento — nenhuma alteração.
+- Nenhuma migração de banco; nenhum dado alterado.
+- Reimpressão (2ª via) mostrará o estado atual do item, que pode ser diferente do momento da 1ª impressão — comportamento esperado e consistente com o restante da guia.
 
 ## Validação
 
-- Reabrir o orçamento D-2026-00002 na Agenda e confirmar que os 3 itens aparecem, com o IMPLANTE marcado como parcial e saldo R$ 1.860,00.
-- Selecionar apenas o IMPLANTE e verificar que o pagamento sugerido é R$ 1.860,00 (etapa saldo).
-- Confirmar que um item 100% pago continua sumindo da lista.
+- Typecheck.
+- Conferência dos números para o orçamento D-2026-00002 (item IMPLANTE), comparando com os valores gravados em `orcamento_itens`.
