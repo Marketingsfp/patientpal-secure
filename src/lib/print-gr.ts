@@ -232,13 +232,8 @@ async function agendamentoUsouConvenio(
   return false;
 }
 
-function renderLinhaVinculo(v: { convenioNome: string; vinculo: "titular" | "dependente"; titularNome?: string } | null): string {
-  if (!v) return "";
-  const suf = v.vinculo === "titular"
-    ? "(TITULAR)"
-    : v.titularNome ? `(DEPENDENTE DE ${esc(v.titularNome)})` : "(DEPENDENTE)";
-  return `<div class="center sm">PLANO: <span class="v">${esc(v.convenioNome)}</span> ${suf}</div>`;
-}
+// renderLinhaVinculo removida: linha PLANO com (TITULAR)/(DEPENDENTE DE X)
+// quebrava a impressão térmica. Mantido apenas o nome do convênio na linha CONV.
 
 // Duplica o HTML de um ou mais tickets para emitir N vias com quebra de
 // página entre elas e um rótulo identificando a via.
