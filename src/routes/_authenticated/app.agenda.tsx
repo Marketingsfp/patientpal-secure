@@ -5215,13 +5215,16 @@ function AgendaPage() {
         const rotulo = etapaSinal.etapa === "sinal" ? "SINAL (entrada)" : "SALDO FINAL";
         opcoes = opcoes.map((o) => ({ ...o, valor: etapaSinal.valor }));
         descSuffix += ` — ${rotulo}`;
+        setSaldoOrcResumo({ total: etapaSinal.total, pago: etapaSinal.pago, restante: etapaSinal.restante });
         setAvisoConvenio({
           tom: "warning",
           mensagem:
             etapaSinal.etapa === "sinal"
-              ? `Pagamento em duas etapas: cobrando o sinal de R$ ${etapaSinal.valor.toFixed(2)}. Saldo de R$ ${(etapaSinal.total - etapaSinal.valor).toFixed(2)} fica para o final do tratamento.`
-              : `Cobrando o saldo final de R$ ${etapaSinal.valor.toFixed(2)} (sinal de R$ ${etapaSinal.pago.toFixed(2)} já pago).`,
+              ? `Orçamento com entrada — Total R$ ${etapaSinal.total.toFixed(2)} • Já pago R$ ${etapaSinal.pago.toFixed(2)} • Falta pagar R$ ${etapaSinal.restante.toFixed(2)}. Sugerido agora: sinal de R$ ${etapaSinal.valor.toFixed(2)} (o valor pode ser alterado).`
+              : `Saldo do orçamento — Total R$ ${etapaSinal.total.toFixed(2)} • Já pago R$ ${etapaSinal.pago.toFixed(2)} • Falta pagar R$ ${etapaSinal.restante.toFixed(2)}. Informe o valor que o paciente está pagando agora (pode ser parcial).`,
         });
+      } else {
+        setSaldoOrcResumo(null);
       }
       // Procedimento sem valor (ex.: REVISÃO / retorno gratuito). Não abre o
       // fluxo de cobrança — registra um lançamento de valor 0 (linha-sombra),
