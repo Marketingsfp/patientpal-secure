@@ -73,6 +73,8 @@ export function RegrasConvenioTab({ clinicaId, convenioId, convenioNome }: Props
   const [regras, setRegras] = useState<CbRegra[]>([]);
   const [especialidades, setEspecialidades] = useState<EspOpt[]>([]);
   const [procedimentos, setProcedimentos] = useState<ProcOpt[]>([]);
+  /** Combinações "especialidadeId|tipo" existentes em serviços ativos. */
+  const [paresEspTipo, setParesEspTipo] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [limiteIdx, setLimiteIdx] = useState<number | null>(null);
   const [novoOpen, setNovoOpen] = useState(false);
