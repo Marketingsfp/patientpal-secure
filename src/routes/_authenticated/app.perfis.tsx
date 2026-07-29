@@ -117,16 +117,6 @@ const GRUPOS_BASE: Grupo[] = [
     ],
   },
   {
-    label: "Marketing",
-    modulos: [
-      { key: "mkt-leads", nome: "Leads", descricao: "Base de leads (entrada do menu Marketing)" },
-      { key: "campanhas", nome: "Campanhas", descricao: "Campanhas de marketing" },
-      { key: "mkt-envios", nome: "Envios", descricao: "Disparos em massa" },
-      { key: "mkt-landing", nome: "Landing Pages", descricao: "Páginas de captura" },
-      { key: "mkt-segmentos", nome: "Segmentos", descricao: "Segmentação de público" },
-    ],
-  },
-  {
     label: "Cadastros",
     modulos: [
       { key: "equipe", nome: "Equipe", descricao: "Usuários do sistema" },
