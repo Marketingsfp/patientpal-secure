@@ -94,6 +94,7 @@ import {
   getProcedimentosComValor,
 } from "@/lib/agenda/refs-cache";
 import { useServerFn } from "@tanstack/react-start";
+import { limparAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
 import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
