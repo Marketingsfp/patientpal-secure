@@ -138,6 +138,67 @@ export async function metaSendText(
   return { wa_message_id };
 }
 
+/** Sobe um arquivo para a Meta e devolve o media_id (válido por ~30 dias). */
+export async function metaUploadMedia(
+  phoneNumberId: string,
+  accessToken: string,
+  bytes: Uint8Array,
+  filename: string,
+  mimeType = "application/pdf",
+): Promise<string> {
+  const form = new FormData();
+  form.append("messaging_product", "whatsapp");
+  form.append("type", mimeType);
+  form.append("file", new Blob([bytes as unknown as BlobPart], { type: mimeType }), filename);
+
+  const res = await fetch(`https://graph.facebook.com/${META_VERSION}/${phoneNumberId}/media`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: form,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !(json as any)?.id) {
+    const msg = (json as any)?.error?.message ?? `HTTP ${res.status}`;
+    throw new Error(`WhatsApp (upload): ${msg}`);
+  }
+  return (json as any).id as string;
+}
+
+/** Envia um documento (PDF) já hospedado na Meta via media_id. */
+export async function metaSendDocument(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  mediaId: string,
+  filename: string,
+  caption?: string,
+): Promise<{ wa_message_id: string | null }> {
+  const res = await fetch(`https://graph.facebook.com/${META_VERSION}/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "document",
+      document: {
+        id: mediaId,
+        filename,
+        ...(caption ? { caption: caption.slice(0, 1000) } : {}),
+      },
+    }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = (json as any)?.error?.message ?? `HTTP ${res.status}`;
+    throw new Error(`WhatsApp (documento): ${msg}`);
+  }
+  return { wa_message_id: (json as any)?.messages?.[0]?.id ?? null };
+}
+
 /**
  * Decide se estamos DENTRO do horário de atendimento humano.
  * Compara hora atual de São Paulo com horario_inicio/fim configurados.
