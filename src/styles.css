@@ -350,19 +350,11 @@
 /* Espacinho entre imagens inline lado a lado */
 .rt-editor .rt-img-wrap + .rt-img-wrap { margin-left: 4px; }
 
-/* Agenda V2 — modo full-bleed no mobile.
- * Quando a rota /app/agenda-v2 monta com viewport < md, o outer app-shell
- * (aside do menu + padding do <main>) é recolhido para dar 100% da largura útil. */
-@media (max-width: 767px) {
-  html.agenda-v2-fullbleed aside { display: none !important; }
-  html.agenda-v2-fullbleed main { padding: 0 !important; }
-}
-
 /* =====================================================================
  * Health Hub Pro — Design System tokens (HHP)
  *
- * Fonte oficial da identidade visual extraída da Agenda V2. Todos os
- * módulos futuros (Prontuário V2, Financeiro V2, RH etc.) devem consumir
+ * Fonte oficial da identidade visual. Todos os
+ * módulos (Prontuário V2, Financeiro V2, RH etc.) devem consumir
  * estes tokens em vez de re-declarar cores/raios/sombras.
  *
  * Convenção: prefixo --hhp-* para evitar conflito com tokens shadcn base.
