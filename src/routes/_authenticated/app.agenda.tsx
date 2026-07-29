@@ -5089,6 +5089,15 @@ function AgendaPage() {
       !confirm(`Liberar este horário? O cliente ${a.paciente_nome} será removido, mas a ficha continuará disponível.`)
     )
       return;
+    // Atendimento externo: desfaz o registro no Financeiro e zera as marcações
+    // de origem antes de liberar o slot. O que foi desfeito fica no histórico.
+    if (a.origem_externa) {
+      const res = await fnLimparExterno({ data: { agendamento_id: a.id } });
+      if (!res.ok) {
+        toast.error(res.message);
+        return;
+      }
+    }
     // Ao desmarcar, o item de orçamento precisa voltar a ficar livre: remove
     // os vínculos desta ficha em agendamento_orcamento_itens. Sem isso, o
     // vínculo órfão dispara o falso aviso de "paciente já agendado".
