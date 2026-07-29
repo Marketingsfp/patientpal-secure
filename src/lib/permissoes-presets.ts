@@ -16,7 +16,7 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   // Operação
   "agenda", "checkin", "caixa", "chat", "clientes", "dashboard", "fluxo",
   "orcamentos", "recepcao", "triagem-enfermagem", "cartao-beneficios",
-  "painel", "documentos", "atendimento-multiplo",
+  "painel", "documentos",
   // Inteligência
   "atendimento-ia", "crm", "alertas-enfermagem", "consulta-rapida", "nina",
   "odontologia", "prontuarios", "anamneses", "exames-resultados",
@@ -50,7 +50,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     estoque: "read", crm: "read", campanhas: "read", "mkt-leads": "read",
     "consulta-rapida": "read", "alertas-enfermagem": "read",
     "cartao-beneficios": "read",
-    "painel-executivo": "write", "atendimento-multiplo": "read",
+    "painel-executivo": "write",
     "tipos-servico": "read",
   },
   medico: {
@@ -58,7 +58,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     "consulta-rapida": "read", "prontuario-modelos": "read",
     odontologia: "write", prontuarios: "write", anamneses: "write",
     documentos: "write", clientes: "read", chat: "write",
-    "atendimento-multiplo": "write", caixa: "read",
+    caixa: "read",
   },
   recepcao: {
     agenda: "write", recepcao: "write", clientes: "write", fluxo: "write",
@@ -69,7 +69,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     checkin: "write", dashboard: "write",
     chat: "write", "cartao-beneficios": "read", caixa: "write",
     procedimentos: "read", nfse: "write",
-    "atendimento-multiplo": "write", "tipos-servico": "read",
+    "tipos-servico": "read",
   },
   caixa: {
     caixa: "write", clientes: "read", recepcao: "read", financeiro: "read",
@@ -90,7 +90,6 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     "atendimento-ia": "read",
     anamneses: "write", prontuarios: "read", estoque: "read",
     documentos: "read", chat: "write", orcamentos: "write",
-    "atendimento-multiplo": "write",
     caixa: "read",
   },
 };
