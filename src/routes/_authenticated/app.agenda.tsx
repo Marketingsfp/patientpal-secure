@@ -4906,10 +4906,31 @@ function AgendaPage() {
     if (!result.ok) {
       setSaving(false);
       if ("validation_error" in result) {
-        const opts = result.validation_error.toast_duration
-          ? { duration: result.validation_error.toast_duration }
-          : undefined;
-        toast.error(result.validation_error.message, opts);
+        const msg = result.validation_error.message;
+        const isBloqueioCartao = msg.includes("cartão benefícios") && msg.includes("Agendamento bloqueado");
+        const opts: Parameters<typeof toast.error>[1] = {};
+        if (result.validation_error.toast_duration) opts.duration = result.validation_error.toast_duration;
+        if (isBloqueioCartao) {
+          // UX: dois atalhos no próprio toast — trocar para Particular
+          // (destrava o Save) ou abrir a aba do contrato para regularizar.
+          opts.duration = 15000;
+          opts.action = {
+            label: "Trocar para Particular",
+            onClick: () => {
+              setForm((f) => ({ ...f, tipo_atendimento: "particular" }));
+              toast.success('Tipo alterado para "Particular". Clique em Salvar novamente.');
+            },
+          };
+          opts.cancel = {
+            label: "Ver mensalidades",
+            onClick: () => {
+              if (form.paciente_id) {
+                window.open(`/app/clientes/${form.paciente_id}`, "_blank");
+              }
+            },
+          };
+        }
+        toast.error(msg, opts);
       } else {
         mostrarErro(result.pg_error);
       }
