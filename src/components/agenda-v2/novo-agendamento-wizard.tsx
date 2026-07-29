@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { notify } from "@/lib/notify";
-import { Check, ChevronRight, User, Stethoscope, UserRound, Clock, CheckCircle2, Loader2, UserPlus, X } from "lucide-react";
+import { Check, ChevronRight, User, Stethoscope, UserRound, Clock, CheckCircle2, Loader2, UserPlus, X, AlertTriangle } from "lucide-react";
 import { HhpWizardShell } from "@/design-system/hhp";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { ProcedimentoPicker, type ProcedimentoOption } from "@/components/agenda/procedimento-picker";
@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
+import { valorDaTabela } from "@/lib/agenda/atendimento-externo-preco";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { cn } from "@/lib/utils";
 
@@ -101,7 +102,8 @@ export function NovoAgendamentoWizard({
   const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento>("particular");
   // Atendimento externo — faturado em outra clínica (ver AGENTS.md §1.9).
   const [externoClinicaNome, setExternoClinicaNome] = useState<string>("");
-  const [externoValor, setExternoValor] = useState<string>("");
+  const [externoValor, setExternoValor] = useState<number | null>(null);
+  const [externoBuscando, setExternoBuscando] = useState(false);
   const [especialidadeId, setEspecialidadeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -118,6 +120,31 @@ export function NovoAgendamentoWizard({
   // de walk-in.
   // -------------------------------------------------------------------------
   const [showQuickCreate, setShowQuickCreate] = useState(false);
+
+  // Preço automático do atendimento externo — tabela desta clínica (base do repasse).
+  useEffect(() => {
+    if (tipoAtendimento !== "externo" || !clinicaId || !procedimento?.nome) {
+      setExternoValor(null);
+      return;
+    }
+    let cancelado = false;
+    setExternoBuscando(true);
+    void (async () => {
+      const { data } = await supabase
+        .from("procedimentos")
+        .select("valor_dinheiro,valor_dinheiro_pix,valor_padrao")
+        .eq("clinica_id", clinicaId)
+        .ilike("nome", procedimento.nome)
+        .limit(1)
+        .maybeSingle();
+      if (cancelado) return;
+      const v = valorDaTabela(data as never);
+      setExternoValor(v > 0 ? v : null);
+      setExternoBuscando(false);
+    })();
+    return () => { cancelado = true; };
+  }, [tipoAtendimento, clinicaId, procedimento?.nome]);
+
   const [qcNome, setQcNome] = useState("");
   const [qcSexo, setQcSexo] = useState<"M" | "F">("F");
   const [qcNasc, setQcNasc] = useState("");
@@ -140,7 +167,8 @@ export function NovoAgendamentoWizard({
     setSlot(null);
     setTipoAtendimento("particular");
     setExternoClinicaNome("");
-    setExternoValor("");
+    setExternoValor(null);
+    setExternoBuscando(false);
     setEspecialidadeId(null);
     setSaving(false);
     resetQuickCreate();
@@ -393,14 +421,13 @@ export function NovoAgendamentoWizard({
           setSaving(false);
           return;
         }
-        const valorNum = externoValor ? Number(externoValor.replace(",", ".")) : 0;
         const mkRes = await marcarExternoFn({
           data: {
             agendamento_id: result.id,
             clinica_id: clinicaId,
             origem_clinica_id: null,
             origem_clinica_nome: externoClinicaNome.trim(),
-            origem_valor: Number.isFinite(valorNum) && valorNum > 0 ? valorNum : null,
+            origem_valor: externoValor && externoValor > 0 ? externoValor : null,
           },
         });
         if (!mkRes.ok) {
@@ -727,16 +754,23 @@ export function NovoAgendamentoWizard({
                 </div>
                 <div>
                   <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Valor do atendimento</label>
-                  <input
-                    value={externoValor}
-                    onChange={(e) => setExternoValor(e.target.value.replace(/[^0-9.,]/g, ""))}
-                    placeholder="0,00"
-                    inputMode="decimal"
-                    className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm tabular-nums"
-                  />
+                  <div className="mt-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-base font-semibold tabular-nums">
+                    {externoBuscando
+                      ? <span className="text-xs font-normal text-slate-500">Buscando na tabela…</span>
+                      : externoValor && externoValor > 0
+                      ? `R$ ${externoValor.toFixed(2).replace(".", ",")}`
+                      : <span className="text-xs font-normal text-slate-500">Sem valor na tabela desta clínica</span>}
+                  </div>
                   <p className="mt-1 text-[10px] text-slate-500">
-                    Deixe em branco para usar o valor do serviço na tabela desta clínica.
+                    Valor do serviço na tabela desta clínica (não editável).
                   </p>
+                  <div className="mt-2 flex gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] text-amber-900">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <span>
+                      Este valor é usado <b>apenas para o repasse do médico</b>. Não entra no
+                      movimento de caixa da atendente e não gera nota fiscal.
+                    </span>
+                  </div>
                 </div>
               </div>
             )}

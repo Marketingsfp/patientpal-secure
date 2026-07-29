@@ -1,24 +1,23 @@
 ## Objetivo
 
-No diálogo "Atendimento externo", ninguém precisa digitar o valor. O sistema assume o **valor do serviço na tabela desta clínica** (a que está atendendo/recebendo a GR) e usa esse valor como base do repasse do médico.
+No registro de **Atendimento externo**, o valor deixa de ser um campo digitável. Ele aparece pronto, calculado pela tabela de preços desta clínica, apenas como base do repasse do médico — com aviso claro de que não entra no movimento de caixa da atendente.
 
 ## O que muda
 
-**1. Diálogo (`src/components/agenda/atendimento-externo-dialog.tsx`)**
-- Ao abrir, busca em `procedimentos` (da clínica atual) o serviço do agendamento e preenche o valor automaticamente (`valor_dinheiro` → `valor_dinheiro_pix` → `valor_padrao`, mesma ordem já usada na agenda).
-- O campo deixa de ser obrigatório e passa a mostrar o valor sugerido, com texto do tipo "Valor da tabela desta clínica — ajuste apenas se for diferente".
-- Se o serviço não estiver na tabela, o campo fica vazio e é permitido salvar; nesse caso o valor entra como 0 e o repasse fica pendente de ajuste.
+### 1. Diálogo da Agenda clássica (`src/components/agenda/atendimento-externo-dialog.tsx`)
+- Substituir o `Input` editável por um bloco de leitura mostrando o valor formatado (`R$ 0,00`), com estado "Buscando na tabela…" enquanto carrega.
+- Se o serviço não tiver preço cadastrado, exibir "Sem valor na tabela desta clínica" (o registro continua permitido, valor nulo).
+- Remover o estado de digitação; manter apenas o valor buscado, enviado como está para `marcarAtendimentoExterno`.
+- Aviso destacado (faixa âmbar com ícone de alerta):
+  "Este valor é usado apenas para o repasse do médico. Não entra no movimento de caixa da atendente e não gera nota fiscal."
 
-**2. Regra de negócio (`src/lib/agenda/atendimento-externo.functions.ts`)**
-- Remove a exigência de `origem_valor > 0`.
-- Quando o valor não vier do formulário, o servidor busca o preço do procedimento na tabela da clínica que atendeu e usa esse valor (fonte da verdade, mesmo se o front falhar).
-- `valor_total` = valor apurado; `valor_medico` = valor apurado; `valor_clinica` = 0; nada em caixa e nenhuma NFS-e, como hoje.
+### 2. Aba "Externo" do wizard V2 (`src/components/agenda-v2/novo-agendamento-wizard.tsx`)
+- Mesmo tratamento: campo de valor vira exibição somente leitura, alimentado pela mesma busca de preço, com o mesmo aviso.
 
-**3. Wizard V2**
-- Mesmo comportamento no fluxo de novo agendamento (`novo-agendamento-wizard.tsx`): campo opcional, preenchido sozinho.
+### 3. Sem mudanças de backend
+`marcarAtendimentoExterno` já busca o preço no banco quando o valor chega nulo, e já cria o `fin_atendimentos` com `valor_clinica = 0`. A regra de negócio permanece intacta; a alteração é de interface.
 
 ## Detalhes técnicos
-
-- Sem migração: `agendamentos.origem_valor` continua guardando o valor apurado.
-- Busca de preço por nome do procedimento + `clinica_id`, reaproveitando o helper `primeiroValorValido` já existente na agenda.
-- O relatório de atendimentos externos continua exibindo "Valor origem" — agora preenchido automaticamente.
+- Reaproveita `valorDaTabela` de `src/lib/agenda/atendimento-externo-preco.ts` e a consulta já existente em `procedimentos` (`valor_dinheiro`, `valor_dinheiro_pix`, `valor_padrao`).
+- Estados `valor`/`externoValor` passam de string editável para número (ou `null`) somente de leitura.
+- Nenhuma migração de banco.

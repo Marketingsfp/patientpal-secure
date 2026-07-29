@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Building2 } from "lucide-react";
+import { Building2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,7 @@ export function AtendimentoExternoDialog({
   const { memberships } = useClinica();
   const [origemId, setOrigemId] = useState<string>("");
   const [clinicaNome, setClinicaNome] = useState("");
-  const [valor, setValor] = useState("");
+  const [valor, setValor] = useState<number | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [buscandoValor, setBuscandoValor] = useState(false);
 
@@ -53,7 +53,7 @@ export function AtendimentoExternoDialog({
     if (open) {
       setOrigemId("");
       setClinicaNome("");
-      setValor("");
+      setValor(null);
     }
   }, [open]);
 
@@ -73,7 +73,7 @@ export function AtendimentoExternoDialog({
         .maybeSingle();
       if (cancelado) return;
       const v = valorDaTabela(data as never);
-      if (v > 0) setValor(v.toFixed(2).replace(".", ","));
+      setValor(v > 0 ? v : null);
       setBuscandoValor(false);
     })();
     return () => { cancelado = true; };
@@ -84,7 +84,6 @@ export function AtendimentoExternoDialog({
     const unidade = unidades.find((u) => u.id === origemId);
     const nomeOrigem = unidade ? unidade.nome : clinicaNome.trim();
     if (!nomeOrigem) return toast.error("Informe a clínica de origem.");
-    const valorNum = valor ? Number(valor.replace(",", ".")) : 0;
     setSalvando(true);
     const res = await marcarFn({
       data: {
@@ -92,7 +91,7 @@ export function AtendimentoExternoDialog({
         clinica_id: clinicaId,
         origem_clinica_id: unidade ? unidade.id : null,
         origem_clinica_nome: nomeOrigem,
-        origem_valor: Number.isFinite(valorNum) && valorNum > 0 ? valorNum : null,
+        origem_valor: valor && valor > 0 ? valor : null,
       },
     });
     setSalvando(false);
@@ -146,16 +145,23 @@ export function AtendimentoExternoDialog({
           </div>
           <div>
             <Label>Valor do atendimento</Label>
-            <Input
-              value={valor}
-              onChange={(e) => setValor(e.target.value.replace(/[^0-9.,]/g, ""))}
-              inputMode="decimal"
-              placeholder={buscandoValor ? "Buscando na tabela…" : "0,00"}
-            />
+            <div className="mt-1 rounded-md border bg-muted/40 px-3 py-2 text-lg font-semibold tabular-nums">
+              {buscandoValor
+                ? <span className="text-sm font-normal text-muted-foreground">Buscando na tabela…</span>
+                : valor && valor > 0
+                ? `R$ ${valor.toFixed(2).replace(".", ",")}`
+                : <span className="text-sm font-normal text-muted-foreground">Sem valor na tabela desta clínica</span>}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Preenchido com o valor da tabela desta clínica — ajuste só se for diferente.
-              Usado para o repasse do médico; não entra no caixa daqui.
+              Valor do serviço na tabela desta clínica (não editável).
             </p>
+            <div className="mt-2 flex gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>
+                Este valor é usado <b>apenas para o repasse do médico</b>. Não entra no
+                movimento de caixa da atendente e não gera nota fiscal.
+              </span>
+            </div>
           </div>
         </div>
 
