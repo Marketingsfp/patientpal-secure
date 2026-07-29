@@ -8496,6 +8496,7 @@ function AgendaPage() {
               let bgClass = "bg-card";
               let borderLeft = "border-l-4 border-transparent";
               if (estornoPend) { bgClass = "bg-rose-500/10"; borderLeft = "border-l-4 border-rose-500"; }
+              else if (a.origem_externa) { bgClass = "bg-violet-500/10"; borderLeft = "border-l-4 border-violet-400"; }
               else if (realizado) { bgClass = "bg-emerald-500/10"; borderLeft = "border-l-4 border-emerald-500"; }
               else if (presente) { bgClass = "bg-blue-500/10"; borderLeft = "border-l-4 border-blue-400"; }
 
@@ -8756,6 +8757,9 @@ function AgendaPage() {
                   if (estornoPend) {
                     bgClass = "bg-rose-500/10 hover:bg-rose-500/15";
                     borderLeft = "border-l-4 border-rose-500";
+                  } else if (a.origem_externa) {
+                    bgClass = "bg-violet-500/10 hover:bg-violet-500/15";
+                    borderLeft = "border-l-4 border-violet-400";
                   } else if (realizado) {
                     bgClass = "bg-emerald-500/10 hover:bg-emerald-500/15";
                     borderLeft = "border-l-4 border-emerald-500";
