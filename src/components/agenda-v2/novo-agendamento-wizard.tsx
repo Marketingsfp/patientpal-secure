@@ -120,6 +120,31 @@ export function NovoAgendamentoWizard({
   // de walk-in.
   // -------------------------------------------------------------------------
   const [showQuickCreate, setShowQuickCreate] = useState(false);
+
+  // Preço automático do atendimento externo — tabela desta clínica (base do repasse).
+  useEffect(() => {
+    if (tipoAtendimento !== "externo" || !clinicaId || !procedimento?.nome) {
+      setExternoValor(null);
+      return;
+    }
+    let cancelado = false;
+    setExternoBuscando(true);
+    void (async () => {
+      const { data } = await supabase
+        .from("procedimentos")
+        .select("valor_dinheiro,valor_dinheiro_pix,valor_padrao")
+        .eq("clinica_id", clinicaId)
+        .ilike("nome", procedimento.nome)
+        .limit(1)
+        .maybeSingle();
+      if (cancelado) return;
+      const v = valorDaTabela(data as never);
+      setExternoValor(v > 0 ? v : null);
+      setExternoBuscando(false);
+    })();
+    return () => { cancelado = true; };
+  }, [tipoAtendimento, clinicaId, procedimento?.nome]);
+
   const [qcNome, setQcNome] = useState("");
   const [qcSexo, setQcSexo] = useState<"M" | "F">("F");
   const [qcNasc, setQcNasc] = useState("");
