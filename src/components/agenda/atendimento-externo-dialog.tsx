@@ -219,7 +219,7 @@ export function AtendimentoExternoDialog({
                 className="mt-2"
                 value={clinicaNome}
                 onChange={(e) => setClinicaNome(e.target.value)}
-                placeholder="Ex.: Policlínica São Francisco de Paula"
+                placeholder="Ex.: nome da clínica de origem"
               />
             )}
           </div>
