@@ -635,11 +635,11 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     setPagina(1);
   };
 
-  // Paginação
-  const totalPaginas = Math.max(1, Math.ceil(filtered.length / POR_PAGINA));
+  // Paginação (server-side: `total` vem do count exato do banco)
+  const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const paginaAtual = Math.min(pagina, totalPaginas);
   const inicioIdx = (paginaAtual - 1) * POR_PAGINA;
-  const paginados = filtered.slice(inicioIdx, inicioIdx + POR_PAGINA);
+  const paginados = filtered;
   // Reset página ao mudar filtros/busca/ordem
   useEffect(() => {
     setPagina(1);
