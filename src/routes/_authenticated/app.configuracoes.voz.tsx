@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Volume2, Play, Square, RotateCcw, Save } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Volume2, Play, Square, RotateCcw, Save, Headphones, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useClinica } from "@/hooks/use-clinica";
 import {
   DEFAULT_TTS_RATE,
@@ -276,6 +278,135 @@ function VozConfigPage() {
           </div>
         </CardContent>
       </Card>
+
+      <TesteServidorLocalCard />
     </div>
+  );
+}
+
+const TTS_ENDPOINT = "https://server-mj.tailec426c.ts.net/api/tts";
+const VOZES = [
+  { value: "faber", label: "Faber (Masculino)" },
+  { value: "feminina", label: "Feminina" },
+] as const;
+
+function TesteServidorLocalCard() {
+  const [texto, setTexto] = useState<string>(
+    "Olá! Este é um teste de síntese de voz.",
+  );
+  const [voice, setVoice] = useState<string>("faber");
+  const [loading, setLoading] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const lastUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
+    };
+  }, []);
+
+  async function ouvir() {
+    const t = texto.trim();
+    if (!t) {
+      toast.warning("Digite um texto para ouvir.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(TTS_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: t, voice }),
+      });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      if (!blob.size) throw new Error("Resposta de áudio vazia.");
+      const url = URL.createObjectURL(blob);
+      if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
+      lastUrlRef.current = url;
+      setAudioUrl(url);
+      // Reproduz automaticamente após o elemento atualizar a src.
+      setTimeout(() => {
+        const el = audioRef.current;
+        if (el) {
+          el.load();
+          el.play().catch(() => {
+            // Autoplay bloqueado: o usuário pode usar o controle nativo.
+          });
+        }
+      }, 0);
+    } catch (err) {
+      const msg =
+        err instanceof TypeError
+          ? "Não foi possível conectar ao servidor local de TTS. Verifique se ele está acessível."
+          : `Falha ao gerar áudio: ${err instanceof Error ? err.message : "erro desconhecido"}`;
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Headphones className="h-4 w-4" /> Teste do servidor local (Piper)
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm">Texto</Label>
+          <Textarea
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            rows={3}
+            placeholder="Digite o texto que deseja ouvir…"
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+          <div className="space-y-2">
+            <Label className="text-sm">Voz</Label>
+            <Select value={voice} onValueChange={setVoice}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {VOZES.map((v) => (
+                  <SelectItem key={v.value} value={v.value}>
+                    {v.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={ouvir} disabled={loading} className="gap-2">
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Gerando…
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4" /> Ouvir
+              </>
+            )}
+          </Button>
+        </div>
+        {audioUrl && (
+          <audio
+            ref={audioRef}
+            src={audioUrl}
+            controls
+            autoPlay
+            className="w-full"
+          />
+        )}
+        <p className="text-xs text-muted-foreground">
+          Faz uma requisição POST direta para <code>{TTS_ENDPOINT}</code>.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
