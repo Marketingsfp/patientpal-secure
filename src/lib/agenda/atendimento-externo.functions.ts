@@ -71,6 +71,9 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
         origem_clinica_id: data.origem_clinica_id,
         origem_clinica_nome: (data.origem_clinica_nome ?? "").trim() || null,
         origem_valor: valor,
+        // Registra se o paciente foi atendido pelo convênio, para a GR
+        // imprimir o plano e as telas enxergarem a modalidade correta.
+        tipo_atendimento: data.convenio_id ? "convenio" : "particular",
       })
       .eq("id", data.agendamento_id);
     if (upErr) return { ok: false, message: upErr.message };

@@ -1,33 +1,36 @@
-Objetivo: a desmarcação de um atendimento externo deve deixar a ficha exatamente como uma desmarcação comum — slot limpo, nada no financeiro, tudo apenas no histórico.
+## 1. GR de atendimento externo: título único
 
-## Como funciona hoje
-A ação "Desmarcar paciente / Liberar horário" limpa paciente, procedimento, observações, status, data de pagamento e orçamento, e remove os vínculos de itens de orçamento. Ela não limpa as marcações de atendimento externo (origem externa, clínica de origem, valor de origem) nem remove o lançamento gerado em Atendimentos do Financeiro. Por isso os três horários desmarcados continuam roxos na agenda e continuam aparecendo no Financeiro.
+Em `src/lib/print-gr.ts`, hoje saem duas linhas: "GUIA DE ATENDIMENTO" e, logo abaixo, o selo "*** ATENDIMENTO EXTERNO ***".
 
-## O que será feito
+- Quando o agendamento for externo, imprimir uma única linha: **"GUIA DE ATENDIMENTO EXTERNO"** (mesmo destaque atual).
+- Manter abaixo as linhas "ORIGEM: <clínica>" e "SEM COBRANCA NESTA UNIDADE".
+- Guia normal segue como está ("GUIA DE ATENDIMENTO").
 
-1. Completar a limpeza na desmarcação
-   - Na mesma ação de desmarcar, além do que já é limpo, zerar: origem externa, clínica de origem e valor de origem.
-   - Remover o registro correspondente em Atendimentos do Financeiro quando ele for de atendimento externo.
-   - Se o repasse desse atendimento já estiver pago, não apagar: avisar que é preciso estornar o repasse antes de liberar o horário (mesma lógica do bloqueio que já existe para atendimento pago).
+## 2. Repasse de R$ 55,00 no Financeiro — causa confirmada
 
-2. Registrar no histórico
-   - Antes de limpar, gravar uma nota no histórico da ficha com paciente, clínica de origem, procedimento e valor de repasse que foram desfeitos, além do usuário e data/hora.
-   - O log de auditoria continua registrando as alterações normalmente.
+Verifiquei o registro do atendimento da Quédima (29/07, CONSULTA (CARDIOLOGIA), origem Policlínica São Francisco de Paula):
 
-3. Aplicar a mesma limpeza no cancelamento
-   - Quando o agendamento externo for movido para "Cancelado", executar a mesma rotina, para não sobrar registro financeiro órfão por esse caminho.
+- Em `fin_atendimentos` está gravado corretamente `valor_medico = 40,00`, `valor_total = 0`, `forma_pagamento = 'externo'` — é o valor calculado no diálogo com o convênio marcado (é o que sai na GR: PRESTADOR 40,00).
+- A tela **Financeiro → Atendimentos** **descarta** esse valor gravado: para toda linha de origem "manual" ela **recalcula** o repasse (`calcRepasseFull`). Sem pagamento em caixa (valor 0) e sem a modalidade de convênio do paciente no mapa da tela, ela casa a regra de convênio por nome do serviço com repasse fixo e devolve **55,00**, sobrescrevendo os 40,00.
+- Ou seja: o erro não está no cálculo do atendimento externo, e sim na tela financeira que recalcula por cima.
 
-4. Corrigir os três casos atuais (29/07, 13:50 / 13:55 / 14:00)
-   - Limpar as marcações de atendimento externo nos três slots.
-   - Remover os três lançamentos externos pendentes no Financeiro (repasse ainda não pago).
-   - Registrar a correção no histórico de cada ficha.
+Correção em `src/routes/_authenticated/app.financeiro.atendimentos.tsx`:
 
-5. Validação
-   - Os três horários devem aparecer como livres e sem destaque roxo na agenda.
-   - Nenhum deles deve aparecer em Financeiro > Atendimentos.
-   - O histórico de cada ficha deve mostrar o que foi desfeito.
+- Nas linhas com `forma_pagamento = 'externo'`, **não recalcular**: usar exatamente `valor_medico` e `valor_total` gravados, com `valor_clinica = 0`.
+- Assim o Financeiro passa a bater com a GR e com o que foi decidido na hora do registro (com ou sem convênio).
+
+## 3. Registrar o convênio no atendimento externo (evita reincidência)
+
+Hoje o diálogo envia `convenio_id`, mas a server function `marcarAtendimentoExterno` ignora esse dado — por isso o agendamento fica como `tipo_atendimento = 'particular'` e a GR imprime "CONV: PARTICULAR" mesmo com plano marcado.
+
+- Gravar no agendamento o vínculo de convênio informado (tipo de atendimento / convênio) ao marcar o externo.
+- Com isso a GR passa a exibir o nome do convênio e qualquer tela que dependa da modalidade enxerga o plano.
+
+## 4. Acerto do registro existente
+
+Após a correção, conferir a linha da Quédima no Financeiro: deve mostrar repasse **40,00** e clínica **0,00**. O registro no banco já está correto, não precisa de alteração de dados.
 
 ## Detalhes técnicos
-- Nova função de servidor `limparAtendimentoExterno` em `src/lib/agenda/atendimento-externo.functions.ts`: valida `repasse_pago`, apaga a linha de `fin_atendimentos` com `forma_pagamento = 'externo'`, zera `origem_externa/origem_clinica_id/origem_clinica_nome/origem_valor` em `agendamentos` e insere a nota em `agendamento_historico_notas`.
-- Chamada a partir de `remove` em `src/routes/_authenticated/app.agenda.tsx` (antes da limpeza atual) e a partir do fluxo de cancelamento em `src/lib/agenda/status-agendamento.functions.ts`.
-- Correção dos registros existentes via operação de dados nos IDs `d2421c9a`, `822a77af` e `ba210e85`.
+
+- Arquivos: `src/lib/print-gr.ts` (título e selo), `src/routes/_authenticated/app.financeiro.atendimentos.tsx` (bypass do recálculo para `externo`), `src/lib/agenda/atendimento-externo.functions.ts` (persistir convênio).
+- Sem migração de banco necessária (usa colunas já existentes de convênio/tipo de atendimento no agendamento).

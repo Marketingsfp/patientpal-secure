@@ -949,7 +949,6 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     } catch { /* guia sai mesmo sem o financeiro */ }
   }
   const externoSeloHtml = ehExterno ? `
-    <div class="center bold lg" style="letter-spacing:1px">*** ATENDIMENTO EXTERNO ***</div>
     ${agExt.origem_clinica_nome ? `<div class="center sm">ORIGEM: <span class="v">${esc(String(agExt.origem_clinica_nome).toUpperCase())}</span></div>` : ""}
     <div class="center sm">SEM COBRANCA NESTA UNIDADE</div>
     <div class="sep"></div>` : "";
@@ -969,7 +968,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
 
     <div class="sep"></div>
-    <div class="center lg">GUIA DE ATENDIMENTO</div>
+    <div class="center lg">${ehExterno ? "GUIA DE ATENDIMENTO EXTERNO" : "GUIA DE ATENDIMENTO"}</div>
     <div class="sep"></div>
     ${externoSeloHtml}
     <div class="center bold">${esc(paciente?.nome ?? a.paciente_nome)}</div>

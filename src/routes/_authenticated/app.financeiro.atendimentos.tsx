@@ -1279,6 +1279,10 @@ function AtendimentosPage() {
     );
     const manuais: Atend[] = manuaisRaw.map((r) => {
       const pago = Number(r.valor_total);
+      // Atendimento externo (faturado em outra clínica): o repasse foi
+      // congelado no momento do registro (com ou sem convênio). Recalcular
+      // aqui sobrescreveria o valor correto — usa o que está gravado.
+      const ehExternoRow = (r.forma_pagamento ?? "").trim().toLowerCase() === "externo";
       // Recalcula repasse usando convênio cadastrado por procedimento
       // (ex.: PREVENTIVO R$ 10,40). Mantém o valor armazenado apenas como
       // fallback caso o cálculo retorne 0 e o banco já tenha um valor manual.
@@ -1289,15 +1293,19 @@ function AtendimentosPage() {
         null,
         resolverModalidade({ pacienteId: r.paciente_id, mapa: mapaConvenio }),
       );
-      const valorMedico = repasse > 0 ? repasse : Number(r.valor_medico);
-      const valorTotal = total > 0 ? total : pago;
+      const valorMedico = ehExternoRow
+        ? Number(r.valor_medico) || 0
+        : repasse > 0
+          ? repasse
+          : Number(r.valor_medico);
+      const valorTotal = ehExternoRow ? pago : total > 0 ? total : pago;
       return {
         id: r.id,
         data: r.data,
         procedimento: r.procedimento,
         valor_total: valorTotal,
         valor_medico: valorMedico,
-        valor_clinica: +(valorTotal - valorMedico).toFixed(2),
+        valor_clinica: ehExternoRow ? 0 : +(valorTotal - valorMedico).toFixed(2),
         status: r.status,
         forma_pagamento: r.forma_pagamento,
         medico_id: r.medico_id,
