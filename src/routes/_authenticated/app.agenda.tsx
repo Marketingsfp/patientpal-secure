@@ -367,6 +367,13 @@ type ConvenioInfo = {
   /** Parcelas vencidas há mais de 5 dias (tolerância). Só isso bloqueia o convênio. */
   parcelasAtrasadas: number;
   desconto: DescontoConvenio | null;
+  /**
+   * Desconto da próxima regra do convênio ignorando as regras de gratuidade.
+   * Usado quando o paciente opta por NÃO usar a gratuidade agora — sem isso,
+   * recusar a cortesia cobrava o particular cheio, mesmo havendo uma regra de
+   * desconto (ex.: Preventivo gratuito 1x/ano OU 10% off) aplicável.
+   */
+  descontoSemGratuidade?: DescontoConvenio | null;
   avisoLimite?: string;
   bloquear?: boolean;
   /** Contrato com parcela(s) vencida(s) dentro da tolerância de 5 dias — informativo, não restringe benefício algum. */
