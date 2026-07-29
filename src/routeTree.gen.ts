@@ -29,7 +29,6 @@ import { Route as PacienteFinanceiroRouteImport } from './routes/paciente.financ
 import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
 import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
 import { Route as PTokenRouteImport } from './routes/p.$token'
-import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
 import { Route as ApiTtsVoicesRouteImport } from './routes/api/tts-voices'
 import { Route as ApiTtsProxyRouteImport } from './routes/api/tts-proxy'
@@ -58,10 +57,6 @@ import { Route as AuthenticatedAppOrcamentosRouteImport } from './routes/_authen
 import { Route as AuthenticatedAppOdontologiaRouteImport } from './routes/_authenticated/app.odontologia'
 import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticated/app.nina'
 import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
-import { Route as AuthenticatedAppMktSegmentosRouteImport } from './routes/_authenticated/app.mkt-segmentos'
-import { Route as AuthenticatedAppMktLeadsRouteImport } from './routes/_authenticated/app.mkt-leads'
-import { Route as AuthenticatedAppMktLandingRouteImport } from './routes/_authenticated/app.mkt-landing'
-import { Route as AuthenticatedAppMktEnviosRouteImport } from './routes/_authenticated/app.mkt-envios'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
 import { Route as AuthenticatedAppLmsAdminRouteImport } from './routes/_authenticated/app.lms-admin'
 import { Route as AuthenticatedAppLgpdRouteImport } from './routes/_authenticated/app.lgpd'
@@ -90,7 +85,6 @@ import { Route as AuthenticatedAppCheckinRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAppChatRouteImport } from './routes/_authenticated/app.chat'
 import { Route as AuthenticatedAppCartaoBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios'
 import { Route as AuthenticatedAppCargosRouteImport } from './routes/_authenticated/app.cargos'
-import { Route as AuthenticatedAppCampanhasRouteImport } from './routes/_authenticated/app.campanhas'
 import { Route as AuthenticatedAppCaixaRouteImport } from './routes/_authenticated/app.caixa'
 import { Route as AuthenticatedAppBoletosRouteImport } from './routes/_authenticated/app.boletos'
 import { Route as AuthenticatedAppBackupsRouteImport } from './routes/_authenticated/app.backups'
@@ -239,11 +233,6 @@ const PacienteCartoesRoute = PacienteCartoesRouteImport.update({
 const PTokenRoute = PTokenRouteImport.update({
   id: '/p/$token',
   path: '/p/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LpSlugRoute = LpSlugRouteImport.update({
-  id: '/lp/$slug',
-  path: '/lp/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CheckinTokenRoute = CheckinTokenRouteImport.update({
@@ -398,30 +387,6 @@ const AuthenticatedAppModelosDocumentosRoute =
   AuthenticatedAppModelosDocumentosRouteImport.update({
     id: '/modelos-documentos',
     path: '/modelos-documentos',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppMktSegmentosRoute =
-  AuthenticatedAppMktSegmentosRouteImport.update({
-    id: '/mkt-segmentos',
-    path: '/mkt-segmentos',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppMktLeadsRoute =
-  AuthenticatedAppMktLeadsRouteImport.update({
-    id: '/mkt-leads',
-    path: '/mkt-leads',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppMktLandingRoute =
-  AuthenticatedAppMktLandingRouteImport.update({
-    id: '/mkt-landing',
-    path: '/mkt-landing',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppMktEnviosRoute =
-  AuthenticatedAppMktEnviosRouteImport.update({
-    id: '/mkt-envios',
-    path: '/mkt-envios',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppMedicosRoute = AuthenticatedAppMedicosRouteImport.update({
@@ -581,12 +546,6 @@ const AuthenticatedAppCargosRoute = AuthenticatedAppCargosRouteImport.update({
   path: '/cargos',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
-const AuthenticatedAppCampanhasRoute =
-  AuthenticatedAppCampanhasRouteImport.update({
-    id: '/campanhas',
-    path: '/campanhas',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
 const AuthenticatedAppCaixaRoute = AuthenticatedAppCaixaRouteImport.update({
   id: '/caixa',
   path: '/caixa',
@@ -899,7 +858,6 @@ export interface FileRoutesByFullPath {
   '/api/tts-proxy': typeof ApiTtsProxyRoute
   '/api/tts-voices': typeof ApiTtsVoicesRoute
   '/checkin/$token': typeof CheckinTokenRoute
-  '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
@@ -917,7 +875,6 @@ export interface FileRoutesByFullPath {
   '/app/backups': typeof AuthenticatedAppBackupsRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/caixa': typeof AuthenticatedAppCaixaRoute
-  '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/app/cargos': typeof AuthenticatedAppCargosRoute
   '/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/app/chat': typeof AuthenticatedAppChatRoute
@@ -946,10 +903,6 @@ export interface FileRoutesByFullPath {
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
-  '/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
-  '/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
-  '/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
-  '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
@@ -1031,7 +984,6 @@ export interface FileRoutesByTo {
   '/api/tts-proxy': typeof ApiTtsProxyRoute
   '/api/tts-voices': typeof ApiTtsVoicesRoute
   '/checkin/$token': typeof CheckinTokenRoute
-  '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
@@ -1048,7 +1000,6 @@ export interface FileRoutesByTo {
   '/app/backups': typeof AuthenticatedAppBackupsRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/caixa': typeof AuthenticatedAppCaixaRoute
-  '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/app/cargos': typeof AuthenticatedAppCargosRoute
   '/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/app/chat': typeof AuthenticatedAppChatRoute
@@ -1075,10 +1026,6 @@ export interface FileRoutesByTo {
   '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
-  '/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
-  '/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
-  '/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
-  '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
@@ -1163,7 +1110,6 @@ export interface FileRoutesById {
   '/api/tts-proxy': typeof ApiTtsProxyRoute
   '/api/tts-voices': typeof ApiTtsVoicesRoute
   '/checkin/$token': typeof CheckinTokenRoute
-  '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
@@ -1181,7 +1127,6 @@ export interface FileRoutesById {
   '/_authenticated/app/backups': typeof AuthenticatedAppBackupsRoute
   '/_authenticated/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/_authenticated/app/caixa': typeof AuthenticatedAppCaixaRoute
-  '/_authenticated/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/_authenticated/app/cargos': typeof AuthenticatedAppCargosRoute
   '/_authenticated/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/_authenticated/app/chat': typeof AuthenticatedAppChatRoute
@@ -1210,10 +1155,6 @@ export interface FileRoutesById {
   '/_authenticated/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/_authenticated/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
-  '/_authenticated/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
-  '/_authenticated/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
-  '/_authenticated/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
-  '/_authenticated/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/_authenticated/app/nina': typeof AuthenticatedAppNinaRoute
   '/_authenticated/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
@@ -1298,7 +1239,6 @@ export interface FileRouteTypes {
     | '/api/tts-proxy'
     | '/api/tts-voices'
     | '/checkin/$token'
-    | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
@@ -1316,7 +1256,6 @@ export interface FileRouteTypes {
     | '/app/backups'
     | '/app/boletos'
     | '/app/caixa'
-    | '/app/campanhas'
     | '/app/cargos'
     | '/app/cartao-beneficios'
     | '/app/chat'
@@ -1345,10 +1284,6 @@ export interface FileRouteTypes {
     | '/app/lgpd'
     | '/app/lms-admin'
     | '/app/medicos'
-    | '/app/mkt-envios'
-    | '/app/mkt-landing'
-    | '/app/mkt-leads'
-    | '/app/mkt-segmentos'
     | '/app/modelos-documentos'
     | '/app/nina'
     | '/app/odontologia'
@@ -1430,7 +1365,6 @@ export interface FileRouteTypes {
     | '/api/tts-proxy'
     | '/api/tts-voices'
     | '/checkin/$token'
-    | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
@@ -1447,7 +1381,6 @@ export interface FileRouteTypes {
     | '/app/backups'
     | '/app/boletos'
     | '/app/caixa'
-    | '/app/campanhas'
     | '/app/cargos'
     | '/app/cartao-beneficios'
     | '/app/chat'
@@ -1474,10 +1407,6 @@ export interface FileRouteTypes {
     | '/app/lgpd'
     | '/app/lms-admin'
     | '/app/medicos'
-    | '/app/mkt-envios'
-    | '/app/mkt-landing'
-    | '/app/mkt-leads'
-    | '/app/mkt-segmentos'
     | '/app/modelos-documentos'
     | '/app/nina'
     | '/app/odontologia'
@@ -1561,7 +1490,6 @@ export interface FileRouteTypes {
     | '/api/tts-proxy'
     | '/api/tts-voices'
     | '/checkin/$token'
-    | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
@@ -1579,7 +1507,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/backups'
     | '/_authenticated/app/boletos'
     | '/_authenticated/app/caixa'
-    | '/_authenticated/app/campanhas'
     | '/_authenticated/app/cargos'
     | '/_authenticated/app/cartao-beneficios'
     | '/_authenticated/app/chat'
@@ -1608,10 +1535,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/lgpd'
     | '/_authenticated/app/lms-admin'
     | '/_authenticated/app/medicos'
-    | '/_authenticated/app/mkt-envios'
-    | '/_authenticated/app/mkt-landing'
-    | '/_authenticated/app/mkt-leads'
-    | '/_authenticated/app/mkt-segmentos'
     | '/_authenticated/app/modelos-documentos'
     | '/_authenticated/app/nina'
     | '/_authenticated/app/odontologia'
@@ -1695,7 +1618,6 @@ export interface RootRouteChildren {
   ApiTtsProxyRoute: typeof ApiTtsProxyRoute
   ApiTtsVoicesRoute: typeof ApiTtsVoicesRoute
   CheckinTokenRoute: typeof CheckinTokenRoute
-  LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
   PacienteCartoesRoute: typeof PacienteCartoesRoute
   PacienteConsultasRoute: typeof PacienteConsultasRoute
@@ -1853,13 +1775,6 @@ declare module '@tanstack/react-router' {
       path: '/p/$token'
       fullPath: '/p/$token'
       preLoaderRoute: typeof PTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/lp/$slug': {
-      id: '/lp/$slug'
-      path: '/lp/$slug'
-      fullPath: '/lp/$slug'
-      preLoaderRoute: typeof LpSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/checkin/$token': {
@@ -2058,34 +1973,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppModelosDocumentosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/mkt-segmentos': {
-      id: '/_authenticated/app/mkt-segmentos'
-      path: '/mkt-segmentos'
-      fullPath: '/app/mkt-segmentos'
-      preLoaderRoute: typeof AuthenticatedAppMktSegmentosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/mkt-leads': {
-      id: '/_authenticated/app/mkt-leads'
-      path: '/mkt-leads'
-      fullPath: '/app/mkt-leads'
-      preLoaderRoute: typeof AuthenticatedAppMktLeadsRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/mkt-landing': {
-      id: '/_authenticated/app/mkt-landing'
-      path: '/mkt-landing'
-      fullPath: '/app/mkt-landing'
-      preLoaderRoute: typeof AuthenticatedAppMktLandingRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/mkt-envios': {
-      id: '/_authenticated/app/mkt-envios'
-      path: '/mkt-envios'
-      fullPath: '/app/mkt-envios'
-      preLoaderRoute: typeof AuthenticatedAppMktEnviosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
     '/_authenticated/app/medicos': {
       id: '/_authenticated/app/medicos'
       path: '/medicos'
@@ -2280,13 +2167,6 @@ declare module '@tanstack/react-router' {
       path: '/cargos'
       fullPath: '/app/cargos'
       preLoaderRoute: typeof AuthenticatedAppCargosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/campanhas': {
-      id: '/_authenticated/app/campanhas'
-      path: '/campanhas'
-      fullPath: '/app/campanhas'
-      preLoaderRoute: typeof AuthenticatedAppCampanhasRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/caixa': {
@@ -2773,7 +2653,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppBackupsRoute: typeof AuthenticatedAppBackupsRoute
   AuthenticatedAppBoletosRoute: typeof AuthenticatedAppBoletosRoute
   AuthenticatedAppCaixaRoute: typeof AuthenticatedAppCaixaRoute
-  AuthenticatedAppCampanhasRoute: typeof AuthenticatedAppCampanhasRoute
   AuthenticatedAppCargosRoute: typeof AuthenticatedAppCargosRoute
   AuthenticatedAppCartaoBeneficiosRoute: typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   AuthenticatedAppChatRoute: typeof AuthenticatedAppChatRoute
@@ -2802,10 +2681,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppLgpdRoute: typeof AuthenticatedAppLgpdRoute
   AuthenticatedAppLmsAdminRoute: typeof AuthenticatedAppLmsAdminRoute
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
-  AuthenticatedAppMktEnviosRoute: typeof AuthenticatedAppMktEnviosRoute
-  AuthenticatedAppMktLandingRoute: typeof AuthenticatedAppMktLandingRoute
-  AuthenticatedAppMktLeadsRoute: typeof AuthenticatedAppMktLeadsRoute
-  AuthenticatedAppMktSegmentosRoute: typeof AuthenticatedAppMktSegmentosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
   AuthenticatedAppNinaRoute: typeof AuthenticatedAppNinaRoute
   AuthenticatedAppOdontologiaRoute: typeof AuthenticatedAppOdontologiaRoute
@@ -2852,7 +2727,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppBackupsRoute: AuthenticatedAppBackupsRoute,
   AuthenticatedAppBoletosRoute: AuthenticatedAppBoletosRoute,
   AuthenticatedAppCaixaRoute: AuthenticatedAppCaixaRoute,
-  AuthenticatedAppCampanhasRoute: AuthenticatedAppCampanhasRoute,
   AuthenticatedAppCargosRoute: AuthenticatedAppCargosRoute,
   AuthenticatedAppCartaoBeneficiosRoute:
     AuthenticatedAppCartaoBeneficiosRouteWithChildren,
@@ -2884,10 +2758,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppLgpdRoute: AuthenticatedAppLgpdRoute,
   AuthenticatedAppLmsAdminRoute: AuthenticatedAppLmsAdminRoute,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
-  AuthenticatedAppMktEnviosRoute: AuthenticatedAppMktEnviosRoute,
-  AuthenticatedAppMktLandingRoute: AuthenticatedAppMktLandingRoute,
-  AuthenticatedAppMktLeadsRoute: AuthenticatedAppMktLeadsRoute,
-  AuthenticatedAppMktSegmentosRoute: AuthenticatedAppMktSegmentosRoute,
   AuthenticatedAppModelosDocumentosRoute:
     AuthenticatedAppModelosDocumentosRoute,
   AuthenticatedAppNinaRoute: AuthenticatedAppNinaRoute,
@@ -2973,7 +2843,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTtsProxyRoute: ApiTtsProxyRoute,
   ApiTtsVoicesRoute: ApiTtsVoicesRoute,
   CheckinTokenRoute: CheckinTokenRoute,
-  LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
   PacienteCartoesRoute: PacienteCartoesRoute,
   PacienteConsultasRoute: PacienteConsultasRoute,
@@ -2993,3 +2862,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
