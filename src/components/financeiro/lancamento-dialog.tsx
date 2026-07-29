@@ -216,10 +216,13 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
               .maybeSingle();
             const convNome = (contrato as { cb_convenios?: { nome?: string } } | null)?.cb_convenios?.nome;
             if (convNome) setConvenioNome(convNome);
-            // Só sugere a categoria do convênio quando o agendamento foi
-            // marcado como "convenio". Se for "particular", mantém a
-            // categoria PARTICULAR (não força o operador a mudar).
-            if (convNome && tipoAg !== "particular") {
+            // Revalida o convênio no MOMENTO de abrir o pagamento. Antes,
+            // se o agendamento tivesse sido gravado como "particular"
+            // (ex.: paciente virou dependente DEPOIS de agendar), a
+            // categoria do convênio nunca era sugerida. Agora, se o
+            // paciente tem contrato ativo e não está bloqueado por
+            // inadimplência, prevalece a categoria do convênio.
+            if (convNome) {
               const match = lista.find((c) => norm(c.nome) === norm(convNome));
               if (match) categoriaEscolhidaId = match.id;
             }
