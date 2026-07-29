@@ -3104,27 +3104,90 @@ function AgendaPage() {
   // sobrescrita com o recorte antigo) até uma nova pesquisa manual.
   loadFnRef.current = load;
 
-  // Realtime: recarrega quando agendamentos mudam (outro recepcionista,
-  // pagamento no caixa, etc.). Debounce simples para evitar refetch em rajada.
+  // Realtime: quando um agendamento muda em outra sessão (recepcionista,
+  // pagamento no caixa, totem etc.), atualizamos apenas a linha afetada
+  // — sem re-executar o `load()` inteiro, que dispararia o skeleton e
+  // faria a agenda toda "piscar" a cada evento.
   useEffect(() => {
     if (!clinicaAtual) return;
-    let t: ReturnType<typeof setTimeout> | null = null;
-    const schedule = () => {
-      if (t) clearTimeout(t);
-      t = setTimeout(() => {
-        void loadFnRef.current();
-      }, 400);
+    const clinicaId = clinicaAtual.clinica_id;
+    const agendaSelect =
+      "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
+    const mapRow = (
+      r: Agendamento & {
+        medico?: { nome: string | null; sexo: string | null } | null;
+        orcamento?: { numero: number | null } | null;
+      },
+    ): Agendamento => ({
+      ...r,
+      paciente_nome: isSlotLivre(r.paciente_nome) ? "DISPONÍVEL" : r.paciente_nome,
+      medico_id: r.medico_id ?? null,
+      medico_nome: r.medico_nome ?? r.medico?.nome ?? null,
+      medico_sexo: r.medico_sexo ?? r.medico?.sexo ?? null,
+      orcamento_numero: r.orcamento_numero ?? r.orcamento?.numero ?? null,
+    });
+    // Debounce por id: rajadas de UPDATE no mesmo agendamento viram
+    // um único refetch daquela linha.
+    const timers = new Map<string, ReturnType<typeof setTimeout>>();
+    const patchOne = (id: string) => {
+      const prev = timers.get(id);
+      if (prev) clearTimeout(prev);
+      timers.set(
+        id,
+        setTimeout(async () => {
+          timers.delete(id);
+          const { data, error } = await supabase
+            .from("agendamentos")
+            .select(agendaSelect as never)
+            .eq("id", id)
+            .maybeSingle();
+          if (error || !data) return;
+          const linha = mapRow(
+            data as unknown as Agendamento & {
+              medico?: { nome: string | null; sexo: string | null } | null;
+              orcamento?: { numero: number | null } | null;
+            },
+          );
+          const merge = (prev: Agendamento[]): Agendamento[] => {
+            const idx = prev.findIndex((x) => x.id === linha.id);
+            if (idx === -1) return prev; // não está na página atual — evita mudar a lista
+            const next = prev.slice();
+            next[idx] = { ...prev[idx], ...linha };
+            return next;
+          };
+          setItems(merge);
+          setFichaBaseItems(merge);
+        }, 250),
+      );
+    };
+    const removeOne = (id: string) => {
+      const prev = timers.get(id);
+      if (prev) {
+        clearTimeout(prev);
+        timers.delete(id);
+      }
+      setItems((p) => p.filter((x) => x.id !== id));
+      setFichaBaseItems((p) => p.filter((x) => x.id !== id));
     };
     const ch = supabase
-      .channel(`agenda-rt-${clinicaAtual.clinica_id}`)
+      .channel(`agenda-rt-${clinicaId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "agendamentos", filter: `clinica_id=eq.${clinicaAtual.clinica_id}` },
-        schedule,
+        { event: "*", schema: "public", table: "agendamentos", filter: `clinica_id=eq.${clinicaId}` },
+        (payload) => {
+          const novo = (payload.new ?? {}) as { id?: string };
+          const antigo = (payload.old ?? {}) as { id?: string };
+          if (payload.eventType === "DELETE") {
+            if (antigo.id) removeOne(antigo.id);
+            return;
+          }
+          if (novo.id) patchOne(novo.id);
+        },
       )
       .subscribe();
     return () => {
-      if (t) clearTimeout(t);
+      for (const t of timers.values()) clearTimeout(t);
+      timers.clear();
       void supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
