@@ -1,18 +1,35 @@
-## Problema (confirmado)
+## Problema
 
-O seletor "Clínica de origem" do diálogo de atendimento externo é montado a partir de `memberships` — as clínicas em que o **usuário logado** tem vínculo — excluindo a clínica atual. Usuários como Luan e Elizabete têm vínculo em apenas uma unidade, então a lista fica vazia e só sobra "Outra clínica (digitar)".
+A tela de Contratos carrega no máximo **500 registros** de uma vez (`.limit(500)` na consulta) e faz filtro, ordenação e paginação em memória. A clínica tem **1.776 contratos**, então 1.276 nunca aparecem — a paginação de 50 em 50 só percorre os 500 baixados.
 
-Além disso, a tabela `clinicas` só permite leitura para membros (política `clinicas_member_select` com `is_member(auth.uid(), id)`), então simplesmente buscar todas as clínicas do banco também retornaria vazio para esses usuários.
+## Objetivo
 
-## Solução
+Mostrar todos os contratos, mantendo 50 por página, com contagem real ("Mostrando 51–100 de 1.776").
 
-1. **Banco**: criar uma função `listar_unidades_basico()` (SECURITY DEFINER, `STABLE`), acessível a usuários autenticados, que devolve apenas dados não sensíveis das unidades ativas: `id`, `nome`, `cidade`, `estado`. Sem CNPJ, telefone, geolocalização ou tokens. Isso mantém a política de RLS atual intacta e expõe só o mínimo necessário para o seletor.
+## O que muda
 
-2. **Frontend** (`src/components/agenda/atendimento-externo-dialog.tsx`): ao abrir o diálogo, carregar as unidades por essa função em vez de `memberships`, continuando a esconder a clínica atual e mantendo a opção "Outra clínica (digitar)". Enquanto carrega, mostrar estado de carregamento; se a chamada falhar, cair no comportamento atual (lista de `memberships`) para não travar o registro.
+**1. Consulta paginada no servidor**
+- Trocar `.limit(500)` por `.range(inicio, fim)` com `count: "exact"`, buscando apenas a página atual.
+- Guardar o total retornado pelo banco e usá-lo para "Mostrando X–Y de N" e para o número de páginas.
+- Recarregar ao trocar de página (a página deixa de ser um recorte local).
 
-3. Nada muda no cálculo de repasse, na gravação do atendimento externo ou na GR — apenas a origem da lista de unidades.
+**2. Filtros passam a ser aplicados no banco**
+Hoje são aplicados em memória; migram para a própria consulta, para que filtrem o conjunto inteiro e não só a página:
+- Status, Convênio, Vendedor (`criado_por`), Valor mensal (faixas), Início e Término (intervalos de data).
+- Ordenação por paciente (A–Z / Z–A) passa a ser `.order("paciente_nome")` no banco; sem ordenação continua por `created_at` desc.
+
+**3. Filtros de Situação e Parcelas**
+Dependem da agregação de mensalidades, que hoje é calculada no cliente. Para funcionarem sobre a base toda, serão resolvidos por uma consulta de apoio que devolve os IDs de contratos que atendem ao critério (em dia / pendente / sem pagamento / em andamento / quitadas), e esses IDs entram na consulta principal com `.in("id", ...)`. Assim a paginação continua correta.
+
+**4. Agregação de mensalidades só da página**
+Com 50 contratos por página, o cálculo de parcelas pagas/atrasadas passa a ser feito apenas para os contratos exibidos — mais rápido que hoje e sem risco de truncamento.
+
+**5. Busca por nome/CPF/prontuário**
+Continua no servidor como já é, mas também paginada (hoje corta em 200 resultados).
 
 ## Detalhes técnicos
 
-- Migração com `CREATE OR REPLACE FUNCTION public.listar_unidades_basico()` + `REVOKE ALL ... FROM public` + `GRANT EXECUTE ... TO authenticated`, `search_path = public`.
-- No componente, substituir o `unidades` derivado de `memberships` por estado carregado via `supabase.rpc("listar_unidades_basico")`, ordenado por nome em pt-BR.
+- Arquivo principal: `src/components/pages/contratos-page.tsx` (função `load`, memo `filtered`, bloco de paginação).
+- `load` passa a depender de `pagina`, filtros e ordenação; a lista local deixa de ser filtrada/fatiada no cliente.
+- As opções dinâmicas de Vendedor e Status (hoje derivadas dos registros carregados) passarão a vir de uma consulta própria, para não sumirem opções ao mudar de página.
+- Se a consulta de apoio para Situação/Parcelas ficar pesada, ela será substituída por uma função no banco (RPC) que devolve os IDs já filtrados.
