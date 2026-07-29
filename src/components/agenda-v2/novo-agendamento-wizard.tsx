@@ -459,6 +459,8 @@ export function NovoAgendamentoWizard({
             origem_clinica_id: null,
             origem_clinica_nome: externoClinicaNome.trim(),
             origem_valor: externoValor && externoValor > 0 ? externoValor : null,
+            repasse_medico: externoRepasse != null ? externoRepasse : null,
+            convenio_id: externoTemConvenio ? externoConvenioId : null,
           },
         });
         if (!mkRes.ok) {
@@ -784,16 +786,44 @@ export function NovoAgendamentoWizard({
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Valor do atendimento</label>
+                  <label className="flex items-center gap-2 text-xs text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={externoTemConvenio}
+                      onChange={(e) => {
+                        setExternoTemConvenio(e.target.checked);
+                        if (!e.target.checked) setExternoConvenioId("");
+                      }}
+                    />
+                    <span>Paciente tem convênio</span>
+                  </label>
+                  {externoTemConvenio && (
+                    <select
+                      value={externoConvenioId}
+                      onChange={(e) => setExternoConvenioId(e.target.value)}
+                      className="mt-1 w-full h-9 rounded-md border border-slate-200 px-2 text-sm bg-white"
+                    >
+                      <option value="">Selecione o convênio</option>
+                      {externoConvenios.map((c) => (
+                        <option key={c.id} value={c.id}>{c.nome}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Repasse do médico</label>
                   <div className="mt-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-base font-semibold tabular-nums">
                     {externoBuscando
-                      ? <span className="text-xs font-normal text-slate-500">Buscando na tabela…</span>
-                      : externoValor && externoValor > 0
-                      ? `R$ ${externoValor.toFixed(2).replace(".", ",")}`
-                      : <span className="text-xs font-normal text-slate-500">Sem valor na tabela desta clínica</span>}
+                      ? <span className="text-xs font-normal text-slate-500">Calculando…</span>
+                      : externoTemConvenio && !externoConvenioId
+                      ? <span className="text-xs font-normal text-slate-500">Selecione o convênio</span>
+                      : externoRepasse != null && externoRepasse > 0
+                      ? `R$ ${externoRepasse.toFixed(2).replace(".", ",")}`
+                      : <span className="text-xs font-normal text-slate-500">Sem regra de repasse cadastrada (R$ 0,00)</span>}
                   </div>
                   <p className="mt-1 text-[10px] text-slate-500">
-                    Valor do serviço na tabela desta clínica (não editável).
+                    Calculado pelo cadastro de repasse do médico
+                    {externoTemConvenio ? " (regras de convênio)" : " (particular)"} — não editável.
                   </p>
                   <div className="mt-2 flex gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] text-amber-900">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
