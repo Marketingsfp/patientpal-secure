@@ -554,97 +554,57 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     if (c) setDetail(c);
   }, [initialContratoId, loading, list, detail]);
 
-  const filtered = useMemo(() => {
-    // Filtro local de texto foi desativado — a busca por nome/CPF/prontuário
-    // já é feita no servidor com JOIN em pacientes (nome atualizado). O
-    // `paciente_nome` do contrato é um snapshot histórico e às vezes vem
-    // truncado, então filtrar por ele aqui esconderia resultados válidos.
-    const base = list;
-    const hojeStr = new Date().toISOString().slice(0, 10);
-    const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
-    const in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
-    const dHoje = new Date(hojeStr + "T00:00:00").getTime();
-    const anoAtual = new Date().getFullYear();
-    const withFilters = base.filter((c) => {
-      const a = parcAgg[c.id];
-      // Início
-      if (filtroInicio !== "todos") {
-        const ini = c.data_inicio?.slice(0, 10) ?? null;
-        if (!ini) return false;
-        const dIni = new Date(ini + "T00:00:00").getTime();
-        const dias = (dHoje - dIni) / 86400000;
-        if (filtroInicio === "30d" && dias > 30) return false;
-        if (filtroInicio === "90d" && dias > 90) return false;
-        if (filtroInicio === "ano" && new Date(ini + "T00:00:00").getFullYear() !== anoAtual) return false;
-        if (filtroInicio === "anterior" && new Date(ini + "T00:00:00").getFullYear() >= anoAtual) return false;
-      }
-      // Mensal
-      if (filtroMensal !== "todos") {
-        const v = Number(c.valor_mensal) || 0;
-        if (filtroMensal === "zero" && v !== 0) return false;
-        if (filtroMensal === "ate100" && !(v > 0 && v <= 100)) return false;
-        if (filtroMensal === "100a200" && !(v > 100 && v <= 200)) return false;
-        if (filtroMensal === "acima200" && !(v > 200)) return false;
-      }
-      // Vendedor
-      if (filtroVendedor !== "todos") {
-        if (filtroVendedor === "sem") {
-          if (c.criado_por && vendedores[c.criado_por]) return false;
-        } else if (c.criado_por !== filtroVendedor) return false;
-      }
-      // Status
-      if (filtroStatus !== "todos" && c.status !== filtroStatus) return false;
-      // Convênio
-      if (filtroConvenio !== "todos") {
-        if (filtroConvenio === "sem") {
-          if (c.convenio_id) return false;
-        } else if (c.convenio_id !== filtroConvenio) return false;
-      }
-      // Situação
-      if (filtroSituacao !== "todas") {
-        const emDia = !a || !a.temAtrasada;
-        if (filtroSituacao === "em_dia" && !emDia) return false;
-        if (filtroSituacao === "pendente" && emDia) return false;
-      }
-      // Término
-      if (filtroTermino !== "todos") {
-        const fim = c.data_fim?.slice(0, 10) ?? null;
-        if (filtroTermino === "sem_data" && fim) return false;
-        if (filtroTermino === "vencidos" && (!fim || fim >= hojeStr)) return false;
-        if (filtroTermino === "30d" && (!fim || fim < hojeStr || fim > in30)) return false;
-        if (filtroTermino === "90d" && (!fim || fim < hojeStr || fim > in90)) return false;
-      }
-      // Progresso
-      if (filtroProgresso !== "todas") {
-        if (!a) return false;
-        if (filtroProgresso === "sem_pag" && a.pagas !== 0) return false;
-        if (filtroProgresso === "andamento" && (a.pagas === 0 || a.pagas >= a.total)) return false;
-        if (filtroProgresso === "quitadas" && (a.total === 0 || a.pagas < a.total)) return false;
-      }
-      return true;
-    });
-    if (!sortPaciente) return withFilters;
-    const ordered = [...withFilters].sort((a, b) =>
-      a.paciente_nome.localeCompare(b.paciente_nome, "pt-BR", { sensitivity: "base" }),
-    );
-    return sortPaciente === "asc" ? ordered : ordered.reverse();
-  }, [list, q, sortPaciente, parcAgg, vendedores, filtroSituacao, filtroTermino, filtroProgresso, filtroInicio, filtroMensal, filtroVendedor, filtroStatus, filtroConvenio]);
+  // A lista já vem filtrada, ordenada e paginada pelo banco.
+  const filtered = list;
 
-  // Opções dinâmicas
-  const vendedorOpcoes = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const c of list) {
-      if (c.criado_por && vendedores[c.criado_por] && !seen.has(c.criado_por)) {
-        seen.set(c.criado_por, vendedores[c.criado_por]);
+  // Opções dinâmicas de Vendedor/Status: derivadas de TODA a base da clínica
+  // (não só da página atual), para que nenhuma opção suma ao paginar.
+  const [statusOpcoes, setStatusOpcoes] = useState<string[]>([]);
+  useEffect(() => {
+    const clinicaId = clinicaAtual?.clinica_id;
+    if (!clinicaId) return;
+    let cancelado = false;
+    void (async () => {
+      const criadores = new Set<string>();
+      const status = new Set<string>();
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase
+          .from("contratos_assinatura")
+          .select("criado_por,status")
+          .eq("clinica_id", clinicaId)
+          .range(from, from + 999);
+        if (error) break;
+        const rows = (data ?? []) as Array<{ criado_por: string | null; status: string | null }>;
+        for (const r of rows) {
+          if (r.criado_por) criadores.add(r.criado_por);
+          if (r.status) status.add(r.status);
+        }
+        if (rows.length < 1000) break;
       }
-    }
-    return Array.from(seen.entries()).sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
-  }, [list, vendedores]);
-  const statusOpcoes = useMemo(() => {
-    const s = new Set<string>();
-    for (const c of list) if (c.status) s.add(c.status);
-    return Array.from(s).sort();
-  }, [list]);
+      if (cancelado) return;
+      setStatusOpcoes(Array.from(status).sort());
+      if (criadores.size > 0) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id,nome")
+          .in("id", Array.from(criadores));
+        if (cancelado) return;
+        const map: Record<string, string> = {};
+        for (const p of (profs ?? []) as Array<{ id: string; nome: string | null }>) {
+          if (p.nome) map[p.id] = p.nome;
+        }
+        setVendedores(map);
+      } else {
+        setVendedores({});
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [clinicaAtual?.clinica_id]);
+
+  const vendedorOpcoes = useMemo(
+    () => Object.entries(vendedores).sort((a, b) => a[1].localeCompare(b[1], "pt-BR")),
+    [vendedores],
+  );
 
   // Filtros ativos (para contagem/rótulo/limpar)
   const filtrosAtivos = useMemo(() => {
