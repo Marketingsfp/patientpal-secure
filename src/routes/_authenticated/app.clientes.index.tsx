@@ -126,7 +126,7 @@ interface Paciente {
 function ClientesPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("clientes");
-  // Cache de dados (React Query) — só São Francisco de Paula. Desligada,
+  // Cache de dados (React Query) — sob a flag `ux_melhorias`. Desligada,
   // segue 100% no caminho manual abaixo (idêntico ao comportamento anterior).
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const [itemsManual, setItemsManual] = useState<Paciente[]>([]);
@@ -191,7 +191,7 @@ function ClientesPage() {
   }, [busca]);
 
   // Página atual (paginação de 500 em 500) — apenas usada no caminho
-  // com cache (São Francisco de Paula via flag `ux_melhorias`) e somente
+  // com cache (flag `ux_melhorias`) e somente
   // quando não há termo de busca. Ao buscar por nome/CPF/telefone o
   // filtro roda no banco todo em uma página só.
   const [pagina, setPagina] = useState(0);
@@ -204,7 +204,7 @@ function ClientesPage() {
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [debouncedBusca, clinicaAtual?.clinica_id, uxMelhorias]);
 
-  // Caminho com cache (só São Francisco): staleTime de 60s — revisitar a
+  // Caminho com cache (flag `ux_melhorias`): staleTime de 60s — revisitar a
   // tela com o mesmo termo mostra os dados na hora e revalida em segundo
   // plano, sem piscar o skeleton de novo.
   const clinicaId = clinicaAtual?.clinica_id;
