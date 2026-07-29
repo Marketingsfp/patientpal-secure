@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useClinica } from "@/hooks/use-clinica";
 import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
+import { supabase } from "@/integrations/supabase/client";
+import { valorDaTabela } from "@/lib/agenda/atendimento-externo-preco";
 
 type Props = {
   open: boolean;
@@ -40,6 +42,7 @@ export function AtendimentoExternoDialog({
   const [clinicaNome, setClinicaNome] = useState("");
   const [valor, setValor] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [buscandoValor, setBuscandoValor] = useState(false);
 
   const unidades = memberships
     .filter((m) => m.clinica_id !== clinicaId)
@@ -54,15 +57,34 @@ export function AtendimentoExternoDialog({
     }
   }, [open]);
 
+  // Preenche automaticamente com o preço do serviço na tabela desta clínica
+  // (a que recebe a GR) — é ele que serve de base para o repasse do médico.
+  useEffect(() => {
+    if (!open || !clinicaId || !procedimento?.trim()) return;
+    let cancelado = false;
+    setBuscandoValor(true);
+    void (async () => {
+      const { data } = await supabase
+        .from("procedimentos")
+        .select("valor_dinheiro,valor_dinheiro_pix,valor_padrao")
+        .eq("clinica_id", clinicaId)
+        .ilike("nome", procedimento.trim())
+        .limit(1)
+        .maybeSingle();
+      if (cancelado) return;
+      const v = valorDaTabela(data as never);
+      if (v > 0) setValor(v.toFixed(2).replace(".", ","));
+      setBuscandoValor(false);
+    })();
+    return () => { cancelado = true; };
+  }, [open, clinicaId, procedimento]);
+
   const salvar = async () => {
     if (!agendamentoId || !clinicaId) return;
     const unidade = unidades.find((u) => u.id === origemId);
     const nomeOrigem = unidade ? unidade.nome : clinicaNome.trim();
     if (!nomeOrigem) return toast.error("Informe a clínica de origem.");
     const valorNum = valor ? Number(valor.replace(",", ".")) : 0;
-    if (!Number.isFinite(valorNum) || valorNum <= 0) {
-      return toast.error("Informe o valor do atendimento na clínica de origem.");
-    }
     setSalvando(true);
     const res = await marcarFn({
       data: {
@@ -70,7 +92,7 @@ export function AtendimentoExternoDialog({
         clinica_id: clinicaId,
         origem_clinica_id: unidade ? unidade.id : null,
         origem_clinica_nome: nomeOrigem,
-        origem_valor: valorNum,
+        origem_valor: Number.isFinite(valorNum) && valorNum > 0 ? valorNum : null,
       },
     });
     setSalvando(false);
@@ -123,15 +145,16 @@ export function AtendimentoExternoDialog({
             )}
           </div>
           <div>
-            <Label>Valor na origem *</Label>
+            <Label>Valor do atendimento</Label>
             <Input
               value={valor}
               onChange={(e) => setValor(e.target.value.replace(/[^0-9.,]/g, ""))}
               inputMode="decimal"
-              placeholder="0,00"
+              placeholder={buscandoValor ? "Buscando na tabela…" : "0,00"}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Usado para o repasse do médico. Não entra no caixa desta clínica.
+              Preenchido com o valor da tabela desta clínica — ajuste só se for diferente.
+              Usado para o repasse do médico; não entra no caixa daqui.
             </p>
           </div>
         </div>

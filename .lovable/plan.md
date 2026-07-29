@@ -1,24 +1,24 @@
 ## Objetivo
 
-No diálogo "Atendimento externo", o campo **GR da origem** sai de cena (as GRs, antigas e novas, não têm numeração) e o **Valor na origem** passa a ser obrigatório, já que é ele que alimenta o repasse do médico.
+No diálogo "Atendimento externo", ninguém precisa digitar o valor. O sistema assume o **valor do serviço na tabela desta clínica** (a que está atendendo/recebendo a GR) e usa esse valor como base do repasse do médico.
 
 ## O que muda
 
 **1. Diálogo (`src/components/agenda/atendimento-externo-dialog.tsx`)**
-- Remove o campo "GR da origem" e seu estado.
-- "Valor na origem" ocupa a largura do formulário, marcado com `*` e validado: precisa ser maior que zero, senão mostra aviso e não salva.
-- Continua a lista suspensa de clínicas + opção "Outra clínica (digitar)".
+- Ao abrir, busca em `procedimentos` (da clínica atual) o serviço do agendamento e preenche o valor automaticamente (`valor_dinheiro` → `valor_dinheiro_pix` → `valor_padrao`, mesma ordem já usada na agenda).
+- O campo deixa de ser obrigatório e passa a mostrar o valor sugerido, com texto do tipo "Valor da tabela desta clínica — ajuste apenas se for diferente".
+- Se o serviço não estiver na tabela, o campo fica vazio e é permitido salvar; nesse caso o valor entra como 0 e o repasse fica pendente de ajuste.
 
 **2. Regra de negócio (`src/lib/agenda/atendimento-externo.functions.ts`)**
-- Deixa de exigir GR; passa a exigir `origem_valor > 0`.
-- `origem_gr_numero` vira opcional no tipo de entrada (mantido para não quebrar registros já gravados) e deixa de ser gravado em novos registros.
-- A observação do `fin_atendimentos` passa de `EXTERNO — GR 123 · Clínica` para `EXTERNO — <nome da clínica de origem>`.
-- `valor_medico` continua igual ao valor informado; `valor_clinica` segue 0 e nada entra no caixa nem gera NFS-e.
+- Remove a exigência de `origem_valor > 0`.
+- Quando o valor não vier do formulário, o servidor busca o preço do procedimento na tabela da clínica que atendeu e usa esse valor (fonte da verdade, mesmo se o front falhar).
+- `valor_total` = valor apurado; `valor_medico` = valor apurado; `valor_clinica` = 0; nada em caixa e nenhuma NFS-e, como hoje.
 
-**3. Identificação sem GR**
-O atendimento externo continua rastreável pela combinação clínica de origem + paciente + data + procedimento, que já é gravada no agendamento e no `fin_atendimentos`.
+**3. Wizard V2**
+- Mesmo comportamento no fluxo de novo agendamento (`novo-agendamento-wizard.tsx`): campo opcional, preenchido sozinho.
 
 ## Detalhes técnicos
 
-- Nenhuma migração: a coluna `origem_gr_numero` permanece na tabela `agendamentos` com os dados históricos, apenas deixa de ser preenchida.
-- Relatório financeiro de atendimentos externos: se ele exibir coluna de GR, ela será removida da apresentação (verificação feita durante a implementação).
+- Sem migração: `agendamentos.origem_valor` continua guardando o valor apurado.
+- Busca de preço por nome do procedimento + `clinica_id`, reaproveitando o helper `primeiroValorValido` já existente na agenda.
+- O relatório de atendimentos externos continua exibindo "Valor origem" — agora preenchido automaticamente.

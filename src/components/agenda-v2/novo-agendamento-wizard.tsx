@@ -394,18 +394,13 @@ export function NovoAgendamentoWizard({
           return;
         }
         const valorNum = externoValor ? Number(externoValor.replace(",", ".")) : 0;
-        if (!Number.isFinite(valorNum) || valorNum <= 0) {
-          notify.error("Informe o valor do atendimento na clínica de origem.");
-          setSaving(false);
-          return;
-        }
         const mkRes = await marcarExternoFn({
           data: {
             agendamento_id: result.id,
             clinica_id: clinicaId,
             origem_clinica_id: null,
             origem_clinica_nome: externoClinicaNome.trim(),
-            origem_valor: valorNum,
+            origem_valor: Number.isFinite(valorNum) && valorNum > 0 ? valorNum : null,
           },
         });
         if (!mkRes.ok) {
@@ -731,7 +726,7 @@ export function NovoAgendamentoWizard({
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Valor na origem *</label>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Valor do atendimento</label>
                   <input
                     value={externoValor}
                     onChange={(e) => setExternoValor(e.target.value.replace(/[^0-9.,]/g, ""))}
@@ -739,6 +734,9 @@ export function NovoAgendamentoWizard({
                     inputMode="decimal"
                     className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm tabular-nums"
                   />
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    Deixe em branco para usar o valor do serviço na tabela desta clínica.
+                  </p>
                 </div>
               </div>
             )}

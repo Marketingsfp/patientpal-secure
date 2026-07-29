@@ -7,6 +7,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { buscarValorProcedimento } from "./atendimento-externo.server";
 
 export type MarcarExternoInput = {
   agendamento_id: string;
@@ -15,7 +16,8 @@ export type MarcarExternoInput = {
   origem_clinica_nome: string | null;
   /** Legado: GRs não têm numeração; mantido apenas por compatibilidade. */
   origem_gr_numero?: string | null;
-  origem_valor: number | null;
+  /** Opcional: se vazio, usa o preço do serviço na tabela desta clínica. */
+  origem_valor?: number | null;
 };
 
 export type MarcarExternoResult =
@@ -31,9 +33,6 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
       return { ok: false, message: "Informe a clínica de origem." };
     }
     const valorInformado = Number(data.origem_valor ?? 0);
-    if (!Number.isFinite(valorInformado) || valorInformado <= 0) {
-      return { ok: false, message: "Informe o valor do atendimento na clínica de origem." };
-    }
 
     const { data: ag, error: agErr } = await supabase
       .from("agendamentos")
@@ -45,13 +44,20 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
       return { ok: false, message: "Agendamento pertence a outra clínica." };
     }
 
+    // Valor base do repasse: o que o operador informou ou, na falta, o preço
+    // do serviço na tabela da clínica que está atendendo (recebendo a GR).
+    const valor =
+      Number.isFinite(valorInformado) && valorInformado > 0
+        ? valorInformado
+        : await buscarValorProcedimento(supabase, ag.clinica_id, ag.procedimento);
+
     const { error: upErr } = await supabase
       .from("agendamentos")
       .update({
         origem_externa: true,
         origem_clinica_id: data.origem_clinica_id,
         origem_clinica_nome: (data.origem_clinica_nome ?? "").trim() || null,
-        origem_valor: data.origem_valor,
+        origem_valor: valor,
       })
       .eq("id", data.agendamento_id);
     if (upErr) return { ok: false, message: upErr.message };
@@ -59,7 +65,6 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
     // fin_atendimentos: valor_clinica = 0, valor_medico = origem_valor (0 se
     // não informado). Fica pendente para o setor de repasse quitar como
     // qualquer outro atendimento — só que sem cobrança em caixa aqui.
-    const valor = valorInformado;
     const obs = `EXTERNO${data.origem_clinica_nome ? ` — ${data.origem_clinica_nome}` : ""}`;
     const dataDia = new Date(ag.inicio).toISOString().slice(0, 10);
     let finId: string | null = null;
