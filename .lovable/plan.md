@@ -1,29 +1,31 @@
 ## Objetivo
 
-No diálogo "Atendimento externo" da agenda, deixar de exibir o valor do serviço e passar a exibir o **valor do repasse que o médico vai receber**, com uma marcação de convênio que muda a regra de cálculo.
+Na Agenda, quando o agendamento for **atendimento externo**, a linha deve ficar com fundo lavanda bem claro e o botão de cifrão ($) deve ficar roxo.
 
-## Como vai ficar a tela
+## Situação atual (verificada)
 
-1. Paciente / procedimento (como hoje)
-2. Clínica de origem (como hoje)
-3. Novo campo: caixa de marcação **"Paciente tem convênio"**
-   - Vem marcada automaticamente quando o sistema encontra um contrato ativo do paciente (titular ou dependente) nesta clínica; o operador pode desmarcar.
-   - Marcada → aparece a lista de convênios da clínica para escolher qual é (pré-selecionado o do contrato encontrado).
-4. **Repasse do médico** (somente leitura, destacado): valor calculado, não editável
-   - Sem convênio: repasse padrão do médico sobre o preço do serviço na tabela desta clínica (regras já existentes: por serviço, por categoria, ou padrão do médico).
-   - Com convênio: usa as regras de repasse de convênio do médico, conforme a modalidade do convênio escolhido (Cartão Consulta ou Cartão Desconto) — repasse fixo por serviço, senão repasse de cartão do médico, senão padrão.
-   - Se não houver regra aplicável, mostra R$ 0,00 com aviso "sem regra de repasse cadastrada".
-5. Aviso amarelo mantido: valor serve só para o repasse, não entra no caixa nem gera nota.
+- A marcação de externo grava `origem_externa = true` na tabela `agendamentos` (`src/lib/agenda/atendimento-externo.functions.ts`).
+- A Agenda (`src/routes/_authenticated/app.agenda.tsx`) **não carrega** esse campo: ele não está na lista `agendaSelect` (linha ~2441) nem no tipo `Agendamento` (linha ~118).
+- A cor da linha é decidida por `bgClass` / `borderLeft` (linhas ~8750-8765), hoje só com regras para estorno pendente, realizado e presente.
+- O botão $ aparece em dois lugares: ação compacta por ícone (~linha 8940) e botão "Cobrar/Pago" da versão em cards/mobile (~linha 8605).
 
-## Regras de negócio
+## O que será feito
 
-- O valor do serviço continua sendo lido internamente da tabela desta clínica (base de cálculo), mas não é mais mostrado.
-- O repasse gravado no financeiro passa a ser o repasse calculado, não o valor cheio do serviço.
-- Trocar o convênio na lista recalcula o repasse na hora.
+1. **Carregar o dado**
+   - Adicionar `origem_externa` (e `origem_clinica_nome`, útil para o tooltip) ao `agendaSelect` e ao tipo `Agendamento`, propagando no mapeamento dos resultados.
+
+2. **Cor da linha**
+   - Nova condição no cálculo de `bgClass`: se `origem_externa`, aplicar lavanda bem claro (overlay translúcido no padrão já usado no arquivo, ex. `bg-violet-500/10 hover:bg-violet-500/15`) com borda esquerda violeta.
+   - Precedência: estorno pendente continua tendo prioridade; externo vem antes de "realizado/presente" para não perder o destaque.
+
+3. **Ícone $ roxo**
+   - Nos dois botões de cobrança, quando `origem_externa`, usar borda/texto violeta (`border-violet-400 text-violet-600 hover:bg-violet-50`) em vez do verde/rosa, com tooltip "Atendimento externo — sem lançamento em caixa".
+
+4. **Mobile/cards**
+   - Aplicar o mesmo destaque lavanda no card correspondente para manter consistência.
 
 ## Detalhes técnicos
 
-- `src/components/agenda/atendimento-externo-dialog.tsx`: substituir o bloco "Valor do atendimento" por checkbox + select de convênio + linha de repasse; carregar `cb_convenios` da clínica e usar `buscarVinculoConvenio` (`src/lib/convenio/modalidade.ts`) para pré-marcar.
-- Cálculo com `calcRepasseFull` (`src/lib/repasse-calc.ts`), montando o contexto com o médico do agendamento, `medico_convenios` (via `getMedicoConveniosAgenda`) e tipos de procedimento; `modalidade` vinda do convênio escolhido ou `null` quando desmarcado.
-- Mesma alteração no wizard V2 (`src/components/agenda-v2/novo-agendamento-wizard.tsx`), reaproveitando um helper novo em `src/lib/agenda/atendimento-externo-preco.ts` (ou arquivo irmão) para não duplicar a lógica.
-- `src/lib/agenda/atendimento-externo.functions.ts`: aceitar `repasse_medico`, `convenio_id`/`modalidade`; gravar `valor_medico = repasse`, mantendo `valor_clinica = 0` e `valor_total` com o preço da tabela; recalcular no servidor quando o cliente não enviar repasse.
+- Sem mudança de banco: a coluna `origem_externa` já existe.
+- Sem alteração de regra de negócio: mudança puramente visual + inclusão do campo no `select`.
+- As cores usam a escala violet do Tailwind com overlay translúcido, seguindo o comentário já existente no arquivo sobre contraste em modo escuro.
