@@ -320,6 +320,71 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     return () => clearTimeout(t);
   }, [q]);
 
+  type ParcInfo = { pagas: number; total: number; temAtrasada: boolean };
+
+  /** Calcula, para TODOS os contratos da clínica, o agregado de parcelas
+   *  (pagas / total do ciclo atual / tem atrasada). Usado apenas quando os
+   *  filtros de Situação ou Parcelas estão ativos, pois eles não podem ser
+   *  resolvidos direto na consulta paginada. Resultado fica em cache por
+   *  clínica durante 60s para não repetir a cada troca de página. */
+  const aggGlobalRef = useRef<{ clinica: string; em: number; map: Record<string, ParcInfo> } | null>(null);
+  const carregarAggGlobal = async (clinicaId: string): Promise<Record<string, ParcInfo>> => {
+    const cache = aggGlobalRef.current;
+    if (cache && cache.clinica === clinicaId && Date.now() - cache.em < 60000) return cache.map;
+    // 1) todos os IDs de contrato da clínica (em páginas de 1000)
+    const ids: string[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from("contratos_assinatura")
+        .select("id")
+        .eq("clinica_id", clinicaId)
+        .order("created_at", { ascending: false })
+        .range(from, from + 999);
+      if (error) { mostrarErro(error); break; }
+      const rows = (data ?? []) as Array<{ id: string }>;
+      ids.push(...rows.map((r) => r.id));
+      if (rows.length < 1000) break;
+    }
+    const map = await calcularParcAgg(ids);
+    aggGlobalRef.current = { clinica: clinicaId, em: Date.now(), map };
+    return map;
+  };
+
+  /** Agregado de parcelas para uma lista de contratos, em lotes para não
+   *  estourar o teto de 1000 linhas por request do PostgREST. */
+  const calcularParcAgg = async (contratoIds: string[]): Promise<Record<string, ParcInfo>> => {
+    const hojeStr = new Date().toISOString().slice(0, 10);
+    const agg: Record<string, ParcInfo> = {};
+    for (const id of contratoIds) agg[id] = { pagas: 0, total: 0, temAtrasada: false };
+    const LOTE = 60; // ~60 contratos × 12 parcelas = 720 linhas por lote
+    for (let i = 0; i < contratoIds.length; i += LOTE) {
+      const slice = contratoIds.slice(i, i + LOTE);
+      const { data: mens } = await supabase
+        .from("contrato_mensalidades")
+        .select("contrato_id, status, vencimento, numero_parcela")
+        .in("contrato_id", slice);
+      // Agrupa por contrato para segmentar em ciclos de 12 parcelas
+      // (renovações acrescentam parcelas 13..24, 25..36, etc.).
+      const porContrato: Record<string, Array<{ status: string; vencimento: string; numero_parcela: number }>> = {};
+      for (const m of (mens ?? []) as Array<{ contrato_id: string; status: string; vencimento: string; numero_parcela: number }>) {
+        if (Number(m.numero_parcela) <= 0) continue; // ignora adesão/taxas
+        (porContrato[m.contrato_id] ||= []).push(m);
+      }
+      for (const [cid, arr] of Object.entries(porContrato)) {
+        const a = agg[cid];
+        if (!a) continue;
+        arr.sort((x, y) => y.numero_parcela - x.numero_parcela);
+        const cicloAtual = arr.slice(0, 12);
+        a.total = cicloAtual.length;
+        for (const m of cicloAtual) {
+          if (m.status === "pago") a.pagas += 1;
+          else if (m.vencimento && m.vencimento < hojeStr) a.temAtrasada = true;
+        }
+      }
+    }
+    return agg;
+  };
+
   const load = async (termo: string = qDebounced) => {
     if (!clinicaAtual) return;
     setLoading(true);
