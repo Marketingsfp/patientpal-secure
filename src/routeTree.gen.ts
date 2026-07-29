@@ -31,6 +31,7 @@ import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
 import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
+import { Route as ApiTtsVoicesRouteImport } from './routes/api/tts-voices'
 import { Route as ApiTtsProxyRouteImport } from './routes/api/tts-proxy'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
@@ -250,6 +251,11 @@ const LpSlugRoute = LpSlugRouteImport.update({
 const CheckinTokenRoute = CheckinTokenRouteImport.update({
   id: '/checkin/$token',
   path: '/checkin/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTtsVoicesRoute = ApiTtsVoicesRouteImport.update({
+  id: '/api/tts-voices',
+  path: '/api/tts-voices',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTtsProxyRoute = ApiTtsProxyRouteImport.update({
@@ -905,6 +911,7 @@ export interface FileRoutesByFullPath {
   '/totem': typeof TotemRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
   '/api/tts-proxy': typeof ApiTtsProxyRoute
+  '/api/tts-voices': typeof ApiTtsVoicesRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -1038,6 +1045,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
   '/api/tts-proxy': typeof ApiTtsProxyRoute
+  '/api/tts-voices': typeof ApiTtsVoicesRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -1171,6 +1179,7 @@ export interface FileRoutesById {
   '/totem': typeof TotemRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
   '/api/tts-proxy': typeof ApiTtsProxyRoute
+  '/api/tts-voices': typeof ApiTtsVoicesRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -1307,6 +1316,7 @@ export interface FileRouteTypes {
     | '/totem'
     | '/app'
     | '/api/tts-proxy'
+    | '/api/tts-voices'
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
@@ -1440,6 +1450,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/totem'
     | '/api/tts-proxy'
+    | '/api/tts-voices'
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
@@ -1572,6 +1583,7 @@ export interface FileRouteTypes {
     | '/totem'
     | '/_authenticated/app'
     | '/api/tts-proxy'
+    | '/api/tts-voices'
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
@@ -1707,6 +1719,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TotemRoute: typeof TotemRoute
   ApiTtsProxyRoute: typeof ApiTtsProxyRoute
+  ApiTtsVoicesRoute: typeof ApiTtsVoicesRoute
   CheckinTokenRoute: typeof CheckinTokenRoute
   LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
@@ -1880,6 +1893,13 @@ declare module '@tanstack/react-router' {
       path: '/checkin/$token'
       fullPath: '/checkin/$token'
       preLoaderRoute: typeof CheckinTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tts-voices': {
+      id: '/api/tts-voices'
+      path: '/api/tts-voices'
+      fullPath: '/api/tts-voices'
+      preLoaderRoute: typeof ApiTtsVoicesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tts-proxy': {
@@ -2996,6 +3016,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TotemRoute: TotemRoute,
   ApiTtsProxyRoute: ApiTtsProxyRoute,
+  ApiTtsVoicesRoute: ApiTtsVoicesRoute,
   CheckinTokenRoute: CheckinTokenRoute,
   LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Volume2, Play, Square, RotateCcw, Save, Headphones, Loader2 } from "lucide-react";
+import { Volume2, Play, Square, RotateCcw, Save, Headphones, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -285,10 +285,36 @@ function VozConfigPage() {
 }
 
 const TTS_ENDPOINT = "/api/tts-proxy";
-const VOZES = [
-  { value: "faber", label: "Faber (Masculino)" },
-  { value: "feminina", label: "Feminina" },
-] as const;
+const VOICES_ENDPOINT = "/api/tts-voices";
+const LABELS_CONHECIDOS: Record<string, string> = {
+  faber: "Faber (Masculino)",
+  feminina: "Feminina",
+};
+function labelDaVoz(v: string): string {
+  return LABELS_CONHECIDOS[v] ?? v.charAt(0).toUpperCase() + v.slice(1);
+}
+const VOZES_FALLBACK = ["faber", "feminina"];
+const VOZES_MANUAIS_KEY = "tts:vozes-manuais";
+
+function lerVozesManuais(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(VOZES_MANUAIS_KEY);
+    const arr = raw ? (JSON.parse(raw) as unknown) : null;
+    return Array.isArray(arr)
+      ? arr.filter((v): v is string => typeof v === "string" && !!v.trim())
+      : [];
+  } catch {
+    return [];
+  }
+}
+function salvarVozesManuais(v: string[]) {
+  try {
+    window.localStorage.setItem(VOZES_MANUAIS_KEY, JSON.stringify(v));
+  } catch {
+    /* ignora */
+  }
+}
 
 function TesteServidorLocalCard() {
   const [texto, setTexto] = useState<string>(
@@ -297,14 +323,100 @@ function TesteServidorLocalCard() {
   const [voice, setVoice] = useState<string>("faber");
   const [loading, setLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [vozesServidor, setVozesServidor] = useState<string[]>(VOZES_FALLBACK);
+  const [origem, setOrigem] = useState<"servidor" | "fallback">("fallback");
+  const [vozesManuais, setVozesManuais] = useState<string[]>(() =>
+    lerVozesManuais(),
+  );
+  const [detectando, setDetectando] = useState(false);
+  const [novaVoz, setNovaVoz] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastUrlRef = useRef<string | null>(null);
+
+  const vozes = Array.from(new Set([...vozesServidor, ...vozesManuais]));
 
   useEffect(() => {
     return () => {
       if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
     };
   }, []);
+
+  async function detectarVozes(opts?: { force?: boolean; silencioso?: boolean }) {
+    setDetectando(true);
+    try {
+      const qs = opts?.force ? "?refresh=1" : "";
+      const res = await fetch(`${VOICES_ENDPOINT}${qs}`);
+      const data = (await res.json()) as {
+        vozes?: string[];
+        origem?: "servidor" | "fallback";
+        error?: string;
+      };
+      if (!res.ok || !Array.isArray(data.vozes)) {
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      const anteriores = new Set(vozesServidor);
+      const novas = data.vozes.filter((v) => !anteriores.has(v));
+      setVozesServidor(data.vozes);
+      setOrigem(data.origem ?? "fallback");
+      if (!opts?.silencioso) {
+        if (data.origem === "fallback") {
+          toast.info(
+            "Servidor Piper não expõe listagem de vozes. Adicione manualmente abaixo.",
+          );
+        } else if (novas.length) {
+          toast.success(
+            `Detectada${novas.length > 1 ? "s" : ""} ${novas.length} nova${novas.length > 1 ? "s" : ""} voz: ${novas.map(labelDaVoz).join(", ")}`,
+          );
+        } else if (opts?.force) {
+          toast.success(`${data.vozes.length} vozes disponíveis no servidor.`);
+        }
+      } else if (novas.length && data.origem === "servidor") {
+        toast.success(
+          `Nova voz detectada: ${novas.map(labelDaVoz).join(", ")}`,
+        );
+      }
+    } catch (err) {
+      toast.error(
+        `Falha ao detectar vozes: ${err instanceof Error ? err.message : "erro"}`,
+      );
+    } finally {
+      setDetectando(false);
+    }
+  }
+
+  // Detecção automática ao abrir a tela + polling a cada 60s.
+  useEffect(() => {
+    void detectarVozes({ silencioso: true });
+    const id = window.setInterval(
+      () => void detectarVozes({ silencioso: true }),
+      60_000,
+    );
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function adicionarVozManual() {
+    const nome = novaVoz.trim();
+    if (!nome) return;
+    if (vozes.includes(nome)) {
+      toast.info(`A voz "${nome}" já está na lista.`);
+      setNovaVoz("");
+      return;
+    }
+    const proximas = [...vozesManuais, nome];
+    setVozesManuais(proximas);
+    salvarVozesManuais(proximas);
+    setVoice(nome);
+    setNovaVoz("");
+    toast.success(`Voz "${nome}" adicionada.`);
+  }
+
+  function removerVozManual(nome: string) {
+    const proximas = vozesManuais.filter((v) => v !== nome);
+    setVozesManuais(proximas);
+    salvarVozesManuais(proximas);
+    if (voice === nome) setVoice(vozesServidor[0] ?? "faber");
+  }
 
   async function ouvir() {
     const t = texto.trim();
@@ -368,15 +480,35 @@ function TesteServidorLocalCard() {
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
           <div className="space-y-2">
-            <Label className="text-sm">Voz</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Voz</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs"
+                onClick={() => void detectarVozes({ force: true })}
+                disabled={detectando}
+              >
+                {detectando ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3" />
+                )}
+                Detectar
+              </Button>
+            </div>
             <Select value={voice} onValueChange={setVoice}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {VOZES.map((v) => (
-                  <SelectItem key={v.value} value={v.value}>
-                    {v.label}
+                {vozes.map((v) => (
+                  <SelectItem key={v} value={v}>
+                    {labelDaVoz(v)}
+                    {vozesManuais.includes(v) && !vozesServidor.includes(v)
+                      ? " (manual)"
+                      : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -394,6 +526,48 @@ function TesteServidorLocalCard() {
             )}
           </Button>
         </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="flex-1 space-y-2">
+            <Label className="text-xs text-muted-foreground">
+              Adicionar uma nova voz manualmente (nome usado no Piper)
+            </Label>
+            <Input
+              value={novaVoz}
+              onChange={(e) => setNovaVoz(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  adicionarVozManual();
+                }
+              }}
+              placeholder="ex.: minha_nova_voz"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            disabled={!novaVoz.trim()}
+            onClick={adicionarVozManual}
+          >
+            Adicionar
+          </Button>
+        </div>
+        {vozesManuais.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {vozesManuais.map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => removerVozManual(v)}
+                className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-xs hover:bg-destructive/10 hover:text-destructive"
+                title="Remover voz manual"
+              >
+                {labelDaVoz(v)} <span aria-hidden>×</span>
+              </button>
+            ))}
+          </div>
+        )}
         {audioUrl && (
           <audio
             ref={audioRef}
@@ -404,7 +578,19 @@ function TesteServidorLocalCard() {
           />
         )}
         <p className="text-xs text-muted-foreground">
-          Faz uma requisição POST direta para <code>{TTS_ENDPOINT}</code>.
+          {origem === "servidor" ? (
+            <>
+              Vozes obtidas automaticamente do servidor Piper — novas aparecem em
+              até 1 minuto (ou use <strong>Detectar</strong>).
+            </>
+          ) : (
+            <>
+              O servidor Piper atual não expõe listagem de vozes. Enquanto isso,
+              use o campo acima para cadastrar o nome de cada voz nova. Assim
+              que o servidor publicar <code>GET /api/voices</code>, esta lista
+              passa a ser preenchida sozinha.
+            </>
+          )}
         </p>
       </CardContent>
     </Card>
