@@ -73,8 +73,6 @@ export const SERVICOS_TABS: ReadonlyArray<SectionTab> = [
 
 export const SEGURANCA_TABS: ReadonlyArray<SectionTab> = [
   { to: "/app/auditoria", label: "Auditoria", icon: ShieldCheck, modulo: "auditoria" },
-  { to: "/app/lgpd", label: "LGPD", icon: ShieldCheck, modulo: "lgpd" },
-  { to: "/app/integration-secrets", label: "Integrações", icon: KeyRound, modulo: "integration-secrets" },
 ];
 
 export const RH_META = { title: "RH", icon: Users };

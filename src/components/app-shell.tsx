@@ -189,8 +189,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     { to: "/app/boletos", label: "Boletos", icon: FileText },
     { to: "/app/contratos", label: "Contratos de assinatura", icon: FileText },
     { to: "/app/nfse", label: "NFS-e", icon: FileText },
-    { to: "/app/integration-secrets", label: "Integrações", icon: KeyRound },
-    { to: "/app/lgpd", label: "LGPD", icon: ShieldCheck },
     ],
   },
   {
