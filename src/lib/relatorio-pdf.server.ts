@@ -74,14 +74,14 @@ export async function gerarRelatorioPdf(rel: RelatorioDiario): Promise<Uint8Arra
 
   // Cabeçalho
   page.drawRectangle({ x: 0, y: A4[1] - 92, width: A4[0], height: 92, color: rgb(0.06, 0.35, 0.29) });
-  page.drawText("Relatorio diario de desenvolvimento", {
+  page.drawText("Relatório diário de desenvolvimento", {
     x: M,
     y: A4[1] - 46,
     size: 17,
     font: bold,
     color: rgb(1, 1, 1),
   });
-  page.drawText(`${dataBr}  -  janela ${rel.janela}`, {
+  page.drawText(`${dataBr}  \u00b7  janela ${rel.janela}`, {
     x: M,
     y: A4[1] - 68,
     size: 11,
@@ -95,14 +95,14 @@ export async function gerarRelatorioPdf(rel: RelatorioDiario): Promise<Uint8Arra
 
   // Números
   const kpis = [
-    `Alteracoes: ${rel.total}`,
+    `Alterações: ${rel.total}`,
     `Loops de erro: ${rel.loops.length}`,
-    `Areas: ${rel.porArea.length}`,
+    `Áreas: ${rel.porArea.length}`,
   ];
-  escrever(kpis.join("     |     "), { size: 10.5, font: bold, cor: [0.06, 0.35, 0.29], espaco: 12 });
+  escrever(kpis.join("  \u00b7  "), { size: 10.5, font: bold, cor: [0.06, 0.35, 0.29], espaco: 12 });
 
   if (rel.porArea.length) {
-    escrever("Por area", { size: 12, font: bold, espaco: 2 });
+    escrever("Por área", { size: 12, font: bold, espaco: 2 });
     for (const a of rel.porArea) escrever(`- ${a.area}: ${a.total}`, { size: 10, recuo: 8 });
     y -= 8;
   }
@@ -115,7 +115,7 @@ export async function gerarRelatorioPdf(rel: RelatorioDiario): Promise<Uint8Arra
 
   escrever("O que mudou", { size: 13, font: bold, espaco: 4 });
   if (!rel.entradas.length) {
-    escrever("Nenhuma alteracao registrada nesta janela.", { size: 10, espaco: 8 });
+    escrever("Nenhuma alteração registrada nesta janela.", { size: 10, espaco: 8 });
   } else {
     for (const e of rel.entradas) {
       const area = e.area ? ` - ${e.area}` : "";
@@ -133,7 +133,7 @@ export async function gerarRelatorioPdf(rel: RelatorioDiario): Promise<Uint8Arra
   y -= 4;
   escrever("Loops de erro (assuntos que voltaram)", { size: 13, font: bold, espaco: 4 });
   if (!rel.loops.length) {
-    escrever("Nenhum loop de erro identificado no periodo.", { size: 10 });
+    escrever("Nenhum loop de erro identificado no período.", { size: 10 });
   } else {
     for (const l of rel.loops) {
       const marca = l.manual ? "marcado manualmente" : `${l.datas.length}x em 30 dias`;
@@ -147,7 +147,7 @@ export async function gerarRelatorioPdf(rel: RelatorioDiario): Promise<Uint8Arra
   // Rodapé em todas as páginas
   const paginas = doc.getPages();
   paginas.forEach((p, i) => {
-    p.drawText(`ClinicaOS - gerado automaticamente - pagina ${i + 1} de ${paginas.length}`, {
+    p.drawText(`ClinicaOS \u00b7 gerado automaticamente \u00b7 página ${i + 1} de ${paginas.length}`, {
       x: M,
       y: 26,
       size: 8,
