@@ -153,16 +153,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     ],
   },
   {
-    label: "Marketing",
-    items: [
-    { to: "/app/mkt-leads", label: "Marketing", icon: Megaphone },
-    { to: "/app/campanhas", label: "Campanhas", icon: Send },
-    { to: "/app/mkt-envios", label: "Envios", icon: Send },
-    { to: "/app/mkt-landing", label: "Landing Pages", icon: Sparkles },
-    { to: "/app/mkt-segmentos", label: "Segmentos", icon: Filter },
-    ],
-  },
-  {
     label: "Cadastros",
     items: [
     { to: "/app/equipe", label: "Médicos", icon: Users },
