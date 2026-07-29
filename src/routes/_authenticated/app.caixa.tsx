@@ -848,7 +848,7 @@ function Page() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("user_id", user.id)
         .order("aberto_em", { ascending: false })
-        .limit(20),
+        .limit(5),
     ]);
     const aberta = abertaRes.data;
     setMinhaSessao((aberta ?? null) as Sessao | null);
@@ -886,17 +886,22 @@ function Page() {
       const agIds = Array.from(new Set(lancRows.map((l) => l.agendamento_id).filter((x): x is string => !!x)));
       const pacIds = new Set(lancRows.map((l) => l.paciente_id).filter((x): x is string => !!x));
 
+      const agChunks = chunkArray(agIds, 200);
+      const agResults = await Promise.all(
+        agChunks.map((ids) =>
+          supabase
+            .from("agendamentos")
+            .select("id, procedimento, paciente_id, medico_id, ficha_numero, inicio, agenda_id, paciente_nome")
+            .in("id", ids),
+        ),
+      );
       const agRows: AgendamentoEnrichRow[] = [];
-      for (const ids of chunkArray(agIds, 200)) {
-        const { data, error } = await supabase
-          .from("agendamentos")
-          .select("id, procedimento, paciente_id, medico_id, ficha_numero, inicio, agenda_id, paciente_nome")
-          .in("id", ids);
-        if (error) {
-          console.warn("Falha ao enriquecer movimentos do caixa por agendamento", error);
+      for (const r of agResults) {
+        if (r.error) {
+          console.warn("Falha ao enriquecer movimentos do caixa por agendamento", r.error);
           continue;
         }
-        agRows.push(...((data ?? []) as AgendamentoEnrichRow[]));
+        agRows.push(...((r.data ?? []) as AgendamentoEnrichRow[]));
       }
 
       const agMap = new Map<string, AgendamentoEnrichRow>();
@@ -909,60 +914,73 @@ function Page() {
         if (a.paciente_id) pacIds.add(a.paciente_id);
       }
 
+      const medChunks = chunkArray(Array.from(medIds), 200);
+      const pacChunks = chunkArray(Array.from(pacIds), 200);
+      const [medResults, pacResults] = await Promise.all([
+        Promise.all(medChunks.map((ids) => supabase.from("medicos").select("id, nome").in("id", ids))),
+        Promise.all(pacChunks.map((ids) => supabase.from("pacientes").select("id, nome").in("id", ids))),
+      ]);
       const medMap = new Map<string, string>();
-      for (const ids of chunkArray(Array.from(medIds), 200)) {
-        const { data, error } = await supabase.from("medicos").select("id, nome").in("id", ids);
-        if (error) {
-          console.warn("Falha ao enriquecer movimentos do caixa por médico", error);
-          continue;
-        }
-        for (const m of (data ?? []) as Array<{ id: string; nome: string | null }>) {
+      for (const r of medResults) {
+        if (r.error) { console.warn("Falha ao enriquecer movimentos do caixa por médico", r.error); continue; }
+        for (const m of (r.data ?? []) as Array<{ id: string; nome: string | null }>) {
           if (m.nome) medMap.set(m.id, m.nome);
         }
       }
-
       const pacMap = new Map<string, string>();
-      for (const ids of chunkArray(Array.from(pacIds), 200)) {
-        const { data, error } = await supabase.from("pacientes").select("id, nome").in("id", ids);
-        if (error) {
-          console.warn("Falha ao enriquecer movimentos do caixa por paciente", error);
-          continue;
-        }
-        for (const p of (data ?? []) as Array<{ id: string; nome: string | null }>) {
+      for (const r of pacResults) {
+        if (r.error) { console.warn("Falha ao enriquecer movimentos do caixa por paciente", r.error); continue; }
+        for (const p of (r.data ?? []) as Array<{ id: string; nome: string | null }>) {
           if (p.nome) pacMap.set(p.id, p.nome);
         }
       }
 
       const fichaCalculadaPorAg = new Map<string, number>();
-      const gruposFicha = new Map<string, { day: string; medicoId: string | null; agendaId: string | null }>();
+      // Fichas calculadas: em vez de uma consulta por (dia, médico, agenda) —
+      // que gerava dezenas de idas ao banco em série — buscamos os
+      // agendamentos do dia inteiro UMA vez por dia (em paralelo) e
+      // classificamos por (médico, agenda) no navegador. Mesma numeração
+      // final, custo drasticamente menor.
+      const diasFicha = new Set<string>();
       for (const a of agRows) {
         if (typeof a.ficha_numero === "number" && a.ficha_numero > 0) continue;
         const day = saoPauloDayKey(a.inicio);
-        if (!day) continue;
-        const key = `${day}::${a.medico_id ?? "__sem_profissional__"}::${a.agenda_id ?? "__sem_agenda__"}`;
-        if (!gruposFicha.has(key)) gruposFicha.set(key, { day, medicoId: a.medico_id, agendaId: a.agenda_id });
+        if (day) diasFicha.add(day);
       }
-      for (const grupo of gruposFicha.values()) {
-        const range = saoPauloDayRange(grupo.day);
-        let q = supabase
-          .from("agendamentos")
-          .select("id, inicio, paciente_nome")
-          .eq("clinica_id", clinicaAtual.clinica_id)
-          .gte("inicio", range.start)
-          .lte("inicio", range.end);
-        q = grupo.medicoId ? q.eq("medico_id", grupo.medicoId) : q.is("medico_id", null);
-        q = grupo.agendaId ? q.eq("agenda_id", grupo.agendaId) : q.is("agenda_id", null);
-        const { data, error } = await q.range(0, 9999);
-        if (error) {
-          console.warn("Falha ao calcular ficha no caixa", error);
-          continue;
+      if (diasFicha.size > 0) {
+        const dias = Array.from(diasFicha);
+        const diaResults = await Promise.all(
+          dias.map((day) => {
+            const range = saoPauloDayRange(day);
+            return supabase
+              .from("agendamentos")
+              .select("id, inicio, paciente_nome, medico_id, agenda_id")
+              .eq("clinica_id", clinicaAtual.clinica_id)
+              .gte("inicio", range.start)
+              .lte("inicio", range.end)
+              .range(0, 9999);
+          }),
+        );
+        type FichaRow = { id: string; inicio: string | null; paciente_nome: string | null; medico_id: string | null; agenda_id: string | null };
+        for (const r of diaResults) {
+          if (r.error) { console.warn("Falha ao calcular ficha no caixa", r.error); continue; }
+          const rows = (r.data ?? []) as FichaRow[];
+          const porGrupo = new Map<string, FichaRow[]>();
+          for (const row of rows) {
+            const key = `${row.medico_id ?? "__sem_profissional__"}::${row.agenda_id ?? "__sem_agenda__"}`;
+            const arr = porGrupo.get(key) ?? [];
+            arr.push(row);
+            porGrupo.set(key, arr);
+          }
+          for (const arr of porGrupo.values()) {
+            arr.sort((a, b) => {
+              const t = String(a.inicio ?? "").localeCompare(String(b.inicio ?? ""));
+              if (t !== 0) return t;
+              return String(a.paciente_nome ?? "").localeCompare(String(b.paciente_nome ?? ""), "pt-BR", { sensitivity: "base" });
+            });
+            arr.forEach((row, index) => fichaCalculadaPorAg.set(row.id, index + 1));
+          }
         }
-        const ordenados = [...((data ?? []) as Array<{ id: string; inicio: string | null; paciente_nome: string | null }>)].sort((a, b) => {
-          const t = String(a.inicio ?? "").localeCompare(String(b.inicio ?? ""));
-          if (t !== 0) return t;
-          return String(a.paciente_nome ?? "").localeCompare(String(b.paciente_nome ?? ""), "pt-BR", { sensitivity: "base" });
-        });
-        ordenados.forEach((row, index) => fichaCalculadaPorAg.set(row.id, index + 1));
       }
 
       for (const l of lancRows) {
