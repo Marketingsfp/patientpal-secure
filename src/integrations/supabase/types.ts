@@ -2503,6 +2503,7 @@ export type Database = {
           rate: number
           updated_at: string
           updated_by: string | null
+          voice: string | null
         }
         Insert: {
           clinica_id: string
@@ -2510,6 +2511,7 @@ export type Database = {
           rate?: number
           updated_at?: string
           updated_by?: string | null
+          voice?: string | null
         }
         Update: {
           clinica_id?: string
@@ -2517,6 +2519,7 @@ export type Database = {
           rate?: number
           updated_at?: string
           updated_by?: string | null
+          voice?: string | null
         }
         Relationships: [
           {
