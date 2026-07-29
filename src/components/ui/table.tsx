@@ -8,7 +8,7 @@ const Table = React.forwardRef<
   React.HTMLAttributes<HTMLTableElement> & { containerClassName?: string }
 >(({ className, containerClassName, ...props }, ref) => {
   // Rolagem horizontal em vez de cortar colunas em telas estreitas — piloto
-  // São Francisco de Paula (flag ux_melhorias). Sem a flag, comportamento
+  // Flag ux_melhorias. Sem a flag, comportamento
   // idêntico ao atual (sem overflow-x, para não mudar nada nas outras clínicas).
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   return (
