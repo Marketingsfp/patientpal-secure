@@ -267,7 +267,7 @@ export function AppShell() {
         queryFn: async () => {
           const { count, error } = await supabase
             .from("pacientes")
-            .select("id", { count: "estimated", head: true })
+            .select("id", { count: "exact", head: true })
             .eq("clinica_id", clinicaId);
           if (error) throw error;
           return count ?? 0;
