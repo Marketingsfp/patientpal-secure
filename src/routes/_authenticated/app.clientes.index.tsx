@@ -493,7 +493,7 @@ function ClientesPage() {
               </TableRow>
             ) : filtrados.map(p => (
               <TableRow key={p.id}>
-                <TableCell className="font-mono text-xs text-muted-foreground">{p.codigo_prontuario ?? "—"}</TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">{p.numero_pasta || p.codigo_prontuario || "—"}</TableCell>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-2">
                     <div className="h-8 w-8 rounded-full overflow-hidden border bg-muted flex items-center justify-center shrink-0">
