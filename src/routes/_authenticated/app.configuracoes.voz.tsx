@@ -284,8 +284,9 @@ function VozConfigPage() {
   );
 }
 
-const TTS_ENDPOINT = "/api/tts-proxy";
-const VOICES_ENDPOINT = "/api/tts-voices";
+const TTS_SERVER_BASE = "https://server-mj.tailec426c.ts.net";
+const TTS_ENDPOINT = `${TTS_SERVER_BASE}/api/tts`;
+const VOICES_ENDPOINT = `${TTS_SERVER_BASE}/api/voices`;
 const LABELS_CONHECIDOS: Record<string, string> = {
   faber: "Faber (Masculino)",
   feminina: "Feminina",
@@ -295,6 +296,37 @@ function labelDaVoz(v: string): string {
 }
 const VOZES_FALLBACK = ["faber", "feminina"];
 const VOZES_MANUAIS_KEY = "tts:vozes-manuais";
+
+function extrairVozes(payload: unknown): string[] {
+  const walk = (v: unknown): string[] | null => {
+    if (Array.isArray(v)) {
+      const strs = v
+        .map((x) => {
+          if (typeof x === "string") return x;
+          if (x && typeof x === "object") {
+            const o = x as Record<string, unknown>;
+            for (const k of ["name", "voice", "id", "key"]) {
+              if (typeof o[k] === "string") return o[k] as string;
+            }
+          }
+          return null;
+        })
+        .filter((x): x is string => !!x && x.length > 0);
+      return strs.length ? strs : null;
+    }
+    if (v && typeof v === "object") {
+      for (const key of ["voices", "vozes", "data", "items", "models"]) {
+        const inner = (v as Record<string, unknown>)[key];
+        const r = walk(inner);
+        if (r) return r;
+      }
+      const keys = Object.keys(v as Record<string, unknown>);
+      if (keys.length && keys.every((k) => typeof k === "string")) return keys;
+    }
+    return null;
+  };
+  return Array.from(new Set(walk(payload) ?? []));
+}
 
 function lerVozesManuais(): string[] {
   if (typeof window === "undefined") return [];
@@ -344,41 +376,39 @@ function TesteServidorLocalCard() {
   async function detectarVozes(opts?: { force?: boolean; silencioso?: boolean }) {
     setDetectando(true);
     try {
-      const qs = opts?.force ? "?refresh=1" : "";
-      const res = await fetch(`${VOICES_ENDPOINT}${qs}`);
-      const data = (await res.json()) as {
-        vozes?: string[];
-        origem?: "servidor" | "fallback";
-        error?: string;
-      };
-      if (!res.ok || !Array.isArray(data.vozes)) {
-        throw new Error(data.error ?? `HTTP ${res.status}`);
-      }
+      const res = await fetch(VOICES_ENDPOINT, {
+        method: "GET",
+        cache: opts?.force ? "no-store" : "default",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = (await res.json()) as unknown;
+      const vozesApi = extrairVozes(payload);
+      if (!vozesApi.length) throw new Error("Nenhuma voz retornada pela API.");
       const anteriores = new Set(vozesServidor);
-      const novas = data.vozes.filter((v) => !anteriores.has(v));
-      setVozesServidor(data.vozes);
-      setOrigem(data.origem ?? "fallback");
+      const novas = vozesApi.filter((v) => !anteriores.has(v));
+      setVozesServidor(vozesApi);
+      setOrigem("servidor");
+      if (voice && !vozesApi.includes(voice)) {
+        setVoice(vozesApi[0]);
+      }
       if (!opts?.silencioso) {
-        if (data.origem === "fallback") {
-          toast.info(
-            "Servidor Piper não expõe listagem de vozes. Adicione manualmente abaixo.",
-          );
-        } else if (novas.length) {
+        if (novas.length) {
           toast.success(
             `Detectada${novas.length > 1 ? "s" : ""} ${novas.length} nova${novas.length > 1 ? "s" : ""} voz: ${novas.map(labelDaVoz).join(", ")}`,
           );
         } else if (opts?.force) {
-          toast.success(`${data.vozes.length} vozes disponíveis no servidor.`);
+          toast.success(`${vozesApi.length} vozes disponíveis no servidor.`);
         }
-      } else if (novas.length && data.origem === "servidor") {
-        toast.success(
-          `Nova voz detectada: ${novas.map(labelDaVoz).join(", ")}`,
-        );
+      } else if (novas.length) {
+        toast.success(`Nova voz detectada: ${novas.map(labelDaVoz).join(", ")}`);
       }
     } catch (err) {
-      toast.error(
-        `Falha ao detectar vozes: ${err instanceof Error ? err.message : "erro"}`,
-      );
+      setOrigem("fallback");
+      if (!opts?.silencioso) {
+        toast.error(
+          `Falha ao detectar vozes: ${err instanceof Error ? err.message : "erro"}`,
+        );
+      }
     } finally {
       setDetectando(false);
     }
