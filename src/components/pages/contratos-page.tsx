@@ -534,74 +534,18 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       })),
     );
     setConvenios((cv.data ?? []) as Convenio[]);
-    // Agregar parcelas dos contratos carregados
-    const contratoIds = ((cs.data ?? []) as Array<{ id: string }>).map((c) => c.id);
-    if (contratoIds.length > 0) {
-      // Buscar mensalidades em lotes de contratos para evitar o teto de 1000
-      // linhas por request do PostgREST (ex.: 500 contratos × 12 parcelas
-      // ≈ 6000 linhas retornariam truncadas, deixando contratos com "0/0").
-      const hojeStr = new Date().toISOString().slice(0, 10);
-      const agg: Record<string, { pagas: number; total: number; temAtrasada: boolean }> = {};
-      for (const id of contratoIds) agg[id] = { pagas: 0, total: 0, temAtrasada: false };
-      const LOTE = 60; // ~60 contratos × 12 parcelas = 720 linhas por lote
-      for (let i = 0; i < contratoIds.length; i += LOTE) {
-        const slice = contratoIds.slice(i, i + LOTE);
-        const { data: mens } = await supabase
-          .from("contrato_mensalidades")
-          .select("contrato_id, status, vencimento, numero_parcela")
-          .in("contrato_id", slice);
-        // Agrupa por contrato para segmentar em ciclos de 12 parcelas
-        // (renovações acrescentam parcelas 13..24, 25..36, etc.). A contagem
-        // exibida é sempre do ciclo atual (últimas 12 parcelas), pois cada
-        // contrato representa um período de 12 meses.
-        const porContrato: Record<string, Array<{ status: string; vencimento: string; numero_parcela: number }>> = {};
-        for (const m of (mens ?? []) as Array<{ contrato_id: string; status: string; vencimento: string; numero_parcela: number }>) {
-          if (Number(m.numero_parcela) <= 0) continue; // ignora adesão/taxas
-          (porContrato[m.contrato_id] ||= []).push(m);
-        }
-        for (const [cid, arr] of Object.entries(porContrato)) {
-          const a = agg[cid];
-          if (!a) continue;
-          // Ciclo atual = as 12 parcelas com maior numero_parcela.
-          arr.sort((x, y) => y.numero_parcela - x.numero_parcela);
-          const cicloAtual = arr.slice(0, 12);
-          a.total = cicloAtual.length;
-          for (const m of cicloAtual) {
-            if (m.status === "pago") a.pagas += 1;
-            else if (m.vencimento && m.vencimento < hojeStr) a.temAtrasada = true;
-          }
-        }
-      }
-      setParcAgg(agg);
-    } else {
-      setParcAgg({});
-    }
-    // Buscar nomes dos usuários que criaram os contratos (vendedores).
-    const ids = Array.from(
-      new Set(
-        ((cs.data ?? []) as Array<{ criado_por: string | null }>)
-          .map((r) => r.criado_por)
-          .filter((x): x is string => !!x),
-      ),
-    );
-    if (ids.length > 0) {
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id,nome")
-        .in("id", ids);
-      const map: Record<string, string> = {};
-      for (const p of (profs ?? []) as Array<{ id: string; nome: string | null }>) {
-        if (p.nome) map[p.id] = p.nome;
-      }
-      setVendedores(map);
-    } else {
-      setVendedores({});
-    }
+    // Agregar parcelas apenas dos contratos exibidos nesta página.
+    const contratoIds = contratosRows.map((c) => c.id);
+    setParcAgg(contratoIds.length > 0 ? await calcularParcAgg(contratoIds) : {});
     setLoading(false);
   };
   useEffect(() => {
     load(qDebounced); /* eslint-disable-next-line */
-  }, [clinicaAtual?.clinica_id, qDebounced]);
+  }, [
+    clinicaAtual?.clinica_id, qDebounced, pagina, sortPaciente,
+    filtroSituacao, filtroTermino, filtroProgresso, filtroInicio,
+    filtroMensal, filtroVendedor, filtroStatus, filtroConvenio,
+  ]);
 
   // Deep-link: abrir automaticamente um contrato específico (ex.: vindo da aba Convênio no cadastro do cliente)
   useEffect(() => {
