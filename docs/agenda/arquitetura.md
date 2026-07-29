@@ -52,37 +52,6 @@ Características:
 - Suporta "Salvar e cobrar" — grava agendamento e abre tela de cobrança
   sem confirmar.
 
-## 3. Fluxo da Agenda V2
-
-Rota: `src/routes/_authenticated/app.agenda-v2.tsx` (piloto, gated por
-flag `agenda_v2` em `profiles.preferencias_ui.flags`, restrito a
-admin/gestor, OFF por padrão).
-
-```text
-Usuário clica "Nova sessão" (HhpToolbar)
-  → abre NovoAgendamentoWizard (5 passos)
-    1. Paciente     — patient-search-input (reuso da clássica)
-    2. Serviço      — procedimento-picker (reuso da clássica)
-    3. Profissional — lista de médicos ativos da clínica
-    4. Horário      — date input + grid de slots DISPONÍVEL do médico no dia
-    5. Confirmação  — resumo + toggle particular/convenio
-  → handleConfirmar() monta payload idêntico ao clássico
-     (orcamento_id=null, pending_orc_item_ids=[], observacoes="[V2]")
-  → chama criarAgendamento(...) via useServerFn
-  → mostra toast (mesmas mensagens da clássica)
-  → invalida queries ["agenda-v2","ags",...]
-  → reset() + fecha wizard
-```
-
-Escopo atual (Fase F simples):
-- Somente agendamento simples (1 paciente × 1 profissional × 1 slot).
-- Somente médicos regulares (recursos de enfermagem indisponíveis pelo
-  wizard — o usuário precisa usar a clássica).
-- Somente slots `DISPONÍVEL` já gerados em Disponibilidades.
-- Sem orçamento (`orcamento_id = null`).
-- Sem "salvar e cobrar" (fecha após salvar).
-- Rastreabilidade obrigatória: `observacoes = "[V2]"`.
-
 ## 4. Responsabilidades de `criarAgendamento`
 
 Server function (`createServerFn` + `requireSupabaseAuth`). Encapsula as
