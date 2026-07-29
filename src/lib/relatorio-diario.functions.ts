@@ -89,3 +89,17 @@ export const enviarRelatorioAgora = createServerFn({ method: "POST" })
     const { enviarRelatorioWhatsApp } = await import("./relatorio-diario.server");
     return enviarRelatorioWhatsApp(data.data);
   });
+
+/** Gera o PDF do relatório do dia e devolve em base64 para download na tela. */
+export const baixarRelatorioPdf = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { data: string }) => d)
+  .handler(async ({ data }) => {
+    const { montarRelatorioDiario } = await import("./relatorio-diario.server");
+    const { gerarRelatorioPdf, nomeArquivoRelatorio } = await import("./relatorio-pdf.server");
+    const rel = await montarRelatorioDiario(data.data);
+    const bytes = await gerarRelatorioPdf(rel);
+    let bin = "";
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return { arquivo: nomeArquivoRelatorio(data.data), base64: btoa(bin) };
+  });
