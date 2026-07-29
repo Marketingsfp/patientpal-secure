@@ -5199,6 +5199,13 @@ function AgendaPage() {
     const { error } = await supabase.from("agendamentos").update(payload).in("id", idsParaAtualizar);
     if (error) mostrarErro(error);
     else {
+      // Cancelamento também desfaz o atendimento externo (Financeiro + marcações).
+      if (status === "cancelado") {
+        for (const id of idsParaAtualizar) {
+          const res = await fnLimparExterno({ data: { agendamento_id: id } });
+          if (!res.ok) toast.error(res.message);
+        }
+      }
       if (idsParaAtualizar.length > 1) toast.success(`${idsParaAtualizar.length} agendamentos do pacote cancelados.`);
       await load();
     }
