@@ -43,6 +43,7 @@ import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_auth
 import { Route as AuthenticatedAppTiposServicoRouteImport } from './routes/_authenticated/app.tipos-servico'
 import { Route as AuthenticatedAppSetoresRouteImport } from './routes/_authenticated/app.setores'
 import { Route as AuthenticatedAppRelatoriosRouteImport } from './routes/_authenticated/app.relatorios'
+import { Route as AuthenticatedAppRelatorioDiarioRouteImport } from './routes/_authenticated/app.relatorio-diario'
 import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
 import { Route as AuthenticatedAppProntuariosRouteImport } from './routes/_authenticated/app.prontuarios'
 import { Route as AuthenticatedAppProntuarioModelosRouteImport } from './routes/_authenticated/app.prontuario-modelos'
@@ -315,6 +316,12 @@ const AuthenticatedAppRelatoriosRoute =
   AuthenticatedAppRelatoriosRouteImport.update({
     id: '/relatorios',
     path: '/relatorios',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppRelatorioDiarioRoute =
+  AuthenticatedAppRelatorioDiarioRouteImport.update({
+    id: '/relatorio-diario',
+    path: '/relatorio-diario',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppRecepcaoRoute =
@@ -972,6 +979,7 @@ export interface FileRoutesByFullPath {
   '/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
+  '/app/relatorio-diario': typeof AuthenticatedAppRelatorioDiarioRoute
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
   '/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
@@ -1102,6 +1110,7 @@ export interface FileRoutesByTo {
   '/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
+  '/app/relatorio-diario': typeof AuthenticatedAppRelatorioDiarioRoute
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
   '/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
@@ -1238,6 +1247,7 @@ export interface FileRoutesById {
   '/_authenticated/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
   '/_authenticated/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
+  '/_authenticated/app/relatorio-diario': typeof AuthenticatedAppRelatorioDiarioRoute
   '/_authenticated/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/_authenticated/app/setores': typeof AuthenticatedAppSetoresRoute
   '/_authenticated/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
@@ -1374,6 +1384,7 @@ export interface FileRouteTypes {
     | '/app/prontuario-modelos'
     | '/app/prontuarios'
     | '/app/recepcao'
+    | '/app/relatorio-diario'
     | '/app/relatorios'
     | '/app/setores'
     | '/app/tipos-servico'
@@ -1504,6 +1515,7 @@ export interface FileRouteTypes {
     | '/app/prontuario-modelos'
     | '/app/prontuarios'
     | '/app/recepcao'
+    | '/app/relatorio-diario'
     | '/app/relatorios'
     | '/app/setores'
     | '/app/tipos-servico'
@@ -1639,6 +1651,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/prontuario-modelos'
     | '/_authenticated/app/prontuarios'
     | '/_authenticated/app/recepcao'
+    | '/_authenticated/app/relatorio-diario'
     | '/_authenticated/app/relatorios'
     | '/_authenticated/app/setores'
     | '/_authenticated/app/tipos-servico'
@@ -1965,6 +1978,13 @@ declare module '@tanstack/react-router' {
       path: '/relatorios'
       fullPath: '/app/relatorios'
       preLoaderRoute: typeof AuthenticatedAppRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/relatorio-diario': {
+      id: '/_authenticated/app/relatorio-diario'
+      path: '/relatorio-diario'
+      fullPath: '/app/relatorio-diario'
+      preLoaderRoute: typeof AuthenticatedAppRelatorioDiarioRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/recepcao': {
@@ -2842,6 +2862,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppProntuarioModelosRoute: typeof AuthenticatedAppProntuarioModelosRoute
   AuthenticatedAppProntuariosRoute: typeof AuthenticatedAppProntuariosRoute
   AuthenticatedAppRecepcaoRoute: typeof AuthenticatedAppRecepcaoRoute
+  AuthenticatedAppRelatorioDiarioRoute: typeof AuthenticatedAppRelatorioDiarioRoute
   AuthenticatedAppRelatoriosRoute: typeof AuthenticatedAppRelatoriosRoute
   AuthenticatedAppSetoresRoute: typeof AuthenticatedAppSetoresRoute
   AuthenticatedAppTiposServicoRoute: typeof AuthenticatedAppTiposServicoRoute
@@ -2929,6 +2950,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppProntuarioModelosRoute,
   AuthenticatedAppProntuariosRoute: AuthenticatedAppProntuariosRoute,
   AuthenticatedAppRecepcaoRoute: AuthenticatedAppRecepcaoRoute,
+  AuthenticatedAppRelatorioDiarioRoute: AuthenticatedAppRelatorioDiarioRoute,
   AuthenticatedAppRelatoriosRoute: AuthenticatedAppRelatoriosRoute,
   AuthenticatedAppSetoresRoute: AuthenticatedAppSetoresRoute,
   AuthenticatedAppTiposServicoRoute: AuthenticatedAppTiposServicoRoute,
