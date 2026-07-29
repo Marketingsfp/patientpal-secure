@@ -27,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 export const Route = createFileRoute("/_authenticated/app/orcamentos-agenda")({
   component: OrcamentosAgendaPage,
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (s: Record<string, unknown>): { orc?: number } => ({
     orc: s.orc != null ? Number(s.orc) : undefined,
   }),
 });
