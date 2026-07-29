@@ -24,7 +24,6 @@ Encapsula as 7 regras extraídas 1:1 do `submit` clássico:
 | Módulo | Arquivo | Uso |
 |---|---|---|
 | Agenda clássica | `src/routes/_authenticated/app.agenda.tsx` (`submit`) | Consumidor oficial desde o Passo B — validado com 12 testes |
-| Agenda V2 — wizard "Nova sessão" | `src/components/agenda-v2/novo-agendamento-wizard.tsx` | Consumirá a mesma função na Fase F (planejamento pendente) |
 
 ## Regra de manutenção
 
