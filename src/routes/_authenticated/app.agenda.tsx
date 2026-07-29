@@ -139,6 +139,8 @@ type Agendamento = {
   edit_lock_by?: string | null;
   edit_lock_by_nome?: string | null;
   edit_lock_at?: string | null;
+  origem_externa?: boolean | null;
+  origem_clinica_nome?: string | null;
 };
 type Medico = {
   id: string;
@@ -2439,7 +2441,7 @@ function AgendaPage() {
     const reqId = ++loadReqId.current;
     setLoading(true);
     const agendaSelect =
-      "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
+      "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
     let q = supabase
       .from("agendamentos")
       .select(agendaSelect as never)
