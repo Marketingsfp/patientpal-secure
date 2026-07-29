@@ -17,7 +17,6 @@ type Row = {
   paciente_nome: string | null;
   procedimento: string | null;
   origem_clinica_nome: string | null;
-  origem_gr_numero: string | null;
   origem_valor: number | null;
   medico: { nome: string | null } | null;
 };
@@ -47,7 +46,7 @@ function Page() {
     const fimIso = new Date(`${ate}T23:59:59`).toISOString();
     const { data, error } = await supabase
       .from("agendamentos")
-      .select("id,inicio,paciente_nome,procedimento,origem_clinica_nome,origem_gr_numero,origem_valor,medico:medicos(nome)")
+      .select("id,inicio,paciente_nome,procedimento,origem_clinica_nome,origem_valor,medico:medicos(nome)")
       .eq("clinica_id", clinicaId)
       .eq("origem_externa", true)
       .gte("inicio", inicioIso)
@@ -127,13 +126,12 @@ function Page() {
                 <TableHead>Médico</TableHead>
                 <TableHead>Procedimento</TableHead>
                 <TableHead>Clínica origem</TableHead>
-                <TableHead>GR origem</TableHead>
                 <TableHead className="text-right">Valor origem</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-sm text-slate-500 py-8">Nenhum atendimento externo no período.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-sm text-slate-500 py-8">Nenhum atendimento externo no período.</TableCell></TableRow>
               )}
               {rows.map((r) => (
                 <TableRow key={r.id}>
@@ -142,7 +140,6 @@ function Page() {
                   <TableCell>{r.medico?.nome ?? "—"}</TableCell>
                   <TableCell>{r.procedimento ?? "—"}</TableCell>
                   <TableCell>{r.origem_clinica_nome ?? "—"}</TableCell>
-                  <TableCell className="font-mono text-xs">{r.origem_gr_numero ?? "—"}</TableCell>
                   <TableCell className="text-right tabular-nums">{r.origem_valor != null ? `R$ ${Number(r.origem_valor).toFixed(2)}` : "—"}</TableCell>
                 </TableRow>
               ))}
