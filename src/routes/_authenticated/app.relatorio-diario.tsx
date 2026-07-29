@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import {
   obterRelatorioDiario, salvarEntradaRelatorio, excluirEntradaRelatorio, enviarRelatorioAgora,
+  baixarRelatorioPdf,
   type EntradaInput,
 } from "@/lib/relatorio-diario.functions";
 
