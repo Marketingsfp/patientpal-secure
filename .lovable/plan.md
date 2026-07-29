@@ -1,23 +1,29 @@
 ## Objetivo
 
-No registro de **Atendimento externo**, o valor deixa de ser um campo digitável. Ele aparece pronto, calculado pela tabela de preços desta clínica, apenas como base do repasse do médico — com aviso claro de que não entra no movimento de caixa da atendente.
+No diálogo "Atendimento externo" da agenda, deixar de exibir o valor do serviço e passar a exibir o **valor do repasse que o médico vai receber**, com uma marcação de convênio que muda a regra de cálculo.
 
-## O que muda
+## Como vai ficar a tela
 
-### 1. Diálogo da Agenda clássica (`src/components/agenda/atendimento-externo-dialog.tsx`)
-- Substituir o `Input` editável por um bloco de leitura mostrando o valor formatado (`R$ 0,00`), com estado "Buscando na tabela…" enquanto carrega.
-- Se o serviço não tiver preço cadastrado, exibir "Sem valor na tabela desta clínica" (o registro continua permitido, valor nulo).
-- Remover o estado de digitação; manter apenas o valor buscado, enviado como está para `marcarAtendimentoExterno`.
-- Aviso destacado (faixa âmbar com ícone de alerta):
-  "Este valor é usado apenas para o repasse do médico. Não entra no movimento de caixa da atendente e não gera nota fiscal."
+1. Paciente / procedimento (como hoje)
+2. Clínica de origem (como hoje)
+3. Novo campo: caixa de marcação **"Paciente tem convênio"**
+   - Vem marcada automaticamente quando o sistema encontra um contrato ativo do paciente (titular ou dependente) nesta clínica; o operador pode desmarcar.
+   - Marcada → aparece a lista de convênios da clínica para escolher qual é (pré-selecionado o do contrato encontrado).
+4. **Repasse do médico** (somente leitura, destacado): valor calculado, não editável
+   - Sem convênio: repasse padrão do médico sobre o preço do serviço na tabela desta clínica (regras já existentes: por serviço, por categoria, ou padrão do médico).
+   - Com convênio: usa as regras de repasse de convênio do médico, conforme a modalidade do convênio escolhido (Cartão Consulta ou Cartão Desconto) — repasse fixo por serviço, senão repasse de cartão do médico, senão padrão.
+   - Se não houver regra aplicável, mostra R$ 0,00 com aviso "sem regra de repasse cadastrada".
+5. Aviso amarelo mantido: valor serve só para o repasse, não entra no caixa nem gera nota.
 
-### 2. Aba "Externo" do wizard V2 (`src/components/agenda-v2/novo-agendamento-wizard.tsx`)
-- Mesmo tratamento: campo de valor vira exibição somente leitura, alimentado pela mesma busca de preço, com o mesmo aviso.
+## Regras de negócio
 
-### 3. Sem mudanças de backend
-`marcarAtendimentoExterno` já busca o preço no banco quando o valor chega nulo, e já cria o `fin_atendimentos` com `valor_clinica = 0`. A regra de negócio permanece intacta; a alteração é de interface.
+- O valor do serviço continua sendo lido internamente da tabela desta clínica (base de cálculo), mas não é mais mostrado.
+- O repasse gravado no financeiro passa a ser o repasse calculado, não o valor cheio do serviço.
+- Trocar o convênio na lista recalcula o repasse na hora.
 
 ## Detalhes técnicos
-- Reaproveita `valorDaTabela` de `src/lib/agenda/atendimento-externo-preco.ts` e a consulta já existente em `procedimentos` (`valor_dinheiro`, `valor_dinheiro_pix`, `valor_padrao`).
-- Estados `valor`/`externoValor` passam de string editável para número (ou `null`) somente de leitura.
-- Nenhuma migração de banco.
+
+- `src/components/agenda/atendimento-externo-dialog.tsx`: substituir o bloco "Valor do atendimento" por checkbox + select de convênio + linha de repasse; carregar `cb_convenios` da clínica e usar `buscarVinculoConvenio` (`src/lib/convenio/modalidade.ts`) para pré-marcar.
+- Cálculo com `calcRepasseFull` (`src/lib/repasse-calc.ts`), montando o contexto com o médico do agendamento, `medico_convenios` (via `getMedicoConveniosAgenda`) e tipos de procedimento; `modalidade` vinda do convênio escolhido ou `null` quando desmarcado.
+- Mesma alteração no wizard V2 (`src/components/agenda-v2/novo-agendamento-wizard.tsx`), reaproveitando um helper novo em `src/lib/agenda/atendimento-externo-preco.ts` (ou arquivo irmão) para não duplicar a lógica.
+- `src/lib/agenda/atendimento-externo.functions.ts`: aceitar `repasse_medico`, `convenio_id`/`modalidade`; gravar `valor_medico = repasse`, mantendo `valor_clinica = 0` e `valor_total` com o preço da tabela; recalcular no servidor quando o cliente não enviar repasse.

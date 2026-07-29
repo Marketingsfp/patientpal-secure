@@ -11,7 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
-import { valorDaTabela } from "@/lib/agenda/atendimento-externo-preco";
+import { buscarVinculoConvenio } from "@/lib/convenio/modalidade";
+import { calcularRepasseExterno, listarConveniosClinica } from "@/lib/agenda/atendimento-externo-repasse";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { cn } from "@/lib/utils";
 
@@ -104,6 +105,12 @@ export function NovoAgendamentoWizard({
   const [externoClinicaNome, setExternoClinicaNome] = useState<string>("");
   const [externoValor, setExternoValor] = useState<number | null>(null);
   const [externoBuscando, setExternoBuscando] = useState(false);
+  const [externoTemConvenio, setExternoTemConvenio] = useState(false);
+  const [externoConvenios, setExternoConvenios] = useState<
+    Array<{ id: string; nome: string; modalidade: "cartao_consulta" | "cartao_desconto" }>
+  >([]);
+  const [externoConvenioId, setExternoConvenioId] = useState<string>("");
+  const [externoRepasse, setExternoRepasse] = useState<number | null>(null);
   const [especialidadeId, setEspecialidadeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -121,29 +128,49 @@ export function NovoAgendamentoWizard({
   // -------------------------------------------------------------------------
   const [showQuickCreate, setShowQuickCreate] = useState(false);
 
-  // Preço automático do atendimento externo — tabela desta clínica (base do repasse).
+  // Convênios da clínica + detecção do contrato ativo do paciente.
+  useEffect(() => {
+    if (tipoAtendimento !== "externo" || !clinicaId) return;
+    let cancelado = false;
+    void (async () => {
+      const lista = await listarConveniosClinica(clinicaId);
+      if (cancelado) return;
+      setExternoConvenios(lista);
+      const vinculo = await buscarVinculoConvenio(clinicaId, paciente?.id ?? null);
+      if (cancelado || !vinculo) return;
+      setExternoTemConvenio(true);
+      setExternoConvenioId(vinculo.convenioId);
+    })();
+    return () => { cancelado = true; };
+  }, [tipoAtendimento, clinicaId, paciente?.id]);
+
+  // Repasse automático do atendimento externo — cadastro de repasse do médico.
   useEffect(() => {
     if (tipoAtendimento !== "externo" || !clinicaId || !procedimento?.nome) {
       setExternoValor(null);
+      setExternoRepasse(null);
       return;
     }
+    if (externoTemConvenio && !externoConvenioId) { setExternoRepasse(null); return; }
+    const modalidade = externoTemConvenio
+      ? externoConvenios.find((c) => c.id === externoConvenioId)?.modalidade ?? null
+      : null;
     let cancelado = false;
     setExternoBuscando(true);
     void (async () => {
-      const { data } = await supabase
-        .from("procedimentos")
-        .select("valor_dinheiro,valor_dinheiro_pix,valor_padrao")
-        .eq("clinica_id", clinicaId)
-        .ilike("nome", procedimento.nome)
-        .limit(1)
-        .maybeSingle();
+      const r = await calcularRepasseExterno({
+        clinicaId,
+        medicoId: medico?.id ?? null,
+        procedimento: procedimento.nome,
+        modalidade,
+      });
       if (cancelado) return;
-      const v = valorDaTabela(data as never);
-      setExternoValor(v > 0 ? v : null);
+      setExternoValor(r.valorTabela > 0 ? r.valorTabela : null);
+      setExternoRepasse(r.repasse);
       setExternoBuscando(false);
     })();
     return () => { cancelado = true; };
-  }, [tipoAtendimento, clinicaId, procedimento?.nome]);
+  }, [tipoAtendimento, clinicaId, procedimento?.nome, medico?.id, externoTemConvenio, externoConvenioId, externoConvenios]);
 
   const [qcNome, setQcNome] = useState("");
   const [qcSexo, setQcSexo] = useState<"M" | "F">("F");
@@ -169,6 +196,9 @@ export function NovoAgendamentoWizard({
     setExternoClinicaNome("");
     setExternoValor(null);
     setExternoBuscando(false);
+    setExternoTemConvenio(false);
+    setExternoConvenioId("");
+    setExternoRepasse(null);
     setEspecialidadeId(null);
     setSaving(false);
     resetQuickCreate();
@@ -428,6 +458,8 @@ export function NovoAgendamentoWizard({
             origem_clinica_id: null,
             origem_clinica_nome: externoClinicaNome.trim(),
             origem_valor: externoValor && externoValor > 0 ? externoValor : null,
+            repasse_medico: externoRepasse != null ? externoRepasse : null,
+            convenio_id: externoTemConvenio ? externoConvenioId : null,
           },
         });
         if (!mkRes.ok) {
@@ -753,16 +785,44 @@ export function NovoAgendamentoWizard({
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Valor do atendimento</label>
+                  <label className="flex items-center gap-2 text-xs text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={externoTemConvenio}
+                      onChange={(e) => {
+                        setExternoTemConvenio(e.target.checked);
+                        if (!e.target.checked) setExternoConvenioId("");
+                      }}
+                    />
+                    <span>Paciente tem convênio</span>
+                  </label>
+                  {externoTemConvenio && (
+                    <select
+                      value={externoConvenioId}
+                      onChange={(e) => setExternoConvenioId(e.target.value)}
+                      className="mt-1 w-full h-9 rounded-md border border-slate-200 px-2 text-sm bg-white"
+                    >
+                      <option value="">Selecione o convênio</option>
+                      {externoConvenios.map((c) => (
+                        <option key={c.id} value={c.id}>{c.nome}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Repasse do médico</label>
                   <div className="mt-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-base font-semibold tabular-nums">
                     {externoBuscando
-                      ? <span className="text-xs font-normal text-slate-500">Buscando na tabela…</span>
-                      : externoValor && externoValor > 0
-                      ? `R$ ${externoValor.toFixed(2).replace(".", ",")}`
-                      : <span className="text-xs font-normal text-slate-500">Sem valor na tabela desta clínica</span>}
+                      ? <span className="text-xs font-normal text-slate-500">Calculando…</span>
+                      : externoTemConvenio && !externoConvenioId
+                      ? <span className="text-xs font-normal text-slate-500">Selecione o convênio</span>
+                      : externoRepasse != null && externoRepasse > 0
+                      ? `R$ ${externoRepasse.toFixed(2).replace(".", ",")}`
+                      : <span className="text-xs font-normal text-slate-500">Sem regra de repasse cadastrada (R$ 0,00)</span>}
                   </div>
                   <p className="mt-1 text-[10px] text-slate-500">
-                    Valor do serviço na tabela desta clínica (não editável).
+                    Calculado pelo cadastro de repasse do médico
+                    {externoTemConvenio ? " (regras de convênio)" : " (particular)"} — não editável.
                   </p>
                   <div className="mt-2 flex gap-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10px] text-amber-900">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />

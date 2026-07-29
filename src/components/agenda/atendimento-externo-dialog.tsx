@@ -6,11 +6,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useClinica } from "@/hooks/use-clinica";
 import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { valorDaTabela } from "@/lib/agenda/atendimento-externo-preco";
+import { buscarVinculoConvenio, type ModalidadeConvenio } from "@/lib/convenio/modalidade";
+import { calcularRepasseExterno, listarConveniosClinica } from "@/lib/agenda/atendimento-externo-repasse";
 
 type Props = {
   open: boolean;
@@ -21,6 +23,10 @@ type Props = {
   procedimento?: string | null;
   onDone?: () => void;
 };
+
+type ConvenioOpt = { id: string; nome: string; modalidade: ModalidadeConvenio };
+
+const brl = (v: number) => `R$ ${v.toFixed(2).replace(".", ",")}`;
 
 /**
  * Registra um atendimento que foi faturado em outra clínica parceira:
@@ -40,50 +46,86 @@ export function AtendimentoExternoDialog({
   const { memberships } = useClinica();
   const [origemId, setOrigemId] = useState<string>("");
   const [clinicaNome, setClinicaNome] = useState("");
-  const [valor, setValor] = useState<number | null>(null);
+  const [temConvenio, setTemConvenio] = useState(false);
+  const [convenios, setConvenios] = useState<ConvenioOpt[]>([]);
+  const [convenioId, setConvenioId] = useState<string>("");
+  const [valorTabela, setValorTabela] = useState(0);
+  const [repasse, setRepasse] = useState<number | null>(null);
+  const [medicoId, setMedicoId] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
-  const [buscandoValor, setBuscandoValor] = useState(false);
+  const [calculando, setCalculando] = useState(false);
 
   const unidades = memberships
     .filter((m) => m.clinica_id !== clinicaId)
     .map((m) => ({ id: m.clinica_id, nome: m.clinica.nome }))
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
 
+  const modalidade: ModalidadeConvenio | null =
+    temConvenio ? convenios.find((c) => c.id === convenioId)?.modalidade ?? null : null;
+
   useEffect(() => {
     if (open) {
       setOrigemId("");
       setClinicaNome("");
-      setValor(null);
+      setTemConvenio(false);
+      setConvenioId("");
+      setRepasse(null);
+      setValorTabela(0);
     }
   }, [open]);
 
-  // Preenche automaticamente com o preço do serviço na tabela desta clínica
-  // (a que recebe a GR) — é ele que serve de base para o repasse do médico.
+  // Carrega médico/paciente do agendamento, convênios da clínica e detecta
+  // se o paciente já tem contrato ativo (pré-marca a flag).
   useEffect(() => {
-    if (!open || !clinicaId || !procedimento?.trim()) return;
+    if (!open || !clinicaId || !agendamentoId) return;
     let cancelado = false;
-    setBuscandoValor(true);
     void (async () => {
-      const { data } = await supabase
-        .from("procedimentos")
-        .select("valor_dinheiro,valor_dinheiro_pix,valor_padrao")
-        .eq("clinica_id", clinicaId)
-        .ilike("nome", procedimento.trim())
-        .limit(1)
-        .maybeSingle();
+      const [{ data: ag }, lista] = await Promise.all([
+        supabase
+          .from("agendamentos")
+          .select("medico_id,paciente_id")
+          .eq("id", agendamentoId)
+          .maybeSingle(),
+        listarConveniosClinica(clinicaId),
+      ]);
       if (cancelado) return;
-      const v = valorDaTabela(data as never);
-      setValor(v > 0 ? v : null);
-      setBuscandoValor(false);
+      setMedicoId((ag?.medico_id as string | null) ?? null);
+      setConvenios(lista);
+      const vinculo = await buscarVinculoConvenio(clinicaId, (ag?.paciente_id as string | null) ?? null);
+      if (cancelado || !vinculo) return;
+      setTemConvenio(true);
+      setConvenioId(vinculo.convenioId);
     })();
     return () => { cancelado = true; };
-  }, [open, clinicaId, procedimento]);
+  }, [open, clinicaId, agendamentoId]);
+
+  // Repasse do médico conforme o cadastro (muda com a flag/convênio).
+  useEffect(() => {
+    if (!open || !clinicaId || !procedimento?.trim()) return;
+    if (temConvenio && !convenioId) { setRepasse(null); return; }
+    let cancelado = false;
+    setCalculando(true);
+    void (async () => {
+      const r = await calcularRepasseExterno({
+        clinicaId,
+        medicoId,
+        procedimento,
+        modalidade,
+      });
+      if (cancelado) return;
+      setValorTabela(r.valorTabela);
+      setRepasse(r.repasse);
+      setCalculando(false);
+    })();
+    return () => { cancelado = true; };
+  }, [open, clinicaId, procedimento, medicoId, temConvenio, convenioId, modalidade]);
 
   const salvar = async () => {
     if (!agendamentoId || !clinicaId) return;
     const unidade = unidades.find((u) => u.id === origemId);
     const nomeOrigem = unidade ? unidade.nome : clinicaNome.trim();
     if (!nomeOrigem) return toast.error("Informe a clínica de origem.");
+    if (temConvenio && !convenioId) return toast.error("Selecione o convênio do paciente.");
     setSalvando(true);
     const res = await marcarFn({
       data: {
@@ -91,7 +133,9 @@ export function AtendimentoExternoDialog({
         clinica_id: clinicaId,
         origem_clinica_id: unidade ? unidade.id : null,
         origem_clinica_nome: nomeOrigem,
-        origem_valor: valor && valor > 0 ? valor : null,
+        origem_valor: valorTabela > 0 ? valorTabela : null,
+        repasse_medico: repasse != null ? repasse : null,
+        convenio_id: temConvenio ? convenioId : null,
       },
     });
     setSalvando(false);
@@ -143,17 +187,47 @@ export function AtendimentoExternoDialog({
               />
             )}
           </div>
+
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={temConvenio}
+                onCheckedChange={(v) => {
+                  const on = v === true;
+                  setTemConvenio(on);
+                  if (!on) setConvenioId("");
+                }}
+              />
+              <span>Paciente tem convênio</span>
+            </label>
+            {temConvenio && (
+              <Select value={convenioId} onValueChange={setConvenioId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o convênio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {convenios.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
           <div>
-            <Label>Valor do atendimento</Label>
+            <Label>Repasse do médico</Label>
             <div className="mt-1 rounded-md border bg-muted/40 px-3 py-2 text-lg font-semibold tabular-nums">
-              {buscandoValor
-                ? <span className="text-sm font-normal text-muted-foreground">Buscando na tabela…</span>
-                : valor && valor > 0
-                ? `R$ ${valor.toFixed(2).replace(".", ",")}`
-                : <span className="text-sm font-normal text-muted-foreground">Sem valor na tabela desta clínica</span>}
+              {calculando
+                ? <span className="text-sm font-normal text-muted-foreground">Calculando…</span>
+                : temConvenio && !convenioId
+                ? <span className="text-sm font-normal text-muted-foreground">Selecione o convênio</span>
+                : repasse != null && repasse > 0
+                ? brl(repasse)
+                : <span className="text-sm font-normal text-muted-foreground">Sem regra de repasse cadastrada (R$ 0,00)</span>}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Valor do serviço na tabela desta clínica (não editável).
+              Calculado pelo cadastro de repasse do médico
+              {temConvenio ? " (regras de convênio)" : " (particular)"} — não editável.
             </p>
             <div className="mt-2 flex gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />

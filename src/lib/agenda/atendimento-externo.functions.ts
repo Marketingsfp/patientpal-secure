@@ -18,6 +18,10 @@ export type MarcarExternoInput = {
   origem_gr_numero?: string | null;
   /** Opcional: se vazio, usa o preço do serviço na tabela desta clínica. */
   origem_valor?: number | null;
+  /** Repasse do médico calculado no cliente (cadastro de repasse). */
+  repasse_medico?: number | null;
+  /** Convênio do paciente, quando houver. */
+  convenio_id?: string | null;
 };
 
 export type MarcarExternoResult =
@@ -51,6 +55,11 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
         ? valorInformado
         : await buscarValorProcedimento(supabase, ag.clinica_id, ag.procedimento);
 
+    // Repasse do médico: vem calculado do cliente pelo cadastro de repasse.
+    // Sem informação, mantém o comportamento antigo (valor cheio da tabela).
+    const repasseInformado = Number(data.repasse_medico ?? NaN);
+    const repasse = Number.isFinite(repasseInformado) && repasseInformado >= 0 ? repasseInformado : valor;
+
     const { error: upErr } = await supabase
       .from("agendamentos")
       .update({
@@ -80,7 +89,7 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
         .from("fin_atendimentos")
         .update({
           valor_total: valor,
-          valor_medico: valor,
+          valor_medico: repasse,
           valor_clinica: 0,
           forma_pagamento: "externo",
           observacoes: obs,
@@ -96,7 +105,7 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
           data: dataDia,
           procedimento: ag.procedimento,
           valor_total: valor,
-          valor_medico: valor,
+          valor_medico: repasse,
           valor_clinica: 0,
           forma_pagamento: "externo",
           status: "confirmado",
