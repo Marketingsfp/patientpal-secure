@@ -200,7 +200,10 @@ export async function montarRelatorioDiario(
 
 /** Envia o relatório do dia para todos os destinatários ativos e registra o envio. */
 export async function enviarRelatorioWhatsApp(data: string) {
-  const { loadWhatsAppConfig, metaSendText } = await import("./whatsapp.server");
+  const { loadWhatsAppConfig, metaSendText, metaSendDocument, metaUploadMedia } = await import(
+    "./whatsapp.server"
+  );
+  const { gerarRelatorioPdf, nomeArquivoRelatorio } = await import("./relatorio-pdf.server");
 
   const rel = await montarRelatorioDiario(data);
 
@@ -242,6 +245,20 @@ export async function enviarRelatorioWhatsApp(data: string) {
 
   const erros: string[] = [];
   let enviados = 0;
+
+  // Gera o PDF uma única vez e sobe para a Meta (media_id reutilizável).
+  const arquivo = nomeArquivoRelatorio(data);
+  let mediaId: string | null = null;
+  try {
+    const pdf = await gerarRelatorioPdf(rel);
+    mediaId = await metaUploadMedia(cfg.phone_number_id, cfg.access_token, pdf, arquivo);
+  } catch (e) {
+    erros.push(`PDF: ${(e as Error).message}`);
+  }
+
+  const [aa, mm, dd] = data.split("-");
+  const legenda = `Relatório diário — ${dd}/${mm}/${aa} (${rel.janela})\n${rel.resumo}`;
+
   for (const d of destinatarios) {
     const to = d.telefone.replace(/\D/g, "");
     if (!to) {
@@ -249,7 +266,18 @@ export async function enviarRelatorioWhatsApp(data: string) {
       continue;
     }
     try {
-      await metaSendText(cfg.phone_number_id, cfg.access_token, to, rel.texto);
+      if (mediaId) {
+        await metaSendDocument(
+          cfg.phone_number_id,
+          cfg.access_token,
+          to,
+          mediaId,
+          arquivo,
+          legenda,
+        );
+      } else {
+        await metaSendText(cfg.phone_number_id, cfg.access_token, to, rel.texto);
+      }
       enviados++;
     } catch (e) {
       erros.push(`${d.nome}: ${(e as Error).message}`);
