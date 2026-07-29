@@ -1,39 +1,33 @@
-## Objetivo
+Objetivo: a desmarcação de um atendimento externo deve deixar a ficha exatamente como uma desmarcação comum — slot limpo, nada no financeiro, tudo apenas no histórico.
 
-Hoje, ao registrar um **Atendimento externo** na agenda, o sistema grava o agendamento (`origem_externa = true`) e o `fin_atendimentos` (valor_clinica = 0, valor_medico = repasse), mas **não imprime GR nenhuma**. A guia só sai no fluxo de faturamento normal, que depende de `fin_lancamentos` — que o externo não gera.
+## Como funciona hoje
+A ação "Desmarcar paciente / Liberar horário" limpa paciente, procedimento, observações, status, data de pagamento e orçamento, e remove os vínculos de itens de orçamento. Ela não limpa as marcações de atendimento externo (origem externa, clínica de origem, valor de origem) nem remove o lançamento gerado em Atendimentos do Financeiro. Por isso os três horários desmarcados continuam roxos na agenda e continuam aparecendo no Financeiro.
 
-Queremos que o atendimento externo imprima uma GR igual às demais, deixando claro que é externo e que não houve cobrança no caixa.
+## O que será feito
 
-## O que muda
+1. Completar a limpeza na desmarcação
+   - Na mesma ação de desmarcar, além do que já é limpo, zerar: origem externa, clínica de origem e valor de origem.
+   - Remover o registro correspondente em Atendimentos do Financeiro quando ele for de atendimento externo.
+   - Se o repasse desse atendimento já estiver pago, não apagar: avisar que é preciso estornar o repasse antes de liberar o horário (mesma lógica do bloqueio que já existe para atendimento pago).
 
-### 1. GR passa a reconhecer o atendimento externo
-Em `src/lib/print-gr.ts` (`printGuiaAtendimentoCore`):
+2. Registrar no histórico
+   - Antes de limpar, gravar uma nota no histórico da ficha com paciente, clínica de origem, procedimento e valor de repasse que foram desfeitos, além do usuário e data/hora.
+   - O log de auditoria continua registrando as alterações normalmente.
 
-- Ler também `origem_externa`, `origem_clinica_nome`, `origem_valor` do agendamento.
-- Quando `origem_externa = true`:
-  - Cabeçalho da guia ganha um selo em destaque logo abaixo de "GUIA DE ATENDIMENTO":
-    ```text
-    ***  ATENDIMENTO EXTERNO  ***
-      ORIGEM: <NOME DA CLÍNICA>
-    SEM COBRANÇA NESTA UNIDADE
-    ```
-  - No lugar do bloco "VALOR RECEBIDO" (que hoje some porque `valor = 0`), imprime:
-    - `VALOR TABELA: R$ x` (origem_valor)
-    - `CLINICA: R$ 0,00`
-    - `PRESTADOR: R$ <repasse>` — lido de `fin_atendimentos.valor_medico` do agendamento (fonte da verdade já gravada pela função `marcarAtendimentoExterno`), sem recalcular repasse.
-  - Rodapé mantém data/ficha/usuário/impressão nº como nas demais guias.
-- Nenhum outro caminho da GR é afetado: o bloco novo só aparece com `origem_externa = true`.
+3. Aplicar a mesma limpeza no cancelamento
+   - Quando o agendamento externo for movido para "Cancelado", executar a mesma rotina, para não sobrar registro financeiro órfão por esse caminho.
 
-### 2. Impressão automática ao registrar
-Em `src/components/agenda/atendimento-externo-dialog.tsx`: depois do `marcarAtendimentoExterno` retornar `ok`, chamar `printGuiaAtendimento` com o `agendamentoId`, `clinicaId`, nome do usuário logado e o número da ficha (quando disponível). Falha de impressão não invalida o registro — mostra toast de aviso.
+4. Corrigir os três casos atuais (29/07, 13:50 / 13:55 / 14:00)
+   - Limpar as marcações de atendimento externo nos três slots.
+   - Remover os três lançamentos externos pendentes no Financeiro (repasse ainda não pago).
+   - Registrar a correção no histórico de cada ficha.
 
-Mesmo tratamento no ponto equivalente do wizard da Agenda V2, se ele também registra externo.
-
-### 3. Reimpressão
-O botão "$" / "Imprimir GR" da agenda já chama `printGuiaAtendimento`/`reimprimirGuiaAtendimento` pelo `agendamentoId`, então a segunda via do externo sai automaticamente com o mesmo selo, contabilizando vias em `gr_impressoes` como qualquer outra guia.
+5. Validação
+   - Os três horários devem aparecer como livres e sem destaque roxo na agenda.
+   - Nenhum deles deve aparecer em Financeiro > Atendimentos.
+   - O histórico de cada ficha deve mostrar o que foi desfeito.
 
 ## Detalhes técnicos
-
-- Sem migração de banco: todas as colunas usadas (`origem_externa`, `origem_clinica_nome`, `origem_valor`, `fin_atendimentos.valor_medico`) já existem.
-- Layout continua térmico (mesmo `BASE_CSS`), com linhas curtas para não quebrar a impressão de 80mm.
-- Número de vias segue a regra atual (`numViasGR`); externo sem forma de pagamento cai no padrão.
+- Nova função de servidor `limparAtendimentoExterno` em `src/lib/agenda/atendimento-externo.functions.ts`: valida `repasse_pago`, apaga a linha de `fin_atendimentos` com `forma_pagamento = 'externo'`, zera `origem_externa/origem_clinica_id/origem_clinica_nome/origem_valor` em `agendamentos` e insere a nota em `agendamento_historico_notas`.
+- Chamada a partir de `remove` em `src/routes/_authenticated/app.agenda.tsx` (antes da limpeza atual) e a partir do fluxo de cancelamento em `src/lib/agenda/status-agendamento.functions.ts`.
+- Correção dos registros existentes via operação de dados nos IDs `d2421c9a`, `822a77af` e `ba210e85`.
