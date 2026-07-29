@@ -60,10 +60,14 @@ export function AtendimentoExternoDialog({
   const [medicoId, setMedicoId] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [calculando, setCalculando] = useState(false);
+  const [unidadesDb, setUnidadesDb] = useState<{ id: string; nome: string }[] | null>(null);
+  const [carregandoUnidades, setCarregandoUnidades] = useState(false);
 
-  const unidades = memberships
-    .filter((m) => m.clinica_id !== clinicaId)
-    .map((m) => ({ id: m.clinica_id, nome: m.clinica.nome }))
+  const unidadesFallback = memberships
+    .map((m) => ({ id: m.clinica_id, nome: m.clinica.nome }));
+
+  const unidades = (unidadesDb ?? unidadesFallback)
+    .filter((u) => u.id !== clinicaId)
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
 
   const modalidade: ModalidadeConvenio | null =
@@ -78,6 +82,21 @@ export function AtendimentoExternoDialog({
       setRepasse(null);
       setValorTabela(0);
     }
+  }, [open]);
+
+  // Lista de unidades: todas as clínicas ativas (RPC), não só as do usuário.
+  useEffect(() => {
+    if (!open) return;
+    let cancelado = false;
+    setCarregandoUnidades(true);
+    void (async () => {
+      const { data, error } = await supabase.rpc("listar_unidades_basico");
+      if (cancelado) return;
+      setCarregandoUnidades(false);
+      if (error || !data) return; // mantém fallback pelas memberships
+      setUnidadesDb((data as { id: string; nome: string }[]).map((u) => ({ id: u.id, nome: u.nome })));
+    })();
+    return () => { cancelado = true; };
   }, [open]);
 
   // Carrega médico/paciente do agendamento, convênios da clínica e detecta
@@ -186,7 +205,7 @@ export function AtendimentoExternoDialog({
             <Label>Clínica de origem</Label>
             <Select value={origemId} onValueChange={setOrigemId}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione a unidade" />
+                <SelectValue placeholder={carregandoUnidades ? "Carregando unidades…" : "Selecione a unidade"} />
               </SelectTrigger>
               <SelectContent>
                 {unidades.map((u) => (
