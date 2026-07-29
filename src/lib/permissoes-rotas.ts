@@ -51,12 +51,6 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/anamneses": "anamneses",
   "/app/exames-resultados": "exames-resultados",
 
-  // Marketing
-  "/app/mkt-leads": "mkt-leads",
-  "/app/campanhas": "campanhas",
-  "/app/mkt-envios": "mkt-envios",
-  "/app/mkt-landing": "mkt-landing",
-  "/app/mkt-segmentos": "mkt-segmentos",
 
   // Cadastros
   "/app/equipe": "equipe",

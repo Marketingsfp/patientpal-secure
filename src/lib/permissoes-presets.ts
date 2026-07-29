@@ -20,8 +20,6 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   // Inteligência
   "atendimento-ia", "crm", "alertas-enfermagem", "consulta-rapida", "nina",
   "odontologia", "prontuarios", "anamneses", "exames-resultados",
-  // Marketing
-  "mkt-leads", "campanhas", "mkt-envios", "mkt-landing", "mkt-segmentos",
   // Cadastros
   "equipe", "especialidades", "disponibilidades", "prontuario-modelos",
   "perfis", "unidades", "medicos", "procedimentos", "planos", "estoque",
@@ -47,7 +45,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     cargos: "read", setores: "read", unidades: "read", medicos: "read",
     especialidades: "read", procedimentos: "read", disponibilidades: "write",
     "prontuario-modelos": "read", "modelos-documentos": "read", planos: "read",
-    estoque: "read", crm: "read", campanhas: "read", "mkt-leads": "read",
+    estoque: "read", crm: "read",
     "consulta-rapida": "read", "alertas-enfermagem": "read",
     "cartao-beneficios": "read",
     "painel-executivo": "write",

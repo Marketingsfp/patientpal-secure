@@ -54,15 +54,7 @@ export function SectionTabs({ title, icon: TitleIcon, tabs }: SectionTabsProps) 
   );
 }
 
-import { Megaphone, Send, Sparkles, Users, Filter, Clock, Palmtree, FileText, FileSignature, GraduationCap, BookOpen, HeartPulse, LayoutGrid, ClipboardList, ShieldCheck, KeyRound, Stethoscope } from "lucide-react";
-
-export const MARKETING_TABS: ReadonlyArray<SectionTab> = [
-  { to: "/app/mkt-leads", label: "Leads", icon: Users, modulo: "mkt-leads" },
-  { to: "/app/campanhas", label: "Campanhas", icon: Megaphone, modulo: "campanhas" },
-  { to: "/app/mkt-envios", label: "Envios", icon: Send, modulo: "mkt-envios" },
-  { to: "/app/mkt-segmentos", label: "Segmentos", icon: Filter, modulo: "mkt-segmentos" },
-  { to: "/app/mkt-landing", label: "Landing Pages", icon: Sparkles, modulo: "mkt-landing" },
-];
+import { Users, Clock, Palmtree, FileText, FileSignature, GraduationCap, BookOpen, HeartPulse, LayoutGrid, ClipboardList, ShieldCheck, KeyRound, Stethoscope } from "lucide-react";
 
 export const RH_TABS: ReadonlyArray<SectionTab> = [
   { to: "/app/hr-ponto", label: "Ponto", icon: Clock, modulo: "hr-ponto" },
@@ -85,7 +77,6 @@ export const SEGURANCA_TABS: ReadonlyArray<SectionTab> = [
   { to: "/app/integration-secrets", label: "Integrações", icon: KeyRound, modulo: "integration-secrets" },
 ];
 
-export const MARKETING_META = { title: "Marketing", icon: Megaphone };
 export const RH_META = { title: "RH", icon: Users };
 export const SERVICOS_META = { title: "Serviços", icon: Stethoscope };
 export const SEGURANCA_META = { title: "Segurança & Compliance", icon: ShieldCheck };
