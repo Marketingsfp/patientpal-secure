@@ -67,7 +67,7 @@ export function AtendimentoExternoDialog({
     .map((m) => ({ id: m.clinica_id, nome: m.clinica.nome }));
 
   const unidades = (unidadesDb ?? unidadesFallback)
-    .filter((m) => m.clinica_id !== clinicaId)
+    .filter((u) => u.id !== clinicaId)
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
 
   const modalidade: ModalidadeConvenio | null =
