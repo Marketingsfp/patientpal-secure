@@ -220,7 +220,7 @@ export const criarTemplateWhatsapp = createServerFn({ method: "POST" })
           .max(512)
           .regex(/^[a-z0-9_]+$/, "Use apenas minúsculas, números e _ (underline)"),
         language: z.string().trim().min(2).max(10).default("pt_BR"),
-        category: z.enum(["MARKETING", "UTILITY", "AUTHENTICATION"]),
+        category: z.enum(["UTILITY", "AUTHENTICATION"]),
         components: z.array(ComponentSchema).min(1).max(4),
       })
       .parse(input),
