@@ -1665,7 +1665,6 @@ function AgendaPage() {
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroCliente, setFiltroCliente] = useState("");
   const [filtroFicha, setFiltroFicha] = useState("");
-  const [filtroApenasMultiplo, setFiltroApenasMultiplo] = useState<boolean>(false);
   const [page, setPage] = useState(1);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [items, setItems] = useState<Agendamento[]>([]);
@@ -3649,9 +3648,9 @@ function AgendaPage() {
         if (!set || !set.has(filtroEspecialidade)) return false;
       }
       if (filtroAgenda !== "todos") {
-        // Agendamentos criados via "Atendimento Múltiplo" não são vinculados a
-        // uma agenda específica (podem envolver médicos/recursos diferentes),
-        // então não os escondemos quando o usuário filtra por agenda.
+        // Agendamentos agrupados (vários serviços do mesmo paciente) não são
+        // vinculados a uma agenda específica, então não os escondemos quando o
+        // usuário filtra por agenda.
         if (filtroAgenda.startsWith("nome:")) {
           // Filtro por NOME da agenda (dedupe entre múltiplos médicos):
           // aplicado quando o usuário está com "TODOS" os profissionais.
@@ -3662,7 +3661,6 @@ function AgendaPage() {
           if (a.agenda_id !== filtroAgenda && !a.atendimento_grupo_id) return false;
         }
       }
-      if (filtroApenasMultiplo && !a.atendimento_grupo_id) return false;
       return true;
     });
   }, [
@@ -3676,7 +3674,6 @@ function AgendaPage() {
     filtroDiaSemana,
     filtroEspecialidade,
     filtroAgenda,
-    filtroApenasMultiplo,
     agendaNomePorId,
     medicoEspec,
     fichaPorId,

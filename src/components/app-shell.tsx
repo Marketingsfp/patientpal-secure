@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, FileBarChart2, Moon, Sun, Pin, PinOff, Menu as MenuIcon } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, FileBarChart2, Moon, Sun, Pin, PinOff, Menu as MenuIcon } from "lucide-react";
 import { Tooth } from "@/components/icons/tooth";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -23,7 +23,6 @@ import { useMenuOrdem } from "@/hooks/use-menu-ordem";
 import { HOVER_SCALE_CLASSES } from "@/lib/menu-hover";
 import { garantirContrasteTextoBranco } from "@/lib/contrast";
 import { cn } from "@/lib/utils";
-import { useAtendimentoMultiploDisabled } from "@/hooks/use-atendimento-multiplo-disabled";
 
 function corDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
@@ -107,7 +106,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     label: "Operação",
     items: [
     { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
-    { to: "/app/atendimento-multiplo", label: "Atendimento Múltiplo", icon: ClipboardList },
     { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
     { to: "/app/caixa", label: "Caixa", icon: Wallet },
     { to: "/app/chat", label: "Chat interno", icon: MessageCircle },
@@ -479,19 +477,7 @@ export function AppShell() {
       return { ...row, items };
     })
     .filter((row) => row.items.length > 0);
-  // Feature flag por clínica: `atendimento_multiplo_disabled` remove o item
-  // "Atendimento Múltiplo" do menu para a clínica atual.
-  const { disabled: atendimentoMultiploDisabled } = useAtendimentoMultiploDisabled();
-  const flagFilteredRows = atendimentoMultiploDisabled
-    ? permissionFilteredRows
-        .map((row) => ({
-          ...row,
-          items: row.items.filter(
-            (it) => isParent(it) || it.to !== "/app/atendimento-multiplo",
-          ),
-        }))
-        .filter((row) => row.items.length > 0)
-    : permissionFilteredRows;
+  const flagFilteredRows = permissionFilteredRows;
   // O perfil médico também deve respeitar a matriz configurada em Perfis de
   // Acesso. O escopo clínico do médico continua sendo aplicado pelos hooks e
   // consultas de cada módulo; não substitua as permissões por um menu fixo.
