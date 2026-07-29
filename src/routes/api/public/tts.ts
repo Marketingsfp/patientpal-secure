@@ -30,9 +30,13 @@ export const Route = createFileRoute("/api/public/tts")({
       OPTIONS: async () => new Response(null, { status: 204, headers: CORS }),
       POST: async ({ request }) => {
         let text = "";
+        let voice: string | undefined;
         try {
-          const body = (await request.json()) as { text?: unknown };
+          const body = (await request.json()) as { text?: unknown; voice?: unknown };
           text = typeof body.text === "string" ? body.text.trim() : "";
+          if (typeof body.voice === "string" && body.voice.trim()) {
+            voice = body.voice.trim();
+          }
         } catch {
           return new Response(JSON.stringify({ error: "invalid json" }), {
             status: 400,
@@ -51,7 +55,7 @@ export const Route = createFileRoute("/api/public/tts")({
           const upstream = await fetch(TTS_UPSTREAM, {
             method: "POST",
             headers: { "Content-Type": "application/json", Accept: "audio/wav" },
-            body: JSON.stringify({ text }),
+            body: JSON.stringify(voice ? { text, voice } : { text }),
           });
           if (!upstream.ok) {
             const detail = await upstream.text().catch(() => "");
