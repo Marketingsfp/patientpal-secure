@@ -8606,10 +8606,12 @@ function AgendaPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => cobrarAgendamento(a)}
-                          className={`h-8 flex-1 text-xs ${pagosSet.has(a.id)
-                            ? "border-emerald-400 bg-emerald-50 text-emerald-700"
-                            : "border-rose-200 text-rose-600 hover:bg-rose-50"}`}
-                          title={pagosSet.has(a.id) ? "Pago" : "Cobrar"}
+                          className={`h-8 flex-1 text-xs ${a.origem_externa
+                            ? "border-violet-400 text-violet-600 hover:bg-violet-50"
+                            : pagosSet.has(a.id)
+                              ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                              : "border-rose-200 text-rose-600 hover:bg-rose-50"}`}
+                          title={a.origem_externa ? "Atendimento externo — sem lançamento em caixa" : pagosSet.has(a.id) ? "Pago" : "Cobrar"}
                         >
                           <DollarSign className="h-3.5 w-3.5 mr-1" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
                           {pagosSet.has(a.id) ? "Pago" : "Cobrar"}
@@ -8939,6 +8941,7 @@ function AgendaPage() {
                               variant="ghost"
                               size="icon"
                               title={(() => {
+                                if (a.origem_externa) return "Atendimento externo — sem lançamento em caixa";
                                 if (!pagosSet.has(a.id)) return "Registrar pagamento";
                                 const info = pagoInfoMap.get(a.id);
                                 if (!info) return "Pago";
@@ -8946,9 +8949,11 @@ function AgendaPage() {
                                 return `Pago • ${v}`;
                               })()}
                               onClick={() => cobrarAgendamento(a)}
-                              className={`h-7 w-7 rounded-md border-2 ${pagosSet.has(a.id)
-                                ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                                : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
+                              className={`h-7 w-7 rounded-md border-2 ${a.origem_externa
+                                ? "border-violet-400 text-violet-600 hover:bg-violet-50"
+                                : pagosSet.has(a.id)
+                                  ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                  : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
                                 }`}
                             >
                               <DollarSign className="h-3.5 w-3.5" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
