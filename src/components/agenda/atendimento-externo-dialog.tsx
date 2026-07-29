@@ -60,10 +60,14 @@ export function AtendimentoExternoDialog({
   const [medicoId, setMedicoId] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [calculando, setCalculando] = useState(false);
+  const [unidadesDb, setUnidadesDb] = useState<{ id: string; nome: string }[] | null>(null);
+  const [carregandoUnidades, setCarregandoUnidades] = useState(false);
 
-  const unidades = memberships
+  const unidadesFallback = memberships
+    .map((m) => ({ id: m.clinica_id, nome: m.clinica.nome }));
+
+  const unidades = (unidadesDb ?? unidadesFallback)
     .filter((m) => m.clinica_id !== clinicaId)
-    .map((m) => ({ id: m.clinica_id, nome: m.clinica.nome }))
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
 
   const modalidade: ModalidadeConvenio | null =
