@@ -717,11 +717,14 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       </div>
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <div>
-          {filtered.length === 0 ? (
+          {total === 0 ? (
             <span>Nenhum contrato{temFiltroAtivo ? " com os filtros atuais" : ""}.</span>
           ) : temFiltroAtivo ? (
             <span>
-              <strong className="text-foreground">{filtered.length}</strong> resultado{filtered.length === 1 ? "" : "s"}
+              <strong className="text-foreground">
+                {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, total)}
+              </strong>{" "}
+              de <strong className="text-foreground">{total}</strong> resultado{total === 1 ? "" : "s"}
               {" — filtros ativos: "}
               <span className="text-foreground">{filtrosAtivos.join(", ")}</span>
             </span>
@@ -729,9 +732,9 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
             <span>
               Mostrando{" "}
               <strong className="text-foreground">
-                {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, filtered.length)}
+                {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, total)}
               </strong>{" "}
-              de <strong className="text-foreground">{filtered.length}</strong> contratos
+              de <strong className="text-foreground">{total}</strong> contratos
             </span>
           )}
         </div>
