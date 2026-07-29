@@ -6,6 +6,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useClinica } from "@/hooks/use-clinica";
 import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
 
 type Props = {
@@ -33,13 +35,21 @@ export function AtendimentoExternoDialog({
   onDone,
 }: Props) {
   const marcarFn = useServerFn(marcarAtendimentoExterno);
+  const { memberships } = useClinica();
+  const [origemId, setOrigemId] = useState<string>("");
   const [clinicaNome, setClinicaNome] = useState("");
   const [gr, setGr] = useState("");
   const [valor, setValor] = useState("");
   const [salvando, setSalvando] = useState(false);
 
+  const unidades = memberships
+    .filter((m) => m.clinica_id !== clinicaId)
+    .map((m) => ({ id: m.clinica_id, nome: m.clinica.nome }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
+
   useEffect(() => {
     if (open) {
+      setOrigemId("");
       setClinicaNome("");
       setGr("");
       setValor("");
@@ -48,15 +58,17 @@ export function AtendimentoExternoDialog({
 
   const salvar = async () => {
     if (!agendamentoId || !clinicaId) return;
-    if (!clinicaNome.trim()) return toast.error("Informe a clínica de origem.");
+    const unidade = unidades.find((u) => u.id === origemId);
+    const nomeOrigem = unidade ? unidade.nome : clinicaNome.trim();
+    if (!nomeOrigem) return toast.error("Informe a clínica de origem.");
     if (!gr.trim()) return toast.error("Informe o número da GR da clínica de origem.");
     setSalvando(true);
     const res = await marcarFn({
       data: {
         agendamento_id: agendamentoId,
         clinica_id: clinicaId,
-        origem_clinica_id: null,
-        origem_clinica_nome: clinicaNome.trim(),
+        origem_clinica_id: unidade ? unidade.id : null,
+        origem_clinica_nome: nomeOrigem,
         origem_gr_numero: gr.trim(),
         origem_valor: valor ? Number(valor.replace(",", ".")) : null,
       },
@@ -90,7 +102,25 @@ export function AtendimentoExternoDialog({
           )}
           <div>
             <Label>Clínica de origem</Label>
-            <Input value={clinicaNome} onChange={(e) => setClinicaNome(e.target.value)} placeholder="Ex.: Policlínica São Francisco de Paula" />
+            <Select value={origemId} onValueChange={setOrigemId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a unidade" />
+              </SelectTrigger>
+              <SelectContent>
+                {unidades.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.nome}</SelectItem>
+                ))}
+                <SelectItem value="outra">Outra clínica (digitar)</SelectItem>
+              </SelectContent>
+            </Select>
+            {origemId === "outra" && (
+              <Input
+                className="mt-2"
+                value={clinicaNome}
+                onChange={(e) => setClinicaNome(e.target.value)}
+                placeholder="Ex.: Policlínica São Francisco de Paula"
+              />
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
