@@ -1601,7 +1601,7 @@ const EMPTY = {
 
 function AgendaPage() {
   const { clinicaAtual } = useClinica();
-  // Undo em exclusões em lote — só São Francisco de Paula (flag ux_melhorias).
+  // Undo em exclusões em lote (flag ux_melhorias).
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const turboDisabled = useTurboDisabled();
   const podeEscrever = usePodeEscrever("agenda");
@@ -1609,9 +1609,7 @@ function AgendaPage() {
   const [usuarioEhMedico, setUsuarioEhMedico] = useState(false);
   const corClinica = (() => {
     const n = (clinicaAtual?.clinica.nome ?? "").toLowerCase();
-    if (n.includes("são francisco") || n.includes("sao francisco")) return "#14532d";
     if (n.includes("menino jesus")) return "#172554";
-    if (n.includes("consulta hoje")) return "#5b21b6";
     return "hsl(var(--border))";
   })();
   const bordaClinica = { borderColor: corClinica, borderWidth: 2 } as const;
@@ -4041,7 +4039,7 @@ function AgendaPage() {
       return;
     }
 
-    // Piloto São Francisco: some da tela na hora, mas só apaga do banco
+    // Some da tela na hora, mas só apaga do banco
     // depois de alguns segundos — dá tempo do usuário desfazer, sem confirm().
     setSelecionados(new Set());
     setItems((prev) => prev.filter((a) => !ids.includes(a.id)));
