@@ -199,11 +199,11 @@ export function AppShell() {
   const { memberships, clinicaAtual, setClinicaAtual, modoTodas, setModoTodas, branding } = useClinica();
   const { allowed: allowedModules, configured: configuredModules, loading: permsLoading } = usePermissoes();
   // Efeito "expandir ao passar o mouse" nos itens do menu clássico — ligado
-  // só nas clínicas com a flag `menu_hover_scale` (hoje apenas a São Francisco).
+  // só nas clínicas com a flag `menu_hover_scale`.
   const { enabled: menuHoverScale } = useClinicFeatureFlag("menu_hover_scale");
   const hoverScaleCls = menuHoverScale ? ` ${HOVER_SCALE_CLASSES}` : "";
   // Pacote de melhorias de UX (navegação SPA, transição de rota, dark mode) —
-  // flag `ux_melhorias`, ligada só para a São Francisco de Paula.
+  // flag `ux_melhorias`.
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const theme = useTheme(uxMelhorias);
   // Ordem personalizada dos itens do menu (arrastar e soltar) — por usuário.
@@ -274,7 +274,7 @@ export function AppShell() {
     if (window.innerWidth < 1024) return true;
     return window.localStorage.getItem("appshell:collapsed") === "1";
   });
-  // Menu que expande ao passar o mouse (só São Francisco de Paula).
+  // Menu que expande ao passar o mouse (flag ux_melhorias).
   // `fixadoAberto` é um "alfinete" opcional: mantém aberto sem depender do
   // mouse. Chave própria no localStorage para não afetar o menu clássico.
   const [hoverSidebar, setHoverSidebar] = useState(false);
@@ -380,8 +380,8 @@ export function AppShell() {
           ? corDaClinica(clinicaAtual.clinica.nome)
           : "#0f172a"
   ), [modoTodas, branding?.primary, clinicaAtual]);
-  // Contraste automático da sidebar (texto branco) — só São Francisco de
-  // Paula. Escurece a cor da clínica quando necessário para legibilidade
+  // Contraste automático da sidebar (texto branco).
+  // Escurece a cor da clínica quando necessário para legibilidade
   // (WCAG AA); não altera --primary/--ring usados em botões no resto do app.
   const corSidebar = uxMelhorias ? garantirContrasteTextoBranco(clinicColor) : clinicColor;
 
