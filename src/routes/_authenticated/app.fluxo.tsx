@@ -101,8 +101,7 @@ function FluxoPage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("fluxo");
   // Alvos de toque maiores nos botões de ação do kanban em telas pequenas
-  // (toque em vez de mouse) — piloto São Francisco de Paula (flag
-  // ux_melhorias). Some do desktop, onde o card denso com 7 colunas é
+  // (toque em vez de mouse) — flag ux_melhorias. Some do desktop, onde o card denso com 7 colunas é
   // proposital.
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const acaoBtnCls = uxMelhorias ? "h-9 sm:h-6 px-2.5 sm:px-1.5" : "h-6 px-1.5";

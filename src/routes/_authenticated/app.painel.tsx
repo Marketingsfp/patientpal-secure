@@ -44,7 +44,7 @@ type RawAtend = { id: string; valor_total: number; valor_medico: number; medico_
 
 function DashboardPage() {
   const { memberships, clinicaAtual, loading } = useClinica();
-  // Stagger + count-up nos KPIs — só São Francisco de Paula (flag ux_melhorias).
+  // Stagger + count-up nos KPIs (flag ux_melhorias).
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const podeVerFinanceiro = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
   const [periodo, setPeriodo] = useState<Periodo>({ de: hojeISO(), ate: hojeISO() });
@@ -858,7 +858,7 @@ function DashboardPage() {
 }
 
 // Contexto que liga o count-up dos KPIs — provido pela flag ux_melhorias
-// (só São Francisco de Paula) uma única vez em DashboardPage.
+// uma única vez em DashboardPage.
 const KpiAnimContext = createContext(false);
 
 function KpiCard({ icon: Icon, title, value, format, small, children, onClick }: {

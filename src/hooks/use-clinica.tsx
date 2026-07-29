@@ -92,7 +92,7 @@ export function ClinicaProvider({ children }: { children: ReactNode }) {
       const raw = (data as unknown[]).filter(isClinicaMembership);
       // A6 — Oculta unidades ainda não operacionais (base não importada
       // E sem médicos ativos), exceto para admin, que precisa enxergá-las
-      // para configurar. Ex.: "CLINICA CONSULTA HOJE".
+      // para configurar.
       const naoOperacionais = raw.filter(
         (m) => m.role !== "admin" && m.clinica.base_importada === false,
       );

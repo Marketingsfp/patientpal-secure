@@ -117,7 +117,7 @@ function Page() {
   // pode estornar.
   const podeEstornar = podeEscrever;
   // Visão em cartões no celular para a tabela de lançamentos (9 colunas) —
-  // piloto São Francisco de Paula (flag ux_melhorias).
+  // flag ux_melhorias.
   const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const isMobile = useIsMobile();
   const modoMobile = uxMelhorias && isMobile;
@@ -1046,7 +1046,7 @@ function Page() {
             const totalPages2 = Math.max(1, Math.ceil(displayItems.length / PAGE_SIZE));
             const currentPage2 = Math.min(page, totalPages2);
             const paginaAtual = displayItems.slice((currentPage2 - 1) * PAGE_SIZE, currentPage2 * PAGE_SIZE);
-            // Visão em cartões no celular (piloto SFP) — mesmos dados e ações
+            // Visão em cartões no celular — mesmos dados e ações
             // da tabela, só em layout vertical com alvos de toque maiores.
             if (modoMobile) {
               const userMap = new Map(usuarios.map((u) => [u.id, u.nome]));
