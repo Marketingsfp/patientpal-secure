@@ -24,6 +24,8 @@ import {
   fetchClinicaTtsConfig,
   saveClinicaTtsConfig,
   applyClinicaTtsConfig,
+  getUserTtsVoice,
+  setUserTtsVoice,
 } from "@/lib/tts-service";
 
 export const Route = createFileRoute("/_authenticated/app/configuracoes/voz")({
@@ -284,9 +286,9 @@ function VozConfigPage() {
   );
 }
 
-const TTS_SERVER_BASE = "https://server-mj.tailec426c.ts.net";
-const TTS_ENDPOINT = `${TTS_SERVER_BASE}/api/tts`;
-const VOICES_ENDPOINT = `${TTS_SERVER_BASE}/api/voices`;
+// Chamadas passam pelos proxies do backend para evitar CORS/rede Tailscale.
+const TTS_ENDPOINT = "/api/public/tts";
+const VOICES_ENDPOINT = "/api/tts-voices";
 const LABELS_CONHECIDOS: Record<string, string> = {
   faber: "Faber (Masculino)",
   feminina: "Feminina",
@@ -349,10 +351,14 @@ function salvarVozesManuais(v: string[]) {
 }
 
 function TesteServidorLocalCard() {
+  const { clinicaAtual } = useClinica();
+  const clinicaId = clinicaAtual?.clinica_id ?? null;
   const [texto, setTexto] = useState<string>(
     "Olá! Este é um teste de síntese de voz.",
   );
-  const [voice, setVoice] = useState<string>("faber");
+  const [voice, setVoice] = useState<string>(() => getUserTtsVoice() ?? "faber");
+  const [vozSistema, setVozSistema] = useState<string | null>(() => getUserTtsVoice());
+  const [salvandoVoz, setSalvandoVoz] = useState(false);
   const [loading, setLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [vozesServidor, setVozesServidor] = useState<string[]>(VOZES_FALLBACK);
@@ -376,18 +382,24 @@ function TesteServidorLocalCard() {
   async function detectarVozes(opts?: { force?: boolean; silencioso?: boolean }) {
     setDetectando(true);
     try {
-      const res = await fetch(VOICES_ENDPOINT, {
+      const url = opts?.force ? `${VOICES_ENDPOINT}?refresh=1` : VOICES_ENDPOINT;
+      const res = await fetch(url, {
         method: "GET",
         cache: opts?.force ? "no-store" : "default",
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const payload = (await res.json()) as unknown;
-      const vozesApi = extrairVozes(payload);
+      const payload = (await res.json()) as {
+        vozes?: string[];
+        origem?: "servidor" | "fallback";
+      } & Record<string, unknown>;
+      const vozesApi = Array.isArray(payload.vozes)
+        ? payload.vozes.filter((v): v is string => typeof v === "string" && !!v.trim())
+        : extrairVozes(payload);
       if (!vozesApi.length) throw new Error("Nenhuma voz retornada pela API.");
       const anteriores = new Set(vozesServidor);
       const novas = vozesApi.filter((v) => !anteriores.has(v));
       setVozesServidor(vozesApi);
-      setOrigem("servidor");
+      setOrigem(payload.origem === "fallback" ? "fallback" : "servidor");
       if (voice && !vozesApi.includes(voice)) {
         setVoice(vozesApi[0]);
       }
@@ -483,11 +495,33 @@ function TesteServidorLocalCard() {
     } catch (err) {
       const msg =
         err instanceof TypeError
-          ? "Não foi possível conectar ao servidor local de TTS. Verifique se ele está acessível."
+          ? "Não foi possível conectar ao proxy de TTS. Verifique sua conexão."
           : `Falha ao gerar áudio: ${err instanceof Error ? err.message : "erro desconhecido"}`;
       toast.error(msg);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function definirComoVozDoSistema() {
+    setSalvandoVoz(true);
+    try {
+      setUserTtsVoice(voice);
+      setVozSistema(voice);
+      if (clinicaId) {
+        const rate = getUserTtsRate();
+        const enabled = isUserTtsEnabled();
+        const { error } = await saveClinicaTtsConfig(clinicaId, { rate, enabled, voice });
+        if (error) {
+          toast.error(`Voz salva neste navegador, mas falhou ao sincronizar: ${error}`);
+          return;
+        }
+      }
+      toast.success(
+        `Voz "${labelDaVoz(voice)}" definida como padrão do sistema${clinicaId ? " (sincronizada com o painel)" : ""}.`,
+      );
+    } finally {
+      setSalvandoVoz(false);
     }
   }
 
@@ -555,6 +589,48 @@ function TesteServidorLocalCard() {
               </>
             )}
           </Button>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 p-3">
+          <div className="text-xs text-muted-foreground">
+            Voz do sistema atual:{" "}
+            <strong className="text-foreground">
+              {vozSistema ? labelDaVoz(vozSistema) : "padrão do servidor"}
+            </strong>
+            . Ela é usada no painel de senhas, alertas e leitura de anamnese.
+          </div>
+          <div className="flex gap-2">
+            {vozSistema && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  setUserTtsVoice(null);
+                  setVozSistema(null);
+                  if (clinicaId) {
+                    await saveClinicaTtsConfig(clinicaId, {
+                      rate: getUserTtsRate(),
+                      enabled: isUserTtsEnabled(),
+                      voice: null,
+                    });
+                  }
+                  toast.success("Voz do sistema redefinida para o padrão.");
+                }}
+              >
+                Limpar
+              </Button>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              onClick={definirComoVozDoSistema}
+              disabled={salvandoVoz || voice === vozSistema}
+              className="gap-2"
+            >
+              <Save className="h-4 w-4" />
+              {salvandoVoz ? "Salvando…" : "Definir como voz do sistema"}
+            </Button>
+          </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <div className="flex-1 space-y-2">
