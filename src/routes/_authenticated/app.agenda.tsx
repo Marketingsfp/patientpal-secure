@@ -2246,6 +2246,7 @@ function AgendaPage() {
   const emitirNfseFn = useServerFn(emitirNfse);
   const consultarNfseFn = useServerFn(consultarNfse);
   const fnCriarAgendamento = useServerFn(criarAgendamento);
+  const fnLimparExterno = useServerFn(limparAtendimentoExterno);
   const carregarEquipe = async () => {
     if (!clinicaAtual || equipeList.length > 0) return;
     try {
