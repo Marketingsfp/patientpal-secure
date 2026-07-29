@@ -1440,7 +1440,30 @@ async function obterInfoConvenioPaciente(params: {
     }
   }
 
-  return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear, emCarencia, diasCarenciaRestantes, acrescimoCartao };
+  // Alternativa quando o paciente NÃO quiser usar a gratuidade agora: melhor
+  // regra do convênio para este procedimento ignorando as regras gratuitas
+  // (mesmo critério do fallback `regra_padrao_convenio`).
+  let descontoSemGratuidade: DescontoConvenio | null = null;
+  {
+    let alt: any = null;
+    for (const eid of espsTentativa) {
+      const r = findRegra(regrasCb as any, eid, procedimentoTipo, procedimentoId, { excludeGratuito: true });
+      if (r && (!alt || scoreRegra(r) > scoreRegra(alt))) alt = r;
+    }
+    if (alt && (isRenovacao || carenciaCumprida(alt, mensalidadesPagas))) {
+      if (alt.modo === "valor_fixo") {
+        const v = Number(alt.valor) || 0;
+        const vC = alt.valor_cartao != null ? (Number(alt.valor_cartao) || 0) : v;
+        descontoSemGratuidade = { tipo: "valor_fixo", valor: v, valorOutros: vC };
+      } else if (alt.modo === "percentual_desconto") {
+        const p = Number(alt.percentual) || 0;
+        const pC = alt.percentual_cartao != null ? (Number(alt.percentual_cartao) || 0) : p;
+        descontoSemGratuidade = { tipo: "percentual", valor: p, percentualOutros: pC };
+      }
+    }
+  }
+
+  return { convenioNome, emDia, parcelasAtrasadas, desconto, descontoSemGratuidade, avisoLimite, bloquear, emCarencia, diasCarenciaRestantes, acrescimoCartao };
 }
 
 /**
