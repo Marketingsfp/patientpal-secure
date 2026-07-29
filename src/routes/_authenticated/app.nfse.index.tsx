@@ -38,13 +38,6 @@ interface Row {
 function NfsePage() {
   const { clinicaAtual } = useClinica();
   const podeEscrever = usePodeEscrever("nfse");
-  // Na São Francisco de Paula esta aba é SOMENTE VISUALIZAÇÃO: não exibe os
-  // botões "Emitir NFS-e" nem "Conferir por imagem" (a emissão, quando houver,
-  // ocorre por outro fluxo). Identificação por nome, mesmo padrão do app-shell
-  // e da agenda para esta clínica.
-  const nomeClinica = (clinicaAtual?.clinica.nome ?? "").toLowerCase();
-  const ehSaoFrancisco =
-    nomeClinica.includes("são francisco") || nomeClinica.includes("sao francisco");
   const consulta = useServerFn(consultarNfse);
   const reenviar = useServerFn(reenviarNfse);
   const extrair = useServerFn(extrairNfseDeImagem);
@@ -252,8 +245,7 @@ function NfsePage() {
           <h1 className="text-2xl font-semibold flex items-center gap-2"><Receipt className="h-6 w-6 text-primary" /> Notas Fiscais (NFS-e)</h1>
           <p className="text-sm text-muted-foreground">Emissão e controle de notas fiscais de serviço.</p>
         </div>
-        {!ehSaoFrancisco && (
-          <div className="flex gap-2">
+        <div className="flex gap-2">
             <Button variant="outline" onClick={() => { setConferirOpen(true); setConferirExtraido(null); setConferirPreview(null); }}>
               <ScanLine className="h-4 w-4 mr-2" /> Conferir por imagem
             </Button>
