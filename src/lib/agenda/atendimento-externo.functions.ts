@@ -13,7 +13,8 @@ export type MarcarExternoInput = {
   clinica_id: string;
   origem_clinica_id: string | null;
   origem_clinica_nome: string | null;
-  origem_gr_numero: string;
+  /** Legado: GRs não têm numeração; mantido apenas por compatibilidade. */
+  origem_gr_numero?: string | null;
   origem_valor: number | null;
 };
 
@@ -26,10 +27,12 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
   .inputValidator((d: MarcarExternoInput) => d)
   .handler(async ({ data, context }): Promise<MarcarExternoResult> => {
     const { supabase } = context;
-    const gr = (data.origem_gr_numero ?? "").trim();
-    if (!gr) return { ok: false, message: "Informe o número da GR da clínica de origem." };
     if (!data.origem_clinica_id && !(data.origem_clinica_nome ?? "").trim()) {
       return { ok: false, message: "Informe a clínica de origem." };
+    }
+    const valorInformado = Number(data.origem_valor ?? 0);
+    if (!Number.isFinite(valorInformado) || valorInformado <= 0) {
+      return { ok: false, message: "Informe o valor do atendimento na clínica de origem." };
     }
 
     const { data: ag, error: agErr } = await supabase
@@ -48,7 +51,6 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
         origem_externa: true,
         origem_clinica_id: data.origem_clinica_id,
         origem_clinica_nome: (data.origem_clinica_nome ?? "").trim() || null,
-        origem_gr_numero: gr,
         origem_valor: data.origem_valor,
       })
       .eq("id", data.agendamento_id);
@@ -57,7 +59,8 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
     // fin_atendimentos: valor_clinica = 0, valor_medico = origem_valor (0 se
     // não informado). Fica pendente para o setor de repasse quitar como
     // qualquer outro atendimento — só que sem cobrança em caixa aqui.
-    const valor = Number(data.origem_valor ?? 0);
+    const valor = valorInformado;
+    const obs = `EXTERNO${data.origem_clinica_nome ? ` — ${data.origem_clinica_nome}` : ""}`;
     const dataDia = new Date(ag.inicio).toISOString().slice(0, 10);
     let finId: string | null = null;
     // Evita duplicidade quando o operador salva duas vezes o mesmo externo.
@@ -75,7 +78,7 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
           valor_medico: valor,
           valor_clinica: 0,
           forma_pagamento: "externo",
-          observacoes: `EXTERNO — GR ${gr}${data.origem_clinica_nome ? ` · ${data.origem_clinica_nome}` : ""}`,
+          observacoes: obs,
         })
         .eq("id", finId);
     } else {
@@ -93,7 +96,7 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
           forma_pagamento: "externo",
           status: "confirmado",
           agendamento_id: data.agendamento_id,
-          observacoes: `EXTERNO — GR ${gr}${data.origem_clinica_nome ? ` · ${data.origem_clinica_nome}` : ""}`,
+          observacoes: obs,
         })
         .select("id")
         .maybeSingle();

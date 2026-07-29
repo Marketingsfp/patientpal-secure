@@ -38,7 +38,6 @@ export function AtendimentoExternoDialog({
   const { memberships } = useClinica();
   const [origemId, setOrigemId] = useState<string>("");
   const [clinicaNome, setClinicaNome] = useState("");
-  const [gr, setGr] = useState("");
   const [valor, setValor] = useState("");
   const [salvando, setSalvando] = useState(false);
 
@@ -51,7 +50,6 @@ export function AtendimentoExternoDialog({
     if (open) {
       setOrigemId("");
       setClinicaNome("");
-      setGr("");
       setValor("");
     }
   }, [open]);
@@ -61,7 +59,10 @@ export function AtendimentoExternoDialog({
     const unidade = unidades.find((u) => u.id === origemId);
     const nomeOrigem = unidade ? unidade.nome : clinicaNome.trim();
     if (!nomeOrigem) return toast.error("Informe a clínica de origem.");
-    if (!gr.trim()) return toast.error("Informe o número da GR da clínica de origem.");
+    const valorNum = valor ? Number(valor.replace(",", ".")) : 0;
+    if (!Number.isFinite(valorNum) || valorNum <= 0) {
+      return toast.error("Informe o valor do atendimento na clínica de origem.");
+    }
     setSalvando(true);
     const res = await marcarFn({
       data: {
@@ -69,8 +70,7 @@ export function AtendimentoExternoDialog({
         clinica_id: clinicaId,
         origem_clinica_id: unidade ? unidade.id : null,
         origem_clinica_nome: nomeOrigem,
-        origem_gr_numero: gr.trim(),
-        origem_valor: valor ? Number(valor.replace(",", ".")) : null,
+        origem_valor: valorNum,
       },
     });
     setSalvando(false);
@@ -122,20 +122,17 @@ export function AtendimentoExternoDialog({
               />
             )}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>GR da origem</Label>
-              <Input value={gr} onChange={(e) => setGr(e.target.value)} placeholder="Nº da guia" />
-            </div>
-            <div>
-              <Label>Valor na origem</Label>
-              <Input
-                value={valor}
-                onChange={(e) => setValor(e.target.value.replace(/[^0-9.,]/g, ""))}
-                inputMode="decimal"
-                placeholder="0,00"
-              />
-            </div>
+          <div>
+            <Label>Valor na origem *</Label>
+            <Input
+              value={valor}
+              onChange={(e) => setValor(e.target.value.replace(/[^0-9.,]/g, ""))}
+              inputMode="decimal"
+              placeholder="0,00"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Usado para o repasse do médico. Não entra no caixa desta clínica.
+            </p>
           </div>
         </div>
 

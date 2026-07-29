@@ -101,7 +101,6 @@ export function NovoAgendamentoWizard({
   const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento>("particular");
   // Atendimento externo — faturado em outra clínica (ver AGENTS.md §1.9).
   const [externoClinicaNome, setExternoClinicaNome] = useState<string>("");
-  const [externoGrNumero, setExternoGrNumero] = useState<string>("");
   const [externoValor, setExternoValor] = useState<string>("");
   const [especialidadeId, setEspecialidadeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -390,25 +389,23 @@ export function NovoAgendamentoWizard({
       }
 
       if (tipoAtendimento === "externo" && result.id) {
-        const grTrim = externoGrNumero.trim();
-        if (!grTrim) {
-          notify.error("Informe o número da GR da clínica de origem.");
-          setSaving(false);
-          return;
-        }
         if (!externoClinicaNome.trim()) {
           notify.error("Informe a clínica de origem.");
           setSaving(false);
           return;
         }
-        const valorNum = externoValor ? Number(externoValor.replace(",", ".")) : null;
+        const valorNum = externoValor ? Number(externoValor.replace(",", ".")) : 0;
+        if (!Number.isFinite(valorNum) || valorNum <= 0) {
+          notify.error("Informe o valor do atendimento na clínica de origem.");
+          setSaving(false);
+          return;
+        }
         const mkRes = await marcarExternoFn({
           data: {
             agendamento_id: result.id,
             clinica_id: clinicaId,
             origem_clinica_id: null,
             origem_clinica_nome: externoClinicaNome.trim(),
-            origem_gr_numero: grTrim,
             origem_valor: valorNum,
           },
         });
@@ -734,26 +731,15 @@ export function NovoAgendamentoWizard({
                     className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Nº da GR</label>
-                    <input
-                      value={externoGrNumero}
-                      onChange={(e) => setExternoGrNumero(e.target.value)}
-                      placeholder="Ex.: 20260123"
-                      className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Valor (opcional)</label>
-                    <input
-                      value={externoValor}
-                      onChange={(e) => setExternoValor(e.target.value.replace(/[^0-9.,]/g, ""))}
-                      placeholder="0,00"
-                      inputMode="decimal"
-                      className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm tabular-nums"
-                    />
-                  </div>
+                <div>
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Valor na origem *</label>
+                  <input
+                    value={externoValor}
+                    onChange={(e) => setExternoValor(e.target.value.replace(/[^0-9.,]/g, ""))}
+                    placeholder="0,00"
+                    inputMode="decimal"
+                    className="mt-1 w-full h-9 rounded-md border border-slate-200 px-3 text-sm tabular-nums"
+                  />
                 </div>
               </div>
             )}
