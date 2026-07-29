@@ -139,6 +139,8 @@ type Agendamento = {
   edit_lock_by?: string | null;
   edit_lock_by_nome?: string | null;
   edit_lock_at?: string | null;
+  origem_externa?: boolean | null;
+  origem_clinica_nome?: string | null;
 };
 type Medico = {
   id: string;
@@ -2439,7 +2441,7 @@ function AgendaPage() {
     const reqId = ++loadReqId.current;
     setLoading(true);
     const agendaSelect =
-      "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
+      "id,paciente_nome,paciente_id,medico_id,inicio,fim,procedimento,status,observacoes,token_publico,data_pagamento,fluxo_etapa,agenda_id,orcamento_id,pacote_id,tipo_atendimento,atendimento_grupo_id,ficha_numero,forma_pagamento_prevista,edit_lock_by,edit_lock_by_nome,edit_lock_at,origem_externa,origem_clinica_nome,medico:medicos(nome,sexo),orcamento:orcamentos(numero)" as const;
     let q = supabase
       .from("agendamentos")
       .select(agendaSelect as never)
@@ -8494,6 +8496,7 @@ function AgendaPage() {
               let bgClass = "bg-card";
               let borderLeft = "border-l-4 border-transparent";
               if (estornoPend) { bgClass = "bg-rose-500/10"; borderLeft = "border-l-4 border-rose-500"; }
+              else if (a.origem_externa) { bgClass = "bg-violet-500/10"; borderLeft = "border-l-4 border-violet-400"; }
               else if (realizado) { bgClass = "bg-emerald-500/10"; borderLeft = "border-l-4 border-emerald-500"; }
               else if (presente) { bgClass = "bg-blue-500/10"; borderLeft = "border-l-4 border-blue-400"; }
 
@@ -8603,10 +8606,12 @@ function AgendaPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => cobrarAgendamento(a)}
-                          className={`h-8 flex-1 text-xs ${pagosSet.has(a.id)
-                            ? "border-emerald-400 bg-emerald-50 text-emerald-700"
-                            : "border-rose-200 text-rose-600 hover:bg-rose-50"}`}
-                          title={pagosSet.has(a.id) ? "Pago" : "Cobrar"}
+                          className={`h-8 flex-1 text-xs ${a.origem_externa
+                            ? "border-violet-400 text-violet-600 hover:bg-violet-50"
+                            : pagosSet.has(a.id)
+                              ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                              : "border-rose-200 text-rose-600 hover:bg-rose-50"}`}
+                          title={a.origem_externa ? "Atendimento externo — sem lançamento em caixa" : pagosSet.has(a.id) ? "Pago" : "Cobrar"}
                         >
                           <DollarSign className="h-3.5 w-3.5 mr-1" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
                           {pagosSet.has(a.id) ? "Pago" : "Cobrar"}
@@ -8754,6 +8759,9 @@ function AgendaPage() {
                   if (estornoPend) {
                     bgClass = "bg-rose-500/10 hover:bg-rose-500/15";
                     borderLeft = "border-l-4 border-rose-500";
+                  } else if (a.origem_externa) {
+                    bgClass = "bg-violet-500/10 hover:bg-violet-500/15";
+                    borderLeft = "border-l-4 border-violet-400";
                   } else if (realizado) {
                     bgClass = "bg-emerald-500/10 hover:bg-emerald-500/15";
                     borderLeft = "border-l-4 border-emerald-500";
@@ -8933,6 +8941,7 @@ function AgendaPage() {
                               variant="ghost"
                               size="icon"
                               title={(() => {
+                                if (a.origem_externa) return "Atendimento externo — sem lançamento em caixa";
                                 if (!pagosSet.has(a.id)) return "Registrar pagamento";
                                 const info = pagoInfoMap.get(a.id);
                                 if (!info) return "Pago";
@@ -8940,9 +8949,11 @@ function AgendaPage() {
                                 return `Pago • ${v}`;
                               })()}
                               onClick={() => cobrarAgendamento(a)}
-                              className={`h-7 w-7 rounded-md border-2 ${pagosSet.has(a.id)
-                                ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                                : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
+                              className={`h-7 w-7 rounded-md border-2 ${a.origem_externa
+                                ? "border-violet-400 text-violet-600 hover:bg-violet-50"
+                                : pagosSet.has(a.id)
+                                  ? "border-emerald-500 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                                  : "border-rose-200 text-rose-500 hover:border-rose-400 hover:bg-rose-50"
                                 }`}
                             >
                               <DollarSign className="h-3.5 w-3.5" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
