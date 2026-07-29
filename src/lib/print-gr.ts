@@ -436,7 +436,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   const [ag, cli] = await Promise.all([
     supabase
       .from("agendamentos")
-      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero, tipo_atendimento")
+      .select("id, paciente_nome, paciente_id, medico_id, agenda_id, inicio, procedimento, observacoes, ficha_numero, tipo_atendimento, origem_externa, origem_clinica_nome, origem_valor")
       .eq("id", agendamentoId)
       .maybeSingle(),
     supabase
@@ -921,6 +921,46 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
   // do convênio na linha CONV.
   void vinculoConv;
 
+  // ---- Atendimento externo -------------------------------------------------
+  // Paciente atendido aqui, mas faturado em outra clínica: não há
+  // fin_lancamentos nem caixa. A guia sai igual às demais, mas com selo de
+  // origem e com os valores vindos de fin_atendimentos (valor_medico já
+  // calculado no registro do externo).
+  const agExt = a as unknown as {
+    origem_externa?: boolean | null;
+    origem_clinica_nome?: string | null;
+    origem_valor?: number | null;
+  };
+  const ehExterno = agExt.origem_externa === true;
+  let externoValorTabela = Number(agExt.origem_valor ?? 0);
+  let externoRepasse = 0;
+  if (ehExterno) {
+    try {
+      const { data: fa } = await supabase
+        .from("fin_atendimentos")
+        .select("valor_total, valor_medico")
+        .eq("agendamento_id", agendamentoId)
+        .maybeSingle();
+      const f = (fa as { valor_total: number | null; valor_medico: number | null } | null) ?? null;
+      if (f) {
+        if (!(externoValorTabela > 0)) externoValorTabela = Number(f.valor_total ?? 0);
+        externoRepasse = Number(f.valor_medico ?? 0);
+      }
+    } catch { /* guia sai mesmo sem o financeiro */ }
+  }
+  const externoSeloHtml = ehExterno ? `
+    <div class="center bold lg" style="letter-spacing:1px">*** ATENDIMENTO EXTERNO ***</div>
+    ${agExt.origem_clinica_nome ? `<div class="center sm">ORIGEM: <span class="v">${esc(String(agExt.origem_clinica_nome).toUpperCase())}</span></div>` : ""}
+    <div class="center sm">SEM COBRANCA NESTA UNIDADE</div>
+    <div class="sep"></div>` : "";
+  const externoValoresHtml = ehExterno ? `
+    <div class="sep"></div>
+    <table>
+      <tr><td class="label">VALOR TABELA:</td><td class="v right">${fmtBRL(externoValorTabela)}</td></tr>
+      <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(0)}</td></tr>
+      <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(externoRepasse)}</td></tr>
+    </table>` : "";
+
   const ticketHtml = `
   <div class="ticket">
     <div class="clinica-nome">${esc(c?.nome ?? "")}</div>
@@ -931,7 +971,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     <div class="sep"></div>
     <div class="center lg">GUIA DE ATENDIMENTO</div>
     <div class="sep"></div>
-
+    ${externoSeloHtml}
     <div class="center bold">${esc(paciente?.nome ?? a.paciente_nome)}</div>
     ${prontuario ? `<div class="center sm">PRONTUÁRIO: <span class="v">${esc(prontuario)}</span></div>` : ""}
     ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
@@ -962,7 +1002,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
     </table>
     ${sinalHtml}
 
-    ${valor > 0 ? `
+    ${ehExterno ? externoValoresHtml : valor > 0 ? `
     <div class="row" style="margin-top:8px">
       <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
       <div class="bold lg">${fmtBRL(valor)}</div>
