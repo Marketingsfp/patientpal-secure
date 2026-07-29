@@ -140,7 +140,6 @@ export function NovoAgendamentoWizard({
     setSlot(null);
     setTipoAtendimento("particular");
     setExternoClinicaNome("");
-    setExternoGrNumero("");
     setExternoValor("");
     setEspecialidadeId(null);
     setSaving(false);
