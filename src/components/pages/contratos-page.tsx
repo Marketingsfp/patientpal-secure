@@ -270,6 +270,8 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
   // rota informa o módulo certo via prop, propagado aos componentes filhos.
   const podeEscrever = usePodeEscrever(modulo);
   const [list, setList] = useState<Contrato[]>([]);
+  // Total de contratos que atendem aos filtros atuais (contagem no banco).
+  const [total, setTotal] = useState(0);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   // Map criado_por (uuid) → nome do vendedor. Preenchido em load().
   const [vendedores, setVendedores] = useState<Record<string, string>>({});
