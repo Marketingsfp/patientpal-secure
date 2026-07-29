@@ -1078,7 +1078,7 @@ export function LancamentoDialog({ open, onOpenChange, tipo, onSaved, onSavedWit
                   rows={2}
                   value={cortesiaJustificativa}
                   onChange={(e) => setCortesiaJustificativa(e.target.value)}
-                  placeholder="Ex: paciente encaminhado pela diretoria, retorno gratuito, campanha social..."
+                  placeholder="Ex: paciente encaminhado pela diretoria, retorno gratuito, cortesia institucional..."
                 />
               </div>
             );
