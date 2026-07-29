@@ -9401,6 +9401,10 @@ function AgendaPage() {
         pacienteNome={externoAg?.paciente_nome ?? null}
         clinicaId={clinicaAtual?.clinica_id ?? null}
         procedimento={externoAg?.procedimento ?? null}
+        fichaNumero={(() => {
+          const f = externoAg ? fichaPorId.get(externoAg.id) : undefined;
+          return f && f !== "—" ? Number(f) : null;
+        })()}
         onDone={() => { void load(); }}
       />
       {selecItensCtx && (
