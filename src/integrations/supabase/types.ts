@@ -3015,6 +3015,111 @@ export type Database = {
         }
         Relationships: []
       }
+      dev_relatorio_destinatarios: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          telefone: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          telefone: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          telefone?: string
+        }
+        Relationships: []
+      }
+      dev_relatorio_entradas: {
+        Row: {
+          area: string | null
+          chave_loop: string | null
+          created_at: string
+          created_by: string | null
+          data: string
+          descricao: string | null
+          hora: string
+          id: string
+          loop_manual: boolean
+          loop_motivo: string | null
+          origem: string
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          area?: string | null
+          chave_loop?: string | null
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          descricao?: string | null
+          hora?: string
+          id?: string
+          loop_manual?: boolean
+          loop_motivo?: string | null
+          origem?: string
+          tipo?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          area?: string | null
+          chave_loop?: string | null
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          descricao?: string | null
+          hora?: string
+          id?: string
+          loop_manual?: boolean
+          loop_motivo?: string | null
+          origem?: string
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      dev_relatorio_envios: {
+        Row: {
+          data: string
+          destinatarios: number
+          enviado_em: string
+          erro: string | null
+          id: string
+          mensagem: string | null
+          status: string
+        }
+        Insert: {
+          data: string
+          destinatarios?: number
+          enviado_em?: string
+          erro?: string | null
+          id?: string
+          mensagem?: string | null
+          status?: string
+        }
+        Update: {
+          data?: string
+          destinatarios?: number
+          enviado_em?: string
+          erro?: string | null
+          id?: string
+          mensagem?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       documentos_emitidos: {
         Row: {
           assinado: boolean
@@ -9015,6 +9120,8 @@ export type Database = {
         }
         Returns: string
       }
+      is_admin_global: { Args: { _user_id: string }; Returns: boolean }
+      is_admin_ou_gestor: { Args: { _user_id: string }; Returns: boolean }
       is_chat_member: {
         Args: { _canal_id: string; _user_id: string }
         Returns: boolean
