@@ -94,13 +94,13 @@ function FinLayout() {
       uxMelhorias ? "h-[calc(100dvh-4rem)]" : "h-[calc(100vh-4rem)]",
     )}>
       <aside className={cn(
-        "bg-card p-1.5 shrink-0 transition-all duration-200",
+        "bg-card p-2 shrink-0 transition-all duration-200",
         modoMobile
           ? "w-full border-b border-border overflow-x-auto"
-          : cn(collapsed ? "w-12" : "w-48", "border-r border-border h-full overflow-hidden"),
+          : cn(collapsed ? "w-12" : "w-48", "border-r border-border overflow-y-auto h-full"),
       )}>
         {!modoMobile && (
-          <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} mb-0.5`}>
+          <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} mb-1`}>
             {!collapsed && (
               <p className="px-1 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Financeiro
@@ -118,7 +118,7 @@ function FinLayout() {
             </Button>
           </div>
         )}
-        <nav className={modoMobile ? "flex items-center gap-1.5" : "space-y-0"}>
+        <nav className={modoMobile ? "flex items-center gap-1.5" : "space-y-0.5"}>
           {visibleSubnav.map((item) => {
             const active = "exact" in item && item.exact
               ? location.pathname === item.to
@@ -164,7 +164,7 @@ function FinLayout() {
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-2 rounded-md px-2.5 py-1 text-[13px] leading-tight transition-colors ${
+                className={`flex items-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors ${
                   active
                     ? "bg-primary/10 text-primary font-medium"
                     : "text-foreground/70 hover:bg-muted hover:text-foreground"

@@ -176,20 +176,6 @@ o pedido parecer trivial ou quando houver aparente inconsistência.
   usuário na interface; o agente não deve dispará-lo por automação nem
   sugerir rodá-lo como parte de uma correção de dados.
 
-### 1.12 Dados de QA / teste no sistema
-
-Existem registros criados por baterias de teste que **permanecem** no sistema
-para avaliação manual. Eles são identificados por:
-
-- nome do paciente iniciado por `TESTE` (ex.: `TESTE CB 001 ...`);
-- campo booleano `teste = true` em `pacientes`, `contratos_assinatura` e
-  `fin_atendimentos`;
-- origem `teste_qa` e tabela de controle `qa_cb_casos`.
-
-O agente **não deve excluir, alterar ou "limpar"** esses registros sem pedido
-explícito, e deve **filtrá-los** em relatórios, contagens e análises
-operacionais para não contaminar números reais.
-
 ---
 
 ## 2. Outras regras herdadas

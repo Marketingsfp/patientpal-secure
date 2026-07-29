@@ -43,7 +43,6 @@ import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_auth
 import { Route as AuthenticatedAppTiposServicoRouteImport } from './routes/_authenticated/app.tipos-servico'
 import { Route as AuthenticatedAppSetoresRouteImport } from './routes/_authenticated/app.setores'
 import { Route as AuthenticatedAppRelatoriosRouteImport } from './routes/_authenticated/app.relatorios'
-import { Route as AuthenticatedAppRelatorioDiarioRouteImport } from './routes/_authenticated/app.relatorio-diario'
 import { Route as AuthenticatedAppRecepcaoRouteImport } from './routes/_authenticated/app.recepcao'
 import { Route as AuthenticatedAppProntuariosRouteImport } from './routes/_authenticated/app.prontuarios'
 import { Route as AuthenticatedAppProntuarioModelosRouteImport } from './routes/_authenticated/app.prontuario-modelos'
@@ -107,7 +106,6 @@ import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
-import { Route as ApiPublicHooksRelatorioDiarioRouteImport } from './routes/api/public/hooks/relatorio-diario'
 import { Route as ApiPublicHooksBackupDiarioRouteImport } from './routes/api/public/hooks/backup-diario'
 import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
 import { Route as AuthenticatedAppNfseTestarRouteImport } from './routes/_authenticated/app.nfse.testar'
@@ -316,12 +314,6 @@ const AuthenticatedAppRelatoriosRoute =
   AuthenticatedAppRelatoriosRouteImport.update({
     id: '/relatorios',
     path: '/relatorios',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppRelatorioDiarioRoute =
-  AuthenticatedAppRelatorioDiarioRouteImport.update({
-    id: '/relatorio-diario',
-    path: '/relatorio-diario',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppRecepcaoRoute =
@@ -683,12 +675,6 @@ const ApiPublicWhatsappClinicaIdRoute =
     path: '/api/public/whatsapp/$clinicaId',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHooksRelatorioDiarioRoute =
-  ApiPublicHooksRelatorioDiarioRouteImport.update({
-    id: '/api/public/hooks/relatorio-diario',
-    path: '/api/public/hooks/relatorio-diario',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiPublicHooksBackupDiarioRoute =
   ApiPublicHooksBackupDiarioRouteImport.update({
     id: '/api/public/hooks/backup-diario',
@@ -979,7 +965,6 @@ export interface FileRoutesByFullPath {
   '/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
-  '/app/relatorio-diario': typeof AuthenticatedAppRelatorioDiarioRoute
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
   '/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
@@ -1023,7 +1008,6 @@ export interface FileRoutesByFullPath {
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
-  '/api/public/hooks/relatorio-diario': typeof ApiPublicHooksRelatorioDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
@@ -1110,7 +1094,6 @@ export interface FileRoutesByTo {
   '/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
   '/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
-  '/app/relatorio-diario': typeof AuthenticatedAppRelatorioDiarioRoute
   '/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/app/setores': typeof AuthenticatedAppSetoresRoute
   '/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
@@ -1154,7 +1137,6 @@ export interface FileRoutesByTo {
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
-  '/api/public/hooks/relatorio-diario': typeof ApiPublicHooksRelatorioDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
@@ -1247,7 +1229,6 @@ export interface FileRoutesById {
   '/_authenticated/app/prontuario-modelos': typeof AuthenticatedAppProntuarioModelosRoute
   '/_authenticated/app/prontuarios': typeof AuthenticatedAppProntuariosRoute
   '/_authenticated/app/recepcao': typeof AuthenticatedAppRecepcaoRoute
-  '/_authenticated/app/relatorio-diario': typeof AuthenticatedAppRelatorioDiarioRoute
   '/_authenticated/app/relatorios': typeof AuthenticatedAppRelatoriosRoute
   '/_authenticated/app/setores': typeof AuthenticatedAppSetoresRoute
   '/_authenticated/app/tipos-servico': typeof AuthenticatedAppTiposServicoRoute
@@ -1291,7 +1272,6 @@ export interface FileRoutesById {
   '/_authenticated/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
   '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
-  '/api/public/hooks/relatorio-diario': typeof ApiPublicHooksRelatorioDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
@@ -1384,7 +1364,6 @@ export interface FileRouteTypes {
     | '/app/prontuario-modelos'
     | '/app/prontuarios'
     | '/app/recepcao'
-    | '/app/relatorio-diario'
     | '/app/relatorios'
     | '/app/setores'
     | '/app/tipos-servico'
@@ -1428,7 +1407,6 @@ export interface FileRouteTypes {
     | '/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
-    | '/api/public/hooks/relatorio-diario'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
     | '/app/clientes/'
@@ -1515,7 +1493,6 @@ export interface FileRouteTypes {
     | '/app/prontuario-modelos'
     | '/app/prontuarios'
     | '/app/recepcao'
-    | '/app/relatorio-diario'
     | '/app/relatorios'
     | '/app/setores'
     | '/app/tipos-servico'
@@ -1559,7 +1536,6 @@ export interface FileRouteTypes {
     | '/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
-    | '/api/public/hooks/relatorio-diario'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
     | '/app/clientes'
@@ -1651,7 +1627,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/prontuario-modelos'
     | '/_authenticated/app/prontuarios'
     | '/_authenticated/app/recepcao'
-    | '/_authenticated/app/relatorio-diario'
     | '/_authenticated/app/relatorios'
     | '/_authenticated/app/setores'
     | '/_authenticated/app/tipos-servico'
@@ -1695,7 +1670,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
     | '/api/public/hooks/backup-diario'
-    | '/api/public/hooks/relatorio-diario'
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
     | '/_authenticated/app/clientes/'
@@ -1736,7 +1710,6 @@ export interface RootRouteChildren {
   TotemTTokenRoute: typeof TotemTTokenRoute
   ApiPublicFocusnfeWebhookRoute: typeof ApiPublicFocusnfeWebhookRoute
   ApiPublicHooksBackupDiarioRoute: typeof ApiPublicHooksBackupDiarioRoute
-  ApiPublicHooksRelatorioDiarioRoute: typeof ApiPublicHooksRelatorioDiarioRoute
   ApiPublicWhatsappClinicaIdRoute: typeof ApiPublicWhatsappClinicaIdRoute
 }
 
@@ -1978,13 +1951,6 @@ declare module '@tanstack/react-router' {
       path: '/relatorios'
       fullPath: '/app/relatorios'
       preLoaderRoute: typeof AuthenticatedAppRelatoriosRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/relatorio-diario': {
-      id: '/_authenticated/app/relatorio-diario'
-      path: '/relatorio-diario'
-      fullPath: '/app/relatorio-diario'
-      preLoaderRoute: typeof AuthenticatedAppRelatorioDiarioRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/recepcao': {
@@ -2428,13 +2394,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappClinicaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/relatorio-diario': {
-      id: '/api/public/hooks/relatorio-diario'
-      path: '/api/public/hooks/relatorio-diario'
-      fullPath: '/api/public/hooks/relatorio-diario'
-      preLoaderRoute: typeof ApiPublicHooksRelatorioDiarioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/hooks/backup-diario': {
       id: '/api/public/hooks/backup-diario'
       path: '/api/public/hooks/backup-diario'
@@ -2862,7 +2821,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppProntuarioModelosRoute: typeof AuthenticatedAppProntuarioModelosRoute
   AuthenticatedAppProntuariosRoute: typeof AuthenticatedAppProntuariosRoute
   AuthenticatedAppRecepcaoRoute: typeof AuthenticatedAppRecepcaoRoute
-  AuthenticatedAppRelatorioDiarioRoute: typeof AuthenticatedAppRelatorioDiarioRoute
   AuthenticatedAppRelatoriosRoute: typeof AuthenticatedAppRelatoriosRoute
   AuthenticatedAppSetoresRoute: typeof AuthenticatedAppSetoresRoute
   AuthenticatedAppTiposServicoRoute: typeof AuthenticatedAppTiposServicoRoute
@@ -2950,7 +2908,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppProntuarioModelosRoute,
   AuthenticatedAppProntuariosRoute: AuthenticatedAppProntuariosRoute,
   AuthenticatedAppRecepcaoRoute: AuthenticatedAppRecepcaoRoute,
-  AuthenticatedAppRelatorioDiarioRoute: AuthenticatedAppRelatorioDiarioRoute,
   AuthenticatedAppRelatoriosRoute: AuthenticatedAppRelatoriosRoute,
   AuthenticatedAppSetoresRoute: AuthenticatedAppSetoresRoute,
   AuthenticatedAppTiposServicoRoute: AuthenticatedAppTiposServicoRoute,
@@ -3034,7 +2991,6 @@ const rootRouteChildren: RootRouteChildren = {
   TotemTTokenRoute: TotemTTokenRoute,
   ApiPublicFocusnfeWebhookRoute: ApiPublicFocusnfeWebhookRoute,
   ApiPublicHooksBackupDiarioRoute: ApiPublicHooksBackupDiarioRoute,
-  ApiPublicHooksRelatorioDiarioRoute: ApiPublicHooksRelatorioDiarioRoute,
   ApiPublicWhatsappClinicaIdRoute: ApiPublicWhatsappClinicaIdRoute,
 }
 export const routeTree = rootRouteImport
