@@ -205,7 +205,7 @@ export function AtendimentoExternoDialog({
             <Label>Clínica de origem</Label>
             <Select value={origemId} onValueChange={setOrigemId}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione a unidade" />
+                <SelectValue placeholder={carregandoUnidades ? "Carregando unidades…" : "Selecione a unidade"} />
               </SelectTrigger>
               <SelectContent>
                 {unidades.map((u) => (
