@@ -9282,6 +9282,15 @@ export type Database = {
           usar_ambiente_nacional: boolean
         }[]
       }
+      listar_unidades_basico: {
+        Args: never
+        Returns: {
+          cidade: string
+          estado: string
+          id: string
+          nome: string
+        }[]
+      }
       log_action: {
         Args: {
           _action: string
