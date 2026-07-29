@@ -104,6 +104,12 @@ export function NovoAgendamentoWizard({
   const [externoClinicaNome, setExternoClinicaNome] = useState<string>("");
   const [externoValor, setExternoValor] = useState<number | null>(null);
   const [externoBuscando, setExternoBuscando] = useState(false);
+  const [externoTemConvenio, setExternoTemConvenio] = useState(false);
+  const [externoConvenios, setExternoConvenios] = useState<
+    Array<{ id: string; nome: string; modalidade: "cartao_consulta" | "cartao_desconto" }>
+  >([]);
+  const [externoConvenioId, setExternoConvenioId] = useState<string>("");
+  const [externoRepasse, setExternoRepasse] = useState<number | null>(null);
   const [especialidadeId, setEspecialidadeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -121,29 +127,49 @@ export function NovoAgendamentoWizard({
   // -------------------------------------------------------------------------
   const [showQuickCreate, setShowQuickCreate] = useState(false);
 
-  // Preço automático do atendimento externo — tabela desta clínica (base do repasse).
+  // Convênios da clínica + detecção do contrato ativo do paciente.
+  useEffect(() => {
+    if (tipoAtendimento !== "externo" || !clinicaId) return;
+    let cancelado = false;
+    void (async () => {
+      const lista = await listarConveniosClinica(clinicaId);
+      if (cancelado) return;
+      setExternoConvenios(lista);
+      const vinculo = await buscarVinculoConvenio(clinicaId, paciente?.id ?? null);
+      if (cancelado || !vinculo) return;
+      setExternoTemConvenio(true);
+      setExternoConvenioId(vinculo.convenioId);
+    })();
+    return () => { cancelado = true; };
+  }, [tipoAtendimento, clinicaId, paciente?.id]);
+
+  // Repasse automático do atendimento externo — cadastro de repasse do médico.
   useEffect(() => {
     if (tipoAtendimento !== "externo" || !clinicaId || !procedimento?.nome) {
       setExternoValor(null);
+      setExternoRepasse(null);
       return;
     }
+    if (externoTemConvenio && !externoConvenioId) { setExternoRepasse(null); return; }
+    const modalidade = externoTemConvenio
+      ? externoConvenios.find((c) => c.id === externoConvenioId)?.modalidade ?? null
+      : null;
     let cancelado = false;
     setExternoBuscando(true);
     void (async () => {
-      const { data } = await supabase
-        .from("procedimentos")
-        .select("valor_dinheiro,valor_dinheiro_pix,valor_padrao")
-        .eq("clinica_id", clinicaId)
-        .ilike("nome", procedimento.nome)
-        .limit(1)
-        .maybeSingle();
+      const r = await calcularRepasseExterno({
+        clinicaId,
+        medicoId: medico?.id ?? null,
+        procedimento: procedimento.nome,
+        modalidade,
+      });
       if (cancelado) return;
-      const v = valorDaTabela(data as never);
-      setExternoValor(v > 0 ? v : null);
+      setExternoValor(r.valorTabela > 0 ? r.valorTabela : null);
+      setExternoRepasse(r.repasse);
       setExternoBuscando(false);
     })();
     return () => { cancelado = true; };
-  }, [tipoAtendimento, clinicaId, procedimento?.nome]);
+  }, [tipoAtendimento, clinicaId, procedimento?.nome, medico?.id, externoTemConvenio, externoConvenioId, externoConvenios]);
 
   const [qcNome, setQcNome] = useState("");
   const [qcSexo, setQcSexo] = useState<"M" | "F">("F");
@@ -169,6 +195,9 @@ export function NovoAgendamentoWizard({
     setExternoClinicaNome("");
     setExternoValor(null);
     setExternoBuscando(false);
+    setExternoTemConvenio(false);
+    setExternoConvenioId("");
+    setExternoRepasse(null);
     setEspecialidadeId(null);
     setSaving(false);
     resetQuickCreate();
