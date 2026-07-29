@@ -130,77 +130,15 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
  * ficha volte ao estado de um agendamento comum — sem sobrar nada no
  * Financeiro. Nada é apagado do histórico/auditoria.
  */
-export type LimparExternoResult =
-  | { ok: true; limpou: boolean }
-  | { ok: false; message: string };
-
 export const limparAtendimentoExterno = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { agendamento_id: string }) => d)
   .handler(async ({ data, context }): Promise<LimparExternoResult> => {
-    const { supabase } = context;
-
-    const { data: ag } = await supabase
-      .from("agendamentos")
-      .select(
-        "id,clinica_id,paciente_nome,procedimento,origem_externa,origem_clinica_nome,origem_valor",
-      )
-      .eq("id", data.agendamento_id)
-      .maybeSingle();
-    if (!ag) return { ok: false, message: "Agendamento não encontrado." };
-
-    const { data: fin } = await supabase
-      .from("fin_atendimentos")
-      .select("id,valor_medico,repasse_pago,forma_pagamento")
-      .eq("agendamento_id", data.agendamento_id)
-      .maybeSingle();
-
-    const ehExterno = !!ag.origem_externa || fin?.forma_pagamento === "externo";
-    if (!ehExterno) return { ok: true, limpou: false };
-
-    if (fin && fin.repasse_pago) {
-      return {
-        ok: false,
-        message:
-          "O repasse deste atendimento externo já foi pago. Estorne o repasse no Financeiro antes de liberar o horário.",
-      };
-    }
-
-    // 1) Histórico primeiro — o registro precisa sobreviver à limpeza.
-    const nome =
-      (context.claims as { user_metadata?: { nome?: string } } | null)?.user_metadata?.nome ?? null;
-    const email = (context.claims as { email?: string } | null)?.email ?? null;
-    const valorRepasse = Number(fin?.valor_medico ?? ag.origem_valor ?? 0);
-    const texto =
-      `Atendimento externo desfeito. Paciente: ${ag.paciente_nome ?? "—"}. ` +
-      `Origem: ${ag.origem_clinica_nome ?? "—"}. ` +
-      `Serviço: ${ag.procedimento ?? "—"}. ` +
-      `Repasse revertido: R$ ${valorRepasse.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}.`;
-    await supabase.from("agendamento_historico_notas" as never).insert({
-      clinica_id: ag.clinica_id,
-      agendamento_id: ag.id,
-      user_email: email,
-      user_nome: nome,
-      texto,
-    } as never);
-
-    // 2) Remove o lançamento externo do Financeiro.
-    if (fin?.id) {
-      const { error: delErr } = await supabase.from("fin_atendimentos").delete().eq("id", fin.id);
-      if (delErr) return { ok: false, message: delErr.message };
-    }
-
-    // 3) Zera as marcações de origem externa no agendamento.
-    const { error: upErr } = await supabase
-      .from("agendamentos")
-      .update({
-        origem_externa: false,
-        origem_clinica_id: null,
-        origem_clinica_nome: null,
-        origem_valor: null,
-      } as never)
-      .eq("id", ag.id);
-    if (upErr) return { ok: false, message: upErr.message };
-
-    return { ok: true, limpou: true };
+    const claims = context.claims as
+      | { email?: string; user_metadata?: { nome?: string } }
+      | null;
+    return limparExternoCore(context.supabase as never, data.agendamento_id, {
+      email: claims?.email ?? null,
+      nome: claims?.user_metadata?.nome ?? null,
+    });
   });
