@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { notify } from "@/lib/notify";
-import { Check, ChevronRight, User, Stethoscope, UserRound, Clock, CheckCircle2, Loader2, UserPlus, X } from "lucide-react";
+import { Check, ChevronRight, User, Stethoscope, UserRound, Clock, CheckCircle2, Loader2, UserPlus, X, AlertTriangle } from "lucide-react";
 import { HhpWizardShell } from "@/design-system/hhp";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { ProcedimentoPicker, type ProcedimentoOption } from "@/components/agenda/procedimento-picker";
@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
+import { valorDaTabela } from "@/lib/agenda/atendimento-externo-preco";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { cn } from "@/lib/utils";
 
@@ -101,7 +102,8 @@ export function NovoAgendamentoWizard({
   const [tipoAtendimento, setTipoAtendimento] = useState<TipoAtendimento>("particular");
   // Atendimento externo — faturado em outra clínica (ver AGENTS.md §1.9).
   const [externoClinicaNome, setExternoClinicaNome] = useState<string>("");
-  const [externoValor, setExternoValor] = useState<string>("");
+  const [externoValor, setExternoValor] = useState<number | null>(null);
+  const [externoBuscando, setExternoBuscando] = useState(false);
   const [especialidadeId, setEspecialidadeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -140,7 +142,8 @@ export function NovoAgendamentoWizard({
     setSlot(null);
     setTipoAtendimento("particular");
     setExternoClinicaNome("");
-    setExternoValor("");
+    setExternoValor(null);
+    setExternoBuscando(false);
     setEspecialidadeId(null);
     setSaving(false);
     resetQuickCreate();
