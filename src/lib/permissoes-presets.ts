@@ -29,7 +29,7 @@ export const TODOS_MODULOS: ReadonlyArray<string> = [
   "lms-admin",
   // Gestão
   "cargos", "financeiro", "funcionarios", "relatorios", "auditoria", "setores",
-  "boletos", "contratos", "nfse", "integration-secrets", "lgpd",
+  "boletos", "contratos", "nfse",
   "painel-executivo",
 ];
 
@@ -39,7 +39,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     dashboard: "write", agenda: "write", fluxo: "write", clientes: "write",
     chat: "write", checkin: "read", recepcao: "read", orcamentos: "read",
     caixa: "read", financeiro: "write", boletos: "read", contratos: "read",
-    nfse: "read", relatorios: "write", auditoria: "read", lgpd: "read",
+    nfse: "read", relatorios: "write", auditoria: "read",
     equipe: "write", "hr-contratos": "read", "hr-ponto": "read",
     "hr-ferias": "read", "hr-holerites": "read", treinamentos: "read",
     cargos: "read", setores: "read", unidades: "read", medicos: "read",
@@ -80,7 +80,7 @@ export const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
     clientes: "read", "cartao-beneficios": "write",
     boletos: "write", nfse: "write", contratos: "write", planos: "read",
     "hr-holerites": "read", "hr-contratos": "read", auditoria: "read",
-    "integration-secrets": "read", chat: "write", dashboard: "read",
+    chat: "write", dashboard: "read",
   },
   enfermeiro: {
     "triagem-enfermagem": "write", "alertas-enfermagem": "write",

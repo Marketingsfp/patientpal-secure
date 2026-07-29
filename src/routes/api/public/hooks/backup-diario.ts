@@ -311,7 +311,7 @@ const TABELAS_COM_CLINICA_ARR = [
   "fin_lancamentos", "fin_lembretes", "fin_notas_pacientes",
   "fin_regras_ia", "gr_impressoes", "hr_banco_horas", "hr_contratos",
   "hr_escalas", "hr_ferias", "hr_holerites", "hr_pontos",
-  "lgpd_consentimentos", "lgpd_solicitacoes", "lms_certificados",
+  "lms_certificados",
   "lms_cursos", "lms_licoes", "lms_modulos", "lms_progresso",
   "lms_quizzes", "lms_trilhas_cargo", "medico_agenda_procedimentos",
   "medico_agendas", "medico_biometria", "medico_convenios",

@@ -59,8 +59,6 @@ import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
 import { Route as AuthenticatedAppLmsAdminRouteImport } from './routes/_authenticated/app.lms-admin'
-import { Route as AuthenticatedAppLgpdRouteImport } from './routes/_authenticated/app.lgpd'
-import { Route as AuthenticatedAppIntegrationSecretsRouteImport } from './routes/_authenticated/app.integration-secrets'
 import { Route as AuthenticatedAppHrPontoRouteImport } from './routes/_authenticated/app.hr-ponto'
 import { Route as AuthenticatedAppHrHoleritesRouteImport } from './routes/_authenticated/app.hr-holerites'
 import { Route as AuthenticatedAppHrFeriasRouteImport } from './routes/_authenticated/app.hr-ferias'
@@ -398,17 +396,6 @@ const AuthenticatedAppLmsAdminRoute =
   AuthenticatedAppLmsAdminRouteImport.update({
     id: '/lms-admin',
     path: '/lms-admin',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppLgpdRoute = AuthenticatedAppLgpdRouteImport.update({
-  id: '/lgpd',
-  path: '/lgpd',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
-const AuthenticatedAppIntegrationSecretsRoute =
-  AuthenticatedAppIntegrationSecretsRouteImport.update({
-    id: '/integration-secrets',
-    path: '/integration-secrets',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppHrPontoRoute = AuthenticatedAppHrPontoRouteImport.update({
@@ -899,8 +886,6 @@ export interface FileRoutesByFullPath {
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
-  '/app/integration-secrets': typeof AuthenticatedAppIntegrationSecretsRoute
-  '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
@@ -1022,8 +1007,6 @@ export interface FileRoutesByTo {
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
-  '/app/integration-secrets': typeof AuthenticatedAppIntegrationSecretsRoute
-  '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
@@ -1151,8 +1134,6 @@ export interface FileRoutesById {
   '/_authenticated/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/_authenticated/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/_authenticated/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
-  '/_authenticated/app/integration-secrets': typeof AuthenticatedAppIntegrationSecretsRoute
-  '/_authenticated/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/_authenticated/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
@@ -1280,8 +1261,6 @@ export interface FileRouteTypes {
     | '/app/hr-ferias'
     | '/app/hr-holerites'
     | '/app/hr-ponto'
-    | '/app/integration-secrets'
-    | '/app/lgpd'
     | '/app/lms-admin'
     | '/app/medicos'
     | '/app/modelos-documentos'
@@ -1403,8 +1382,6 @@ export interface FileRouteTypes {
     | '/app/hr-ferias'
     | '/app/hr-holerites'
     | '/app/hr-ponto'
-    | '/app/integration-secrets'
-    | '/app/lgpd'
     | '/app/lms-admin'
     | '/app/medicos'
     | '/app/modelos-documentos'
@@ -1531,8 +1508,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/hr-ferias'
     | '/_authenticated/app/hr-holerites'
     | '/_authenticated/app/hr-ponto'
-    | '/_authenticated/app/integration-secrets'
-    | '/_authenticated/app/lgpd'
     | '/_authenticated/app/lms-admin'
     | '/_authenticated/app/medicos'
     | '/_authenticated/app/modelos-documentos'
@@ -1985,20 +1960,6 @@ declare module '@tanstack/react-router' {
       path: '/lms-admin'
       fullPath: '/app/lms-admin'
       preLoaderRoute: typeof AuthenticatedAppLmsAdminRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/lgpd': {
-      id: '/_authenticated/app/lgpd'
-      path: '/lgpd'
-      fullPath: '/app/lgpd'
-      preLoaderRoute: typeof AuthenticatedAppLgpdRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/integration-secrets': {
-      id: '/_authenticated/app/integration-secrets'
-      path: '/integration-secrets'
-      fullPath: '/app/integration-secrets'
-      preLoaderRoute: typeof AuthenticatedAppIntegrationSecretsRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/hr-ponto': {
@@ -2677,8 +2638,6 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppHrFeriasRoute: typeof AuthenticatedAppHrFeriasRoute
   AuthenticatedAppHrHoleritesRoute: typeof AuthenticatedAppHrHoleritesRoute
   AuthenticatedAppHrPontoRoute: typeof AuthenticatedAppHrPontoRoute
-  AuthenticatedAppIntegrationSecretsRoute: typeof AuthenticatedAppIntegrationSecretsRoute
-  AuthenticatedAppLgpdRoute: typeof AuthenticatedAppLgpdRoute
   AuthenticatedAppLmsAdminRoute: typeof AuthenticatedAppLmsAdminRoute
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
@@ -2753,9 +2712,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppHrFeriasRoute: AuthenticatedAppHrFeriasRoute,
   AuthenticatedAppHrHoleritesRoute: AuthenticatedAppHrHoleritesRoute,
   AuthenticatedAppHrPontoRoute: AuthenticatedAppHrPontoRoute,
-  AuthenticatedAppIntegrationSecretsRoute:
-    AuthenticatedAppIntegrationSecretsRoute,
-  AuthenticatedAppLgpdRoute: AuthenticatedAppLgpdRoute,
   AuthenticatedAppLmsAdminRoute: AuthenticatedAppLmsAdminRoute,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
   AuthenticatedAppModelosDocumentosRoute:

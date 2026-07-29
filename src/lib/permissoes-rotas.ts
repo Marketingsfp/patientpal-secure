@@ -100,8 +100,6 @@ export const ROUTE_TO_MODULE: Record<string, string | null> = {
   "/app/setores": "setores",
   "/app/boletos": "boletos",
   "/app/contratos": "contratos",
-  "/app/integration-secrets": "integration-secrets",
-  "/app/lgpd": "lgpd",
   "/app/backups": "auditoria",
 
   // Sistema / livre

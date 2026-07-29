@@ -160,7 +160,6 @@ export function useDefaultScreenEntries(): CommandEntry[] {
       mk("Clínicas", "/app/clinicas"),
       mk("Perfis de acesso", "/app/perfis"),
       mk("Auditoria", "/app/auditoria"),
-      mk("LGPD", "/app/lgpd"),
       mk("Relatórios", "/app/relatorios"),
     ];
     return all.filter((e): e is CommandEntry => e !== null);
