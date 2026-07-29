@@ -982,12 +982,12 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
             })}
           </TableBody>
         </Table>
-        {filtered.length > 0 ? (
+        {total > 0 ? (
           <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-sm text-muted-foreground">
             <span>
-              {filtered.length} contrato{filtered.length === 1 ? "" : "s"}
-              {filtered.length > POR_PAGINA ? (
-                <> — exibindo {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, filtered.length)}</>
+              {total} contrato{total === 1 ? "" : "s"}
+              {total > POR_PAGINA ? (
+                <> — exibindo {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, total)}</>
               ) : null}
             </span>
             {totalPaginas > 1 ? (
