@@ -94,6 +94,7 @@ import {
   getProcedimentosComValor,
 } from "@/lib/agenda/refs-cache";
 import { useServerFn } from "@tanstack/react-start";
+import { limparAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
 import { listarEquipe } from "@/lib/equipe.functions";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
@@ -2246,6 +2247,7 @@ function AgendaPage() {
   const emitirNfseFn = useServerFn(emitirNfse);
   const consultarNfseFn = useServerFn(consultarNfse);
   const fnCriarAgendamento = useServerFn(criarAgendamento);
+  const fnLimparExterno = useServerFn(limparAtendimentoExterno);
   const carregarEquipe = async () => {
     if (!clinicaAtual || equipeList.length > 0) return;
     try {
@@ -5089,6 +5091,15 @@ function AgendaPage() {
       !confirm(`Liberar este horário? O cliente ${a.paciente_nome} será removido, mas a ficha continuará disponível.`)
     )
       return;
+    // Atendimento externo: desfaz o registro no Financeiro e zera as marcações
+    // de origem antes de liberar o slot. O que foi desfeito fica no histórico.
+    if (a.origem_externa) {
+      const res = await fnLimparExterno({ data: { agendamento_id: a.id } });
+      if (!res.ok) {
+        toast.error(res.message);
+        return;
+      }
+    }
     // Ao desmarcar, o item de orçamento precisa voltar a ficar livre: remove
     // os vínculos desta ficha em agendamento_orcamento_itens. Sem isso, o
     // vínculo órfão dispara o falso aviso de "paciente já agendado".
@@ -5188,6 +5199,13 @@ function AgendaPage() {
     const { error } = await supabase.from("agendamentos").update(payload).in("id", idsParaAtualizar);
     if (error) mostrarErro(error);
     else {
+      // Cancelamento também desfaz o atendimento externo (Financeiro + marcações).
+      if (status === "cancelado") {
+        for (const id of idsParaAtualizar) {
+          const res = await fnLimparExterno({ data: { agendamento_id: id } });
+          if (!res.ok) toast.error(res.message);
+        }
+      }
       if (idsParaAtualizar.length > 1) toast.success(`${idsParaAtualizar.length} agendamentos do pacote cancelados.`);
       await load();
     }

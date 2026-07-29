@@ -7,7 +7,11 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { buscarValorProcedimento } from "./atendimento-externo.server";
+import {
+  buscarValorProcedimento,
+  limparExternoCore,
+  type LimparExternoResult,
+} from "./atendimento-externo.server";
 
 export type MarcarExternoInput = {
   agendamento_id: string;
@@ -119,4 +123,26 @@ export const marcarAtendimentoExterno = createServerFn({ method: "POST" })
     }
 
     return { ok: true, fin_atendimento_id: finId };
+  });
+
+/**
+ * Desfaz um atendimento externo: apaga o registro em `fin_atendimentos`
+ * (quando o repasse ainda não foi pago), zera as marcações de origem externa
+ * no agendamento e registra o que foi desfeito no histórico da ficha.
+ *
+ * Usado pela desmarcação ("Liberar horário") e pelo cancelamento, para que a
+ * ficha volte ao estado de um agendamento comum — sem sobrar nada no
+ * Financeiro. Nada é apagado do histórico/auditoria.
+ */
+export const limparAtendimentoExterno = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { agendamento_id: string }) => d)
+  .handler(async ({ data, context }): Promise<LimparExternoResult> => {
+    const claims = context.claims as
+      | { email?: string; user_metadata?: { nome?: string } }
+      | null;
+    return limparExternoCore(context.supabase as never, data.agendamento_id, {
+      email: claims?.email ?? null,
+      nome: claims?.user_metadata?.nome ?? null,
+    });
   });
