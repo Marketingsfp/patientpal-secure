@@ -5055,7 +5055,7 @@ function AgendaPage() {
         if (info?.desconto?.tipo === "gratuidade" && !opcoesOrc) {
           const escolha = await perguntarGratuidade(info.convenioNome);
           if (escolha === "cancel") return;
-          if (escolha === "depois") info = { ...info, desconto: null };
+          if (escolha === "depois") info = { ...info, desconto: info.descontoSemGratuidade ?? null };
         }
         if (opcoesOrc) {
           opcoes = opcoesOrc;
@@ -5619,7 +5619,7 @@ function AgendaPage() {
         if (info?.desconto?.tipo === "gratuidade" && !opcoesOrc) {
           const escolha = await perguntarGratuidade(info.convenioNome);
           if (escolha === "cancel") return;
-          if (escolha === "depois") info = { ...info, desconto: null };
+          if (escolha === "depois") info = { ...info, desconto: info.descontoSemGratuidade ?? null };
         }
         if (opcoesOrc) {
           // O orçamento é gravado sempre em valor particular; o benefício do
