@@ -2838,6 +2838,7 @@ export type Database = {
           status: string
           tabela_legada: boolean
           taxa_adesao: number
+          teste: boolean
           titular_apenas_financeiro: boolean
           token_publico: string | null
           updated_at: string
@@ -2875,6 +2876,7 @@ export type Database = {
           status?: string
           tabela_legada?: boolean
           taxa_adesao?: number
+          teste?: boolean
           titular_apenas_financeiro?: boolean
           token_publico?: string | null
           updated_at?: string
@@ -2912,6 +2914,7 @@ export type Database = {
           status?: string
           tabela_legada?: boolean
           taxa_adesao?: number
+          teste?: boolean
           titular_apenas_financeiro?: boolean
           token_publico?: string | null
           updated_at?: string
@@ -3495,6 +3498,7 @@ export type Database = {
           repasse_pago_em: string | null
           repasse_pago_por: string | null
           status: string
+          teste: boolean
           updated_at: string
           valor_clinica: number
           valor_laudo: number
@@ -3529,6 +3533,7 @@ export type Database = {
           repasse_pago_em?: string | null
           repasse_pago_por?: string | null
           status?: string
+          teste?: boolean
           updated_at?: string
           valor_clinica?: number
           valor_laudo?: number
@@ -3563,6 +3568,7 @@ export type Database = {
           repasse_pago_em?: string | null
           repasse_pago_por?: string | null
           status?: string
+          teste?: boolean
           updated_at?: string
           valor_clinica?: number
           valor_laudo?: number
@@ -6946,6 +6952,7 @@ export type Database = {
           sexo: string
           telefone: string | null
           telefone2: string | null
+          teste: boolean
           updated_at: string
         }
         Insert: {
@@ -6982,6 +6989,7 @@ export type Database = {
           sexo?: string
           telefone?: string | null
           telefone2?: string | null
+          teste?: boolean
           updated_at?: string
         }
         Update: {
@@ -7018,6 +7026,7 @@ export type Database = {
           sexo?: string
           telefone?: string | null
           telefone2?: string | null
+          teste?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -7890,6 +7899,72 @@ export type Database = {
           },
         ]
       }
+      qa_cb_casos: {
+        Row: {
+          caso: number
+          cenario: string
+          clinica_id: string
+          contrato_id: string | null
+          convenio_id: string | null
+          convenio_nome: string | null
+          created_at: string
+          detalhe: string | null
+          execucao: string
+          forma: string | null
+          id: string
+          observacao: string | null
+          paciente_id: string | null
+          passou: boolean
+          procedimento_id: string | null
+          procedimento_nome: string | null
+          valor_esperado: number
+          valor_obtido: number
+          valor_particular: number
+        }
+        Insert: {
+          caso: number
+          cenario: string
+          clinica_id: string
+          contrato_id?: string | null
+          convenio_id?: string | null
+          convenio_nome?: string | null
+          created_at?: string
+          detalhe?: string | null
+          execucao: string
+          forma?: string | null
+          id?: string
+          observacao?: string | null
+          paciente_id?: string | null
+          passou?: boolean
+          procedimento_id?: string | null
+          procedimento_nome?: string | null
+          valor_esperado?: number
+          valor_obtido?: number
+          valor_particular?: number
+        }
+        Update: {
+          caso?: number
+          cenario?: string
+          clinica_id?: string
+          contrato_id?: string | null
+          convenio_id?: string | null
+          convenio_nome?: string | null
+          created_at?: string
+          detalhe?: string | null
+          execucao?: string
+          forma?: string | null
+          id?: string
+          observacao?: string | null
+          paciente_id?: string | null
+          passou?: boolean
+          procedimento_id?: string | null
+          procedimento_nome?: string | null
+          valor_esperado?: number
+          valor_obtido?: number
+          valor_particular?: number
+        }
+        Relationships: []
+      }
       regras_rateio: {
         Row: {
           ativo: boolean
@@ -8694,6 +8769,7 @@ export type Database = {
           sexo: string
           telefone: string | null
           telefone2: string | null
+          teste: boolean
           updated_at: string
         }[]
         SetofOptions: {
@@ -9348,6 +9424,7 @@ export type Database = {
           sexo: string
           telefone: string | null
           telefone2: string | null
+          teste: boolean
           updated_at: string
         }[]
         SetofOptions: {
