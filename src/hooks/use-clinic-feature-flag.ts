@@ -15,8 +15,8 @@ import { useClinica } from "./use-clinica";
  * `clinica_feature_flags`). Todas as flags abaixo estão `ativo = true` lá.
  *
  * Inclui flags que LIGAM UX (`ux_melhorias`, `menu_hover_scale`) e flags que
- * DESLIGAM recursos (`turbo_mode_agenda_disabled`, `atendimento_multiplo_disabled`)
- * — a Menino Jesus fica idêntica à São Francisco.
+ * DESLIGAM recursos (`turbo_mode_agenda_disabled`) — a Menino Jesus fica
+ * idêntica à São Francisco.
  *
  * NÃO incluídas (a São Francisco não as tem): `permissoes_financeiro_granular`,
  * `novo_layout_agenda`, `agenda_express_disabled` (esta foi removida do sistema).
@@ -25,7 +25,6 @@ const FLAGS_HERDADAS_SFP = new Set<string>([
   "ux_melhorias",
   "menu_hover_scale",
   "turbo_mode_agenda_disabled",
-  "atendimento_multiplo_disabled",
 ]);
 
 /** Clínica que herda a config da São Francisco de Paula (por nome, mesmo padrão
