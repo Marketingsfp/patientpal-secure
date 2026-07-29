@@ -220,8 +220,8 @@ function NinaPage() {
               titulo="Cobrança de boleto / Pix"
               desc="Envia o boleto/Pix no dia da emissão e lembretes 3 dias antes e no vencimento." ativa />
             <AutoCard icon={Cake} cor="text-pink-500"
-              titulo="Aniversários e campanhas"
-              desc="Parabeniza pacientes no aniversário e dispara campanhas segmentadas (ex: revisão anual)." ativa />
+              titulo="Aniversários"
+              desc="Parabeniza pacientes automaticamente na data de aniversário." ativa />
             <AutoCard icon={Mic} cor="text-emerald-500"
               titulo="Resposta a áudios"
               desc="Transcreve áudios do paciente com IA (Gemini) e responde por texto ou áudio." ativa />
@@ -1175,7 +1175,7 @@ function TemplatesWhatsapp() {
 
   // Formulário
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<"MARKETING" | "UTILITY" | "AUTHENTICATION">("UTILITY");
+  const [category, setCategory] = useState<"UTILITY" | "AUTHENTICATION">("UTILITY");
   const [language, setLanguage] = useState("pt_BR");
   const [headerText, setHeaderText] = useState("");
   const [body, setBody] = useState("Olá {{1}}, sua consulta está confirmada para {{2}}.");
@@ -1371,7 +1371,6 @@ function TemplatesWhatsapp() {
                   onChange={(e) => setCategory(e.target.value as any)}
                 >
                   <option value="UTILITY">Utilidade (transacional)</option>
-                  <option value="MARKETING">Marketing</option>
                   <option value="AUTHENTICATION">Autenticação</option>
                 </select>
               </div>
