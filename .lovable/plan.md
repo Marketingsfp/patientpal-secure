@@ -1,20 +1,39 @@
 ## Objetivo
 
-Na tela **Financeiro → Atendimentos**, as linhas de atendimentos externos devem aparecer com fundo vermelho bem claro.
+Hoje, ao registrar um **Atendimento externo** na agenda, o sistema grava o agendamento (`origem_externa = true`) e o `fin_atendimentos` (valor_clinica = 0, valor_medico = repasse), mas **não imprime GR nenhuma**. A guia só sai no fluxo de faturamento normal, que depende de `fin_lancamentos` — que o externo não gera.
 
-## Situação atual (verificada)
+Queremos que o atendimento externo imprima uma GR igual às demais, deixando claro que é externo e que não houve cobrança no caixa.
 
-- A tabela é renderizada em `src/routes/_authenticated/app.financeiro.atendimentos.tsx` (linhas ~2607-2624).
-- A cor da linha hoje é decidida pela variável `rowBg`: âmbar quando selecionada e pendente, senão zebrado (`bg-background` / `bg-slate-50 dark:bg-slate-900/40`).
-- Atendimentos externos são gravados em `fin_atendimentos` com `forma_pagamento = "externo"` (ver `src/lib/agenda/atendimento-externo.functions.ts`), e esse campo já vem no `select` e é mapeado no item (`forma_pagamento`), tanto na origem `manual` quanto na de agenda.
+## O que muda
 
-## O que será feito
+### 1. GR passa a reconhecer o atendimento externo
+Em `src/lib/print-gr.ts` (`printGuiaAtendimentoCore`):
 
-1. No cálculo de `rowBg`, adicionar a detecção de externo: `a.forma_pagamento === "externo"` (comparação sem diferenciar maiúsculas/acentos).
-2. Precedência: seleção pendente (âmbar) continua vencendo; logo abaixo entra o vermelho claro, e só depois o zebrado padrão.
-3. Cor: `bg-rose-50 dark:bg-rose-950/30`, mantendo o `hover:bg-muted/30` e a coluna fixa acompanhando (a variável `rowBg` já é usada pela célula fixa, então o destaque fica consistente na linha inteira).
+- Ler também `origem_externa`, `origem_clinica_nome`, `origem_valor` do agendamento.
+- Quando `origem_externa = true`:
+  - Cabeçalho da guia ganha um selo em destaque logo abaixo de "GUIA DE ATENDIMENTO":
+    ```text
+    ***  ATENDIMENTO EXTERNO  ***
+      ORIGEM: <NOME DA CLÍNICA>
+    SEM COBRANÇA NESTA UNIDADE
+    ```
+  - No lugar do bloco "VALOR RECEBIDO" (que hoje some porque `valor = 0`), imprime:
+    - `VALOR TABELA: R$ x` (origem_valor)
+    - `CLINICA: R$ 0,00`
+    - `PRESTADOR: R$ <repasse>` — lido de `fin_atendimentos.valor_medico` do agendamento (fonte da verdade já gravada pela função `marcarAtendimentoExterno`), sem recalcular repasse.
+  - Rodapé mantém data/ficha/usuário/impressão nº como nas demais guias.
+- Nenhum outro caminho da GR é afetado: o bloco novo só aparece com `origem_externa = true`.
+
+### 2. Impressão automática ao registrar
+Em `src/components/agenda/atendimento-externo-dialog.tsx`: depois do `marcarAtendimentoExterno` retornar `ok`, chamar `printGuiaAtendimento` com o `agendamentoId`, `clinicaId`, nome do usuário logado e o número da ficha (quando disponível). Falha de impressão não invalida o registro — mostra toast de aviso.
+
+Mesmo tratamento no ponto equivalente do wizard da Agenda V2, se ele também registra externo.
+
+### 3. Reimpressão
+O botão "$" / "Imprimir GR" da agenda já chama `printGuiaAtendimento`/`reimprimirGuiaAtendimento` pelo `agendamentoId`, então a segunda via do externo sai automaticamente com o mesmo selo, contabilizando vias em `gr_impressoes` como qualquer outra guia.
 
 ## Detalhes técnicos
 
-- Mudança puramente visual, num único arquivo, sem alteração de consulta, banco ou regra de negócio.
-- Se houver células com fundo próprio dentro da linha que quebrem o tom, elas reutilizam `rowBg` — verificarei durante a implementação para o vermelho cobrir a linha completa.
+- Sem migração de banco: todas as colunas usadas (`origem_externa`, `origem_clinica_nome`, `origem_valor`, `fin_atendimentos.valor_medico`) já existem.
+- Layout continua térmico (mesmo `BASE_CSS`), com linhas curtas para não quebrar a impressão de 80mm.
+- Número de vias segue a regra atual (`numViasGR`); externo sem forma de pagamento cai no padrão.
