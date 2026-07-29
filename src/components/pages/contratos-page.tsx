@@ -321,11 +321,86 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
   const load = async (termo: string = qDebounced) => {
     if (!clinicaAtual) return;
     setLoading(true);
+    const paginaReq = Math.max(1, pagina);
+    const hojeISO = new Date().toISOString().slice(0, 10);
+    const anoAtual = new Date().getFullYear();
+
+    // Filtros que dependem das mensalidades (Situação / Parcelas) não podem
+    // ser resolvidos direto na query de contratos: calculamos o agregado de
+    // toda a clínica uma vez (cache por clínica) e restringimos por IDs.
+    let idsPorParcelas: string[] | null = null;
+    if (filtroSituacao !== "todas" || filtroProgresso !== "todas") {
+      const aggAll = await carregarAggGlobal(clinicaAtual.clinica_id);
+      idsPorParcelas = Object.entries(aggAll)
+        .filter(([, a]) => {
+          if (filtroSituacao !== "todas") {
+            const emDia = !a.temAtrasada;
+            if (filtroSituacao === "em_dia" && !emDia) return false;
+            if (filtroSituacao === "pendente" && emDia) return false;
+          }
+          if (filtroProgresso !== "todas") {
+            if (filtroProgresso === "sem_pag" && a.pagas !== 0) return false;
+            if (filtroProgresso === "andamento" && (a.pagas === 0 || a.pagas >= a.total)) return false;
+            if (filtroProgresso === "quitadas" && (a.total === 0 || a.pagas < a.total)) return false;
+          }
+          return true;
+        })
+        .map(([id]) => id);
+      if (idsPorParcelas.length === 0) {
+        setList([]);
+        setTotal(0);
+        setParcAgg({});
+        setLoading(false);
+        return;
+      }
+    }
+
     let contratosQuery = supabase
       .from("contratos_assinatura")
-      .select("*")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("created_at", { ascending: false });
+      .select("*", { count: "exact" })
+      .eq("clinica_id", clinicaAtual.clinica_id);
+
+    if (idsPorParcelas) contratosQuery = contratosQuery.in("id", idsPorParcelas);
+
+    // Filtros simples aplicados no banco (valem para a base inteira).
+    if (filtroStatus !== "todos") contratosQuery = contratosQuery.eq("status", filtroStatus);
+    if (filtroConvenio !== "todos") {
+      contratosQuery = filtroConvenio === "sem"
+        ? contratosQuery.is("convenio_id", null)
+        : contratosQuery.eq("convenio_id", filtroConvenio);
+    }
+    if (filtroVendedor !== "todos") {
+      contratosQuery = filtroVendedor === "sem"
+        ? contratosQuery.is("criado_por", null)
+        : contratosQuery.eq("criado_por", filtroVendedor);
+    }
+    if (filtroMensal !== "todos") {
+      if (filtroMensal === "zero") contratosQuery = contratosQuery.eq("valor_mensal", 0);
+      if (filtroMensal === "ate100") contratosQuery = contratosQuery.gt("valor_mensal", 0).lte("valor_mensal", 100);
+      if (filtroMensal === "100a200") contratosQuery = contratosQuery.gt("valor_mensal", 100).lte("valor_mensal", 200);
+      if (filtroMensal === "acima200") contratosQuery = contratosQuery.gt("valor_mensal", 200);
+    }
+    if (filtroInicio !== "todos") {
+      const dISO = (d: number) => new Date(Date.now() - d * 86400000).toISOString().slice(0, 10);
+      if (filtroInicio === "30d") contratosQuery = contratosQuery.gte("data_inicio", dISO(30));
+      if (filtroInicio === "90d") contratosQuery = contratosQuery.gte("data_inicio", dISO(90));
+      if (filtroInicio === "ano") {
+        contratosQuery = contratosQuery.gte("data_inicio", `${anoAtual}-01-01`).lte("data_inicio", `${anoAtual}-12-31`);
+      }
+      if (filtroInicio === "anterior") contratosQuery = contratosQuery.lt("data_inicio", `${anoAtual}-01-01`);
+    }
+    if (filtroTermino !== "todos") {
+      const emDias = (d: number) => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
+      if (filtroTermino === "sem_data") contratosQuery = contratosQuery.is("data_fim", null);
+      if (filtroTermino === "vencidos") contratosQuery = contratosQuery.lt("data_fim", hojeISO);
+      if (filtroTermino === "30d") contratosQuery = contratosQuery.gte("data_fim", hojeISO).lte("data_fim", emDias(30));
+      if (filtroTermino === "90d") contratosQuery = contratosQuery.gte("data_fim", hojeISO).lte("data_fim", emDias(90));
+    }
+
+    contratosQuery = sortPaciente
+      ? contratosQuery.order("paciente_nome", { ascending: sortPaciente === "asc" })
+      : contratosQuery.order("created_at", { ascending: false });
+
     const s = termo.trim();
     if (s.length >= 2) {
       // Busca no servidor. O campo `paciente_nome` no contrato é um snapshot
@@ -353,10 +428,10 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       const orParts: string[] = [`paciente_nome.ilike.%${escLike}%`];
       if (soDigitos) orParts.push(`numero.eq.${s}`);
       if (pacIdsMatch.length > 0) orParts.push(`paciente_id.in.(${pacIdsMatch.join(",")})`);
-      contratosQuery = contratosQuery.or(orParts.join(",")).limit(200);
-    } else {
-      contratosQuery = contratosQuery.limit(500);
+      contratosQuery = contratosQuery.or(orParts.join(","));
     }
+    const inicioRange = (paginaReq - 1) * POR_PAGINA;
+    contratosQuery = contratosQuery.range(inicioRange, inicioRange + POR_PAGINA - 1);
     const [cs, cv] = await Promise.all([
       contratosQuery,
       supabase
@@ -368,6 +443,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     ]);
     if (cs.error) mostrarErro(cs.error);
     const contratosRows = (cs.data ?? []) as Contrato[];
+    setTotal(cs.count ?? contratosRows.length);
     // Enriquecer com codigo_prontuario do paciente titular (leitura, imutável).
     const pacIds = Array.from(
       new Set(contratosRows.map((c) => c.paciente_id).filter((x): x is string => !!x)),
