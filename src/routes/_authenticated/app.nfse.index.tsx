@@ -253,7 +253,6 @@ function NfsePage() {
               <Button asChild><Link to="/app/nfse/testar"><FilePlus2 className="h-4 w-4 mr-2" /> Emitir NFS-e</Link></Button>
             )}
           </div>
-        )}
       </div>
 
       <div className="rounded-lg border bg-card p-4 flex flex-wrap gap-3 items-end">
