@@ -284,7 +284,7 @@ function VozConfigPage() {
   );
 }
 
-const TTS_ENDPOINT = "https://server-mj.tailec426c.ts.net/api/tts";
+const TTS_ENDPOINT = "/api/tts-proxy";
 const VOZES = [
   { value: "faber", label: "Faber (Masculino)" },
   { value: "feminina", label: "Feminina" },

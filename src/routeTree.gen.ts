@@ -31,6 +31,7 @@ import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
 import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
+import { Route as ApiTtsProxyRouteImport } from './routes/api/tts-proxy'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
 import { Route as TotemTTokenRouteImport } from './routes/totem_.t.$token'
@@ -249,6 +250,11 @@ const LpSlugRoute = LpSlugRouteImport.update({
 const CheckinTokenRoute = CheckinTokenRouteImport.update({
   id: '/checkin/$token',
   path: '/checkin/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTtsProxyRoute = ApiTtsProxyRouteImport.update({
+  id: '/api/tts-proxy',
+  path: '/api/tts-proxy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
@@ -898,6 +904,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
+  '/api/tts-proxy': typeof ApiTtsProxyRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -1030,6 +1037,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
+  '/api/tts-proxy': typeof ApiTtsProxyRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -1162,6 +1170,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
+  '/api/tts-proxy': typeof ApiTtsProxyRoute
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
@@ -1297,6 +1306,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/totem'
     | '/app'
+    | '/api/tts-proxy'
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
@@ -1429,6 +1439,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/sitemap.xml'
     | '/totem'
+    | '/api/tts-proxy'
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
@@ -1560,6 +1571,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/totem'
     | '/_authenticated/app'
+    | '/api/tts-proxy'
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
@@ -1694,6 +1706,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TotemRoute: typeof TotemRoute
+  ApiTtsProxyRoute: typeof ApiTtsProxyRoute
   CheckinTokenRoute: typeof CheckinTokenRoute
   LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
@@ -1867,6 +1880,13 @@ declare module '@tanstack/react-router' {
       path: '/checkin/$token'
       fullPath: '/checkin/$token'
       preLoaderRoute: typeof CheckinTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tts-proxy': {
+      id: '/api/tts-proxy'
+      path: '/api/tts-proxy'
+      fullPath: '/api/tts-proxy'
+      preLoaderRoute: typeof ApiTtsProxyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app': {
@@ -2975,6 +2995,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TotemRoute: TotemRoute,
+  ApiTtsProxyRoute: ApiTtsProxyRoute,
   CheckinTokenRoute: CheckinTokenRoute,
   LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
