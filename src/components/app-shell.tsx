@@ -11,9 +11,7 @@ import { ROUTE_TO_MODULE as SHARED_ROUTE_TO_MODULE, moduloDaRota, SUBMODULE_PARE
 import { SemPermissao } from "@/components/sem-permissao";
 import { supabase } from "@/integrations/supabase/client";
 import { getSubsystem, setSubsystem, subscribeSubsystem, SUBSYSTEMS } from "@/lib/subsystem";
-import logoSaoFrancisco from "@/assets/logo-sao-francisco.png";
 import logoMeninoJesus from "@/assets/logo-menino-jesus.png";
-import logoConsultaHoje from "@/assets/logo-consulta-hoje.png";
 import { EstornosBell } from "@/components/EstornosBell";
 import { UniversalSearchBar } from "@/components/universal-search-bar";
 import { TTSToggle } from "@/components/tts/tts-toggle";
@@ -26,25 +24,19 @@ import { cn } from "@/lib/utils";
 
 function corDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
-  if (n.includes("são francisco") || n.includes("sao francisco")) return "#006634"; // verde São Francisco
   if (n.includes("menino jesus")) return "#2A4A9C"; // azul Menino Jesus
-  if (n.includes("consulta hoje")) return "#6D28D9"; // roxo Consulta Hoje
   return "hsl(var(--muted-foreground))";
 }
 
 function corHoverDaClinica(nome?: string): string {
   const n = (nome ?? "").toLowerCase();
-  if (n.includes("são francisco") || n.includes("sao francisco")) return "#004d27"; // verde escuro
   if (n.includes("menino jesus")) return "#1E3A7A"; // azul escuro Menino Jesus
-  if (n.includes("consulta hoje")) return "#4C1D95"; // roxo escuro
   return "rgba(0,0,0,0.25)";
 }
 
 function logoDaClinica(nome?: string): string | null {
   const n = (nome ?? "").toLowerCase();
-  if (n.includes("são francisco") || n.includes("sao francisco")) return logoSaoFrancisco;
   if (n.includes("menino jesus")) return logoMeninoJesus;
-  if (n.includes("consulta hoje")) return logoConsultaHoje;
   return null;
 }
 import {
@@ -70,7 +62,7 @@ const isParent = (it: NavItem): it is NavParent => "children" in it;
 const navItemKey = (it: NavItem): string =>
   isParent(it) ? `grupo:${it.label}` : `${it.to}${it.hash ? `#${it.hash}` : ""}`;
 
-// Bottom nav mobile — piloto São Francisco de Paula (flag ux_melhorias).
+// Bottom nav mobile (flag ux_melhorias).
 // Os 4 atalhos mais usados; o resto do menu continua acessível via "Mais".
 const BOTTOM_NAV_ITENS: ReadonlyArray<{ to: string; label: string; Icon: typeof CalendarDays }> = [
   { to: "/app/agenda", label: "Agenda", Icon: CalendarDays },
