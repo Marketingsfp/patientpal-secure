@@ -11,7 +11,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { criarAgendamento } from "@/lib/agenda/criar-agendamento.functions";
 import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
-import { valorDaTabela } from "@/lib/agenda/atendimento-externo-preco";
 import { buscarVinculoConvenio } from "@/lib/convenio/modalidade";
 import { calcularRepasseExterno, listarConveniosClinica } from "@/lib/agenda/atendimento-externo-repasse";
 import { mostrarErro } from "@/lib/traduzir-erro";
