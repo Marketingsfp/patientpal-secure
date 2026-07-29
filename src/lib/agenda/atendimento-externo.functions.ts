@@ -7,7 +7,11 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { buscarValorProcedimento } from "./atendimento-externo.server";
+import {
+  buscarValorProcedimento,
+  limparExternoCore,
+  type LimparExternoResult,
+} from "./atendimento-externo.server";
 
 export type MarcarExternoInput = {
   agendamento_id: string;
