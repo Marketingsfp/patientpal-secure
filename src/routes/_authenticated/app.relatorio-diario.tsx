@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { CalendarDays, Plus, RefreshCw, Send, Trash2, AlertTriangle, Copy } from "lucide-react";
+import { CalendarDays, Plus, RefreshCw, Send, Trash2, AlertTriangle, Copy, FileDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,6 +90,25 @@ function Page() {
   const salvar = useServerFn(salvarEntradaRelatorio);
   const excluir = useServerFn(excluirEntradaRelatorio);
   const enviar = useServerFn(enviarRelatorioAgora);
+  const baixarPdf = useServerFn(baixarRelatorioPdf);
+  const [baixando, setBaixando] = useState(false);
+
+  const baixar = async () => {
+    setBaixando(true);
+    try {
+      const r = await baixarPdf({ data: { data: dia } });
+      const bin = atob(r.base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = r.arquivo;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { mostrarErro(e); }
+    finally { setBaixando(false); }
+  };
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -167,6 +186,9 @@ function Page() {
         </Button>
         <Button size="sm" variant="secondary" onClick={() => void enviarAgora()} disabled={enviando}>
           <Send className="h-4 w-4 mr-1" /> Enviar agora
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => void baixar()} disabled={baixando}>
+          <FileDown className="h-4 w-4 mr-1" /> Baixar PDF
         </Button>
       </div>
 
