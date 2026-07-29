@@ -297,6 +297,37 @@ function labelDaVoz(v: string): string {
 const VOZES_FALLBACK = ["faber", "feminina"];
 const VOZES_MANUAIS_KEY = "tts:vozes-manuais";
 
+function extrairVozes(payload: unknown): string[] {
+  const walk = (v: unknown): string[] | null => {
+    if (Array.isArray(v)) {
+      const strs = v
+        .map((x) => {
+          if (typeof x === "string") return x;
+          if (x && typeof x === "object") {
+            const o = x as Record<string, unknown>;
+            for (const k of ["name", "voice", "id", "key"]) {
+              if (typeof o[k] === "string") return o[k] as string;
+            }
+          }
+          return null;
+        })
+        .filter((x): x is string => !!x && x.length > 0);
+      return strs.length ? strs : null;
+    }
+    if (v && typeof v === "object") {
+      for (const key of ["voices", "vozes", "data", "items", "models"]) {
+        const inner = (v as Record<string, unknown>)[key];
+        const r = walk(inner);
+        if (r) return r;
+      }
+      const keys = Object.keys(v as Record<string, unknown>);
+      if (keys.length && keys.every((k) => typeof k === "string")) return keys;
+    }
+    return null;
+  };
+  return Array.from(new Set(walk(payload) ?? []));
+}
+
 function lerVozesManuais(): string[] {
   if (typeof window === "undefined") return [];
   try {
