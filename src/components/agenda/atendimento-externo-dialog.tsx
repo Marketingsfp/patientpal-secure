@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useClinica } from "@/hooks/use-clinica";
+import { useAuth } from "@/hooks/use-auth";
+import { printGuiaAtendimento } from "@/lib/print-gr";
 import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { buscarVinculoConvenio, type ModalidadeConvenio } from "@/lib/convenio/modalidade";
@@ -21,6 +23,8 @@ type Props = {
   clinicaId: string | null;
   pacienteNome?: string | null;
   procedimento?: string | null;
+  /** Número da ficha calculado na agenda (para a GR bater com a lista). */
+  fichaNumero?: number | null;
   onDone?: () => void;
 };
 
@@ -40,10 +44,12 @@ export function AtendimentoExternoDialog({
   clinicaId,
   pacienteNome,
   procedimento,
+  fichaNumero,
   onDone,
 }: Props) {
   const marcarFn = useServerFn(marcarAtendimentoExterno);
   const { memberships } = useClinica();
+  const { user } = useAuth();
   const [origemId, setOrigemId] = useState<string>("");
   const [clinicaNome, setClinicaNome] = useState("");
   const [temConvenio, setTemConvenio] = useState(false);
@@ -141,6 +147,17 @@ export function AtendimentoExternoDialog({
     setSalvando(false);
     if (!res.ok) return toast.error(res.message);
     toast.success("Atendimento externo registrado — sem lançamento em caixa.");
+    try {
+      await printGuiaAtendimento({
+        agendamentoId,
+        clinicaId,
+        usuarioNome: (user?.user_metadata as { nome?: string } | undefined)?.nome ?? user?.email ?? undefined,
+        usuarioId: user?.id ?? null,
+        fichaNumero: fichaNumero ?? undefined,
+      });
+    } catch {
+      toast.warning("Registro salvo, mas a GR não pôde ser impressa. Use o botão Imprimir GR na agenda.");
+    }
     onOpenChange(false);
     onDone?.();
   };
