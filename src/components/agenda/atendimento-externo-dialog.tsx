@@ -84,6 +84,21 @@ export function AtendimentoExternoDialog({
     }
   }, [open]);
 
+  // Lista de unidades: todas as clínicas ativas (RPC), não só as do usuário.
+  useEffect(() => {
+    if (!open) return;
+    let cancelado = false;
+    setCarregandoUnidades(true);
+    void (async () => {
+      const { data, error } = await supabase.rpc("listar_unidades_basico");
+      if (cancelado) return;
+      setCarregandoUnidades(false);
+      if (error || !data) return; // mantém fallback pelas memberships
+      setUnidadesDb((data as { id: string; nome: string }[]).map((u) => ({ id: u.id, nome: u.nome })));
+    })();
+    return () => { cancelado = true; };
+  }, [open]);
+
   // Carrega médico/paciente do agendamento, convênios da clínica e detecta
   // se o paciente já tem contrato ativo (pré-marca a flag).
   useEffect(() => {
