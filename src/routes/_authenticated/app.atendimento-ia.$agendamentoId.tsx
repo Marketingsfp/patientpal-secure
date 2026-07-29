@@ -446,7 +446,7 @@ function AtendimentoEditorPage() {
             {salvo.valorMedico > 0 && <> Repasse médico: <b className="text-foreground">R$ {salvo.valorMedico.toFixed(2)}</b>.</>}
           </p>
           <Button size="lg" onClick={() => navigate({ to: backTo })}>
-            <ArrowLeft className="h-4 w-4" /> {cameFromAgendaV2 ? backLabel : "Voltar para fila de atendimento"}
+            <ArrowLeft className="h-4 w-4" /> Voltar para fila de atendimento
           </Button>
         </Card>
       </div>
