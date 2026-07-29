@@ -166,7 +166,7 @@ function ClientesPage() {
         ? Promise.resolve({ count: totalPacientesManual, error: null })
         : supabase
           .from("pacientes")
-          .select("id", { count: "estimated", head: true })
+          .select("id", { count: "exact", head: true })
           .eq("clinica_id", clinicaAtual.clinica_id);
       const [{ data, error }, { count, error: countError }] = await Promise.all([dataRequest, countRequest]);
       if (requestId !== loadSeq.current) return;
@@ -213,7 +213,7 @@ function ClientesPage() {
     queryFn: async () => {
       const { count, error } = await supabase
         .from("pacientes")
-        .select("id", { count: "estimated", head: true })
+        .select("id", { count: "exact", head: true })
         .eq("clinica_id", clinicaId!);
       if (error) throw error;
       return count ?? 0;
