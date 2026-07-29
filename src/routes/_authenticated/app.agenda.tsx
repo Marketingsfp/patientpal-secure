@@ -6107,7 +6107,9 @@ function AgendaPage() {
 
   const imprimirGR = async (a: Agendamento) => {
     if (!clinicaAtual) return;
-    if (!pagosSet.has(a.id)) {
+    // Atendimento externo não gera lançamento em caixa local, portanto a GR
+    // (2ª via) deve poder ser reimpressa sem exigir pagamento.
+    if (!pagosSet.has(a.id) && !a.origem_externa) {
       toast.error("GR só pode ser impressa após o pagamento. Registre o pagamento antes.");
       return;
     }
@@ -8657,7 +8659,7 @@ function AgendaPage() {
                                 <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem onClick={() => imprimirGR(a)} disabled={!pagosSet.has(a.id)}>
+                            <DropdownMenuItem onClick={() => imprimirGR(a)} disabled={!pagosSet.has(a.id) && !a.origem_externa}>
                               <Printer className="h-4 w-4 mr-2" /> Imprimir GR
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => imprimirComprovante(a)}>
@@ -9050,9 +9052,9 @@ function AgendaPage() {
                               <DropdownMenuSeparator />
 
                               {/* Imprimir GR */}
-                              <DropdownMenuItem onClick={() => imprimirGR(a)} disabled={!pagosSet.has(a.id)}>
+                              <DropdownMenuItem onClick={() => imprimirGR(a)} disabled={!pagosSet.has(a.id) && !a.origem_externa}>
                                 <Printer className="h-4 w-4 mr-2" /> Imprimir GR
-                                {!pagosSet.has(a.id) && (
+                                {!pagosSet.has(a.id) && !a.origem_externa && (
                                   <span className="ml-2 text-xs text-muted-foreground">(pagar)</span>
                                 )}
                               </DropdownMenuItem>
