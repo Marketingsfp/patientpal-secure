@@ -17,7 +17,7 @@ import { formatDatePura } from "@/lib/date-utils";
 export const Route = createFileRoute("/_authenticated/app/hr-contratos/")({
   component: ContratosPage,
   head: () => ({ meta: [{ title: "Funcionários — ClinicaOS" }] }),
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (search: Record<string, unknown>): { new?: "1"; edit?: string } => ({
     new: search.new === "1" || search.new === 1 ? "1" : undefined,
     edit: typeof search.edit === "string" ? search.edit : undefined,
   }),
