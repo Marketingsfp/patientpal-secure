@@ -367,6 +367,13 @@ type ConvenioInfo = {
   /** Parcelas vencidas há mais de 5 dias (tolerância). Só isso bloqueia o convênio. */
   parcelasAtrasadas: number;
   desconto: DescontoConvenio | null;
+  /**
+   * Desconto da próxima regra do convênio ignorando as regras de gratuidade.
+   * Usado quando o paciente opta por NÃO usar a gratuidade agora — sem isso,
+   * recusar a cortesia cobrava o particular cheio, mesmo havendo uma regra de
+   * desconto (ex.: Preventivo gratuito 1x/ano OU 10% off) aplicável.
+   */
+  descontoSemGratuidade?: DescontoConvenio | null;
   avisoLimite?: string;
   bloquear?: boolean;
   /** Contrato com parcela(s) vencida(s) dentro da tolerância de 5 dias — informativo, não restringe benefício algum. */
@@ -1433,7 +1440,30 @@ async function obterInfoConvenioPaciente(params: {
     }
   }
 
-  return { convenioNome, emDia, parcelasAtrasadas, desconto, avisoLimite, bloquear, emCarencia, diasCarenciaRestantes, acrescimoCartao };
+  // Alternativa quando o paciente NÃO quiser usar a gratuidade agora: melhor
+  // regra do convênio para este procedimento ignorando as regras gratuitas
+  // (mesmo critério do fallback `regra_padrao_convenio`).
+  let descontoSemGratuidade: DescontoConvenio | null = null;
+  {
+    let alt: any = null;
+    for (const eid of espsTentativa) {
+      const r = findRegra(regrasCb as any, eid, procedimentoTipo, procedimentoId, { excludeGratuito: true });
+      if (r && (!alt || scoreRegra(r) > scoreRegra(alt))) alt = r;
+    }
+    if (alt && (isRenovacao || carenciaCumprida(alt, mensalidadesPagas))) {
+      if (alt.modo === "valor_fixo") {
+        const v = Number(alt.valor) || 0;
+        const vC = alt.valor_cartao != null ? (Number(alt.valor_cartao) || 0) : v;
+        descontoSemGratuidade = { tipo: "valor_fixo", valor: v, valorOutros: vC };
+      } else if (alt.modo === "percentual_desconto") {
+        const p = Number(alt.percentual) || 0;
+        const pC = alt.percentual_cartao != null ? (Number(alt.percentual_cartao) || 0) : p;
+        descontoSemGratuidade = { tipo: "percentual", valor: p, percentualOutros: pC };
+      }
+    }
+  }
+
+  return { convenioNome, emDia, parcelasAtrasadas, desconto, descontoSemGratuidade, avisoLimite, bloquear, emCarencia, diasCarenciaRestantes, acrescimoCartao };
 }
 
 /**
@@ -5025,7 +5055,7 @@ function AgendaPage() {
         if (info?.desconto?.tipo === "gratuidade" && !opcoesOrc) {
           const escolha = await perguntarGratuidade(info.convenioNome);
           if (escolha === "cancel") return;
-          if (escolha === "depois") info = { ...info, desconto: null };
+          if (escolha === "depois") info = { ...info, desconto: info.descontoSemGratuidade ?? null };
         }
         if (opcoesOrc) {
           opcoes = opcoesOrc;
@@ -5589,7 +5619,7 @@ function AgendaPage() {
         if (info?.desconto?.tipo === "gratuidade" && !opcoesOrc) {
           const escolha = await perguntarGratuidade(info.convenioNome);
           if (escolha === "cancel") return;
-          if (escolha === "depois") info = { ...info, desconto: null };
+          if (escolha === "depois") info = { ...info, desconto: info.descontoSemGratuidade ?? null };
         }
         if (opcoesOrc) {
           // O orçamento é gravado sempre em valor particular; o benefício do
