@@ -8,7 +8,7 @@ Configurações são independentes por clínica: código/UI compartilhados, mas 
 Independência de features/layout entre clínicas via feature flags por `clinica_id` (Opção B). Toda nova mudança divergível nasce com flag; correção global só para bugs críticos (segurança, LGPD, financeiro, schema). Nunca `if` por nome de clínica.
 
 ## Memories
-- [Apenas Menino Jesus ativa](mem://constraints/clinica-unica-menino-jesus) — SFP e Consulta Hoje removidas do código; flags agora nativas da MJ; dados mantidos no banco
+- [Apenas Menino Jesus ativa](mem://constraints/clinica-unica-menino-jesus) — clínica única no banco e no código; histórico das outras unidades migrado para a MJ
 - [Testes só com dados fictícios](mem://constraints/testes-dados-ficticios) — proibido tocar registros reais em qualquer simulação
 - [URL de publicação imutável](mem://constraints/url-publicacao-imutavel) — nunca alterar slug ou URL Lovable
 - [Config independente por clínica](mem://preferences/config-por-clinica) — parametrização sempre escopada por clinica_id
