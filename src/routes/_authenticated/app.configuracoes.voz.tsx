@@ -294,7 +294,27 @@ function labelDaVoz(v: string): string {
   return LABELS_CONHECIDOS[v] ?? v.charAt(0).toUpperCase() + v.slice(1);
 }
 const VOZES_FALLBACK = ["faber", "feminina"];
-const VOZES_CONHECIDAS_KEY = "tts:vozes-conhecidas";
+const VOZES_MANUAIS_KEY = "tts:vozes-manuais";
+
+function lerVozesManuais(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(VOZES_MANUAIS_KEY);
+    const arr = raw ? (JSON.parse(raw) as unknown) : null;
+    return Array.isArray(arr)
+      ? arr.filter((v): v is string => typeof v === "string" && !!v.trim())
+      : [];
+  } catch {
+    return [];
+  }
+}
+function salvarVozesManuais(v: string[]) {
+  try {
+    window.localStorage.setItem(VOZES_MANUAIS_KEY, JSON.stringify(v));
+  } catch {
+    /* ignora */
+  }
+}
 
 function TesteServidorLocalCard() {
   const [texto, setTexto] = useState<string>(
@@ -303,20 +323,17 @@ function TesteServidorLocalCard() {
   const [voice, setVoice] = useState<string>("faber");
   const [loading, setLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [vozes, setVozes] = useState<string[]>(() => {
-    if (typeof window === "undefined") return VOZES_FALLBACK;
-    try {
-      const s = window.localStorage.getItem(VOZES_CONHECIDAS_KEY);
-      const arr = s ? (JSON.parse(s) as string[]) : null;
-      return Array.isArray(arr) && arr.length ? arr : VOZES_FALLBACK;
-    } catch {
-      return VOZES_FALLBACK;
-    }
-  });
+  const [vozesServidor, setVozesServidor] = useState<string[]>(VOZES_FALLBACK);
+  const [origem, setOrigem] = useState<"servidor" | "fallback">("fallback");
+  const [vozesManuais, setVozesManuais] = useState<string[]>(() =>
+    lerVozesManuais(),
+  );
   const [detectando, setDetectando] = useState(false);
   const [novaVoz, setNovaVoz] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastUrlRef = useRef<string | null>(null);
+
+  const vozes = Array.from(new Set([...vozesServidor, ...vozesManuais]));
 
   useEffect(() => {
     return () => {
@@ -324,44 +341,38 @@ function TesteServidorLocalCard() {
     };
   }, []);
 
-  async function detectarVozes(opts?: { force?: boolean; extra?: string[] }) {
+  async function detectarVozes(opts?: { force?: boolean; silencioso?: boolean }) {
     setDetectando(true);
     try {
-      const params = new URLSearchParams();
-      if (opts?.force) params.set("refresh", "1");
-      if (opts?.extra?.length) params.set("extra", opts.extra.join(","));
-      const qs = params.toString();
-      const res = await fetch(
-        `${VOICES_ENDPOINT}${qs ? `?${qs}` : ""}`,
-      );
-      const data = (await res.json()) as { vozes?: string[]; error?: string };
+      const qs = opts?.force ? "?refresh=1" : "";
+      const res = await fetch(`${VOICES_ENDPOINT}${qs}`);
+      const data = (await res.json()) as {
+        vozes?: string[];
+        origem?: "servidor" | "fallback";
+        error?: string;
+      };
       if (!res.ok || !Array.isArray(data.vozes)) {
         throw new Error(data.error ?? `HTTP ${res.status}`);
       }
-      const combinadas = Array.from(
-        new Set([...(data.vozes ?? []), ...(opts?.extra ?? [])]),
-      );
-      if (combinadas.length === 0) {
-        toast.info("Nenhuma voz detectada no servidor Piper.");
-        return;
-      }
-      const anteriores = new Set(vozes);
-      const novas = combinadas.filter((v) => !anteriores.has(v));
-      setVozes(combinadas);
-      try {
-        window.localStorage.setItem(
-          VOZES_CONHECIDAS_KEY,
-          JSON.stringify(combinadas),
-        );
-      } catch {
-        /* ignora */
-      }
-      if (!vozes.includes(voice) && combinadas[0]) setVoice(combinadas[0]);
-      if (opts?.force || novas.length) {
+      const anteriores = new Set(vozesServidor);
+      const novas = data.vozes.filter((v) => !anteriores.has(v));
+      setVozesServidor(data.vozes);
+      setOrigem(data.origem ?? "fallback");
+      if (!opts?.silencioso) {
+        if (data.origem === "fallback") {
+          toast.info(
+            "Servidor Piper não expõe listagem de vozes. Adicione manualmente abaixo.",
+          );
+        } else if (novas.length) {
+          toast.success(
+            `Detectada${novas.length > 1 ? "s" : ""} ${novas.length} nova${novas.length > 1 ? "s" : ""} voz: ${novas.map(labelDaVoz).join(", ")}`,
+          );
+        } else if (opts?.force) {
+          toast.success(`${data.vozes.length} vozes disponíveis no servidor.`);
+        }
+      } else if (novas.length && data.origem === "servidor") {
         toast.success(
-          novas.length
-            ? `Detectada${novas.length > 1 ? "s" : ""} ${novas.length} nova${novas.length > 1 ? "s" : ""} voz: ${novas.map(labelDaVoz).join(", ")}`
-            : `${combinadas.length} vozes disponíveis.`,
+          `Nova voz detectada: ${novas.map(labelDaVoz).join(", ")}`,
         );
       }
     } catch (err) {
@@ -375,11 +386,37 @@ function TesteServidorLocalCard() {
 
   // Detecção automática ao abrir a tela + polling a cada 60s.
   useEffect(() => {
-    void detectarVozes();
-    const id = window.setInterval(() => void detectarVozes(), 60_000);
+    void detectarVozes({ silencioso: true });
+    const id = window.setInterval(
+      () => void detectarVozes({ silencioso: true }),
+      60_000,
+    );
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function adicionarVozManual() {
+    const nome = novaVoz.trim();
+    if (!nome) return;
+    if (vozes.includes(nome)) {
+      toast.info(`A voz "${nome}" já está na lista.`);
+      setNovaVoz("");
+      return;
+    }
+    const proximas = [...vozesManuais, nome];
+    setVozesManuais(proximas);
+    salvarVozesManuais(proximas);
+    setVoice(nome);
+    setNovaVoz("");
+    toast.success(`Voz "${nome}" adicionada.`);
+  }
+
+  function removerVozManual(nome: string) {
+    const proximas = vozesManuais.filter((v) => v !== nome);
+    setVozesManuais(proximas);
+    salvarVozesManuais(proximas);
+    if (voice === nome) setVoice(vozesServidor[0] ?? "faber");
+  }
 
   async function ouvir() {
     const t = texto.trim();
@@ -469,6 +506,9 @@ function TesteServidorLocalCard() {
                 {vozes.map((v) => (
                   <SelectItem key={v} value={v}>
                     {labelDaVoz(v)}
+                    {vozesManuais.includes(v) && !vozesServidor.includes(v)
+                      ? " (manual)"
+                      : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -489,11 +529,17 @@ function TesteServidorLocalCard() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <div className="flex-1 space-y-2">
             <Label className="text-xs text-muted-foreground">
-              Testar um nome de voz específico (avançado)
+              Adicionar uma nova voz manualmente (nome usado no Piper)
             </Label>
             <Input
               value={novaVoz}
               onChange={(e) => setNovaVoz(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  adicionarVozManual();
+                }
+              }}
               placeholder="ex.: minha_nova_voz"
             />
           </div>
@@ -501,17 +547,27 @@ function TesteServidorLocalCard() {
             type="button"
             variant="outline"
             className="gap-2"
-            disabled={detectando || !novaVoz.trim()}
-            onClick={async () => {
-              const nome = novaVoz.trim();
-              if (!nome) return;
-              await detectarVozes({ force: true, extra: [nome] });
-              setNovaVoz("");
-            }}
+            disabled={!novaVoz.trim()}
+            onClick={adicionarVozManual}
           >
             Adicionar
           </Button>
         </div>
+        {vozesManuais.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {vozesManuais.map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => removerVozManual(v)}
+                className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-xs hover:bg-destructive/10 hover:text-destructive"
+                title="Remover voz manual"
+              >
+                {labelDaVoz(v)} <span aria-hidden>×</span>
+              </button>
+            ))}
+          </div>
+        )}
         {audioUrl && (
           <audio
             ref={audioRef}
@@ -522,9 +578,19 @@ function TesteServidorLocalCard() {
           />
         )}
         <p className="text-xs text-muted-foreground">
-          As vozes são detectadas automaticamente no servidor Piper (via{" "}
-          <code>{VOICES_ENDPOINT}</code>). Vozes novas aparecem sozinhas em até
-          1 minuto — use <strong>Detectar</strong> para forçar a atualização.
+          {origem === "servidor" ? (
+            <>
+              Vozes obtidas automaticamente do servidor Piper — novas aparecem em
+              até 1 minuto (ou use <strong>Detectar</strong>).
+            </>
+          ) : (
+            <>
+              O servidor Piper atual não expõe listagem de vozes. Enquanto isso,
+              use o campo acima para cadastrar o nome de cada voz nova. Assim
+              que o servidor publicar <code>GET /api/voices</code>, esta lista
+              passa a ser preenchida sozinha.
+            </>
+          )}
         </p>
       </CardContent>
     </Card>
