@@ -1,67 +1,61 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-const UPSTREAM = "https://server-mj.tailec426c.ts.net/api/tts";
+const UPSTREAM_BASE = "https://server-mj.tailec426c.ts.net";
+const CANDIDATOS_LISTAGEM = ["/api/voices", "/voices", "/api/tts/voices"];
+const FALLBACK = ["faber", "feminina"];
 
-// Nomes conhecidos + comuns em vozes Piper pt-BR. Amplie livremente:
-// qualquer voz que o servidor Piper aceitar aparecerá automaticamente na tela.
-const CANDIDATOS = [
-  "faber",
-  "feminina",
-  "cadu",
-  "edresson",
-  "jeff",
-  "pirata",
-  "leila",
-  "julio",
-  "brenda",
-  "carlos",
-  "ana",
-  "bruno",
-  "clara",
-  "diana",
-  "eva",
-  "gabriel",
-  "helena",
-  "isabela",
-  "joao",
-  "luana",
-  "maria",
-  "pedro",
-  "rafael",
-  "sofia",
-  "thiago",
-  "vitoria",
-];
-
-type CacheEntry = { at: number; vozes: string[] };
+type CacheEntry = { at: number; vozes: string[]; origem: "servidor" | "fallback" };
 let cache: CacheEntry | null = null;
-const TTL_MS = 60_000;
+const TTL_MS = 30_000;
 
-async function probe(voice: string, signal: AbortSignal): Promise<boolean> {
-  try {
-    const r = await fetch(UPSTREAM, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: ".", voice }),
-      signal,
-    });
-    return r.ok;
-  } catch {
-    return false;
-  }
+function extrairVozes(payload: unknown): string[] | null {
+  const walk = (v: unknown): string[] | null => {
+    if (Array.isArray(v)) {
+      const strs = v
+        .map((x) =>
+          typeof x === "string"
+            ? x
+            : x && typeof x === "object" && "name" in (x as Record<string, unknown>)
+              ? String((x as Record<string, unknown>).name)
+              : x && typeof x === "object" && "voice" in (x as Record<string, unknown>)
+                ? String((x as Record<string, unknown>).voice)
+                : null,
+        )
+        .filter((x): x is string => !!x && x.length > 0);
+      return strs.length ? strs : null;
+    }
+    if (v && typeof v === "object") {
+      for (const key of ["voices", "vozes", "data", "items", "models"]) {
+        const inner = (v as Record<string, unknown>)[key];
+        const r = walk(inner);
+        if (r) return r;
+      }
+      const keys = Object.keys(v as Record<string, unknown>);
+      if (keys.length && keys.every((k) => typeof k === "string")) return keys;
+    }
+    return null;
+  };
+  return walk(payload);
 }
 
-async function detectar(extras: string[]): Promise<string[]> {
-  const lista = Array.from(
-    new Set([...CANDIDATOS, ...extras].map((v) => v.trim()).filter(Boolean)),
-  );
+async function tentarListar(): Promise<string[] | null> {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 15_000);
+  const timer = setTimeout(() => ctrl.abort(), 8_000);
   try {
-    const results = await Promise.all(
-      lista.map(async (v) => ((await probe(v, ctrl.signal)) ? v : null)),
-    );
-    return results.filter((v): v is string => !!v);
+    for (const path of CANDIDATOS_LISTAGEM) {
+      try {
+        const r = await fetch(`${UPSTREAM_BASE}${path}`, { signal: ctrl.signal });
+        if (!r.ok) continue;
+        const ct = r.headers.get("Content-Type") ?? "";
+        if (!ct.includes("json")) continue;
+        const j = (await r.json()) as unknown;
+        const vozes = extrairVozes(j);
+        if (vozes && vozes.length) return Array.from(new Set(vozes));
+      } catch {
+        /* tenta a próxima */
+      }
+    }
+    return null;
   } finally {
     clearTimeout(timer);
   }
@@ -73,28 +67,16 @@ export const Route = createFileRoute("/api/tts-voices")({
       GET: async ({ request }) => {
         const url = new URL(request.url);
         const force = url.searchParams.get("refresh") === "1";
-        const extras = (url.searchParams.get("extra") ?? "")
-          .split(",")
-          .map((v) => v.trim())
-          .filter(Boolean);
         const now = Date.now();
-        if (!force && cache && now - cache.at < TTL_MS && extras.length === 0) {
-          return Response.json({ vozes: cache.vozes, cached: true });
+        if (!force && cache && now - cache.at < TTL_MS) {
+          return Response.json({ ...cache, cached: true });
         }
-        try {
-          const vozes = await detectar(extras);
-          if (extras.length === 0) cache = { at: now, vozes };
-          return Response.json({ vozes, cached: false });
-        } catch (err) {
-          return Response.json(
-            {
-              vozes: [],
-              error:
-                err instanceof Error ? err.message : "Falha ao detectar vozes",
-            },
-            { status: 502 },
-          );
-        }
+        const vozes = await tentarListar();
+        const resposta: CacheEntry = vozes
+          ? { at: now, vozes, origem: "servidor" }
+          : { at: now, vozes: FALLBACK, origem: "fallback" };
+        cache = resposta;
+        return Response.json({ ...resposta, cached: false });
       },
     },
   },
