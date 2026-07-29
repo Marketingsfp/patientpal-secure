@@ -1,24 +1,24 @@
 ## Objetivo
 
-No diálogo **Atendimento externo** (agenda), o campo "Clínica de origem" deixa de ser texto livre e passa a oferecer uma lista suspensa com as unidades cadastradas no sistema.
+No diálogo "Atendimento externo", o campo **GR da origem** sai de cena (as GRs, antigas e novas, não têm numeração) e o **Valor na origem** passa a ser obrigatório, já que é ele que alimenta o repasse do médico.
 
-## Situação atual (verificada)
+## O que muda
 
-- `src/components/agenda/atendimento-externo-dialog.tsx` usa um `<Input>` livre e envia sempre `origem_clinica_id: null`, só o nome digitado.
-- O banco tem 3 unidades cadastradas: POLICLINICA MENINO JESUS, POLICLINICA SAO FRANCISCO DE PAULA e CLINICA CONSULTA HOJE.
-- As unidades do usuário já estão disponíveis no app via `useClinica()` (`memberships`), sem consulta nova.
+**1. Diálogo (`src/components/agenda/atendimento-externo-dialog.tsx`)**
+- Remove o campo "GR da origem" e seu estado.
+- "Valor na origem" ocupa a largura do formulário, marcado com `*` e validado: precisa ser maior que zero, senão mostra aviso e não salva.
+- Continua a lista suspensa de clínicas + opção "Outra clínica (digitar)".
 
-## O que vou fazer
+**2. Regra de negócio (`src/lib/agenda/atendimento-externo.functions.ts`)**
+- Deixa de exigir GR; passa a exigir `origem_valor > 0`.
+- `origem_gr_numero` vira opcional no tipo de entrada (mantido para não quebrar registros já gravados) e deixa de ser gravado em novos registros.
+- A observação do `fin_atendimentos` passa de `EXTERNO — GR 123 · Clínica` para `EXTERNO — <nome da clínica de origem>`.
+- `valor_medico` continua igual ao valor informado; `valor_clinica` segue 0 e nada entra no caixa nem gera NFS-e.
 
-1. Trocar o campo por um **seletor** com as unidades cadastradas, ordenadas por nome, ocultando a unidade em que o agendamento está sendo feito (não faz sentido "externo" para ela mesma).
-2. Manter uma opção **"Outra clínica (digitar)"** ao final da lista, que revela o campo de texto — assim clínicas parceiras que não estão cadastradas continuam funcionando.
-3. Ao escolher uma unidade da lista, gravar também o **identificador da unidade** (`origem_clinica_id`) além do nome, deixando o acerto entre clínicas rastreável. Na opção "Outra", grava só o nome, como hoje.
-4. Nenhuma mudança em valores, repasse, caixa ou nota fiscal — o comportamento de registro segue idêntico.
+**3. Identificação sem GR**
+O atendimento externo continua rastreável pela combinação clínica de origem + paciente + data + procedimento, que já é gravada no agendamento e no `fin_atendimentos`.
 
 ## Detalhes técnicos
 
-- Arquivo: `src/components/agenda/atendimento-externo-dialog.tsx`.
-- Fonte da lista: `memberships` de `@/hooks/use-clinica` (já em contexto, sem round-trip). Filtro: `clinica_id !== clinicaId` da prop.
-- UI: componente `Select` do shadcn já usado no projeto; estado novo `origemId` (`string | "outra"`).
-- Envio: `origem_clinica_id = origemId === "outra" ? null : origemId`; `origem_clinica_nome` = nome da unidade escolhida ou o texto digitado.
-- Validação atual (nome obrigatório) mantida; GR continua obrigatória.
+- Nenhuma migração: a coluna `origem_gr_numero` permanece na tabela `agendamentos` com os dados históricos, apenas deixa de ser preenchida.
+- Relatório financeiro de atendimentos externos: se ele exibir coluna de GR, ela será removida da apresentação (verificação feita durante a implementação).
