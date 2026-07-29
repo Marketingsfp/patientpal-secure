@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useClinica } from "@/hooks/use-clinica";
 import { marcarAtendimentoExterno } from "@/lib/agenda/atendimento-externo.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { valorDaTabela } from "@/lib/agenda/atendimento-externo.server";
+import { valorDaTabela } from "@/lib/agenda/atendimento-externo-preco";
 
 type Props = {
   open: boolean;

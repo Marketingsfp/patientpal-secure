@@ -1,31 +1,7 @@
-// Helpers server-only do atendimento externo. Ficam fora do arquivo
-// *.functions.ts por causa do split de server functions (o bundler apaga
-// declarações irmãs do handler).
+// Helper server-only do atendimento externo. Fica fora do *.functions.ts por
+// causa do split de server functions (o bundler apaga declarações irmãs).
+import { valorDaTabela, type PrecosProcedimento } from "./atendimento-externo-preco";
 
-type Precos = {
-  valor_dinheiro?: number | null;
-  valor_dinheiro_pix?: number | null;
-  valor_padrao?: number | null;
-};
-
-export function primeiroValorValido(...vals: Array<number | null | undefined>): number {
-  for (const v of vals) {
-    const n = Number(v);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  return 0;
-}
-
-export function valorDaTabela(p: Precos | null | undefined): number {
-  if (!p) return 0;
-  return primeiroValorValido(p.valor_dinheiro, p.valor_dinheiro_pix, p.valor_padrao);
-}
-
-/**
- * Preço do procedimento na tabela da clínica que está atendendo (a que
- * recebe a GR). É esse valor que vira base do repasse do médico quando o
- * operador não informa nada.
- */
 export async function buscarValorProcedimento(
   supabase: { from: (t: string) => any },
   clinicaId: string,
@@ -40,5 +16,5 @@ export async function buscarValorProcedimento(
     .ilike("nome", nome)
     .limit(1)
     .maybeSingle();
-  return valorDaTabela(data as Precos | null);
+  return valorDaTabela(data as PrecosProcedimento | null);
 }
