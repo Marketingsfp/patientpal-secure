@@ -166,10 +166,8 @@ export function MeuModulo() {
 
 ## 6. Rollback e adoção
 
-- O HHP é aditivo. Nenhum componente da Agenda V2 (ou clássica) foi
-  reescrito nesta fase — a Agenda V2 continua com seus próprios arquivos em
-  `src/components/agenda-v2/*` e os novos primitivos vivem em
-  `src/design-system/hhp/*`.
+- O HHP é aditivo. Nenhum componente existente foi reescrito nesta fase —
+  os primitivos vivem isolados em `src/design-system/hhp/*`.
 - Para "desligar" o HHP: basta remover a pasta `src/design-system/hhp/` e o
   bloco `Health Hub Pro — Design System tokens` de `src/styles.css`. Nada
   fora dessa pasta importa dele por padrão.

@@ -83,7 +83,7 @@ invalidar queries; (e) fechar o modal/wizard; (f) UX.
 Todas as extensões abaixo devem consumir `criarAgendamento` sem
 modificá-la, exceto onde explicitamente indicado.
 
-### Fase F.2 — Orçamento vinculado (Agenda V2)
+### Fase F.2 — Orçamento vinculado
 - Adicionar `orcamento_id` e `pending_orc_item_ids` no payload do wizard.
 - Reutilizar `buscarOrcamento` da clássica (extrair para
   `src/lib/agenda/orcamento.functions.ts` se acoplamento permitir).
@@ -91,13 +91,13 @@ modificá-la, exceto onde explicitamente indicado.
   grupos" — não reimplementar.
 - Sem mudança em `criarAgendamento`: a função já aceita os campos.
 
-### Fase F.3 — Sessão laboratorial com N exames (Agenda V2)
+### Fase F.3 — Sessão laboratorial com N exames
 - Novo step "múltiplos exames" no wizard V2 (ou reuso do picker).
 - Payload monta `procedimento = "LABORATÓRIO (N EXAMES): nome1, nome2..."`
   e envia N `pending_orc_item_ids`.
 - Sem mudança em `criarAgendamento`.
 
-### Recursos de Enfermagem (Agenda V2)
+### Recursos de Enfermagem
 - Novo step "profissional ou recurso" com toggle médico/recurso.
 - Payload preenche `enfermagem_recurso_id` em vez de `medico_id`.
 - Caller marca `checagens.validar_agenda_aberta = false` (bypass conforme
