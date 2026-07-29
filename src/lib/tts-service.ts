@@ -17,6 +17,7 @@
 const PROXY_URL = "/api/public/tts";
 const STORAGE_KEY = "tts:enabled";
 const RATE_STORAGE_KEY = "tts:rate";
+const VOICE_STORAGE_KEY = "tts:voice";
 export const DEFAULT_TTS_RATE = 0.55;
 export const MIN_TTS_RATE = 0.3;
 export const MAX_TTS_RATE = 1.5;
@@ -32,6 +33,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface ClinicaTtsConfig {
   rate: number;
   enabled: boolean;
+  voice?: string | null;
 }
 
 /** Aplica a config recebida no cache local e notifica todas as abas/hooks. */
@@ -51,6 +53,15 @@ export function applyClinicaTtsConfig(cfg: Partial<ClinicaTtsConfig>) {
     window.localStorage.setItem(STORAGE_KEY, cfg.enabled ? "1" : "0");
     if (!cfg.enabled) stopSpeaking();
   }
+  if (typeof cfg.voice === "string" && cfg.voice.trim()) {
+    window.localStorage.setItem(VOICE_STORAGE_KEY, cfg.voice.trim());
+    cache.forEach((url) => URL.revokeObjectURL(url));
+    cache.clear();
+  } else if (cfg.voice === null) {
+    window.localStorage.removeItem(VOICE_STORAGE_KEY);
+    cache.forEach((url) => URL.revokeObjectURL(url));
+    cache.clear();
+  }
   emitTtsChanged();
 }
 
@@ -60,11 +71,12 @@ export async function fetchClinicaTtsConfig(
 ): Promise<ClinicaTtsConfig | null> {
   const { data, error } = await supabase
     .from("clinica_tts_config")
-    .select("rate, enabled")
+    .select("rate, enabled, voice")
     .eq("clinica_id", clinicaId)
     .maybeSingle();
   if (error || !data) return null;
-  return { rate: Number(data.rate), enabled: !!data.enabled };
+  const row = data as { rate: number; enabled: boolean; voice?: string | null };
+  return { rate: Number(row.rate), enabled: !!row.enabled, voice: row.voice ?? null };
 }
 
 /** Grava a configuração da clínica no banco (dispara Realtime). */
@@ -79,6 +91,7 @@ export async function saveClinicaTtsConfig(
         clinica_id: clinicaId,
         rate: cfg.rate,
         enabled: cfg.enabled,
+        voice: cfg.voice ?? null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "clinica_id" },
@@ -108,12 +121,13 @@ export function subscribeClinicaTtsConfig(clinicaId: string): () => void {
       },
       (payload) => {
         const row = (payload.new ?? payload.old) as
-          | { rate?: number; enabled?: boolean }
+          | { rate?: number; enabled?: boolean; voice?: string | null }
           | null;
         if (!row) return;
         applyClinicaTtsConfig({
           rate: typeof row.rate === "number" ? row.rate : Number(row.rate),
           enabled: row.enabled,
+          voice: row.voice ?? null,
         });
       },
     )
