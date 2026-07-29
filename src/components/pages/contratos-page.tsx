@@ -270,6 +270,8 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
   // rota informa o módulo certo via prop, propagado aos componentes filhos.
   const podeEscrever = usePodeEscrever(modulo);
   const [list, setList] = useState<Contrato[]>([]);
+  // Total de contratos que atendem aos filtros atuais (contagem no banco).
+  const [total, setTotal] = useState(0);
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   // Map criado_por (uuid) → nome do vendedor. Preenchido em load().
   const [vendedores, setVendedores] = useState<Record<string, string>>({});
@@ -318,14 +320,154 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     return () => clearTimeout(t);
   }, [q]);
 
+  type ParcInfo = { pagas: number; total: number; temAtrasada: boolean };
+
+  /** Calcula, para TODOS os contratos da clínica, o agregado de parcelas
+   *  (pagas / total do ciclo atual / tem atrasada). Usado apenas quando os
+   *  filtros de Situação ou Parcelas estão ativos, pois eles não podem ser
+   *  resolvidos direto na consulta paginada. Resultado fica em cache por
+   *  clínica durante 60s para não repetir a cada troca de página. */
+  const aggGlobalRef = useRef<{ clinica: string; em: number; map: Record<string, ParcInfo> } | null>(null);
+  const carregarAggGlobal = async (clinicaId: string): Promise<Record<string, ParcInfo>> => {
+    const cache = aggGlobalRef.current;
+    if (cache && cache.clinica === clinicaId && Date.now() - cache.em < 60000) return cache.map;
+    // 1) todos os IDs de contrato da clínica (em páginas de 1000)
+    const ids: string[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from("contratos_assinatura")
+        .select("id")
+        .eq("clinica_id", clinicaId)
+        .order("created_at", { ascending: false })
+        .range(from, from + 999);
+      if (error) { mostrarErro(error); break; }
+      const rows = (data ?? []) as Array<{ id: string }>;
+      ids.push(...rows.map((r) => r.id));
+      if (rows.length < 1000) break;
+    }
+    const map = await calcularParcAgg(ids);
+    aggGlobalRef.current = { clinica: clinicaId, em: Date.now(), map };
+    return map;
+  };
+
+  /** Agregado de parcelas para uma lista de contratos, em lotes para não
+   *  estourar o teto de 1000 linhas por request do PostgREST. */
+  const calcularParcAgg = async (contratoIds: string[]): Promise<Record<string, ParcInfo>> => {
+    const hojeStr = new Date().toISOString().slice(0, 10);
+    const agg: Record<string, ParcInfo> = {};
+    for (const id of contratoIds) agg[id] = { pagas: 0, total: 0, temAtrasada: false };
+    const LOTE = 60; // ~60 contratos × 12 parcelas = 720 linhas por lote
+    for (let i = 0; i < contratoIds.length; i += LOTE) {
+      const slice = contratoIds.slice(i, i + LOTE);
+      const { data: mens } = await supabase
+        .from("contrato_mensalidades")
+        .select("contrato_id, status, vencimento, numero_parcela")
+        .in("contrato_id", slice);
+      // Agrupa por contrato para segmentar em ciclos de 12 parcelas
+      // (renovações acrescentam parcelas 13..24, 25..36, etc.).
+      const porContrato: Record<string, Array<{ status: string; vencimento: string; numero_parcela: number }>> = {};
+      for (const m of (mens ?? []) as Array<{ contrato_id: string; status: string; vencimento: string; numero_parcela: number }>) {
+        if (Number(m.numero_parcela) <= 0) continue; // ignora adesão/taxas
+        (porContrato[m.contrato_id] ||= []).push(m);
+      }
+      for (const [cid, arr] of Object.entries(porContrato)) {
+        const a = agg[cid];
+        if (!a) continue;
+        arr.sort((x, y) => y.numero_parcela - x.numero_parcela);
+        const cicloAtual = arr.slice(0, 12);
+        a.total = cicloAtual.length;
+        for (const m of cicloAtual) {
+          if (m.status === "pago") a.pagas += 1;
+          else if (m.vencimento && m.vencimento < hojeStr) a.temAtrasada = true;
+        }
+      }
+    }
+    return agg;
+  };
+
   const load = async (termo: string = qDebounced) => {
     if (!clinicaAtual) return;
     setLoading(true);
+    const paginaReq = Math.max(1, pagina);
+    const hojeISO = new Date().toISOString().slice(0, 10);
+    const anoAtual = new Date().getFullYear();
+
+    // Filtros que dependem das mensalidades (Situação / Parcelas) não podem
+    // ser resolvidos direto na query de contratos: calculamos o agregado de
+    // toda a clínica uma vez (cache por clínica) e restringimos por IDs.
+    let idsPorParcelas: string[] | null = null;
+    if (filtroSituacao !== "todas" || filtroProgresso !== "todas") {
+      const aggAll = await carregarAggGlobal(clinicaAtual.clinica_id);
+      idsPorParcelas = Object.entries(aggAll)
+        .filter(([, a]) => {
+          if (filtroSituacao !== "todas") {
+            const emDia = !a.temAtrasada;
+            if (filtroSituacao === "em_dia" && !emDia) return false;
+            if (filtroSituacao === "pendente" && emDia) return false;
+          }
+          if (filtroProgresso !== "todas") {
+            if (filtroProgresso === "sem_pag" && a.pagas !== 0) return false;
+            if (filtroProgresso === "andamento" && (a.pagas === 0 || a.pagas >= a.total)) return false;
+            if (filtroProgresso === "quitadas" && (a.total === 0 || a.pagas < a.total)) return false;
+          }
+          return true;
+        })
+        .map(([id]) => id);
+      if (idsPorParcelas.length === 0) {
+        setList([]);
+        setTotal(0);
+        setParcAgg({});
+        setLoading(false);
+        return;
+      }
+    }
+
     let contratosQuery = supabase
       .from("contratos_assinatura")
-      .select("*")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .order("created_at", { ascending: false });
+      .select("*", { count: "exact" })
+      .eq("clinica_id", clinicaAtual.clinica_id);
+
+    if (idsPorParcelas) contratosQuery = contratosQuery.in("id", idsPorParcelas);
+
+    // Filtros simples aplicados no banco (valem para a base inteira).
+    if (filtroStatus !== "todos") contratosQuery = contratosQuery.eq("status", filtroStatus);
+    if (filtroConvenio !== "todos") {
+      contratosQuery = filtroConvenio === "sem"
+        ? contratosQuery.is("convenio_id", null)
+        : contratosQuery.eq("convenio_id", filtroConvenio);
+    }
+    if (filtroVendedor !== "todos") {
+      contratosQuery = filtroVendedor === "sem"
+        ? contratosQuery.is("criado_por", null)
+        : contratosQuery.eq("criado_por", filtroVendedor);
+    }
+    if (filtroMensal !== "todos") {
+      if (filtroMensal === "zero") contratosQuery = contratosQuery.eq("valor_mensal", 0);
+      if (filtroMensal === "ate100") contratosQuery = contratosQuery.gt("valor_mensal", 0).lte("valor_mensal", 100);
+      if (filtroMensal === "100a200") contratosQuery = contratosQuery.gt("valor_mensal", 100).lte("valor_mensal", 200);
+      if (filtroMensal === "acima200") contratosQuery = contratosQuery.gt("valor_mensal", 200);
+    }
+    if (filtroInicio !== "todos") {
+      const dISO = (d: number) => new Date(Date.now() - d * 86400000).toISOString().slice(0, 10);
+      if (filtroInicio === "30d") contratosQuery = contratosQuery.gte("data_inicio", dISO(30));
+      if (filtroInicio === "90d") contratosQuery = contratosQuery.gte("data_inicio", dISO(90));
+      if (filtroInicio === "ano") {
+        contratosQuery = contratosQuery.gte("data_inicio", `${anoAtual}-01-01`).lte("data_inicio", `${anoAtual}-12-31`);
+      }
+      if (filtroInicio === "anterior") contratosQuery = contratosQuery.lt("data_inicio", `${anoAtual}-01-01`);
+    }
+    if (filtroTermino !== "todos") {
+      const emDias = (d: number) => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
+      if (filtroTermino === "sem_data") contratosQuery = contratosQuery.is("data_fim", null);
+      if (filtroTermino === "vencidos") contratosQuery = contratosQuery.lt("data_fim", hojeISO);
+      if (filtroTermino === "30d") contratosQuery = contratosQuery.gte("data_fim", hojeISO).lte("data_fim", emDias(30));
+      if (filtroTermino === "90d") contratosQuery = contratosQuery.gte("data_fim", hojeISO).lte("data_fim", emDias(90));
+    }
+
+    contratosQuery = sortPaciente
+      ? contratosQuery.order("paciente_nome", { ascending: sortPaciente === "asc" })
+      : contratosQuery.order("created_at", { ascending: false });
+
     const s = termo.trim();
     if (s.length >= 2) {
       // Busca no servidor. O campo `paciente_nome` no contrato é um snapshot
@@ -353,10 +495,10 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       const orParts: string[] = [`paciente_nome.ilike.%${escLike}%`];
       if (soDigitos) orParts.push(`numero.eq.${s}`);
       if (pacIdsMatch.length > 0) orParts.push(`paciente_id.in.(${pacIdsMatch.join(",")})`);
-      contratosQuery = contratosQuery.or(orParts.join(",")).limit(200);
-    } else {
-      contratosQuery = contratosQuery.limit(500);
+      contratosQuery = contratosQuery.or(orParts.join(","));
     }
+    const inicioRange = (paginaReq - 1) * POR_PAGINA;
+    contratosQuery = contratosQuery.range(inicioRange, inicioRange + POR_PAGINA - 1);
     const [cs, cv] = await Promise.all([
       contratosQuery,
       supabase
@@ -368,6 +510,7 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     ]);
     if (cs.error) mostrarErro(cs.error);
     const contratosRows = (cs.data ?? []) as Contrato[];
+    setTotal(cs.count ?? contratosRows.length);
     // Enriquecer com codigo_prontuario do paciente titular (leitura, imutável).
     const pacIds = Array.from(
       new Set(contratosRows.map((c) => c.paciente_id).filter((x): x is string => !!x)),
@@ -391,74 +534,18 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       })),
     );
     setConvenios((cv.data ?? []) as Convenio[]);
-    // Agregar parcelas dos contratos carregados
-    const contratoIds = ((cs.data ?? []) as Array<{ id: string }>).map((c) => c.id);
-    if (contratoIds.length > 0) {
-      // Buscar mensalidades em lotes de contratos para evitar o teto de 1000
-      // linhas por request do PostgREST (ex.: 500 contratos × 12 parcelas
-      // ≈ 6000 linhas retornariam truncadas, deixando contratos com "0/0").
-      const hojeStr = new Date().toISOString().slice(0, 10);
-      const agg: Record<string, { pagas: number; total: number; temAtrasada: boolean }> = {};
-      for (const id of contratoIds) agg[id] = { pagas: 0, total: 0, temAtrasada: false };
-      const LOTE = 60; // ~60 contratos × 12 parcelas = 720 linhas por lote
-      for (let i = 0; i < contratoIds.length; i += LOTE) {
-        const slice = contratoIds.slice(i, i + LOTE);
-        const { data: mens } = await supabase
-          .from("contrato_mensalidades")
-          .select("contrato_id, status, vencimento, numero_parcela")
-          .in("contrato_id", slice);
-        // Agrupa por contrato para segmentar em ciclos de 12 parcelas
-        // (renovações acrescentam parcelas 13..24, 25..36, etc.). A contagem
-        // exibida é sempre do ciclo atual (últimas 12 parcelas), pois cada
-        // contrato representa um período de 12 meses.
-        const porContrato: Record<string, Array<{ status: string; vencimento: string; numero_parcela: number }>> = {};
-        for (const m of (mens ?? []) as Array<{ contrato_id: string; status: string; vencimento: string; numero_parcela: number }>) {
-          if (Number(m.numero_parcela) <= 0) continue; // ignora adesão/taxas
-          (porContrato[m.contrato_id] ||= []).push(m);
-        }
-        for (const [cid, arr] of Object.entries(porContrato)) {
-          const a = agg[cid];
-          if (!a) continue;
-          // Ciclo atual = as 12 parcelas com maior numero_parcela.
-          arr.sort((x, y) => y.numero_parcela - x.numero_parcela);
-          const cicloAtual = arr.slice(0, 12);
-          a.total = cicloAtual.length;
-          for (const m of cicloAtual) {
-            if (m.status === "pago") a.pagas += 1;
-            else if (m.vencimento && m.vencimento < hojeStr) a.temAtrasada = true;
-          }
-        }
-      }
-      setParcAgg(agg);
-    } else {
-      setParcAgg({});
-    }
-    // Buscar nomes dos usuários que criaram os contratos (vendedores).
-    const ids = Array.from(
-      new Set(
-        ((cs.data ?? []) as Array<{ criado_por: string | null }>)
-          .map((r) => r.criado_por)
-          .filter((x): x is string => !!x),
-      ),
-    );
-    if (ids.length > 0) {
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id,nome")
-        .in("id", ids);
-      const map: Record<string, string> = {};
-      for (const p of (profs ?? []) as Array<{ id: string; nome: string | null }>) {
-        if (p.nome) map[p.id] = p.nome;
-      }
-      setVendedores(map);
-    } else {
-      setVendedores({});
-    }
+    // Agregar parcelas apenas dos contratos exibidos nesta página.
+    const contratoIds = contratosRows.map((c) => c.id);
+    setParcAgg(contratoIds.length > 0 ? await calcularParcAgg(contratoIds) : {});
     setLoading(false);
   };
   useEffect(() => {
     load(qDebounced); /* eslint-disable-next-line */
-  }, [clinicaAtual?.clinica_id, qDebounced]);
+  }, [
+    clinicaAtual?.clinica_id, qDebounced, pagina, sortPaciente,
+    filtroSituacao, filtroTermino, filtroProgresso, filtroInicio,
+    filtroMensal, filtroVendedor, filtroStatus, filtroConvenio,
+  ]);
 
   // Deep-link: abrir automaticamente um contrato específico (ex.: vindo da aba Convênio no cadastro do cliente)
   useEffect(() => {
@@ -467,97 +554,57 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     if (c) setDetail(c);
   }, [initialContratoId, loading, list, detail]);
 
-  const filtered = useMemo(() => {
-    // Filtro local de texto foi desativado — a busca por nome/CPF/prontuário
-    // já é feita no servidor com JOIN em pacientes (nome atualizado). O
-    // `paciente_nome` do contrato é um snapshot histórico e às vezes vem
-    // truncado, então filtrar por ele aqui esconderia resultados válidos.
-    const base = list;
-    const hojeStr = new Date().toISOString().slice(0, 10);
-    const in30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
-    const in90 = new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10);
-    const dHoje = new Date(hojeStr + "T00:00:00").getTime();
-    const anoAtual = new Date().getFullYear();
-    const withFilters = base.filter((c) => {
-      const a = parcAgg[c.id];
-      // Início
-      if (filtroInicio !== "todos") {
-        const ini = c.data_inicio?.slice(0, 10) ?? null;
-        if (!ini) return false;
-        const dIni = new Date(ini + "T00:00:00").getTime();
-        const dias = (dHoje - dIni) / 86400000;
-        if (filtroInicio === "30d" && dias > 30) return false;
-        if (filtroInicio === "90d" && dias > 90) return false;
-        if (filtroInicio === "ano" && new Date(ini + "T00:00:00").getFullYear() !== anoAtual) return false;
-        if (filtroInicio === "anterior" && new Date(ini + "T00:00:00").getFullYear() >= anoAtual) return false;
-      }
-      // Mensal
-      if (filtroMensal !== "todos") {
-        const v = Number(c.valor_mensal) || 0;
-        if (filtroMensal === "zero" && v !== 0) return false;
-        if (filtroMensal === "ate100" && !(v > 0 && v <= 100)) return false;
-        if (filtroMensal === "100a200" && !(v > 100 && v <= 200)) return false;
-        if (filtroMensal === "acima200" && !(v > 200)) return false;
-      }
-      // Vendedor
-      if (filtroVendedor !== "todos") {
-        if (filtroVendedor === "sem") {
-          if (c.criado_por && vendedores[c.criado_por]) return false;
-        } else if (c.criado_por !== filtroVendedor) return false;
-      }
-      // Status
-      if (filtroStatus !== "todos" && c.status !== filtroStatus) return false;
-      // Convênio
-      if (filtroConvenio !== "todos") {
-        if (filtroConvenio === "sem") {
-          if (c.convenio_id) return false;
-        } else if (c.convenio_id !== filtroConvenio) return false;
-      }
-      // Situação
-      if (filtroSituacao !== "todas") {
-        const emDia = !a || !a.temAtrasada;
-        if (filtroSituacao === "em_dia" && !emDia) return false;
-        if (filtroSituacao === "pendente" && emDia) return false;
-      }
-      // Término
-      if (filtroTermino !== "todos") {
-        const fim = c.data_fim?.slice(0, 10) ?? null;
-        if (filtroTermino === "sem_data" && fim) return false;
-        if (filtroTermino === "vencidos" && (!fim || fim >= hojeStr)) return false;
-        if (filtroTermino === "30d" && (!fim || fim < hojeStr || fim > in30)) return false;
-        if (filtroTermino === "90d" && (!fim || fim < hojeStr || fim > in90)) return false;
-      }
-      // Progresso
-      if (filtroProgresso !== "todas") {
-        if (!a) return false;
-        if (filtroProgresso === "sem_pag" && a.pagas !== 0) return false;
-        if (filtroProgresso === "andamento" && (a.pagas === 0 || a.pagas >= a.total)) return false;
-        if (filtroProgresso === "quitadas" && (a.total === 0 || a.pagas < a.total)) return false;
-      }
-      return true;
-    });
-    if (!sortPaciente) return withFilters;
-    const ordered = [...withFilters].sort((a, b) =>
-      a.paciente_nome.localeCompare(b.paciente_nome, "pt-BR", { sensitivity: "base" }),
-    );
-    return sortPaciente === "asc" ? ordered : ordered.reverse();
-  }, [list, q, sortPaciente, parcAgg, vendedores, filtroSituacao, filtroTermino, filtroProgresso, filtroInicio, filtroMensal, filtroVendedor, filtroStatus, filtroConvenio]);
+  // A lista já vem filtrada, ordenada e paginada pelo banco.
+  const filtered = list;
 
-  // Opções dinâmicas
-  const vendedorOpcoes = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const c of list) {
-      if (c.criado_por && vendedores[c.criado_por] && !seen.has(c.criado_por)) {
-        seen.set(c.criado_por, vendedores[c.criado_por]);
+  // Opções dinâmicas de Vendedor/Status: derivadas de TODA a base da clínica
+  // (não só da página atual), para que nenhuma opção suma ao paginar.
+  const [statusOpcoes, setStatusOpcoes] = useState<string[]>([]);
+  useEffect(() => {
+    const clinicaId = clinicaAtual?.clinica_id;
+    if (!clinicaId) return;
+    let cancelado = false;
+    void (async () => {
+      const criadores = new Set<string>();
+      const status = new Set<string>();
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase
+          .from("contratos_assinatura")
+          .select("criado_por,status")
+          .eq("clinica_id", clinicaId)
+          .range(from, from + 999);
+        if (error) break;
+        const rows = (data ?? []) as Array<{ criado_por: string | null; status: string | null }>;
+        for (const r of rows) {
+          if (r.criado_por) criadores.add(r.criado_por);
+          if (r.status) status.add(r.status);
+        }
+        if (rows.length < 1000) break;
       }
-    }
-    return Array.from(seen.entries()).sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
-  }, [list, vendedores]);
-  const statusOpcoes = useMemo(() => {
-    const s = new Set<string>();
-    for (const c of list) if (c.status) s.add(c.status);
-    return Array.from(s).sort();
-  }, [list]);
+      if (cancelado) return;
+      setStatusOpcoes(Array.from(status).sort());
+      if (criadores.size > 0) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id,nome")
+          .in("id", Array.from(criadores));
+        if (cancelado) return;
+        const map: Record<string, string> = {};
+        for (const p of (profs ?? []) as Array<{ id: string; nome: string | null }>) {
+          if (p.nome) map[p.id] = p.nome;
+        }
+        setVendedores(map);
+      } else {
+        setVendedores({});
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [clinicaAtual?.clinica_id]);
+
+  const vendedorOpcoes = useMemo(
+    () => Object.entries(vendedores).sort((a, b) => a[1].localeCompare(b[1], "pt-BR")),
+    [vendedores],
+  );
 
   // Filtros ativos (para contagem/rótulo/limpar)
   const filtrosAtivos = useMemo(() => {
@@ -588,11 +635,11 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
     setPagina(1);
   };
 
-  // Paginação
-  const totalPaginas = Math.max(1, Math.ceil(filtered.length / POR_PAGINA));
+  // Paginação (server-side: `total` vem do count exato do banco)
+  const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const paginaAtual = Math.min(pagina, totalPaginas);
   const inicioIdx = (paginaAtual - 1) * POR_PAGINA;
-  const paginados = filtered.slice(inicioIdx, inicioIdx + POR_PAGINA);
+  const paginados = filtered;
   // Reset página ao mudar filtros/busca/ordem
   useEffect(() => {
     setPagina(1);
@@ -670,11 +717,14 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
       </div>
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <div>
-          {filtered.length === 0 ? (
+          {total === 0 ? (
             <span>Nenhum contrato{temFiltroAtivo ? " com os filtros atuais" : ""}.</span>
           ) : temFiltroAtivo ? (
             <span>
-              <strong className="text-foreground">{filtered.length}</strong> resultado{filtered.length === 1 ? "" : "s"}
+              <strong className="text-foreground">
+                {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, total)}
+              </strong>{" "}
+              de <strong className="text-foreground">{total}</strong> resultado{total === 1 ? "" : "s"}
               {" — filtros ativos: "}
               <span className="text-foreground">{filtrosAtivos.join(", ")}</span>
             </span>
@@ -682,9 +732,9 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
             <span>
               Mostrando{" "}
               <strong className="text-foreground">
-                {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, filtered.length)}
+                {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, total)}
               </strong>{" "}
-              de <strong className="text-foreground">{filtered.length}</strong> contratos
+              de <strong className="text-foreground">{total}</strong> contratos
             </span>
           )}
         </div>
@@ -932,12 +982,12 @@ export function ContratosPage({ initialContratoId, modulo = "contratos" }: { ini
             })}
           </TableBody>
         </Table>
-        {filtered.length > 0 ? (
+        {total > 0 ? (
           <div className="flex items-center justify-between gap-3 border-t px-3 py-2 text-sm text-muted-foreground">
             <span>
-              {filtered.length} contrato{filtered.length === 1 ? "" : "s"}
-              {filtered.length > POR_PAGINA ? (
-                <> — exibindo {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, filtered.length)}</>
+              {total} contrato{total === 1 ? "" : "s"}
+              {total > POR_PAGINA ? (
+                <> — exibindo {inicioIdx + 1}–{Math.min(inicioIdx + POR_PAGINA, total)}</>
               ) : null}
             </span>
             {totalPaginas > 1 ? (
