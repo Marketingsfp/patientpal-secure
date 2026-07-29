@@ -176,6 +176,24 @@ export function setUserTtsRate(rate: number) {
   emitTtsChanged();
 }
 
+export function getUserTtsVoice(): string | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(VOICE_STORAGE_KEY);
+  return raw && raw.trim() ? raw.trim() : null;
+}
+
+export function setUserTtsVoice(voice: string | null) {
+  if (typeof window === "undefined") return;
+  if (voice && voice.trim()) {
+    window.localStorage.setItem(VOICE_STORAGE_KEY, voice.trim());
+  } else {
+    window.localStorage.removeItem(VOICE_STORAGE_KEY);
+  }
+  cache.forEach((url) => URL.revokeObjectURL(url));
+  cache.clear();
+  emitTtsChanged();
+}
+
 let currentAudio: HTMLAudioElement | null = null;
 let currentUrl: string | null = null;
 const cache = new Map<string, string>(); // text → objectUrl (LRU-lite, max 20)
@@ -205,17 +223,19 @@ export function stopSpeaking() {
 
 async function fetchAudioUrl(text: string): Promise<string> {
   const key = text.trim();
-  const cached = cache.get(key);
+  const voice = getUserTtsVoice();
+  const cacheKey = voice ? `${voice}::${key}` : key;
+  const cached = cache.get(cacheKey);
   if (cached) return cached;
   const res = await fetch(PROXY_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: key }),
+    body: JSON.stringify(voice ? { text: key, voice } : { text: key }),
   });
   if (!res.ok) throw new Error(`TTS falhou: ${res.status}`);
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
-  cache.set(key, url);
+  cache.set(cacheKey, url);
   if (cache.size > 20) {
     const oldest = cache.keys().next().value;
     if (oldest) {
