@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Volume2, Play, Square, RotateCcw, Save, Headphones, Loader2 } from "lucide-react";
+import { Volume2, Play, Square, RotateCcw, Save, Headphones, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -285,10 +285,16 @@ function VozConfigPage() {
 }
 
 const TTS_ENDPOINT = "/api/tts-proxy";
-const VOZES = [
-  { value: "faber", label: "Faber (Masculino)" },
-  { value: "feminina", label: "Feminina" },
-] as const;
+const VOICES_ENDPOINT = "/api/tts-voices";
+const LABELS_CONHECIDOS: Record<string, string> = {
+  faber: "Faber (Masculino)",
+  feminina: "Feminina",
+};
+function labelDaVoz(v: string): string {
+  return LABELS_CONHECIDOS[v] ?? v.charAt(0).toUpperCase() + v.slice(1);
+}
+const VOZES_FALLBACK = ["faber", "feminina"];
+const VOZES_CONHECIDAS_KEY = "tts:vozes-conhecidas";
 
 function TesteServidorLocalCard() {
   const [texto, setTexto] = useState<string>(
@@ -297,6 +303,18 @@ function TesteServidorLocalCard() {
   const [voice, setVoice] = useState<string>("faber");
   const [loading, setLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [vozes, setVozes] = useState<string[]>(() => {
+    if (typeof window === "undefined") return VOZES_FALLBACK;
+    try {
+      const s = window.localStorage.getItem(VOZES_CONHECIDAS_KEY);
+      const arr = s ? (JSON.parse(s) as string[]) : null;
+      return Array.isArray(arr) && arr.length ? arr : VOZES_FALLBACK;
+    } catch {
+      return VOZES_FALLBACK;
+    }
+  });
+  const [detectando, setDetectando] = useState(false);
+  const [novaVoz, setNovaVoz] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastUrlRef = useRef<string | null>(null);
 
@@ -304,6 +322,63 @@ function TesteServidorLocalCard() {
     return () => {
       if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
     };
+  }, []);
+
+  async function detectarVozes(opts?: { force?: boolean; extra?: string[] }) {
+    setDetectando(true);
+    try {
+      const params = new URLSearchParams();
+      if (opts?.force) params.set("refresh", "1");
+      if (opts?.extra?.length) params.set("extra", opts.extra.join(","));
+      const qs = params.toString();
+      const res = await fetch(
+        `${VOICES_ENDPOINT}${qs ? `?${qs}` : ""}`,
+      );
+      const data = (await res.json()) as { vozes?: string[]; error?: string };
+      if (!res.ok || !Array.isArray(data.vozes)) {
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      const combinadas = Array.from(
+        new Set([...(data.vozes ?? []), ...(opts?.extra ?? [])]),
+      );
+      if (combinadas.length === 0) {
+        toast.info("Nenhuma voz detectada no servidor Piper.");
+        return;
+      }
+      const anteriores = new Set(vozes);
+      const novas = combinadas.filter((v) => !anteriores.has(v));
+      setVozes(combinadas);
+      try {
+        window.localStorage.setItem(
+          VOZES_CONHECIDAS_KEY,
+          JSON.stringify(combinadas),
+        );
+      } catch {
+        /* ignora */
+      }
+      if (!vozes.includes(voice) && combinadas[0]) setVoice(combinadas[0]);
+      if (opts?.force || novas.length) {
+        toast.success(
+          novas.length
+            ? `Detectada${novas.length > 1 ? "s" : ""} ${novas.length} nova${novas.length > 1 ? "s" : ""} voz: ${novas.map(labelDaVoz).join(", ")}`
+            : `${combinadas.length} vozes disponíveis.`,
+        );
+      }
+    } catch (err) {
+      toast.error(
+        `Falha ao detectar vozes: ${err instanceof Error ? err.message : "erro"}`,
+      );
+    } finally {
+      setDetectando(false);
+    }
+  }
+
+  // Detecção automática ao abrir a tela + polling a cada 60s.
+  useEffect(() => {
+    void detectarVozes();
+    const id = window.setInterval(() => void detectarVozes(), 60_000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function ouvir() {
@@ -368,15 +443,32 @@ function TesteServidorLocalCard() {
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
           <div className="space-y-2">
-            <Label className="text-sm">Voz</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Voz</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs"
+                onClick={() => void detectarVozes({ force: true })}
+                disabled={detectando}
+              >
+                {detectando ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3" />
+                )}
+                Detectar
+              </Button>
+            </div>
             <Select value={voice} onValueChange={setVoice}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {VOZES.map((v) => (
-                  <SelectItem key={v.value} value={v.value}>
-                    {v.label}
+                {vozes.map((v) => (
+                  <SelectItem key={v} value={v}>
+                    {labelDaVoz(v)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -394,6 +486,32 @@ function TesteServidorLocalCard() {
             )}
           </Button>
         </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="flex-1 space-y-2">
+            <Label className="text-xs text-muted-foreground">
+              Testar um nome de voz específico (avançado)
+            </Label>
+            <Input
+              value={novaVoz}
+              onChange={(e) => setNovaVoz(e.target.value)}
+              placeholder="ex.: minha_nova_voz"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            disabled={detectando || !novaVoz.trim()}
+            onClick={async () => {
+              const nome = novaVoz.trim();
+              if (!nome) return;
+              await detectarVozes({ force: true, extra: [nome] });
+              setNovaVoz("");
+            }}
+          >
+            Adicionar
+          </Button>
+        </div>
         {audioUrl && (
           <audio
             ref={audioRef}
@@ -404,7 +522,9 @@ function TesteServidorLocalCard() {
           />
         )}
         <p className="text-xs text-muted-foreground">
-          Faz uma requisição POST direta para <code>{TTS_ENDPOINT}</code>.
+          As vozes são detectadas automaticamente no servidor Piper (via{" "}
+          <code>{VOICES_ENDPOINT}</code>). Vozes novas aparecem sozinhas em até
+          1 minuto — use <strong>Detectar</strong> para forçar a atualização.
         </p>
       </CardContent>
     </Card>
