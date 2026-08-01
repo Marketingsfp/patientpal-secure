@@ -1,35 +1,104 @@
-## Problema
+# Multi-exame + contagem por categoria de procedimento
 
-A tela de Contratos carrega no máximo **500 registros** de uma vez (`.limit(500)` na consulta) e faz filtro, ordenação e paginação em memória. A clínica tem **1.776 contratos**, então 1.276 nunca aparecem — a paginação de 50 em 50 só percorre os 500 baixados.
+## Fonte da verdade: `procedimentos.tipo_procedimento`
 
-## Objetivo
+Já existe hoje com CHECK: `consulta | exame | laboratorio | procedimento | cirurgia | equipamento | vacina | telemedicina`.
 
-Mostrar todos os contratos, mantendo 50 por página, com contagem real ("Mostrando 51–100 de 1.776").
+Ajuste **mínimo** no CHECK: adicionar `imagem`. Fica:
+`consulta | exame | laboratorio | imagem | procedimento | cirurgia | equipamento | vacina | telemedicina`.
 
-## O que muda
+Mantemos `exame` como valor legado (procedimentos antigos que ninguém reclassificou continuam funcionando — caem em "cada um = 1 atendimento", mesma regra de imagem).
 
-**1. Consulta paginada no servidor**
-- Trocar `.limit(500)` por `.range(inicio, fim)` com `count: "exact"`, buscando apenas a página atual.
-- Guardar o total retornado pelo banco e usá-lo para "Mostrando X–Y de N" e para o número de páginas.
-- Recarregar ao trocar de página (a página deixa de ser um recorte local).
+Categorias que o usuário pediu mapeadas 1:1:
+- **laboratório** → `tipo_procedimento = 'laboratorio'`
+- **imagem** → `tipo_procedimento = 'imagem'`
+- **consulta** → `tipo_procedimento = 'consulta'`
+- **procedimento** → `tipo_procedimento = 'procedimento'`
+- **cirurgia** → `tipo_procedimento = 'cirurgia'`
 
-**2. Filtros passam a ser aplicados no banco**
-Hoje são aplicados em memória; migram para a própria consulta, para que filtrem o conjunto inteiro e não só a página:
-- Status, Convênio, Vendedor (`criado_por`), Valor mensal (faixas), Início e Término (intervalos de data).
-- Ordenação por paciente (A–Z / Z–A) passa a ser `.order("paciente_nome")` no banco; sem ordenação continua por `created_at` desc.
+## Migration (aguarda aprovação separada)
 
-**3. Filtros de Situação e Parcelas**
-Dependem da agregação de mensalidades, que hoje é calculada no cliente. Para funcionarem sobre a base toda, serão resolvidos por uma consulta de apoio que devolve os IDs de contratos que atendem ao critério (em dia / pendente / sem pagamento / em andamento / quitadas), e esses IDs entram na consulta principal com `.in("id", ...)`. Assim a paginação continua correta.
+1. `ALTER TABLE procedimentos DROP CONSTRAINT procedimentos_tipo_procedimento_check`
+2. Recria o CHECK incluindo `'imagem'`.
+3. Backfill best-effort para `tipo_procedimento IS NULL`:
+   - nome contém `raio-x|raio x|rx |tomograf|ultrass|usg|ressonan|mamograf|densitomet` → `'imagem'`
+   - nome contém `hemograma|glicemia|colesterol|urina|fezes|coleta` **ou** grupo contém `laborat` → `'laboratorio'`
+   - resto → mantém NULL (não força classificação).
 
-**4. Agregação de mensalidades só da página**
-Com 50 contratos por página, o cálculo de parcelas pagas/atrasadas passa a ser feito apenas para os contratos exibidos — mais rápido que hoje e sem risco de truncamento.
+Sem toque em: cobranças, pagamentos, NFS-e, GR/guia, contratos, cartão benefícios, financeiro. **Nenhum trigger, nenhuma RLS, nenhuma flag de QA.**
 
-**5. Busca por nome/CPF/prontuário**
-Continua no servidor como já é, mas também paginada (hoje corta em 200 resultados).
+Rollback: recolocar o CHECK antigo (o backfill vira dado válido nele porque só adicionamos rótulos).
 
-## Detalhes técnicos
+## Código
 
-- Arquivo principal: `src/components/pages/contratos-page.tsx` (função `load`, memo `filtered`, bloco de paginação).
-- `load` passa a depender de `pagina`, filtros e ordenação; a lista local deixa de ser filtrada/fatiada no cliente.
-- As opções dinâmicas de Vendedor e Status (hoje derivadas dos registros carregados) passarão a vir de uma consulta própria, para não sumirem opções ao mudar de página.
-- Se a consulta de apoio para Situação/Parcelas ficar pesada, ela será substituída por uma função no banco (RPC) que devolve os IDs já filtrados.
+### Novo helper: `src/lib/procedimento/categoria.ts`
+
+```ts
+export type CategoriaProc = "laboratorio" | "imagem" | "consulta"
+  | "procedimento" | "cirurgia" | "outro";
+
+export function categoriaDoProcedimento(tipo: string | null): CategoriaProc;
+export function permiteMultiExame(cat: CategoriaProc): boolean;   // true p/ laboratorio+imagem
+export function contaComoUmAtendimento(cat: CategoriaProc): boolean; // true p/ laboratorio
+```
+
+### Refactor: `src/lib/agenda/contagem.ts`
+
+Troca a heurística "especialidade contém laborat" pela categoria real do procedimento. Assinatura nova:
+
+```ts
+contarAtendimentos(ags, procMetaById): number
+// agrupa por (paciente_id, dia) quando categoria === 'laboratorio';
+// demais contam 1 por linha.
+```
+
+Fallback: se `procMetaById` não tiver o id (linha antiga sem procedimento_id), conta 1 — comportamento atual.
+
+### UI — `app.agenda.tsx` + `procedimento-cell.tsx`
+
+Quando os procedimentos filtrados para o médico selecionado tiverem `tipo_procedimento in ('laboratorio','imagem')`, o campo vira multiselect com checkboxes + busca. Badge:
+- "Laboratório — conta como 1 atendimento"
+- "Imagem — cada exame conta 1"
+
+Fora dessas categorias, single-select como hoje. **Zero mudança visual** no fluxo de consulta/procedimento/cirurgia.
+
+### Server — `src/lib/agenda/criar-agendamento.functions.ts`
+
+Novo campo opcional `procedimentos?: string[]` (nomes).
+
+- `laboratorio` (N nomes) → **1 agendamento**, campo `procedimento` recebe os nomes concatenados com ` + `. Cria **N linhas em `agendamento_orcamento_itens`** — isso preserva GR/guia separada por exame quando o financeiro emitir. 1 `fin_atendimento`, 1 pagamento, 1 NFS-e (regra financeira **inalterada**).
+- `imagem` (N nomes) → **N agendamentos irmãos** no mesmo horário/paciente/médico. 1º valida slot; irmãos 2..N recebem `origem='encaixe_grupo'` e bypass de slot. Cada um gera `fin_atendimento` e GR próprios (comportamento atual).
+- demais categorias → **single**, comportamento idêntico ao atual (contrato preservado para Agenda V2).
+
+### Contagem aplicada em 4 pontos
+
+Todos passam a usar o helper `contarAtendimentos`:
+- `src/routes/_authenticated/app.painel.tsx`
+- `src/routes/_authenticated/app.painel-executivo.tsx`
+- `src/routes/_authenticated/app.relatorios.tsx`
+- `src/routes/_authenticated/app.financeiro.atendimentos.tsx` (Repasse) — apenas a **quantidade** de atendimentos é agrupada; o **valor de repasse** continua vindo da soma dos `fin_atendimentos` (regra financeira preservada).
+
+## O que NÃO muda (compromisso do ticket)
+
+- Cobrança, pagamento, NFS-e, GR/guia, regra financeira, contratos, pacientes associados: intocados.
+- GRs continuam separadas por exame/procedimento quando o fluxo financeiro exigir (imagem = N `fin_atendimentos`; laboratório = 1 agendamento com N itens de orçamento).
+- Agenda V2 e Express: intocadas — o campo `procedimentos[]` é opcional.
+
+## Rascunho da Jornada do Paciente
+
+Crio `.lovable/plan-jornada.md` **só como documento**, com:
+- objetivo (uma ficha por comparecimento agrupando N atendimentos de N modalidades),
+- modelo de dados proposto (tabela `jornadas_paciente` + `jornada_itens`, sem migration nesta rodada),
+- fluxo de recepção,
+- impactos em Painel, Relatórios, Repasse (por jornada + por exame),
+- riscos e faseamento.
+
+## Ordem de execução (após seu OK)
+
+1. Migration (CHECK + backfill).
+2. Helper `categoria.ts` + refactor `contagem.ts`.
+3. UI multiselect + `criarAgendamento` (procedimentos[]).
+4. Aplicar contagem nos 4 lugares.
+5. Rascunho `.lovable/plan-jornada.md`.
+
+Cada passo autocontido; se algo travar, dá para reverter só aquele passo.

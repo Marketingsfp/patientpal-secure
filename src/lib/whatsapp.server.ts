@@ -13,7 +13,7 @@ export type WaTemplateComponent =
 export interface WaTemplatePayload {
   name: string;
   language: string;
-  category: "UTILITY" | "AUTHENTICATION";
+  category: "MARKETING" | "UTILITY" | "AUTHENTICATION";
   components: WaTemplateComponent[];
 }
 

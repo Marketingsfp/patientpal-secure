@@ -36,7 +36,7 @@ interface ClinicaContextValue {
   refresh: () => Promise<void>;
 }
 
-export const ClinicaContext = createContext<ClinicaContextValue | undefined>(undefined);
+const ClinicaContext = createContext<ClinicaContextValue | undefined>(undefined);
 const STORAGE_KEY = "clinica_atual_id";
 const TODAS_KEY = "clinica_modo_todas";
 const MEMBERSHIPS_CACHE_KEY = "clinica_memberships_cache_v1";
@@ -92,7 +92,7 @@ export function ClinicaProvider({ children }: { children: ReactNode }) {
       const raw = (data as unknown[]).filter(isClinicaMembership);
       // A6 — Oculta unidades ainda não operacionais (base não importada
       // E sem médicos ativos), exceto para admin, que precisa enxergá-las
-      // para configurar.
+      // para configurar. Ex.: "CLINICA CONSULTA HOJE".
       const naoOperacionais = raw.filter(
         (m) => m.role !== "admin" && m.clinica.base_importada === false,
       );

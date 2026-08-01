@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SimpleCrud } from "@/components/simple-crud/SimpleCrud";
-import { usePodeEscrever } from "@/hooks/use-permissoes";
 
 export const Route = createFileRoute("/_authenticated/app/prontuario-modelos")({
   component: ModelosPage,
@@ -18,7 +17,6 @@ type Form = Omit<Modelo, "id">;
 const EMPTY: Form = { nome: "", prompt_ia: "", ativo: true, secoes: [{ chave: "queixa_principal", titulo: "Queixa principal", placeholder: "" }] };
 
 function ModelosPage() {
-  const podeEscrever = usePodeEscrever("prontuario-modelos");
   return (
     <SimpleCrud<Modelo, Form>
       table="prontuario_modelos"
@@ -27,7 +25,6 @@ function ModelosPage() {
       subtitle="Estrutura SOAP por especialidade, usada no Atendimento com IA."
       icon={<FileHeart className="h-6 w-6 text-primary" />}
       orderBy={{ column: "nome", ascending: true }}
-      readOnly={!podeEscrever}
       columns={[
         { key: "nome", header: "Modelo", render: (r) => <span className="font-medium">{r.nome}</span> },
         { key: "secoes", header: "Seções", render: (r) => <span className="text-sm text-muted-foreground">{r.secoes?.length ?? 0} campos</span> },
@@ -57,19 +54,19 @@ function ModelosPage() {
             </div>
             {f.secoes.map((s, i) => (
               <div key={i} className="grid grid-cols-12 gap-2 items-end p-2 rounded border bg-muted/20">
-                <div className="col-span-12 sm:col-span-3 space-y-1">
+                <div className="col-span-3 space-y-1">
                   <Label className="text-xs">Chave</Label>
                   <Input value={s.chave} onChange={(e) => { const ns = [...f.secoes]; ns[i] = { ...s, chave: e.target.value }; set({ ...f, secoes: ns }); }} />
                 </div>
-                <div className="col-span-12 sm:col-span-4 space-y-1">
+                <div className="col-span-4 space-y-1">
                   <Label className="text-xs">Título</Label>
                   <Input value={s.titulo} onChange={(e) => { const ns = [...f.secoes]; ns[i] = { ...s, titulo: e.target.value }; set({ ...f, secoes: ns }); }} />
                 </div>
-                <div className="col-span-10 sm:col-span-4 space-y-1">
+                <div className="col-span-4 space-y-1">
                   <Label className="text-xs">Placeholder</Label>
                   <Input value={s.placeholder ?? ""} onChange={(e) => { const ns = [...f.secoes]; ns[i] = { ...s, placeholder: e.target.value }; set({ ...f, secoes: ns }); }} />
                 </div>
-                <Button type="button" size="icon" variant="ghost" className="col-span-2 sm:col-span-1" onClick={() => { const ns = f.secoes.filter((_, idx) => idx !== i); set({ ...f, secoes: ns }); }}>
+                <Button type="button" size="icon" variant="ghost" className="col-span-1" onClick={() => { const ns = f.secoes.filter((_, idx) => idx !== i); set({ ...f, secoes: ns }); }}>
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </div>

@@ -1,1 +1,0 @@
-ALTER TYPE public.caixa_mov_tipo ADD VALUE IF NOT EXISTS 'reabertura';

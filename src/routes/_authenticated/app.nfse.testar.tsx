@@ -5,7 +5,6 @@ import { FileText, Loader2, ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { emitirNfse, consultarNfse } from "@/lib/nfse.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +28,6 @@ interface Emitente {
 
 function TestarNfse() {
   const { clinicaAtual } = useClinica();
-  const podeEscrever = usePodeEscrever("nfse");
   const emit = useServerFn(emitirNfse);
   const consulta = useServerFn(consultarNfse);
 
@@ -44,24 +42,12 @@ function TestarNfse() {
   const [resultado, setResultado] = useState<{ id: string; ref?: string; ok: boolean; error?: string; focus?: unknown } | null>(null);
   const [notaId, setNotaId] = useState<string | null>(null);
   const [statusInfo, setStatusInfo] = useState<{ status: string | null; numero?: string | null; url_pdf?: string | null; erro?: string | null } | null>(null);
-  // Endereço do tomador — a NFS-e Nacional (DPS) só respeita o cadastro do
-  // paciente quando estes campos são enviados; sem eles a prefeitura usa o
-  // endereço da Receita para o CPF/CNPJ e a nota sai sem o endereço da
-  // clínica. Autopreenchidos ao digitar um CPF já cadastrado.
-  const [cep, setCep] = useState("");
-  const [logradouro, setLogradouro] = useState("");
-  const [numero, setNumero] = useState("");
-  const [bairro, setBairro] = useState("");
-  const [cidade, setCidade] = useState("");
-  const [uf, setUf] = useState("");
-  const [pacienteId, setPacienteId] = useState<string | null>(null);
-  const [enderecoBuscando, setEnderecoBuscando] = useState(false);
 
   useEffect(() => {
     if (!clinicaAtual) return;
     void (async () => {
       const { data } = await supabase
-        .from("nfse_emitentes_publico")
+        .from("nfse_emitentes")
         .select("id, nome, cnpj, focus_ambiente, descricao_servico_padrao")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("ativo", true);
@@ -74,39 +60,7 @@ function TestarNfse() {
     })();
   }, [clinicaAtual?.clinica_id]); // eslint-disable-line
 
-  // Ao terminar de digitar o CPF (11 dígitos), busca o paciente na clínica
-  // atual para trazer nome + endereço automaticamente. Evita emissão sem
-  // endereço do tomador quando o cliente já existe no cadastro.
-  useEffect(() => {
-    const cpfLimpo = (cpf || "").replace(/\D/g, "");
-    if (!clinicaAtual || cpfLimpo.length !== 11) return;
-    let cancelado = false;
-    setEnderecoBuscando(true);
-    (async () => {
-      const { data } = await supabase
-        .from("pacientes")
-        .select("id, nome, email, cep, logradouro, numero, bairro, cidade, estado")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("cpf", cpfLimpo)
-        .maybeSingle();
-      if (cancelado) return;
-      setEnderecoBuscando(false);
-      if (!data) return;
-      setPacienteId(data.id);
-      if (data.nome) setNome(data.nome);
-      if (!email && data.email) setEmail(data.email);
-      if (data.cep) setCep(data.cep);
-      if (data.logradouro) setLogradouro(data.logradouro);
-      if (data.numero) setNumero(data.numero);
-      if (data.bairro) setBairro(data.bairro);
-      if (data.cidade) setCidade(data.cidade);
-      if (data.estado) setUf(data.estado);
-    })();
-    return () => { cancelado = true; };
-  }, [cpf, clinicaAtual?.clinica_id]); // eslint-disable-line
-
   const onEmitir = async () => {
-    if (!podeEscrever) return toast.error("Você não tem permissão de edição neste módulo.");
     if (!emitenteId) return toast.error("Selecione um emitente");
     if (!nome.trim()) return toast.error("Informe o nome do tomador");
     const cpfLimpo = (cpf || "").replace(/\D/g, "");
@@ -115,9 +69,6 @@ function TestarNfse() {
     }
     const valorNum = Number(valor);
     if (!valorNum || valorNum <= 0) return toast.error("Valor inválido");
-    if (!logradouro.trim()) {
-      return toast.error("Endereço do tomador é obrigatório (logradouro). Sem endereço a prefeitura usa o cadastro da Receita para o CPF/CNPJ.");
-    }
 
     setLoading(true);
     setResultado(null);
@@ -126,20 +77,9 @@ function TestarNfse() {
       const r = await emit({
         data: {
           emitenteId,
-          pacienteId: pacienteId ?? undefined,
           valorServicos: valorNum,
           descricaoServicos: descricao,
-          tomador: {
-            nome,
-            cpfCnpj: cpfLimpo,
-            email: email || undefined,
-            cep: cep.trim() || undefined,
-            logradouro: logradouro.trim() || undefined,
-            numero: numero.trim() || undefined,
-            bairro: bairro.trim() || undefined,
-            municipio: cidade.trim() || undefined,
-            uf: uf.trim() || undefined,
-          },
+          tomador: { nome, cpfCnpj: cpfLimpo, email: email || undefined },
         },
       });
       setResultado(r);
@@ -222,31 +162,6 @@ function TestarNfse() {
             <div className="space-y-1"><Label>E-mail (opcional)</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} /></div>
           </div>
 
-          <div className="space-y-3 rounded-md border border-dashed p-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium">Endereço do tomador *</p>
-              {enderecoBuscando && <span className="text-xs text-muted-foreground">Buscando no cadastro…</span>}
-              {pacienteId && !enderecoBuscando && (
-                <span className="text-xs text-emerald-600">Preenchido a partir do cadastro do paciente</span>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>CEP</Label><Input value={cep} onChange={(e) => setCep(e.target.value)} /></div>
-              <div className="space-y-1"><Label>UF</Label><Input value={uf} onChange={(e) => setUf(e.target.value.toUpperCase())} maxLength={2} /></div>
-            </div>
-            <div className="grid grid-cols-[2fr_1fr] gap-3">
-              <div className="space-y-1"><Label>Logradouro *</Label><Input value={logradouro} onChange={(e) => setLogradouro(e.target.value)} /></div>
-              <div className="space-y-1"><Label>Número</Label><Input value={numero} onChange={(e) => setNumero(e.target.value)} /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>Bairro</Label><Input value={bairro} onChange={(e) => setBairro(e.target.value)} /></div>
-              <div className="space-y-1"><Label>Município</Label><Input value={cidade} onChange={(e) => setCidade(e.target.value)} /></div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Sem endereço a prefeitura usa o cadastro da Receita para o CPF/CNPJ, e a NFS-e sai sem o endereço do cliente.
-            </p>
-          </div>
-
           <div className="space-y-1"><Label>Descrição dos serviços</Label><Textarea rows={3} value={descricao} onChange={(e) => setDescricao(e.target.value)} /></div>
 
           <div className="flex gap-2">
@@ -254,7 +169,6 @@ function TestarNfse() {
               onClick={onEmitir}
               disabled={
                 loading ||
-                !podeEscrever ||
                 !((cpf || "").replace(/\D/g, "").length === 11 || (cpf || "").replace(/\D/g, "").length === 14)
               }
             >

@@ -1,1 +1,0 @@
-ALTER TABLE public.clinica_tts_config ADD COLUMN IF NOT EXISTS voice text;

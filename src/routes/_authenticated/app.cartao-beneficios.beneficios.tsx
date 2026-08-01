@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +43,6 @@ type Especialidade = { id: string; nome: string };
 
 function BeneficiosPage() {
   const { clinicaAtual } = useClinica();
-  const podeEscrever = usePodeEscrever("cartao-beneficios");
   const [convenios, setConvenios] = useState<Convenio[]>([]);
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
   const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
@@ -114,7 +112,6 @@ function BeneficiosPage() {
   );
 
   const openNew = () => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (convenios.length === 0) {
       toast.error("Cadastre um convênio primeiro.");
       return;
@@ -131,7 +128,6 @@ function BeneficiosPage() {
   };
 
   const openEdit = (b: Beneficio) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setEditing(b);
     setNome(b.nome);
     setDescricao(b.descricao ?? "");
@@ -147,7 +143,6 @@ function BeneficiosPage() {
 
   const save = async () => {
     if (!clinicaAtual) return;
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!convenioId) { toast.error("Selecione um convênio."); return; }
     if (escopo === "servico" && !procedimentoId) { toast.error("Selecione o procedimento."); return; }
     if (escopo === "especialidade" && !especialidadeId) { toast.error("Selecione a especialidade."); return; }
@@ -186,7 +181,6 @@ function BeneficiosPage() {
 
   const confirmDelete = async () => {
     if (!toDelete) return;
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const { error } = await supabase.from("cb_beneficios").delete().eq("id", toDelete.id);
     if (error) { mostrarErro(error); return; }
     toast.success("Benefício excluído.");
@@ -215,9 +209,7 @@ function BeneficiosPage() {
               ))}
             </SelectContent>
           </Select>
-          {podeEscrever && (
-            <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo benefício</Button>
-          )}
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" />Novo benefício</Button>
         </div>
       </div>
 
@@ -266,12 +258,8 @@ function BeneficiosPage() {
                     <Badge variant={b.ativo ? "default" : "outline"}>{b.ativo ? "Ativo" : "Inativo"}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {podeEscrever && (
-                      <>
-                        <Button size="sm" variant="ghost" onClick={() => openEdit(b)}><Pencil className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="ghost" onClick={() => setToDelete(b)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                      </>
-                    )}
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(b)}><Pencil className="h-4 w-4" /></Button>
+                    <Button size="sm" variant="ghost" onClick={() => setToDelete(b)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </TableCell>
                 </TableRow>
               ))}

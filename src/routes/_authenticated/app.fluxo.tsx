@@ -2,9 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { usePodeEscrever } from "@/hooks/use-permissoes";
-import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
-import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/fluxo")({
   component: FluxoPage,
   head: () => ({ meta: [{ title: "Fluxo do paciente — ClinicaOS" }] }),
@@ -99,13 +95,6 @@ function anterior(e: Etapa, isExame: boolean): Etapa | null {
 
 function FluxoPage() {
   const { clinicaAtual } = useClinica();
-  const podeEscrever = usePodeEscrever("fluxo");
-  // Alvos de toque maiores nos botões de ação do kanban em telas pequenas
-  // (toque em vez de mouse) — flag ux_melhorias. Some do desktop, onde o card denso com 7 colunas é
-  // proposital.
-  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
-  const acaoBtnCls = uxMelhorias ? "h-9 sm:h-6 px-2.5 sm:px-1.5" : "h-6 px-1.5";
-  const acaoTxtCls = uxMelhorias ? "text-xs sm:text-[9px]" : "text-[9px]";
   const [ags, setAgs] = useState<Ag[]>([]);
   const [loading, setLoading] = useState(false);
   const [dataRef, setDataRef] = useState(() => {
@@ -188,7 +177,6 @@ function FluxoPage() {
   }, [carregar, clinicaAtual]);
 
   async function setEtapa(id: string, etapa: Etapa) {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const { error } = await supabase
       .from("agendamentos")
       .update({ fluxo_etapa: etapa, fluxo_atualizado_em: new Date().toISOString() } as never)
@@ -201,7 +189,6 @@ function FluxoPage() {
   }
 
   async function ciclarPrioridade(a: Ag) {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const atual = a.prioridade ?? "normal";
     const prox = atual === "normal" ? "prioritario" : atual === "prioritario" ? "urgente" : "normal";
     const { error } = await supabase
@@ -217,7 +204,6 @@ function FluxoPage() {
 
   async function chamarPaciente(a: Ag) {
     if (!clinicaAtual) return;
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!consultorio.trim()) {
       toast.error("Defina o consultório (botão de configuração no topo)");
       return;
@@ -307,7 +293,8 @@ function FluxoPage() {
             
             <div className="flex items-center gap-1 px-1">
               <CalendarDays className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-              <DateInputBR 
+              <Input 
+                type="date" 
                 value={dataRef} 
                 onChange={(e) => { 
                   setFallbackAplicado(true); 
@@ -359,7 +346,7 @@ function FluxoPage() {
       </div>
 
       {/* Colunas do fluxo - grid sem scroll */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+      <div className="grid grid-cols-7 gap-3">
         {ETAPAS.map((col) => {
           const items = colunas.get(col.id) ?? [];
           const Icon = col.icon;
@@ -424,20 +411,20 @@ function FluxoPage() {
 
                       {/* Ações */}
                       <div className="flex items-center gap-0.5 pt-1 flex-wrap">
-                        <Button size="sm" variant="ghost" className={acaoBtnCls} disabled={!prev} onClick={() => prev && setEtapa(a.id, prev)} title="Voltar">
+                        <Button size="sm" variant="ghost" className="h-6 px-1.5" disabled={!prev} onClick={() => prev && setEtapa(a.id, prev)} title="Voltar">
                           <ChevronLeft className="h-3.5 w-3.5" />
                         </Button>
-                        <Button size="sm" variant="ghost" className={acaoBtnCls} onClick={() => ciclarPrioridade(a)} title="Prioridade">
+                        <Button size="sm" variant="ghost" className="h-6 px-1.5" onClick={() => ciclarPrioridade(a)} title="Prioridade">
                           <PrioridadeIcon className={`h-3.5 w-3.5 ${prioridadeInfo.cor}`} />
                         </Button>
 
                         {col.id === "triagem" && (
                           <>
-                            <Button size="sm" className={cn(acaoBtnCls, acaoTxtCls, "gap-1 bg-blue-600 hover:bg-blue-700 text-white flex-1 min-w-[40px]")} onClick={() => chamarPaciente(a)}>
+                            <Button size="sm" className="h-6 px-1.5 text-[9px] gap-1 bg-blue-600 hover:bg-blue-700 text-white flex-1 min-w-[40px]" onClick={() => chamarPaciente(a)}>
                               <Bell className="h-3 w-3" /> Chamar
                             </Button>
                             {isExame && (
-                              <Button size="sm" variant="outline" className={cn(acaoBtnCls, acaoTxtCls, "border-violet-400 text-violet-700 hover:bg-violet-50 flex-1 min-w-[35px]")} onClick={() => setEtapa(a.id, "exame")}>
+                              <Button size="sm" variant="outline" className="h-6 px-1.5 text-[9px] border-violet-400 text-violet-700 hover:bg-violet-50 flex-1 min-w-[35px]" onClick={() => setEtapa(a.id, "exame")}>
                                 Exame
                               </Button>
                             )}
@@ -447,19 +434,19 @@ function FluxoPage() {
                         {col.id !== "triagem" && col.id !== "finalizado" && (
                           <>
                             {col.id === "atendimento" && (
-                              <Button size="sm" variant="ghost" className={acaoBtnCls} onClick={() => chamarPaciente(a)} title="Rechamar">
+                              <Button size="sm" variant="ghost" className="h-6 px-1.5" onClick={() => chamarPaciente(a)} title="Rechamar">
                                 <Bell className="h-3.5 w-3.5" />
                               </Button>
                             )}
                             <Button
                               size="sm"
-                              className={cn(acaoBtnCls, "flex-1 min-w-[30px] bg-emerald-600 hover:bg-emerald-700 text-white")}
+                              className={`h-6 px-1.5 flex-1 min-w-[30px] ${isUltimaEtapa ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}
                               disabled={!next}
                               onClick={() => next && setEtapa(a.id, next)}
                               title={isUltimaEtapa ? "Finalizar" : "Avançar"}
                             >
                               {isUltimaEtapa ? (
-                                <span className={cn("flex items-center gap-1", acaoTxtCls)}><CheckCircle2 className="h-3 w-3" /> Fim</span>
+                                <><CheckCircle2 className="h-3 w-3" /> Fim</>
                               ) : (
                                 <ChevronRight className="h-3.5 w-3.5" />
                               )}

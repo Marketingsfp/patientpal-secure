@@ -1,0 +1,47 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+const EVT = "agenda:flag-changed";
+
+/**
+ * Feature flag agenda_v2. Persistida em profiles.preferencias_ui.flags.agenda_v2.
+ * Default: OFF. Não altera nada da agenda clássica.
+ */
+export function useAgendaV2Flag() {
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const uidRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) { if (alive) setLoading(false); return; }
+      uidRef.current = u.user.id;
+      const { data } = await supabase.from("profiles")
+        .select("preferencias_ui").eq("id", u.user.id).maybeSingle();
+      const prefs = (data?.preferencias_ui ?? {}) as { flags?: { agenda_v2?: boolean } };
+      if (alive) { setEnabled(Boolean(prefs.flags?.agenda_v2)); setLoading(false); }
+    })();
+    const onChange = (e: Event) => {
+      const ce = e as CustomEvent<{ agenda_v2: boolean }>;
+      if (ce.detail) setEnabled(Boolean(ce.detail.agenda_v2));
+    };
+    window.addEventListener(EVT, onChange as EventListener);
+    return () => { alive = false; window.removeEventListener(EVT, onChange as EventListener); };
+  }, []);
+
+  const set = useCallback(async (v: boolean) => {
+    if (!uidRef.current) return;
+    const { data } = await supabase.from("profiles")
+      .select("preferencias_ui").eq("id", uidRef.current).maybeSingle();
+    const prev = (data?.preferencias_ui ?? {}) as Record<string, unknown>;
+    const flags = { ...((prev.flags as object) ?? {}), agenda_v2: v };
+    const next = { ...prev, flags };
+    await supabase.from("profiles").update({ preferencias_ui: next }).eq("id", uidRef.current);
+    setEnabled(v);
+    window.dispatchEvent(new CustomEvent(EVT, { detail: { agenda_v2: v } }));
+  }, []);
+
+  return { enabled, loading, setEnabled: set };
+}

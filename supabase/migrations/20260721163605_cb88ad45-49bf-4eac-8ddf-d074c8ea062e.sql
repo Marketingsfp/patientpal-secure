@@ -1,1 +1,0 @@
-DROP POLICY IF EXISTS "members select emitentes" ON public.nfse_emitentes;

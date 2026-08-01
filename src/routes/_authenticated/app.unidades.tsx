@@ -3,7 +3,6 @@ import { useState, type FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
-import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,7 +43,6 @@ function UnidadesPage() {
 function ClinicasTab() {
   const { user } = useAuth();
   const { memberships, refresh, setClinicaAtual, clinicaAtual } = useClinica();
-  const podeEscrever = usePodeEscrever("unidades");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -112,7 +110,6 @@ function ClinicasTab() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!user) return;
     setLoading(true);
     if (editingId) {
@@ -151,7 +148,6 @@ function ClinicasTab() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        {podeEscrever && (
         <Dialog open={open} onOpenChange={(n) => { setOpen(n); if (!n) resetForm(); }}>
           <DialogTrigger asChild>
             <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Nova unidade</Button>
@@ -171,7 +167,7 @@ function ClinicasTab() {
               </div>
               <div className="space-y-2"><Label>Endereço</Label>
                 <Input value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} /></div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-2"><Label>Cidade</Label>
                   <Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
                 <div className="space-y-2"><Label>UF</Label>
@@ -187,7 +183,7 @@ function ClinicasTab() {
                     Usar minha localização
                   </Button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-2"><Label className="text-xs">Latitude</Label>
                     <Input value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} /></div>
                   <div className="space-y-2"><Label className="text-xs">Longitude</Label>
@@ -208,7 +204,6 @@ function ClinicasTab() {
             </form>
           </DialogContent>
         </Dialog>
-        )}
       </div>
 
       {memberships.length === 0 ? (
@@ -243,11 +238,9 @@ function ClinicasTab() {
                     <Button className="flex-1" variant="secondary" onClick={() => selectClinica(m.clinica_id)} disabled={ativa}>
                       <CheckCircle2 className="h-4 w-4 mr-2" /> Selecionar
                     </Button>
-                    {podeEscrever && (
-                      <Button variant="outline" onClick={() => openEdit(m.clinica_id)} disabled={loading}>
-                        <Pencil className="h-4 w-4 mr-2" /> Editar
-                      </Button>
-                    )}
+                    <Button variant="outline" onClick={() => openEdit(m.clinica_id)} disabled={loading}>
+                      <Pencil className="h-4 w-4 mr-2" /> Editar
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

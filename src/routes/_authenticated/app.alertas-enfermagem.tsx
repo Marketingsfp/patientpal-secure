@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,8 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { BellRing, Phone, CheckCircle2, MessageCircle, Clock, Loader2 } from "lucide-react";
-import { TTSButton } from "@/components/tts/tts-button";
-import { useTts } from "@/hooks/use-tts";
 
 export const Route = createFileRoute("/_authenticated/app/alertas-enfermagem")({
   component: AlertasEnfermagemPage,
@@ -47,9 +44,6 @@ const SEV_COR: Record<Severidade, string> = {
 
 function AlertasEnfermagemPage() {
   const { clinicaAtual } = useClinica();
-  const podeEscrever = usePodeEscrever("alertas-enfermagem");
-  const { speak } = useTts();
-  const jaFaladoRef = useRef<Set<string>>(new Set());
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [filtro, setFiltro] = useState<"aberto" | "todos">("aberto");
   const [loading, setLoading] = useState(true);
@@ -72,20 +66,7 @@ function AlertasEnfermagemPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [clinicaId, filtro]);
 
-  // Autoplay de novos alertas críticos ainda em aberto (Menino Jesus).
-  useEffect(() => {
-    const novosCriticos = alertas.filter(
-      (a) => a.severidade === "critico" && a.status === "aberto" && !jaFaladoRef.current.has(a.id),
-    );
-    if (!novosCriticos.length) return;
-    const primeiro = novosCriticos[0];
-    jaFaladoRef.current.add(primeiro.id);
-    const texto = `Alerta crítico. ${primeiro.titulo}. ${primeiro.paciente_nome ?? ""}. ${primeiro.descricao ?? ""}`;
-    void speak(texto);
-  }, [alertas, speak]);
-
   const updateStatus = async (a: Alerta, novo: Status) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const observacao = obs[a.id] ?? a.observacao_contato ?? null;
     const patch: Partial<Alerta> = { status: novo, observacao_contato: observacao };
     if (novo === "em_contato") patch.contatado_em = new Date().toISOString();
@@ -132,12 +113,6 @@ function AlertasEnfermagemPage() {
                   <Badge className={`uppercase ${SEV_COR[a.severidade]}`}>{a.severidade}</Badge>
                   <Badge variant="outline">{a.status}</Badge>
                   <span className="font-semibold">{a.titulo}</span>
-                  <TTSButton
-                    text={`Alerta ${a.severidade}. ${a.titulo}. Paciente ${a.paciente_nome ?? "não informado"}. ${a.descricao ?? ""} ${a.mensagem_sugerida ?? ""}`}
-                    size="icon"
-                    variant="ghost"
-                    label="Ouvir alerta"
-                  />
                 </div>
                 <div className="text-sm text-muted-foreground mt-0.5">
                   {a.paciente_nome ?? "—"} · {new Date(a.created_at).toLocaleString("pt-BR")}
@@ -160,19 +135,17 @@ function AlertasEnfermagemPage() {
                   />
                 </div>
               </div>
-              {podeEscrever && (
-                <div className="flex flex-col gap-2 min-w-[180px]">
-                  <Button size="sm" variant="outline" onClick={() => updateStatus(a, "em_contato")}>
-                    <Phone className="h-4 w-4 mr-1" /> Em contato
-                  </Button>
-                  <Button size="sm" onClick={() => updateStatus(a, "resolvido")}>
-                    <CheckCircle2 className="h-4 w-4 mr-1" /> Resolvido
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => updateStatus(a, "sem_contato")}>
-                    <Clock className="h-4 w-4 mr-1" /> Sem contato
-                  </Button>
-                </div>
-              )}
+              <div className="flex flex-col gap-2 min-w-[180px]">
+                <Button size="sm" variant="outline" onClick={() => updateStatus(a, "em_contato")}>
+                  <Phone className="h-4 w-4 mr-1" /> Em contato
+                </Button>
+                <Button size="sm" onClick={() => updateStatus(a, "resolvido")}>
+                  <CheckCircle2 className="h-4 w-4 mr-1" /> Resolvido
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => updateStatus(a, "sem_contato")}>
+                  <Clock className="h-4 w-4 mr-1" /> Sem contato
+                </Button>
+              </div>
             </div>
           </Card>
         ))}

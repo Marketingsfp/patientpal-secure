@@ -1,16 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   Wallet, PlusCircle, MinusCircle, ArrowDownToLine, ArrowUpFromLine, Lock,
-  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, Undo2, Printer, CalendarIcon, X, Search,
+  Unlock, Eye, FileDown, Users, Receipt, ChevronRight, Trash2, Plus, HandCoins, ArrowRight, Undo2, Printer,
 } from "lucide-react";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 import { useAuth } from "@/hooks/use-auth";
-import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { exportToExcel } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -26,146 +25,17 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import type { DateRange } from "react-day-picker";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { ListSkeleton } from "@/components/ui/list-skeleton";
 import { SolicitarEstornoDialog } from "@/components/financeiro/SolicitarEstornoDialog";
 import { useCaixaV2Flag } from "@/hooks/use-caixa-v2-flag";
 import { CaixaV2Mount } from "@/components/caixa-v2/caixa-v2-mount";
-import { useAutoReloadOnNewBuild } from "@/hooks/use-auto-reload-on-new-build";
-import { printComprovanteCaixa } from "@/lib/print-caixa-comprovante";
 
-import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/caixa")({
   component: CaixaRouteDispatcher,
   head: () => ({ meta: [{ title: "Caixa — ClinicaOS" }] }),
 });
-
-/**
- * Normaliza o valor gravado em `caixa_movimentos.forma_pagamento` para os
- * buckets exibidos no painel (Dinheiro / PIX / Débito / Crédito / Boleto /
- * Transferência / Convênio). Aliases: `cartao_credito`/`cartao_debito` do
- * banco viram `credito`/`debito`. Retorna `misto` para pagamentos divididos
- * (que são decompostos depois consultando `fin_lancamentos.observacoes`) e
- * `outros` como residual.
- */
-const FORMA_BUCKETS = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio"] as const;
-type FormaBucket = typeof FORMA_BUCKETS[number] | "misto" | "outros" | "indeterminado";
-
-function normalizarForma(f: string | null | undefined): FormaBucket {
-  const k = (f ?? "").toLowerCase().trim();
-  if (!k) return "outros";
-  if (k === "dinheiro" || k === "pix" || k === "boleto" || k === "transferencia" || k === "convenio" || k === "misto") return k;
-  if (k === "credito" || k === "cartao_credito" || k === "cartão_credito" || k === "cartao credito") return "credito";
-  if (k === "debito" || k === "cartao_debito" || k === "cartão_debito" || k === "cartao debito") return "debito";
-  return "outros";
-}
-
-/**
- * Bucket efetivo do movimento para agrupamento por forma de pagamento.
- * Sangria, suprimento e despesa mexem no dinheiro físico do caixa: quando
- * chegam sem `forma_pagamento`, contam como "dinheiro" (em vez de cair em
- * "outros"). Se, no futuro, algum desses lançamentos vier com forma
- * explícita, a forma informada é respeitada.
- */
-function bucketDeMov(m: { tipo: string; forma_pagamento: string | null }): FormaBucket {
-  const bruto = normalizarForma(m.forma_pagamento);
-  if (bruto === "outros" && (m.tipo === "sangria" || m.tipo === "suprimento" || m.tipo === "despesa")) {
-    return "dinheiro";
-  }
-  return bruto;
-}
-
-/**
- * Extrai as parcelas de um pagamento misto a partir do trecho
- * `Pagamento misto: Dinheiro R$ 60,00; PIX R$ 50,00 | ...` gravado em
- * `fin_lancamentos.observacoes`. Retorna somas por bucket já normalizado.
- */
-function decomporMistoObs(obs: string | null | undefined): Partial<Record<FormaBucket, number>> {
-  const out: Partial<Record<FormaBucket, number>> = {};
-  if (!obs) return out;
-  const marker = obs.match(/pagamento\s+misto\s*:/i);
-  if (!marker || marker.index == null) return out;
-  const trecho = obs
-    .slice(marker.index + marker[0].length)
-    .split(/\s+\|\s+/)[0];
-  const partes = trecho.split(";").map((s) => s.trim()).filter(Boolean);
-  const LABEL_TO_KEY: Array<[RegExp, FormaBucket]> = [
-    [/^cart[ãa]o\s*cr[ée]dito/i, "credito"],
-    [/^cart[ãa]o\s*d[ée]bito/i, "debito"],
-    [/^cr[ée]dito/i, "credito"],
-    [/^d[ée]bito/i, "debito"],
-    [/^dinheiro/i, "dinheiro"],
-    [/^pix/i, "pix"],
-    [/^boleto/i, "boleto"],
-    [/^conv[êe]nio/i, "convenio"],
-    [/^transfer[êe]ncia/i, "transferencia"],
-  ];
-  const parseBRL = (s: string) =>
-    Number(s.replace(/[.\s\u00a0]/g, "").replace(",", ".")) || 0;
-  for (const p of partes) {
-    const match = LABEL_TO_KEY.find(([re]) => re.test(p));
-    if (!match) continue;
-    const valMatch = p.match(/R\$[\s\u00a0]*([\d.\s\u00a0]+,\d{2})/i);
-    if (!valMatch) continue;
-    const v = parseBRL(valMatch[1]);
-    out[match[1]] = (out[match[1]] ?? 0) + v;
-  }
-  return out;
-}
-
-/**
- * Rótulo bonito para exibir a forma de pagamento em tabelas. Para
- * `misto`, converte as parcelas decompostas em algo como
- * "Dinheiro R$ 60,00 · PIX R$ 100,00". Sem observações do lançamento
- * ainda em cache, retorna um aviso temporário sem usar o rótulo misto.
- */
-const FORMA_LABEL: Record<FormaBucket, string> = {
-  dinheiro: "Dinheiro", pix: "PIX", debito: "Cartão débito", credito: "Cartão crédito",
-  boleto: "Boleto", transferencia: "Transferência", convenio: "Convênio",
-  misto: "Misto", outros: "Outros", indeterminado: "Indeterminado (conferir)",
-};
-
-/**
- * Falha 2.8 — decomposição do "misto" a partir de DADO ESTRUTURADO
- * (`fin_lancamentos.composicao_pagamento`). O texto da observação vira
- * apenas fallback legado. Retorna `null` quando não há fonte confiável —
- * nesse caso o valor NUNCA deve ser contabilizado como Dinheiro.
- */
-function partesDaComposicao(comp: unknown): Partial<Record<FormaBucket, number>> | null {
-  if (!comp || typeof comp !== "object") return null;
-  const arr = (comp as { partes?: unknown }).partes;
-  if (!Array.isArray(arr) || arr.length === 0) return null;
-  const out: Partial<Record<FormaBucket, number>> = {};
-  for (const p of arr as Array<{ forma?: string; valor?: number | string }>) {
-    const b = normalizarForma(p?.forma);
-    const v = Number(p?.valor ?? 0);
-    if (!v || b === "misto") continue;
-    out[b] = (out[b] ?? 0) + v;
-  }
-  return Object.keys(out).length ? out : null;
-}
-function formatarFormaPagamento(
-  m: { forma_pagamento: string | null; lancamento_id?: string | null },
-  mistoObs: Record<string, string>,
-): string {
-  const bucket = normalizarForma(m.forma_pagamento);
-  if (bucket !== "misto") return m.forma_pagamento || "—";
-  const obs = m.lancamento_id ? mistoObs[m.lancamento_id] : undefined;
-  const partes = obs ? decomporMistoObs(obs) : {};
-  const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0);
-  if (entradas.length === 0) return "Aguardando formas";
-  return entradas
-    .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k} ${(v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`)
-    .join(" · ");
-}
 
 /**
  * Promoção controlada do CaixaShellV2 para `/app/caixa`, atrás da flag
@@ -180,21 +50,13 @@ function formatarFormaPagamento(
 function CaixaRouteDispatcher() {
   const { clinicaAtual } = useClinica();
   const { enabled, loading } = useCaixaV2Flag();
-  // `?classico=1` força a tela clássica (usado pelos botões do caixa novo
-  // que delegam ações ao clássico). Sem isso, navegar para /app/caixa
-  // continuava caindo no caixa novo e "nada acontecia".
-  const forcaClassico = typeof window !== "undefined"
-    && new URLSearchParams(window.location.search).get("classico") === "1";
-  // Detecta novo bundle publicado enquanto a tela do Caixa está aberta e
-  // recarrega automaticamente — evita a necessidade de Ctrl+Shift+R.
-  useAutoReloadOnNewBuild(true);
   const role = clinicaAtual?.role ?? null;
   const v2Allowed = role === "admin" || role === "gestor";
-  if (!forcaClassico && !loading && enabled && v2Allowed) return <CaixaV2Mount />;
+  if (!loading && enabled && v2Allowed) return <CaixaV2Mount />;
   return <Page />;
 }
 
-type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento" | "estorno" | "reabertura";
+type MovTipo = "abertura" | "sangria" | "suprimento" | "recebimento" | "despesa" | "fechamento";
 interface Sessao {
   id: string; clinica_id: string; user_id: string; user_nome: string | null;
   aberto_em: string; valor_abertura: number;
@@ -208,36 +70,6 @@ interface Mov {
   created_at: string;
   lancamento_id?: string | null;
 }
-type MovEnrich = {
-  servico: string | null;
-  medico: string | null;
-  paciente: string | null;
-  paciente_id: string | null;
-  ficha: number | null;
-  /** ID do usuário que faturou (fin_lancamentos.criado_por) — pode diferir
-   *  do operador de caixa (caixa_movimentos.user_id) em cobranças
-   *  centralizadas. Usado para exibir "Quem faturou" na coluna Usuário. */
-  faturado_por_id: string | null;
-};
-type LancamentoEnrichRow = {
-  id: string;
-  medico_id: string | null;
-  agendamento_id: string | null;
-  paciente_id: string | null;
-  descricao: string | null;
-  status: string | null;
-  criado_por: string | null;
-};
-type AgendamentoEnrichRow = {
-  id: string;
-  procedimento: string | null;
-  paciente_id: string | null;
-  medico_id: string | null;
-  ficha_numero: number | null;
-  inicio: string | null;
-  agenda_id: string | null;
-  paciente_nome: string | null;
-};
 interface FilaCaixa {
   id: string;
   paciente_id: string | null;
@@ -258,11 +90,10 @@ const fmtDT = (s: string | null) =>
 const TIPO_LABEL: Record<MovTipo, string> = {
   abertura: "Abertura", sangria: "Sangria", suprimento: "Suprimento",
   recebimento: "Recebimento", despesa: "Despesa", fechamento: "Fechamento",
-  estorno: "Estorno", reabertura: "Reabertura",
 };
 const TIPO_SINAL: Record<MovTipo, 1 | -1 | 0> = {
   abertura: 1, suprimento: 1, recebimento: 1,
-  sangria: -1, despesa: -1, fechamento: 0, estorno: -1, reabertura: 0,
+  sangria: -1, despesa: -1, fechamento: 0,
 };
 const TIPO_CLASS: Record<MovTipo, string> = {
   abertura: "bg-sky-100 text-sky-700 border-sky-300 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800",
@@ -271,84 +102,10 @@ const TIPO_CLASS: Record<MovTipo, string> = {
   sangria: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
   despesa: "bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800",
   fechamento: "bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700",
-  estorno: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300 dark:bg-fuchsia-950 dark:text-fuchsia-300 dark:border-fuchsia-800",
-  reabertura: "bg-violet-100 text-violet-700 border-violet-300 dark:bg-violet-950 dark:text-violet-300 dark:border-violet-800",
 };
 
 const SESSAO_FIELDS = "id, clinica_id, user_id, user_nome, aberto_em, valor_abertura, fechado_em, valor_fechamento_informado, valor_fechamento_calculado, diferenca, status, observacoes";
 const MOV_FIELDS = "id, sessao_id, user_id, tipo, valor, descricao, forma_pagamento, created_at, lancamento_id";
-
-/** Extrai o nome do serviço da descrição de um movimento como fallback, quando
- *  não há enriquecimento via fin_lancamentos/agendamento. */
-function servicoFromDescricao(desc: string | null): string | null {
-  if (!desc) return null;
-  // Remove prefixo "Recebimento — " para facilitar o parse
-  const clean = desc.replace(/^Recebimento\s+—\s+/i, "");
-  // Padrão 1: "PACIENTE (SERVIÇO)" — texto entre parênteses no final
-  const par = clean.match(/\(([^()]+)\)\s*$/);
-  if (par) return par[1].trim() || null;
-  // Padrão 2: separado por " — " ou " · "
-  const idx = Math.max(clean.lastIndexOf(" — "), clean.lastIndexOf(" · "));
-  if (idx > 0) {
-    return clean.slice(idx + 3).replace(/\s*\(.*\)\s*$/, "").trim() || null;
-  }
-  return null;
-}
-
-/** Extrai o nome do paciente da descrição de um movimento como fallback,
- *  quando não há enriquecimento via fin_lancamentos.paciente_id. Aceita
- *  os formatos usados nos diversos caminhos de escrita: cobrança
- *  (`NOME — SERVIÇO (ESPECIALIDADE)` / `NOME · SERVIÇO`), mensalidade
- *  (`MENSALIDADE X/Y - CONTRATO #Z - NOME`) e recebimento genérico
- *  (`Recebimento — NOME (SERVIÇO)`). Retorna null quando o texto não
- *  contém um nome identificável (sangrias, aberturas, [Caixa] livres). */
-function pacienteFromDescricao(desc: string | null): string | null {
-  if (!desc) return null;
-  // Mensalidade de contrato: nome fica no fim, depois do último " - "
-  const mens = desc.match(/CONTRATO\s+#\S+\s+-\s+(.+?)\s*$/i);
-  if (mens) return mens[1].trim() || null;
-  // Descarta descrições sem paciente (sangria/suprimento/fechamento/etc.)
-  if (/^\s*(abertura|fechamento|reabertura|sangria|suprimento|estorno|fechamento\s+desfeito)\b/i.test(desc)) return null;
-  if (/^\s*\[caixa\]/i.test(desc)) return null;
-  const clean = desc.replace(/^Recebimento\s+—\s+/i, "");
-  // Nome vem antes do PRIMEIRO separador " — " ou " · "
-  const seps = [" — ", " · "];
-  let idx = -1;
-  for (const s of seps) {
-    const i = clean.indexOf(s);
-    if (i > 0 && (idx === -1 || i < idx)) idx = i;
-  }
-  if (idx > 0) {
-    const nome = clean.slice(0, idx).trim();
-    if (!nome || /^mensalidade/i.test(nome)) return null;
-    return nome;
-  }
-  return null;
-}
-
-function chunkArray<T>(items: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
-  return chunks;
-}
-
-function saoPauloDayKey(value: string | null): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-}
-
-function saoPauloDayRange(day: string): { start: string; end: string } {
-  return {
-    start: `${day}T00:00:00.000-03:00`,
-    end: `${day}T23:59:59.999-03:00`,
-  };
-}
-
-function formatFichaCaixa(ficha: number | null | undefined): string {
-  return typeof ficha === "number" && ficha > 0 ? String(ficha).padStart(3, "0") : "—";
-}
 
 const BANDEIRAS_CARTAO = [
   "Visa", "Mastercard", "Elo", "Hipercard", "American Express", "Diners", "Outra",
@@ -366,12 +123,7 @@ function montarSufixoCartao(forma: string, bandeira: string, parcelas: string): 
 function Page() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
-  const podeEscrever = usePodeEscrever("caixa");
   const isManager = clinicaAtual?.role === "admin" || clinicaAtual?.role === "gestor";
-  const podeLancarRecebDespesa =
-    clinicaAtual?.role === "admin" ||
-    clinicaAtual?.role === "gestor" ||
-    clinicaAtual?.role === "financeiro";
 
   const [tab, setTab] = useState<"meu" | "todos" | "repasse">("meu");
   const [estornoFor, setEstornoFor] = useState<Mov | null>(null);
@@ -431,140 +183,40 @@ function Page() {
   const [loading, setLoading] = useState(true);
   const [minhaSessao, setMinhaSessao] = useState<Sessao | null>(null);
   const [minhasMovs, setMinhasMovs] = useState<Mov[]>([]);
-  // Movimentos do próprio usuário ao longo das ~20 sessões mais recentes
-  // (aberta + fechadas). Usado APENAS na aba "Meu caixa → Movimentos" para
-  // permitir visualizar/estornar lançamentos retroativos. NÃO é usado nos
-  // cálculos de Saldo/Totais — esses continuam presos à sessão aberta atual
-  // via `minhasMovs`.
-  const [minhasMovsHist, setMinhasMovsHist] = useState<Mov[]>([]);
   const [minhasSessoes, setMinhasSessoes] = useState<Sessao[]>([]);
-  // Solicitações de estorno vinculadas às movimentações visíveis
-  // (chave = lancamento_id, valor = status). Usado para trocar o botão
-  // "Solicitar estorno" por "Aguardando aprovação" (pendente) ou
-  // "Estornado" (aprovado) conforme a decisão do financeiro.
-  const [estornosPorLanc, setEstornosPorLanc] = useState<Map<string, "pendente" | "aprovado">>(new Map());
-  // Espelho do estornosPorLanc, mas indexado por caixa_movimento_id — usado
-  // para o botão de estorno de sangria (que não tem lançamento financeiro).
-  const [estornosPorMov, setEstornosPorMov] = useState<Map<string, "pendente" | "aprovado">>(new Map());
-  const [enrichPorLanc, setEnrichPorLanc] = useState<Map<string, MovEnrich>>(new Map());
-  // Mapa user_id → nome de exibição. Alimenta a coluna "Usuário" (quem
-  // faturou) em Movimentos, no Detalhe de sessão, no drill-down do saldo
-  // e na exportação/impressão. Cobre tanto o operador do caixa
-  // (caixa_movimentos.user_id) quanto o autor do lançamento financeiro
-  // (fin_lancamentos.criado_por) — que podem divergir em cobranças
-  // centralizadas (ex.: financeiro/laboratório).
-  const [userNamesById, setUserNamesById] = useState<Map<string, string>>(new Map());
-  // Conjunto de lancamento_ids cujo fin_lancamentos.status = 'cancelado'
-  // (i.e., estornados). Esses recebimentos não devem entrar no saldo do
-  // caixa mesmo que o movimento reverso ainda não tenha sido gravado.
-  const [lancsCancelados, setLancsCancelados] = useState<Set<string>>(new Set());
   // Filtro de período para "Movimentos" (padrão: hoje)
   type PeriodoFiltro = "hoje" | "semana" | "quinzena" | "mes" | "intervalo" | "todos";
   const [meuPeriodo, setMeuPeriodo] = useState<PeriodoFiltro>("hoje");
   const [meuDataIni, setMeuDataIni] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [meuDataFim, setMeuDataFim] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [meuMedico, setMeuMedico] = useState<string>("__all__");
-  const [meuPaciente, setMeuPaciente] = useState<string>("");
-  const [openCal, setOpenCal] = useState(false);
   const minhasMovsFiltrados = useMemo<Mov[]>(() => {
-    // 1) filtro de período (data)
-    let base: Mov[] = minhasMovsHist;
-    if (meuPeriodo !== "todos") {
-      const now = new Date();
-      const fim = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-      let ini: Date;
-      let fimP: Date = fim;
-      if (meuPeriodo === "hoje") {
-        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-      } else if (meuPeriodo === "semana") {
-        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0);
-      } else if (meuPeriodo === "quinzena") {
-        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14, 0, 0, 0, 0);
-      } else if (meuPeriodo === "mes") {
-        ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0);
-      } else {
-        // Validação defensiva: se o intervalo estiver em branco/mal
-        // formatado, cai para o dia de hoje em vez de gerar Date(NaN)
-        // e sumir com todas as linhas silenciosamente.
-        const parseIso = (s: string): [number, number, number] | null => {
-          const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || "");
-          if (!m) return null;
-          const y = Number(m[1]); const mo = Number(m[2]); const d = Number(m[3]);
-          if (!y || !mo || !d) return null;
-          return [y, mo, d];
-        };
-        const pi = parseIso(meuDataIni);
-        const pf = parseIso(meuDataFim);
-        if (pi) ini = new Date(pi[0], pi[1] - 1, pi[2], 0, 0, 0, 0);
-        else ini = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-        if (pf) fimP = new Date(pf[0], pf[1] - 1, pf[2], 23, 59, 59, 999);
-      }
-      base = base.filter((m) => {
+    if (meuPeriodo === "todos") return minhasMovs;
+    const now = new Date();
+    const fim = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    let ini: Date;
+    if (meuPeriodo === "hoje") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    } else if (meuPeriodo === "semana") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0);
+    } else if (meuPeriodo === "quinzena") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 14, 0, 0, 0, 0);
+    } else if (meuPeriodo === "mes") {
+      ini = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0);
+    } else {
+      const [yi, mi, di] = meuDataIni.split("-").map(Number);
+      const [yf, mf, df] = meuDataFim.split("-").map(Number);
+      ini = new Date(yi, (mi || 1) - 1, di || 1, 0, 0, 0, 0);
+      return minhasMovs.filter((m) => {
         const d = new Date(m.created_at);
+        const fimP = new Date(yf, (mf || 1) - 1, df || 1, 23, 59, 59, 999);
         return d >= ini && d <= fimP;
       });
     }
-    // 2) filtro por médico (usa enrichPorLanc quando disponível)
-    if (meuMedico && meuMedico !== "__all__") {
-      base = base.filter((m) => {
-        const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
-        return (enr?.medico ?? "").trim() === meuMedico;
-      });
-    }
-    // 3) filtro por paciente — usa o nome enriquecido de fin_lancamentos
-    // (fonte de verdade) com fallback para a descrição do próprio
-    // movimento. Assim, mensalidades e recebimentos manuais sem o nome
-    // no texto continuam encontráveis quando existe vínculo real.
-    const termo = meuPaciente.trim().toLocaleLowerCase("pt-BR");
-    if (termo) {
-      base = base.filter((m) => {
-        const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
-        const nomeEnr = (enr?.paciente ?? "").toLocaleLowerCase("pt-BR");
-        if (nomeEnr && nomeEnr.includes(termo)) return true;
-        const desc = (m.descricao ?? "").toLocaleLowerCase("pt-BR");
-        return desc.includes(termo);
-      });
-    }
-    return base;
-  }, [minhasMovsHist, meuPeriodo, meuDataIni, meuDataFim, meuMedico, meuPaciente, enrichPorLanc]);
-
-  // Lista de médicos distintos presentes nos movimentos carregados.
-  const medicosDisponiveis = useMemo<string[]>(() => {
-    const set = new Set<string>();
-    for (const m of minhasMovsHist) {
-      const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
-      const nome = (enr?.medico ?? "").trim();
-      if (nome) set.add(nome);
-    }
-    return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [minhasMovsHist, enrichPorLanc]);
-
-  const filtrosAtivos =
-    meuPeriodo !== "hoje" || meuMedico !== "__all__" || meuPaciente.trim() !== "";
-  // Nota: o rótulo "(X de N)" e o botão "Limpar" continuam válidos
-  // porque `meuPeriodo === "intervalo"` também difere de "hoje".
-  const limparFiltros = () => {
-    setMeuPeriodo("hoje");
-    setMeuMedico("__all__");
-    setMeuPaciente("");
-    const hj = new Date().toISOString().slice(0, 10);
-    setMeuDataIni(hj);
-    setMeuDataFim(hj);
-  };
-
-  // Rótulo curto do período para mostrar no botão do calendário.
-  const periodoLabel = useMemo(() => {
-    if (meuPeriodo === "hoje") return "Hoje";
-    if (meuPeriodo === "semana") return "Última semana";
-    if (meuPeriodo === "quinzena") return "Última quinzena";
-    if (meuPeriodo === "mes") return "Último mês";
-    if (meuPeriodo === "todos") return "Todos";
-    const p = (s: string) => {
-      const [y, m, d] = s.split("-");
-      return `${d}/${m}/${y}`;
-    };
-    return `${p(meuDataIni)} — ${p(meuDataFim)}`;
-  }, [meuPeriodo, meuDataIni, meuDataFim]);
+    return minhasMovs.filter((m) => {
+      const d = new Date(m.created_at);
+      return d >= ini && d <= fim;
+    });
+  }, [minhasMovs, meuPeriodo, meuDataIni, meuDataFim]);
 
   const [todasSessoes, setTodasSessoes] = useState<Sessao[]>([]);
   const [todosMovs, setTodosMovs] = useState<Mov[]>([]);
@@ -585,180 +237,6 @@ function Page() {
   const linhaVazia = (): LinhaPag => ({ forma: "dinheiro", valor: "0", bandeira: "", parcelas: "1" });
   const [cobrancaLinhas, setCobrancaLinhas] = useState<LinhaPag[]>([linhaVazia()]);
 
-  // Edição inline da "Forma" nas tabelas de Movimentos. Só liberada para
-  // quem tem permissão de escrita no módulo caixa e apenas para movimentos
-  // simples (não-mistos), em tipos que fazem sentido (recebimento, despesa,
-  // estorno). Atualiza tanto `caixa_movimentos.forma_pagamento` quanto o
-  // `fin_lancamentos.forma_pagamento` associado (quando existir), para que
-  // relatórios financeiros e resumos por moeda fiquem coerentes.
-  const FORMAS_EDITAVEIS: Array<{ value: string; label: string }> = [
-    { value: "dinheiro", label: "Dinheiro" },
-    { value: "pix", label: "PIX" },
-    { value: "cartao_debito", label: "Cartão débito" },
-    { value: "cartao_credito", label: "Cartão crédito" },
-    { value: "boleto", label: "Boleto" },
-    { value: "transferencia", label: "Transferência" },
-    { value: "convenio", label: "Convênio" },
-  ];
-  const TIPOS_FORMA_EDITAVEL = new Set<MovTipo>(["recebimento", "despesa", "estorno"]);
-  const [salvandoFormaId, setSalvandoFormaId] = useState<string | null>(null);
-
-  // Diálogo de detalhes do cartão (crédito/débito) na edição inline da Forma.
-  type CartaoDetalhes = {
-    bandeira: string;
-    parcelas: string;
-    data: string;
-    autorizacao: string;
-    valorLiquido: string;
-  };
-  const [cartaoEditFor, setCartaoEditFor] = useState<{ mov: Mov; forma: "cartao_credito" | "cartao_debito" } | null>(null);
-  const [cartaoEdit, setCartaoEdit] = useState<CartaoDetalhes>({
-    bandeira: "", parcelas: "1", data: "", autorizacao: "", valorLiquido: "",
-  });
-  const [salvandoCartao, setSalvandoCartao] = useState(false);
-
-  async function alterarFormaMov(m: Mov, nova: string) {
-    if (!m || !nova || nova === (m.forma_pagamento ?? "")) return;
-    // Cartão exige coleta de dados adicionais → abre o diálogo em vez de gravar direto.
-    if (nova === "cartao_credito" || nova === "cartao_debito") {
-      // Pré-carrega valores existentes do lançamento (se houver) para permitir edição.
-      let prefill: Partial<CartaoDetalhes> = {};
-      if (m.lancamento_id) {
-        const { data } = await supabase
-          .from("fin_lancamentos")
-          .select("bandeira_cartao, parcelas, data_cartao, autorizacao_cartao, valor_liquido_cartao, valor")
-          .eq("id", m.lancamento_id)
-          .maybeSingle();
-        const row = (data ?? null) as
-          | { bandeira_cartao: string | null; parcelas: number | null; data_cartao: string | null; autorizacao_cartao: string | null; valor_liquido_cartao: number | null; valor: number | null }
-          | null;
-        if (row) {
-          prefill = {
-            bandeira: row.bandeira_cartao ?? "",
-            parcelas: String(row.parcelas ?? 1),
-            data: row.data_cartao ?? "",
-            autorizacao: row.autorizacao_cartao ?? "",
-            valorLiquido: row.valor_liquido_cartao != null ? String(row.valor_liquido_cartao) : String(row.valor ?? m.valor ?? ""),
-          };
-        }
-      }
-      setCartaoEdit({
-        bandeira: prefill.bandeira ?? "",
-        parcelas: prefill.parcelas ?? "1",
-        data: prefill.data ?? new Date().toISOString().slice(0, 10),
-        autorizacao: prefill.autorizacao ?? "",
-        valorLiquido: prefill.valorLiquido ?? String(m.valor ?? ""),
-      });
-      setCartaoEditFor({ mov: m, forma: nova });
-      return;
-    }
-    setSalvandoFormaId(m.id);
-    try {
-      const { error: eMov } = await supabase
-        .from("caixa_movimentos")
-        .update({ forma_pagamento: nova })
-        .eq("id", m.id);
-      if (eMov) throw eMov;
-      if (m.lancamento_id) {
-        const { error: eLanc } = await supabase
-          .from("fin_lancamentos")
-          .update({ forma_pagamento: nova })
-          .eq("id", m.lancamento_id);
-        if (eLanc) throw eLanc;
-      }
-      const patchLista = (lista: Mov[]) =>
-        lista.map((x) => (x.id === m.id ? { ...x, forma_pagamento: nova } : x));
-      setMinhasMovs((prev) => patchLista(prev));
-      setMinhasMovsHist((prev) => patchLista(prev));
-      setTodosMovs((prev) => patchLista(prev));
-      setDetalheMovs((prev) => patchLista(prev));
-      toast.success("Forma de pagamento atualizada.");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Falha ao atualizar";
-      toast.error(msg);
-    } finally {
-      setSalvandoFormaId(null);
-    }
-  }
-
-  async function confirmarCartaoEdit() {
-    if (!cartaoEditFor) return;
-    const { mov: m, forma: nova } = cartaoEditFor;
-    if (!cartaoEdit.bandeira) {
-      toast.error("Selecione a bandeira do cartão.");
-      return;
-    }
-    const parcelasNum = nova === "cartao_credito" ? Math.max(1, Number(cartaoEdit.parcelas) || 1) : 1;
-    const liquidoNum = cartaoEdit.valorLiquido ? Number(String(cartaoEdit.valorLiquido).replace(",", ".")) : null;
-    setSalvandoCartao(true);
-    try {
-      const { error: eMov } = await supabase
-        .from("caixa_movimentos")
-        .update({ forma_pagamento: nova })
-        .eq("id", m.id);
-      if (eMov) throw eMov;
-      if (m.lancamento_id) {
-        const patchLanc: Record<string, unknown> = {
-          forma_pagamento: nova,
-          bandeira_cartao: cartaoEdit.bandeira,
-          parcelas: parcelasNum,
-          data_cartao: cartaoEdit.data || null,
-          autorizacao_cartao: cartaoEdit.autorizacao || null,
-          valor_liquido_cartao: liquidoNum,
-        };
-        const { error: eLanc } = await supabase
-          .from("fin_lancamentos")
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .update(patchLanc as any)
-          .eq("id", m.lancamento_id);
-        if (eLanc) throw eLanc;
-      }
-      const patchLista = (lista: Mov[]) =>
-        lista.map((x) => (x.id === m.id ? { ...x, forma_pagamento: nova } : x));
-      setMinhasMovs((prev) => patchLista(prev));
-      setMinhasMovsHist((prev) => patchLista(prev));
-      setTodosMovs((prev) => patchLista(prev));
-      setDetalheMovs((prev) => patchLista(prev));
-      toast.success("Forma de pagamento atualizada.");
-      setCartaoEditFor(null);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Falha ao atualizar";
-      toast.error(msg);
-    } finally {
-      setSalvandoCartao(false);
-    }
-  }
-
-  function FormaCellEditavel({ m }: { m: Mov }) {
-    const bucket = normalizarForma(m.forma_pagamento);
-    const editavel =
-      podeEscrever && bucket !== "misto" && TIPOS_FORMA_EDITAVEL.has(m.tipo);
-    if (!editavel) {
-      return <span className="text-xs">{formatarFormaPagamento(m, mistoObs)}</span>;
-    }
-    const atual = (m.forma_pagamento ?? "").trim();
-    const known = FORMAS_EDITAVEIS.some((f) => f.value === atual);
-    return (
-      <Select
-        value={known ? atual : ""}
-        onValueChange={(v) => { void alterarFormaMov(m, v); }}
-        disabled={salvandoFormaId === m.id}
-      >
-        <SelectTrigger className="h-7 text-xs w-[150px]">
-          <SelectValue placeholder={atual || "Selecione"} />
-        </SelectTrigger>
-        <SelectContent>
-          {FORMAS_EDITAVEIS.map((f) => (
-            <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
-          ))}
-          {atual && !known && (
-            <SelectItem value={atual}>{atual}</SelectItem>
-          )}
-        </SelectContent>
-      </Select>
-    );
-  }
-
   // Formularios
   const [valorAbertura, setValorAbertura] = useState("0");
   const [obsAbertura, setObsAbertura] = useState("");
@@ -767,29 +245,9 @@ function Page() {
   const [movForma, setMovForma] = useState("dinheiro");
   const [movBandeira, setMovBandeira] = useState("");
   const [movParcelas, setMovParcelas] = useState("1");
-  const [movDestinoUserId, setMovDestinoUserId] = useState("");
-  const [membrosClinica, setMembrosClinica] = useState<Array<{ user_id: string; nome: string }>>([]);
   const [valorInformado, setValorInformado] = useState("");
   const [obsFechamento, setObsFechamento] = useState("");
-  const [dataFechamento, setDataFechamento] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
-  // Conferência por forma de pagamento no fechamento do próprio caixa.
-  const [conferidoOwn, setConferidoOwn] = useState<Record<string, string>>({});
-
-  // Fechamento de caixa de OUTRO usuário (gestor/admin no tab "Todos").
-  const [openFecharTerceiro, setOpenFecharTerceiro] = useState<Sessao | null>(null);
-  const [informadoTerceiro, setInformadoTerceiro] = useState("");
-  const [obsTerceiro, setObsTerceiro] = useState("");
-  const [dataFechamentoTerceiro, setDataFechamentoTerceiro] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  // Conferência por forma de pagamento no fechamento de terceiros.
-  const [conferidoTerceiro, setConferidoTerceiro] = useState<Record<string, string>>({});
-  // Fechamento em lote (por dia) — gestor
-  const [openLote, setOpenLote] = useState(false);
-  // Desfazer fechamento (admin/gestor/financeiro)
-  const [openReabrir, setOpenReabrir] = useState<Sessao | null>(null);
-  const [motivoReabrir, setMotivoReabrir] = useState("");
-  const [loteSelecionados, setLoteSelecionados] = useState<Record<string, boolean>>({});
-  const [obsLote, setObsLote] = useState("");
 
   // Atalho: 1..5 na modal de cobrança seleciona a forma da última linha
   useEffect(() => {
@@ -848,295 +306,25 @@ function Page() {
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("user_id", user.id)
         .order("aberto_em", { ascending: false })
-        .limit(5),
+        .limit(20),
     ]);
     const aberta = abertaRes.data;
     setMinhaSessao((aberta ?? null) as Sessao | null);
 
-    // Enriquecimento compartilhado entre os dois ramos (com/sem sessão
-    // aberta). Puxa serviço, médico E paciente a partir de
-    // fin_lancamentos, para que a lista de Movimentos exiba o paciente
-    // vinculado mesmo quando a descrição do movimento não trouxer o nome.
-    const enrichMovsList = async (
-      movsList: Mov[],
-    ): Promise<{
-      enrich: Map<string, MovEnrich>;
-      cancelados: Set<string>;
-    }> => {
-      const enrich = new Map<string, MovEnrich>();
-      const cancelados = new Set<string>();
-      const lancIds = Array.from(new Set(movsList.map((m) => m.lancamento_id).filter((x): x is string => !!x)));
-      if (lancIds.length === 0) return { enrich, cancelados };
-      const lancRows: LancamentoEnrichRow[] = [];
-      for (const ids of chunkArray(lancIds, 200)) {
-        const { data, error } = await supabase
-          .from("fin_lancamentos")
-          .select("id, medico_id, agendamento_id, paciente_id, descricao, status, criado_por")
-          .in("id", ids);
-        if (error) {
-          console.warn("Falha ao enriquecer movimentos do caixa por lançamento", error);
-          continue;
-        }
-        lancRows.push(...((data ?? []) as LancamentoEnrichRow[]));
-      }
-      for (const l of lancRows) {
-        if (l.status === "cancelado") cancelados.add(l.id);
-      }
-      const medIds = new Set(lancRows.map((l) => l.medico_id).filter((x): x is string => !!x));
-      const agIds = Array.from(new Set(lancRows.map((l) => l.agendamento_id).filter((x): x is string => !!x)));
-      const pacIds = new Set(lancRows.map((l) => l.paciente_id).filter((x): x is string => !!x));
-
-      const agChunks = chunkArray(agIds, 200);
-      const agResults = await Promise.all(
-        agChunks.map((ids) =>
-          supabase
-            .from("agendamentos")
-            .select("id, procedimento, paciente_id, medico_id, ficha_numero, inicio, agenda_id, paciente_nome")
-            .in("id", ids),
-        ),
-      );
-      const agRows: AgendamentoEnrichRow[] = [];
-      for (const r of agResults) {
-        if (r.error) {
-          console.warn("Falha ao enriquecer movimentos do caixa por agendamento", r.error);
-          continue;
-        }
-        agRows.push(...((r.data ?? []) as AgendamentoEnrichRow[]));
-      }
-
-      const agMap = new Map<string, AgendamentoEnrichRow>();
-      for (const a of agRows) {
-        agMap.set(a.id, a);
-        if (a.medico_id) medIds.add(a.medico_id);
-        // Paciente pelo agendamento cobre casos em que fin_lancamentos
-        // não tem paciente_id (ex.: mensalidades ou lançamentos gerados
-        // por caminhos antigos).
-        if (a.paciente_id) pacIds.add(a.paciente_id);
-      }
-
-      const medChunks = chunkArray(Array.from(medIds), 200);
-      const pacChunks = chunkArray(Array.from(pacIds), 200);
-      const [medResults, pacResults] = await Promise.all([
-        Promise.all(medChunks.map((ids) => supabase.from("medicos").select("id, nome").in("id", ids))),
-        Promise.all(pacChunks.map((ids) => supabase.from("pacientes").select("id, nome").in("id", ids))),
-      ]);
-      const medMap = new Map<string, string>();
-      for (const r of medResults) {
-        if (r.error) { console.warn("Falha ao enriquecer movimentos do caixa por médico", r.error); continue; }
-        for (const m of (r.data ?? []) as Array<{ id: string; nome: string | null }>) {
-          if (m.nome) medMap.set(m.id, m.nome);
-        }
-      }
-      const pacMap = new Map<string, string>();
-      for (const r of pacResults) {
-        if (r.error) { console.warn("Falha ao enriquecer movimentos do caixa por paciente", r.error); continue; }
-        for (const p of (r.data ?? []) as Array<{ id: string; nome: string | null }>) {
-          if (p.nome) pacMap.set(p.id, p.nome);
-        }
-      }
-
-      const fichaCalculadaPorAg = new Map<string, number>();
-      // Fichas calculadas: em vez de uma consulta por (dia, médico, agenda) —
-      // que gerava dezenas de idas ao banco em série — buscamos os
-      // agendamentos do dia inteiro UMA vez por dia (em paralelo) e
-      // classificamos por (médico, agenda) no navegador. Mesma numeração
-      // final, custo drasticamente menor.
-      const diasFicha = new Set<string>();
-      for (const a of agRows) {
-        if (typeof a.ficha_numero === "number" && a.ficha_numero > 0) continue;
-        const day = saoPauloDayKey(a.inicio);
-        if (day) diasFicha.add(day);
-      }
-      if (diasFicha.size > 0) {
-        const dias = Array.from(diasFicha);
-        const diaResults = await Promise.all(
-          dias.map((day) => {
-            const range = saoPauloDayRange(day);
-            return supabase
-              .from("agendamentos")
-              .select("id, inicio, paciente_nome, medico_id, agenda_id")
-              .eq("clinica_id", clinicaAtual.clinica_id)
-              .gte("inicio", range.start)
-              .lte("inicio", range.end)
-              .range(0, 9999);
-          }),
-        );
-        type FichaRow = { id: string; inicio: string | null; paciente_nome: string | null; medico_id: string | null; agenda_id: string | null };
-        for (const r of diaResults) {
-          if (r.error) { console.warn("Falha ao calcular ficha no caixa", r.error); continue; }
-          const rows = (r.data ?? []) as FichaRow[];
-          const porGrupo = new Map<string, FichaRow[]>();
-          for (const row of rows) {
-            const key = `${row.medico_id ?? "__sem_profissional__"}::${row.agenda_id ?? "__sem_agenda__"}`;
-            const arr = porGrupo.get(key) ?? [];
-            arr.push(row);
-            porGrupo.set(key, arr);
-          }
-          for (const arr of porGrupo.values()) {
-            arr.sort((a, b) => {
-              const t = String(a.inicio ?? "").localeCompare(String(b.inicio ?? ""));
-              if (t !== 0) return t;
-              return String(a.paciente_nome ?? "").localeCompare(String(b.paciente_nome ?? ""), "pt-BR", { sensitivity: "base" });
-            });
-            arr.forEach((row, index) => fichaCalculadaPorAg.set(row.id, index + 1));
-          }
-        }
-      }
-
-      for (const l of lancRows) {
-        const agInfo = l.agendamento_id ? agMap.get(l.agendamento_id) : undefined;
-        const servicoFromProc = agInfo?.procedimento ?? null;
-        // fallback: extrai serviço da descrição do lançamento
-        let servico = servicoFromProc;
-        if (!servico && l.descricao) {
-          const desc = l.descricao;
-          const idx = Math.max(desc.lastIndexOf(" — "), desc.lastIndexOf(" · "));
-          if (idx > 0) servico = desc.slice(idx + 3).replace(/\s*\(.*\)\s*$/, "").trim() || null;
-        }
-        // Paciente: prioriza fin_lancamentos.paciente_id; fallback via
-        // agendamento.paciente_id; se nada disso existir, fica null e a
-        // linha usará pacienteFromDescricao() no render.
-        const pacIdEfetivo = l.paciente_id ?? agInfo?.paciente_id ?? null;
-        const pacienteNome = pacIdEfetivo ? pacMap.get(pacIdEfetivo) ?? null : null;
-        const medIdEfetivo = l.medico_id ?? agInfo?.medico_id ?? null;
-        enrich.set(l.id, {
-          servico,
-          medico: medIdEfetivo ? medMap.get(medIdEfetivo) ?? null : null,
-          paciente: pacienteNome,
-          paciente_id: pacIdEfetivo,
-          ficha: agInfo ? (agInfo.ficha_numero ?? fichaCalculadaPorAg.get(agInfo.id) ?? null) : null,
-          faturado_por_id: l.criado_por ?? null,
-        });
-      }
-      return { enrich, cancelados };
-    };
-
-    // Sessões recentes do usuário (aberta + últimas fechadas).
-    // Carregamos os movimentos de TODAS elas em uma única consulta e
-    // dividimos em duas listas:
-    //   - minhasMovs      → só a sessão aberta atual (base para Saldo/Totais)
-    //   - minhasMovsHist  → todas as sessões recentes (base para a aba
-    //                       "Meu caixa → Movimentos", permitindo ver e
-    //                       solicitar estorno de lançamentos retroativos)
-    const histSessoes = (histRes.data ?? []) as Sessao[];
-    const sessaoIds = new Set<string>(histSessoes.map((s) => s.id));
-    if (aberta) sessaoIds.add((aberta as Sessao).id);
-    const idsArr = Array.from(sessaoIds);
-    let movsHist: Mov[] = [];
-    if (idsArr.length > 0) {
+    if (aberta) {
       const { data: movs } = await supabase
         .from("caixa_movimentos")
         .select(MOV_FIELDS)
-        .in("sessao_id", idsArr)
-        .order("created_at", { ascending: false });
-      movsHist = (movs ?? []) as Mov[];
-    }
-    setMinhasMovsHist(movsHist);
-    if (aberta) {
-      // Sessão aberta: `minhasMovs` recebe apenas os movimentos da sessão
-      // atual (ordem crescente, como antes) para manter Saldo/Totais
-      // idênticos ao comportamento anterior.
-      const sid = (aberta as Sessao).id;
-      const abertaMovs = movsHist
-        .filter((m) => m.sessao_id === sid)
-        .slice()
-        .sort((a, b) => a.created_at.localeCompare(b.created_at));
-      setMinhasMovs(abertaMovs);
+        .eq("sessao_id", (aberta as Sessao).id)
+        .order("created_at", { ascending: true });
+      setMinhasMovs((movs ?? []) as Mov[]);
     } else {
       setMinhasMovs([]);
     }
-    const { enrich, cancelados } = await enrichMovsList(movsHist);
-    setEnrichPorLanc(enrich);
-    setLancsCancelados(cancelados);
 
     setMinhasSessoes((histRes.data ?? []) as Sessao[]);
     setLoading(false);
   }, [clinicaAtual, user]);
-
-  // Recarrega o conjunto de solicitações de estorno pendentes vinculadas
-  // às movimentações atuais para trocar o botão pelo rótulo
-  // "Aguardando aprovação" quando o financeiro ainda não decidiu.
-  const reloadEstornosPendentes = useCallback(async () => {
-    if (!clinicaAtual) {
-      setEstornosPorLanc(new Map());
-      setEstornosPorMov(new Map());
-      return;
-    }
-    const ids = Array.from(new Set(
-      minhasMovs.map((m) => m.lancamento_id).filter((x): x is string => !!x),
-    ));
-    const sangriaIds = Array.from(new Set(
-      minhasMovs.filter((m) => m.tipo === "sangria").map((m) => m.id),
-    ));
-    if (ids.length === 0 && sangriaIds.length === 0) {
-      setEstornosPorLanc(new Map());
-      setEstornosPorMov(new Map());
-      return;
-    }
-    let q = supabase
-      .from("estorno_solicitacoes")
-      .select("lancamento_id, caixa_movimento_id, status")
-      .eq("clinica_id", clinicaAtual.clinica_id)
-      .in("status", ["pendente", "aprovado"]);
-    // OR entre os dois filtros de id (lancamento OU caixa_movimento).
-    const parts: string[] = [];
-    if (ids.length > 0) parts.push(`lancamento_id.in.(${ids.join(",")})`);
-    if (sangriaIds.length > 0) parts.push(`caixa_movimento_id.in.(${sangriaIds.join(",")})`);
-    q = q.or(parts.join(","));
-    const { data } = await q;
-    const mapLanc = new Map<string, "pendente" | "aprovado">();
-    const mapMov  = new Map<string, "pendente" | "aprovado">();
-    for (const r of (data ?? []) as Array<{ lancamento_id: string | null; caixa_movimento_id: string | null; status: string }>) {
-      const st = r.status === "pendente" || r.status === "aprovado" ? r.status : null;
-      if (!st) continue;
-      if (r.lancamento_id) {
-        const prev = mapLanc.get(r.lancamento_id);
-        if (prev !== "pendente") mapLanc.set(r.lancamento_id, st);
-      }
-      if (r.caixa_movimento_id) {
-        const prev = mapMov.get(r.caixa_movimento_id);
-        if (prev !== "pendente") mapMov.set(r.caixa_movimento_id, st);
-      }
-    }
-    setEstornosPorLanc(mapLanc);
-    setEstornosPorMov(mapMov);
-  }, [clinicaAtual, minhasMovs]);
-
-  useEffect(() => {
-    void reloadEstornosPendentes();
-  }, [reloadEstornosPendentes]);
-
-  // Realtime: se o financeiro aprovar/recusar ou outro caixa solicitar,
-  // atualiza o rótulo do botão sem exigir F5.
-  useEffect(() => {
-    if (!clinicaAtual) return;
-    const ch = supabase
-      .channel(`caixa-estornos-${clinicaAtual.clinica_id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "estorno_solicitacoes",
-          filter: `clinica_id=eq.${clinicaAtual.clinica_id}`,
-        },
-        () => { void reloadEstornosPendentes(); },
-      )
-      .subscribe();
-    return () => { void supabase.removeChannel(ch); };
-  }, [clinicaAtual, reloadEstornosPendentes]);
-
-  // Se o usuário voltar para a aba após o financeiro decidir e o evento
-  // realtime tiver sido perdido, ressincroniza ao ganhar foco.
-  useEffect(() => {
-    const onFocus = () => { void reloadEstornosPendentes(); };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
-    };
-  }, [reloadEstornosPendentes]);
 
   // Carrega a fila de cobrança (agendamentos hoje aguardando caixa)
   const loadFilaCaixa = useCallback(async () => {
@@ -1237,23 +425,13 @@ function Page() {
     }
     if (linhasValidadas.length === 0) { toast.error("Adicione ao menos uma forma de pagamento"); return; }
     setSaving(true);
-    // Escopo externo ao try para permitir rollback inter-linhas no catch.
-    // Cada par (lançamento + movimento) é atômico via RPC no banco
-    // (Abordagem B). Estas listas apenas rastreiam pares JÁ confirmados
-    // pelo banco para desfazê-los caso uma linha POSTERIOR falhe.
-    const movimentosInseridos: string[] = [];
-    const lancamentosInseridos: string[] = [];
     try {
-      // Re-checa server-side se já foi pago (anti dupla cobrança / race).
-      // ALTA-10: sem o filtro de status, uma cobrança já estornada
-      // (status='cancelado') ainda contava como "já paga" e bloqueava
-      // cobrar de novo — mesmo depois de um estorno legítimo.
+      // Re-checa server-side se já foi pago (anti dupla cobrança / race)
       const { data: jaPago } = await supabase
         .from("fin_lancamentos")
         .select("id")
         .eq("clinica_id", clinicaAtual.clinica_id)
         .eq("tipo", "receita")
-        .eq("status", "confirmado")
         .eq("agendamento_id", openCobranca.id)
         .limit(1)
         .maybeSingle();
@@ -1271,41 +449,32 @@ function Page() {
         .maybeSingle();
       const medicoId = (ag as { medico_id: string | null } | null)?.medico_id ?? null;
       const hoje = new Date().toISOString().slice(0, 10);
-      // Cada linha vira um par atômico (lançamento + movimento) via RPC.
-      // Se a inserção do movimento falhar dentro do banco, o lançamento
-      // é revertido automaticamente pela transação Postgres — não há mais
-      // janela para lançamento órfão sem movimento correspondente.
       for (const l of linhasValidadas) {
         const sufixoCartao = montarSufixoCartao(l.forma, l.bandeira, l.parcelas);
-        const { data: rpcData, error: rpcErr } = await supabase.rpc(
-          "fn_registrar_lancamento_e_caixa",
-          {
-            p_lancamento: {
-              clinica_id: clinicaAtual.clinica_id,
-              tipo: "receita",
-              descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})${sufixoCartao}`,
-              valor: l.valor,
-              data: hoje,
-              status: "confirmado",
-              forma_pagamento: l.forma,
-              paciente_id: openCobranca.paciente_id,
-              agendamento_id: openCobranca.id,
-              medico_id: medicoId,
-              criado_por: user.id,
-            },
-            p_movimento: {
-              user_id: user.id,
-              tipo: "recebimento",
-              valor: l.valor,
-              descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}`,
-              forma_pagamento: l.forma,
-            },
-          },
-        );
-        if (rpcErr) throw rpcErr;
-        const ids = (rpcData ?? {}) as { lancamento_id?: string; movimento_id?: string };
-        if (ids.lancamento_id) lancamentosInseridos.push(ids.lancamento_id);
-        if (ids.movimento_id) movimentosInseridos.push(ids.movimento_id);
+        const { error: e1 } = await supabase.from("caixa_movimentos").insert({
+          sessao_id: minhaSessao.id,
+          clinica_id: clinicaAtual.clinica_id,
+          user_id: user.id,
+          tipo: "recebimento",
+          valor: l.valor,
+          descricao: `${openCobranca.paciente_nome} · ${openCobranca.procedimento ?? "atendimento"}${sufixoCartao}`,
+          forma_pagamento: l.forma,
+        });
+        if (e1) throw e1;
+        const { error: e2 } = await supabase.from("fin_lancamentos").insert({
+          clinica_id: clinicaAtual.clinica_id,
+          tipo: "receita",
+          descricao: `Recebimento — ${openCobranca.paciente_nome} (${openCobranca.procedimento ?? "atendimento"})${sufixoCartao}`,
+          valor: l.valor,
+          data: hoje,
+          status: "confirmado",
+          forma_pagamento: l.forma,
+          paciente_id: openCobranca.paciente_id,
+          agendamento_id: openCobranca.id,
+          medico_id: medicoId,
+          criado_por: user.id,
+        } as never);
+        if (e2) throw e2;
       }
       const { error: e3 } = await supabase.from("agendamentos")
         .update({ fluxo_etapa: "triagem", fluxo_atualizado_em: new Date().toISOString() } as never)
@@ -1316,21 +485,6 @@ function Page() {
       setCobrancaLinhas([linhaVazia()]);
       void load(); void loadFilaCaixa();
     } catch (err) {
-      // Rollback dos inserts já feitos neste ciclo para evitar orfãos
-      // (caixa sem lançamento ou lançamento sem caixa).
-      try {
-        if (lancamentosInseridos.length > 0) {
-          await supabase.from("fin_lancamentos").delete().in("id", lancamentosInseridos);
-        }
-        if (movimentosInseridos.length > 0) {
-          await supabase.from("caixa_movimentos").delete().in("id", movimentosInseridos);
-        }
-      } catch (rbErr) {
-        console.error("Falha no rollback da cobrança:", rbErr);
-        toast.error(
-          `ERRO CRÍTICO: cobrança falhou e o rollback também. Registros parciais podem ter permanecido — contate o suporte. Mov: [${movimentosInseridos.join(",")}] Lanc: [${lancamentosInseridos.join(",")}]`,
-        );
-      }
       mostrarErro(err);
     } finally { setSaving(false); }
   };
@@ -1371,302 +525,23 @@ function Page() {
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { if (tab === "todos") void loadTodos(); }, [tab, loadTodos]);
 
-  // Membros da clínica para o seletor de destino de sangria/suprimento
-  useEffect(() => {
-    if (!clinicaAtual) { setMembrosClinica([]); return; }
-    let alive = true;
-    void (async () => {
-      const { data: memb } = await supabase
-        .from("clinica_memberships")
-        .select("user_id")
-        .eq("clinica_id", clinicaAtual.clinica_id)
-        .eq("ativo", true);
-      const ids = ((memb ?? []) as Array<{ user_id: string }>).map((m) => m.user_id);
-      if (!ids.length) { if (alive) setMembrosClinica([]); return; }
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id, nome")
-        .in("id", ids);
-      const list = ((profs ?? []) as Array<{ id: string; nome: string | null }>)
-        .map((p) => ({ user_id: p.id, nome: p.nome || "(sem nome)" }))
-        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-      if (alive) setMembrosClinica(list);
-    })();
-    return () => { alive = false; };
-  }, [clinicaAtual?.clinica_id]);
-
   // Calculos
   const saldoAtual = useMemo(() => {
     if (!minhaSessao) return 0;
-    return minhasMovs.reduce((acc, m) => {
-      // Blindagem: recebimento cujo lançamento foi cancelado (estornado) não
-      // entra no saldo. A sangria de reversão correspondente também é
-      // ignorada — o par se anula, mas se o reverso ainda não foi gravado
-      // (dados antigos) o saldo já fica correto.
-      if (m.lancamento_id && lancsCancelados.has(m.lancamento_id)) {
-        if (m.tipo === "recebimento") return acc;
-        if (m.tipo === "estorno") return acc;
-        if (
-          m.tipo === "sangria" &&
-          (m.descricao ?? "").toLowerCase().startsWith("estorno")
-        ) {
-          return acc;
-        }
-      }
-      return acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0);
-    }, 0);
-  }, [minhaSessao, minhasMovs, lancsCancelados]);
+    return minhasMovs.reduce(
+      (acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0),
+      0,
+    );
+  }, [minhaSessao, minhasMovs]);
 
   const resumoTipos = useMemo(() => {
     const r: Record<MovTipo, number> = {
       abertura: 0, sangria: 0, suprimento: 0,
-      recebimento: 0, despesa: 0, fechamento: 0, estorno: 0, reabertura: 0,
+      recebimento: 0, despesa: 0, fechamento: 0,
     };
     minhasMovs.forEach((m) => { r[m.tipo] += Number(m.valor || 0); });
     return r;
   }, [minhasMovs]);
-
-  // Decomposição de pagamentos "misto" — busca observações dos lançamentos
-  // vinculados às movimentações da sessão atual. Chave = lancamento_id.
-  const [mistoObs, setMistoObs] = useState<Record<string, string>>({});
-  // Composição estruturada por lançamento (falha 2.8). `null` = legado/sem dado.
-  const [mistoComp, setMistoComp] = useState<Record<string, Partial<Record<FormaBucket, number>> | null>>({});
-  // Flag por clínica: quando ligada, a decomposição usa o dado estruturado e
-  // o resíduo sem fonte confiável vai para "Indeterminado" em vez de Dinheiro.
-  // Desligar a flag restaura o comportamento antigo (rollback sem deploy).
-  const { enabled: mistoEstruturado } = useClinicFeatureFlag("caixa_misto_estruturado");
-  const residualBucket: FormaBucket = mistoEstruturado ? "indeterminado" : "dinheiro";
-  /** Partes decompostas de um movimento "misto": estruturado → observação. */
-  const partesDoMov = useCallback((m: { lancamento_id?: string | null }): Partial<Record<FormaBucket, number>> => {
-    const id = m.lancamento_id ?? undefined;
-    if (!id) return {};
-    if (mistoEstruturado) {
-      const est = mistoComp[id];
-      if (est) return est;
-    }
-    return decomporMistoObs(mistoObs[id]);
-  }, [mistoComp, mistoObs, mistoEstruturado]);
-  const mistoLancIds = useMemo(() => {
-    const ids = new Set<string>();
-    const scan = (arr: Mov[]) => arr.forEach((m) => {
-      if (m.tipo === "recebimento" && normalizarForma(m.forma_pagamento) === "misto" && m.lancamento_id) {
-        ids.add(m.lancamento_id);
-      }
-    });
-    scan(minhasMovs);
-    scan(detalheMovs);
-    scan(todosMovs);
-    return Array.from(ids);
-  }, [minhasMovs, detalheMovs, todosMovs]);
-  useEffect(() => {
-    let alive = true;
-    const pendentes = mistoLancIds.filter((id) => !(id in mistoObs));
-    if (pendentes.length === 0) return;
-    (async () => {
-      const { data } = await supabase.from("fin_lancamentos")
-        .select("id, observacoes, composicao_pagamento").in("id", pendentes);
-      if (!alive || !data) return;
-      setMistoComp((prev) => {
-        const next = { ...prev };
-        for (const row of data as Array<{ id: string; composicao_pagamento?: unknown }>) {
-          next[row.id] = partesDaComposicao(row.composicao_pagamento);
-        }
-        for (const id of pendentes) if (!(id in next)) next[id] = null;
-        return next;
-      });
-      setMistoObs((prev) => {
-        const next = { ...prev };
-        for (const row of data) next[row.id as string] = (row.observacoes as string | null) ?? "";
-        // Marca também os que não voltaram, para não refazer o fetch em loop.
-        for (const id of pendentes) if (!(id in next)) next[id] = "";
-        return next;
-      });
-    })();
-    return () => { alive = false; };
-  }, [mistoLancIds, mistoObs]);
-
-  // Resolve nomes de usuários referenciados por movimentos e enriquecimentos
-  // (operador do caixa + quem faturou o lançamento). Executa em lotes de 200
-  // e cacheia no state para evitar refetch a cada re-render.
-  useEffect(() => {
-    const alvo = new Set<string>();
-    const scanMovs = (arr: Mov[]) => arr.forEach((m) => { if (m.user_id) alvo.add(m.user_id); });
-    scanMovs(minhasMovs);
-    scanMovs(minhasMovsHist);
-    scanMovs(detalheMovs);
-    scanMovs(todosMovs);
-    enrichPorLanc.forEach((e) => { if (e.faturado_por_id) alvo.add(e.faturado_por_id); });
-    const pendentes = Array.from(alvo).filter((id) => !userNamesById.has(id));
-    if (pendentes.length === 0) return;
-    let alive = true;
-    (async () => {
-      const acc = new Map<string, string>();
-      for (const ids of chunkArray(pendentes, 200)) {
-        const { data } = await supabase.from("profiles").select("id, nome").in("id", ids);
-        for (const p of ((data ?? []) as Array<{ id: string; nome: string | null }>)) {
-          acc.set(p.id, (p.nome ?? "").trim() || p.id.slice(0, 8));
-        }
-        // marca também os não retornados para não refazer o fetch em loop
-        for (const id of ids) if (!acc.has(id)) acc.set(id, id.slice(0, 8));
-      }
-      if (!alive) return;
-      setUserNamesById((prev) => {
-        const next = new Map(prev);
-        acc.forEach((v, k) => next.set(k, v));
-        return next;
-      });
-    })();
-    return () => { alive = false; };
-  }, [minhasMovs, minhasMovsHist, detalheMovs, todosMovs, enrichPorLanc, userNamesById]);
-
-  /** Retorna o nome de quem faturou o movimento (prioriza
-   *  fin_lancamentos.criado_por → autor real do lançamento; fallback para
-   *  caixa_movimentos.user_id → operador do caixa que registrou o mov). */
-  const usuarioNomeFor = useCallback((m: Mov): string => {
-    const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
-    const uid = enr?.faturado_por_id ?? m.user_id ?? null;
-    if (!uid) return "—";
-    return userNamesById.get(uid) ?? "…";
-  }, [enrichPorLanc, userNamesById]);
-
-  // Entradas agrupadas por forma de pagamento (recebimento + suprimento).
-  // Aliases cartao_credito/cartao_debito ficam em credito/debito; pagamentos
-  // "misto" são decompostos pelas observações do fin_lancamento.
-  const entradasPorForma = useMemo(() => {
-    const r: Record<string, number> & { total: number } = {
-      dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0, total: 0,
-    };
-    minhasMovs.forEach((m) => {
-      if (m.tipo !== "recebimento" && m.tipo !== "suprimento") return;
-      const v = Number(m.valor || 0);
-      r.total += v;
-      const bucket = bucketDeMov(m);
-      if (bucket === "misto") {
-        const partes = partesDoMov(m);
-        let somado = 0;
-        for (const [k, val] of Object.entries(partes)) {
-          r[k] = (r[k] ?? 0) + (val ?? 0);
-          somado += val ?? 0;
-        }
-        // Diferença (ex.: obs ainda não carregada, ou parcela sem label
-        // reconhecido) vai para "outros" para preservar o total.
-        const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
-      } else {
-        r[bucket] += v;
-      }
-    });
-    return r;
-  }, [minhasMovs, partesDoMov, residualBucket]);
-
-  // Quebra do "Saldo" por dia (com base em created_at das movimentações
-  // da sessão atual). Cada dia mostra entradas, saídas, saldo do dia e
-  // entradas agrupadas por forma de pagamento.
-  interface DiaResumo {
-    dia: string;                // YYYY-MM-DD
-    label: string;              // dd/mm/yyyy
-    entradas: number;
-    saidas: number;
-    saldo: number;
-    porForma: Record<string, number>;
-  }
-  const resumoPorDia = useMemo<DiaResumo[]>(() => {
-    const mapa = new Map<string, DiaResumo>();
-    const bucketInit = (): Record<string, number> => ({
-      dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
-    });
-    for (const m of minhasMovs) {
-      const d = new Date(m.created_at);
-      const dia = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      let r = mapa.get(dia);
-      if (!r) {
-        r = { dia, label: d.toLocaleDateString("pt-BR"), entradas: 0, saidas: 0, saldo: 0, porForma: bucketInit() };
-        mapa.set(dia, r);
-      }
-      const v = Number(m.valor || 0);
-      const sinal = TIPO_SINAL[m.tipo];
-      r.saldo += sinal * v;
-      if (m.tipo === "recebimento" || m.tipo === "suprimento") {
-        r.entradas += v;
-        const bucket = bucketDeMov(m);
-        if (bucket === "misto") {
-          const partes = partesDoMov(m);
-          let somado = 0;
-          for (const [k, val] of Object.entries(partes)) {
-            r.porForma[k] = (r.porForma[k] ?? 0) + (val ?? 0);
-            somado += val ?? 0;
-          }
-          const resto = v - somado;
-          if (Math.abs(resto) > 0.005) r.porForma[residualBucket] = (r.porForma[residualBucket] ?? 0) + resto;
-        } else {
-          r.porForma[bucket] = (r.porForma[bucket] ?? 0) + v;
-        }
-      } else if (m.tipo === "sangria" || m.tipo === "despesa" || m.tipo === "estorno") {
-        r.saidas += v;
-      }
-    }
-    return Array.from(mapa.values()).sort((a, b) => b.dia.localeCompare(a.dia));
-  }, [minhasMovs, partesDoMov, residualBucket]);
-
-  // Helper: converte `created_at` para "YYYY-MM-DD" no fuso local, para casar
-  // com o `<DateInputBR>` do modal de fechamento.
-  const localYMD = (iso: string) => {
-    const d = new Date(iso);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  };
-
-  // Escopo por dia selecionado no modal de "Fechar caixa": movimentos,
-  // saldo (entradas - saídas) e por-forma calculados apenas daquele dia.
-  const movsDoDiaFechamento = useMemo(() => {
-    if (!dataFechamento) return minhasMovs;
-    return minhasMovs.filter((m) => localYMD(m.created_at) === dataFechamento);
-  }, [minhasMovs, dataFechamento]);
-  const saldoDoDiaFechamento = useMemo(() => {
-    return movsDoDiaFechamento.reduce(
-      (acc, m) => acc + TIPO_SINAL[m.tipo] * Number(m.valor || 0), 0,
-    );
-  }, [movsDoDiaFechamento]);
-  const porFormaDoDiaFechamento = useMemo<Record<string, number>>(() => {
-    const r: Record<string, number> = {
-      dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
-    };
-    movsDoDiaFechamento.forEach((m) => {
-      // "Esperado por forma" deve refletir o SALDO LÍQUIDO por forma no dia,
-      // batendo com o saldo do caixa (entradas − saídas). Por isso incluímos
-      // também sangria e despesa com sinal negativo. Abertura/fechamento não
-      // entram (abertura é saldo inicial, fechamento é registro contábil).
-      if (
-        m.tipo !== "recebimento" &&
-        m.tipo !== "suprimento" &&
-        m.tipo !== "estorno" &&
-        m.tipo !== "sangria" &&
-        m.tipo !== "despesa"
-      ) return;
-      const sinal =
-        m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
-      const v = Number(m.valor || 0) * sinal;
-      const bucket = bucketDeMov(m);
-      if (bucket === "misto") {
-        const partes = partesDoMov(m);
-        let somado = 0;
-        for (const [k, val] of Object.entries(partes)) {
-          r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
-          somado += (val ?? 0) * sinal;
-        }
-        const resto = v - somado;
-        // Sem decomposição (pagamento agrupado, obs sem "Pagamento misto:"),
-        // o resto cai em Dinheiro — a UI não deve exibir "Outros" para
-        // recebimentos reais. O operador pode ajustar no modal de fechamento.
-        if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
-      } else {
-        r[bucket] = (r[bucket] ?? 0) + v;
-      }
-    });
-    return r;
-  }, [movsDoDiaFechamento, partesDoMov, residualBucket]);
 
   // Calculo por sessao (todos)
   const calcSaldoSessao = useCallback((sid: string) => {
@@ -1686,137 +561,6 @@ function Page() {
       .filter((m) => m.sessao_id === sid && (m.descricao ?? "").toLowerCase().includes("estorno"))
       .reduce((acc, m) => acc + Number(m.valor || 0), 0);
   }, [todosMovs]);
-
-  // ============ Agrupamento por operador × dia ============
-  // Um mesmo turno pode atravessar a meia-noite; a listagem mostra uma linha
-  // por dia, com os movimentos, sangrias, informado e diferença daquele dia
-  // específico. Cada dia = "um caixa" com abertura e fechamento próprios.
-  type LinhaDia = {
-    key: string; user_id: string; user_nome: string; data: string;
-    primeiraAbertura: string | null; ultimoFechamento: string | null;
-    statusDia: "aberto" | "fechado";
-    valorAbertura: number; calculado: number; informado: number;
-    sangria: number; estorno: number; diferenca: number;
-    sessoes: Sessao[]; sessaoAbertaId: string | null;
-  };
-  const localDate = (iso: string | null | undefined): string | null => {
-    if (!iso) return null;
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return null;
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  };
-  const fmtDia = (data: string) => {
-    const [y, m, d] = data.split("-");
-    return `${d}/${m}/${y}`;
-  };
-  const fmtHora = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "—";
-
-  const agruparPorDia = useCallback((sessoes: Sessao[], movs: Mov[]): LinhaDia[] => {
-    const buckets = new Map<string, LinhaDia>();
-    const sessById = new Map(sessoes.map((s) => [s.id, s]));
-    const get = (uid: string, nome: string, data: string) => {
-      const k = `${uid}__${data}`;
-      let b = buckets.get(k);
-      if (!b) {
-        b = {
-          key: k, user_id: uid, user_nome: nome, data,
-          primeiraAbertura: null, ultimoFechamento: null,
-          statusDia: "fechado",
-          valorAbertura: 0, calculado: 0, informado: 0,
-          sangria: 0, estorno: 0, diferenca: 0,
-          sessoes: [], sessaoAbertaId: null,
-        };
-        buckets.set(k, b);
-      }
-      return b;
-    };
-    for (const s of sessoes) {
-      const nome = (s.user_nome || s.user_id.slice(0, 8)).toString();
-      const dAb = localDate(s.aberto_em);
-      if (dAb) {
-        const b = get(s.user_id, nome, dAb);
-        b.sessoes.push(s);
-        b.valorAbertura += Number(s.valor_abertura || 0);
-        if (!b.primeiraAbertura || s.aberto_em < b.primeiraAbertura) b.primeiraAbertura = s.aberto_em;
-        if (s.status === "aberto") {
-          b.statusDia = "aberto";
-          if (!b.sessaoAbertaId) b.sessaoAbertaId = s.id;
-        }
-      }
-      const dFe = localDate(s.fechado_em);
-      if (dFe && s.fechado_em) {
-        const b = get(s.user_id, nome, dFe);
-        if (!b.sessoes.some((x) => x.id === s.id)) b.sessoes.push(s);
-        b.informado += Number(s.valor_fechamento_informado || 0);
-        b.diferenca += Number(s.diferenca || 0);
-        if (!b.ultimoFechamento || s.fechado_em > b.ultimoFechamento) b.ultimoFechamento = s.fechado_em;
-      }
-    }
-    for (const m of movs) {
-      const d = localDate(m.created_at);
-      if (!d) continue;
-      const s = sessById.get(m.sessao_id);
-      if (!s) continue;
-      const nome = (s.user_nome || s.user_id.slice(0, 8)).toString();
-      const b = get(s.user_id, nome, d);
-      b.calculado += TIPO_SINAL[m.tipo] * Number(m.valor || 0);
-      if (m.tipo === "sangria") b.sangria += Number(m.valor || 0);
-      if ((m.descricao ?? "").toLowerCase().includes("estorno")) b.estorno += Number(m.valor || 0);
-    }
-    return Array.from(buckets.values()).sort((a, b) => {
-      if (a.data !== b.data) return b.data.localeCompare(a.data);
-      return a.user_nome.localeCompare(b.user_nome, "pt-BR");
-    });
-  }, []);
-
-  const linhasTodosPorDia = useMemo(
-    () => agruparPorDia(todasSessoes, todosMovs),
-    [agruparPorDia, todasSessoes, todosMovs],
-  );
-  const linhasMinhasPorDia = useMemo(
-    () => agruparPorDia(minhasSessoes, minhasMovs),
-    [agruparPorDia, minhasSessoes, minhasMovs],
-  );
-
-  // Total recebido/suprido por forma de pagamento em uma sessão qualquer
-  // (usa `todosMovs`). Decompõe pagamentos "misto" quando as observações do
-  // lançamento já foram carregadas via `mistoObs`.
-  const entradasPorFormaSessao = useCallback((sid: string) => {
-    const r: Record<string, number> = {
-      dinheiro: 0, pix: 0, debito: 0, credito: 0,
-      boleto: 0, transferencia: 0, convenio: 0, outros: 0, indeterminado: 0,
-    };
-    todosMovs.forEach((m) => {
-      if (m.sessao_id !== sid) return;
-      // Saldo líquido por forma na sessão (usado nos modais de fechamento):
-      // entradas − saídas por forma, para bater com o saldo do caixa.
-      if (
-        m.tipo !== "recebimento" &&
-        m.tipo !== "suprimento" &&
-        m.tipo !== "estorno" &&
-        m.tipo !== "sangria" &&
-        m.tipo !== "despesa"
-      ) return;
-      const sinal =
-        m.tipo === "estorno" || m.tipo === "sangria" || m.tipo === "despesa" ? -1 : 1;
-      const v = Number(m.valor || 0) * sinal;
-      const bucket = bucketDeMov(m);
-      if (bucket === "misto") {
-        const partes = partesDoMov(m);
-        let somado = 0;
-        for (const [k, val] of Object.entries(partes)) {
-          r[k] = (r[k] ?? 0) + (val ?? 0) * sinal;
-          somado += (val ?? 0) * sinal;
-        }
-        const resto = v - somado;
-        if (Math.abs(resto) > 0.005) r[residualBucket] = (r[residualBucket] ?? 0) + resto;
-      } else {
-        r[bucket] = (r[bucket] ?? 0) + v;
-      }
-    });
-    return r;
-  }, [todosMovs, partesDoMov, residualBucket]);
 
   // Acoes
   const abrirCaixa = async (e: FormEvent) => {
@@ -1883,77 +627,23 @@ function Page() {
     if (ehPagto && (movForma === "credito" || movForma === "debito") && !movBandeira) {
       toast.error("Selecione a bandeira do cartão"); return;
     }
-    const ehTransfer = openMov.tipo === "sangria" || openMov.tipo === "suprimento";
-    if (ehTransfer && !movDestinoUserId) {
-      toast.error(openMov.tipo === "sangria"
-        ? "Selecione a quem o dinheiro está sendo entregue"
-        : "Selecione de quem o dinheiro está sendo recebido");
-      return;
-    }
-    // Estorno avulso não tem seletor de destino (não é transferência entre
-    // membros da equipe) — a descrição é o único registro de quem/o que
-    // está sendo estornado, então é obrigatória aqui.
-    if (openMov.tipo === "estorno" && !movDesc.trim()) {
-      toast.error("Descreva o motivo/paciente do estorno");
-      return;
-    }
-    const destinoNome = ehTransfer
-      ? (membrosClinica.find((m) => m.user_id === movDestinoUserId)?.nome ?? null)
-      : null;
-    const sufixoDestino = ehTransfer && destinoNome
-      ? ` — ${openMov.tipo === "sangria" ? "Entregue a" : "Recebido de"}: ${destinoNome}`
-      : "";
     const sufixoCartao = ehPagto ? montarSufixoCartao(movForma, movBandeira, movParcelas) : "";
     setSaving(true);
-    const { data: movRow, error } = await supabase.from("caixa_movimentos").insert({
+    const { error } = await supabase.from("caixa_movimentos").insert({
       sessao_id: minhaSessao.id,
       clinica_id: clinicaAtual.clinica_id,
       user_id: user.id,
       tipo: openMov.tipo,
       valor: v,
-      descricao: ((movDesc || "") + sufixoCartao + sufixoDestino) || null,
+      descricao: (movDesc || "") + sufixoCartao || null,
       forma_pagamento: ehPagto ? movForma : null,
-      destino_user_id: ehTransfer ? movDestinoUserId : null,
-      destino_nome: ehTransfer ? destinoNome : null,
-    }).select("id").single();
-    if (error || !movRow) { setSaving(false); mostrarErro(error); return; }
-    // Recebimento/despesa manuais são receita/despesa real (diferente de
-    // sangria/suprimento, que só transferem dinheiro dentro do caixa) — sem um
-    // fin_lancamentos vinculado, o valor nunca aparecia em Financeiro >
-    // Movimento (que só importa sangria/suprimento de caixa_movimentos).
-    if (openMov.tipo === "recebimento" || openMov.tipo === "despesa") {
-      const { data: lanc, error: eLanc } = await supabase.from("fin_lancamentos").insert({
-        clinica_id: clinicaAtual.clinica_id,
-        tipo: openMov.tipo === "recebimento" ? "receita" : "despesa",
-        valor: v,
-        descricao: `[Caixa] ${(movDesc || TIPO_LABEL[openMov.tipo]) + sufixoCartao}`,
-        forma_pagamento: movForma,
-        status: "confirmado",
-        criado_por: user.id,
-      }).select("id").single();
-      if (eLanc) {
-        toast.warning("Movimento de caixa registrado, mas falhou ao vincular ao financeiro — registre manualmente em Financeiro > Movimento.");
-      } else if (lanc) {
-        await supabase.from("caixa_movimentos").update({ lancamento_id: lanc.id }).eq("id", movRow.id);
-      }
-    }
+    });
     setSaving(false);
+    if (error) { mostrarErro(error); return; }
     setOpenMov(null);
-    const tipoLancado = openMov.tipo;
-    const descLancada = (movDesc || "") + sufixoCartao + sufixoDestino;
     setMovValor(""); setMovDesc(""); setMovForma("dinheiro");
-    setMovBandeira(""); setMovParcelas("1"); setMovDestinoUserId("");
-    toast.success(`${TIPO_LABEL[tipoLancado]} registrada`);
-    if (tipoLancado === "sangria" || tipoLancado === "suprimento" || tipoLancado === "estorno") {
-      printComprovanteCaixa({
-        tipo: tipoLancado,
-        clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
-        operadorNome: minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
-        valor: v,
-        descricao: descLancada || null,
-        destinoNome,
-      });
-    }
+    setMovBandeira(""); setMovParcelas("1");
+    toast.success(`${TIPO_LABEL[openMov.tipo]} registrada`);
     void load();
   };
 
@@ -1961,26 +651,19 @@ function Page() {
     e.preventDefault();
     if (!minhaSessao || !clinicaAtual || !user) return;
     const informado = Number(valorInformado) || 0;
-    // Escopo por dia selecionado: fecha apenas os valores do dia escolhido.
-    const saldoRef = saldoDoDiaFechamento;
-    const diff = informado - saldoRef;
-    // Data escolhida pelo operador — usa 23:59:59 local desse dia para preservar o dia contábil.
-    const hoje = new Date().toISOString().slice(0, 10);
-    const fechadoEmISO = dataFechamento && dataFechamento !== hoje
-      ? new Date(`${dataFechamento}T23:59:59`).toISOString()
-      : new Date().toISOString();
+    const diff = informado - saldoAtual;
     setSaving(true);
     const { error } = await supabase
       .from("caixa_sessoes")
       .update({
         status: "fechado",
-        fechado_em: fechadoEmISO,
+        fechado_em: new Date().toISOString(),
         valor_fechamento_informado: informado,
-        valor_fechamento_calculado: saldoRef,
+        valor_fechamento_calculado: saldoAtual,
         diferenca: diff,
         observacoes: obsFechamento
-          ? `${minhaSessao.observacoes ? minhaSessao.observacoes + " | " : ""}[Dia ${dataFechamento}] ${obsFechamento}`
-          : `${minhaSessao.observacoes ? minhaSessao.observacoes + " | " : ""}[Dia ${dataFechamento}]`,
+          ? `${minhaSessao.observacoes ? minhaSessao.observacoes + " | " : ""}${obsFechamento}`
+          : minhaSessao.observacoes,
       })
       .eq("id", minhaSessao.id);
     if (!error) {
@@ -1990,200 +673,18 @@ function Page() {
         user_id: user.id,
         tipo: "fechamento",
         valor: informado,
-        created_at: fechadoEmISO,
-        descricao: `Fechamento do dia ${dataFechamento}. Calculado: ${fmt(saldoRef)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}`,
+        descricao: `Fechamento. Calculado: ${fmt(saldoAtual)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}`,
       });
     }
     setSaving(false);
     if (error) { mostrarErro(error); return; }
     setOpenFechar(false);
-    const obsFinal = obsFechamento;
-    setValorInformado(""); setObsFechamento(""); setConferidoOwn({});
-    setDataFechamento(new Date().toISOString().slice(0, 10));
+    setValorInformado(""); setObsFechamento("");
     toast.success("Caixa fechado");
-    // Comprovante escopado ao dia selecionado.
-    const porForma: Record<string, number> = { ...porFormaDoDiaFechamento };
-    // Remove buckets zerados para não poluir o comprovante.
-    for (const k of Object.keys(porForma)) if (Math.abs(porForma[k]) < 0.005) delete porForma[k];
-    printComprovanteCaixa({
-      tipo: "fechamento",
-      clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
-      operadorNome: minhaSessao.user_nome || user.user_metadata?.nome || user.email || "Atendente",
-      valor: informado,
-      saldoCalculado: saldoRef,
-      valorInformado: informado,
-      diferenca: diff,
-      descricao: `Fechamento do dia ${dataFechamento}${obsFinal ? " — " + obsFinal : ""}`,
-      porForma,
-    });
-    void load();
-  };
-
-  // Fechamento pelo gestor de um caixa aberto por outro usuário.
-  const fecharSessaoTerceiro = async (e: FormEvent) => {
-    e.preventDefault();
-    const alvo = openFecharTerceiro;
-    if (!alvo || !clinicaAtual || !user) return;
-    const calc = calcSaldoSessao(alvo.id);
-    const conferidoNum: Record<string, number> = {};
-    for (const [k, v] of Object.entries(conferidoTerceiro)) {
-      const n = Number(v) || 0;
-      if (Math.abs(n) > 0.005) conferidoNum[k] = n;
-    }
-    const informado = Object.values(conferidoNum).reduce((a, x) => a + x, 0)
-      || (Number(informadoTerceiro) || 0);
-    const diff = informado - calc;
-    const breakdownStr = Object.entries(conferidoNum)
-      .map(([k, v]) => `${FORMA_LABEL[k as FormaBucket] ?? k}: ${fmt(v)}`)
-      .join("; ");
-    const hoje = new Date().toISOString().slice(0, 10);
-    const fechadoEmISO = dataFechamentoTerceiro && dataFechamentoTerceiro !== hoje
-      ? new Date(`${dataFechamentoTerceiro}T23:59:59`).toISOString()
-      : new Date().toISOString();
-    setSaving(true);
-    const { error } = await supabase
-      .from("caixa_sessoes")
-      .update({
-        status: "fechado",
-        fechado_em: fechadoEmISO,
-        valor_fechamento_informado: informado,
-        valor_fechamento_calculado: calc,
-        diferenca: diff,
-        observacoes: obsTerceiro
-          ? `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}] ${obsTerceiro}${breakdownStr ? " | Conferência: " + breakdownStr : ""}`
-          : `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado por ${user.user_metadata?.nome || user.email || "gestor"}]${breakdownStr ? " | Conferência: " + breakdownStr : ""}`,
-      })
-      .eq("id", alvo.id);
-    if (!error) {
-      await supabase.from("caixa_movimentos").insert({
-        sessao_id: alvo.id,
-        clinica_id: clinicaAtual.clinica_id,
-        user_id: user.id,
-        tipo: "fechamento",
-        valor: informado,
-        created_at: fechadoEmISO,
-        descricao: `Fechamento pelo gestor. Operador original: ${alvo.user_nome || alvo.user_id.slice(0, 8)} | Calculado: ${fmt(calc)} | Informado: ${fmt(informado)} | Diferença: ${fmt(diff)}${breakdownStr ? " | " + breakdownStr : ""}`,
-      });
-    }
-    setSaving(false);
-    if (error) { mostrarErro(error); return; }
-    setOpenFecharTerceiro(null);
-    setInformadoTerceiro("");
-    setObsTerceiro("");
-    setConferidoTerceiro({});
-    setDataFechamentoTerceiro(new Date().toISOString().slice(0, 10));
-    toast.success(`Caixa de ${alvo.user_nome || "operador"} fechado`);
-    printComprovanteCaixa({
-      tipo: "fechamento",
-      clinicaNome: clinicaAtual.clinica?.nome ?? "Clínica",
-      operadorNome: alvo.user_nome || "Atendente",
-      valor: informado,
-      saldoCalculado: calc,
-      valorInformado: informado,
-      diferenca: diff,
-      descricao: obsTerceiro ? `Fechado pelo gestor. ${obsTerceiro}` : "Fechado pelo gestor.",
-      porForma: conferidoNum,
-    });
-    void loadTodos();
-    void load();
-  };
-
-  // Desfazer fechamento de um caixa (admin/gestor/financeiro).
-  // Registra auditoria via caixa_movimentos.tipo='reabertura' e limpa
-  // os campos de fechamento da sessão, deixando-a novamente 'aberto'.
-  const desfazerFechamento = async () => {
-    const alvo = openReabrir;
-    if (!alvo || !clinicaAtual || !user) return;
-    const motivo = motivoReabrir.trim();
-    if (!motivo) { toast.error("Informe o motivo da reabertura."); return; }
-    const executorNome = user.user_metadata?.nome || user.email || "gestor";
-    const agora = new Date();
-    const marcador = `[Reaberto por ${executorNome} em ${agora.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })} — ${motivo}]`;
-    const novaObs = alvo.observacoes ? `${alvo.observacoes} | ${marcador}` : marcador;
-    setSaving(true);
-    const { error } = await supabase
-      .from("caixa_sessoes")
-      .update({
-        status: "aberto",
-        fechado_em: null,
-        valor_fechamento_informado: null,
-        valor_fechamento_calculado: null,
-        diferenca: null,
-        observacoes: novaObs,
-      })
-      .eq("id", alvo.id);
-    if (!error) {
-      // Remove o(s) movimento(s) de fechamento desta sessão para que o caixa
-      // do operador volte exatamente ao estado anterior (saldo, lista de
-      // movimentos e totais). A auditoria da reabertura fica registrada no
-      // campo `observacoes` da sessão (marcador com executor, data e motivo).
-      await supabase
-        .from("caixa_movimentos")
-        .delete()
-        .eq("sessao_id", alvo.id)
-        .eq("tipo", "fechamento");
-    }
-    setSaving(false);
-    if (error) { mostrarErro(error); return; }
-    setOpenReabrir(null);
-    setMotivoReabrir("");
-    toast.success("Fechamento desfeito. O caixa foi reaberto.");
-    void loadTodos();
-    void load();
-  };
-
-  // Fecha em lote todas as sessões marcadas — usa o saldo calculado como
-  // valor informado (diferença = 0). Uma observação global identifica o
-  // fechamento como feito pelo gestor.
-  const fecharLote = async () => {
-    if (!clinicaAtual || !user) return;
-    const alvos = todasSessoes.filter(
-      (s) => s.status === "aberto" && loteSelecionados[s.id],
-    );
-    if (alvos.length === 0) {
-      toast.error("Selecione ao menos um caixa aberto para fechar.");
-      return;
-    }
-    setSaving(true);
-    let ok = 0;
-    let fail = 0;
-    const gestorNome = user.user_metadata?.nome || user.email || "gestor";
-    for (const alvo of alvos) {
-      const calc = calcSaldoSessao(alvo.id);
-      const { error } = await supabase
-        .from("caixa_sessoes")
-        .update({
-          status: "fechado",
-          fechado_em: new Date().toISOString(),
-          valor_fechamento_informado: calc,
-          valor_fechamento_calculado: calc,
-          diferenca: 0,
-          observacoes: `${alvo.observacoes ? alvo.observacoes + " | " : ""}[Fechado em lote por ${gestorNome}]${obsLote ? " " + obsLote : ""}`,
-        })
-        .eq("id", alvo.id);
-      if (error) { fail += 1; continue; }
-      await supabase.from("caixa_movimentos").insert({
-        sessao_id: alvo.id,
-        clinica_id: clinicaAtual.clinica_id,
-        user_id: user.id,
-        tipo: "fechamento",
-        valor: calc,
-        descricao: `Fechamento em lote pelo gestor. Operador original: ${alvo.user_nome || alvo.user_id.slice(0, 8)} | Calculado: ${fmt(calc)}${obsLote ? " | " + obsLote : ""}`,
-      });
-      ok += 1;
-    }
-    setSaving(false);
-    setOpenLote(false);
-    setLoteSelecionados({});
-    setObsLote("");
-    if (ok > 0) toast.success(`${ok} caixa(s) fechado(s)${fail ? ` — ${fail} falha(s)` : ""}`);
-    else if (fail > 0) toast.error(`Falha ao fechar ${fail} caixa(s)`);
-    void loadTodos();
     void load();
   };
 
   const verDetalhe = async (s: Sessao) => {
-    // (marcador para localizar próxima função)
     setOpenDetalhe(s);
     const { data } = await supabase
       .from("caixa_movimentos")
@@ -2193,105 +694,18 @@ function Page() {
     setDetalheMovs((data ?? []) as Mov[]);
   };
 
-  const imprimirRelatorioMovs = (movs: Mov[], periodo: string, subtitulo?: string) => {
-    const esc = (v: unknown) =>
-      String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
-    type Cat = { label: string; pagamento: number; recebimento: number };
-    const cats = new Map<string, Cat>();
-    let totPag = 0, totReceb = 0;
-    for (const m of movs) {
-      if (m.tipo === "abertura" || m.tipo === "fechamento" || m.tipo === "reabertura") continue;
-      const key = TIPO_LABEL[m.tipo];
-      const cat = cats.get(key) ?? { label: key, pagamento: 0, recebimento: 0 };
-      const v = Number(m.valor || 0);
-      if (TIPO_SINAL[m.tipo] < 0) { cat.pagamento += v; totPag += v; }
-      else if (TIPO_SINAL[m.tipo] > 0) { cat.recebimento += v; totReceb += v; }
-      cats.set(key, cat);
-    }
-    let acc = 0;
-    const linhasCat = Array.from(cats.values()).map((c) => {
-      acc += c.recebimento - c.pagamento;
-      return '<tr><td>' + esc(c.label) + '</td><td style="text-align:right;">' + fmt(c.pagamento) + '</td><td style="text-align:right;">' + fmt(c.recebimento) + '</td><td style="text-align:right;">' + fmt(acc) + '</td></tr>';
-    }).join("");
-    type Forma = { label: string; pagamento: number; recebimento: number };
-    const formas = new Map<string, Forma>();
-    for (const m of movs) {
-      if (m.tipo === "abertura" || m.tipo === "fechamento" || m.tipo === "reabertura") continue;
-      const bucket = normalizarForma(m.forma_pagamento) || "—";
-      const v = Number(m.valor || 0);
-      const sinal = TIPO_SINAL[m.tipo];
-      if (sinal === 0) continue;
-      // Decompõe pagamentos mistos usando as observações do lançamento
-      // (mesma lógica exibida em tela) para que o "Resumo por tipo de moeda"
-      // some cada parte na forma real (Dinheiro, PIX, Crédito, etc.) em vez
-      // de agrupar tudo em "MISTO".
-      const partes = bucket === "misto" ? partesDoMov(m) : {};
-      const entradas = Object.entries(partes).filter(([, val]) => (val ?? 0) > 0) as Array<[FormaBucket, number]>;
-      const totalPartes = entradas.reduce((s, [, val]) => s + (val ?? 0), 0);
-      if (bucket === "misto" && entradas.length > 0 && totalPartes > 0) {
-        for (const [k, val] of entradas) {
-          const label = (FORMA_LABEL[k] ?? k).toUpperCase();
-          const f = formas.get(label) ?? { label, pagamento: 0, recebimento: 0 };
-          // Se o total decomposto não bater com o valor do movimento
-          // (arredondamento raro), rateia proporcionalmente.
-          const parte = totalPartes === v ? (val ?? 0) : ((val ?? 0) * v) / totalPartes;
-          if (sinal < 0) f.pagamento += parte;
-          else f.recebimento += parte;
-          formas.set(label, f);
-        }
-      } else {
-        const label = ((FORMA_LABEL[bucket as FormaBucket] ?? bucket) as string).toUpperCase();
-        const f = formas.get(label) ?? { label, pagamento: 0, recebimento: 0 };
-        if (sinal < 0) f.pagamento += v;
-        else f.recebimento += v;
-        formas.set(label, f);
-      }
-    }
-    let accF = 0;
-    const linhasForma = Array.from(formas.values()).map((f) => {
-      accF += f.recebimento - f.pagamento;
-      return '<tr><td>' + esc(f.label) + '</td><td style="text-align:right;">' + fmt(f.pagamento) + '</td><td style="text-align:right;">' + fmt(f.recebimento) + '</td><td style="text-align:right;">' + fmt(accF) + '</td></tr>';
-    }).join("");
-    const qtd = movs.filter((m) => m.tipo !== "abertura" && m.tipo !== "fechamento" && m.tipo !== "reabertura").length;
-    const reaberturas = movs.filter((m) => m.tipo === "reabertura");
-    const linhasReabertura = reaberturas.length === 0 ? "" :
-      '<div style="margin-top:10px;font-size:11px;color:#7c3aed;"><strong>Reaberturas de fechamento:</strong><ul style="margin:4px 0 0 16px;padding:0;">' +
-      reaberturas.map((m) => '<li>' + esc(new Date(m.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })) + ' — ' + esc(m.descricao || "sem detalhes") + '</li>').join("") +
-      '</ul></div>';
-    const emissao = new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
-    const style = 'body{font-family:Arial,sans-serif;padding:24px;color:#0f172a;} h1{font-size:16px;margin:0 0 6px;text-align:center;letter-spacing:.5px;} .meta{font-size:11px;color:#475569;margin-bottom:10px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;} table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;} th,td{padding:5px 6px;border-bottom:1px solid #cbd5e1;} thead th{border-bottom:2px solid #0f172a;text-align:left;} thead th.n{text-align:right;} tfoot td{border-top:2px solid #0f172a;font-weight:700;} .right{text-align:right;}';
-    const empty = '<tr><td colspan="4" style="text-align:center;color:#64748b;">Sem movimentos</td></tr>';
-    const html =
-      '<!doctype html><html><head><meta charset="utf-8"/><title>Relatório de movimento de caixa</title><style>' + style + '</style></head><body>' +
-      '<div class="meta"><span>Emitido: ' + esc(emissao) + '</span></div>' +
-      '<h1>RELATÓRIO DE MOVIMENTO DE CAIXA</h1>' +
-      '<div class="meta"><span>Tipo: TODOS (SEM TRANSFERÊNCIA)</span><span>Período: ' + esc(periodo) + '</span><span>Agrupar: CATEGORIA</span></div>' +
-      (subtitulo ? '<div class="meta"><span>' + esc(subtitulo) + '</span></div>' : '') +
-      '<table><thead><tr><th>GERAL — Descrição</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + (linhasCat || empty) + '</tbody></table>' +
-      '<table><thead><tr><th>Resumo por tipo de moeda</th><th class="n">Pagamento</th><th class="n">Recebimento</th><th class="n">Acumulado</th></tr></thead><tbody>' + (linhasForma || empty) + '</tbody>' +
-      '<tfoot><tr><td>TOTAL</td><td class="right">' + fmt(totPag) + '</td><td class="right">' + fmt(totReceb) + '</td><td class="right">' + fmt(totReceb - totPag) + '</td></tr></tfoot></table>' +
-      '<div class="meta"><span>' + qtd + ' registro' + (qtd === 1 ? '' : 's') + '</span></div>' +
-      linhasReabertura +
-      '<script>window.onload=function(){window.print();}</script></body></html>';
-    const w = window.open("", "_blank", "width=900,height=700");
-    if (!w) { toast.error("Bloqueador de pop-up impediu a impressão"); return; }
-    w.document.write(html);
-    w.document.close();
-  };
-
   const exportarTodos = () => {
-    const rows = linhasTodosPorDia.map((l) => ({
-      Operador: l.user_nome,
-      Dia: fmtDia(l.data),
-      "Abertura (hora)": fmtHora(l.primeiraAbertura),
-      "Fechamento (hora)": fmtHora(l.ultimoFechamento),
-      Status: l.statusDia,
-      "Valor abertura": l.valorAbertura,
-      "Saldo calculado": l.calculado,
-      "Valor informado": l.informado,
-      Sangria: l.sangria,
-      Estorno: l.estorno,
-      Diferenca: l.diferenca,
+    const rows = todasSessoes.map((s) => ({
+      Operador: s.user_nome || s.user_id.slice(0, 8),
+      Abertura: fmtDT(s.aberto_em),
+      Fechamento: fmtDT(s.fechado_em),
+      Status: s.status,
+      "Valor abertura": Number(s.valor_abertura || 0),
+      "Saldo calculado": calcSaldoSessao(s.id),
+      "Valor informado": Number(s.valor_fechamento_informado || 0),
+      Sangria: calcSangriaSessao(s.id),
+      Estorno: calcEstornoSessao(s.id),
+      Diferenca: Number(s.diferenca || 0),
     }));
     exportToExcel(rows, `caixas_${fIni}_a_${fFim}`);
   };
@@ -2304,7 +718,6 @@ function Page() {
       Tipo: TIPO_LABEL[m.tipo],
       Descricao: m.descricao ?? "",
       Forma: m.forma_pagamento ?? "",
-      Usuario: usuarioNomeFor(m),
       Valor: (TIPO_SINAL[m.tipo] < 0 ? -1 : 1) * Number(m.valor || 0),
     }));
     const op = (openDetalhe.user_nome || "operador").replace(/\s+/g, "_");
@@ -2323,7 +736,6 @@ function Page() {
         <td>${TIPO_LABEL[m.tipo]}</td>
         <td>${esc(m.descricao ?? "")}</td>
         <td>${esc(m.forma_pagamento ?? "—")}</td>
-        <td>${esc(usuarioNomeFor(m))}</td>
         <td style="text-align:right;">${TIPO_SINAL[m.tipo] < 0 ? "-" : ""}${fmt(m.valor)}</td>
       </tr>`).join("");
     const html = `<!doctype html><html><head><meta charset="utf-8"/>
@@ -2347,7 +759,7 @@ function Page() {
         <div><b>Diferença</b><br/>${fmt(s.diferenca)}</div>
       </div>
       <table><thead><tr>
-        <th>Data</th><th>Hora</th><th>Tipo</th><th>Descrição</th><th>Forma</th><th>Usuário</th><th style="text-align:right;">Valor</th>
+        <th>Data</th><th>Hora</th><th>Tipo</th><th>Descrição</th><th>Forma</th><th style="text-align:right;">Valor</th>
       </tr></thead><tbody>${linhas}</tbody></table>
       <script>window.onload=()=>{window.print();}</script>
       </body></html>`;
@@ -2374,36 +786,27 @@ function Page() {
         <TabsList>
           <TabsTrigger value="meu">Meu caixa</TabsTrigger>
           {isManager && <TabsTrigger value="todos"><Users className="h-4 w-4 mr-1" /> Todos (Financeiro)</TabsTrigger>}
-          {podeLancarRecebDespesa && <TabsTrigger value="repasse"><HandCoins className="h-4 w-4 mr-1" /> Repasse médico</TabsTrigger>}
+          <TabsTrigger value="repasse"><HandCoins className="h-4 w-4 mr-1" /> Repasse médico</TabsTrigger>
         </TabsList>
 
         {/* ===================== MEU CAIXA ===================== */}
         <TabsContent value="meu" className="space-y-4 pt-4">
-          {loading && <ListSkeleton rows={4} fallback={<p className="text-sm text-muted-foreground">Carregando…</p>} />}
+          {loading && <p className="text-sm text-muted-foreground">Carregando…</p>}
 
-          {!loading && (
-            <Tabs defaultValue="saldo" className="w-full">
-              <TabsList>
-                <TabsTrigger value="saldo">Saldo</TabsTrigger>
-                <TabsTrigger value="movimentos">Movimentos</TabsTrigger>
-                <TabsTrigger value="historico">Histórico</TabsTrigger>
-                <TabsTrigger value="aguardando">Aguardando</TabsTrigger>
-              </TabsList>
+          {!loading && !minhaSessao && (
+            <Card>
+              <CardContent className="py-10 text-center space-y-3">
+                <Wallet className="h-10 w-10 mx-auto text-muted-foreground" />
+                <p className="text-muted-foreground">Nenhum caixa aberto.</p>
+                <Button onClick={() => setOpenAbrir(true)}>
+                  <Unlock className="h-4 w-4 mr-2" /> Abrir caixa
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
-              {/* ---------- Saldo ---------- */}
-              <TabsContent value="saldo" className="space-y-4 pt-4">
-                {!minhaSessao ? (
-                  <Card>
-                    <CardContent className="py-10 text-center space-y-3">
-                      <Wallet className="h-10 w-10 mx-auto text-muted-foreground" />
-                      <p className="text-muted-foreground">Nenhum caixa aberto.</p>
-                      <Button onClick={() => setOpenAbrir(true)}>
-                        <Unlock className="h-4 w-4 mr-2" /> Abrir caixa
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <>
+          {!loading && minhaSessao && (
+            <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setCaixaDrill("saldo")}>
                   <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground">Saldo atual</CardTitle></CardHeader>
@@ -2427,52 +830,6 @@ function Page() {
                 </Card>
               </div>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground">Movimentação por dia</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {resumoPorDia.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Sem movimentações nesta sessão.</p>
-                  ) : resumoPorDia.map((d) => {
-                    const cards: Array<{ label: string; value: number; sempre?: boolean }> = [
-                      { label: "Dinheiro", value: d.porForma.dinheiro ?? 0, sempre: true },
-                      { label: "PIX", value: d.porForma.pix ?? 0, sempre: true },
-                      { label: "Débito", value: d.porForma.debito ?? 0, sempre: true },
-                      { label: "Crédito", value: d.porForma.credito ?? 0, sempre: true },
-                      { label: "Boleto", value: d.porForma.boleto ?? 0 },
-                      { label: "Transferência", value: d.porForma.transferencia ?? 0 },
-                      { label: "Convênio", value: d.porForma.convenio ?? 0 },
-                      { label: "Outros", value: d.porForma.outros ?? 0 },
-                    ];
-                    const visiveis = cards.filter((c) => c.sempre || (c.value ?? 0) > 0.005);
-                    return (
-                      <div key={d.dia} className="rounded-lg border p-3 space-y-3 bg-card">
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <div className="font-semibold text-sm flex items-center gap-2">
-                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                            {d.label}
-                          </div>
-                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
-                            <span>Entradas: <b className="text-emerald-600">{fmt(d.entradas)}</b></span>
-                            <span>Saídas: <b className="text-rose-600">{fmt(d.saidas)}</b></span>
-                            <span>Saldo do dia: <b className={d.saldo >= 0 ? "text-primary" : "text-rose-600"}>{fmt(d.saldo)}</b></span>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {visiveis.map((it) => (
-                            <div key={it.label} className="rounded-md border bg-muted/30 px-3 py-2">
-                              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{it.label}</div>
-                              <div className="text-base font-semibold tabular-nums">{fmt(it.value)}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => setOpenMov({ tipo: "suprimento" })}>
                   <ArrowDownToLine className="h-4 w-4 mr-2 text-emerald-600" /> Suprimento
@@ -2480,49 +837,19 @@ function Page() {
                 <Button variant="outline" onClick={() => setOpenMov({ tipo: "sangria" })}>
                   <ArrowUpFromLine className="h-4 w-4 mr-2 text-rose-600" /> Sangria
                 </Button>
-                <Button variant="outline" onClick={() => setOpenMov({ tipo: "estorno" })}>
-                  <Undo2 className="h-4 w-4 mr-2 text-fuchsia-600" /> Estorno
+                <Button variant="outline" onClick={() => setOpenMov({ tipo: "recebimento" })}>
+                  <PlusCircle className="h-4 w-4 mr-2 text-emerald-600" /> Recebimento
                 </Button>
-                {podeLancarRecebDespesa && (
-                  <>
-                    <Button variant="outline" onClick={() => setOpenMov({ tipo: "recebimento" })}>
-                      <PlusCircle className="h-4 w-4 mr-2 text-emerald-600" /> Recebimento
-                    </Button>
-                    <Button variant="outline" onClick={() => setOpenMov({ tipo: "despesa" })}>
-                      <MinusCircle className="h-4 w-4 mr-2 text-rose-600" /> Despesa
-                    </Button>
-                  </>
-                )}
+                <Button variant="outline" onClick={() => setOpenMov({ tipo: "despesa" })}>
+                  <MinusCircle className="h-4 w-4 mr-2 text-rose-600" /> Despesa
+                </Button>
                 <div className="flex-1" />
-                <Button variant="destructive" onClick={() => {
-                  setValorInformado(saldoAtual.toFixed(2));
-                  if (minhaSessao) {
-                    const porForma = entradasPorFormaSessao(minhaSessao.id);
-                    const inicial: Record<string, string> = {};
-                    for (const [k, v] of Object.entries(porForma)) {
-                      if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
-                    }
-                    if (!inicial.dinheiro) inicial.dinheiro = "0.00";
-                    setConferidoOwn(inicial);
-                  }
-                  setOpenFechar(true);
-                }}>
+                <Button variant="destructive" onClick={() => { setValorInformado(saldoAtual.toFixed(2)); setOpenFechar(true); }}>
                   <Lock className="h-4 w-4 mr-2" /> Fechar caixa
                 </Button>
               </div>
-                  </>
-                )}
-              </TabsContent>
 
-              {/* ---------- Aguardando ---------- */}
-              <TabsContent value="aguardando" className="space-y-4 pt-4">
-                {!minhaSessao ? (
-                  <Card>
-                    <CardContent className="py-10 text-center text-muted-foreground">
-                      Abra um caixa para visualizar a fila de cobrança.
-                    </CardContent>
-                  </Card>
-                ) : (
+              {/* === FILA DE COBRANÇA === */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
@@ -2534,7 +861,7 @@ function Page() {
                   {filaCaixa.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">Nenhum paciente aguardando cobrança hoje.</p>
                   ) : (
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[32rem] overflow-auto pr-1">
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-80 overflow-auto pr-1">
                       {filaCaixa.map((f) => {
                         const hora = new Date(f.inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
                         return (
@@ -2570,132 +897,58 @@ function Page() {
                   )}
                 </CardContent>
               </Card>
-                )}
-              </TabsContent>
 
-              {/* ---------- Movimentos ---------- */}
-              <TabsContent value="movimentos" className="space-y-4 pt-4">
               <Card>
-                <CardHeader className="gap-3">
-                  <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
-                    <CardTitle className="text-base">
-                      Meus movimentos
-                      {filtrosAtivos && (
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          ({minhasMovsFiltrados.length} de {minhasMovsHist.length})
-                        </span>
-                      )}
-                    </CardTitle>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => imprimirRelatorioMovs(
-                          minhasMovsFiltrados,
-                          periodoLabel,
-                        )}
-                        disabled={minhasMovsFiltrados.length === 0}
-                      >
-                        <Printer className="h-4 w-4 mr-1" /> Relatório
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex items-end gap-2 flex-wrap">
-                    <div>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
+                  <CardTitle className="text-base">
+                    {isManager ? "Movimentos da sessão" : "Movimentos de hoje"}
+                  </CardTitle>
+                  {isManager ? (
+                    <div className="flex items-end gap-2 flex-wrap">
+                      <div>
                         <Label className="text-xs">Período</Label>
-                        <Popover open={openCal} onOpenChange={setOpenCal}>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-8 justify-start font-normal min-w-[220px]">
-                              <CalendarIcon className="h-3.5 w-3.5 mr-2" />
-                              {periodoLabel}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <div className="flex flex-col sm:flex-row">
-                              <div className="flex sm:flex-col gap-1 p-2 border-b sm:border-b-0 sm:border-r bg-muted/30">
-                                {([
-                                  ["hoje", "Hoje"],
-                                  ["semana", "Última semana"],
-                                  ["quinzena", "Última quinzena"],
-                                  ["mes", "Último mês"],
-                                  ["todos", "Todos"],
-                                ] as const).map(([v, lbl]) => (
-                                  <Button
-                                    key={v}
-                                    type="button"
-                                    variant={meuPeriodo === v ? "default" : "ghost"}
-                                    size="sm"
-                                    className="justify-start text-xs h-7"
-                                    onClick={() => { setMeuPeriodo(v); setOpenCal(false); }}
-                                  >
-                                    {lbl}
-                                  </Button>
-                                ))}
-                              </div>
-                              <Calendar
-                                mode="range"
-                                locale={ptBR}
-                                numberOfMonths={2}
-                                selected={{
-                                  from: meuDataIni ? new Date(meuDataIni + "T00:00:00") : undefined,
-                                  to: meuDataFim ? new Date(meuDataFim + "T00:00:00") : undefined,
-                                }}
-                                onSelect={(range: DateRange | undefined) => {
-                                  if (!range?.from) return;
-                                  const f = range.from;
-                                  const t = range.to ?? range.from;
-                                  const iso = (d: Date) =>
-                                    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-                                  setMeuDataIni(iso(f));
-                                  setMeuDataFim(iso(t));
-                                  setMeuPeriodo("intervalo");
-                                  if (range.to) setOpenCal(false);
-                                }}
-                                initialFocus
-                                className={cn("p-3 pointer-events-auto")}
-                              />
-                            </div>
-                          </PopoverContent>
-                        </Popover>
+                        <Select value={meuPeriodo} onValueChange={(v) => setMeuPeriodo(v as typeof meuPeriodo)}>
+                          <SelectTrigger className="h-8 w-[160px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="hoje">Hoje</SelectItem>
+                            <SelectItem value="semana">Última semana</SelectItem>
+                            <SelectItem value="quinzena">Última quinzena</SelectItem>
+                            <SelectItem value="mes">Último mês</SelectItem>
+                            <SelectItem value="intervalo">Intervalo personalizado</SelectItem>
+                            <SelectItem value="todos">Todos</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                    <div>
-                      <Label className="text-xs">Médico</Label>
-                      <Select value={meuMedico} onValueChange={setMeuMedico}>
-                        <SelectTrigger className="h-8 w-[200px]">
-                          <SelectValue placeholder="Todos" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__all__">Todos os médicos</SelectItem>
-                          {medicosDisponiveis.map((n) => (
-                            <SelectItem key={n} value={n}>{n}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {meuPeriodo === "intervalo" && (
+                        <>
+                          <div>
+                            <Label className="text-xs">De</Label>
+                            <Input
+                              type="date"
+                              value={meuDataIni}
+                              onChange={(e) => setMeuDataIni(e.target.value)}
+                              className="h-8 w-[150px]"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Até</Label>
+                            <Input
+                              type="date"
+                              value={meuDataFim}
+                              onChange={(e) => setMeuDataFim(e.target.value)}
+                              className="h-8 w-[150px]"
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
-                    <div>
-                      <Label className="text-xs">Paciente</Label>
-                      <div className="relative">
-                        <Search className="h-3.5 w-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          value={meuPaciente}
-                          onChange={(e) => setMeuPaciente(e.target.value)}
-                          placeholder="Buscar paciente..."
-                          className="h-8 w-[200px] pl-7"
-                        />
-                      </div>
-                    </div>
-                    {filtrosAtivos && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={limparFiltros}
-                        className="h-8 text-xs"
-                      >
-                        <X className="h-3.5 w-3.5 mr-1" /> Limpar
-                      </Button>
-                    )}
-                  </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      {new Date().toLocaleDateString("pt-BR")}
+                    </span>
+                  )}
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
                   <Table>
@@ -2704,114 +957,33 @@ function Page() {
                         <TableHead>Data</TableHead>
                         <TableHead>Hora</TableHead>
                         <TableHead>Tipo</TableHead>
-                        <TableHead>Paciente</TableHead>
                         <TableHead>Descrição</TableHead>
-                        <TableHead>Serviço</TableHead>
-                        <TableHead>Médico</TableHead>
-                        <TableHead>Ficha</TableHead>
-                        <TableHead>Usuário</TableHead>
                         <TableHead>Forma</TableHead>
                         <TableHead className="text-right">Valor</TableHead>
                         <TableHead className="text-right w-[1%]">Ação</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                       {minhasMovsFiltrados.length === 0 ? (
-                         <TableRow>
-                           <TableCell colSpan={12} className="text-center text-muted-foreground">
-                            {filtrosAtivos
-                              ? "Nenhum movimento corresponde aos filtros"
-                              : "Sem movimentos no período"}
+                      {minhasMovsFiltrados.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground">
+                            {isManager
+                              ? "Sem movimentos no período"
+                              : "Sem movimentos hoje"}
                           </TableCell>
                         </TableRow>
-                      ) : minhasMovsFiltrados.flatMap((m) => {
-                         const enr = m.lancamento_id ? enrichPorLanc.get(m.lancamento_id) : undefined;
-                         const servico = enr?.servico ?? servicoFromDescricao(m.descricao);
-                         const medico = enr?.medico ?? null;
-                         const ficha = enr?.ficha ?? null;
-                         const paciente = enr?.paciente ?? pacienteFromDescricao(m.descricao);
-                         const usuario = usuarioNomeFor(m);
-                         const bucket = bucketDeMov(m);
-                         const partes = bucket === "misto" ? partesDoMov(m) : {};
-                         const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
-                         if (bucket === "misto" && entradas.length > 0) {
-                           return entradas.map(([k, v], idx) => (
-                             <TableRow key={`${m.id}-${k}`}>
-                               <TableCell className="whitespace-nowrap">{idx === 0 ? new Date(m.created_at).toLocaleDateString("pt-BR") : ""}</TableCell>
-                               <TableCell className="whitespace-nowrap">{idx === 0 ? new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""}</TableCell>
-                               <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
-                               <TableCell className="text-xs uppercase font-medium max-w-[220px] truncate" title={paciente ?? undefined}>{idx === 0 ? (paciente || "—") : ""}</TableCell>
-                               <TableCell className="max-w-[320px] truncate" title={m.descricao ?? undefined}>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
-                               <TableCell className="text-xs">{idx === 0 ? (servico || "—") : ""}</TableCell>
-                               <TableCell className="text-xs">{idx === 0 ? (medico || "—") : ""}</TableCell>
-                                <TableCell className="text-xs tabular-nums">{idx === 0 ? formatFichaCaixa(ficha) : ""}</TableCell>
-                               <TableCell className="text-xs uppercase" title={usuario}>{idx === 0 ? usuario : ""}</TableCell>
-                               <TableCell className="text-xs">{FORMA_LABEL[k] ?? k}</TableCell>
-                               <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
-                                 {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
-                               </TableCell>
-                               <TableCell className="text-right"></TableCell>
-                             </TableRow>
-                           ));
-                         }
-                         return [(
-                         <TableRow key={m.id}>
+                      ) : minhasMovsFiltrados.map((m) => (
+                        <TableRow key={m.id}>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
                           <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
                           <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
-                          <TableCell
-                            className="text-xs uppercase font-medium max-w-[220px] truncate"
-                            title={paciente ?? undefined}
-                          >
-                            {paciente || "—"}
-                          </TableCell>
-                          <TableCell
-                            className="max-w-[320px] truncate"
-                            title={m.descricao ?? undefined}
-                          >
-                            {m.descricao || "—"}
-                          </TableCell>
-                          <TableCell className="text-xs">{servico || "—"}</TableCell>
-                          <TableCell className="text-xs">{medico || "—"}</TableCell>
-                           <TableCell className="text-xs tabular-nums">{formatFichaCaixa(ficha)}</TableCell>
-                          <TableCell className="text-xs uppercase" title={usuario}>{usuario}</TableCell>
-                          <TableCell><FormaCellEditavel m={m} /></TableCell>
+                          <TableCell>{m.descricao || "—"}</TableCell>
+                          <TableCell>{m.forma_pagamento || "—"}</TableCell>
                           <TableCell className={`text-right font-medium ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
                             {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
                           </TableCell>
                           <TableCell className="text-right">
-                            {m.tipo === "recebimento" && podeEscrever && (
-                              (() => {
-                                const st = m.lancamento_id ? estornosPorLanc.get(m.lancamento_id) : undefined;
-                                if (st === "pendente") {
-                                  return (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      disabled
-                                      className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
-                                      title="Solicitação de estorno enviada — aguardando decisão do financeiro"
-                                    >
-                                      <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
-                                    </Button>
-                                  );
-                                }
-                                if (st === "aprovado") {
-                                  return (
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      disabled
-                                      className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
-                                      title="Este lançamento já foi estornado"
-                                    >
-                                      <Undo2 className="h-3 w-3 mr-1" /> Estornado
-                                    </Button>
-                                  );
-                                }
-                                return (
+                            {m.tipo === "recebimento" && (
                               <Button
                                 type="button"
                                 size="sm"
@@ -2822,72 +994,24 @@ function Page() {
                               >
                                 <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
                               </Button>
-                                );
-                              })()
-                            )}
-                            {m.tipo === "sangria" && podeEscrever && (
-                              (() => {
-                                const st = estornosPorMov.get(m.id);
-                                if (st === "pendente") {
-                                  return (
-                                    <Button
-                                      type="button" size="sm" variant="outline" disabled
-                                      className="h-7 text-xs text-amber-800 border-amber-300 bg-amber-50 cursor-not-allowed"
-                                      title="Solicitação de estorno enviada — aguardando decisão do financeiro"
-                                    >
-                                      <Undo2 className="h-3 w-3 mr-1" /> Aguardando aprovação
-                                    </Button>
-                                  );
-                                }
-                                if (st === "aprovado") {
-                                  return (
-                                    <Button
-                                      type="button" size="sm" variant="outline" disabled
-                                      className="h-7 text-xs text-slate-600 border-slate-300 bg-slate-100 cursor-not-allowed"
-                                      title="Esta sangria já foi estornada"
-                                    >
-                                      <Undo2 className="h-3 w-3 mr-1" /> Estornada
-                                    </Button>
-                                  );
-                                }
-                                return (
-                                  <Button
-                                    type="button" size="sm" variant="outline"
-                                    className="h-7 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
-                                    title="Solicitar estorno da sangria ao financeiro"
-                                    onClick={() => setEstornoFor(m)}
-                                  >
-                                    <Undo2 className="h-3 w-3 mr-1" /> Solicitar estorno
-                                  </Button>
-                                );
-                              })()
                             )}
                           </TableCell>
                         </TableRow>
-                         )];
-                       })}
+                      ))}
                     </TableBody>
                   </Table>
                 </CardContent>
               </Card>
-              </TabsContent>
+            </>
+          )}
 
-              {/* ---------- Histórico ---------- */}
-              <TabsContent value="historico" className="space-y-4 pt-4">
-                {minhasSessoes.length === 0 ? (
-                  <Card>
-                    <CardContent className="py-10 text-center text-muted-foreground">
-                      Nenhuma sessão anterior.
-                    </CardContent>
-                  </Card>
-                ) : (
+          {minhasSessoes.length > 0 && (
             <Card>
               <CardHeader><CardTitle className="text-base">Meu histórico</CardTitle></CardHeader>
               <CardContent className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Dia</TableHead>
                       <TableHead>Abertura</TableHead>
                       <TableHead>Fechamento</TableHead>
                       <TableHead>Status</TableHead>
@@ -2898,36 +1022,25 @@ function Page() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {linhasMinhasPorDia.map((l) => {
-                      const sPrincipal = l.sessoes[0];
-                      return (
-                        <TableRow key={l.key}>
-                          <TableCell className="font-medium">{fmtDia(l.data)}</TableCell>
-                          <TableCell>{fmtHora(l.primeiraAbertura)}</TableCell>
-                          <TableCell>{fmtHora(l.ultimoFechamento)}</TableCell>
-                          <TableCell>
-                            <Badge variant={l.statusDia === "aberto" ? "default" : "secondary"}>{l.statusDia}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right">{fmt(l.valorAbertura)}</TableCell>
-                          <TableCell className="text-right">{fmt(l.informado)}</TableCell>
-                          <TableCell className={`text-right ${l.diferenca < 0 ? "text-rose-600" : l.diferenca > 0 ? "text-amber-600" : ""}`}>
-                            {fmt(l.diferenca)}
-                          </TableCell>
-                          <TableCell>
-                            {sPrincipal && (
-                              <Button size="sm" variant="ghost" onClick={() => verDetalhe(sPrincipal)}><Eye className="h-4 w-4" /></Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {minhasSessoes.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell>{fmtDT(s.aberto_em)}</TableCell>
+                        <TableCell>{fmtDT(s.fechado_em)}</TableCell>
+                        <TableCell>
+                          <Badge variant={s.status === "aberto" ? "default" : "secondary"}>{s.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{fmt(s.valor_abertura)}</TableCell>
+                        <TableCell className="text-right">{fmt(s.valor_fechamento_informado)}</TableCell>
+                        <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
+                          {fmt(s.diferenca)}
+                        </TableCell>
+                        <TableCell><Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}><Eye className="h-4 w-4" /></Button></TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
-                )}
-              </TabsContent>
-            </Tabs>
           )}
         </TabsContent>
 
@@ -2938,11 +1051,11 @@ function Page() {
               <CardContent className="pt-4 flex flex-wrap items-end gap-3">
                 <div>
                   <Label className="text-xs">De</Label>
-                  <DateInputBR value={fIni} onChange={(e) => setFIni(e.target.value)} />
+                  <Input type="date" value={fIni} onChange={(e) => setFIni(e.target.value)} />
                 </div>
                 <div>
                   <Label className="text-xs">Até</Label>
-                  <DateInputBR value={fFim} onChange={(e) => setFFim(e.target.value)} />
+                  <Input type="date" value={fFim} onChange={(e) => setFFim(e.target.value)} />
                 </div>
                 <div className="min-w-[200px]">
                   <Label className="text-xs">Operador</Label>
@@ -2957,38 +1070,7 @@ function Page() {
                   </Select>
                 </div>
                 <Button onClick={() => void loadTodos()}>Filtrar</Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    const hoje = new Date().toISOString().slice(0, 10);
-                    setFIni(hoje);
-                    setFFim(hoje);
-                  }}
-                  title="Filtrar apenas o dia de hoje"
-                >
-                  Hoje
-                </Button>
                 <Button variant="outline" onClick={exportarTodos}><FileDown className="h-4 w-4 mr-2" /> Excel</Button>
-                {(() => {
-                  const abertos = todasSessoes.filter((s) => s.status === "aberto").length;
-                  if (abertos === 0) return null;
-                  return (
-                    <Button
-                      variant="destructive"
-                      onClick={() => {
-                        const inicial: Record<string, boolean> = {};
-                        todasSessoes.forEach((s) => {
-                          if (s.status === "aberto") inicial[s.id] = true;
-                        });
-                        setLoteSelecionados(inicial);
-                        setObsLote("");
-                        setOpenLote(true);
-                      }}
-                    >
-                      <Lock className="h-4 w-4 mr-2" /> Fechar caixas abertos ({abertos})
-                    </Button>
-                  );
-                })()}
               </CardContent>
             </Card>
 
@@ -2998,7 +1080,6 @@ function Page() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Operador</TableHead>
-                      <TableHead>Dia</TableHead>
                       <TableHead>Abertura</TableHead>
                       <TableHead>Fechamento</TableHead>
                       <TableHead>Status</TableHead>
@@ -3012,77 +1093,28 @@ function Page() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {linhasTodosPorDia.length === 0 && (
-                      <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">Sem sessões no período</TableCell></TableRow>
+                    {todasSessoes.length === 0 && (
+                      <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">Sem sessões no período</TableCell></TableRow>
                     )}
-                    {linhasTodosPorDia.map((l) => {
-                      const sAberta = l.sessaoAbertaId
-                        ? l.sessoes.find((x) => x.id === l.sessaoAbertaId)
-                        : null;
-                      const sPrincipal = sAberta ?? l.sessoes[0];
+                    {todasSessoes.map((s) => {
+                      const calc = calcSaldoSessao(s.id);
+                      const sangria = calcSangriaSessao(s.id);
+                      const estorno = calcEstornoSessao(s.id);
                       return (
-                        <TableRow key={l.key}>
-                          <TableCell className="font-medium uppercase">{l.user_nome.toUpperCase()}</TableCell>
-                          <TableCell className="whitespace-nowrap">{fmtDia(l.data)}</TableCell>
-                          <TableCell>{fmtHora(l.primeiraAbertura)}</TableCell>
-                          <TableCell>{fmtHora(l.ultimoFechamento)}</TableCell>
-                          <TableCell><Badge variant={l.statusDia === "aberto" ? "default" : "secondary"}>{l.statusDia}</Badge></TableCell>
-                          <TableCell className="text-right">{fmt(l.valorAbertura)}</TableCell>
-                          <TableCell className="text-right">{fmt(l.calculado)}</TableCell>
-                          <TableCell className="text-right">{fmt(l.informado)}</TableCell>
-                          <TableCell className={`text-right ${l.sangria > 0 ? "text-amber-700" : "text-muted-foreground"}`}>{fmt(l.sangria)}</TableCell>
-                          <TableCell className={`text-right ${l.estorno > 0 ? "text-rose-700" : "text-muted-foreground"}`}>{fmt(l.estorno)}</TableCell>
-                          <TableCell className={`text-right ${l.diferenca < 0 ? "text-rose-600" : l.diferenca > 0 ? "text-amber-600" : ""}`}>
-                            {fmt(l.diferenca)}
+                        <TableRow key={s.id}>
+                          <TableCell className="font-medium uppercase">{(s.user_nome || s.user_id.slice(0, 8)).toUpperCase()}</TableCell>
+                          <TableCell>{fmtDT(s.aberto_em)}</TableCell>
+                          <TableCell>{fmtDT(s.fechado_em)}</TableCell>
+                          <TableCell><Badge variant={s.status === "aberto" ? "default" : "secondary"}>{s.status}</Badge></TableCell>
+                          <TableCell className="text-right">{fmt(s.valor_abertura)}</TableCell>
+                          <TableCell className="text-right">{fmt(calc)}</TableCell>
+                          <TableCell className="text-right">{fmt(s.valor_fechamento_informado)}</TableCell>
+                          <TableCell className={`text-right ${sangria > 0 ? "text-amber-700" : "text-muted-foreground"}`}>{fmt(sangria)}</TableCell>
+                          <TableCell className={`text-right ${estorno > 0 ? "text-rose-700" : "text-muted-foreground"}`}>{fmt(estorno)}</TableCell>
+                          <TableCell className={`text-right ${Number(s.diferenca || 0) < 0 ? "text-rose-600" : Number(s.diferenca || 0) > 0 ? "text-amber-600" : ""}`}>
+                            {fmt(s.diferenca)}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            {sPrincipal && (
-                              <Button size="sm" variant="ghost" onClick={() => verDetalhe(sPrincipal)} title="Ver detalhes">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {sAberta && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                title="Fechar este caixa"
-                                onClick={() => {
-                                  setOpenFecharTerceiro(sAberta);
-                                  setObsTerceiro("");
-                                  const porForma = entradasPorFormaSessao(sAberta.id);
-                                  const inicial: Record<string, string> = {};
-                                  let soma = 0;
-                                  for (const k of Object.keys(porForma)) {
-                                    const v = porForma[k] ?? 0;
-                                    if (Math.abs(v) > 0.005 || k === "dinheiro") {
-                                      inicial[k] = v.toFixed(2);
-                                      soma += v;
-                                    }
-                                  }
-                                  setConferidoTerceiro(inicial);
-                                  setInformadoTerceiro(soma.toFixed(2));
-                                }}
-                              >
-                                <Lock className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {!sAberta && l.statusDia === "fechado" && podeLancarRecebDespesa && (() => {
-                              const sFechada = [...l.sessoes]
-                                .filter((x) => x.status === "fechado" && x.fechado_em)
-                                .sort((a, b) => (b.fechado_em || "").localeCompare(a.fechado_em || ""))[0];
-                              if (!sFechada) return null;
-                              return (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  title="Desfazer fechamento (reabrir caixa)"
-                                  onClick={() => { setOpenReabrir(sFechada); setMotivoReabrir(""); }}
-                                >
-                                  <Undo2 className="h-4 w-4 text-amber-700" />
-                                </Button>
-                              );
-                            })()}
-                          </TableCell>
+                          <TableCell><Button size="sm" variant="ghost" onClick={() => verDetalhe(s)}><Eye className="h-4 w-4" /></Button></TableCell>
                         </TableRow>
                       );
                     })}
@@ -3168,6 +1200,13 @@ function Page() {
               </div>
 
               <div className="flex flex-wrap gap-2">
+                <Button asChild size="lg" className="bg-emerald-600 hover:bg-emerald-700">
+                  <Link to="/app/financeiro/atendimentos">
+                    <HandCoins className="h-4 w-4 mr-2" />
+                    Abrir tela completa de Repasse
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Link>
+                </Button>
                 <Button variant="outline" onClick={() => void loadRepasseHoje()}>
                   Atualizar resumo
                 </Button>
@@ -3207,7 +1246,6 @@ function Page() {
               {openMov?.tipo === "suprimento" && "Adição de dinheiro ao caixa."}
               {openMov?.tipo === "recebimento" && "Entrada de pagamento avulsa."}
               {openMov?.tipo === "despesa" && "Pagamento avulso de despesa pelo caixa."}
-              {openMov?.tipo === "estorno" && "Devolução de dinheiro ao paciente fora do fluxo de solicitação de estorno (ex.: troco, valor cobrado a mais). Descreva o motivo/paciente abaixo."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={lancarMov} className="space-y-3">
@@ -3219,24 +1257,6 @@ function Page() {
               <Label>Descrição</Label>
               <Input value={movDesc} onChange={(e) => setMovDesc(e.target.value)} placeholder="Motivo / referência" />
             </div>
-            {openMov && (openMov.tipo === "sangria" || openMov.tipo === "suprimento") && (
-              <div>
-                <Label>{openMov.tipo === "sangria" ? "Entregue a *" : "Recebido de *"}</Label>
-                <Select value={movDestinoUserId} onValueChange={setMovDestinoUserId}>
-                  <SelectTrigger><SelectValue placeholder="Selecione o usuário..." /></SelectTrigger>
-                  <SelectContent>
-                    {membrosClinica.map((m) => (
-                      <SelectItem key={m.user_id} value={m.user_id}>{m.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  {openMov.tipo === "sangria"
-                    ? "Registre a quem o dinheiro está sendo entregue (ex.: financeiro, gestor)."
-                    : "Registre de quem o dinheiro está sendo recebido."}
-                </p>
-              </div>
-            )}
             {openMov && (openMov.tipo === "recebimento" || openMov.tipo === "despesa") && (
               <div>
                 <Label>Forma de pagamento</Label>
@@ -3291,108 +1311,9 @@ function Page() {
       <Dialog open={openFechar} onOpenChange={setOpenFechar}>
         <DialogContent>
           <DialogHeader><DialogTitle>Fechar caixa</DialogTitle>
-            <DialogDescription>
-              Fechando o dia <strong>{dataFechamento ? new Date(`${dataFechamento}T00:00:00`).toLocaleDateString("pt-BR") : "—"}</strong>
-              {" · "}Saldo calculado do dia: <strong>{fmt(saldoDoDiaFechamento)}</strong>
-              {" · "}Esperado em espécie: <strong>{fmt(porFormaDoDiaFechamento.dinheiro ?? 0)}</strong>
-            </DialogDescription>
-            {Math.abs(porFormaDoDiaFechamento.indeterminado ?? 0) > 0.005 && (
-              <p className="text-xs text-destructive">
-                Atenção: {fmt(porFormaDoDiaFechamento.indeterminado ?? 0)} sem forma de pagamento
-                identificada (pagamento misto sem composição registrada). Esse valor NÃO foi somado
-                ao esperado em espécie — confira manualmente antes de fechar.
-              </p>
-            )}
+            <DialogDescription>Saldo calculado: <strong>{fmt(saldoAtual)}</strong></DialogDescription>
           </DialogHeader>
           <form onSubmit={fecharCaixa} className="space-y-3">
-            <div>
-              <Label>Dia a fechar</Label>
-              <DateInputBR
-                value={dataFechamento}
-                max={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => {
-                  const novo = e.target.value;
-                  setDataFechamento(novo);
-                  // Ao trocar o dia, pré-preenche a conferência com os valores
-                  // esperados daquele dia (o operador ajusta em seguida).
-                  const filtrados = novo
-                    ? minhasMovs.filter((m) => localYMD(m.created_at) === novo)
-                    : minhasMovs;
-                  const pf: Record<string, number> = {};
-                  filtrados.forEach((m) => {
-                    if (m.tipo !== "recebimento" && m.tipo !== "suprimento" && m.tipo !== "estorno") return;
-                    const sinal = m.tipo === "estorno" ? -1 : 1;
-                    const v = Number(m.valor || 0) * sinal;
-                    const bucket = bucketDeMov(m);
-                    if (bucket === "misto") {
-                      const partes = partesDoMov(m);
-                      let somado = 0;
-                      for (const [k, val] of Object.entries(partes)) {
-                        pf[k] = (pf[k] ?? 0) + (val ?? 0) * sinal; somado += (val ?? 0) * sinal;
-                      }
-                      const resto = v - somado;
-                      if (Math.abs(resto) > 0.005) pf[residualBucket] = (pf[residualBucket] ?? 0) + resto;
-                    } else {
-                      pf[bucket] = (pf[bucket] ?? 0) + v;
-                    }
-                  });
-                  const inicial: Record<string, string> = {};
-                  for (const [k, v] of Object.entries(pf)) {
-                    if (Math.abs(v) > 0.005) inicial[k] = v.toFixed(2);
-                  }
-                  if (!inicial.dinheiro) inicial.dinheiro = "0.00";
-                  setConferidoOwn(inicial);
-                  const soma = Object.values(inicial).reduce((a, x) => a + (Number(x) || 0), 0);
-                  setValorInformado(soma.toFixed(2));
-                }}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Só os movimentos deste dia serão considerados no fechamento.
-              </p>
-            </div>
-            {minhaSessao && (() => {
-              const porForma = porFormaDoDiaFechamento;
-              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros", "indeterminado"];
-              // "Outros" só aparece se realmente houver saldo residual (ex.: parcela
-              // de pagamento misto ainda não decomposta). Sangria/suprimento/despesa
-              // agora contam em "Dinheiro" via bucketDeMov.
-              const chaves = ordem.filter((k) => (k !== "outros" && k !== "indeterminado") || Math.abs(porForma[k] ?? 0) > 0.005);
-              const totalConferido = Object.values(conferidoOwn)
-                .reduce((acc, v) => acc + (Number(v) || 0), 0);
-              return (
-                <div className="space-y-2">
-                  <Label>Conferência por forma de pagamento</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {chaves.map((k) => {
-                      const esperado = porForma[k] ?? 0;
-                      return (
-                        <div key={k} className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-medium">{FORMA_LABEL[k as FormaBucket] ?? k}</span>
-                            <span className="text-muted-foreground">Esperado: {fmt(esperado)}</span>
-                          </div>
-                          <CurrencyInput
-                            value={conferidoOwn[k] ?? ""}
-                            onChange={(v) => {
-                              setConferidoOwn((prev) => {
-                                const next = { ...prev, [k]: v };
-                                const soma = Object.values(next).reduce((a, x) => a + (Number(x) || 0), 0);
-                                setValorInformado(soma.toFixed(2));
-                                return next;
-                              });
-                            }}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="flex justify-between text-sm pt-1 border-t">
-                    <span className="text-muted-foreground">Total conferido</span>
-                    <strong>{fmt(totalConferido)}</strong>
-                  </div>
-                </div>
-              );
-            })()}
             <div>
               <Label>Valor conferido em caixa</Label>
               <CurrencyInput value={valorInformado} onChange={setValorInformado} />
@@ -3406,202 +1327,6 @@ function Page() {
               <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
             </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* === Modal Desfazer fechamento (admin/gestor/financeiro) === */}
-      <Dialog open={!!openReabrir} onOpenChange={(o) => { if (!o) { setOpenReabrir(null); setMotivoReabrir(""); } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Desfazer fechamento do caixa</DialogTitle>
-            {openReabrir && (
-              <DialogDescription>
-                Operador: <strong className="uppercase">{openReabrir.user_nome || openReabrir.user_id.slice(0, 8)}</strong>
-                <br />
-                Calculado: <strong>{fmt(Number(openReabrir.valor_fechamento_calculado || 0))}</strong>
-                {" · "}Informado: <strong>{fmt(Number(openReabrir.valor_fechamento_informado || 0))}</strong>
-                {" · "}Diferença: <strong>{fmt(Number(openReabrir.diferenca || 0))}</strong>
-                <br />
-                <span className="text-xs text-muted-foreground">
-                  O caixa voltará ao status "aberto". O histórico de fechamento
-                  fica registrado e uma linha de reabertura será adicionada aos
-                  movimentos do operador.
-                </span>
-              </DialogDescription>
-            )}
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="motivo-reabrir">Motivo (obrigatório)</Label>
-            <Textarea
-              id="motivo-reabrir"
-              value={motivoReabrir}
-              onChange={(e) => setMotivoReabrir(e.target.value)}
-              placeholder="Ex.: valor informado incorreto, sangria pendente..."
-              rows={3}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setOpenReabrir(null); setMotivoReabrir(""); }}>Cancelar</Button>
-            <Button variant="destructive" disabled={saving || !motivoReabrir.trim()} onClick={() => void desfazerFechamento()}>
-              <Undo2 className="h-4 w-4 mr-2" /> Reabrir caixa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* === Modal Fechar caixa de OUTRO usuário (gestor/admin) === */}
-      <Dialog open={!!openFecharTerceiro} onOpenChange={(o) => { if (!o) setOpenFecharTerceiro(null); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Fechar caixa de outro operador</DialogTitle>
-            {openFecharTerceiro && (
-              <DialogDescription>
-                Operador: <strong className="uppercase">{openFecharTerceiro.user_nome || openFecharTerceiro.user_id.slice(0, 8)}</strong>
-                <br />
-                Saldo calculado: <strong>{fmt(calcSaldoSessao(openFecharTerceiro.id))}</strong>
-              </DialogDescription>
-            )}
-          </DialogHeader>
-          <form onSubmit={fecharSessaoTerceiro} className="space-y-3">
-            {openFecharTerceiro && (() => {
-              const porForma = entradasPorFormaSessao(openFecharTerceiro.id);
-              const ordem = ["dinheiro", "pix", "debito", "credito", "boleto", "transferencia", "convenio", "outros", "indeterminado"];
-              const chaves = ordem.filter((k) => (k !== "outros" && k !== "indeterminado") || Math.abs(porForma[k] ?? 0) > 0.005);
-              const totalConferido = Object.values(conferidoTerceiro)
-                .reduce((acc, v) => acc + (Number(v) || 0), 0);
-              return (
-                <div className="space-y-2">
-                  <Label>Conferência por forma de pagamento</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {chaves.map((k) => {
-                      const esperado = porForma[k] ?? 0;
-                      return (
-                        <div key={k} className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-medium">{FORMA_LABEL[k as FormaBucket] ?? k}</span>
-                            <span className="text-muted-foreground">Esperado: {fmt(esperado)}</span>
-                          </div>
-                          <CurrencyInput
-                            value={conferidoTerceiro[k] ?? ""}
-                            onChange={(v) => {
-                              setConferidoTerceiro((prev) => {
-                                const next = { ...prev, [k]: v };
-                                const soma = Object.values(next).reduce((a, x) => a + (Number(x) || 0), 0);
-                                setInformadoTerceiro(soma.toFixed(2));
-                                return next;
-                              });
-                            }}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="flex justify-between text-sm pt-1 border-t">
-                    <span className="text-muted-foreground">Total conferido</span>
-                    <strong>{fmt(totalConferido)}</strong>
-                  </div>
-                </div>
-              );
-            })()}
-            <div>
-              <Label>Data do fechamento</Label>
-              <DateInputBR
-                value={dataFechamentoTerceiro}
-                max={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => setDataFechamentoTerceiro(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Dia a que este fechamento se refere.
-              </p>
-            </div>
-            <div>
-              <Label>Observações</Label>
-              <Textarea
-                value={obsTerceiro}
-                onChange={(e) => setObsTerceiro(e.target.value)}
-                placeholder="Motivo do fechamento pelo gestor (ex.: operador ausente, fim de turno etc.)"
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setOpenFecharTerceiro(null)}>Cancelar</Button>
-              <Button type="submit" variant="destructive" disabled={saving} data-primary>Confirmar fechamento</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* === Modal Fechamento em lote (por dia/período) === */}
-      <Dialog open={openLote} onOpenChange={setOpenLote}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Fechar caixas abertos no período</DialogTitle>
-            <DialogDescription>
-              Cada caixa selecionado será fechado com o valor <strong>calculado</strong> (diferença = 0). Use quando os operadores esquecem de fechar o próprio caixa ao fim do dia.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="max-h-80 overflow-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10"></TableHead>
-                    <TableHead>Operador</TableHead>
-                    <TableHead>Abertura</TableHead>
-                    <TableHead className="text-right">Calculado</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {todasSessoes.filter((s) => s.status === "aberto").length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
-                        Nenhum caixa aberto no período.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {todasSessoes.filter((s) => s.status === "aberto").map((s) => {
-                    const calc = calcSaldoSessao(s.id);
-                    const checked = !!loteSelecionados[s.id];
-                    return (
-                      <TableRow key={s.id}>
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => setLoteSelecionados((prev) => ({ ...prev, [s.id]: e.target.checked }))}
-                            className="h-4 w-4"
-                          />
-                        </TableCell>
-                        <TableCell className="uppercase font-medium">{(s.user_nome || s.user_id.slice(0, 8)).toUpperCase()}</TableCell>
-                        <TableCell>{fmtDT(s.aberto_em)}</TableCell>
-                        <TableCell className="text-right">{fmt(calc)}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-            <div>
-              <Label>Observação (aplicada a todos)</Label>
-              <Textarea
-                value={obsLote}
-                onChange={(e) => setObsLote(e.target.value)}
-                placeholder="Ex.: Fechamento de fim de dia — operadores não fecharam o caixa."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setOpenLote(false)}>Cancelar</Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={saving}
-              onClick={() => void fecharLote()}
-              data-primary
-            >
-              <Lock className="h-4 w-4 mr-2" />
-              Confirmar fechamento em lote
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -3740,18 +1465,6 @@ function Page() {
                   <Button size="sm" variant="outline" onClick={exportarDetalhe}>
                     <FileDown className="h-4 w-4 mr-1" /> Excel
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => imprimirRelatorioMovs(
-                      detalheMovs,
-                      `${new Date(openDetalhe.aberto_em).toLocaleDateString("pt-BR")}${openDetalhe.fechado_em ? ` — ${new Date(openDetalhe.fechado_em).toLocaleDateString("pt-BR")}` : ""}`,
-                      openDetalhe.user_nome ?? undefined,
-                    )}
-                    disabled={detalheMovs.length === 0}
-                  >
-                    <Printer className="h-4 w-4 mr-1" /> Relatório
-                  </Button>
                   <Button size="sm" variant="outline" onClick={imprimirDetalhe}>
                     <Printer className="h-4 w-4 mr-1" /> Imprimir
                   </Button>
@@ -3769,25 +1482,14 @@ function Page() {
               {(() => {
                 const tot = { recebimento: 0, sangria: 0, estorno: 0 };
                 let qtdReceb = 0;
-                let qtdEstornoReceb = 0;
                 detalheMovs.forEach((m) => {
                   const v = Number(m.valor || 0);
                   if (m.tipo === "recebimento") { tot.recebimento += v; qtdReceb++; }
                   else if (m.tipo === "sangria") tot.sangria += v;
-                  else if (m.tipo === "estorno") { tot.estorno += v; qtdEstornoReceb++; }
-                  if (m.tipo !== "estorno" && (m.descricao ?? "").toLowerCase().includes("estorno")) {
-                    tot.estorno += v;
-                    qtdEstornoReceb++;
-                  }
+                  if ((m.descricao ?? "").toLowerCase().includes("estorno")) tot.estorno += v;
                 });
-                // Recebimentos líquidos: o estorno desconta do recebimento do
-                // mesmo movimento, então nem o valor nem a contagem entram no
-                // total exibido — a linha original continua na tabela como
-                // rastro de auditoria.
-                const recebLiquido = tot.recebimento - tot.estorno;
-                const qtdRecebLiquido = Math.max(0, qtdReceb - qtdEstornoReceb);
                 const diff = Number(openDetalhe.diferenca || 0);
-                const media = qtdRecebLiquido > 0 ? recebLiquido / qtdRecebLiquido : 0;
+                const media = qtdReceb > 0 ? tot.recebimento / qtdReceb : 0;
                 return (
                   <>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
@@ -3797,11 +1499,8 @@ function Page() {
                       </div>
                       <div className="rounded-lg border bg-emerald-50 dark:bg-emerald-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Recebimentos</p>
-                        <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{fmt(recebLiquido)}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {qtdRecebLiquido} lançamento{qtdRecebLiquido === 1 ? "" : "s"}
-                          {qtdEstornoReceb > 0 ? ` · ${qtdEstornoReceb} estornado${qtdEstornoReceb === 1 ? "" : "s"}` : ""}
-                        </p>
+                        <p className="text-base font-bold text-emerald-700 dark:text-emerald-400">{fmt(tot.recebimento)}</p>
+                        <p className="text-[11px] text-muted-foreground">{qtdReceb} lançamento{qtdReceb === 1 ? "" : "s"}</p>
                       </div>
                       <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Sangrias</p>
@@ -3810,7 +1509,7 @@ function Page() {
                       <div className="rounded-lg border bg-sky-50 dark:bg-sky-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Média / atendimento</p>
                         <p className="text-base font-bold text-sky-700 dark:text-sky-400">{fmt(media)}</p>
-                        <p className="text-[11px] text-muted-foreground">{qtdRecebLiquido} atendimento{qtdRecebLiquido === 1 ? "" : "s"}</p>
+                        <p className="text-[11px] text-muted-foreground">{qtdReceb} atendimento{qtdReceb === 1 ? "" : "s"}</p>
                       </div>
                       <div className="rounded-lg border bg-fuchsia-50 dark:bg-fuchsia-950/30 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Estornos</p>
@@ -3837,44 +1536,22 @@ function Page() {
                       <TableHead>Tipo</TableHead>
                       <TableHead>Descrição</TableHead>
                       <TableHead>Forma</TableHead>
-                      <TableHead>Usuário</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {detalheMovs.flatMap((m) => {
-                      const bucket = bucketDeMov(m);
-                      const partes = bucket === "misto" ? partesDoMov(m) : {};
-                      const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
-                      if (bucket === "misto" && entradas.length > 0) {
-                        return entradas.map(([k, v], idx) => (
-                          <TableRow key={`${m.id}-${k}`}>
-                            <TableCell className="whitespace-nowrap">{idx === 0 ? new Date(m.created_at).toLocaleDateString("pt-BR") : ""}</TableCell>
-                            <TableCell>{idx === 0 ? new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""}</TableCell>
-                            <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
-                            <TableCell>{idx === 0 ? (m.descricao || "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
-                            <TableCell>{FORMA_LABEL[k] ?? k}</TableCell>
-                            <TableCell className="text-xs uppercase">{idx === 0 ? usuarioNomeFor(m) : ""}</TableCell>
-                            <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
-                              {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
-                            </TableCell>
-                          </TableRow>
-                        ));
-                      }
-                      return [(
-                        <TableRow key={m.id}>
-                          <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
-                          <TableCell>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
-                          <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
-                          <TableCell>{m.descricao || "—"}</TableCell>
-                          <TableCell><FormaCellEditavel m={m} /></TableCell>
-                          <TableCell className="text-xs uppercase">{usuarioNomeFor(m)}</TableCell>
-                          <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
-                            {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
-                          </TableCell>
-                        </TableRow>
-                      )];
-                    })}
+                    {detalheMovs.map((m) => (
+                      <TableRow key={m.id}>
+                        <TableCell className="whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("pt-BR")}</TableCell>
+                        <TableCell>{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</TableCell>
+                        <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
+                        <TableCell>{m.descricao || "—"}</TableCell>
+                        <TableCell>{m.forma_pagamento || "—"}</TableCell>
+                        <TableCell className={`text-right ${TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : ""}`}>
+                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </div>
@@ -3888,15 +1565,12 @@ function Page() {
         descricao={estornoFor?.descricao ?? null}
         valor={estornoFor?.valor ?? null}
         lancamentoId={estornoFor?.lancamento_id ?? null}
-        caixaMovimentoId={estornoFor?.tipo === "sangria" ? estornoFor.id : null}
         pacienteNome={(() => {
-          if (estornoFor?.tipo === "sangria") return null;
           const d = estornoFor?.descricao ?? "";
           // Formato esperado: "NOME PACIENTE — PROCEDIMENTO"
           const idx = d.indexOf("—");
           return idx > 0 ? d.slice(0, idx).trim() : null;
         })()}
-        onCreated={() => { void reloadEstornosPendentes(); }}
       />
       <Dialog open={!!caixaDrill} onOpenChange={(v) => { if (!v) setCaixaDrill(null); }}>
         <DialogContent className="max-w-3xl">
@@ -3938,119 +1612,24 @@ function Page() {
                   {minhasMovs
                     .filter((m) => {
                       if (caixaDrill === "entradas") return m.tipo === "suprimento" || m.tipo === "recebimento";
-                      if (caixaDrill === "saidas") return m.tipo === "sangria" || m.tipo === "despesa" || m.tipo === "estorno";
+                      if (caixaDrill === "saidas") return m.tipo === "sangria" || m.tipo === "despesa";
                       return true;
                     })
-                    .flatMap((m) => {
-                      const bucket = bucketDeMov(m);
-                      const partes = bucket === "misto" ? partesDoMov(m) : {};
-                      const entradas = Object.entries(partes).filter(([, v]) => (v ?? 0) > 0.005) as Array<[FormaBucket, number]>;
-                      if (bucket === "misto" && entradas.length > 0) {
-                        return entradas.map(([k, v], idx) => (
-                          <TableRow key={`${m.id}-${k}`}>
-                            <TableCell className="whitespace-nowrap">{idx === 0 ? fmtDT(m.created_at) : ""}</TableCell>
-                            <TableCell>{idx === 0 ? <Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge> : null}</TableCell>
-                            <TableCell>{idx === 0 ? (m.descricao ?? "—") : <span className="text-muted-foreground text-xs pl-2">↳ parcela</span>}</TableCell>
-                            <TableCell>{FORMA_LABEL[k] ?? k}</TableCell>
-                            <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
-                              {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(v)}
-                            </TableCell>
-                          </TableRow>
-                        ));
-                      }
-                      return [(
-                        <TableRow key={m.id}>
-                          <TableCell className="whitespace-nowrap">{fmtDT(m.created_at)}</TableCell>
-                          <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
-                          <TableCell>{m.descricao ?? "—"}</TableCell>
-                          <TableCell><FormaCellEditavel m={m} /></TableCell>
-                          <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
-                            {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
-                          </TableCell>
-                        </TableRow>
-                      )];
-                    })}
+                    .map((m) => (
+                      <TableRow key={m.id}>
+                        <TableCell className="whitespace-nowrap">{fmtDT(m.created_at)}</TableCell>
+                        <TableCell><Badge variant="outline" className={TIPO_CLASS[m.tipo]}>{TIPO_LABEL[m.tipo]}</Badge></TableCell>
+                        <TableCell>{m.descricao ?? "—"}</TableCell>
+                        <TableCell>{m.forma_pagamento ?? "—"}</TableCell>
+                        <TableCell className={`text-right font-semibold ${TIPO_SINAL[m.tipo] > 0 ? "text-emerald-600" : TIPO_SINAL[m.tipo] < 0 ? "text-rose-600" : ""}`}>
+                          {TIPO_SINAL[m.tipo] < 0 ? "-" : ""}{fmt(m.valor)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Diálogo para dados do cartão (crédito/débito) ao editar a Forma inline. */}
-      <Dialog open={!!cartaoEditFor} onOpenChange={(v) => { if (!v) setCartaoEditFor(null); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {cartaoEditFor?.forma === "cartao_credito" ? "Dados do cartão de crédito" : "Dados do cartão de débito"}
-            </DialogTitle>
-            <DialogDescription>
-              Informe os dados da transação no cartão. Eles ficam vinculados ao lançamento financeiro.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3">
-            <div className="grid gap-1.5">
-              <Label>Bandeira</Label>
-              <Select
-                value={cartaoEdit.bandeira}
-                onValueChange={(v) => setCartaoEdit((s) => ({ ...s, bandeira: v }))}
-              >
-                <SelectTrigger><SelectValue placeholder="Selecione a bandeira" /></SelectTrigger>
-                <SelectContent>
-                  {BANDEIRAS_CARTAO.map((b) => (
-                    <SelectItem key={b} value={b}>{b}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {cartaoEditFor?.forma === "cartao_credito" && (
-              <div className="grid gap-1.5">
-                <Label>Parcelamento</Label>
-                <Select
-                  value={cartaoEdit.parcelas}
-                  onValueChange={(v) => setCartaoEdit((s) => ({ ...s, parcelas: v }))}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
-                      <SelectItem key={n} value={String(n)}>{n}x</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="grid gap-1.5">
-              <Label>Data da transação</Label>
-              <Input
-                type="date"
-                value={cartaoEdit.data}
-                onChange={(e) => setCartaoEdit((s) => ({ ...s, data: e.target.value }))}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label>Número de autorização</Label>
-              <Input
-                value={cartaoEdit.autorizacao}
-                onChange={(e) => setCartaoEdit((s) => ({ ...s, autorizacao: e.target.value }))}
-                placeholder="Ex.: 123456"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label>Valor total líquido (R$)</Label>
-              <CurrencyInput
-                value={cartaoEdit.valorLiquido}
-                onChange={(v) => setCartaoEdit((s) => ({ ...s, valorLiquido: v }))}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setCartaoEditFor(null)} disabled={salvandoCartao}>
-              Cancelar
-            </Button>
-            <Button onClick={() => void confirmarCartaoEdit()} disabled={salvandoCartao}>
-              {salvandoCartao ? "Salvando…" : "Salvar"}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

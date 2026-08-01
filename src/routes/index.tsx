@@ -2,7 +2,7 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Activity } from "lucide-react";
 
-export function hasSupabaseSession(): boolean {
+function hasSupabaseSession(): boolean {
   if (typeof window === "undefined") return false;
   try {
     for (let i = 0; i < localStorage.length; i++) {

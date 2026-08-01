@@ -1,1 +1,0 @@
-CREATE POLICY "members select emitentes" ON public.nfse_emitentes FOR SELECT TO authenticated USING (is_member(auth.uid(), clinica_id));

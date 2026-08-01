@@ -4,9 +4,7 @@ import { Users, Search, Plus, Trash2, AlertCircle, CheckCircle2, X } from "lucid
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
-import { incluirDependenteContrato } from "@/lib/contrato-dependentes";
 import { useClinica } from "@/hooks/use-clinica";
-import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +25,7 @@ type Contrato = {
   paciente_id: string;
   paciente_nome: string;
   status: string;
+  plano_id: string | null;
   convenio_id: string | null;
 };
 type Dep = {
@@ -41,7 +40,6 @@ type Filter = "todos" | "sem" | "com";
 
 function DependentesPage() {
   const { clinicaAtual } = useClinica();
-  const podeEscrever = usePodeEscrever("cartao-beneficios");
   const [loading, setLoading] = useState(true);
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [deps, setDeps] = useState<Dep[]>([]);
@@ -65,7 +63,7 @@ function DependentesPage() {
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabase
         .from("contratos_assinatura")
-        .select("id, numero, paciente_id, paciente_nome, status, convenio_id")
+        .select("id, numero, paciente_id, paciente_nome, status, plano_id, convenio_id")
         .eq("clinica_id", cid)
         .neq("status", "cancelado")
         .order("paciente_nome")
@@ -125,16 +123,16 @@ function DependentesPage() {
 
   const adicionar = async () => {
     if (!openTitular || !novoDep) return;
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     setSaving(true);
-    const resultado = await incluirDependenteContrato({
-      contratoId: openTitular.id,
-      pacienteId: novoDep.id,
-      pacienteNome: novoDep.nome,
+    const { error } = await supabase.from("contrato_dependentes").insert({
+      contrato_id: openTitular.id,
+      paciente_id: novoDep.id,
+      paciente_nome: novoDep.nome,
       parentesco: parentesco.trim() || null,
+      ativo: true,
     });
     setSaving(false);
-    if (!resultado.ok) { toast.error(resultado.mensagem); return; }
+    if (error) { mostrarErro(error); return; }
     toast.success("Dependente adicionado.");
     setNovoDep(null);
     setParentesco("");
@@ -148,7 +146,6 @@ function DependentesPage() {
   };
 
   const remover = async (depId: string) => {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!confirm("Excluir este dependente?")) return;
     const { error } = await supabase
       .from("contrato_dependentes")
@@ -243,11 +240,9 @@ function DependentesPage() {
                         </div>
                       )}
                     </div>
-                    {podeEscrever && (
-                      <Button size="sm" onClick={() => setOpenTitular(c)}>
-                        <Plus className="h-4 w-4 mr-1" /> Adicionar dependente
-                      </Button>
-                    )}
+                    <Button size="sm" onClick={() => setOpenTitular(c)}>
+                      <Plus className="h-4 w-4 mr-1" /> Adicionar dependente
+                    </Button>
                   </li>
                 );
               })}

@@ -4,7 +4,6 @@ import { Brain, Sparkles, FileHeart, Stethoscope, Save, Loader2, History, Wand2,
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +25,9 @@ import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/$agendamentoId")({
   component: AtendimentoEditorPage,
   head: () => ({ meta: [{ title: "Atendimento — ClinicaOS" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    from: s.from === "agenda-v2" ? ("agenda-v2" as const) : undefined,
+  }),
 });
 
 type Modelo = { id: string; nome: string; prompt_ia: string | null };
@@ -73,16 +75,17 @@ const EMPTY: Soap = { queixa_principal: "", historia_doenca: "", exame_fisico: "
 
 function AtendimentoEditorPage() {
   const { agendamentoId } = Route.useParams();
-  const backTo = "/app/atendimento-ia";
-  const backLabel = "Voltar para fila";
+  const { from } = Route.useSearch();
+  const cameFromAgendaV2 = from === "agenda-v2";
+  const backTo = cameFromAgendaV2 ? "/app/agenda-v2" : "/app/atendimento-ia";
+  const backLabel = cameFromAgendaV2 ? "Voltar para Agenda V2" : "Voltar para fila";
   const navigate = useNavigate();
   const { clinicaAtual } = useClinica();
-  const podeEscrever = usePodeEscrever("atendimento-ia");
   const estruturar = useServerFn(gerarAnamneseEstruturada);
   const sugerir = useServerFn(sugerirCondutaClinica);
   const resumir = useServerFn(resumirHistoricoPaciente);
 
-  const [agendamento, setAgendamento] = useState<{ id: string; paciente_id: string | null; paciente_nome: string; medico_id: string | null; procedimento: string | null; fluxo_etapa: string; status: string } | null>(null);
+  const [agendamento, setAgendamento] = useState<{ id: string; paciente_id: string | null; paciente_nome: string; medico_id: string | null; procedimento: string | null; fluxo_etapa: string } | null>(null);
   const [medico, setMedico] = useState<Medico | null>(null);
   const [modelo, setModelo] = useState<Modelo | null>(null);
   const [triagem, setTriagem] = useState<Triagem | null>(null);
@@ -101,22 +104,10 @@ function AtendimentoEditorPage() {
     if (!clinicaAtual || !agendamentoId) return;
     const { data: ag, error } = await supabase
         .from("agendamentos")
-        .select("id, paciente_id, paciente_nome, medico_id, procedimento, fluxo_etapa, status")
+        .select("id, paciente_id, paciente_nome, medico_id, procedimento, fluxo_etapa")
         .eq("id", agendamentoId)
         .maybeSingle();
       if (error || !ag) { toast.error("Agendamento não encontrado"); navigate({ to: "/app/atendimento-ia" }); return; }
-      // CRIT-09: consulta cancelada não pode ser "atendida" — sem esta
-      // checagem, o médico conseguia abrir a tela e criar prontuário para um
-      // agendamento cancelado, e a promoção automática de etapa abaixo
-      // (quando já pago) ignorava o cancelamento e empurrava para
-      // "atendimento" mesmo assim. Roda de novo a cada refresh via realtime,
-      // então também tira o médico da tela se o agendamento for cancelado
-      // no meio do atendimento.
-      if (ag.status === "cancelado") {
-        toast.error("Este atendimento foi cancelado.");
-        navigate({ to: "/app/atendimento-ia" });
-        return;
-      }
       setAgendamento(ag as never);
 
       // Pagamento ANTES da consulta — bloqueia avanço enquanto pendente.
@@ -241,29 +232,20 @@ function AtendimentoEditorPage() {
   const pacienteId = agendamento?.paciente_id ?? "";
   const pacienteNome = agendamento?.paciente_nome ?? "";
 
-  async function handleEstruturar(textoOverride?: string) {
-    const texto = (textoOverride ?? transcricao).trim();
-    if (!texto) { toast.error("Grave ou cole a transcrição primeiro"); return; }
+  async function handleEstruturar() {
+    if (!transcricao.trim()) { toast.error("Grave ou cole a transcrição primeiro"); return; }
     setLoading("estruturar");
     try {
-      const out = await estruturar({ data: { transcricao: texto, especialidade, promptExtra: modelo?.prompt_ia ?? undefined } });
-      const nextSoap = {
-        queixa_principal: out.queixa_principal || soap.queixa_principal,
-        historia_doenca: out.historia_doenca || soap.historia_doenca,
-        exame_fisico: out.exame_fisico || soap.exame_fisico,
-        hipotese_diagnostica: out.hipotese_diagnostica || soap.hipotese_diagnostica,
-        conduta: out.conduta || soap.conduta,
-        prescricao: out.prescricao || soap.prescricao,
-      };
-      setSoap(nextSoap);
-      toast.success("Prontuário preenchido pela IA como sugestão");
-      // Gera CIDs/exames/prescrição sugerida na sequência
-      try {
-        const sug = await sugerir({ data: { ...nextSoap, especialidade } });
-        setSugestoes(sug);
-      } catch (err) {
-        console.error("sugerir falhou", err);
-      }
+      const out = await estruturar({ data: { transcricao, especialidade, promptExtra: modelo?.prompt_ia ?? undefined } });
+      setSoap((s) => ({
+        queixa_principal: out.queixa_principal || s.queixa_principal,
+        historia_doenca: out.historia_doenca || s.historia_doenca,
+        exame_fisico: out.exame_fisico || s.exame_fisico,
+        hipotese_diagnostica: out.hipotese_diagnostica || s.hipotese_diagnostica,
+        conduta: out.conduta || s.conduta,
+        prescricao: out.prescricao || s.prescricao,
+      }));
+      toast.success("Anamnese estruturada");
     } catch (e) { mostrarErro(e); }
     finally { setLoading(null); }
   }
@@ -291,7 +273,6 @@ function AtendimentoEditorPage() {
   }
 
   async function handleSalvar() {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual || !pacienteId) { toast.error("Paciente não identificado"); return; }
     if (pagamento && !pagamento.pago) {
       toast.error("Pagamento pendente — finalize no caixa antes de salvar o prontuário.");
@@ -304,10 +285,6 @@ function AtendimentoEditorPage() {
         clinica_id: cid,
         paciente_id: pacienteId,
         medico_id: medico?.id ?? null,
-        // ALTA-04: sem isso, duas consultas do mesmo paciente no mesmo dia
-        // não tinham como ser distinguidas — nenhum campo ligava o
-        // prontuário de volta ao agendamento que o originou.
-        agendamento_id: agendamentoId,
         data: new Date().toISOString(),
         queixa_principal: soap.queixa_principal || null,
         historia_doenca: soap.historia_doenca || null,
@@ -316,7 +293,7 @@ function AtendimentoEditorPage() {
         conduta: soap.conduta || null,
         prescricao: soap.prescricao || null,
         observacoes: transcricao ? `Transcrição:\n${transcricao}` : null,
-      } as never);
+      });
       if (error) throw error;
 
       const procNome = agendamento?.procedimento ?? "";
@@ -346,18 +323,11 @@ function AtendimentoEditorPage() {
         if (!valorTotal) valorTotal = Number(lancExist.valor ?? 0);
       }
 
-      // Só cria fin_atendimentos quando NÃO houver fin_lancamentos vinculado
-      // ao agendamento — caso contrário duplicaria o registro no Financeiro
-      // (o repasse já vive em fin_lancamentos gerado no caixa).
-      if (valorTotal > 0 && !lancExist) {
+      if (valorTotal > 0) {
         await supabase.from("fin_atendimentos").insert({
           clinica_id: cid,
           paciente_id: pacienteId,
           medico_id: medico?.id ?? null,
-          // ALTA-04: mesma lacuna do prontuário — sem agendamento_id não dá
-          // pra provar qual cobrança é de qual consulta quando há mais de
-          // uma no mesmo dia.
-          agendamento_id: agendamentoId,
           procedimento: procNome || null,
           data: new Date().toISOString().slice(0, 10),
           valor_total: valorTotal,
@@ -446,7 +416,7 @@ function AtendimentoEditorPage() {
             {salvo.valorMedico > 0 && <> Repasse médico: <b className="text-foreground">R$ {salvo.valorMedico.toFixed(2)}</b>.</>}
           </p>
           <Button size="lg" onClick={() => navigate({ to: backTo })}>
-            <ArrowLeft className="h-4 w-4" /> Voltar para fila de atendimento
+            <ArrowLeft className="h-4 w-4" /> {cameFromAgendaV2 ? backLabel : "Voltar para fila de atendimento"}
           </Button>
         </Card>
       </div>
@@ -586,13 +556,10 @@ function AtendimentoEditorPage() {
             <VoiceInput
               size="sm"
               currentValue={transcricao}
-              onTranscript={(t) => {
-                setTranscricao(t);
-                void handleEstruturar(t);
-              }}
+              onTranscript={setTranscricao}
               append
               prompt="Transcreva fielmente a conversa entre médico e paciente em português do Brasil. Retorne apenas o texto, sem rótulos."
-              title="Gravar conversa — preenche o prontuário automaticamente"
+              title="Gravar conversa"
             />
           </div>
           <Textarea
@@ -601,7 +568,7 @@ function AtendimentoEditorPage() {
             onChange={(e) => setTranscricao(e.target.value)}
             placeholder="Clique no microfone para gravar a consulta, ou cole/digite aqui o relato…"
           />
-          <Button onClick={() => handleEstruturar()} disabled={loading === "estruturar"} className="w-full">
+          <Button onClick={handleEstruturar} disabled={loading === "estruturar"} className="w-full">
             {loading === "estruturar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
             Estruturar prontuário com IA
           </Button>
@@ -621,6 +588,13 @@ function AtendimentoEditorPage() {
                     {k === "hipotese_diagnostica" && (
                       <Cid10Picker onPick={(t) => addToHipotese(t)} />
                     )}
+                    <VoiceInput
+                      size="sm"
+                      currentValue={soap[k]}
+                      onTranscript={(t) => setSoap((s) => ({ ...s, [k]: t }))}
+                      prompt={`Transcreva o áudio em português como anotação médica do campo "${label}". Retorne apenas o texto.`}
+                      title={`Ditar ${label}`}
+                    />
                   </div>
                 </div>
                 <Textarea
@@ -692,17 +666,15 @@ function AtendimentoEditorPage() {
         <Button variant="outline" size="lg" onClick={() => imprimirDocumento("Prescrição")} disabled={!soap.prescricao.trim()}>
           <Printer className="h-4 w-4" /> Imprimir prescrição
         </Button>
-        {podeEscrever && (
-          <Button
-            size="lg"
-            onClick={handleSalvar}
-            disabled={loading === "salvar" || !pacienteId || (pagamento ? !pagamento.pago : false)}
-            title={pagamento && !pagamento.pago ? "Pagamento pendente" : undefined}
-          >
-            {loading === "salvar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Salvar prontuário
-          </Button>
-        )}
+        <Button
+          size="lg"
+          onClick={handleSalvar}
+          disabled={loading === "salvar" || !pacienteId || (pagamento ? !pagamento.pago : false)}
+          title={pagamento && !pagamento.pago ? "Pagamento pendente" : undefined}
+        >
+          {loading === "salvar" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Salvar prontuário
+        </Button>
       </div>
     </div>
   );

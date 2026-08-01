@@ -127,9 +127,10 @@ export function useDefaultScreenEntries(): CommandEntry[] {
     const mk = (label: string, to: string, hint?: string, keywords?: string[]): CommandEntry => ({
       id: `nav:${to}`, label, hint, group: "Telas", keywords, onSelect: nav(to),
     });
-    const all: (CommandEntry | null)[] = [
+    return [
       mk("Início", "/app", "Painel inicial"),
       mk("Agenda", "/app/agenda"),
+      mk("Agenda Express", "/app/agenda/express"),
       mk("Recepção", "/app/recepcao"),
       mk("Check-in", "/app/checkin"),
       mk("Clientes", "/app/clientes"),
@@ -144,24 +145,25 @@ export function useDefaultScreenEntries(): CommandEntry[] {
       mk("Cartão de Benefícios", "/app/cartao-beneficios", "Associados, regras e planos"),
       mk("Associados", "/app/cartao-beneficios/dependentes", "Titulares e dependentes"),
       mk("Regras do Cartão", "/app/cartao-beneficios/beneficios", "Regras dos benefícios"),
-      mk("Modelos de Cartão", "/app/cartao-beneficios/convenios"),
+      mk("Modelos de Cartão", "/app/cartao-beneficios/modelos"),
       mk("Contratos do Cartão", "/app/cartao-beneficios/contratos"),
       mk("Empresas associadas", "/app/cartao-beneficios/convenios", "Empresas / entidades associadas", ["empresa","associada","grupos"]),
       mk("Financeiro — Movimento", "/app/financeiro/movimento"),
+      mk("Financeiro — Atendimentos", "/app/financeiro/atendimentos"),
       mk("Financeiro — Notas", "/app/financeiro/notas"),
       mk("Financeiro — Relatórios", "/app/financeiro/relatorios"),
       mk("Boletos", "/app/boletos"),
       mk("NFS-e", "/app/nfse"),
       mk("Procedimentos", "/app/procedimentos"),
       mk("Especialidades", "/app/especialidades"),
-      mk("Médicos", "/app/equipe"),
-      mk("Funcionários", "/app/hr-contratos"),
+      mk("Médicos", "/app/medicos"),
+      mk("Equipe", "/app/equipe"),
       mk("Unidades", "/app/unidades"),
       mk("Clínicas", "/app/clinicas"),
       mk("Perfis de acesso", "/app/perfis"),
       mk("Auditoria", "/app/auditoria"),
+      mk("LGPD", "/app/lgpd"),
       mk("Relatórios", "/app/relatorios"),
     ];
-    return all.filter((e): e is CommandEntry => e !== null);
   }, [navigate]);
 }

@@ -16,13 +16,14 @@ import {
   ShieldCheck, ConciergeBell, Wallet, DollarSign, HeartPulse, Stethoscope, Briefcase,
   ChevronDown, ChevronRight, Save, Loader2,
 } from "lucide-react";
-import { PRESETS, type Acesso, type PerfilKey } from "@/lib/permissoes-presets";
-import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
 export const Route = createFileRoute("/_authenticated/app/perfis")({
   component: PerfisPage,
   head: () => ({ meta: [{ title: "Perfis de Acesso — ClinicaOS" }] }),
 });
+
+type PerfilKey = "admin" | "gestor" | "medico" | "recepcao" | "caixa" | "financeiro" | "enfermeiro";
+type Acesso = "none" | "read" | "write";
 
 const PERFIS: Array<{
   key: PerfilKey;
@@ -77,13 +78,7 @@ const PERFIS: Array<{
 type Modulo = { key: string; nome: string; descricao: string };
 type Grupo = { label: string; modulos: Modulo[] };
 
-const SUBMODULOS_FINANCEIRO: Modulo[] = [
-  { key: "financeiro-movcaixa", nome: "Financeiro › Mov. Caixa", descricao: "Aba Movimento de Caixa dentro do Financeiro" },
-  { key: "financeiro-atendimentos", nome: "Financeiro › Atendimentos", descricao: "Aba Atendimentos/Repasse dentro do Financeiro" },
-  { key: "financeiro-estorno", nome: "Financeiro › Estorno", descricao: "Aba Estorno dentro do Financeiro" },
-];
-
-const GRUPOS_BASE: Grupo[] = [
+const GRUPOS: Grupo[] = [
   {
     label: "Operação",
     modulos: [
@@ -98,8 +93,8 @@ const GRUPOS_BASE: Grupo[] = [
       { key: "recepcao", nome: "Recepção / Filas", descricao: "Check-in e filas" },
       { key: "triagem-enfermagem", nome: "Triagem - Enfermagem", descricao: "Triagem inicial" },
       { key: "cartao-beneficios", nome: "Cartão Benefícios", descricao: "Planos e contratos" },
-      { key: "documentos", nome: "Documentos do paciente", descricao: "Anexos e arquivos clínicos" },
       { key: "painel", nome: "Painel de Senhas", descricao: "Painel público de chamadas" },
+      { key: "documentos", nome: "Documentos do paciente", descricao: "Anexos e arquivos clínicos" },
     ],
   },
   {
@@ -111,27 +106,36 @@ const GRUPOS_BASE: Grupo[] = [
       { key: "consulta-rapida", nome: "Informações rápidas", descricao: "Consulta a tabelas" },
       { key: "nina", nome: "Nina — WhatsApp", descricao: "Conversas WhatsApp" },
       { key: "odontologia", nome: "Odontologia", descricao: "Odontograma e plano" },
-      { key: "exames-resultados", nome: "Resultados de Exames", descricao: "Laudos e resultados" },
       { key: "prontuarios", nome: "Prontuários", descricao: "Prontuários clínicos" },
       { key: "anamneses", nome: "Anamneses", descricao: "Modelos e respostas de anamnese" },
+      { key: "exames-resultados", nome: "Resultados de Exames", descricao: "Laudos e resultados" },
+    ],
+  },
+  {
+    label: "Marketing",
+    modulos: [
+      { key: "mkt-leads", nome: "Leads", descricao: "Base de leads (entrada do menu Marketing)" },
+      { key: "campanhas", nome: "Campanhas", descricao: "Campanhas de marketing" },
+      { key: "mkt-envios", nome: "Envios", descricao: "Disparos em massa" },
+      { key: "mkt-landing", nome: "Landing Pages", descricao: "Páginas de captura" },
+      { key: "mkt-segmentos", nome: "Segmentos", descricao: "Segmentação de público" },
     ],
   },
   {
     label: "Cadastros",
     modulos: [
       { key: "equipe", nome: "Equipe", descricao: "Usuários do sistema" },
-      { key: "perfis", nome: "Perfis de acesso", descricao: "Perfis e permissões" },
       { key: "especialidades", nome: "Serviços", descricao: "Especialidades, tipos de serviço, procedimentos e recursos de enfermagem" },
       { key: "disponibilidades", nome: "Horários médicos", descricao: "Agenda dos médicos" },
       { key: "prontuario-modelos", nome: "Modelos de Prontuário", descricao: "Templates clínicos" },
+      { key: "perfis", nome: "Perfis de acesso", descricao: "Perfis e permissões" },
       { key: "unidades", nome: "Unidades", descricao: "Clínicas / unidades" },
+      { key: "medicos", nome: "Médicos", descricao: "Cadastro de médicos" },
+      { key: "procedimentos", nome: "Procedimentos", descricao: "Tabela de procedimentos" },
       { key: "planos", nome: "Planos / Convênios", descricao: "Planos de saúde e convênios" },
+      { key: "estoque", nome: "Estoque", descricao: "Produtos e movimentos" },
       { key: "modelos-documentos", nome: "Modelos de Documentos", descricao: "Templates de documentos" },
       { key: "clinicas", nome: "Clínicas", descricao: "Cadastro de clínicas (multi-empresa)" },
-      { key: "medicos", nome: "Médicos", descricao: "Cadastro de médicos" },
-      { key: "estoque", nome: "Estoque", descricao: "Produtos e movimentos" },
-      { key: "procedimentos", nome: "Procedimentos", descricao: "Tabela de procedimentos" },
-      { key: "tipos-servico", nome: "Tipos de serviço", descricao: "Classificação de serviços" },
     ],
   },
   {
@@ -151,42 +155,83 @@ const GRUPOS_BASE: Grupo[] = [
       { key: "cargos", nome: "Cargos", descricao: "Cargos e funções" },
       { key: "financeiro", nome: "Financeiro", descricao: "Financeiro completo (BI, contas, lembretes, regras-IA)" },
       { key: "funcionarios", nome: "Funcionários", descricao: "Listagem operacional de funcionários" },
-      { key: "nfse", nome: "NFS-e", descricao: "Notas fiscais de serviço" },
       { key: "relatorios", nome: "Relatórios", descricao: "Relatórios e BI" },
-      { key: "auditoria", nome: "Segurança & Compliance", descricao: "Auditoria e logs do sistema" },
+      { key: "auditoria", nome: "Segurança & Compliance", descricao: "Auditoria, logs e LGPD" },
       { key: "setores", nome: "Setores", descricao: "Setores da clínica" },
       { key: "boletos", nome: "Boletos", descricao: "Emissão e gestão de boletos" },
       { key: "contratos", nome: "Contratos de assinatura", descricao: "Cartão Benefícios e mensalidades" },
-      { key: "painel-executivo", nome: "Painel Executivo", descricao: "Indicadores executivos da clínica" },
+      { key: "nfse", nome: "NFS-e", descricao: "Notas fiscais de serviço" },
+      { key: "integration-secrets", nome: "Integrações", descricao: "Chaves e integrações externas" },
+      { key: "lgpd", nome: "LGPD", descricao: "Gestão de privacidade" },
+    ],
+  },
+  {
+    label: "Sistema",
+    modulos: [
+      { key: "perfil-proprio", nome: "Perfil próprio", descricao: "Dados do próprio usuário" },
     ],
   },
 ];
 
-function aplicaGranularidade(grupos: Grupo[], granular: boolean): Grupo[] {
-  if (!granular) return grupos;
-  return grupos.map((g) => {
-    if (g.label !== "Gestão") return g;
-    const idx = g.modulos.findIndex((m) => m.key === "financeiro");
-    if (idx < 0) return g;
-    const novos = [...g.modulos];
-    novos.splice(idx + 1, 0, ...SUBMODULOS_FINANCEIRO);
-    return { ...g, modulos: novos };
-  });
-}
+const TODOS_MODULOS = GRUPOS.flatMap((g) => g.modulos.map((m) => m.key));
 
-function buildInitialState(todosModulos: string[]): Record<PerfilKey, Record<string, Acesso>> {
+// Sugestão inicial (mock) por perfil
+const PRESETS: Record<PerfilKey, Partial<Record<string, Acesso>>> = {
+  admin: Object.fromEntries(TODOS_MODULOS.map((k) => [k, "write" as Acesso])),
+  gestor: {
+    dashboard: "write", agenda: "write", fluxo: "write", clientes: "write",
+    chat: "write", checkin: "read", recepcao: "read", orcamentos: "read",
+    caixa: "read", financeiro: "read", boletos: "read", contratos: "read",
+    nfse: "read", relatorios: "write", auditoria: "read", lgpd: "read",
+    equipe: "write", "hr-contratos": "read", "hr-ponto": "read",
+    "hr-ferias": "read", "hr-holerites": "read", treinamentos: "read",
+    cargos: "read", setores: "read", unidades: "read", medicos: "read",
+    especialidades: "read", procedimentos: "read", disponibilidades: "write",
+    "prontuario-modelos": "read", "modelos-documentos": "read", planos: "read",
+    estoque: "read", crm: "read", campanhas: "read", "mkt-leads": "read",
+    "consulta-rapida": "read", "alertas-enfermagem": "read",
+    "cartao-beneficios": "read", painel: "read", "perfil-proprio": "write",
+  },
+  medico: {
+    agenda: "write", "atendimento-ia": "write", "exames-resultados": "read",
+    "consulta-rapida": "read", "perfil-proprio": "write", "prontuario-modelos": "read",
+    odontologia: "write", prontuarios: "write", anamneses: "write",
+    documentos: "write", clientes: "read", chat: "write",
+  },
+  recepcao: {
+    agenda: "write", recepcao: "write", clientes: "write", fluxo: "write",
+    orcamentos: "write", "consulta-rapida": "read", "perfil-proprio": "write",
+    checkin: "write", painel: "write", anamneses: "write", documentos: "read",
+    chat: "write", "cartao-beneficios": "read", caixa: "read",
+  },
+  caixa: {
+    caixa: "write", clientes: "read", recepcao: "read", financeiro: "read",
+    "consulta-rapida": "read", "perfil-proprio": "write",
+    boletos: "write", nfse: "read", contratos: "read",
+    "cartao-beneficios": "read", chat: "write",
+  },
+  financeiro: {
+    financeiro: "write", caixa: "read", relatorios: "write", orcamentos: "read",
+    clientes: "read", "cartao-beneficios": "write", "perfil-proprio": "write",
+    boletos: "write", nfse: "write", contratos: "write", planos: "read",
+    "hr-holerites": "read", "hr-contratos": "read", auditoria: "read",
+    "integration-secrets": "read", chat: "write", dashboard: "read",
+  },
+  enfermeiro: {
+    "triagem-enfermagem": "write", "alertas-enfermagem": "write",
+    agenda: "read", clientes: "read", "consulta-rapida": "read",
+    "atendimento-ia": "read", "perfil-proprio": "write",
+    anamneses: "write", prontuarios: "read", estoque: "read",
+    documentos: "read", chat: "write",
+  },
+};
+
+function buildInitialState(): Record<PerfilKey, Record<string, Acesso>> {
   const out = {} as Record<PerfilKey, Record<string, Acesso>>;
   for (const p of PERFIS) {
     const preset = PRESETS[p.key];
-    const financeiroDefault = (preset["financeiro"] ?? "none") as Acesso;
     out[p.key] = Object.fromEntries(
-      todosModulos.map((k) => {
-        // Submódulos do financeiro herdam do acesso do pai por padrão,
-        // para que ativar a granularidade não retire acesso de perfis
-        // que já tinham "financeiro" liberado.
-        if (k.startsWith("financeiro-")) return [k, (preset[k] ?? financeiroDefault) as Acesso];
-        return [k, (preset[k] ?? "none") as Acesso];
-      }),
+      TODOS_MODULOS.map((k) => [k, (preset[k] ?? "none") as Acesso]),
     );
   }
   return out;
@@ -195,41 +240,9 @@ function buildInitialState(todosModulos: string[]): Record<PerfilKey, Record<str
 function PerfisPage() {
   const { clinicaAtual } = useClinica();
   const clinicaId = clinicaAtual?.clinica_id ?? null;
-  const { enabled: financeiroGranular } = useClinicFeatureFlag("permissoes_financeiro_granular");
-  const GRUPOS = useMemo(() => aplicaGranularidade(GRUPOS_BASE, financeiroGranular), [financeiroGranular]);
-  const TODOS_MODULOS = useMemo(() => GRUPOS.flatMap((g) => g.modulos.map((m) => m.key)), [GRUPOS]);
-  // Deliberadamente hardcoded para role === "admin", e NÃO
-  // usePodeEscrever("perfis") — quem gerencia permissões precisa ser um
-  // admin de verdade, mesmo que a matriz configure "perfis: Edição" para
-  // outro perfil. Sem essa trava, um perfil não-admin com edição em
-  // "Perfis de acesso" poderia se auto-promover a qualquer nível de
-  // acesso no sistema.
-  const podeAdministrar = clinicaAtual?.role === "admin";
   const [tab, setTab] = useState<"perfis" | "permissoes">("perfis");
   const [perfilSel, setPerfilSel] = useState<PerfilKey>("admin");
-  const [matriz, setMatriz] = useState<Record<PerfilKey, Record<string, Acesso>>>(() => buildInitialState(GRUPOS_BASE.flatMap((g) => g.modulos.map((m) => m.key))));
-
-  // Quando a granularidade muda (flag carrega), garante que as novas chaves
-  // apareçam na matriz com o valor padrão herdado do pai.
-  useEffect(() => {
-    setMatriz((prev) => {
-      const next = { ...prev } as Record<PerfilKey, Record<string, Acesso>>;
-      for (const p of PERFIS) {
-        const preset = PRESETS[p.key];
-        const parentDefault = (preset["financeiro"] ?? "none") as Acesso;
-        const atual = next[p.key] ?? {};
-        const novo: Record<string, Acesso> = { ...atual };
-        for (const k of TODOS_MODULOS) {
-          if (!(k in novo)) {
-            if (k.startsWith("financeiro-")) novo[k] = (preset[k] ?? parentDefault) as Acesso;
-            else novo[k] = (preset[k] ?? "none") as Acesso;
-          }
-        }
-        next[p.key] = novo;
-      }
-      return next;
-    });
-  }, [TODOS_MODULOS]);
+  const [matriz, setMatriz] = useState<Record<PerfilKey, Record<string, Acesso>>>(buildInitialState);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
     () => Object.fromEntries(GRUPOS.map((g) => [g.label, true])),
   );
@@ -285,17 +298,7 @@ function PerfisPage() {
               const chave = idToChave[row.perfil_id];
               if (!chave) continue;
               if (!seen[chave]) {
-                // Reseta módulos "normais" para "none"; submódulos ficam com
-                // o default herdado do pai (via buildInitialState) para que
-                // ativar a granularidade não retire acesso já concedido.
-                const preset = PRESETS[chave];
-                const parentFin = (preset["financeiro"] ?? "none") as Acesso;
-                next[chave] = Object.fromEntries(TODOS_MODULOS.map((k) => [
-                  k,
-                  k.startsWith("financeiro-")
-                    ? ((preset[k] ?? parentFin) as Acesso)
-                    : ("none" as Acesso),
-                ]));
+                next[chave] = Object.fromEntries(TODOS_MODULOS.map((k) => [k, "none" as Acesso]));
                 seen[chave] = true;
               }
               next[chave][row.modulo] = row.acesso as Acesso;
@@ -315,10 +318,6 @@ function PerfisPage() {
   }, [clinicaId]);
 
   const salvar = async () => {
-    if (!podeAdministrar) {
-      toast.error("Somente administradores podem alterar permissões.");
-      return;
-    }
     const perfilId = perfilIds[perfilSel];
     if (!perfilId) {
       toast.error("Perfil ainda não foi inicializado.");
@@ -446,10 +445,10 @@ function PerfisPage() {
                   <Badge variant="outline" className="text-sm">
                     Acessos: <span className="ml-1 font-semibold">{acessosPerfil}</span> / {totalModulos}
                   </Badge>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("read")} disabled={!podeAdministrar || loading || saving}>Tudo Leitura</Button>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("write")} disabled={!podeAdministrar || loading || saving}>Tudo Edição</Button>
-                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("none")} disabled={!podeAdministrar || loading || saving}>Limpar</Button>
-                  <Button size="sm" onClick={salvar} disabled={!podeAdministrar || loading || saving || !perfilIds[perfilSel]}>
+                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("read")} disabled={loading || saving}>Tudo Leitura</Button>
+                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("write")} disabled={loading || saving}>Tudo Edição</Button>
+                  <Button variant="outline" size="sm" onClick={() => aplicarTodos("none")} disabled={loading || saving}>Limpar</Button>
+                  <Button size="sm" onClick={salvar} disabled={loading || saving || !perfilIds[perfilSel]}>
                     {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                     Salvar
                   </Button>
@@ -501,7 +500,6 @@ function PerfisPage() {
                                 <RadioGroup
                                   value={val}
                                   onValueChange={(v) => setAcesso(m.key, v as Acesso)}
-                                  disabled={!podeAdministrar}
                                   className="flex items-center justify-end gap-4"
                                 >
                                   <label className="flex items-center gap-1.5 text-sm cursor-pointer">

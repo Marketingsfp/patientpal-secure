@@ -45,26 +45,7 @@ export const getContextoClinica = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     await assertMembership(supabase, userId, data.clinicaId);
-
-    const carregarProcedimentos = async () => {
-      const pageSize = 1000;
-      const rows: any[] = [];
-      for (let from = 0; ; from += pageSize) {
-        const { data: page, error } = await supabase
-          .from("procedimentos")
-          .select("id, nome, tipo, grupo, valor_padrao, valor_dinheiro, valor_dinheiro_pix, valor_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, duracao_minutos, preparo")
-          .eq("clinica_id", data.clinicaId)
-          .eq("ativo", true)
-          .order("nome")
-          .range(from, from + pageSize - 1);
-        if (error) throw new Error(error.message);
-        rows.push(...(page ?? []));
-        if (!page || page.length < pageSize) break;
-      }
-      return rows;
-    };
-
-    const [medR, dispR, procedimentosRows, meR, espAllR] = await Promise.all([
+    const [medR, dispR, procR, meR, espAllR] = await Promise.all([
       supabase
         .from("medicos")
         .select("id, nome, crm, crm_uf, telefone, email")
@@ -78,7 +59,12 @@ export const getContextoClinica = createServerFn({ method: "POST" })
         .eq("ativo", true)
         .order("dia_semana")
         .order("hora_inicio"),
-      carregarProcedimentos(),
+      supabase
+        .from("procedimentos")
+        .select("id, nome, tipo, grupo, valor_padrao, valor_dinheiro, valor_dinheiro_pix, valor_pix, valor_cartao, valor_cartao_credito, valor_cartao_debito, duracao_minutos, preparo")
+        .eq("clinica_id", data.clinicaId)
+        .eq("ativo", true)
+        .order("nome"),
       supabase
         .from("medico_especialidades")
         .select("medico_id, especialidade_id"),
@@ -110,7 +96,7 @@ export const getContextoClinica = createServerFn({ method: "POST" })
         })),
     }));
 
-    const procedimentos = procedimentosRows.map((p: any) => {
+    const procedimentos = (procR.data ?? []).map((p: any) => {
       const dinheiro =
         Number(p.valor_dinheiro_pix) ||
         Number(p.valor_dinheiro) ||
@@ -146,7 +132,7 @@ function montarContextoTexto(ctx: {
   }>;
   procedimentos: Array<{ nome: string; valor_dinheiro_pix: number; valor_cartao: number; grupo: string | null; preparo?: string | null }>;
   especialidades?: string[];
-  convenios?: Array<{ nome: string; modalidade: string; valor_mensal: number; max_dependentes: number; descricao: string | null }>;
+  convenios?: Array<{ nome: string; tipo: string; valor_mensal: number; max_dependentes: number; descricao_beneficios: string | null }>;
   clinica?: { nome: string; endereco: string | null; cidade: string | null; estado: string | null; telefone: string | null; email: string | null } | null;
   agendaResumo?: Array<{ medico: string; total: number; livres: number; ocupados: number }>;
 }) {
@@ -172,7 +158,7 @@ function montarContextoTexto(ctx: {
   const convText = (ctx.convenios ?? [])
     .map(
       (c) =>
-        `- ${c.nome} [${c.modalidade}] — mensalidade base R$ ${Number(c.valor_mensal).toFixed(2)} / até ${c.max_dependentes} dependentes${c.descricao ? ` | ${c.descricao.replace(/\s+/g, " ").trim().slice(0, 240)}` : ""}`,
+        `- ${c.nome} [${c.tipo}] — mensalidade base R$ ${Number(c.valor_mensal).toFixed(2)} / até ${c.max_dependentes} dependentes${c.descricao_beneficios ? ` | ${c.descricao_beneficios.replace(/\s+/g, " ").trim().slice(0, 240)}` : ""}`,
     )
     .join("\n") || "(nenhum)";
   const clinicaText = ctx.clinica
@@ -203,26 +189,7 @@ export const chatNina = createServerFn({ method: "POST" })
     await assertMembership(supabase, userId, data.clinicaId);
     const inicioDia = new Date(); inicioDia.setHours(0, 0, 0, 0);
     const fimDia = new Date(); fimDia.setHours(23, 59, 59, 999);
-
-    const carregarProcedimentos = async () => {
-      const pageSize = 1000;
-      const rows: any[] = [];
-      for (let from = 0; ; from += pageSize) {
-        const { data: page, error } = await supabase
-          .from("procedimentos")
-          .select("nome, grupo, valor_dinheiro_pix, valor_cartao, preparo")
-          .eq("clinica_id", data.clinicaId)
-          .eq("ativo", true)
-          .order("nome")
-          .range(from, from + pageSize - 1);
-        if (error) throw new Error(error.message);
-        rows.push(...(page ?? []));
-        if (!page || page.length < pageSize) break;
-      }
-      return rows;
-    };
-
-    const [medR, dispR, procedimentosRows, espR, planR, cliR, agR, meR] = await Promise.all([
+    const [medR, dispR, procR, espR, planR, cliR, agR, meR] = await Promise.all([
       supabase
         .from("medicos")
         .select("id, nome, crm, crm_uf")
@@ -233,14 +200,18 @@ export const chatNina = createServerFn({ method: "POST" })
         .select("medico_id, dia_semana, hora_inicio, hora_fim, observacoes")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true),
-      carregarProcedimentos(),
+      supabase
+        .from("procedimentos")
+        .select("nome, grupo, valor_dinheiro_pix, valor_cartao, preparo")
+        .eq("clinica_id", data.clinicaId)
+        .eq("ativo", true),
       supabase
         .from("especialidades")
         .select("id, nome")
         .eq("ativo", true),
       supabase
-        .from("cb_convenios")
-        .select("nome, modalidade, valor_mensal, max_dependentes, descricao")
+        .from("planos_assinatura")
+        .select("nome, tipo, valor_mensal, max_dependentes, descricao_beneficios")
         .eq("clinica_id", data.clinicaId)
         .eq("ativo", true),
       supabase
@@ -301,7 +272,7 @@ export const chatNina = createServerFn({ method: "POST" })
 
     const contextoTexto = montarContextoTexto({
       medicos,
-      procedimentos: procedimentosRows as Array<{
+      procedimentos: (procR.data ?? []) as Array<{
         nome: string;
         valor_dinheiro_pix: number;
         valor_cartao: number;

@@ -5,49 +5,21 @@ import { Badge } from "@/components/ui/badge";
 import { Printer, ArrowRightLeft, History as HistoryIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { pagadorLabel, type OrcV2 } from "./orcamento-card";
-import { formatNumeroOrcamento } from "@/lib/orcamento-numero";
 
 const BRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-type Item = {
-  id: string;
-  descricao: string;
-  quantidade: number;
-  valor_unitario: number;
-  valores_formas: Record<string, number> | null;
-  sinal_valor: number | null;
-  valor_pago: number | null;
-  valor_total: number | null;
-  status_financeiro: string | null;
-};
-
-function splitFormas(i: Item): { din: number; cart: number } | null {
-  const vf = i.valores_formas;
-  if (!vf) return null;
-  const din = Number(vf["Dinheiro"] ?? 0);
-  const cart = Math.max(
-    Number(vf["PIX"] ?? 0),
-    Number(vf["Cartão de Crédito"] ?? 0),
-    Number(vf["Cartão de Débito"] ?? 0),
-    Number(vf["Cartão"] ?? 0),
-  );
-  if (!din && !cart) return null;
-  if (din === cart) return null;
-  return { din, cart };
-}
+type Item = { id: string; descricao: string; quantidade: number; valor_unitario: number };
 
 interface Props {
   orc: OrcV2 | null;
   onClose: () => void;
   onPrint: (id: string) => void;
   onConverter: (id: string) => void;
-  /** Oculta a ação de conversão em pagamento (ex.: aba Odontologia) */
-  ocultarConversao?: boolean;
   onHistorico?: (id: string) => void;
   podeHistorico?: boolean;
 }
 
-export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistorico, podeHistorico, ocultarConversao }: Props) {
+export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistorico, podeHistorico }: Props) {
   const [itens, setItens] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -58,7 +30,7 @@ export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistoric
     void (async () => {
       const { data } = await supabase
         .from("orcamento_itens")
-        .select("id, descricao, quantidade, valor_unitario, valores_formas, sinal_valor, valor_pago, valor_total, status_financeiro")
+        .select("id, descricao, quantidade, valor_unitario")
         .eq("orcamento_id", orc.id)
         .order("created_at", { ascending: true });
       if (cancel) return;
@@ -74,7 +46,7 @@ export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistoric
         {orc && (
           <>
             <SheetHeader>
-              <SheetTitle>#ORC-{formatNumeroOrcamento(orc.serie, orc.numero)} · {orc.paciente_nome}</SheetTitle>
+              <SheetTitle>#ORC-{orc.numero} · {orc.paciente_nome}</SheetTitle>
             </SheetHeader>
             <div className="mt-4 space-y-4 text-sm">
               <div className="flex flex-wrap gap-2">
@@ -82,19 +54,6 @@ export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistoric
                 {orc.categoria === "laboratorio" && <Badge variant="secondary">Laboratório</Badge>}
                 <Badge variant="secondary">{orc.status}</Badge>
               </div>
-              {(() => {
-                const splits = itens.map(splitFormas);
-                const temSplit = splits.some(Boolean);
-                const totalDin = itens.reduce((s, i, idx) => {
-                  const sp = splits[idx];
-                  return s + Number(i.quantidade) * (sp ? sp.din : Number(i.valor_unitario));
-                }, 0);
-                const totalCart = itens.reduce((s, i, idx) => {
-                  const sp = splits[idx];
-                  return s + Number(i.quantidade) * (sp ? sp.cart : Number(i.valor_unitario));
-                }, 0);
-                return (
-                  <>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="text-xs text-muted-foreground">Médico</div>
@@ -108,23 +67,10 @@ export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistoric
                   <div className="text-xs text-muted-foreground">Criado em</div>
                   <div>{new Date(orc.created_at).toLocaleString("pt-BR")}</div>
                 </div>
-                {temSplit ? (
-                  <>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Total Dinheiro</div>
-                      <div className="font-semibold">{BRL(totalDin)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Total Cartão/PIX</div>
-                      <div className="font-semibold">{BRL(totalCart)}</div>
-                    </div>
-                  </>
-                ) : (
-                  <div>
-                    <div className="text-xs text-muted-foreground">Valor total</div>
-                    <div className="font-semibold">{BRL(Number(orc.valor_total))}</div>
-                  </div>
-                )}
+                <div>
+                  <div className="text-xs text-muted-foreground">Valor total</div>
+                  <div className="font-semibold">{BRL(Number(orc.valor_total))}</div>
+                </div>
               </div>
 
               <div>
@@ -135,62 +81,20 @@ export function OrcamentoDrawer({ orc, onClose, onPrint, onConverter, onHistoric
                   <div className="text-muted-foreground text-xs">Sem itens.</div>
                 ) : (
                   <ul className="divide-y border rounded">
-                    {itens.map((i, idx) => {
-                      const sp = splits[idx];
-                      const q = Number(i.quantidade);
-                      return (
-                        <li key={i.id} className="px-3 py-2">
-                          <div className="flex justify-between gap-2">
-                            <span className="truncate">{q}× {i.descricao}</span>
-                            {!sp && (
-                              <span className="tabular-nums">{BRL(q * Number(i.valor_unitario))}</span>
-                            )}
-                          </div>
-                          {sp && (
-                            <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
-                              <div className="flex justify-between rounded bg-muted/40 px-2 py-1">
-                                <span className="text-muted-foreground">Dinheiro</span>
-                                <span className="tabular-nums font-medium">{BRL(q * sp.din)}</span>
-                              </div>
-                              <div className="flex justify-between rounded bg-muted/40 px-2 py-1">
-                                <span className="text-muted-foreground">Cartão/PIX</span>
-                                <span className="tabular-nums font-medium">{BRL(q * sp.cart)}</span>
-                              </div>
-                            </div>
-                          )}
-                          {Number(i.sinal_valor ?? 0) > 0 && (() => {
-                            const totalItem = Number(i.valor_total ?? q * Number(i.valor_unitario));
-                            const pago = Number(i.valor_pago ?? 0);
-                            const saldo = Math.max(0, totalItem - pago);
-                            const quitado = i.status_financeiro === "pago" || saldo <= 0.004;
-                            return (
-                              <div className="mt-1 text-xs">
-                                <Badge variant={quitado ? "secondary" : "outline"} className="font-normal">
-                                  {quitado
-                                    ? "Quitado"
-                                    : pago > 0
-                                      ? `Sinal pago — saldo ${BRL(saldo)}`
-                                      : `Sinal pendente ${BRL(Number(i.sinal_valor))}`}
-                                </Badge>
-                              </div>
-                            );
-                          })()}
-                        </li>
-                      );
-                    })}
+                    {itens.map((i) => (
+                      <li key={i.id} className="flex justify-between px-3 py-2">
+                        <span className="truncate">{i.quantidade}× {i.descricao}</span>
+                        <span className="tabular-nums">{BRL(Number(i.quantidade) * Number(i.valor_unitario))}</span>
+                      </li>
+                    ))}
                   </ul>
                 )}
               </div>
-                  </>
-                );
-              })()}
 
               <div className="flex flex-wrap gap-2 pt-2">
-                {!ocultarConversao && (
-                  <Button size="sm" onClick={() => onConverter(orc.id)}>
-                    <ArrowRightLeft className="h-4 w-4" /> Converter
-                  </Button>
-                )}
+                <Button size="sm" onClick={() => onConverter(orc.id)}>
+                  <ArrowRightLeft className="h-4 w-4" /> Converter
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => onPrint(orc.id)}>
                   <Printer className="h-4 w-4" /> Imprimir
                 </Button>

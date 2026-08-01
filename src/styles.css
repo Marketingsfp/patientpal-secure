@@ -171,10 +171,6 @@
   --status-in-service: oklch(0.72 0.15 240);
   --status-canceled: oklch(0.70 0.22 25);
   --status-refunded: oklch(0.70 0.20 300);
-  /* Superfície do conteúdo (usada no <main> do app-shell) — sem override
-   * o fundo ficaria claro com os cards escuros no tema dark. */
-  --surface-cream: oklch(0.16 0.035 264);
-  --surface-cream-soft: oklch(0.19 0.038 264);
 }
 
 @layer base {
@@ -195,20 +191,6 @@
  * ============================================================ */
 @layer base {
   html, body, #root { max-width: 100vw; overflow-x: hidden; }
-
-  /* Barra de rolagem fina e visível em toda a aplicação */
-  * { scrollbar-width: thin; scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent; }
-  *::-webkit-scrollbar { width: 10px; height: 10px; }
-  *::-webkit-scrollbar-track { background: transparent; }
-  *::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--muted-foreground) / 0.35);
-    border-radius: 8px;
-    border: 2px solid transparent;
-    background-clip: content-box;
-  }
-  *::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--muted-foreground) / 0.6);
-  }
 
   /* Any table inside main scrolls horizontally instead of pushing layout */
   main table {
@@ -350,11 +332,19 @@
 /* Espacinho entre imagens inline lado a lado */
 .rt-editor .rt-img-wrap + .rt-img-wrap { margin-left: 4px; }
 
+/* Agenda V2 — modo full-bleed no mobile.
+ * Quando a rota /app/agenda-v2 monta com viewport < md, o outer app-shell
+ * (aside do menu + padding do <main>) é recolhido para dar 100% da largura útil. */
+@media (max-width: 767px) {
+  html.agenda-v2-fullbleed aside { display: none !important; }
+  html.agenda-v2-fullbleed main { padding: 0 !important; }
+}
+
 /* =====================================================================
  * Health Hub Pro — Design System tokens (HHP)
  *
- * Fonte oficial da identidade visual. Todos os
- * módulos (Prontuário V2, Financeiro V2, RH etc.) devem consumir
+ * Fonte oficial da identidade visual extraída da Agenda V2. Todos os
+ * módulos futuros (Prontuário V2, Financeiro V2, RH etc.) devem consumir
  * estes tokens em vez de re-declarar cores/raios/sombras.
  *
  * Convenção: prefixo --hhp-* para evitar conflito com tokens shadcn base.
@@ -415,7 +405,11 @@
 }
 
 /* =====================================================================
- * Accent institucional (`--clinic-accent`).
+ * Sprint Beauty — Agenda V2 · Sistema de skin por clínica
+ *
+ * Um único visual (Azure Institutional), três skins temáveis via
+ * CSS variables. Aplicado por `useClinicSkin` em <html> enquanto a
+ * Agenda V2 está montada.
  *
  * Regra dura: nenhum componente hardcode `text-blue-500` / `bg-indigo-*`
  * para intenção "cor da clínica" — usar `var(--clinic-accent)`.
@@ -427,6 +421,125 @@
   --clinic-accent-soft: #e0f2fe;
   --clinic-accent-fg: #ffffff;
   --clinic-accent-glow: rgba(2, 132, 199, 0.18);
+}
+html.clinic-skin-azure {
+  --clinic-accent: #0284c7;
+  --clinic-accent-strong: #0369a1;
+  --clinic-accent-soft: #e0f2fe;
+  --clinic-accent-fg: #ffffff;
+  --clinic-accent-glow: rgba(2, 132, 199, 0.18);
+}
+html.clinic-skin-emerald {
+  --clinic-accent: #059669;
+  --clinic-accent-strong: #047857;
+  --clinic-accent-soft: #d1fae5;
+  --clinic-accent-fg: #ffffff;
+  --clinic-accent-glow: rgba(5, 150, 105, 0.18);
+}
+html.clinic-skin-violet {
+  --clinic-accent: #7c3aed;
+  --clinic-accent-strong: #6d28d9;
+  --clinic-accent-soft: #ede9fe;
+  --clinic-accent-fg: #ffffff;
+  --clinic-accent-glow: rgba(124, 58, 237, 0.18);
+}
+html.clinic-skin-orange {
+  --clinic-accent: #ea580c;
+  --clinic-accent-strong: #c2410c;
+  --clinic-accent-soft: #ffedd5;
+  --clinic-accent-fg: #ffffff;
+  --clinic-accent-glow: rgba(234, 88, 12, 0.18);
+}
+
+/* Sprint Beauty — refinos visuais escopados à Agenda V2.
+ * Não afeta a agenda clássica nem outras telas. */
+html.agenda-v2-active {
+  /* Fundo neutro premium — remove qualquer tom rosado/bege herdado. */
+  --background: oklch(0.985 0.003 240);
+  --muted: oklch(0.97 0.006 240);
+  --accent: oklch(0.955 0.008 240);
+  --hhp-surface-page: #F8FAFC;
+  --hhp-surface-panel: #FFFFFF;
+  --hhp-surface-card: #FFFFFF;
+
+  /* Contornos discretos porém visíveis (contraste ~AA em fundo branco). */
+  --hhp-border-hair: rgba(15, 23, 42, 0.18);
+  --hhp-border-subtle: #475569;
+  --hhp-card-border-strong: #334155;
+
+  /* Sombras mais limpas — evita halo cinza no fundo claro. */
+  --hhp-shadow-hair: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --hhp-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px -10px rgba(15, 23, 42, 0.10);
+  --hhp-shadow-lift: 0 12px 32px -18px rgba(15, 23, 42, 0.20);
+}
+/* Reforça bordas de cards shadcn dentro da Agenda V2 sem tocar componentes. */
+html.agenda-v2-active .agenda-v2-scope [data-slot="card"],
+html.agenda-v2-active .agenda-v2-scope .rounded-2xl.border,
+html.agenda-v2-active .agenda-v2-scope .rounded-xl.border,
+html.agenda-v2-active .agenda-v2-scope .rounded-lg.border {
+  border-color: var(--hhp-card-border-strong); /* contorno bem escuro */
+  border-width: 1.5px;
+  box-shadow: none;              /* apar\u00eancia "planilha organizada" */
+  transition: border-color var(--hhp-dur-base) var(--hhp-ease),
+              box-shadow var(--hhp-dur-base) var(--hhp-ease);
+}
+/* Hover discreto — borda azul sinaliza afordância sem sombra pesada. */
+html.agenda-v2-active .agenda-v2-scope [data-slot="card"]:hover,
+html.agenda-v2-active .agenda-v2-scope .rounded-2xl.border:hover,
+html.agenda-v2-active .agenda-v2-scope .rounded-xl.border:hover,
+html.agenda-v2-active .agenda-v2-scope .rounded-lg.border:hover {
+  border-color: var(--clinic-accent, #3B82F6);
+}
+/* Hover consistente em superfícies clicáveis dentro da Agenda V2. */
+html.agenda-v2-active .agenda-v2-scope button:not(:disabled):hover,
+html.agenda-v2-active .agenda-v2-scope [role="button"]:not([aria-disabled="true"]):hover {
+  transition: box-shadow var(--hhp-dur-base) var(--hhp-ease),
+              border-color var(--hhp-dur-base) var(--hhp-ease),
+              background-color var(--hhp-dur-base) var(--hhp-ease);
+}
+html.agenda-v2-active .agenda-v2-scope {
+  font-family: var(--hhp-font-body);
+  background-color: var(--hhp-surface-page);
+}
+/* Números em tabular — leitura consistente em KPIs, timeline, chips numéricos. */
+html.agenda-v2-active .agenda-v2-scope,
+html.agenda-v2-active .agenda-v2-scope * {
+  font-variant-numeric: tabular-nums;
+}
+/* Header interno da Agenda V2 — branco puro + hairline slate-200. */
+html.agenda-v2-active .agenda-v2-scope header {
+  background-color: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+}
+html.agenda-v2-active .agenda-v2-scope h1,
+html.agenda-v2-active .agenda-v2-scope h2,
+html.agenda-v2-active .agenda-v2-scope h3 {
+  font-family: var(--hhp-font-display);
+  letter-spacing: -0.02em;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* =====================================================================
+ * MenuV2 sidebar — legibilidade em fundo navy
+ * A sidebar agora é mid-navy; o markup interno usa text-muted-foreground
+ * (que no tema light é escuro). Redefinimos os tokens *dentro* da aside
+ * para tons claros, sem afetar o resto do app.
+ * ===================================================================== */
+[data-testid="menu-v2"] {
+  --muted-foreground: oklch(0.88 0.02 250);
+  --foreground: oklch(0.99 0 0);
+  --border: oklch(0.38 0.10 258);
+  --primary: oklch(0.86 0.10 240);
+  --ring: oklch(0.86 0.10 240);
+  color: var(--sidebar-foreground);
+}
+[data-testid="menu-v2"] input {
+  background-color: color-mix(in oklab, white 8%, transparent);
+  color: var(--sidebar-foreground);
+  border-color: var(--sidebar-border);
+}
+[data-testid="menu-v2"] input::placeholder {
+  color: color-mix(in oklab, white 55%, transparent);
 }
 
 /* =====================================================================
@@ -491,63 +604,3 @@ html.theme-emerald {
 .hhp-kpi-anim {
   animation: hhp-kpi-in 320ms var(--hhp-ease, cubic-bezier(0.32, 0.72, 0, 1)) both;
 }
-
-/* Stagger de entrada para grades de KPI (painel/dashboard) — piloto São
- * Francisco de Paula, ligado via classe condicional (flag ux_melhorias). */
-.kpi-stagger > * {
-  animation: hhp-kpi-in 320ms var(--hhp-ease, cubic-bezier(0.32, 0.72, 0, 1)) both;
-}
-.kpi-stagger > *:nth-child(1) { animation-delay: 0ms; }
-.kpi-stagger > *:nth-child(2) { animation-delay: 40ms; }
-.kpi-stagger > *:nth-child(3) { animation-delay: 80ms; }
-.kpi-stagger > *:nth-child(4) { animation-delay: 120ms; }
-.kpi-stagger > *:nth-child(5) { animation-delay: 160ms; }
-.kpi-stagger > *:nth-child(6) { animation-delay: 200ms; }
-.kpi-stagger > *:nth-child(7) { animation-delay: 240ms; }
-.kpi-stagger > *:nth-child(8) { animation-delay: 280ms; }
-.kpi-stagger > *:nth-child(9) { animation-delay: 320ms; }
-.kpi-stagger > *:nth-child(10) { animation-delay: 360ms; }
-.kpi-stagger > *:nth-child(n+11) { animation-delay: 400ms; }
-@media (prefers-reduced-motion: reduce) {
-  .kpi-stagger > * { animation: none; }
-}
-
-/* =====================================================================
- * Totem — modo Alto Contraste (acessibilidade)
- *
- * Ativado pela classe .totem-hc no container do totem. Reforça texto,
- * bordas e foco para leitura em pé, à distância, por idosos/baixa visão.
- * Sobrescreve tokens semânticos só dentro do totem (não vaza p/ o app).
- * ===================================================================== */
-.totem-hc {
-  --muted-foreground: oklch(0.30 0.03 250);
-  --border: oklch(0.42 0.02 250);
-  --foreground: oklch(0.12 0.04 250);
-}
-.dark .totem-hc {
-  --muted-foreground: oklch(0.92 0.02 250);
-  --border: oklch(0.85 0.02 250);
-  --foreground: oklch(0.99 0.003 250);
-}
-/* Foco visível reforçado para navegação por toque/teclado assistivo. */
-.totem-hc :where(button, input):focus-visible {
-  outline: 4px solid var(--ring);
-  outline-offset: 3px;
-}
-/* Subtítulos brancos sobre os botões coloridos: opacidade total. */
-.totem-hc [class*="text-white/"] { color: #fff !important; }
-
-/* Impressão global do app: força A4 retrato para janelas de print padrão
- * (window.print()). Impressões térmicas usam iframes com documento próprio
- * e @page interno, portanto não são afetadas por esta regra. */
-@page { size: A4 portrait; margin: 12mm; }
-@media print {
-  @page { size: A4 portrait; margin: 12mm; }
-}
-
-/* Menu lateral — barra de rolagem oculta (rolagem continua funcional) */
-.sidebar-scroll {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.sidebar-scroll::-webkit-scrollbar { width: 0; height: 0; display: none; }

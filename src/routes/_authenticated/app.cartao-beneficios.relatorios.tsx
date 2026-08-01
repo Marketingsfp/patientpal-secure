@@ -13,7 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { exportToExcel } from "@/lib/export-csv";
 
-import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/relatorios")({
   component: RelatoriosPage,
   head: () => ({ meta: [{ title: "Relatórios — Cartão Benefícios" }] }),
@@ -21,9 +20,9 @@ export const Route = createFileRoute("/_authenticated/app/cartao-beneficios/rela
 
 const BRL = (v: number) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-type Contrato = { id: string; numero: number; paciente_id: string; paciente_nome: string; convenio_id: string; valor_mensal: number; taxa_adesao: number; status: string; data_inicio: string; assinado_em: string | null };
-type Plano = { id: string; nome: string; modalidade: string; valor_mensal: number };
-type Mens = { id: string; contrato_id: string; numero_parcela: number; valor: number; status: string; pago_em: string | null; vencimento: string };
+type Contrato = { id: string; numero: number; paciente_id: string; paciente_nome: string; plano_id: string; valor_mensal: number; taxa_adesao: number; status: string; data_inicio: string; assinado_em: string | null };
+type Plano = { id: string; nome: string; tipo: string; valor_mensal: number };
+type Mens = { id: string; contrato_id: string; valor: number; status: string; pago_em: string | null; vencimento: string };
 type Dep = { id: string; contrato_id: string; paciente_id: string; paciente_nome: string; tipo: string; ativo: boolean };
 type Pac = { id: string; data_nascimento: string | null };
 type Atend = { id: string; paciente_id: string | null; data: string };
@@ -78,8 +77,8 @@ function RelatoriosPage() {
     const cid = clinicaAtual.clinica_id;
 
     const [cs, ps, ds, ls] = await Promise.all([
-      supabase.from("contratos_assinatura").select("id, numero, paciente_id, paciente_nome, convenio_id, valor_mensal, taxa_adesao, status, data_inicio, assinado_em").eq("clinica_id", cid).gte("data_inicio", from).lte("data_inicio", to).limit(2000),
-      supabase.from("cb_convenios").select("id, nome, modalidade, valor_mensal").eq("clinica_id", cid),
+      supabase.from("contratos_assinatura").select("id, numero, paciente_id, paciente_nome, plano_id, valor_mensal, taxa_adesao, status, data_inicio, assinado_em").eq("clinica_id", cid).gte("data_inicio", from).lte("data_inicio", to).limit(2000),
+      supabase.from("planos_assinatura").select("id, nome, tipo, valor_mensal").eq("clinica_id", cid),
       // dependents and lancamentos parallel
       supabase.from("contrato_dependentes").select("id, contrato_id, paciente_id, paciente_nome, tipo, ativo").eq("ativo", true).limit(5000),
       supabase.from("fin_lancamentos").select("id, tipo, valor, data, descricao").eq("clinica_id", cid).eq("tipo", "despesa").gte("data", from).lte("data", to).limit(5000),
@@ -90,7 +89,7 @@ function RelatoriosPage() {
     // Carregar TODOS contratos da clínica (sem filtro de período) para o painel "Planos — mais vendidos"
     const allCsRes = await supabase
       .from("contratos_assinatura")
-      .select("id, numero, paciente_id, paciente_nome, convenio_id, valor_mensal, taxa_adesao, status, data_inicio, assinado_em")
+      .select("id, numero, paciente_id, paciente_nome, plano_id, valor_mensal, taxa_adesao, status, data_inicio, assinado_em")
       .eq("clinica_id", cid)
       .limit(10000);
     const allCList = (allCsRes.data ?? []) as Contrato[];
@@ -99,12 +98,12 @@ function RelatoriosPage() {
       ? await supabase.from("contrato_dependentes").select("id, contrato_id, paciente_id, paciente_nome, tipo, ativo").in("contrato_id", allCIds).limit(20000)
       : { data: [] as Dep[] };
     const allMensRes = allCIds.length
-      ? await supabase.from("contrato_mensalidades").select("id, contrato_id, numero_parcela, valor, status, pago_em, vencimento").in("contrato_id", allCIds).eq("status", "pago").limit(50000)
+      ? await supabase.from("contrato_mensalidades").select("id, contrato_id, valor, status, pago_em, vencimento").in("contrato_id", allCIds).eq("status", "pago").limit(50000)
       : { data: [] as Mens[] };
 
     // Mensalidades para contratos do período
     const mensRes = cIds.length
-      ? await supabase.from("contrato_mensalidades").select("id, contrato_id, numero_parcela, valor, status, pago_em, vencimento").in("contrato_id", cIds).limit(20000)
+      ? await supabase.from("contrato_mensalidades").select("id, contrato_id, valor, status, pago_em, vencimento").in("contrato_id", cIds).limit(20000)
       : { data: [] as Mens[] };
 
     // Coletar todos paciente_ids (titulares + deps)
@@ -154,19 +153,10 @@ function RelatoriosPage() {
     );
     const pagantes = contratos.filter((c) => contratosComPag.has(c.id)).length;
 
-    const isAdesao = (m: Mens) => Number(m.numero_parcela) === 0;
-    const pagasPeriodo = mens.filter((m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to);
-    const receitaMens = pagasPeriodo
-      .filter((m) => !isAdesao(m))
+    const receitaMens = mens
+      .filter((m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to)
       .reduce((s, m) => s + Number(m.valor), 0);
-    const contratosComAdesaoLancada = new Set(mens.filter(isAdesao).map((m) => m.contrato_id));
-    const receitaAdesaoLancada = pagasPeriodo
-      .filter(isAdesao)
-      .reduce((s, m) => s + Number(m.valor), 0);
-    const receitaAdesaoLegada = contratos
-      .filter((c) => !contratosComAdesaoLancada.has(c.id))
-      .reduce((s, c) => s + Number(c.taxa_adesao || 0), 0);
-    const receitaAdesao = receitaAdesaoLancada + receitaAdesaoLegada;
+    const receitaAdesao = contratos.reduce((s, c) => s + Number(c.taxa_adesao || 0), 0);
     const receita = receitaMens + receitaAdesao;
     const aReceber = mens.filter((m) => m.status !== "pago").reduce((s, m) => s + Number(m.valor), 0);
     const despesa = despesas.reduce((s, l) => s + Number(l.valor), 0);
@@ -181,12 +171,12 @@ function RelatoriosPage() {
 
     // Por plano
     const porPlano = planos.map((p) => {
-      const cs = contratos.filter((c) => c.convenio_id === p.id);
+      const cs = contratos.filter((c) => c.plano_id === p.id);
       const depsCount = deps.filter((d) => cs.find((c) => c.id === d.contrato_id)).length;
       const titularesCount = cs.length;
       return {
         plano: p.nome,
-        tipo: p.modalidade,
+        tipo: p.tipo,
         contratos: titularesCount,
         pessoas: titularesCount + depsCount,
         receita: cs.reduce((s, c) => {
@@ -198,7 +188,7 @@ function RelatoriosPage() {
 
     // Por plano — TODOS os cartões da clínica (lifetime)
     const porPlanoAll = planos.map((p) => {
-      const cs = allContratos.filter((c) => c.convenio_id === p.id);
+      const cs = allContratos.filter((c) => c.plano_id === p.id);
       const csIds = new Set(cs.map((c) => c.id));
       const ativos = cs.filter((c) => c.status === "ativo");
       const depsCount = allDeps.filter((d) => d.ativo && csIds.has(d.contrato_id)).length;
@@ -207,7 +197,7 @@ function RelatoriosPage() {
       const adesao = cs.reduce((s, c) => s + Number(c.taxa_adesao || 0), 0);
       return {
         plano: p.nome,
-        tipo: p.modalidade,
+        tipo: p.tipo,
         valorMensal: Number(p.valor_mensal || 0),
         titulares: cs.length,
         titularesAtivos: ativos.length,
@@ -248,7 +238,7 @@ function RelatoriosPage() {
     const tituPorContrato = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
     const consultasTitulares = contratos.map((c) => ({
       nome: c.paciente_nome,
-      plano: planos.find((p) => p.id === c.convenio_id)?.nome ?? "—",
+      plano: planos.find((p) => p.id === c.plano_id)?.nome ?? "—",
       consultas: usoPorPac.get(c.paciente_id) ?? 0,
     })).sort((a, b) => b.consultas - a.consultas);
     const consultasDependentes = deps.map((d) => ({
@@ -265,9 +255,8 @@ function RelatoriosPage() {
     const resultado = receita - despesa;
     const margemPct = receita > 0 ? (resultado / receita) * 100 : 0;
     const ticketMedio = pagantes > 0 ? receita / pagantes : 0;
-    const mensalidades = mens.filter((m) => !isAdesao(m));
-    const totalMens = mensalidades.length;
-    const mensPagas = mensalidades.filter((m) => m.status === "pago").length;
+    const totalMens = mens.length;
+    const mensPagas = mens.filter((m) => m.status === "pago").length;
     const mensAbertas = totalMens - mensPagas;
     const inadimplenciaPct = totalMens > 0 ? (mensAbertas / totalMens) * 100 : 0;
     const utilizacaoPct = (titulares + dependentesCount) > 0
@@ -326,7 +315,7 @@ function RelatoriosPage() {
       setDrill({
         title: `Titulares (${contratos.length})`,
         columns: [{key:"nome",label:"Titular"},{key:"plano",label:"Plano"},{key:"status",label:"Status"},{key:"valor",label:"Mensal",align:"right"}],
-        rows: contratos.map((c) => ({ nome: c.paciente_nome, plano: planoNome.get(c.convenio_id) ?? "—", status: c.status, valor: BRL(c.valor_mensal) })),
+        rows: contratos.map((c) => ({ nome: c.paciente_nome, plano: planoNome.get(c.plano_id) ?? "—", status: c.status, valor: BRL(c.valor_mensal) })),
       });
     } else if (which === "dependentes") {
       const tituPorContrato = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
@@ -338,7 +327,7 @@ function RelatoriosPage() {
     } else if (which === "totalPessoas") {
       const tituPorContrato = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
       const rows = [
-        ...contratos.map((c) => ({ nome: c.paciente_nome, tipo: "Titular", vinculo: planoNome.get(c.convenio_id) ?? "—" })),
+        ...contratos.map((c) => ({ nome: c.paciente_nome, tipo: "Titular", vinculo: planoNome.get(c.plano_id) ?? "—" })),
         ...deps.map((d) => ({ nome: d.paciente_nome, tipo: "Dependente", vinculo: `Titular: ${tituPorContrato.get(d.contrato_id) ?? "—"}` })),
       ];
       setDrill({
@@ -354,15 +343,14 @@ function RelatoriosPage() {
       setDrill({
         title: `Pagantes no período (${lista.length})`,
         columns: [{key:"nome",label:"Titular"},{key:"plano",label:"Plano"},{key:"valor",label:"Mensal",align:"right"}],
-        rows: lista.map((c) => ({ nome: c.paciente_nome, plano: planoNome.get(c.convenio_id) ?? "—", valor: BRL(c.valor_mensal) })),
+        rows: lista.map((c) => ({ nome: c.paciente_nome, plano: planoNome.get(c.plano_id) ?? "—", valor: BRL(c.valor_mensal) })),
       });
     } else if (which === "receita") {
       const contratoNome = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
       const pagas = mens.filter((m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to);
-      const contratosComAdesaoLancada = new Set(mens.filter((m) => Number(m.numero_parcela) === 0).map((m) => m.contrato_id));
       const rows = [
-        ...pagas.map((m) => ({ data: fmtDate(m.pago_em ?? ""), descricao: `${Number(m.numero_parcela) === 0 ? "Adesao" : "Mensalidade"} - ${contratoNome.get(m.contrato_id) ?? "�"}`, valor: BRL(m.valor) })),
-        ...contratos.filter((c) => Number(c.taxa_adesao || 0) > 0 && !contratosComAdesaoLancada.has(c.id)).map((c) => ({ data: fmtDate(c.data_inicio), descricao: `Ades�o - ${c.paciente_nome}`, valor: BRL(c.taxa_adesao) })),
+        ...pagas.map((m) => ({ data: fmtDate(m.pago_em ?? ""), descricao: `Mensalidade — ${contratoNome.get(m.contrato_id) ?? "—"}`, valor: BRL(m.valor) })),
+        ...contratos.filter((c) => Number(c.taxa_adesao || 0) > 0).map((c) => ({ data: fmtDate(c.data_inicio), descricao: `Adesão — ${c.paciente_nome}`, valor: BRL(c.taxa_adesao) })),
       ];
       setDrill({
         title: `Receita do período (${rows.length})`,
@@ -392,10 +380,9 @@ function RelatoriosPage() {
     } else if (which === "resultado") {
       const contratoNome = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
       const pagas = mens.filter((m) => m.status === "pago" && m.pago_em && m.pago_em >= from && m.pago_em <= to);
-      const contratosComAdesaoLancada = new Set(mens.filter((m) => Number(m.numero_parcela) === 0).map((m) => m.contrato_id));
       const rows = [
-        ...pagas.map((m) => ({ data: fmtDate(m.pago_em ?? ""), tipo: "Receita", descricao: `${Number(m.numero_parcela) === 0 ? "Adesao" : "Mensalidade"} - ${contratoNome.get(m.contrato_id) ?? "�"}`, valor: BRL(m.valor) })),
-        ...contratos.filter((c) => Number(c.taxa_adesao || 0) > 0 && !contratosComAdesaoLancada.has(c.id)).map((c) => ({ data: fmtDate(c.data_inicio), tipo: "Receita", descricao: `Ades�o - ${c.paciente_nome}`, valor: BRL(c.taxa_adesao) })),
+        ...pagas.map((m) => ({ data: fmtDate(m.pago_em ?? ""), tipo: "Receita", descricao: `Mensalidade — ${contratoNome.get(m.contrato_id) ?? "—"}`, valor: BRL(m.valor) })),
+        ...contratos.filter((c) => Number(c.taxa_adesao || 0) > 0).map((c) => ({ data: fmtDate(c.data_inicio), tipo: "Receita", descricao: `Adesão — ${c.paciente_nome}`, valor: BRL(c.taxa_adesao) })),
         ...despesas.map((l) => ({ data: fmtDate(l.data), tipo: "Despesa", descricao: l.descricao ?? "—", valor: `- ${BRL(l.valor)}` })),
       ];
       setDrill({
@@ -418,7 +405,7 @@ function RelatoriosPage() {
       setDrill({
         title: `Ticket médio — ${BRL(stats.ticketMedio)} (${lista.length} pagantes)`,
         columns: [{key:"nome",label:"Titular"},{key:"plano",label:"Plano"},{key:"total",label:"Total no período",align:"right"}],
-        rows: lista.map((c) => ({ nome: c.paciente_nome, plano: planoNome.get(c.convenio_id) ?? "—", total: BRL(totalPorContrato.get(c.id) ?? 0) })),
+        rows: lista.map((c) => ({ nome: c.paciente_nome, plano: planoNome.get(c.plano_id) ?? "—", total: BRL(totalPorContrato.get(c.id) ?? 0) })),
       });
     } else if (which === "inadimplencia") {
       const contratoNome = new Map(contratos.map((c) => [c.id, c.paciente_nome] as const));
@@ -433,7 +420,7 @@ function RelatoriosPage() {
       const usoPorPac = new Map<string, number>();
       atends.forEach((a) => { if (a.paciente_id) usoPorPac.set(a.paciente_id, (usoPorPac.get(a.paciente_id) ?? 0) + 1); });
       const todas = [
-        ...contratos.map((c) => ({ nome: c.paciente_nome, tipo: "Titular", vinculo: planoNome.get(c.convenio_id) ?? "—", usou: (usoPorPac.get(c.paciente_id) ?? 0) > 0 ? "Sim" : "Não", consultas: usoPorPac.get(c.paciente_id) ?? 0 })),
+        ...contratos.map((c) => ({ nome: c.paciente_nome, tipo: "Titular", vinculo: planoNome.get(c.plano_id) ?? "—", usou: (usoPorPac.get(c.paciente_id) ?? 0) > 0 ? "Sim" : "Não", consultas: usoPorPac.get(c.paciente_id) ?? 0 })),
         ...deps.map((d) => ({ nome: d.paciente_nome, tipo: "Dependente", vinculo: `Titular: ${tituPorContrato.get(d.contrato_id) ?? "—"}`, usou: (usoPorPac.get(d.paciente_id) ?? 0) > 0 ? "Sim" : "Não", consultas: usoPorPac.get(d.paciente_id) ?? 0 })),
       ].sort((a, b) => b.consultas - a.consultas);
       setDrill({
@@ -458,7 +445,7 @@ function RelatoriosPage() {
       const usoPorPac = new Map<string, number>();
       atends.forEach((a) => { if (a.paciente_id) usoPorPac.set(a.paciente_id, (usoPorPac.get(a.paciente_id) ?? 0) + 1); });
       const rows = [
-        ...contratos.map((c) => ({ nome: c.paciente_nome, tipo: "Titular", vinculo: planoNome.get(c.convenio_id) ?? "—", consultas: usoPorPac.get(c.paciente_id) ?? 0 })),
+        ...contratos.map((c) => ({ nome: c.paciente_nome, tipo: "Titular", vinculo: planoNome.get(c.plano_id) ?? "—", consultas: usoPorPac.get(c.paciente_id) ?? 0 })),
         ...deps.map((d) => ({ nome: d.paciente_nome, tipo: "Dependente", vinculo: `Titular: ${tituPorContrato.get(d.contrato_id) ?? "—"}`, consultas: usoPorPac.get(d.paciente_id) ?? 0 })),
       ].sort((a, b) => b.consultas - a.consultas);
       setDrill({
@@ -493,8 +480,8 @@ function RelatoriosPage() {
           </div>
           {showCustom && (
             <>
-              <div><Label>De</Label><DateInputBR value={from} onChange={(e) => setFrom(e.target.value)}/></div>
-              <div><Label>Até</Label><DateInputBR value={to} onChange={(e) => setTo(e.target.value)}/></div>
+              <div><Label>De</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)}/></div>
+              <div><Label>Até</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)}/></div>
             </>
           )}
           <Button variant="outline" onClick={exportarPlanos}><Download className="h-4 w-4 mr-2"/>Exportar planos (CSV)</Button>

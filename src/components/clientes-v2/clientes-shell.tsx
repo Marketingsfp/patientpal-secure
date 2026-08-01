@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Info, Plus, Rows3, LayoutList, RefreshCw } from "lucide-react";
+import { Info, Plus, Rows3, LayoutList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -16,7 +16,6 @@ import { ClienteDrawer } from "./cliente-drawer";
 import { ClientesKpiBar, type ClientesKpi } from "./kpi-bar";
 import { ResumoBar } from "./resumo-bar";
 import { useClientesKpis } from "./use-kpis";
-import { useTotalPacientes } from "./use-total-pacientes";
 import {
   cadastroIncompleto, isAniversarianteHoje, isNovo30d,
   marcarDuplicados, pagadorLabel, semCpf, semTelefone,
@@ -72,8 +71,6 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const reqRef = useRef(0);
 
   const kpis = useClientesKpis(clinicaAtual?.clinica_id ?? null);
-  const { total: totalLive, refetch: refetchTotal } = useTotalPacientes(clinicaAtual?.clinica_id ?? null);
-  const [refreshing, setRefreshing] = useState(false);
 
   const modoBusca = q.trim().length >= 2;
   const scope = useMemo(
@@ -155,19 +152,6 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     else void loadRecentes();
   }, [modoBusca, q, loadBusca, loadRecentes]);
 
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await Promise.all([
-        refetchTotal(),
-        Promise.resolve(kpis.refresh()),
-        modoBusca ? loadBusca(q.trim()) : loadRecentes(),
-      ]);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [refetchTotal, kpis, modoBusca, q, loadBusca, loadRecentes]);
-
   const filtrados = useMemo(() => {
     let r = rows;
     if (tab === "ativos") r = r.filter((p) => p.ativo);
@@ -223,22 +207,8 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
       <div className="flex-1 min-h-0 p-3 sm:p-4">
         <ListShell<TabV>
           title={
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <div className="flex items-baseline gap-2">
               <h1 className="text-lg font-semibold">Clientes</h1>
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 px-2 py-0.5 text-xs text-muted-foreground"
-                title="Total de pacientes na clínica — atualiza a cada 15s"
-                aria-live="polite"
-              >
-                <span className="relative inline-flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                </span>
-                Pacientes:{" "}
-                <b className="tabular-nums text-foreground">
-                  {totalLive === null ? "…" : totalLive.toLocaleString("pt-BR")}
-                </b>
-              </span>
               {totalBase !== null && !modoBusca && (
                 <span className="text-xs text-muted-foreground">
                   base ~{totalBase.toLocaleString("pt-BR")}
@@ -248,16 +218,6 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
           }
           actions={
             <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleRefresh}
-                disabled={refreshing}
-                title="Atualizar contagem e lista"
-              >
-                <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`} />
-                Atualizar
-              </Button>
               <div className="hidden sm:flex items-center gap-1.5">
                 <Label className="text-xs flex items-center gap-1.5">
                   {compactPref ? <Rows3 className="h-3.5 w-3.5" /> : <LayoutList className="h-3.5 w-3.5" />}

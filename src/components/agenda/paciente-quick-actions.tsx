@@ -7,9 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { descriptorDaFoto, registrarBiometriaPaciente } from "@/lib/biometria";
 
-import { DateInputBR } from "@/components/ui/date-input-br";
 interface Props {
   pacienteId: string;
   clinicaId: string;
@@ -162,7 +160,8 @@ export function PacienteQuickActions({ pacienteId, clinicaId }: Props) {
         </div>
         <div className="col-span-5 sm:col-span-5 flex items-center gap-1 min-w-0">
           <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-          <DateInputBR
+          <Input
+            type="date"
             value={data.data_nascimento ?? ""}
             onChange={(e) => { setData(d => ({ ...d, data_nascimento: e.target.value })); setEdited(true); }}
             className="h-8 w-full min-w-0"
@@ -232,34 +231,34 @@ function EnderecoDialog({
           <DialogTitle className="flex items-center gap-2"><MapPin className="h-5 w-5"/> Endereço do paciente</DialogTitle>
           <DialogDescription>Atualize CEP, rua, número, bairro e demais dados. Use o botão buscar para preencher pelo CEP.</DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <div className="sm:col-span-1 space-y-1">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="col-span-1 space-y-1">
             <Label className="text-xs">CEP</Label>
             <div className="flex gap-1">
               <Input value={data.cep ?? ""} onChange={(e) => setData(d => ({ ...d, cep: e.target.value }))} onBlur={onBuscarCep}/>
             </div>
           </div>
-          <div className="sm:col-span-2 space-y-1">
+          <div className="col-span-2 space-y-1">
             <Label className="text-xs">Logradouro</Label>
             <Input value={data.logradouro ?? ""} onChange={(e) => setData(d => ({ ...d, logradouro: e.target.value }))}/>
           </div>
-          <div className="sm:col-span-1 space-y-1">
+          <div className="col-span-1 space-y-1">
             <Label className="text-xs">Número</Label>
             <Input value={data.numero ?? ""} onChange={(e) => setData(d => ({ ...d, numero: e.target.value }))}/>
           </div>
-          <div className="sm:col-span-2 space-y-1">
+          <div className="col-span-2 space-y-1">
             <Label className="text-xs">Complemento</Label>
             <Input value={data.complemento ?? ""} onChange={(e) => setData(d => ({ ...d, complemento: e.target.value }))}/>
           </div>
-          <div className="sm:col-span-2 space-y-1">
+          <div className="col-span-2 space-y-1">
             <Label className="text-xs">Bairro</Label>
             <Input value={data.bairro ?? ""} onChange={(e) => setData(d => ({ ...d, bairro: e.target.value }))}/>
           </div>
-          <div className="sm:col-span-1 space-y-1">
+          <div className="col-span-1 space-y-1">
             <Label className="text-xs">UF</Label>
             <Input value={data.estado ?? ""} maxLength={2} onChange={(e) => setData(d => ({ ...d, estado: e.target.value.toUpperCase() }))}/>
           </div>
-          <div className="sm:col-span-3 space-y-1">
+          <div className="col-span-3 space-y-1">
             <Label className="text-xs">Cidade</Label>
             <Input value={data.cidade ?? ""} onChange={(e) => setData(d => ({ ...d, cidade: e.target.value }))}/>
           </div>
@@ -337,18 +336,6 @@ function FotoDialog({
         .update({ foto_url: path, foto_atualizado_em: new Date().toISOString() })
         .eq("id", pacienteId);
       if (updErr) throw updErr;
-
-      // A foto do paciente é a fonte da biometria usada no reconhecimento do totem
-      const descriptor = await descriptorDaFoto(blob);
-      if (descriptor) {
-        const bioErr = await registrarBiometriaPaciente(pacienteId, clinicaId, descriptor);
-        if (bioErr) mostrarErro(bioErr, "foto salva, mas a biometria facial falhou");
-      } else {
-        toast.warning(
-          "Foto salva, mas nenhum rosto foi detectado nela — o totem não vai reconhecer o paciente com esta foto.",
-        );
-      }
-
       const { data: signed } = await supabase.storage
         .from("pacientes-fotos")
         .createSignedUrl(path, 3600);

@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { isMedicoOnlyUser } from "@/lib/medico-only";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,41 +38,19 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && user) {
-      (async () => {
-        const soMedico = await isMedicoOnlyUser(user.id);
-        navigate({ to: soMedico ? "/medico" : "/app", replace: true });
-      })();
-    }
+    if (!authLoading && user) navigate({ to: "/app", replace: true });
   }, [authLoading, navigate, user]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) { mostrarErro(error); return; }
     toast.success("Bem-vindo!");
-    const uid = data.user?.id;
-    const soMedico = uid ? await isMedicoOnlyUser(uid) : false;
-    navigate({ to: soMedico ? "/medico" : "/app", replace: true });
-  };
-
-  const handleForgotPassword = async () => {
-    if (!email) {
-      toast.error("Informe seu e-mail para recuperar a senha.");
-      return;
-    }
-    setResetLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setResetLoading(false);
-    if (error) { mostrarErro(error); return; }
-    toast.success("Enviamos um e-mail com instruções para redefinir sua senha.");
+    navigate({ to: "/app", replace: true });
   };
 
   return (
@@ -144,14 +121,6 @@ function LoginPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Senha</Label>
-                  <button
-                    type="button"
-                    onClick={handleForgotPassword}
-                    disabled={resetLoading}
-                    className="text-xs text-primary font-medium hover:underline disabled:opacity-60"
-                  >
-                    {resetLoading ? "Enviando..." : "Esqueci a senha"}
-                  </button>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -165,6 +134,9 @@ function LoginPage() {
                 {loading ? "Entrando..." : "Entrar"}
               </Button>
             </form>
+            <p className="mt-6 text-center text-sm text-muted-foreground">
+              Não tem conta? <Link to="/signup" className="text-primary font-medium hover:underline">Criar conta</Link>
+            </p>
           </div>
         </div>
       </div>

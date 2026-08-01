@@ -1,1 +1,0 @@
-ALTER TABLE public.fin_contas ADD COLUMN IF NOT EXISTS bandeira TEXT NULL;

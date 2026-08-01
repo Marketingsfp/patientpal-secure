@@ -12,9 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TotemRouteImport } from './routes/totem'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SignupRouteImport } from './routes/signup'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PainelRouteImport } from './routes/painel'
-import { Route as MedicoRouteImport } from './routes/medico'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
 import { Route as AutoatendimentoRouteImport } from './routes/autoatendimento'
@@ -22,22 +20,16 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PacienteIndexRouteImport } from './routes/paciente.index'
 import { Route as VerificarCodigoRouteImport } from './routes/verificar.$codigo'
-import { Route as TotemClinicaIdRouteImport } from './routes/totem_.$clinicaId'
-import { Route as PainelClinicaIdRouteImport } from './routes/painel.$clinicaId'
 import { Route as PacientePerfilRouteImport } from './routes/paciente.perfil'
 import { Route as PacienteFinanceiroRouteImport } from './routes/paciente.financeiro'
 import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
 import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
 import { Route as PTokenRouteImport } from './routes/p.$token'
+import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
-import { Route as ApiTtsVoicesRouteImport } from './routes/api/tts-voices'
-import { Route as ApiTtsProxyRouteImport } from './routes/api/tts-proxy'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
-import { Route as TotemTTokenRouteImport } from './routes/totem_.t.$token'
-import { Route as PainelTTokenRouteImport } from './routes/painel_.t.$token'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
-import { Route as ApiPublicTtsRouteImport } from './routes/api/public/tts'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
 import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
 import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_authenticated/app.treinamentos'
@@ -57,20 +49,30 @@ import { Route as AuthenticatedAppOrcamentosRouteImport } from './routes/_authen
 import { Route as AuthenticatedAppOdontologiaRouteImport } from './routes/_authenticated/app.odontologia'
 import { Route as AuthenticatedAppNinaRouteImport } from './routes/_authenticated/app.nina'
 import { Route as AuthenticatedAppModelosDocumentosRouteImport } from './routes/_authenticated/app.modelos-documentos'
+import { Route as AuthenticatedAppMktSegmentosRouteImport } from './routes/_authenticated/app.mkt-segmentos'
+import { Route as AuthenticatedAppMktLeadsRouteImport } from './routes/_authenticated/app.mkt-leads'
+import { Route as AuthenticatedAppMktLandingRouteImport } from './routes/_authenticated/app.mkt-landing'
+import { Route as AuthenticatedAppMktEnviosRouteImport } from './routes/_authenticated/app.mkt-envios'
 import { Route as AuthenticatedAppMedicosRouteImport } from './routes/_authenticated/app.medicos'
 import { Route as AuthenticatedAppLmsAdminRouteImport } from './routes/_authenticated/app.lms-admin'
+import { Route as AuthenticatedAppLgpdRouteImport } from './routes/_authenticated/app.lgpd'
+import { Route as AuthenticatedAppIntegrationSecretsRouteImport } from './routes/_authenticated/app.integration-secrets'
 import { Route as AuthenticatedAppHrPontoRouteImport } from './routes/_authenticated/app.hr-ponto'
 import { Route as AuthenticatedAppHrHoleritesRouteImport } from './routes/_authenticated/app.hr-holerites'
 import { Route as AuthenticatedAppHrFeriasRouteImport } from './routes/_authenticated/app.hr-ferias'
+import { Route as AuthenticatedAppHrContratosRouteImport } from './routes/_authenticated/app.hr-contratos'
+import { Route as AuthenticatedAppFuncionariosRouteImport } from './routes/_authenticated/app.funcionarios'
 import { Route as AuthenticatedAppFluxoRouteImport } from './routes/_authenticated/app.fluxo'
 import { Route as AuthenticatedAppFinanceiroRouteImport } from './routes/_authenticated/app.financeiro'
 import { Route as AuthenticatedAppExamesResultadosRouteImport } from './routes/_authenticated/app.exames-resultados'
 import { Route as AuthenticatedAppEstoqueRouteImport } from './routes/_authenticated/app.estoque'
 import { Route as AuthenticatedAppEspecialidadesRouteImport } from './routes/_authenticated/app.especialidades'
 import { Route as AuthenticatedAppEquipeRouteImport } from './routes/_authenticated/app.equipe'
+import { Route as AuthenticatedAppEnfermagemRecursosRouteImport } from './routes/_authenticated/app.enfermagem-recursos'
 import { Route as AuthenticatedAppDocumentosRouteImport } from './routes/_authenticated/app.documentos'
 import { Route as AuthenticatedAppDisponibilidadesRouteImport } from './routes/_authenticated/app.disponibilidades'
 import { Route as AuthenticatedAppDevOrcamentosShellRouteImport } from './routes/_authenticated/app.dev-orcamentos-shell'
+import { Route as AuthenticatedAppDevMenuShellRouteImport } from './routes/_authenticated/app.dev-menu-shell'
 import { Route as AuthenticatedAppDevListShellRouteImport } from './routes/_authenticated/app.dev-list-shell'
 import { Route as AuthenticatedAppDevHhpRouteImport } from './routes/_authenticated/app.dev-hhp'
 import { Route as AuthenticatedAppDevClientesShellRouteImport } from './routes/_authenticated/app.dev-clientes-shell'
@@ -83,44 +85,40 @@ import { Route as AuthenticatedAppCheckinRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAppChatRouteImport } from './routes/_authenticated/app.chat'
 import { Route as AuthenticatedAppCartaoBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios'
 import { Route as AuthenticatedAppCargosRouteImport } from './routes/_authenticated/app.cargos'
+import { Route as AuthenticatedAppCampanhasRouteImport } from './routes/_authenticated/app.campanhas'
 import { Route as AuthenticatedAppCaixaRouteImport } from './routes/_authenticated/app.caixa'
 import { Route as AuthenticatedAppBoletosRouteImport } from './routes/_authenticated/app.boletos'
-import { Route as AuthenticatedAppBackupsRouteImport } from './routes/_authenticated/app.backups'
 import { Route as AuthenticatedAppAuditoriaRouteImport } from './routes/_authenticated/app.auditoria'
+import { Route as AuthenticatedAppAtendimentoMultiploRouteImport } from './routes/_authenticated/app.atendimento-multiplo'
 import { Route as AuthenticatedAppAtendimentoIaRouteImport } from './routes/_authenticated/app.atendimento-ia'
 import { Route as AuthenticatedAppAnamnesesRouteImport } from './routes/_authenticated/app.anamneses'
 import { Route as AuthenticatedAppAlertasEnfermagemRouteImport } from './routes/_authenticated/app.alertas-enfermagem'
+import { Route as AuthenticatedAppAgendaV2RouteImport } from './routes/_authenticated/app.agenda-v2'
 import { Route as AuthenticatedAppAgendaRouteImport } from './routes/_authenticated/app.agenda'
 import { Route as AuthenticatedAppNfseIndexRouteImport } from './routes/_authenticated/app.nfse.index'
-import { Route as AuthenticatedAppHrContratosIndexRouteImport } from './routes/_authenticated/app.hr-contratos.index'
 import { Route as AuthenticatedAppFinanceiroIndexRouteImport } from './routes/_authenticated/app.financeiro.index'
 import { Route as AuthenticatedAppEquipeIndexRouteImport } from './routes/_authenticated/app.equipe.index'
 import { Route as AuthenticatedAppClientesIndexRouteImport } from './routes/_authenticated/app.clientes.index'
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as ApiPublicWhatsappClinicaIdRouteImport } from './routes/api/public/whatsapp.$clinicaId'
-import { Route as ApiPublicHooksBackupDiarioRouteImport } from './routes/api/public/hooks/backup-diario'
 import { Route as ApiPublicFocusnfeWebhookRouteImport } from './routes/api/public/focusnfe.webhook'
 import { Route as AuthenticatedAppNfseTestarRouteImport } from './routes/_authenticated/app.nfse.testar'
 import { Route as AuthenticatedAppMedicoMedicoIdRouteImport } from './routes/_authenticated/app.medico.$medicoId'
 import { Route as AuthenticatedAppImprimirAgendamentoIdRouteImport } from './routes/_authenticated/app.imprimir.$agendamentoId'
-import { Route as AuthenticatedAppHrContratosIdRouteImport } from './routes/_authenticated/app.hr-contratos.$id'
+import { Route as AuthenticatedAppFuncionarioUserIdRouteImport } from './routes/_authenticated/app.funcionario.$userId'
 import { Route as AuthenticatedAppFinanceiroRelatoriosRouteImport } from './routes/_authenticated/app.financeiro.relatorios'
 import { Route as AuthenticatedAppFinanceiroRegrasIaRouteImport } from './routes/_authenticated/app.financeiro.regras-ia'
 import { Route as AuthenticatedAppFinanceiroNotasRouteImport } from './routes/_authenticated/app.financeiro.notas'
 import { Route as AuthenticatedAppFinanceiroMovimentoRouteImport } from './routes/_authenticated/app.financeiro.movimento'
 import { Route as AuthenticatedAppFinanceiroLembretesRouteImport } from './routes/_authenticated/app.financeiro.lembretes'
-import { Route as AuthenticatedAppFinanceiroEstornoRouteImport } from './routes/_authenticated/app.financeiro.estorno'
 import { Route as AuthenticatedAppFinanceiroEstatisticasRouteImport } from './routes/_authenticated/app.financeiro.estatisticas'
 import { Route as AuthenticatedAppFinanceiroEmpresasRouteImport } from './routes/_authenticated/app.financeiro.empresas'
 import { Route as AuthenticatedAppFinanceiroContasRouteImport } from './routes/_authenticated/app.financeiro.contas'
 import { Route as AuthenticatedAppFinanceiroCategoriasRouteImport } from './routes/_authenticated/app.financeiro.categorias'
 import { Route as AuthenticatedAppFinanceiroBiRouteImport } from './routes/_authenticated/app.financeiro.bi'
-import { Route as AuthenticatedAppFinanceiroAtendimentosExternosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos-externos'
 import { Route as AuthenticatedAppFinanceiroAtendimentosRouteImport } from './routes/_authenticated/app.financeiro.atendimentos'
 import { Route as AuthenticatedAppFinanceiroAnaliticoRouteImport } from './routes/_authenticated/app.financeiro.analitico'
 import { Route as AuthenticatedAppFinanceiroAlertasRouteImport } from './routes/_authenticated/app.financeiro.alertas'
-import { Route as AuthenticatedAppConfiguracoesVozRouteImport } from './routes/_authenticated/app.configuracoes.voz'
-import { Route as AuthenticatedAppConfiguracoesPainelTotemRouteImport } from './routes/_authenticated/app.configuracoes.painel-totem'
 import { Route as AuthenticatedAppConfiguracoesNfseRouteImport } from './routes/_authenticated/app.configuracoes.nfse'
 import { Route as AuthenticatedAppClientesDuplicadosRouteImport } from './routes/_authenticated/app.clientes.duplicados'
 import { Route as AuthenticatedAppCartaoBeneficiosRelatoriosRouteImport } from './routes/_authenticated/app.cartao-beneficios.relatorios'
@@ -130,9 +128,11 @@ import { Route as AuthenticatedAppCartaoBeneficiosConveniosRouteImport } from '.
 import { Route as AuthenticatedAppCartaoBeneficiosContratosRouteImport } from './routes/_authenticated/app.cartao-beneficios.contratos'
 import { Route as AuthenticatedAppCartaoBeneficiosBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios.beneficios'
 import { Route as AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport } from './routes/_authenticated/app.atendimento-ia.$agendamentoId'
-import { Route as AuthenticatedAppClientesPacienteIdVisualizarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.visualizar'
+import { Route as AuthenticatedAppAgendaExpressRouteImport } from './routes/_authenticated/app.agenda.express'
 import { Route as AuthenticatedAppClientesPacienteIdEditarRouteImport } from './routes/_authenticated/app.clientes.$pacienteId.editar'
 import { Route as AuthenticatedAppEquipeMedicoMedicoIdEditarRouteImport } from './routes/_authenticated/app.equipe.medico.$medicoId.editar'
+import { Route as AuthenticatedAppEquipeFuncionarioUserIdEditarRouteImport } from './routes/_authenticated/app.equipe.funcionario.$userId.editar'
+import { Route as AuthenticatedAppEquipeEnfermeiroUserIdEditarRouteImport } from './routes/_authenticated/app.equipe.enfermeiro.$userId.editar'
 
 const TotemRoute = TotemRouteImport.update({
   id: '/totem',
@@ -149,19 +149,9 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const PainelRoute = PainelRouteImport.update({
   id: '/painel',
   path: '/painel',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MedicoRoute = MedicoRouteImport.update({
-  id: '/medico',
-  path: '/medico',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -198,16 +188,6 @@ const VerificarCodigoRoute = VerificarCodigoRouteImport.update({
   path: '/verificar/$codigo',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TotemClinicaIdRoute = TotemClinicaIdRouteImport.update({
-  id: '/totem_/$clinicaId',
-  path: '/totem/$clinicaId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PainelClinicaIdRoute = PainelClinicaIdRouteImport.update({
-  id: '/$clinicaId',
-  path: '/$clinicaId',
-  getParentRoute: () => PainelRoute,
-} as any)
 const PacientePerfilRoute = PacientePerfilRouteImport.update({
   id: '/paciente/perfil',
   path: '/paciente/perfil',
@@ -233,19 +213,14 @@ const PTokenRoute = PTokenRouteImport.update({
   path: '/p/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LpSlugRoute = LpSlugRouteImport.update({
+  id: '/lp/$slug',
+  path: '/lp/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CheckinTokenRoute = CheckinTokenRouteImport.update({
   id: '/checkin/$token',
   path: '/checkin/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiTtsVoicesRoute = ApiTtsVoicesRouteImport.update({
-  id: '/api/tts-voices',
-  path: '/api/tts-voices',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiTtsProxyRoute = ApiTtsProxyRouteImport.update({
-  id: '/api/tts-proxy',
-  path: '/api/tts-proxy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
@@ -258,24 +233,9 @@ const AuthenticatedAppIndexRoute = AuthenticatedAppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
-const TotemTTokenRoute = TotemTTokenRouteImport.update({
-  id: '/totem_/t/$token',
-  path: '/totem/t/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PainelTTokenRoute = PainelTTokenRouteImport.update({
-  id: '/painel_/t/$token',
-  path: '/painel/t/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const PContratoTokenRoute = PContratoTokenRouteImport.update({
   id: '/p/contrato/$token',
   path: '/p/contrato/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicTtsRoute = ApiPublicTtsRouteImport.update({
-  id: '/api/public/tts',
-  path: '/api/public/tts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppUnidadesRoute =
@@ -387,6 +347,30 @@ const AuthenticatedAppModelosDocumentosRoute =
     path: '/modelos-documentos',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppMktSegmentosRoute =
+  AuthenticatedAppMktSegmentosRouteImport.update({
+    id: '/mkt-segmentos',
+    path: '/mkt-segmentos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppMktLeadsRoute =
+  AuthenticatedAppMktLeadsRouteImport.update({
+    id: '/mkt-leads',
+    path: '/mkt-leads',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppMktLandingRoute =
+  AuthenticatedAppMktLandingRouteImport.update({
+    id: '/mkt-landing',
+    path: '/mkt-landing',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppMktEnviosRoute =
+  AuthenticatedAppMktEnviosRouteImport.update({
+    id: '/mkt-envios',
+    path: '/mkt-envios',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppMedicosRoute = AuthenticatedAppMedicosRouteImport.update({
   id: '/medicos',
   path: '/medicos',
@@ -396,6 +380,17 @@ const AuthenticatedAppLmsAdminRoute =
   AuthenticatedAppLmsAdminRouteImport.update({
     id: '/lms-admin',
     path: '/lms-admin',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppLgpdRoute = AuthenticatedAppLgpdRouteImport.update({
+  id: '/lgpd',
+  path: '/lgpd',
+  getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const AuthenticatedAppIntegrationSecretsRoute =
+  AuthenticatedAppIntegrationSecretsRouteImport.update({
+    id: '/integration-secrets',
+    path: '/integration-secrets',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppHrPontoRoute = AuthenticatedAppHrPontoRouteImport.update({
@@ -413,6 +408,18 @@ const AuthenticatedAppHrFeriasRoute =
   AuthenticatedAppHrFeriasRouteImport.update({
     id: '/hr-ferias',
     path: '/hr-ferias',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppHrContratosRoute =
+  AuthenticatedAppHrContratosRouteImport.update({
+    id: '/hr-contratos',
+    path: '/hr-contratos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppFuncionariosRoute =
+  AuthenticatedAppFuncionariosRouteImport.update({
+    id: '/funcionarios',
+    path: '/funcionarios',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppFluxoRoute = AuthenticatedAppFluxoRouteImport.update({
@@ -448,6 +455,12 @@ const AuthenticatedAppEquipeRoute = AuthenticatedAppEquipeRouteImport.update({
   path: '/equipe',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppEnfermagemRecursosRoute =
+  AuthenticatedAppEnfermagemRecursosRouteImport.update({
+    id: '/enfermagem-recursos',
+    path: '/enfermagem-recursos',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppDocumentosRoute =
   AuthenticatedAppDocumentosRouteImport.update({
     id: '/documentos',
@@ -464,6 +477,12 @@ const AuthenticatedAppDevOrcamentosShellRoute =
   AuthenticatedAppDevOrcamentosShellRouteImport.update({
     id: '/dev-orcamentos-shell',
     path: '/dev-orcamentos-shell',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppDevMenuShellRoute =
+  AuthenticatedAppDevMenuShellRouteImport.update({
+    id: '/dev-menu-shell',
+    path: '/dev-menu-shell',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppDevListShellRoute =
@@ -533,6 +552,12 @@ const AuthenticatedAppCargosRoute = AuthenticatedAppCargosRouteImport.update({
   path: '/cargos',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppCampanhasRoute =
+  AuthenticatedAppCampanhasRouteImport.update({
+    id: '/campanhas',
+    path: '/campanhas',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppCaixaRoute = AuthenticatedAppCaixaRouteImport.update({
   id: '/caixa',
   path: '/caixa',
@@ -543,15 +568,16 @@ const AuthenticatedAppBoletosRoute = AuthenticatedAppBoletosRouteImport.update({
   path: '/boletos',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
-const AuthenticatedAppBackupsRoute = AuthenticatedAppBackupsRouteImport.update({
-  id: '/backups',
-  path: '/backups',
-  getParentRoute: () => AuthenticatedAppRoute,
-} as any)
 const AuthenticatedAppAuditoriaRoute =
   AuthenticatedAppAuditoriaRouteImport.update({
     id: '/auditoria',
     path: '/auditoria',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppAtendimentoMultiploRoute =
+  AuthenticatedAppAtendimentoMultiploRouteImport.update({
+    id: '/atendimento-multiplo',
+    path: '/atendimento-multiplo',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppAtendimentoIaRoute =
@@ -572,6 +598,12 @@ const AuthenticatedAppAlertasEnfermagemRoute =
     path: '/alertas-enfermagem',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppAgendaV2Route =
+  AuthenticatedAppAgendaV2RouteImport.update({
+    id: '/agenda-v2',
+    path: '/agenda-v2',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppAgendaRoute = AuthenticatedAppAgendaRouteImport.update({
   id: '/agenda',
   path: '/agenda',
@@ -581,12 +613,6 @@ const AuthenticatedAppNfseIndexRoute =
   AuthenticatedAppNfseIndexRouteImport.update({
     id: '/nfse/',
     path: '/nfse/',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppHrContratosIndexRoute =
-  AuthenticatedAppHrContratosIndexRouteImport.update({
-    id: '/hr-contratos/',
-    path: '/hr-contratos/',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppFinanceiroIndexRoute =
@@ -619,12 +645,6 @@ const ApiPublicWhatsappClinicaIdRoute =
     path: '/api/public/whatsapp/$clinicaId',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicHooksBackupDiarioRoute =
-  ApiPublicHooksBackupDiarioRouteImport.update({
-    id: '/api/public/hooks/backup-diario',
-    path: '/api/public/hooks/backup-diario',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiPublicFocusnfeWebhookRoute =
   ApiPublicFocusnfeWebhookRouteImport.update({
     id: '/api/public/focusnfe/webhook',
@@ -649,10 +669,10 @@ const AuthenticatedAppImprimirAgendamentoIdRoute =
     path: '/imprimir/$agendamentoId',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
-const AuthenticatedAppHrContratosIdRoute =
-  AuthenticatedAppHrContratosIdRouteImport.update({
-    id: '/hr-contratos/$id',
-    path: '/hr-contratos/$id',
+const AuthenticatedAppFuncionarioUserIdRoute =
+  AuthenticatedAppFuncionarioUserIdRouteImport.update({
+    id: '/funcionario/$userId',
+    path: '/funcionario/$userId',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppFinanceiroRelatoriosRoute =
@@ -685,12 +705,6 @@ const AuthenticatedAppFinanceiroLembretesRoute =
     path: '/lembretes',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
-const AuthenticatedAppFinanceiroEstornoRoute =
-  AuthenticatedAppFinanceiroEstornoRouteImport.update({
-    id: '/estorno',
-    path: '/estorno',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
-  } as any)
 const AuthenticatedAppFinanceiroEstatisticasRoute =
   AuthenticatedAppFinanceiroEstatisticasRouteImport.update({
     id: '/estatisticas',
@@ -721,12 +735,6 @@ const AuthenticatedAppFinanceiroBiRoute =
     path: '/bi',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
   } as any)
-const AuthenticatedAppFinanceiroAtendimentosExternosRoute =
-  AuthenticatedAppFinanceiroAtendimentosExternosRouteImport.update({
-    id: '/atendimentos-externos',
-    path: '/atendimentos-externos',
-    getParentRoute: () => AuthenticatedAppFinanceiroRoute,
-  } as any)
 const AuthenticatedAppFinanceiroAtendimentosRoute =
   AuthenticatedAppFinanceiroAtendimentosRouteImport.update({
     id: '/atendimentos',
@@ -744,18 +752,6 @@ const AuthenticatedAppFinanceiroAlertasRoute =
     id: '/alertas',
     path: '/alertas',
     getParentRoute: () => AuthenticatedAppFinanceiroRoute,
-  } as any)
-const AuthenticatedAppConfiguracoesVozRoute =
-  AuthenticatedAppConfiguracoesVozRouteImport.update({
-    id: '/configuracoes/voz',
-    path: '/configuracoes/voz',
-    getParentRoute: () => AuthenticatedAppRoute,
-  } as any)
-const AuthenticatedAppConfiguracoesPainelTotemRoute =
-  AuthenticatedAppConfiguracoesPainelTotemRouteImport.update({
-    id: '/configuracoes/painel-totem',
-    path: '/configuracoes/painel-totem',
-    getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppConfiguracoesNfseRoute =
   AuthenticatedAppConfiguracoesNfseRouteImport.update({
@@ -811,11 +807,11 @@ const AuthenticatedAppAtendimentoIaAgendamentoIdRoute =
     path: '/$agendamentoId',
     getParentRoute: () => AuthenticatedAppAtendimentoIaRoute,
   } as any)
-const AuthenticatedAppClientesPacienteIdVisualizarRoute =
-  AuthenticatedAppClientesPacienteIdVisualizarRouteImport.update({
-    id: '/clientes/$pacienteId/visualizar',
-    path: '/clientes/$pacienteId/visualizar',
-    getParentRoute: () => AuthenticatedAppRoute,
+const AuthenticatedAppAgendaExpressRoute =
+  AuthenticatedAppAgendaExpressRouteImport.update({
+    id: '/express',
+    path: '/express',
+    getParentRoute: () => AuthenticatedAppAgendaRoute,
   } as any)
 const AuthenticatedAppClientesPacienteIdEditarRoute =
   AuthenticatedAppClientesPacienteIdEditarRouteImport.update({
@@ -829,39 +825,48 @@ const AuthenticatedAppEquipeMedicoMedicoIdEditarRoute =
     path: '/medico/$medicoId/editar',
     getParentRoute: () => AuthenticatedAppEquipeRoute,
   } as any)
+const AuthenticatedAppEquipeFuncionarioUserIdEditarRoute =
+  AuthenticatedAppEquipeFuncionarioUserIdEditarRouteImport.update({
+    id: '/funcionario/$userId/editar',
+    path: '/funcionario/$userId/editar',
+    getParentRoute: () => AuthenticatedAppEquipeRoute,
+  } as any)
+const AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute =
+  AuthenticatedAppEquipeEnfermeiroUserIdEditarRouteImport.update({
+    id: '/enfermeiro/$userId/editar',
+    path: '/enfermeiro/$userId/editar',
+    getParentRoute: () => AuthenticatedAppEquipeRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
-  '/medico': typeof MedicoRoute
-  '/painel': typeof PainelRouteWithChildren
-  '/reset-password': typeof ResetPasswordRoute
+  '/painel': typeof PainelRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
   '/app': typeof AuthenticatedAppRouteWithChildren
-  '/api/tts-proxy': typeof ApiTtsProxyRoute
-  '/api/tts-voices': typeof ApiTtsVoicesRoute
   '/checkin/$token': typeof CheckinTokenRoute
+  '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/paciente/financeiro': typeof PacienteFinanceiroRoute
   '/paciente/perfil': typeof PacientePerfilRoute
-  '/painel/$clinicaId': typeof PainelClinicaIdRoute
-  '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
-  '/app/agenda': typeof AuthenticatedAppAgendaRoute
+  '/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
+  '/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRouteWithChildren
+  '/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
   '/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
-  '/app/backups': typeof AuthenticatedAppBackupsRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/caixa': typeof AuthenticatedAppCaixaRoute
+  '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/app/cargos': typeof AuthenticatedAppCargosRoute
   '/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/app/chat': typeof AuthenticatedAppChatRoute
@@ -874,20 +879,30 @@ export interface FileRoutesByFullPath {
   '/app/dev-clientes-shell': typeof AuthenticatedAppDevClientesShellRoute
   '/app/dev-hhp': typeof AuthenticatedAppDevHhpRoute
   '/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
+  '/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
+  '/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
   '/app/equipe': typeof AuthenticatedAppEquipeRouteWithChildren
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
+  '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
+  '/app/integration-secrets': typeof AuthenticatedAppIntegrationSecretsRoute
+  '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
+  '/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
+  '/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
+  '/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
+  '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
@@ -907,11 +922,9 @@ export interface FileRoutesByFullPath {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
-  '/api/public/tts': typeof ApiPublicTtsRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
-  '/painel/t/$token': typeof PainelTTokenRoute
-  '/totem/t/$token': typeof TotemTTokenRoute
   '/app/': typeof AuthenticatedAppIndexRoute
+  '/app/agenda/express': typeof AuthenticatedAppAgendaExpressRoute
   '/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
   '/app/cartao-beneficios/beneficios': typeof AuthenticatedAppCartaoBeneficiosBeneficiosRoute
   '/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
@@ -921,38 +934,33 @@ export interface FileRoutesByFullPath {
   '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
   '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
-  '/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
-  '/app/configuracoes/voz': typeof AuthenticatedAppConfiguracoesVozRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
-  '/app/financeiro/atendimentos-externos': typeof AuthenticatedAppFinanceiroAtendimentosExternosRoute
   '/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
   '/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
   '/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
-  '/app/financeiro/estorno': typeof AuthenticatedAppFinanceiroEstornoRoute
   '/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
   '/app/financeiro/movimento': typeof AuthenticatedAppFinanceiroMovimentoRoute
   '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
-  '/app/hr-contratos/$id': typeof AuthenticatedAppHrContratosIdRoute
+  '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
-  '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
   '/app/equipe/': typeof AuthenticatedAppEquipeIndexRoute
   '/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
-  '/app/hr-contratos/': typeof AuthenticatedAppHrContratosIndexRoute
   '/app/nfse/': typeof AuthenticatedAppNfseIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
-  '/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
+  '/app/equipe/enfermeiro/$userId/editar': typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute
+  '/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
   '/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
 export interface FileRoutesByTo {
@@ -960,31 +968,28 @@ export interface FileRoutesByTo {
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
-  '/medico': typeof MedicoRoute
-  '/painel': typeof PainelRouteWithChildren
-  '/reset-password': typeof ResetPasswordRoute
+  '/painel': typeof PainelRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
-  '/api/tts-proxy': typeof ApiTtsProxyRoute
-  '/api/tts-voices': typeof ApiTtsVoicesRoute
   '/checkin/$token': typeof CheckinTokenRoute
+  '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/paciente/financeiro': typeof PacienteFinanceiroRoute
   '/paciente/perfil': typeof PacientePerfilRoute
-  '/painel/$clinicaId': typeof PainelClinicaIdRoute
-  '/totem/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente': typeof PacienteIndexRoute
-  '/app/agenda': typeof AuthenticatedAppAgendaRoute
+  '/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
+  '/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
+  '/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
   '/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
-  '/app/backups': typeof AuthenticatedAppBackupsRoute
   '/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/app/caixa': typeof AuthenticatedAppCaixaRoute
+  '/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/app/cargos': typeof AuthenticatedAppCargosRoute
   '/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/app/chat': typeof AuthenticatedAppChatRoute
@@ -997,18 +1002,28 @@ export interface FileRoutesByTo {
   '/app/dev-clientes-shell': typeof AuthenticatedAppDevClientesShellRoute
   '/app/dev-hhp': typeof AuthenticatedAppDevHhpRoute
   '/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
+  '/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
   '/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/app/documentos': typeof AuthenticatedAppDocumentosRoute
+  '/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
   '/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
+  '/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
+  '/app/integration-secrets': typeof AuthenticatedAppIntegrationSecretsRoute
+  '/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/app/medicos': typeof AuthenticatedAppMedicosRoute
+  '/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
+  '/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
+  '/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
+  '/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/app/nina': typeof AuthenticatedAppNinaRoute
   '/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
@@ -1028,11 +1043,9 @@ export interface FileRoutesByTo {
   '/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
-  '/api/public/tts': typeof ApiPublicTtsRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
-  '/painel/t/$token': typeof PainelTTokenRoute
-  '/totem/t/$token': typeof TotemTTokenRoute
   '/app': typeof AuthenticatedAppIndexRoute
+  '/app/agenda/express': typeof AuthenticatedAppAgendaExpressRoute
   '/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
   '/app/cartao-beneficios/beneficios': typeof AuthenticatedAppCartaoBeneficiosBeneficiosRoute
   '/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
@@ -1042,38 +1055,33 @@ export interface FileRoutesByTo {
   '/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
   '/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
-  '/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
-  '/app/configuracoes/voz': typeof AuthenticatedAppConfiguracoesVozRoute
   '/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
-  '/app/financeiro/atendimentos-externos': typeof AuthenticatedAppFinanceiroAtendimentosExternosRoute
   '/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
   '/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
   '/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
-  '/app/financeiro/estorno': typeof AuthenticatedAppFinanceiroEstornoRoute
   '/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
   '/app/financeiro/movimento': typeof AuthenticatedAppFinanceiroMovimentoRoute
   '/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
-  '/app/hr-contratos/$id': typeof AuthenticatedAppHrContratosIdRoute
+  '/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
-  '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/app/clientes': typeof AuthenticatedAppClientesIndexRoute
   '/app/equipe': typeof AuthenticatedAppEquipeIndexRoute
   '/app/financeiro': typeof AuthenticatedAppFinanceiroIndexRoute
-  '/app/hr-contratos': typeof AuthenticatedAppHrContratosIndexRoute
   '/app/nfse': typeof AuthenticatedAppNfseIndexRoute
   '/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
-  '/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
+  '/app/equipe/enfermeiro/$userId/editar': typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute
+  '/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
   '/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
 export interface FileRoutesById {
@@ -1083,33 +1091,30 @@ export interface FileRoutesById {
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
-  '/medico': typeof MedicoRoute
-  '/painel': typeof PainelRouteWithChildren
-  '/reset-password': typeof ResetPasswordRoute
+  '/painel': typeof PainelRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/totem': typeof TotemRoute
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
-  '/api/tts-proxy': typeof ApiTtsProxyRoute
-  '/api/tts-voices': typeof ApiTtsVoicesRoute
   '/checkin/$token': typeof CheckinTokenRoute
+  '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/paciente/financeiro': typeof PacienteFinanceiroRoute
   '/paciente/perfil': typeof PacientePerfilRoute
-  '/painel/$clinicaId': typeof PainelClinicaIdRoute
-  '/totem_/$clinicaId': typeof TotemClinicaIdRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
-  '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRoute
+  '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
+  '/_authenticated/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
   '/_authenticated/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/_authenticated/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
   '/_authenticated/app/atendimento-ia': typeof AuthenticatedAppAtendimentoIaRouteWithChildren
+  '/_authenticated/app/atendimento-multiplo': typeof AuthenticatedAppAtendimentoMultiploRoute
   '/_authenticated/app/auditoria': typeof AuthenticatedAppAuditoriaRoute
-  '/_authenticated/app/backups': typeof AuthenticatedAppBackupsRoute
   '/_authenticated/app/boletos': typeof AuthenticatedAppBoletosRoute
   '/_authenticated/app/caixa': typeof AuthenticatedAppCaixaRoute
+  '/_authenticated/app/campanhas': typeof AuthenticatedAppCampanhasRoute
   '/_authenticated/app/cargos': typeof AuthenticatedAppCargosRoute
   '/_authenticated/app/cartao-beneficios': typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   '/_authenticated/app/chat': typeof AuthenticatedAppChatRoute
@@ -1122,20 +1127,30 @@ export interface FileRoutesById {
   '/_authenticated/app/dev-clientes-shell': typeof AuthenticatedAppDevClientesShellRoute
   '/_authenticated/app/dev-hhp': typeof AuthenticatedAppDevHhpRoute
   '/_authenticated/app/dev-list-shell': typeof AuthenticatedAppDevListShellRoute
+  '/_authenticated/app/dev-menu-shell': typeof AuthenticatedAppDevMenuShellRoute
   '/_authenticated/app/dev-orcamentos-shell': typeof AuthenticatedAppDevOrcamentosShellRoute
   '/_authenticated/app/disponibilidades': typeof AuthenticatedAppDisponibilidadesRoute
   '/_authenticated/app/documentos': typeof AuthenticatedAppDocumentosRoute
+  '/_authenticated/app/enfermagem-recursos': typeof AuthenticatedAppEnfermagemRecursosRoute
   '/_authenticated/app/equipe': typeof AuthenticatedAppEquipeRouteWithChildren
   '/_authenticated/app/especialidades': typeof AuthenticatedAppEspecialidadesRoute
   '/_authenticated/app/estoque': typeof AuthenticatedAppEstoqueRoute
   '/_authenticated/app/exames-resultados': typeof AuthenticatedAppExamesResultadosRoute
   '/_authenticated/app/financeiro': typeof AuthenticatedAppFinanceiroRouteWithChildren
   '/_authenticated/app/fluxo': typeof AuthenticatedAppFluxoRoute
+  '/_authenticated/app/funcionarios': typeof AuthenticatedAppFuncionariosRoute
+  '/_authenticated/app/hr-contratos': typeof AuthenticatedAppHrContratosRoute
   '/_authenticated/app/hr-ferias': typeof AuthenticatedAppHrFeriasRoute
   '/_authenticated/app/hr-holerites': typeof AuthenticatedAppHrHoleritesRoute
   '/_authenticated/app/hr-ponto': typeof AuthenticatedAppHrPontoRoute
+  '/_authenticated/app/integration-secrets': typeof AuthenticatedAppIntegrationSecretsRoute
+  '/_authenticated/app/lgpd': typeof AuthenticatedAppLgpdRoute
   '/_authenticated/app/lms-admin': typeof AuthenticatedAppLmsAdminRoute
   '/_authenticated/app/medicos': typeof AuthenticatedAppMedicosRoute
+  '/_authenticated/app/mkt-envios': typeof AuthenticatedAppMktEnviosRoute
+  '/_authenticated/app/mkt-landing': typeof AuthenticatedAppMktLandingRoute
+  '/_authenticated/app/mkt-leads': typeof AuthenticatedAppMktLeadsRoute
+  '/_authenticated/app/mkt-segmentos': typeof AuthenticatedAppMktSegmentosRoute
   '/_authenticated/app/modelos-documentos': typeof AuthenticatedAppModelosDocumentosRoute
   '/_authenticated/app/nina': typeof AuthenticatedAppNinaRoute
   '/_authenticated/app/odontologia': typeof AuthenticatedAppOdontologiaRoute
@@ -1155,11 +1170,9 @@ export interface FileRoutesById {
   '/_authenticated/app/treinamentos': typeof AuthenticatedAppTreinamentosRoute
   '/_authenticated/app/triagem-enfermagem': typeof AuthenticatedAppTriagemEnfermagemRoute
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
-  '/api/public/tts': typeof ApiPublicTtsRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
-  '/painel_/t/$token': typeof PainelTTokenRoute
-  '/totem_/t/$token': typeof TotemTTokenRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
+  '/_authenticated/app/agenda/express': typeof AuthenticatedAppAgendaExpressRoute
   '/_authenticated/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
   '/_authenticated/app/cartao-beneficios/beneficios': typeof AuthenticatedAppCartaoBeneficiosBeneficiosRoute
   '/_authenticated/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
@@ -1169,38 +1182,33 @@ export interface FileRoutesById {
   '/_authenticated/app/cartao-beneficios/relatorios': typeof AuthenticatedAppCartaoBeneficiosRelatoriosRoute
   '/_authenticated/app/clientes/duplicados': typeof AuthenticatedAppClientesDuplicadosRoute
   '/_authenticated/app/configuracoes/nfse': typeof AuthenticatedAppConfiguracoesNfseRoute
-  '/_authenticated/app/configuracoes/painel-totem': typeof AuthenticatedAppConfiguracoesPainelTotemRoute
-  '/_authenticated/app/configuracoes/voz': typeof AuthenticatedAppConfiguracoesVozRoute
   '/_authenticated/app/financeiro/alertas': typeof AuthenticatedAppFinanceiroAlertasRoute
   '/_authenticated/app/financeiro/analitico': typeof AuthenticatedAppFinanceiroAnaliticoRoute
   '/_authenticated/app/financeiro/atendimentos': typeof AuthenticatedAppFinanceiroAtendimentosRoute
-  '/_authenticated/app/financeiro/atendimentos-externos': typeof AuthenticatedAppFinanceiroAtendimentosExternosRoute
   '/_authenticated/app/financeiro/bi': typeof AuthenticatedAppFinanceiroBiRoute
   '/_authenticated/app/financeiro/categorias': typeof AuthenticatedAppFinanceiroCategoriasRoute
   '/_authenticated/app/financeiro/contas': typeof AuthenticatedAppFinanceiroContasRoute
   '/_authenticated/app/financeiro/empresas': typeof AuthenticatedAppFinanceiroEmpresasRoute
   '/_authenticated/app/financeiro/estatisticas': typeof AuthenticatedAppFinanceiroEstatisticasRoute
-  '/_authenticated/app/financeiro/estorno': typeof AuthenticatedAppFinanceiroEstornoRoute
   '/_authenticated/app/financeiro/lembretes': typeof AuthenticatedAppFinanceiroLembretesRoute
   '/_authenticated/app/financeiro/movimento': typeof AuthenticatedAppFinanceiroMovimentoRoute
   '/_authenticated/app/financeiro/notas': typeof AuthenticatedAppFinanceiroNotasRoute
   '/_authenticated/app/financeiro/regras-ia': typeof AuthenticatedAppFinanceiroRegrasIaRoute
   '/_authenticated/app/financeiro/relatorios': typeof AuthenticatedAppFinanceiroRelatoriosRoute
-  '/_authenticated/app/hr-contratos/$id': typeof AuthenticatedAppHrContratosIdRoute
+  '/_authenticated/app/funcionario/$userId': typeof AuthenticatedAppFuncionarioUserIdRoute
   '/_authenticated/app/imprimir/$agendamentoId': typeof AuthenticatedAppImprimirAgendamentoIdRoute
   '/_authenticated/app/medico/$medicoId': typeof AuthenticatedAppMedicoMedicoIdRoute
   '/_authenticated/app/nfse/testar': typeof AuthenticatedAppNfseTestarRoute
   '/api/public/focusnfe/webhook': typeof ApiPublicFocusnfeWebhookRoute
-  '/api/public/hooks/backup-diario': typeof ApiPublicHooksBackupDiarioRoute
   '/api/public/whatsapp/$clinicaId': typeof ApiPublicWhatsappClinicaIdRoute
   '/_authenticated/app/atendimento-ia/': typeof AuthenticatedAppAtendimentoIaIndexRoute
   '/_authenticated/app/clientes/': typeof AuthenticatedAppClientesIndexRoute
   '/_authenticated/app/equipe/': typeof AuthenticatedAppEquipeIndexRoute
   '/_authenticated/app/financeiro/': typeof AuthenticatedAppFinanceiroIndexRoute
-  '/_authenticated/app/hr-contratos/': typeof AuthenticatedAppHrContratosIndexRoute
   '/_authenticated/app/nfse/': typeof AuthenticatedAppNfseIndexRoute
   '/_authenticated/app/clientes/$pacienteId/editar': typeof AuthenticatedAppClientesPacienteIdEditarRoute
-  '/_authenticated/app/clientes/$pacienteId/visualizar': typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
+  '/_authenticated/app/equipe/enfermeiro/$userId/editar': typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute
+  '/_authenticated/app/equipe/funcionario/$userId/editar': typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
   '/_authenticated/app/equipe/medico/$medicoId/editar': typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
 export interface FileRouteTypes {
@@ -1210,33 +1218,30 @@ export interface FileRouteTypes {
     | '/autoatendimento'
     | '/diagnostico'
     | '/login'
-    | '/medico'
     | '/painel'
-    | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
     | '/totem'
     | '/app'
-    | '/api/tts-proxy'
-    | '/api/tts-voices'
     | '/checkin/$token'
+    | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
     | '/paciente/financeiro'
     | '/paciente/perfil'
-    | '/painel/$clinicaId'
-    | '/totem/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente/'
     | '/app/agenda'
+    | '/app/agenda-v2'
     | '/app/alertas-enfermagem'
     | '/app/anamneses'
     | '/app/atendimento-ia'
+    | '/app/atendimento-multiplo'
     | '/app/auditoria'
-    | '/app/backups'
     | '/app/boletos'
     | '/app/caixa'
+    | '/app/campanhas'
     | '/app/cargos'
     | '/app/cartao-beneficios'
     | '/app/chat'
@@ -1249,20 +1254,30 @@ export interface FileRouteTypes {
     | '/app/dev-clientes-shell'
     | '/app/dev-hhp'
     | '/app/dev-list-shell'
+    | '/app/dev-menu-shell'
     | '/app/dev-orcamentos-shell'
     | '/app/disponibilidades'
     | '/app/documentos'
+    | '/app/enfermagem-recursos'
     | '/app/equipe'
     | '/app/especialidades'
     | '/app/estoque'
     | '/app/exames-resultados'
     | '/app/financeiro'
     | '/app/fluxo'
+    | '/app/funcionarios'
+    | '/app/hr-contratos'
     | '/app/hr-ferias'
     | '/app/hr-holerites'
     | '/app/hr-ponto'
+    | '/app/integration-secrets'
+    | '/app/lgpd'
     | '/app/lms-admin'
     | '/app/medicos'
+    | '/app/mkt-envios'
+    | '/app/mkt-landing'
+    | '/app/mkt-leads'
+    | '/app/mkt-segmentos'
     | '/app/modelos-documentos'
     | '/app/nina'
     | '/app/odontologia'
@@ -1282,11 +1297,9 @@ export interface FileRouteTypes {
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
-    | '/api/public/tts'
     | '/p/contrato/$token'
-    | '/painel/t/$token'
-    | '/totem/t/$token'
     | '/app/'
+    | '/app/agenda/express'
     | '/app/atendimento-ia/$agendamentoId'
     | '/app/cartao-beneficios/beneficios'
     | '/app/cartao-beneficios/contratos'
@@ -1296,38 +1309,33 @@ export interface FileRouteTypes {
     | '/app/cartao-beneficios/relatorios'
     | '/app/clientes/duplicados'
     | '/app/configuracoes/nfse'
-    | '/app/configuracoes/painel-totem'
-    | '/app/configuracoes/voz'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
     | '/app/financeiro/atendimentos'
-    | '/app/financeiro/atendimentos-externos'
     | '/app/financeiro/bi'
     | '/app/financeiro/categorias'
     | '/app/financeiro/contas'
     | '/app/financeiro/empresas'
     | '/app/financeiro/estatisticas'
-    | '/app/financeiro/estorno'
     | '/app/financeiro/lembretes'
     | '/app/financeiro/movimento'
     | '/app/financeiro/notas'
     | '/app/financeiro/regras-ia'
     | '/app/financeiro/relatorios'
-    | '/app/hr-contratos/$id'
+    | '/app/funcionario/$userId'
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
-    | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia/'
     | '/app/clientes/'
     | '/app/equipe/'
     | '/app/financeiro/'
-    | '/app/hr-contratos/'
     | '/app/nfse/'
     | '/app/clientes/$pacienteId/editar'
-    | '/app/clientes/$pacienteId/visualizar'
+    | '/app/equipe/enfermeiro/$userId/editar'
+    | '/app/equipe/funcionario/$userId/editar'
     | '/app/equipe/medico/$medicoId/editar'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1335,31 +1343,28 @@ export interface FileRouteTypes {
     | '/autoatendimento'
     | '/diagnostico'
     | '/login'
-    | '/medico'
     | '/painel'
-    | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
     | '/totem'
-    | '/api/tts-proxy'
-    | '/api/tts-voices'
     | '/checkin/$token'
+    | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
     | '/paciente/financeiro'
     | '/paciente/perfil'
-    | '/painel/$clinicaId'
-    | '/totem/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente'
     | '/app/agenda'
+    | '/app/agenda-v2'
     | '/app/alertas-enfermagem'
     | '/app/anamneses'
+    | '/app/atendimento-multiplo'
     | '/app/auditoria'
-    | '/app/backups'
     | '/app/boletos'
     | '/app/caixa'
+    | '/app/campanhas'
     | '/app/cargos'
     | '/app/cartao-beneficios'
     | '/app/chat'
@@ -1372,18 +1377,28 @@ export interface FileRouteTypes {
     | '/app/dev-clientes-shell'
     | '/app/dev-hhp'
     | '/app/dev-list-shell'
+    | '/app/dev-menu-shell'
     | '/app/dev-orcamentos-shell'
     | '/app/disponibilidades'
     | '/app/documentos'
+    | '/app/enfermagem-recursos'
     | '/app/especialidades'
     | '/app/estoque'
     | '/app/exames-resultados'
     | '/app/fluxo'
+    | '/app/funcionarios'
+    | '/app/hr-contratos'
     | '/app/hr-ferias'
     | '/app/hr-holerites'
     | '/app/hr-ponto'
+    | '/app/integration-secrets'
+    | '/app/lgpd'
     | '/app/lms-admin'
     | '/app/medicos'
+    | '/app/mkt-envios'
+    | '/app/mkt-landing'
+    | '/app/mkt-leads'
+    | '/app/mkt-segmentos'
     | '/app/modelos-documentos'
     | '/app/nina'
     | '/app/odontologia'
@@ -1403,11 +1418,9 @@ export interface FileRouteTypes {
     | '/app/treinamentos'
     | '/app/triagem-enfermagem'
     | '/app/unidades'
-    | '/api/public/tts'
     | '/p/contrato/$token'
-    | '/painel/t/$token'
-    | '/totem/t/$token'
     | '/app'
+    | '/app/agenda/express'
     | '/app/atendimento-ia/$agendamentoId'
     | '/app/cartao-beneficios/beneficios'
     | '/app/cartao-beneficios/contratos'
@@ -1417,38 +1430,33 @@ export interface FileRouteTypes {
     | '/app/cartao-beneficios/relatorios'
     | '/app/clientes/duplicados'
     | '/app/configuracoes/nfse'
-    | '/app/configuracoes/painel-totem'
-    | '/app/configuracoes/voz'
     | '/app/financeiro/alertas'
     | '/app/financeiro/analitico'
     | '/app/financeiro/atendimentos'
-    | '/app/financeiro/atendimentos-externos'
     | '/app/financeiro/bi'
     | '/app/financeiro/categorias'
     | '/app/financeiro/contas'
     | '/app/financeiro/empresas'
     | '/app/financeiro/estatisticas'
-    | '/app/financeiro/estorno'
     | '/app/financeiro/lembretes'
     | '/app/financeiro/movimento'
     | '/app/financeiro/notas'
     | '/app/financeiro/regras-ia'
     | '/app/financeiro/relatorios'
-    | '/app/hr-contratos/$id'
+    | '/app/funcionario/$userId'
     | '/app/imprimir/$agendamentoId'
     | '/app/medico/$medicoId'
     | '/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
-    | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
     | '/app/atendimento-ia'
     | '/app/clientes'
     | '/app/equipe'
     | '/app/financeiro'
-    | '/app/hr-contratos'
     | '/app/nfse'
     | '/app/clientes/$pacienteId/editar'
-    | '/app/clientes/$pacienteId/visualizar'
+    | '/app/equipe/enfermeiro/$userId/editar'
+    | '/app/equipe/funcionario/$userId/editar'
     | '/app/equipe/medico/$medicoId/editar'
   id:
     | '__root__'
@@ -1457,33 +1465,30 @@ export interface FileRouteTypes {
     | '/autoatendimento'
     | '/diagnostico'
     | '/login'
-    | '/medico'
     | '/painel'
-    | '/reset-password'
     | '/signup'
     | '/sitemap.xml'
     | '/totem'
     | '/_authenticated/app'
-    | '/api/tts-proxy'
-    | '/api/tts-voices'
     | '/checkin/$token'
+    | '/lp/$slug'
     | '/p/$token'
     | '/paciente/cartoes'
     | '/paciente/consultas'
     | '/paciente/financeiro'
     | '/paciente/perfil'
-    | '/painel/$clinicaId'
-    | '/totem_/$clinicaId'
     | '/verificar/$codigo'
     | '/paciente/'
     | '/_authenticated/app/agenda'
+    | '/_authenticated/app/agenda-v2'
     | '/_authenticated/app/alertas-enfermagem'
     | '/_authenticated/app/anamneses'
     | '/_authenticated/app/atendimento-ia'
+    | '/_authenticated/app/atendimento-multiplo'
     | '/_authenticated/app/auditoria'
-    | '/_authenticated/app/backups'
     | '/_authenticated/app/boletos'
     | '/_authenticated/app/caixa'
+    | '/_authenticated/app/campanhas'
     | '/_authenticated/app/cargos'
     | '/_authenticated/app/cartao-beneficios'
     | '/_authenticated/app/chat'
@@ -1496,20 +1501,30 @@ export interface FileRouteTypes {
     | '/_authenticated/app/dev-clientes-shell'
     | '/_authenticated/app/dev-hhp'
     | '/_authenticated/app/dev-list-shell'
+    | '/_authenticated/app/dev-menu-shell'
     | '/_authenticated/app/dev-orcamentos-shell'
     | '/_authenticated/app/disponibilidades'
     | '/_authenticated/app/documentos'
+    | '/_authenticated/app/enfermagem-recursos'
     | '/_authenticated/app/equipe'
     | '/_authenticated/app/especialidades'
     | '/_authenticated/app/estoque'
     | '/_authenticated/app/exames-resultados'
     | '/_authenticated/app/financeiro'
     | '/_authenticated/app/fluxo'
+    | '/_authenticated/app/funcionarios'
+    | '/_authenticated/app/hr-contratos'
     | '/_authenticated/app/hr-ferias'
     | '/_authenticated/app/hr-holerites'
     | '/_authenticated/app/hr-ponto'
+    | '/_authenticated/app/integration-secrets'
+    | '/_authenticated/app/lgpd'
     | '/_authenticated/app/lms-admin'
     | '/_authenticated/app/medicos'
+    | '/_authenticated/app/mkt-envios'
+    | '/_authenticated/app/mkt-landing'
+    | '/_authenticated/app/mkt-leads'
+    | '/_authenticated/app/mkt-segmentos'
     | '/_authenticated/app/modelos-documentos'
     | '/_authenticated/app/nina'
     | '/_authenticated/app/odontologia'
@@ -1529,11 +1544,9 @@ export interface FileRouteTypes {
     | '/_authenticated/app/treinamentos'
     | '/_authenticated/app/triagem-enfermagem'
     | '/_authenticated/app/unidades'
-    | '/api/public/tts'
     | '/p/contrato/$token'
-    | '/painel_/t/$token'
-    | '/totem_/t/$token'
     | '/_authenticated/app/'
+    | '/_authenticated/app/agenda/express'
     | '/_authenticated/app/atendimento-ia/$agendamentoId'
     | '/_authenticated/app/cartao-beneficios/beneficios'
     | '/_authenticated/app/cartao-beneficios/contratos'
@@ -1543,38 +1556,33 @@ export interface FileRouteTypes {
     | '/_authenticated/app/cartao-beneficios/relatorios'
     | '/_authenticated/app/clientes/duplicados'
     | '/_authenticated/app/configuracoes/nfse'
-    | '/_authenticated/app/configuracoes/painel-totem'
-    | '/_authenticated/app/configuracoes/voz'
     | '/_authenticated/app/financeiro/alertas'
     | '/_authenticated/app/financeiro/analitico'
     | '/_authenticated/app/financeiro/atendimentos'
-    | '/_authenticated/app/financeiro/atendimentos-externos'
     | '/_authenticated/app/financeiro/bi'
     | '/_authenticated/app/financeiro/categorias'
     | '/_authenticated/app/financeiro/contas'
     | '/_authenticated/app/financeiro/empresas'
     | '/_authenticated/app/financeiro/estatisticas'
-    | '/_authenticated/app/financeiro/estorno'
     | '/_authenticated/app/financeiro/lembretes'
     | '/_authenticated/app/financeiro/movimento'
     | '/_authenticated/app/financeiro/notas'
     | '/_authenticated/app/financeiro/regras-ia'
     | '/_authenticated/app/financeiro/relatorios'
-    | '/_authenticated/app/hr-contratos/$id'
+    | '/_authenticated/app/funcionario/$userId'
     | '/_authenticated/app/imprimir/$agendamentoId'
     | '/_authenticated/app/medico/$medicoId'
     | '/_authenticated/app/nfse/testar'
     | '/api/public/focusnfe/webhook'
-    | '/api/public/hooks/backup-diario'
     | '/api/public/whatsapp/$clinicaId'
     | '/_authenticated/app/atendimento-ia/'
     | '/_authenticated/app/clientes/'
     | '/_authenticated/app/equipe/'
     | '/_authenticated/app/financeiro/'
-    | '/_authenticated/app/hr-contratos/'
     | '/_authenticated/app/nfse/'
     | '/_authenticated/app/clientes/$pacienteId/editar'
-    | '/_authenticated/app/clientes/$pacienteId/visualizar'
+    | '/_authenticated/app/equipe/enfermeiro/$userId/editar'
+    | '/_authenticated/app/equipe/funcionario/$userId/editar'
     | '/_authenticated/app/equipe/medico/$medicoId/editar'
   fileRoutesById: FileRoutesById
 }
@@ -1584,29 +1592,21 @@ export interface RootRouteChildren {
   AutoatendimentoRoute: typeof AutoatendimentoRoute
   DiagnosticoRoute: typeof DiagnosticoRoute
   LoginRoute: typeof LoginRoute
-  MedicoRoute: typeof MedicoRoute
-  PainelRoute: typeof PainelRouteWithChildren
-  ResetPasswordRoute: typeof ResetPasswordRoute
+  PainelRoute: typeof PainelRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TotemRoute: typeof TotemRoute
-  ApiTtsProxyRoute: typeof ApiTtsProxyRoute
-  ApiTtsVoicesRoute: typeof ApiTtsVoicesRoute
   CheckinTokenRoute: typeof CheckinTokenRoute
+  LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
   PacienteCartoesRoute: typeof PacienteCartoesRoute
   PacienteConsultasRoute: typeof PacienteConsultasRoute
   PacienteFinanceiroRoute: typeof PacienteFinanceiroRoute
   PacientePerfilRoute: typeof PacientePerfilRoute
-  TotemClinicaIdRoute: typeof TotemClinicaIdRoute
   VerificarCodigoRoute: typeof VerificarCodigoRoute
   PacienteIndexRoute: typeof PacienteIndexRoute
-  ApiPublicTtsRoute: typeof ApiPublicTtsRoute
   PContratoTokenRoute: typeof PContratoTokenRoute
-  PainelTTokenRoute: typeof PainelTTokenRoute
-  TotemTTokenRoute: typeof TotemTTokenRoute
   ApiPublicFocusnfeWebhookRoute: typeof ApiPublicFocusnfeWebhookRoute
-  ApiPublicHooksBackupDiarioRoute: typeof ApiPublicHooksBackupDiarioRoute
   ApiPublicWhatsappClinicaIdRoute: typeof ApiPublicWhatsappClinicaIdRoute
 }
 
@@ -1633,25 +1633,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/painel': {
       id: '/painel'
       path: '/painel'
       fullPath: '/painel'
       preLoaderRoute: typeof PainelRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/medico': {
-      id: '/medico'
-      path: '/medico'
-      fullPath: '/medico'
-      preLoaderRoute: typeof MedicoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -1703,20 +1689,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerificarCodigoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/totem_/$clinicaId': {
-      id: '/totem_/$clinicaId'
-      path: '/totem/$clinicaId'
-      fullPath: '/totem/$clinicaId'
-      preLoaderRoute: typeof TotemClinicaIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/painel/$clinicaId': {
-      id: '/painel/$clinicaId'
-      path: '/$clinicaId'
-      fullPath: '/painel/$clinicaId'
-      preLoaderRoute: typeof PainelClinicaIdRouteImport
-      parentRoute: typeof PainelRoute
-    }
     '/paciente/perfil': {
       id: '/paciente/perfil'
       path: '/paciente/perfil'
@@ -1752,25 +1724,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lp/$slug': {
+      id: '/lp/$slug'
+      path: '/lp/$slug'
+      fullPath: '/lp/$slug'
+      preLoaderRoute: typeof LpSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/checkin/$token': {
       id: '/checkin/$token'
       path: '/checkin/$token'
       fullPath: '/checkin/$token'
       preLoaderRoute: typeof CheckinTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tts-voices': {
-      id: '/api/tts-voices'
-      path: '/api/tts-voices'
-      fullPath: '/api/tts-voices'
-      preLoaderRoute: typeof ApiTtsVoicesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tts-proxy': {
-      id: '/api/tts-proxy'
-      path: '/api/tts-proxy'
-      fullPath: '/api/tts-proxy'
-      preLoaderRoute: typeof ApiTtsProxyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app': {
@@ -1787,32 +1752,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/totem_/t/$token': {
-      id: '/totem_/t/$token'
-      path: '/totem/t/$token'
-      fullPath: '/totem/t/$token'
-      preLoaderRoute: typeof TotemTTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/painel_/t/$token': {
-      id: '/painel_/t/$token'
-      path: '/painel/t/$token'
-      fullPath: '/painel/t/$token'
-      preLoaderRoute: typeof PainelTTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/p/contrato/$token': {
       id: '/p/contrato/$token'
       path: '/p/contrato/$token'
       fullPath: '/p/contrato/$token'
       preLoaderRoute: typeof PContratoTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/tts': {
-      id: '/api/public/tts'
-      path: '/api/public/tts'
-      fullPath: '/api/public/tts'
-      preLoaderRoute: typeof ApiPublicTtsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app/unidades': {
@@ -1948,6 +1892,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppModelosDocumentosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/mkt-segmentos': {
+      id: '/_authenticated/app/mkt-segmentos'
+      path: '/mkt-segmentos'
+      fullPath: '/app/mkt-segmentos'
+      preLoaderRoute: typeof AuthenticatedAppMktSegmentosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/mkt-leads': {
+      id: '/_authenticated/app/mkt-leads'
+      path: '/mkt-leads'
+      fullPath: '/app/mkt-leads'
+      preLoaderRoute: typeof AuthenticatedAppMktLeadsRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/mkt-landing': {
+      id: '/_authenticated/app/mkt-landing'
+      path: '/mkt-landing'
+      fullPath: '/app/mkt-landing'
+      preLoaderRoute: typeof AuthenticatedAppMktLandingRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/mkt-envios': {
+      id: '/_authenticated/app/mkt-envios'
+      path: '/mkt-envios'
+      fullPath: '/app/mkt-envios'
+      preLoaderRoute: typeof AuthenticatedAppMktEnviosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/medicos': {
       id: '/_authenticated/app/medicos'
       path: '/medicos'
@@ -1960,6 +1932,20 @@ declare module '@tanstack/react-router' {
       path: '/lms-admin'
       fullPath: '/app/lms-admin'
       preLoaderRoute: typeof AuthenticatedAppLmsAdminRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/lgpd': {
+      id: '/_authenticated/app/lgpd'
+      path: '/lgpd'
+      fullPath: '/app/lgpd'
+      preLoaderRoute: typeof AuthenticatedAppLgpdRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/integration-secrets': {
+      id: '/_authenticated/app/integration-secrets'
+      path: '/integration-secrets'
+      fullPath: '/app/integration-secrets'
+      preLoaderRoute: typeof AuthenticatedAppIntegrationSecretsRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/hr-ponto': {
@@ -1981,6 +1967,20 @@ declare module '@tanstack/react-router' {
       path: '/hr-ferias'
       fullPath: '/app/hr-ferias'
       preLoaderRoute: typeof AuthenticatedAppHrFeriasRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/hr-contratos': {
+      id: '/_authenticated/app/hr-contratos'
+      path: '/hr-contratos'
+      fullPath: '/app/hr-contratos'
+      preLoaderRoute: typeof AuthenticatedAppHrContratosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/funcionarios': {
+      id: '/_authenticated/app/funcionarios'
+      path: '/funcionarios'
+      fullPath: '/app/funcionarios'
+      preLoaderRoute: typeof AuthenticatedAppFuncionariosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/fluxo': {
@@ -2025,6 +2025,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppEquipeRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/enfermagem-recursos': {
+      id: '/_authenticated/app/enfermagem-recursos'
+      path: '/enfermagem-recursos'
+      fullPath: '/app/enfermagem-recursos'
+      preLoaderRoute: typeof AuthenticatedAppEnfermagemRecursosRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/documentos': {
       id: '/_authenticated/app/documentos'
       path: '/documentos'
@@ -2044,6 +2051,13 @@ declare module '@tanstack/react-router' {
       path: '/dev-orcamentos-shell'
       fullPath: '/app/dev-orcamentos-shell'
       preLoaderRoute: typeof AuthenticatedAppDevOrcamentosShellRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/dev-menu-shell': {
+      id: '/_authenticated/app/dev-menu-shell'
+      path: '/dev-menu-shell'
+      fullPath: '/app/dev-menu-shell'
+      preLoaderRoute: typeof AuthenticatedAppDevMenuShellRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/dev-list-shell': {
@@ -2130,6 +2144,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppCargosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/campanhas': {
+      id: '/_authenticated/app/campanhas'
+      path: '/campanhas'
+      fullPath: '/app/campanhas'
+      preLoaderRoute: typeof AuthenticatedAppCampanhasRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/caixa': {
       id: '/_authenticated/app/caixa'
       path: '/caixa'
@@ -2144,18 +2165,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppBoletosRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/backups': {
-      id: '/_authenticated/app/backups'
-      path: '/backups'
-      fullPath: '/app/backups'
-      preLoaderRoute: typeof AuthenticatedAppBackupsRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
     '/_authenticated/app/auditoria': {
       id: '/_authenticated/app/auditoria'
       path: '/auditoria'
       fullPath: '/app/auditoria'
       preLoaderRoute: typeof AuthenticatedAppAuditoriaRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/atendimento-multiplo': {
+      id: '/_authenticated/app/atendimento-multiplo'
+      path: '/atendimento-multiplo'
+      fullPath: '/app/atendimento-multiplo'
+      preLoaderRoute: typeof AuthenticatedAppAtendimentoMultiploRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/atendimento-ia': {
@@ -2179,6 +2200,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppAlertasEnfermagemRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/agenda-v2': {
+      id: '/_authenticated/app/agenda-v2'
+      path: '/agenda-v2'
+      fullPath: '/app/agenda-v2'
+      preLoaderRoute: typeof AuthenticatedAppAgendaV2RouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/agenda': {
       id: '/_authenticated/app/agenda'
       path: '/agenda'
@@ -2191,13 +2219,6 @@ declare module '@tanstack/react-router' {
       path: '/nfse'
       fullPath: '/app/nfse/'
       preLoaderRoute: typeof AuthenticatedAppNfseIndexRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/hr-contratos/': {
-      id: '/_authenticated/app/hr-contratos/'
-      path: '/hr-contratos'
-      fullPath: '/app/hr-contratos/'
-      preLoaderRoute: typeof AuthenticatedAppHrContratosIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/financeiro/': {
@@ -2235,13 +2256,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicWhatsappClinicaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/backup-diario': {
-      id: '/api/public/hooks/backup-diario'
-      path: '/api/public/hooks/backup-diario'
-      fullPath: '/api/public/hooks/backup-diario'
-      preLoaderRoute: typeof ApiPublicHooksBackupDiarioRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/focusnfe/webhook': {
       id: '/api/public/focusnfe/webhook'
       path: '/api/public/focusnfe/webhook'
@@ -2270,11 +2284,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppImprimirAgendamentoIdRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
-    '/_authenticated/app/hr-contratos/$id': {
-      id: '/_authenticated/app/hr-contratos/$id'
-      path: '/hr-contratos/$id'
-      fullPath: '/app/hr-contratos/$id'
-      preLoaderRoute: typeof AuthenticatedAppHrContratosIdRouteImport
+    '/_authenticated/app/funcionario/$userId': {
+      id: '/_authenticated/app/funcionario/$userId'
+      path: '/funcionario/$userId'
+      fullPath: '/app/funcionario/$userId'
+      preLoaderRoute: typeof AuthenticatedAppFuncionarioUserIdRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/financeiro/relatorios': {
@@ -2312,13 +2326,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroLembretesRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
-    '/_authenticated/app/financeiro/estorno': {
-      id: '/_authenticated/app/financeiro/estorno'
-      path: '/estorno'
-      fullPath: '/app/financeiro/estorno'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroEstornoRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
     '/_authenticated/app/financeiro/estatisticas': {
       id: '/_authenticated/app/financeiro/estatisticas'
       path: '/estatisticas'
@@ -2354,13 +2361,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFinanceiroBiRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
     }
-    '/_authenticated/app/financeiro/atendimentos-externos': {
-      id: '/_authenticated/app/financeiro/atendimentos-externos'
-      path: '/atendimentos-externos'
-      fullPath: '/app/financeiro/atendimentos-externos'
-      preLoaderRoute: typeof AuthenticatedAppFinanceiroAtendimentosExternosRouteImport
-      parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
     '/_authenticated/app/financeiro/atendimentos': {
       id: '/_authenticated/app/financeiro/atendimentos'
       path: '/atendimentos'
@@ -2381,20 +2381,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/financeiro/alertas'
       preLoaderRoute: typeof AuthenticatedAppFinanceiroAlertasRouteImport
       parentRoute: typeof AuthenticatedAppFinanceiroRoute
-    }
-    '/_authenticated/app/configuracoes/voz': {
-      id: '/_authenticated/app/configuracoes/voz'
-      path: '/configuracoes/voz'
-      fullPath: '/app/configuracoes/voz'
-      preLoaderRoute: typeof AuthenticatedAppConfiguracoesVozRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
-    }
-    '/_authenticated/app/configuracoes/painel-totem': {
-      id: '/_authenticated/app/configuracoes/painel-totem'
-      path: '/configuracoes/painel-totem'
-      fullPath: '/app/configuracoes/painel-totem'
-      preLoaderRoute: typeof AuthenticatedAppConfiguracoesPainelTotemRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/configuracoes/nfse': {
       id: '/_authenticated/app/configuracoes/nfse'
@@ -2459,12 +2445,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport
       parentRoute: typeof AuthenticatedAppAtendimentoIaRoute
     }
-    '/_authenticated/app/clientes/$pacienteId/visualizar': {
-      id: '/_authenticated/app/clientes/$pacienteId/visualizar'
-      path: '/clientes/$pacienteId/visualizar'
-      fullPath: '/app/clientes/$pacienteId/visualizar'
-      preLoaderRoute: typeof AuthenticatedAppClientesPacienteIdVisualizarRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
+    '/_authenticated/app/agenda/express': {
+      id: '/_authenticated/app/agenda/express'
+      path: '/express'
+      fullPath: '/app/agenda/express'
+      preLoaderRoute: typeof AuthenticatedAppAgendaExpressRouteImport
+      parentRoute: typeof AuthenticatedAppAgendaRoute
     }
     '/_authenticated/app/clientes/$pacienteId/editar': {
       id: '/_authenticated/app/clientes/$pacienteId/editar'
@@ -2480,8 +2466,36 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRouteImport
       parentRoute: typeof AuthenticatedAppEquipeRoute
     }
+    '/_authenticated/app/equipe/funcionario/$userId/editar': {
+      id: '/_authenticated/app/equipe/funcionario/$userId/editar'
+      path: '/funcionario/$userId/editar'
+      fullPath: '/app/equipe/funcionario/$userId/editar'
+      preLoaderRoute: typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRouteImport
+      parentRoute: typeof AuthenticatedAppEquipeRoute
+    }
+    '/_authenticated/app/equipe/enfermeiro/$userId/editar': {
+      id: '/_authenticated/app/equipe/enfermeiro/$userId/editar'
+      path: '/enfermeiro/$userId/editar'
+      fullPath: '/app/equipe/enfermeiro/$userId/editar'
+      preLoaderRoute: typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRouteImport
+      parentRoute: typeof AuthenticatedAppEquipeRoute
+    }
   }
 }
+
+interface AuthenticatedAppAgendaRouteChildren {
+  AuthenticatedAppAgendaExpressRoute: typeof AuthenticatedAppAgendaExpressRoute
+}
+
+const AuthenticatedAppAgendaRouteChildren: AuthenticatedAppAgendaRouteChildren =
+  {
+    AuthenticatedAppAgendaExpressRoute: AuthenticatedAppAgendaExpressRoute,
+  }
+
+const AuthenticatedAppAgendaRouteWithChildren =
+  AuthenticatedAppAgendaRoute._addFileChildren(
+    AuthenticatedAppAgendaRouteChildren,
+  )
 
 interface AuthenticatedAppAtendimentoIaRouteChildren {
   AuthenticatedAppAtendimentoIaAgendamentoIdRoute: typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
@@ -2533,12 +2547,18 @@ const AuthenticatedAppCartaoBeneficiosRouteWithChildren =
 
 interface AuthenticatedAppEquipeRouteChildren {
   AuthenticatedAppEquipeIndexRoute: typeof AuthenticatedAppEquipeIndexRoute
+  AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute: typeof AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute
+  AuthenticatedAppEquipeFuncionarioUserIdEditarRoute: typeof AuthenticatedAppEquipeFuncionarioUserIdEditarRoute
   AuthenticatedAppEquipeMedicoMedicoIdEditarRoute: typeof AuthenticatedAppEquipeMedicoMedicoIdEditarRoute
 }
 
 const AuthenticatedAppEquipeRouteChildren: AuthenticatedAppEquipeRouteChildren =
   {
     AuthenticatedAppEquipeIndexRoute: AuthenticatedAppEquipeIndexRoute,
+    AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute:
+      AuthenticatedAppEquipeEnfermeiroUserIdEditarRoute,
+    AuthenticatedAppEquipeFuncionarioUserIdEditarRoute:
+      AuthenticatedAppEquipeFuncionarioUserIdEditarRoute,
     AuthenticatedAppEquipeMedicoMedicoIdEditarRoute:
       AuthenticatedAppEquipeMedicoMedicoIdEditarRoute,
   }
@@ -2552,13 +2572,11 @@ interface AuthenticatedAppFinanceiroRouteChildren {
   AuthenticatedAppFinanceiroAlertasRoute: typeof AuthenticatedAppFinanceiroAlertasRoute
   AuthenticatedAppFinanceiroAnaliticoRoute: typeof AuthenticatedAppFinanceiroAnaliticoRoute
   AuthenticatedAppFinanceiroAtendimentosRoute: typeof AuthenticatedAppFinanceiroAtendimentosRoute
-  AuthenticatedAppFinanceiroAtendimentosExternosRoute: typeof AuthenticatedAppFinanceiroAtendimentosExternosRoute
   AuthenticatedAppFinanceiroBiRoute: typeof AuthenticatedAppFinanceiroBiRoute
   AuthenticatedAppFinanceiroCategoriasRoute: typeof AuthenticatedAppFinanceiroCategoriasRoute
   AuthenticatedAppFinanceiroContasRoute: typeof AuthenticatedAppFinanceiroContasRoute
   AuthenticatedAppFinanceiroEmpresasRoute: typeof AuthenticatedAppFinanceiroEmpresasRoute
   AuthenticatedAppFinanceiroEstatisticasRoute: typeof AuthenticatedAppFinanceiroEstatisticasRoute
-  AuthenticatedAppFinanceiroEstornoRoute: typeof AuthenticatedAppFinanceiroEstornoRoute
   AuthenticatedAppFinanceiroLembretesRoute: typeof AuthenticatedAppFinanceiroLembretesRoute
   AuthenticatedAppFinanceiroMovimentoRoute: typeof AuthenticatedAppFinanceiroMovimentoRoute
   AuthenticatedAppFinanceiroNotasRoute: typeof AuthenticatedAppFinanceiroNotasRoute
@@ -2575,8 +2593,6 @@ const AuthenticatedAppFinanceiroRouteChildren: AuthenticatedAppFinanceiroRouteCh
       AuthenticatedAppFinanceiroAnaliticoRoute,
     AuthenticatedAppFinanceiroAtendimentosRoute:
       AuthenticatedAppFinanceiroAtendimentosRoute,
-    AuthenticatedAppFinanceiroAtendimentosExternosRoute:
-      AuthenticatedAppFinanceiroAtendimentosExternosRoute,
     AuthenticatedAppFinanceiroBiRoute: AuthenticatedAppFinanceiroBiRoute,
     AuthenticatedAppFinanceiroCategoriasRoute:
       AuthenticatedAppFinanceiroCategoriasRoute,
@@ -2586,8 +2602,6 @@ const AuthenticatedAppFinanceiroRouteChildren: AuthenticatedAppFinanceiroRouteCh
       AuthenticatedAppFinanceiroEmpresasRoute,
     AuthenticatedAppFinanceiroEstatisticasRoute:
       AuthenticatedAppFinanceiroEstatisticasRoute,
-    AuthenticatedAppFinanceiroEstornoRoute:
-      AuthenticatedAppFinanceiroEstornoRoute,
     AuthenticatedAppFinanceiroLembretesRoute:
       AuthenticatedAppFinanceiroLembretesRoute,
     AuthenticatedAppFinanceiroMovimentoRoute:
@@ -2606,14 +2620,16 @@ const AuthenticatedAppFinanceiroRouteWithChildren =
   )
 
 interface AuthenticatedAppRouteChildren {
-  AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRoute
+  AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRouteWithChildren
+  AuthenticatedAppAgendaV2Route: typeof AuthenticatedAppAgendaV2Route
   AuthenticatedAppAlertasEnfermagemRoute: typeof AuthenticatedAppAlertasEnfermagemRoute
   AuthenticatedAppAnamnesesRoute: typeof AuthenticatedAppAnamnesesRoute
   AuthenticatedAppAtendimentoIaRoute: typeof AuthenticatedAppAtendimentoIaRouteWithChildren
+  AuthenticatedAppAtendimentoMultiploRoute: typeof AuthenticatedAppAtendimentoMultiploRoute
   AuthenticatedAppAuditoriaRoute: typeof AuthenticatedAppAuditoriaRoute
-  AuthenticatedAppBackupsRoute: typeof AuthenticatedAppBackupsRoute
   AuthenticatedAppBoletosRoute: typeof AuthenticatedAppBoletosRoute
   AuthenticatedAppCaixaRoute: typeof AuthenticatedAppCaixaRoute
+  AuthenticatedAppCampanhasRoute: typeof AuthenticatedAppCampanhasRoute
   AuthenticatedAppCargosRoute: typeof AuthenticatedAppCargosRoute
   AuthenticatedAppCartaoBeneficiosRoute: typeof AuthenticatedAppCartaoBeneficiosRouteWithChildren
   AuthenticatedAppChatRoute: typeof AuthenticatedAppChatRoute
@@ -2626,20 +2642,30 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppDevClientesShellRoute: typeof AuthenticatedAppDevClientesShellRoute
   AuthenticatedAppDevHhpRoute: typeof AuthenticatedAppDevHhpRoute
   AuthenticatedAppDevListShellRoute: typeof AuthenticatedAppDevListShellRoute
+  AuthenticatedAppDevMenuShellRoute: typeof AuthenticatedAppDevMenuShellRoute
   AuthenticatedAppDevOrcamentosShellRoute: typeof AuthenticatedAppDevOrcamentosShellRoute
   AuthenticatedAppDisponibilidadesRoute: typeof AuthenticatedAppDisponibilidadesRoute
   AuthenticatedAppDocumentosRoute: typeof AuthenticatedAppDocumentosRoute
+  AuthenticatedAppEnfermagemRecursosRoute: typeof AuthenticatedAppEnfermagemRecursosRoute
   AuthenticatedAppEquipeRoute: typeof AuthenticatedAppEquipeRouteWithChildren
   AuthenticatedAppEspecialidadesRoute: typeof AuthenticatedAppEspecialidadesRoute
   AuthenticatedAppEstoqueRoute: typeof AuthenticatedAppEstoqueRoute
   AuthenticatedAppExamesResultadosRoute: typeof AuthenticatedAppExamesResultadosRoute
   AuthenticatedAppFinanceiroRoute: typeof AuthenticatedAppFinanceiroRouteWithChildren
   AuthenticatedAppFluxoRoute: typeof AuthenticatedAppFluxoRoute
+  AuthenticatedAppFuncionariosRoute: typeof AuthenticatedAppFuncionariosRoute
+  AuthenticatedAppHrContratosRoute: typeof AuthenticatedAppHrContratosRoute
   AuthenticatedAppHrFeriasRoute: typeof AuthenticatedAppHrFeriasRoute
   AuthenticatedAppHrHoleritesRoute: typeof AuthenticatedAppHrHoleritesRoute
   AuthenticatedAppHrPontoRoute: typeof AuthenticatedAppHrPontoRoute
+  AuthenticatedAppIntegrationSecretsRoute: typeof AuthenticatedAppIntegrationSecretsRoute
+  AuthenticatedAppLgpdRoute: typeof AuthenticatedAppLgpdRoute
   AuthenticatedAppLmsAdminRoute: typeof AuthenticatedAppLmsAdminRoute
   AuthenticatedAppMedicosRoute: typeof AuthenticatedAppMedicosRoute
+  AuthenticatedAppMktEnviosRoute: typeof AuthenticatedAppMktEnviosRoute
+  AuthenticatedAppMktLandingRoute: typeof AuthenticatedAppMktLandingRoute
+  AuthenticatedAppMktLeadsRoute: typeof AuthenticatedAppMktLeadsRoute
+  AuthenticatedAppMktSegmentosRoute: typeof AuthenticatedAppMktSegmentosRoute
   AuthenticatedAppModelosDocumentosRoute: typeof AuthenticatedAppModelosDocumentosRoute
   AuthenticatedAppNinaRoute: typeof AuthenticatedAppNinaRoute
   AuthenticatedAppOdontologiaRoute: typeof AuthenticatedAppOdontologiaRoute
@@ -2662,30 +2688,29 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
   AuthenticatedAppClientesDuplicadosRoute: typeof AuthenticatedAppClientesDuplicadosRoute
   AuthenticatedAppConfiguracoesNfseRoute: typeof AuthenticatedAppConfiguracoesNfseRoute
-  AuthenticatedAppConfiguracoesPainelTotemRoute: typeof AuthenticatedAppConfiguracoesPainelTotemRoute
-  AuthenticatedAppConfiguracoesVozRoute: typeof AuthenticatedAppConfiguracoesVozRoute
-  AuthenticatedAppHrContratosIdRoute: typeof AuthenticatedAppHrContratosIdRoute
+  AuthenticatedAppFuncionarioUserIdRoute: typeof AuthenticatedAppFuncionarioUserIdRoute
   AuthenticatedAppImprimirAgendamentoIdRoute: typeof AuthenticatedAppImprimirAgendamentoIdRoute
   AuthenticatedAppMedicoMedicoIdRoute: typeof AuthenticatedAppMedicoMedicoIdRoute
   AuthenticatedAppNfseTestarRoute: typeof AuthenticatedAppNfseTestarRoute
   AuthenticatedAppClientesIndexRoute: typeof AuthenticatedAppClientesIndexRoute
-  AuthenticatedAppHrContratosIndexRoute: typeof AuthenticatedAppHrContratosIndexRoute
   AuthenticatedAppNfseIndexRoute: typeof AuthenticatedAppNfseIndexRoute
   AuthenticatedAppClientesPacienteIdEditarRoute: typeof AuthenticatedAppClientesPacienteIdEditarRoute
-  AuthenticatedAppClientesPacienteIdVisualizarRoute: typeof AuthenticatedAppClientesPacienteIdVisualizarRoute
 }
 
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
-  AuthenticatedAppAgendaRoute: AuthenticatedAppAgendaRoute,
+  AuthenticatedAppAgendaRoute: AuthenticatedAppAgendaRouteWithChildren,
+  AuthenticatedAppAgendaV2Route: AuthenticatedAppAgendaV2Route,
   AuthenticatedAppAlertasEnfermagemRoute:
     AuthenticatedAppAlertasEnfermagemRoute,
   AuthenticatedAppAnamnesesRoute: AuthenticatedAppAnamnesesRoute,
   AuthenticatedAppAtendimentoIaRoute:
     AuthenticatedAppAtendimentoIaRouteWithChildren,
+  AuthenticatedAppAtendimentoMultiploRoute:
+    AuthenticatedAppAtendimentoMultiploRoute,
   AuthenticatedAppAuditoriaRoute: AuthenticatedAppAuditoriaRoute,
-  AuthenticatedAppBackupsRoute: AuthenticatedAppBackupsRoute,
   AuthenticatedAppBoletosRoute: AuthenticatedAppBoletosRoute,
   AuthenticatedAppCaixaRoute: AuthenticatedAppCaixaRoute,
+  AuthenticatedAppCampanhasRoute: AuthenticatedAppCampanhasRoute,
   AuthenticatedAppCargosRoute: AuthenticatedAppCargosRoute,
   AuthenticatedAppCartaoBeneficiosRoute:
     AuthenticatedAppCartaoBeneficiosRouteWithChildren,
@@ -2699,21 +2724,33 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppDevClientesShellRoute: AuthenticatedAppDevClientesShellRoute,
   AuthenticatedAppDevHhpRoute: AuthenticatedAppDevHhpRoute,
   AuthenticatedAppDevListShellRoute: AuthenticatedAppDevListShellRoute,
+  AuthenticatedAppDevMenuShellRoute: AuthenticatedAppDevMenuShellRoute,
   AuthenticatedAppDevOrcamentosShellRoute:
     AuthenticatedAppDevOrcamentosShellRoute,
   AuthenticatedAppDisponibilidadesRoute: AuthenticatedAppDisponibilidadesRoute,
   AuthenticatedAppDocumentosRoute: AuthenticatedAppDocumentosRoute,
+  AuthenticatedAppEnfermagemRecursosRoute:
+    AuthenticatedAppEnfermagemRecursosRoute,
   AuthenticatedAppEquipeRoute: AuthenticatedAppEquipeRouteWithChildren,
   AuthenticatedAppEspecialidadesRoute: AuthenticatedAppEspecialidadesRoute,
   AuthenticatedAppEstoqueRoute: AuthenticatedAppEstoqueRoute,
   AuthenticatedAppExamesResultadosRoute: AuthenticatedAppExamesResultadosRoute,
   AuthenticatedAppFinanceiroRoute: AuthenticatedAppFinanceiroRouteWithChildren,
   AuthenticatedAppFluxoRoute: AuthenticatedAppFluxoRoute,
+  AuthenticatedAppFuncionariosRoute: AuthenticatedAppFuncionariosRoute,
+  AuthenticatedAppHrContratosRoute: AuthenticatedAppHrContratosRoute,
   AuthenticatedAppHrFeriasRoute: AuthenticatedAppHrFeriasRoute,
   AuthenticatedAppHrHoleritesRoute: AuthenticatedAppHrHoleritesRoute,
   AuthenticatedAppHrPontoRoute: AuthenticatedAppHrPontoRoute,
+  AuthenticatedAppIntegrationSecretsRoute:
+    AuthenticatedAppIntegrationSecretsRoute,
+  AuthenticatedAppLgpdRoute: AuthenticatedAppLgpdRoute,
   AuthenticatedAppLmsAdminRoute: AuthenticatedAppLmsAdminRoute,
   AuthenticatedAppMedicosRoute: AuthenticatedAppMedicosRoute,
+  AuthenticatedAppMktEnviosRoute: AuthenticatedAppMktEnviosRoute,
+  AuthenticatedAppMktLandingRoute: AuthenticatedAppMktLandingRoute,
+  AuthenticatedAppMktLeadsRoute: AuthenticatedAppMktLeadsRoute,
+  AuthenticatedAppMktSegmentosRoute: AuthenticatedAppMktSegmentosRoute,
   AuthenticatedAppModelosDocumentosRoute:
     AuthenticatedAppModelosDocumentosRoute,
   AuthenticatedAppNinaRoute: AuthenticatedAppNinaRoute,
@@ -2741,21 +2778,16 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppClientesDuplicadosRoute,
   AuthenticatedAppConfiguracoesNfseRoute:
     AuthenticatedAppConfiguracoesNfseRoute,
-  AuthenticatedAppConfiguracoesPainelTotemRoute:
-    AuthenticatedAppConfiguracoesPainelTotemRoute,
-  AuthenticatedAppConfiguracoesVozRoute: AuthenticatedAppConfiguracoesVozRoute,
-  AuthenticatedAppHrContratosIdRoute: AuthenticatedAppHrContratosIdRoute,
+  AuthenticatedAppFuncionarioUserIdRoute:
+    AuthenticatedAppFuncionarioUserIdRoute,
   AuthenticatedAppImprimirAgendamentoIdRoute:
     AuthenticatedAppImprimirAgendamentoIdRoute,
   AuthenticatedAppMedicoMedicoIdRoute: AuthenticatedAppMedicoMedicoIdRoute,
   AuthenticatedAppNfseTestarRoute: AuthenticatedAppNfseTestarRoute,
   AuthenticatedAppClientesIndexRoute: AuthenticatedAppClientesIndexRoute,
-  AuthenticatedAppHrContratosIndexRoute: AuthenticatedAppHrContratosIndexRoute,
   AuthenticatedAppNfseIndexRoute: AuthenticatedAppNfseIndexRoute,
   AuthenticatedAppClientesPacienteIdEditarRoute:
     AuthenticatedAppClientesPacienteIdEditarRoute,
-  AuthenticatedAppClientesPacienteIdVisualizarRoute:
-    AuthenticatedAppClientesPacienteIdVisualizarRoute,
 }
 
 const AuthenticatedAppRouteWithChildren =
@@ -2773,48 +2805,39 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
-interface PainelRouteChildren {
-  PainelClinicaIdRoute: typeof PainelClinicaIdRoute
-}
-
-const PainelRouteChildren: PainelRouteChildren = {
-  PainelClinicaIdRoute: PainelClinicaIdRoute,
-}
-
-const PainelRouteWithChildren =
-  PainelRoute._addFileChildren(PainelRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AutoatendimentoRoute: AutoatendimentoRoute,
   DiagnosticoRoute: DiagnosticoRoute,
   LoginRoute: LoginRoute,
-  MedicoRoute: MedicoRoute,
-  PainelRoute: PainelRouteWithChildren,
-  ResetPasswordRoute: ResetPasswordRoute,
+  PainelRoute: PainelRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TotemRoute: TotemRoute,
-  ApiTtsProxyRoute: ApiTtsProxyRoute,
-  ApiTtsVoicesRoute: ApiTtsVoicesRoute,
   CheckinTokenRoute: CheckinTokenRoute,
+  LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
   PacienteCartoesRoute: PacienteCartoesRoute,
   PacienteConsultasRoute: PacienteConsultasRoute,
   PacienteFinanceiroRoute: PacienteFinanceiroRoute,
   PacientePerfilRoute: PacientePerfilRoute,
-  TotemClinicaIdRoute: TotemClinicaIdRoute,
   VerificarCodigoRoute: VerificarCodigoRoute,
   PacienteIndexRoute: PacienteIndexRoute,
-  ApiPublicTtsRoute: ApiPublicTtsRoute,
   PContratoTokenRoute: PContratoTokenRoute,
-  PainelTTokenRoute: PainelTTokenRoute,
-  TotemTTokenRoute: TotemTTokenRoute,
   ApiPublicFocusnfeWebhookRoute: ApiPublicFocusnfeWebhookRoute,
-  ApiPublicHooksBackupDiarioRoute: ApiPublicHooksBackupDiarioRoute,
   ApiPublicWhatsappClinicaIdRoute: ApiPublicWhatsappClinicaIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

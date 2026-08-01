@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ElementType } from "react";
+import { useEffect, useMemo, useState, type ElementType } from "react";
 import {
   Building2, Bell, CalendarDays, Users, RotateCcw, MessageCircle,
   CheckCircle2, Handshake, CreditCard, Banknote, Receipt, BadgeDollarSign, Stethoscope, BookOpen, Brain, Filter, X,
@@ -16,10 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { buildCategoriaResolver } from "@/lib/procedimento/categoria";
-import { cn } from "@/lib/utils";
-import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
-import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/painel")({
   component: DashboardPage,
   head: () => ({ meta: [{ title: "Painel — ClinicaOS" }] }),
@@ -44,8 +41,6 @@ type RawAtend = { id: string; valor_total: number; valor_medico: number; medico_
 
 function DashboardPage() {
   const { memberships, clinicaAtual, loading } = useClinica();
-  // Stagger + count-up nos KPIs (flag ux_melhorias).
-  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
   const podeVerFinanceiro = ["admin", "gestor", "financeiro"].includes(clinicaAtual?.role ?? "");
   const [periodo, setPeriodo] = useState<Periodo>({ de: hojeISO(), ate: hojeISO() });
   const [carregando, setCarregando] = useState(false);
@@ -63,26 +58,17 @@ function DashboardPage() {
     conf: { presencas: 0, ausencias: 0 },
     vendas: { total: 0, orcamentos: 0 },
     pagamentos: { realizado: 0, aPagar: 0 },
-    recebimentos: { realizado: 0, aReceber: 0, qtdRealizado: 0, qtdAReceber: 0, mensalidades: 0, qtdMensalidades: 0, atendimentos: 0, qtdAtendimentos: 0, mensConsulta: 0, qtdMensConsulta: 0, mensDesconto: 0, qtdMensDesconto: 0, mensOutros: 0, qtdMensOutros: 0 },
+    recebimentos: { realizado: 0, aReceber: 0, qtdRealizado: 0, qtdAReceber: 0 },
     comissoes: { pagas: 0, pendentes: 0, percentReceita: 0 },
-    // Atendimentos do dia = GRs de agendamento + GRs de mensalidade do cartão.
-    grs: { agendamentos: 0, mensalidades: 0, outrosDias: 0, total: 0 },
-    // Pagamentos recebidos no período, separando o que é do próprio dia
-    // do que se refere a atendimentos/competências de outras datas.
-    caixaDia: { total: 0, doDia: 0, outrasDatas: 0, qtd: 0 },
     porMedico: [] as { nome: string; total: number; pagos: number; novos: number }[],
   });
   const [rawAgs, setRawAgs] = useState<RawAg[]>([]);
   const [rawLancs, setRawLancs] = useState<RawLanc[]>([]);
   const [rawAtends, setRawAtends] = useState<RawAtend[]>([]);
-  const [pagosAgIds, setPagosAgIds] = useState<Set<string>>(new Set());
   const [novosIds, setNovosIds] = useState<Set<string>>(new Set());
   const [pacNomes, setPacNomes] = useState<Map<string, string>>(new Map());
   const [medNomes, setMedNomes] = useState<Map<string, string>>(new Map());
   const [drill, setDrill] = useState<DrillSpec | null>(null);
-  const [drillBusca, setDrillBusca] = useState("");
-  // GRs de mensalidade do período (para o detalhamento com nome do paciente)
-  const [grMensLista, setGrMensLista] = useState<Array<{ ficha: number | null; quando: string | null; paciente: string }>>([]);
 
   // Conjunto efetivo de medico_ids após filtros (intersecção médicos x especialidades)
   const medicosFiltradosIds = useMemo(() => {
@@ -105,25 +91,12 @@ function DashboardPage() {
     const [alertasR, agendR, lancR, atendR, medicosR, espR, medEspR, procR] = await Promise.all([
       supabase.from("fin_alertas").select("id,mensagem").eq("clinica_id", cid).eq("lido", false).order("created_at", { ascending: false }).limit(5),
       supabase.from("agendamentos").select("id,status,medico_id,paciente_id,procedimento,inicio").eq("clinica_id", cid).gte("inicio", ini).lte("inicio", fim),
-      supabase.from("fin_lancamentos").select("id,tipo,status,valor,medico_id,contrato_id,descricao").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
+      supabase.from("fin_lancamentos").select("id,tipo,status,valor,medico_id").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
       supabase.from("fin_atendimentos").select("id,valor_total,valor_medico,medico_id,status").eq("clinica_id", cid).gte("data", periodo.de).lte("data", periodo.ate),
       supabase.from("medicos").select("id,nome").eq("clinica_id", cid).eq("ativo", true),
       supabase.from("especialidades").select("id,nome"),
       supabase.from("medico_especialidades").select("medico_id,especialidade_id"),
       supabase.from("procedimentos").select("nome,tipo_procedimento").eq("clinica_id", cid).eq("ativo", true),
-    ]);
-
-    // GRs de mensalidade (cartão consulta / cartão desconto) impressas no período:
-    // cada pagamento de mensalidade conta como uma GR do dia.
-    const [grMensR, recebidoR] = await Promise.all([
-      supabase.from("gr_impressoes").select("id,mensalidade_id,agendamento_id,ficha_numero,created_at").eq("clinica_id", cid)
-        .in("tipo", ["mensalidade", "taxa_adesao"]).eq("via_numero", 1)
-        .gte("created_at", ini).lte("created_at", fim),
-      // Recebimentos efetivados no período (data de lançamento no caixa),
-      // independentemente da competência/data do atendimento.
-      supabase.from("fin_lancamentos").select("id,valor,data,tipo,status")
-        .eq("clinica_id", cid).eq("tipo", "receita").eq("status", "confirmado")
-        .gte("created_at", ini).lte("created_at", fim),
     ]);
 
     const medsAll = (medicosR.data ?? []) as { id: string; nome: string }[];
@@ -153,9 +126,7 @@ function DashboardPage() {
     const medIdsPermitidos = new Set(medsFiltrados.map(m => m.id));
     const passaFiltro = (mid: string | null) => !filtroAtivo || (!!mid && medIdsPermitidos.has(mid));
 
-    // Só contam fichas realmente ocupadas por um paciente — os slots vazios
-    // gerados na grade de horários (paciente_id nulo) não são agendamentos.
-    const ags = (agendR.data ?? []).filter(a => passaFiltro(a.medico_id) && !!a.paciente_id);
+    const ags = (agendR.data ?? []).filter(a => passaFiltro(a.medico_id));
     const lancs = (lancR.data ?? []).filter(l => !filtroAtivo || passaFiltro(l.medico_id));
     const atends = (atendR.data ?? []).filter(a => passaFiltro(a.medico_id));
     const meds = medsFiltrados;
@@ -217,75 +188,14 @@ function DashboardPage() {
     const recebAReceber = receitas.filter(l => l.status === "pendente").reduce((s, l) => s + Number(l.valor || 0), 0);
     const qtdReceb = receitas.filter(l => l.status === "confirmado").length;
     const qtdAReceber = receitas.filter(l => l.status === "pendente").length;
-    // Parte do recebido que vem de mensalidades do cartão.
-    // Alguns lançamentos antigos não gravam contrato_id — nesses casos
-    // identificamos pela descrição ("MENSALIDADE ..." / "TAXA DE ADESÃO ...").
-    const ehMensalidade = (l: { contrato_id?: string | null; descricao?: string | null }) => {
-      if (l.contrato_id) return true;
-      const d = (l.descricao ?? "").toUpperCase();
-      return d.startsWith("MENSALIDADE") || d.includes("TAXA DE ADES");
-    };
-    const recMens = receitas.filter(l => l.status === "confirmado" && ehMensalidade(l));
-    const recebMensalidades = recMens.reduce((s, l) => s + Number(l.valor || 0), 0);
-    // Separa as mensalidades por tipo de cartão (Consulta x Desconto),
-    // olhando o convênio do contrato de cada lançamento.
-    const contratoIds = Array.from(new Set(recMens.map(l => l.contrato_id).filter(Boolean) as string[]));
-    const tipoPorContrato = new Map<string, string>();
-    if (contratoIds.length > 0) {
-      const { data: ctrRows } = await supabase
-        .from("contratos_assinatura").select("id,convenio_id").in("id", contratoIds);
-      const convIds = Array.from(new Set(((ctrRows ?? []) as Array<{ convenio_id: string | null }>)
-        .map(c => c.convenio_id).filter(Boolean) as string[]));
-      const nomePorConv = new Map<string, string>();
-      if (convIds.length > 0) {
-        const { data: convRows } = await supabase.from("cb_convenios").select("id,nome").in("id", convIds);
-        for (const c of (convRows ?? []) as Array<{ id: string; nome: string | null }>) {
-          nomePorConv.set(c.id, (c.nome ?? "").toUpperCase());
-        }
-      }
-      for (const c of (ctrRows ?? []) as Array<{ id: string; convenio_id: string | null }>) {
-        const nome = c.convenio_id ? (nomePorConv.get(c.convenio_id) ?? "") : "";
-        tipoPorContrato.set(c.id, nome.includes("DESCONTO") ? "desconto" : nome.includes("CONSULTA") ? "consulta" : "outros");
-      }
-    }
-    let mensConsulta = 0, qtdMensConsulta = 0, mensDesconto = 0, qtdMensDesconto = 0, mensOutros = 0, qtdMensOutros = 0;
-    for (const l of recMens) {
-      const v = Number(l.valor || 0);
-      const tipo = l.contrato_id ? (tipoPorContrato.get(l.contrato_id) ?? "outros") : "outros";
-      if (tipo === "desconto") { mensDesconto += v; qtdMensDesconto++; }
-      else if (tipo === "consulta") { mensConsulta += v; qtdMensConsulta++; }
-      else { mensOutros += v; qtdMensOutros++; }
-    }
-    const recebAtendimentos = recebRealizado - recebMensalidades;
-    const qtdRecebAtendimentos = qtdReceb - recMens.length;
     const pagRealizado = despesas.filter(l => l.status === "confirmado").reduce((s, l) => s + Number(l.valor || 0), 0);
     const pagAPagar = despesas.filter(l => l.status === "pendente").reduce((s, l) => s + Number(l.valor || 0), 0);
 
     const vendasTotal = atends.reduce((s, a) => s + Number(a.valor_total || 0), 0);
     const comissoesPagas = atends.reduce((s, a) => s + Number(a.valor_medico || 0), 0);
 
-    // Pagamentos das fichas: consideramos pago o agendamento que tem
-    // recebimento confirmado no caixa (fin_lancamentos.agendamento_id) ou
-    // atendimento financeiro quitado. O status da agenda ("realizado") não
-    // significa pagamento — por isso antes tudo aparecia como "não pago".
-    const agIds = ags.map(x => x.id);
-    const pagosSet = new Set<string>();
-    if (agIds.length > 0) {
-      for (let i = 0; i < agIds.length; i += 500) {
-        const { data: pagosR } = await supabase
-          .from("fin_lancamentos")
-          .select("agendamento_id,status,tipo")
-          .eq("clinica_id", cid)
-          .eq("tipo", "receita")
-          .eq("status", "confirmado")
-          .in("agendamento_id", agIds.slice(i, i + 500));
-        for (const l of (pagosR ?? []) as Array<{ agendamento_id: string | null }>) {
-          if (l.agendamento_id) pagosSet.add(l.agendamento_id);
-        }
-      }
-    }
-    setPagosAgIds(pagosSet);
-    const pagos = contarGRs(ags.filter(x => pagosSet.has(x.id)));
+    // Pagamentos das senhas (pagos/não pagos): a partir de atendimentos status
+    const pagos = atends.filter(a => a.status === "pago" || a.status === "realizado").length;
     const naoPagos = Math.max(0, total - pagos);
 
     // Por médico
@@ -298,86 +208,16 @@ function DashboardPage() {
         pagos: contarGRs(agendados.filter(a => a.status === "realizado")),
         novos: pacIdsM.filter(p => !setExistentes.has(p)).length,
       };
-    })
-      // "Médicos do dia": só entram profissionais com agenda no período ou
-      // com pagamento/atendimento lançado na data selecionada.
-      .filter(m => {
-        const med = meds.find(x => x.nome === m.nome);
-        const temMovimento = !!med && (
-          atends.some(at => at.medico_id === med.id) || lancs.some(l => l.medico_id === med.id)
-        );
-        return m.total > 0 || temMovimento;
-      })
-      .sort((a, b) => b.total - a.total);
-
-    const grMensRows = (grMensR.data ?? []) as Array<{ id: string; mensalidade_id: string | null; agendamento_id: string | null; ficha_numero: number | null; created_at: string | null }>;
-    const qtdMensGR = grMensRows.length;
-    // Nome do paciente de cada GR de mensalidade (mensalidade -> contrato -> titular)
-    const mensIds = Array.from(new Set(grMensRows.map(g => g.mensalidade_id).filter(Boolean) as string[]));
-    const nomePorMens = new Map<string, string>();
-    if (mensIds.length > 0) {
-      const { data: mens } = await supabase
-        .from("contrato_mensalidades").select("id,contrato_id").in("id", mensIds);
-      const contratoIds = Array.from(new Set(((mens ?? []) as Array<{ contrato_id: string | null }>).map(m => m.contrato_id).filter(Boolean) as string[]));
-      const nomePorContrato = new Map<string, string>();
-      if (contratoIds.length > 0) {
-        const { data: cts } = await supabase
-          .from("contratos_assinatura").select("id,paciente_nome").in("id", contratoIds);
-        for (const c of (cts ?? []) as Array<{ id: string; paciente_nome: string | null }>) {
-          nomePorContrato.set(c.id, c.paciente_nome ?? "—");
-        }
-      }
-      for (const m of (mens ?? []) as Array<{ id: string; contrato_id: string | null }>) {
-        nomePorMens.set(m.id, (m.contrato_id && nomePorContrato.get(m.contrato_id)) || "—");
-      }
-    }
-    // Fallback do nome: algumas GRs de mensalidade não gravam mensalidade_id,
-    // mas guardam o agendamento — daí puxamos o paciente.
-    const agIdsGr = Array.from(new Set(grMensRows.map(g => g.agendamento_id).filter(Boolean) as string[]));
-    const nomePorAgGr = new Map<string, string>();
-    if (agIdsGr.length > 0) {
-      const { data: agsGr } = await supabase
-        .from("agendamentos").select("id,paciente_id").in("id", agIdsGr);
-      const pacIdsGr = Array.from(new Set(((agsGr ?? []) as Array<{ paciente_id: string | null }>).map(a => a.paciente_id).filter(Boolean) as string[]));
-      const nomePorPacGr = new Map<string, string>();
-      if (pacIdsGr.length > 0) {
-        const { data: pacsGr } = await supabase.from("pacientes").select("id,nome").in("id", pacIdsGr);
-        for (const p of (pacsGr ?? []) as Array<{ id: string; nome: string | null }>) nomePorPacGr.set(p.id, p.nome ?? "—");
-      }
-      for (const a of (agsGr ?? []) as Array<{ id: string; paciente_id: string | null }>) {
-        nomePorAgGr.set(a.id, (a.paciente_id && nomePorPacGr.get(a.paciente_id)) || "—");
-      }
-    }
-    setGrMensLista(grMensRows.map(g => ({
-      ficha: g.ficha_numero,
-      quando: g.created_at,
-      paciente: (g.mensalidade_id && nomePorMens.get(g.mensalidade_id))
-        || (g.agendamento_id && nomePorAgGr.get(g.agendamento_id))
-        || "—",
-    })));
-    const recebidos = (recebidoR.data ?? []) as Array<{ valor: number; data: string | null }>;
-    const caixaTotal = recebidos.reduce((s2, r) => s2 + Number(r.valor || 0), 0);
-    const caixaDoDia = recebidos
-      .filter(r => (r.data ?? "") >= periodo.de && (r.data ?? "") <= periodo.ate)
-      .reduce((s2, r) => s2 + Number(r.valor || 0), 0);
+    }).sort((a, b) => b.total - a.total);
 
     setData({
       alertas: alertasR.data ?? [],
-      // Atendimentos REALIZADOS do dia (não o total agendado) + GRs de mensalidade.
-      // GRs pagas no período: atendidos + pagos para outras datas + mensalidades do cartão.
-      grs: {
-        agendamentos: atendidos,
-        mensalidades: qtdMensGR,
-        outrosDias: Math.max(0, pagos - atendidos),
-        total: Math.max(pagos, atendidos) + qtdMensGR,
-      },
-      caixaDia: { total: caixaTotal, doDia: caixaDoDia, outrasDatas: caixaTotal - caixaDoDia, qtd: recebidos.length },
       agend: { total, atendidos, faltas, pagos, naoPagos, novos, regulares, retornos, semAgenda },
       msgs: { enviadas: 0, respostas: 0, total: 0 },
       conf: { presencas: atendidos, ausencias: faltas },
       vendas: { total: vendasTotal, orcamentos: 0 },
       pagamentos: { realizado: pagRealizado, aPagar: pagAPagar },
-      recebimentos: { realizado: recebRealizado, aReceber: recebAReceber, qtdRealizado: qtdReceb, qtdAReceber, mensalidades: recebMensalidades, qtdMensalidades: recMens.length, atendimentos: recebAtendimentos, qtdAtendimentos: qtdRecebAtendimentos, mensConsulta, qtdMensConsulta, mensDesconto, qtdMensDesconto, mensOutros, qtdMensOutros },
+      recebimentos: { realizado: recebRealizado, aReceber: recebAReceber, qtdRealizado: qtdReceb, qtdAReceber },
       comissoes: { pagas: comissoesPagas, pendentes: 0, percentReceita: recebRealizado > 0 ? (comissoesPagas / recebRealizado) * 100 : 0 },
       porMedico,
     });
@@ -426,7 +266,6 @@ function DashboardPage() {
   const moneyBRL = (n: number) => `R$ ${fmtMoney(Number(n || 0))}`;
 
   const openDrill = (kind: string, ctx?: Record<string, string>) => {
-    setDrillBusca("");
     if (kind === "alertas") {
       setDrill({
         title: `Central de alertas (${data.alertas.length})`,
@@ -438,8 +277,12 @@ function DashboardPage() {
         if (kind === "agend_total") return true;
         if (kind === "agend_atendidos") return g.status === "realizado";
         if (kind === "agend_faltas") return g.status === "faltou";
-        if (kind === "agend_pagos") return pagosAgIds.has(g.id);
-        if (kind === "agend_naopagos") return !pagosAgIds.has(g.id);
+        if (kind === "agend_pagos") {
+          const atIds = new Set(rawAtends.filter(at => at.status === "pago" || at.status === "realizado").map(at => at.id));
+          // approximate: agendamentos com status realizado/pago
+          return g.status === "realizado" || atIds.has(g.id);
+        }
+        if (kind === "agend_naopagos") return g.status !== "realizado" && g.status !== "pago";
         return true;
       };
       const titulos: Record<string, string> = {
@@ -460,7 +303,6 @@ function DashboardPage() {
         rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), medico: medNome(g.medico_id), proc: g.procedimento ?? "—", status: g.status })),
       });
     } else if (kind === "clientes_novos" || kind === "clientes_regulares" || kind === "clientes_total") {
-      // (mantido)
       const pacsAg = Array.from(new Set(rawAgs.map(g => g.paciente_id).filter(Boolean) as string[]));
       const lista = pacsAg.filter(p => kind === "clientes_total" ? true : (kind === "clientes_novos" ? novosIds.has(p) : !novosIds.has(p)));
       const titulos: Record<string, string> = { clientes_total: "Clientes agendados", clientes_novos: "Clientes novos", clientes_regulares: "Clientes regulares" };
@@ -526,32 +368,6 @@ function DashboardPage() {
         columns: [{ key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" }, { key: "proc", label: "Procedimento" }, { key: "status", label: "Status" }],
         rows: lista.map(g => ({ data: fmtDt(g.inicio), paciente: pacNome(g.paciente_id), proc: g.procedimento ?? "—", status: g.status })),
       });
-    } else if (kind === "grs_total" || kind === "grs_mens" || kind === "grs_outros") {
-      const rowsMens = grMensLista.map(m => ({
-        data: fmtDt(m.quando),
-        paciente: m.paciente,
-        proc: m.ficha ? `Mensalidade do cartão — GR MENS. Nº ${m.ficha}` : "Mensalidade do cartão",
-        origem: "Mensalidade",
-      }));
-      const mapAg = (g: RawAg) => ({
-        data: fmtDt(g.inicio),
-        paciente: pacNome(g.paciente_id),
-        proc: g.procedimento ?? "—",
-        origem: g.status === "realizado" ? "Atendido" : "Pago p/ outro dia",
-      });
-      const rowsAtendidos = rawAgs.filter(g => g.status === "realizado").map(mapAg);
-      const rowsOutros = rawAgs.filter(g => g.status !== "realizado" && pagosAgIds.has(g.id)).map(mapAg);
-      const rows = kind === "grs_mens" ? rowsMens
-        : kind === "grs_outros" ? rowsOutros
-        : [...rowsAtendidos, ...rowsOutros, ...rowsMens];
-      setDrill({
-        title: `${kind === "grs_mens" ? "Mensalidades do cartão" : kind === "grs_outros" ? "GRs pagas para outros dias" : "GRs pagas no período"} (${rows.length})`,
-        columns: [
-          { key: "data", label: "Quando" }, { key: "paciente", label: "Paciente" },
-          { key: "proc", label: "Procedimento" }, { key: "origem", label: "Origem" },
-        ],
-        rows,
-      });
     }
   };
 
@@ -586,11 +402,11 @@ function DashboardPage() {
           />
           <div className="space-y-1">
             <Label className="text-xs">Período</Label>
-            <DateInputBR value={periodo.de} onChange={(e) => setPeriodo(p => ({ ...p, de: e.target.value }))} className="w-40" />
+            <Input type="date" value={periodo.de} onChange={(e) => setPeriodo(p => ({ ...p, de: e.target.value }))} className="w-40" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">até</Label>
-            <DateInputBR value={periodo.ate} onChange={(e) => setPeriodo(p => ({ ...p, ate: e.target.value }))} className="w-40" />
+            <Input type="date" value={periodo.ate} onChange={(e) => setPeriodo(p => ({ ...p, ate: e.target.value }))} className="w-40" />
           </div>
           <Button variant="outline" onClick={load}>Atualizar</Button>
         </div>
@@ -637,8 +453,7 @@ function DashboardPage() {
         </div>
       )}
 
-      <KpiAnimContext.Provider value={uxMelhorias}>
-      <div className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-3", uxMelhorias && "kpi-stagger")}>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {/* Informações rápidas — lembrete para a equipe */}
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-4 space-y-3">
@@ -667,10 +482,7 @@ function DashboardPage() {
             : <ul className="space-y-1 text-sm">{data.alertas.map(al => <li key={al.id} className="truncate">• {al.mensagem}</li>)}</ul>}
         </KpiCard>
 
-        <KpiCard icon={CalendarDays} title="Agendamentos" value={a.total} format={fmtInt} onClick={() => openDrill("agend_total")}>
-          <p className="text-[11px] text-muted-foreground mb-1">
-            No período filtrado · contado por GR (serviços do mesmo paciente no mesmo atendimento contam como 1)
-          </p>
+        <KpiCard icon={CalendarDays} title="Agendamentos" big={fmtInt(a.total)} onClick={() => openDrill("agend_total")}>
           <SubGrid items={[
             { label: "Atendidos", value: fmtInt(a.atendidos), pct: pct(a.atendidos, a.total), onClick: () => openDrill("agend_atendidos") },
             { label: "Faltas", value: fmtInt(a.faltas), pct: pct(a.faltas, a.total), onClick: () => openDrill("agend_faltas") },
@@ -679,59 +491,28 @@ function DashboardPage() {
           ]} />
         </KpiCard>
 
-        <KpiCard icon={Receipt} title="GRs pagas no período" value={data.grs.total} format={fmtInt} onClick={() => openDrill("grs_total")}>
-          <p className="text-[11px] text-muted-foreground mb-1">
-            Segue o filtro de Período acima
-          </p>
-          <SubGrid items={[
-            { label: "Atendidos", value: fmtInt(data.grs.agendamentos), onClick: () => openDrill("agend_atendidos") },
-            { label: "Mensalidades do cartão", value: fmtInt(data.grs.mensalidades), onClick: () => openDrill("grs_mens") },
-            { label: "Pagas para outros dias", value: fmtInt(data.grs.outrosDias), onClick: () => openDrill("grs_outros") },
-          ]} />
-        </KpiCard>
-
-        {podeVerFinanceiro && (
-        <KpiCard icon={Banknote} title="Pagamentos no período" value={data.caixaDia.total} format={fmtMoney}>
-          <p className="text-[11px] text-muted-foreground mb-1">
-            Recebimentos lançados no caixa dentro do período filtrado
-          </p>
-          <SubGrid items={[
-            { label: `Atendimentos (${fmtInt(data.recebimentos.qtdAtendimentos)})`, value: fmtMoney(data.recebimentos.atendimentos) },
-            { label: `Mensalidades do cartão (${fmtInt(data.recebimentos.qtdMensalidades)})`, value: fmtMoney(data.recebimentos.mensalidades) },
-          ]} />
-          <p className="text-[11px] text-muted-foreground">
-            Mensalidades por cartão — Consulta: {fmtMoney(data.recebimentos.mensConsulta)} ({fmtInt(data.recebimentos.qtdMensConsulta)})
-            {" · "}Desconto: {fmtMoney(data.recebimentos.mensDesconto)} ({fmtInt(data.recebimentos.qtdMensDesconto)})
-            {data.recebimentos.qtdMensOutros > 0 && <> {" · "}Outros: {fmtMoney(data.recebimentos.mensOutros)} ({fmtInt(data.recebimentos.qtdMensOutros)})</>}
-          </p>
-        </KpiCard>
-        )}
-
-        <KpiCard icon={Users} title="Pacientes distintos na agenda" value={a.novos + a.regulares} format={fmtInt} onClick={() => openDrill("clientes_total")}>
-          <p className="text-[11px] text-muted-foreground mb-1">
-            Quantas pessoas diferentes foram atendidas/marcadas no período (o card "Agendamentos" conta fichas/GRs, por isso é maior)
-          </p>
+        <KpiCard icon={Users} title="Clientes Agendados" big={fmtInt(a.novos + a.regulares)} onClick={() => openDrill("clientes_total")}>
           <SubGrid items={[
             { label: "Novos", value: fmtInt(a.novos), pct: pct(a.novos, a.novos + a.regulares), onClick: () => openDrill("clientes_novos") },
             { label: "Regulares", value: fmtInt(a.regulares), pct: pct(a.regulares, a.novos + a.regulares), onClick: () => openDrill("clientes_regulares") },
           ]} />
         </KpiCard>
 
-        <KpiCard icon={RotateCcw} title="Retornos" value={a.retornos} format={fmtInt} onClick={() => openDrill("retornos")}>
+        <KpiCard icon={RotateCcw} title="Retornos" big={fmtInt(a.retornos)} onClick={() => openDrill("retornos")}>
           <SubGrid items={[
             { label: "Sem Agenda", value: fmtInt(a.semAgenda), onClick: () => openDrill("retornos_sem") },
             { label: "Agendados", value: fmtInt(a.retornos), onClick: () => openDrill("retornos") },
           ]} />
         </KpiCard>
 
-        <KpiCard icon={MessageCircle} title="Mensagens Enviadas" value={data.msgs.enviadas} format={fmtInt}>
+        <KpiCard icon={MessageCircle} title="Mensagens Enviadas" big={fmtInt(data.msgs.enviadas)}>
           <SubGrid items={[
             { label: "Respostas", value: fmtInt(data.msgs.respostas) },
             { label: "Total", value: fmtInt(data.msgs.total) },
           ]} />
         </KpiCard>
 
-        <KpiCard icon={CheckCircle2} title="Confirmações das Agendas" value={data.conf.presencas + data.conf.ausencias} format={fmtInt} onClick={() => openDrill("conf_total")}>
+        <KpiCard icon={CheckCircle2} title="Confirmações das Agendas" big={fmtInt(data.conf.presencas + data.conf.ausencias)} onClick={() => openDrill("conf_total")}>
           <SubGrid items={[
             { label: "Presenças", value: fmtInt(data.conf.presencas), pct: pct(data.conf.presencas, data.conf.presencas + data.conf.ausencias), onClick: () => openDrill("conf_pres") },
             { label: "Ausências", value: fmtInt(data.conf.ausencias), pct: pct(data.conf.ausencias, data.conf.presencas + data.conf.ausencias), onClick: () => openDrill("conf_aus") },
@@ -739,7 +520,7 @@ function DashboardPage() {
         </KpiCard>
 
         {podeVerFinanceiro && (
-        <KpiCard icon={Handshake} title="Vendas" value={data.vendas.total} format={fmtMoney} onClick={() => openDrill("vendas")}>
+        <KpiCard icon={Handshake} title="Vendas" big={fmtMoney(data.vendas.total)} onClick={() => openDrill("vendas")}>
           <SubGrid items={[
             { label: "Conversão", value: "—" },
             { label: "Orçamentos", value: fmtMoney(data.vendas.orcamentos) },
@@ -748,7 +529,7 @@ function DashboardPage() {
         )}
 
         {podeVerFinanceiro && (
-        <KpiCard icon={CreditCard} title="Pagamentos" value={data.pagamentos.realizado + data.pagamentos.aPagar} format={fmtMoney} onClick={() => openDrill("pag_real")}>
+        <KpiCard icon={CreditCard} title="Pagamentos" big={fmtMoney(data.pagamentos.realizado + data.pagamentos.aPagar)} onClick={() => openDrill("pag_real")}>
           <SubGrid items={[
             { label: "Realizado", value: fmtMoney(data.pagamentos.realizado), onClick: () => openDrill("pag_real") },
             { label: "À pagar", value: fmtMoney(data.pagamentos.aPagar), onClick: () => openDrill("pag_apagar") },
@@ -757,32 +538,25 @@ function DashboardPage() {
         )}
 
         {podeVerFinanceiro && (
-        <KpiCard icon={Banknote} title="Recebimentos" value={data.recebimentos.realizado + data.recebimentos.aReceber} format={fmtMoney} onClick={() => openDrill("rec_real")}>
+        <KpiCard icon={Banknote} title="Recebimentos" big={fmtMoney(data.recebimentos.realizado + data.recebimentos.aReceber)} onClick={() => openDrill("rec_real")}>
           <SubGrid items={[
             { label: "Realizado", value: fmtMoney(data.recebimentos.realizado), onClick: () => openDrill("rec_real") },
             { label: "À receber", value: fmtMoney(data.recebimentos.aReceber), onClick: () => openDrill("rec_areceber") },
           ]} />
-          <p className="text-[11px] text-muted-foreground mt-2">
-            Atendimentos: {fmtMoney(data.recebimentos.atendimentos)} ({fmtInt(data.recebimentos.qtdAtendimentos)})
-            {" · "}Mensalidades do cartão: {fmtMoney(data.recebimentos.mensalidades)} ({fmtInt(data.recebimentos.qtdMensalidades)})
-          </p>
         </KpiCard>
         )}
 
         {podeVerFinanceiro && (
-        <KpiCard icon={Receipt} title="Lançamentos de recebimento (Qtd.)" value={data.recebimentos.qtdRealizado + data.recebimentos.qtdAReceber} format={fmtInt} onClick={() => openDrill("rec_real")}>
+        <KpiCard icon={Receipt} title="Recebimentos Qtd." big={fmtInt(data.recebimentos.qtdRealizado + data.recebimentos.qtdAReceber)} onClick={() => openDrill("rec_real")}>
           <SubGrid items={[
             { label: "Realizado", value: fmtInt(data.recebimentos.qtdRealizado), onClick: () => openDrill("rec_real") },
             { label: "À receber", value: fmtInt(data.recebimentos.qtdAReceber), onClick: () => openDrill("rec_areceber") },
           ]} />
-          <p className="text-[11px] text-muted-foreground mt-2">
-            Conta lançamentos no caixa (não GRs). Sendo {fmtInt(data.recebimentos.qtdAtendimentos)} de atendimentos e {fmtInt(data.recebimentos.qtdMensalidades)} de mensalidades do cartão.
-          </p>
         </KpiCard>
         )}
 
         {podeVerFinanceiro && (
-        <KpiCard icon={BadgeDollarSign} title="Comissões Pagas" value={data.comissoes.pagas} format={fmtMoney} onClick={() => openDrill("comissoes")}>
+        <KpiCard icon={BadgeDollarSign} title="Comissões Pagas" big={fmtMoney(data.comissoes.pagas)} onClick={() => openDrill("comissoes")}>
           <SubGrid items={[
             { label: "% da Receita", value: `${data.comissoes.percentReceita.toFixed(1)}%` },
             { label: "Pendentes", value: fmtMoney(data.comissoes.pendentes) },
@@ -790,15 +564,13 @@ function DashboardPage() {
         </KpiCard>
         )}
       </div>
-      </KpiAnimContext.Provider>
 
       {data.porMedico.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase mb-3">Médicos do dia — total de atendimentos</h2>
-          <KpiAnimContext.Provider value={uxMelhorias}>
-          <div className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-3", uxMelhorias && "kpi-stagger")}>
+          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase mb-3">Total de Agendamentos por médico</h2>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {data.porMedico.map((m) => (
-              <KpiCard key={m.nome} icon={Stethoscope} title={m.nome} value={m.total} format={fmtInt} small onClick={() => openDrill("medico", { nome: m.nome })}>
+              <KpiCard key={m.nome} icon={Stethoscope} title={m.nome} big={fmtInt(m.total)} small onClick={() => openDrill("medico", { nome: m.nome })}>
                 <SubGrid items={[
                   { label: "Pagos", value: fmtInt(m.pagos), pct: pct(m.pagos, m.total) },
                   { label: "Clientes Novos", value: fmtInt(m.novos), pct: pct(m.novos, m.total) },
@@ -806,30 +578,16 @@ function DashboardPage() {
               </KpiCard>
             ))}
           </div>
-          </KpiAnimContext.Provider>
         </div>
       )}
 
-      <Dialog open={drill !== null} onOpenChange={(o) => { if (!o) { setDrill(null); setDrillBusca(""); } }}>
+      <Dialog open={drill !== null} onOpenChange={(o) => { if (!o) setDrill(null); }}>
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader><DialogTitle>{drill?.title}</DialogTitle></DialogHeader>
-          <Input
-            value={drillBusca}
-            onChange={(e) => setDrillBusca(e.target.value)}
-            placeholder="Filtrar por nome do paciente, procedimento..."
-            className="mb-2"
-          />
           <div className="overflow-auto flex-1">
-            {(() => {
-              if (!drill) return null;
-              const termo = drillBusca.trim().toLowerCase();
-              const linhas = termo
-                ? drill.rows.filter(r => Object.values(r).some(v => String(v ?? "").toLowerCase().includes(termo)))
-                : drill.rows;
-              if (linhas.length === 0) {
-                return <p className="text-sm text-muted-foreground py-6 text-center">Nenhum registro.</p>;
-              }
-              return (
+            {drill && drill.rows.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-6 text-center">Nenhum registro.</p>
+            ) : drill ? (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -839,7 +597,7 @@ function DashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {linhas.map((r, i) => (
+                  {drill.rows.map((r, i) => (
                     <TableRow key={i}>
                       {drill.columns.map((c) => (
                         <TableCell key={c.key} className={c.align === "right" ? "text-right" : ""}>{r[c.key]}</TableCell>
@@ -848,8 +606,7 @@ function DashboardPage() {
                   ))}
                 </TableBody>
               </Table>
-              );
-            })()}
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>
@@ -857,61 +614,23 @@ function DashboardPage() {
   );
 }
 
-// Contexto que liga o count-up dos KPIs — provido pela flag ux_melhorias
-// uma única vez em DashboardPage.
-const KpiAnimContext = createContext(false);
-
-function KpiCard({ icon: Icon, title, value, format, small, children, onClick }: {
-  icon: ElementType; title: string; value?: number; format?: (n: number) => string;
-  small?: boolean; children?: React.ReactNode; onClick?: () => void;
+function KpiCard({ icon: Icon, title, big, small, children, onClick }: {
+  icon: ElementType; title: string; big?: string; small?: boolean; children?: React.ReactNode; onClick?: () => void;
 }) {
-  const animado = useContext(KpiAnimContext);
-  const big = value !== undefined && format
-    ? (animado ? <CountUpNumber value={value} format={format} /> : format(value))
-    : undefined;
   return (
     <Card className={`overflow-hidden ${onClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`} onClick={onClick}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2 text-sm text-muted-foreground min-w-0 flex-1">
-            <Icon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <span className="line-clamp-2 leading-tight" title={title}>{title}</span>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0 flex-1">
+            <Icon className="h-4 w-4 text-primary shrink-0" />
+            <span className="truncate" title={title}>{title}</span>
           </div>
-          {big !== undefined && <div className="text-xl lg:text-2xl font-semibold tabular-nums shrink-0 whitespace-nowrap">{big}</div>}
+          {big !== undefined && <div className="text-2xl font-semibold tabular-nums shrink-0">{big}</div>}
         </div>
         {children && <div className="mt-4 pt-3 border-t border-border">{children}</div>}
       </CardContent>
     </Card>
   );
-}
-
-/** Anima o número de `from` (valor anterior, 0 no primeiro carregamento) até
- * `value`, reformatando a cada quadro. Respeita prefers-reduced-motion. */
-function CountUpNumber({ value, format }: { value: number; format: (n: number) => string }) {
-  const [display, setDisplay] = useState(0);
-  const prevRef = useRef(0);
-  useEffect(() => {
-    const from = prevRef.current;
-    const to = value;
-    prevRef.current = value;
-    const reduceMotion = typeof window !== "undefined"
-      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (from === to || reduceMotion) { setDisplay(to); return; }
-    const toIsInt = Number.isInteger(to);
-    const duration = 600;
-    const start = performance.now();
-    let raf = 0;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      const atual = from + (to - from) * eased;
-      setDisplay(t < 1 ? (toIsInt ? Math.round(atual) : atual) : to);
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [value]);
-  return <>{format(display)}</>;
 }
 
 function SubGrid({ items }: { items: { label: string; value: string; pct?: string; onClick?: () => void }[] }) {

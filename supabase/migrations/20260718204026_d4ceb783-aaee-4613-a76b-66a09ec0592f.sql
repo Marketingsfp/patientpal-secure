@@ -1,1 +1,0 @@
-DELETE FROM public.clinica_feature_flags WHERE flag_key = 'agenda_express_disabled';

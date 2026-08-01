@@ -39,7 +39,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
   const { data: contrato, error } = await supabase
     .from("contratos_assinatura")
     .select(
-      "id, numero, paciente_nome, paciente_id, convenio_id, valor_mensal, data_inicio, dia_vencimento, clinica_id, observacoes",
+      "id, numero, paciente_nome, paciente_id, convenio_id, plano_id, valor_mensal, data_inicio, dia_vencimento, clinica_id, observacoes",
     )
     .eq("id", contratoId)
     .single();
@@ -50,6 +50,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
     { data: paciente },
     { data: clinica },
     { data: convenio },
+    { data: planoFallback },
     { data: dependentesRows },
   ] = await Promise.all([
       supabase
@@ -70,6 +71,9 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
       contrato.convenio_id
         ? supabase.from("cb_convenios").select("nome").eq("id", contrato.convenio_id as string).maybeSingle()
         : Promise.resolve({ data: null as { nome: string | null } | null }),
+      contrato.plano_id
+        ? supabase.from("planos_assinatura").select("nome").eq("id", contrato.plano_id as string).maybeSingle()
+        : Promise.resolve({ data: null as { nome: string | null } | null }),
       supabase
         .from("contrato_dependentes")
         .select("paciente_id, paciente_nome")
@@ -77,7 +81,7 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
         .eq("ativo", true),
     ]);
 
-  const convenioNome = convenio?.nome ?? "—";
+  const convenioNome = convenio?.nome ?? planoFallback?.nome ?? "—";
   const depPacienteIds = (dependentesRows ?? [])
     .map((d: any) => d.paciente_id as string | null)
     .filter((id): id is string => !!id);
@@ -107,22 +111,19 @@ export async function gerarCarnePDF(contratoId: string): Promise<void> {
     throw new Error("Nenhuma mensalidade em aberto para gerar carnê.");
   }
   const fichas = parcelasAbertas.map((p) => {
-    const isAdesao = Number(p.numero_parcela) === 0;
-    const total = (parcelas ?? []).filter((parcela) => Number(parcela.numero_parcela) !== 0).length;
-    const parcelaLabel = isAdesao ? "Adesao" : `${p.numero_parcela}/${total}`;
-    const docLabel = isAdesao ? "TAXA DE ADESAO" : "CARNE DE PAGAMENTO";
+    const total = (parcelas ?? []).length;
     const buildFicha = (viaLabel: string) => `
       <div class="ficha">
         <div class="via-label">${viaLabel}</div>
         <div class="ficha-header">
           <div class="ficha-titulo">
             <div class="ficha-clinica">${esc(clinica?.nome ?? "Clínica")}</div>
-            <div class="ficha-doc">${docLabel} - Contrato #${esc(contrato.numero)}</div>
+            <div class="ficha-doc">CARNÊ DE PAGAMENTO — Contrato #${esc(contrato.numero)}</div>
           </div>
           <div style="display:flex;gap:18px;align-items:flex-start;">
             <div class="ficha-parcela">
               <div class="lab">Parcela</div>
-              <div class="val">${parcelaLabel}</div>
+              <div class="val">${p.numero_parcela}/${total}</div>
             </div>
             <div class="ficha-parcela">
               <div class="lab">Mês Ref.</div>

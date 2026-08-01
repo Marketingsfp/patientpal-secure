@@ -1,1 +1,0 @@
-CREATE UNIQUE INDEX IF NOT EXISTS ux_fin_lancamentos_agendamento_receita ON public.fin_lancamentos (agendamento_id) WHERE agendamento_id IS NOT NULL AND tipo = 'receita';

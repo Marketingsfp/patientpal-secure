@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { SectionTabs, RH_TABS, RH_META } from "@/components/section-tabs";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,9 +16,8 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { formatDatePura } from "@/lib/date-utils";
 
-import { DateInputBR } from "@/components/ui/date-input-br";
 export const Route = createFileRoute("/_authenticated/app/hr-ferias")({
-  component: FeriasPage,
+  component: FeriasPageWithTabs,
   head: () => ({ meta: [{ title: "Férias — ClinicaOS" }] }),
 });
 
@@ -32,7 +31,6 @@ interface Ferias {
 
 function FeriasPage() {
   const { clinicaAtual } = useClinica();
-  const podeEscrever = usePodeEscrever("hr-ferias");
   const [rows, setRows] = useState<Ferias[]>([]);
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +68,6 @@ function FeriasPage() {
   }
 
   async function salvar() {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) return;
     if (!form.contrato_id) { toast.error("Selecione o funcionário"); return; }
     setSaving(true);
@@ -93,7 +90,6 @@ function FeriasPage() {
   }
 
   async function decidir(id: string, status: "aprovada" | "rejeitada") {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("hr_ferias").update({
       status, aprovado_por: user?.id, aprovado_em: new Date().toISOString(),
@@ -111,9 +107,7 @@ function FeriasPage() {
           <h1 className="text-xl font-bold">Férias</h1>
           <p className="text-sm text-muted-foreground">Solicitações e gestão de períodos de férias.</p>
         </div>
-        {podeEscrever && (
-          <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Nova solicitação</Button>
-        )}
+        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Nova solicitação</Button>
       </div>
 
       <Card>
@@ -143,7 +137,7 @@ function FeriasPage() {
                 <TableCell>{r.abono_pecuniario ? "Sim" : "Não"}</TableCell>
                 <TableCell><Badge variant={r.status === "aprovada" ? "default" : r.status === "rejeitada" ? "destructive" : "secondary"}>{r.status}</Badge></TableCell>
                 <TableCell className="text-right space-x-1">
-                  {r.status === "solicitada" && podeEscrever && (
+                  {r.status === "solicitada" && (
                     <>
                       <Button size="icon" variant="ghost" onClick={() => decidir(r.id, "aprovada")}><Check className="h-4 w-4 text-emerald-600" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => decidir(r.id, "rejeitada")}><X className="h-4 w-4 text-destructive" /></Button>
@@ -168,10 +162,10 @@ function FeriasPage() {
               </Select>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Aquisitivo início</Label><DateInputBR value={form.periodo_aquisitivo_inicio} onChange={e => setForm({ ...form, periodo_aquisitivo_inicio: e.target.value })} /></div>
-              <div><Label>Aquisitivo fim</Label><DateInputBR value={form.periodo_aquisitivo_fim} onChange={e => setForm({ ...form, periodo_aquisitivo_fim: e.target.value })} /></div>
-              <div><Label>Início gozo</Label><DateInputBR value={form.inicio} onChange={e => setForm({ ...form, inicio: e.target.value })} /></div>
-              <div><Label>Fim gozo</Label><DateInputBR value={form.fim} onChange={e => setForm({ ...form, fim: e.target.value })} /></div>
+              <div><Label>Aquisitivo início</Label><Input type="date" value={form.periodo_aquisitivo_inicio} onChange={e => setForm({ ...form, periodo_aquisitivo_inicio: e.target.value })} /></div>
+              <div><Label>Aquisitivo fim</Label><Input type="date" value={form.periodo_aquisitivo_fim} onChange={e => setForm({ ...form, periodo_aquisitivo_fim: e.target.value })} /></div>
+              <div><Label>Início gozo</Label><Input type="date" value={form.inicio} onChange={e => setForm({ ...form, inicio: e.target.value })} /></div>
+              <div><Label>Fim gozo</Label><Input type="date" value={form.fim} onChange={e => setForm({ ...form, fim: e.target.value })} /></div>
               <div><Label>Dias</Label><Input type="number" value={form.dias} onChange={e => setForm({ ...form, dias: e.target.value })} /></div>
               <div className="flex items-end">
                 <label className="flex items-center gap-2 text-sm">
@@ -188,5 +182,13 @@ function FeriasPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+function FeriasPageWithTabs() {
+  return (
+    <>
+      <SectionTabs title={RH_META.title} icon={RH_META.icon} tabs={RH_TABS} />
+      <FeriasPage />
+    </>
   );
 }

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { useAuth } from "@/hooks/use-auth";
-import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -102,18 +101,12 @@ const formVazio: Form = {
 function TriagemEnfermagemPage() {
   const { clinicaAtual } = useClinica();
   const { user } = useAuth();
-  const podeEscrever = usePodeEscrever("triagem-enfermagem");
   const [loading, setLoading] = useState(false);
   const [ags, setAgs] = useState<Ag[]>([]);
   const [pagosSet, setPagosSet] = useState<Set<string>>(new Set());
   const [aberto, setAberto] = useState<Grupo | null>(null);
   const [form, setForm] = useState<Form>(formVazio);
   const [salvando, setSalvando] = useState(false);
-  // ALTA-14: clique duplo em "Chamar" disparava duas chamadas antes do botão
-  // desabilitar (não havia nenhum estado de loading para essa ação) — cada
-  // uma lia o mesmo "próximo número" e inseria sua própria senha, gerando
-  // duplicidade na fila.
-  const [chamandoId, setChamandoId] = useState<string | null>(null);
   const [consultorio, setConsultorio] = useState<string>(() =>
     typeof window !== "undefined" ? localStorage.getItem("triagem_consultorio") ?? "" : ""
   );
@@ -129,10 +122,6 @@ function TriagemEnfermagemPage() {
       .select("id, paciente_id, paciente_nome, procedimento, inicio, fluxo_etapa, prioridade, medicos(nome)")
       .eq("clinica_id", clinicaAtual.clinica_id)
       .eq("fluxo_etapa", "triagem")
-      // Cancelar um agendamento não reseta fluxo_etapa — sem este filtro, um
-      // paciente cancelado ficava "esperando" na fila de triagem para sempre
-      // (CRIT-09).
-      .neq("status", "cancelado")
       .gte("inicio", hoje.toISOString())
       .lt("inicio", amanha.toISOString())
       .order("inicio");
@@ -183,45 +172,31 @@ function TriagemEnfermagemPage() {
 
   async function chamarPaciente(g: Grupo) {
     if (!clinicaAtual) return;
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    if (chamandoId) return; // clique duplo — já tem uma chamada em andamento
     if (!grupoPago(g)) {
       toast.error("Pagamento pendente — envie o paciente ao caixa antes de chamar para a triagem.");
       return;
     }
     if (!consultorio.trim()) { toast.error("Informe o consultório/sala da enfermagem no topo."); return; }
-    setChamandoId(g.chave);
-    try {
-      const hoje = new Date().toISOString().slice(0, 10);
-      const { data: ult } = await supabase
-        .from("senhas").select("numero")
-        .eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("tipo", "T")
-        .order("numero", { ascending: false }).limit(1).maybeSingle();
-      const proximoNum = Math.min(9999, (ult?.numero ?? 0) + 1);
-      const nomeCurto = g.paciente_nome.split(/\s+/).slice(0, 2).join(" ").toUpperCase().slice(0, 24);
-      const guicheStr = `Triagem · Sala ${consultorio.trim()}`;
-      const { error } = await supabase.from("senhas").insert({
-        clinica_id: clinicaAtual.clinica_id, tipo: "T", numero: proximoNum,
-        codigo: nomeCurto, status: "chamada", paciente_id: g.paciente_id,
-        guiche: guicheStr, chamada_em: new Date().toISOString(),
-      } as never);
-      if (error) { mostrarErro(error); return; }
-      toast.success(`Chamando ${nomeCurto} · ${guicheStr}`);
-      abrir(g);
-    } finally {
-      setChamandoId(null);
-    }
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { data: ult } = await supabase
+      .from("senhas").select("numero")
+      .eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("tipo", "N")
+      .order("numero", { ascending: false }).limit(1).maybeSingle();
+    const proximoNum = Math.min(9999, (ult?.numero ?? 0) + 1);
+    const nomeCurto = g.paciente_nome.split(/\s+/).slice(0, 2).join(" ").toUpperCase().slice(0, 24);
+    const guicheStr = `Triagem · Sala ${consultorio.trim()}`;
+    const { error } = await supabase.from("senhas").insert({
+      clinica_id: clinicaAtual.clinica_id, tipo: "N", numero: proximoNum,
+      codigo: nomeCurto, status: "chamada", paciente_id: g.paciente_id,
+      guiche: guicheStr, chamada_em: new Date().toISOString(),
+    } as never);
+    if (error) { mostrarErro(error); return; }
+    toast.success(`Chamando ${nomeCurto} · ${guicheStr}`);
+    abrir(g);
   }
 
   async function salvarEAvancar(avancar: boolean) {
     if (!clinicaAtual || !aberto) return;
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    // ALTA-14: guarda explícita contra reentrância — o botão já desabilita
-    // via disabled={salvando}, mas isso só some depois do próximo render;
-    // um clique duplo bem rápido conseguia disparar duas chamadas antes
-    // disso. O índice único em triagens_enfermagem.agendamento_id (banco)
-    // é a última linha de defesa contra a mesma corrida.
-    if (salvando) return;
     // Validação de faixas plausíveis (só valida se preenchido)
     const range = (v: string, min: number, max: number, label: string) => {
       if (!v.trim()) return true;
@@ -278,17 +253,7 @@ function TriagemEnfermagemPage() {
     };
     const rows = aberto.agendamentos.map((a) => ({ ...base, agendamento_id: a.id }));
     const { error } = await supabase.from("triagens_enfermagem").insert(rows as never);
-    if (error) {
-      setSalvando(false);
-      if ((error as { code?: string }).code === "23505") {
-        toast.error("Já existe uma triagem registrada para este atendimento.");
-        setAberto(null); setForm(formVazio);
-        void carregar();
-        return;
-      }
-      mostrarErro(error);
-      return;
-    }
+    if (error) { setSalvando(false); mostrarErro(error); return; }
 
     const ids = aberto.agendamentos.map((a) => a.id);
     if (form.prioridade !== "normal" && ids.length) {
@@ -382,7 +347,7 @@ function TriagemEnfermagemPage() {
                 <Button
                   size="sm" className="flex-1"
                   onClick={() => chamarPaciente(g)}
-                  disabled={!pago || !!chamandoId}
+                  disabled={!pago}
                   title={!pago ? "Pagamento pendente" : undefined}
                 >
                   <Bell className="h-4 w-4 mr-1" /> Chamar

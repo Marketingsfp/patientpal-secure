@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, User, UserPlus } from "lucide-react";
+import { Search, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { Input } from "@/components/ui/input";
@@ -19,8 +19,6 @@ export interface PatientOption {
   email?: string | null;
   /** Preenchido quando o paciente tem contrato ativo de convênio. */
   associado_convenio?: string | null;
-  /** 'titular' | 'dependente' — quando associado_convenio está preenchido. */
-  associado_tipo?: "titular" | "dependente" | null;
   ultima_consulta?: string | null;
   cadastro_incompleto?: boolean;
   match_score?: number;
@@ -37,11 +35,6 @@ interface PatientSearchInputProps {
   clinicaIdsOverride?: string[];
   /** Mostra um botão de microfone para ditar a busca por voz. */
   enableVoice?: boolean;
-  /**
-   * Se informado, exibe um botão "Cadastrar novo paciente" quando a busca
-   * não retorna resultados. O callback recebe o texto atualmente digitado.
-   */
-  onRequestCreate?: (query: string) => void;
 }
 
 /**
@@ -90,7 +83,6 @@ export function PatientSearchInput({
   autoFocus,
   clinicaIdsOverride,
   enableVoice = false,
-  onRequestCreate,
 }: PatientSearchInputProps) {
   const { clinicaIds } = useClinica();
   const scope = useMemo(
@@ -228,21 +220,8 @@ export function PatientSearchInput({
             <div className="px-3 py-2 text-sm text-muted-foreground">Buscando…</div>
           )}
           {!loading && options.length === 0 && (
-            <div className="px-3 py-2 text-sm text-muted-foreground space-y-2">
-              <div>Nenhum paciente encontrado.</div>
-              {onRequestCreate && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onRequestCreate(query.trim());
-                    setOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md border border-dashed border-primary/40 text-primary hover:bg-primary/5 text-sm font-medium"
-                >
-                  <UserPlus className="h-4 w-4" />
-                  Cadastrar novo paciente{query.trim() ? `: "${query.trim()}"` : ""}
-                </button>
-              )}
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+              Nenhum paciente encontrado.
             </div>
           )}
           {!loading && options.map((p) => (
@@ -272,7 +251,7 @@ export function PatientSearchInput({
                   )}
                   {p.associado_convenio ? (
                     <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
-                      Associado - {p.associado_tipo === "dependente" ? "dependente" : "titular"} — {p.associado_convenio}
+                      Associado — {p.associado_convenio}
                     </span>
                   ) : (
                     <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">

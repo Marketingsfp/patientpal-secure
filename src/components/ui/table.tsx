@@ -1,36 +1,21 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
-import { useClinicFeatureFlag } from "@/hooks/use-clinic-feature-flag";
 
-const Table = React.forwardRef<
-  HTMLTableElement,
-  React.HTMLAttributes<HTMLTableElement> & { containerClassName?: string }
->(({ className, containerClassName, ...props }, ref) => {
-  // Rolagem horizontal em vez de cortar colunas em telas estreitas — piloto
-  // Flag ux_melhorias. Sem a flag, comportamento
-  // idêntico ao atual (sem overflow-x, para não mudar nada nas outras clínicas).
-  const { enabled: uxMelhorias } = useClinicFeatureFlag("ux_melhorias");
-  return (
-    <div className={cn("relative w-full", uxMelhorias && "overflow-x-auto", containerClassName)}>
+const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
+  ({ className, ...props }, ref) => (
+    <div className="relative w-full overflow-auto">
       <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
     </div>
-  );
-});
+  ),
+);
 Table.displayName = "Table";
 
 const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead
-    ref={ref}
-    className={cn(
-      "bg-primary/10 border-b-2 border-primary/30 [&_tr]:border-b-0 [&_tr:hover]:bg-primary/10 [&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-muted [&_th]:shadow-[inset_0_-1px_0_hsl(var(--border))]",
-      className,
-    )}
-    {...props}
-  />
+  <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
 ));
 TableHeader.displayName = "TableHeader";
 
@@ -75,7 +60,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-11 px-2 text-left align-middle font-bold uppercase tracking-wide text-xs text-primary [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      "h-10 px-2 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
       className,
     )}
     {...props}

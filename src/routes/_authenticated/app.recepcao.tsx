@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
-import { usePodeEscrever } from "@/hooks/use-permissoes";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
-import { Bell, Check, X, ExternalLink, Volume2 } from "lucide-react";
+import { Bell, Check, X, ExternalLink } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/recepcao")({
   component: RecepcaoPage,
@@ -15,7 +14,7 @@ export const Route = createFileRoute("/_authenticated/app/recepcao")({
 type Senha = {
   id: string;
   codigo: string;
-  tipo: "N" | "P" | "C" | "R";
+  tipo: "N" | "P" | "E" | "R";
   status: string;
   guiche: string | null;
   emitida_em: string;
@@ -28,45 +27,18 @@ type Senha = {
 const TIPO_COR: Record<string, string> = {
   N: "bg-primary/10 text-primary",
   P: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-  C: "bg-rose-500/15 text-rose-700 dark:text-rose-400",
+  E: "bg-rose-500/15 text-rose-700 dark:text-rose-400",
   R: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
 };
 
-// Prioridade de atendimento: Emergência > Prioritário > Retorno > Normal
-const TIPO_PRIORIDADE: Record<string, number> = { C: 0, P: 1, R: 2, N: 3 };
-
-function ordenarPorPrioridade(a: Senha, b: Senha) {
-  const pa = TIPO_PRIORIDADE[a.tipo] ?? 99;
-  const pb = TIPO_PRIORIDADE[b.tipo] ?? 99;
-  if (pa !== pb) return pa - pb;
-  return a.emitida_em.localeCompare(b.emitida_em);
-}
-
 function RecepcaoPage() {
   const { clinicaAtual } = useClinica();
-  const podeEscrever = usePodeEscrever("recepcao");
-  const [guiche, setGuiche] = useState<string>("1");
-  const [tipoFiltro, setTipoFiltro] = useState<"AUTO" | "N" | "P" | "C" | "R">("AUTO");
+  const [guiche, setGuiche] = useState<string>(() => localStorage.getItem("guiche") ?? "1");
   const [fila, setFila] = useState<Senha[]>([]);
   const [chamadas, setChamadas] = useState<Senha[]>([]);
   const [busy, setBusy] = useState(false);
 
-  // Refs para o atalho de teclado sempre ler o valor mais recente
-  // sem precisar remontar o listener a cada mudança
-  const clinicaIdRef = useRef(clinicaAtual?.clinica_id);
-  useEffect(() => { clinicaIdRef.current = clinicaAtual?.clinica_id; }, [clinicaAtual?.clinica_id]);
-
-  // Carrega o guichê salvo assim que a clínica é conhecida (namespaced por clínica)
-  useEffect(() => {
-    if (!clinicaAtual) return;
-    const saved = localStorage.getItem(`guiche:${clinicaAtual.clinica_id}`);
-    setGuiche(saved ?? "1");
-  }, [clinicaAtual?.clinica_id]);
-
-  useEffect(() => {
-    if (!clinicaAtual) return;
-    localStorage.setItem(`guiche:${clinicaAtual.clinica_id}`, guiche);
-  }, [guiche, clinicaAtual?.clinica_id]);
+  useEffect(() => { localStorage.setItem("guiche", guiche); }, [guiche]);
 
   // Atalho: C = chamar próxima senha
   useEffect(() => {
@@ -76,35 +48,23 @@ function RecepcaoPage() {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key.toLowerCase() === "c") {
         e.preventDefault();
-        if (!clinicaIdRef.current) return;
         void chamarProxima();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [clinicaAtual?.clinica_id, guiche]);
 
   const carregar = async () => {
     if (!clinicaAtual) return;
     const hoje = new Date().toISOString().slice(0, 10);
     const sel = "id, codigo, tipo, status, guiche, emitida_em, chamada_em, identificado_por_facial, paciente_id, pacientes(nome)";
-    const [{ data: emit, error: errEmit }, { data: cham, error: errCham }] = await Promise.all([
-      // Fila da recepção: apenas senhas emitidas pelo totem/recepção
-      // (exclui as senhas geradas pela Triagem, que já nascem com status="chamada").
+    const [{ data: emit }, { data: cham }] = await Promise.all([
       supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "emitida").order("emitida_em"),
-      // Chamadas recentes: só as chamadas feitas pela Recepção — filtra fora
-      // qualquer senha cujo guichê comece com "Triagem" (fila separada).
-      supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "chamada").not("guiche", "ilike", "Triagem%").order("chamada_em", { ascending: false }).limit(10),
+      supabase.from("senhas").select(sel).eq("clinica_id", clinicaAtual.clinica_id).eq("data_dia", hoje).eq("status", "chamada").order("chamada_em", { ascending: false }).limit(10),
     ]);
-
-    if (errEmit || errCham) {
-      mostrarErro(errEmit ?? errCham!);
-      return;
-    }
-
-    const filaOrdenada = ((emit ?? []) as unknown as Senha[]).sort(ordenarPorPrioridade);
-    setFila(filaOrdenada);
+    setFila((emit ?? []) as unknown as Senha[]);
     setChamadas((cham ?? []) as unknown as Senha[]);
   };
 
@@ -130,34 +90,20 @@ function RecepcaoPage() {
 
   async function chamarProxima() {
     if (!clinicaAtual) return;
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!guiche.trim()) { toast.error("Informe o guichê"); return; }
     setBusy(true);
-    const { data, error } = await supabase.rpc("chamar_proxima_senha_tipo", {
+    const { data, error } = await supabase.rpc("chamar_proxima_senha", {
       _clinica_id: clinicaAtual.clinica_id,
       _guiche: guiche.trim(),
-      _tipo: tipoFiltro === "AUTO" ? null : tipoFiltro,
-    } as never);
+    });
     setBusy(false);
     if (error) { mostrarErro(error); return; }
-    if (!data) {
-      toast.info(tipoFiltro === "AUTO" ? "Não há senhas na fila" : `Não há senhas do tipo ${tipoFiltro}`);
-      return;
-    }
+    if (!data) { toast.info("Não há senhas na fila"); return; }
     const row = Array.isArray(data) ? data[0] : data;
     toast.success(`Chamada ${row.codigo} no guichê ${guiche}`);
   }
 
-  async function rechamar(id: string) {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
-    const { data, error } = await supabase.rpc("rechamar_senha", { _id: id } as never);
-    if (error) { mostrarErro(error); return; }
-    const row = Array.isArray(data) ? data[0] : data;
-    toast.success(`Rechamada ${row?.codigo ?? ""}`);
-  }
-
   async function setStatus(id: string, status: "atendida" | "cancelada") {
-    if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     const now = new Date().toISOString();
     const patch = status === "atendida"
       ? { status, atendida_em: now }
@@ -177,35 +123,22 @@ function RecepcaoPage() {
         </div>
         <div className="flex items-end gap-3">
           <div className="space-y-1">
-            <label htmlFor="guiche-input" className="text-xs text-muted-foreground">Meu guichê</label>
+            <label className="text-xs text-muted-foreground">Meu guichê</label>
             <input
-              id="guiche-input"
               value={guiche}
               onChange={(e) => setGuiche(e.target.value.slice(0, 10))}
               className="h-10 w-24 px-3 rounded-md border bg-background text-lg font-semibold"
             />
           </div>
-          <div className="space-y-1">
-            <label htmlFor="tipo-select" className="text-xs text-muted-foreground">Tipo</label>
-            <select
-              id="tipo-select"
-              value={tipoFiltro}
-              onChange={(e) => setTipoFiltro(e.target.value as typeof tipoFiltro)}
-              className="h-10 px-2 rounded-md border bg-background text-sm font-medium"
-            >
-              <option value="AUTO">Automático (C · P · R · N)</option>
-              <option value="C">C · Cartão consulta</option>
-              <option value="P">P · Preferencial</option>
-              <option value="R">R · Retorno</option>
-              <option value="N">N · Comum</option>
-            </select>
-          </div>
           <Button size="lg" onClick={chamarProxima} disabled={busy} data-primary>
             <Bell className="h-4 w-4 mr-2" /> Chamar próxima
             <kbd className="ml-2 hidden md:inline-flex h-5 min-w-5 items-center justify-center rounded border bg-background/20 px-1 text-[10px] font-mono">C</kbd>
           </Button>
-          <Button variant="outline" asChild title="Links, QR Codes e rotação de token do Painel e Totem">
-            <a href="/app/configuracoes/painel-totem"><ExternalLink className="h-4 w-4 mr-2" /> Painel & Totem</a>
+          <Button variant="outline" asChild>
+            <a href="/totem" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-2" /> Totem</a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href="/painel" target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4 mr-2" /> Painel</a>
           </Button>
         </div>
       </div>
@@ -214,7 +147,7 @@ function RecepcaoPage() {
         <section className="bg-card border rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold">Fila ({fila.length})</h2>
-            <span className="text-xs text-muted-foreground">Ordem: C · P · R · N</span>
+            <span className="text-xs text-muted-foreground">Ordem: E · P · R · N</span>
           </div>
           <div className="space-y-2 max-h-[60vh] overflow-auto">
             {fila.length === 0 && <div className="text-sm text-muted-foreground py-6 text-center">Fila vazia</div>}
@@ -246,14 +179,9 @@ function RecepcaoPage() {
                   <span className="font-bold tabular-nums">{s.codigo}</span>
                   <span className="text-sm text-muted-foreground">Guichê {s.guiche ?? "—"}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={() => rechamar(s.id)} title="Rechamar (o painel toca e fala novamente)">
-                    <Volume2 className="h-4 w-4 mr-1" /> Rechamar
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setStatus(s.id, "atendida")}>
-                    <Check className="h-4 w-4 mr-1" /> Concluir
-                  </Button>
-                </div>
+                <Button size="sm" variant="outline" onClick={() => setStatus(s.id, "atendida")}>
+                  <Check className="h-4 w-4 mr-1" /> Concluir
+                </Button>
               </div>
             ))}
           </div>
