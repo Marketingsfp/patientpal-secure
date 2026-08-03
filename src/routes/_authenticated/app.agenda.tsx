@@ -4602,9 +4602,9 @@ function AgendaPage() {
                               size="icon"
                               title="Confirmar presença (check-in)"
                               onClick={() => confirmarPresenca(a)}
-                              className="h-5 w-5 border rounded-md text-emerald-700 border-emerald-600 hover:bg-emerald-50"
+                              className="h-7 w-7 rounded-md text-slate-500 hover:text-emerald-600 hover:bg-emerald-50"
                             >
-                              <BadgeCheck className="h-2.5 w-2.5" />
+                              <BadgeCheck className="h-4 w-4" />
                             </Button>
                           );
                         }
@@ -4615,9 +4615,9 @@ function AgendaPage() {
                               size="icon"
                               disabled
                               title="Check-in já realizado"
-                              className="h-5 w-5 border rounded-md bg-emerald-500 text-white border-emerald-600 disabled:opacity-100"
+                              className="h-7 w-7 rounded-md text-emerald-600 disabled:opacity-100"
                             >
-                              <BadgeCheck className="h-2.5 w-2.5" />
+                              <BadgeCheck className="h-4 w-4" />
                             </Button>
                           );
                         }
@@ -4635,11 +4635,11 @@ function AgendaPage() {
                           return `Pago • ${f} • ${v}`;
                         })()}
                         onClick={() => cobrarAgendamento(a)}
-                        className={`h-7 w-7 border-2 rounded-md shadow-sm ${pagosSet.has(a.id)
-                          ? "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 hover:text-white ring-2 ring-emerald-300"
-                          : "text-rose-600 border-rose-600 hover:text-rose-700 hover:bg-rose-50"}`}
+                        className={`h-7 w-7 rounded-md ${pagosSet.has(a.id)
+                          ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                          : "text-slate-500 hover:text-rose-600 hover:bg-rose-50"}`}
                       >
-                        <DollarSign className="h-4 w-4" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
+                        <DollarSign className="h-4 w-4" strokeWidth={pagosSet.has(a.id) ? 2.5 : 2} />
                       </Button>
                       {(() => {
                         if (isSlotLivre(a.paciente_nome)) return null;
@@ -4656,11 +4656,11 @@ function AgendaPage() {
                             size="icon"
                             title={title}
                             onClick={() => verOuEmitirNota(a)}
-                            className={`h-7 w-7 border-2 rounded-md shadow-sm ${emitida
-                              ? "bg-sky-600 text-white border-sky-700 hover:bg-sky-700 hover:text-white"
-                              : "text-sky-700 border-sky-600 hover:bg-sky-50"}`}
+                            className={`h-7 w-7 rounded-md ${emitida
+                              ? "text-sky-600 hover:text-sky-700 hover:bg-sky-50"
+                              : "text-slate-500 hover:text-sky-600 hover:bg-sky-50"}`}
                           >
-                            <FileText className="h-4 w-4" strokeWidth={emitida ? 3 : 2.5} />
+                            <FileText className="h-4 w-4" strokeWidth={2} />
                           </Button>
                         );
                       })()}
@@ -4677,17 +4677,17 @@ function AgendaPage() {
                             title={concluido ? "Atendimento concluído (prontuário em papel)" : "Concluir atendimento (médico faz prontuário em papel)"}
                             disabled={concluido}
                             onClick={() => concluirAtendimentoManual(a)}
-                            className={`h-7 w-7 border-2 rounded-md shadow-sm ${concluido
-                              ? "bg-emerald-600 text-white border-emerald-700 disabled:opacity-100"
-                              : "text-amber-700 border-amber-600 hover:bg-amber-50"}`}
+                            className={`h-7 w-7 rounded-md ${concluido
+                              ? "text-emerald-600 disabled:opacity-100"
+                              : "text-slate-500 hover:text-amber-600 hover:bg-amber-50"}`}
                           >
-                            <FileText className="h-4 w-4" strokeWidth={2.5} />
+                            <FileText className="h-4 w-4" strokeWidth={2} />
                           </Button>
                         );
                       })()}
                       <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md text-slate-500 hover:text-foreground"><MoreHorizontal className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
