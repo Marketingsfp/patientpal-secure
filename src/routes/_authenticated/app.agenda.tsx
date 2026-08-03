@@ -4413,8 +4413,132 @@ function AgendaPage() {
         <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
       </div>
 
+      {/* Lista mobile */}
+      <div className="md:hidden space-y-2">
+        {loading ? (
+          <div className="rounded-xl border border-slate-200/80 bg-card p-6 text-center text-sm text-muted-foreground">Carregando…</div>
+        ) : !clinicaAtual ? (
+          <div className="rounded-xl border border-slate-200/80 bg-card p-6 text-center text-sm text-muted-foreground">Selecione uma clínica.</div>
+        ) : paginados.length === 0 ? (
+          <div className="rounded-xl border border-slate-200/80 bg-card p-6 text-center text-sm text-muted-foreground">Nenhum agendamento encontrado.</div>
+        ) : paginados.map((a) => {
+          const fichaNum = fichaPorId.get(a.id) ?? "";
+          const livre = isSlotLivre(a.paciente_nome);
+          const pago = pagosSet.has(a.id);
+          const etapaRow = etapaMap.get(a.id) ?? "aguardando_recepcao";
+          const realizado = a.status === "realizado";
+          return (
+            <div
+              key={a.id}
+              className={`rounded-xl border border-slate-200/80 bg-card p-3 shadow-sm ${
+                realizado ? "bg-emerald-50/60" : ""
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  className="mt-1 shrink-0"
+                  checked={selecionados.has(a.id)}
+                  onCheckedChange={() => toggleSel(a.id)}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                    <span className="font-mono">{fichaNum}</span>
+                    <span>{fmtData(a.inicio)}</span>
+                    <span className="font-medium text-emerald-600">
+                      {fmtHora(a.inicio)} - {fmtHora(a.fim)}
+                    </span>
+                  </div>
+                  <div className="mt-1 truncate text-xs font-medium uppercase text-slate-600">
+                    {medicoNomeAgendamento(a)}
+                  </div>
+                  {livre ? (
+                    <Button
+                      size="sm"
+                      onClick={() => openSlot(a)}
+                      className="mt-2 h-9 w-full"
+                    >
+                      <UserPlus className="mr-1 h-4 w-4" /> Agendar cliente
+                    </Button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => abrirInfoPaciente(a.paciente_id, a.paciente_nome)}
+                      className="mt-0.5 block max-w-full truncate text-left text-sm font-semibold uppercase text-foreground"
+                    >
+                      {a.paciente_nome}
+                    </button>
+                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {livre ? (
+                      <Badge variant="secondary" className="rounded-full border-0 bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-500">Livre</Badge>
+                    ) : (
+                      <Badge className={`rounded-full border-0 px-2.5 py-0.5 text-[11px] font-medium shadow-none ${STATUS_COR[a.status]}`}>{STATUS_LABEL[a.status]}</Badge>
+                    )}
+                    {pago && (
+                      <Badge className="rounded-full border-0 bg-emerald-100 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 shadow-none">Pago</Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  {!livre && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title={pago ? "Pago" : "Pagamento pendente"}
+                      onClick={() => cobrarAgendamento(a)}
+                      className={`h-9 w-9 rounded-md ${pago ? "text-emerald-600" : "text-slate-500"}`}
+                    >
+                      <DollarSign className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {!livre && ["aguardando_recepcao", "recepcao"].includes(etapaRow) && !realizado && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Confirmar presença (check-in)"
+                      onClick={() => confirmarPresenca(a)}
+                      className="h-9 w-9 rounded-md text-slate-500"
+                    >
+                      <BadgeCheck className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-9 w-9 rounded-md text-slate-500">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => iniciarReagendamento(a)} disabled={realizado}>
+                        <CalendarDays className="h-4 w-4 mr-2" /> Reagendar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => cobrarAgendamento(a)}><DollarSign className="h-4 w-4 mr-2" /> Pagamento</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => imprimirGR(a)} disabled={!pago}><Printer className="h-4 w-4 mr-2" /> Imprimir GR</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => verOuEmitirNota(a)} disabled={!nfseMap.has(a.id) && !pago}>
+                        <FileText className="h-4 w-4 mr-2" /> {nfseMap.has(a.id) ? "Ver nota emitida" : "Emitir nota fiscal"}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
+                        <DropdownMenuItem key={s} onClick={() => mudarStatus(a, s)}>
+                          <Flag className="h-4 w-4 mr-2" /> {STATUS_LABEL[s]}
+                        </DropdownMenuItem>
+                      ))}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => remove(a)} className="text-destructive">
+                        <Trash2 className="h-4 w-4 mr-2" /> Excluir
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Tabela */}
-      <div className="min-w-0 max-w-full rounded-xl border border-slate-200/80 bg-card shadow-sm">
+      <div className="hidden md:block min-w-0 max-w-full rounded-xl border border-slate-200/80 bg-card shadow-sm">
         <Table className="min-w-[720px] xl:min-w-[980px]">
           <TableHeader className="[&_th]:h-9 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500">
             <TableRow className="bg-slate-50/70 hover:bg-slate-50/70 border-slate-200/80">
