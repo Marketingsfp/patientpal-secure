@@ -4240,7 +4240,7 @@ function AgendaPage() {
         style={{ ["--clinic" as never]: corClinica }}
       >
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-5">
-          <div className="space-y-0.5">
+          <div className="space-y-1.5">
             <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
@@ -4267,7 +4267,7 @@ function AgendaPage() {
             const unica = ags.length <= 1;
             const semProfissional = filtroMedico === "todos";
             return (
-              <div className="space-y-0.5">
+              <div className="space-y-1.5">
                 <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Agenda</Label>
                 <Select
                   value={filtroAgenda}
@@ -4287,7 +4287,7 @@ function AgendaPage() {
               </div>
             );
           })()}
-          <div className="space-y-0.5">
+          <div className="space-y-1.5">
             <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Data Ref.</Label>
             <DataRefField
               dataRef={dataRef}
@@ -4297,7 +4297,7 @@ function AgendaPage() {
               shiftData={shiftData}
             />
           </div>
-          <div className="space-y-0.5">
+          <div className="space-y-1.5">
             <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Dia Semana</Label>
             <Select value={filtroDiaSemana} onValueChange={setFiltroDiaSemana}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -4307,7 +4307,7 @@ function AgendaPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-0.5">
+          <div className="space-y-1.5">
             <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Cliente</Label>
             <div className="flex gap-1">
               <Input data-quick-search value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Nome ou CPF…" />
@@ -4326,11 +4326,11 @@ function AgendaPage() {
               </Button>
             </div>
           </div>
-          <div className="space-y-0.5">
+          <div className="space-y-1.5">
             <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Nº Ficha</Label>
             <Input value={filtroFicha} onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 001" inputMode="numeric" />
           </div>
-          <div className="space-y-0.5">
+          <div className="space-y-1.5">
             <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Atend. Múltiplo</Label>
             <button
               type="button"
@@ -4347,7 +4347,7 @@ function AgendaPage() {
               {filtroApenasMultiplo ? "Somente múltiplos" : "Todos"}
             </button>
           </div>
-          <div className="space-y-0.5">
+          <div className="space-y-1.5">
             <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -4357,7 +4357,7 @@ function AgendaPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-0.5">
+          <div className="space-y-1.5">
             <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
               <SelectTrigger><SelectValue /></SelectTrigger>
