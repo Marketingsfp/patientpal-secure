@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
+import { Link, Outlet, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins } from "lucide-react";
 import { toast } from "sonner";
@@ -16,30 +16,7 @@ import { UniversalSearchBar } from "@/components/universal-search-bar";
 import { MenuV2 } from "@/components/menu-v2/menu-v2";
 import { useMenuV2Flag } from "@/hooks/use-menu-prefs";
 import type { PerfilKey } from "@/components/menu-v2/menu-catalog";
-
-function corDaClinica(nome?: string): string {
-  const n = (nome ?? "").toLowerCase();
-  if (n.includes("são francisco") || n.includes("sao francisco")) return "#006634"; // verde São Francisco
-  if (n.includes("menino jesus")) return "#2A4A9C"; // azul Menino Jesus
-  if (n.includes("consulta hoje")) return "#6D28D9"; // roxo Consulta Hoje
-  return "hsl(var(--muted-foreground))";
-}
-
-function corHoverDaClinica(nome?: string): string {
-  const n = (nome ?? "").toLowerCase();
-  if (n.includes("são francisco") || n.includes("sao francisco")) return "#004d27"; // verde escuro
-  if (n.includes("menino jesus")) return "#1E3A7A"; // azul escuro Menino Jesus
-  if (n.includes("consulta hoje")) return "#4C1D95"; // roxo escuro
-  return "rgba(0,0,0,0.25)";
-}
-
-function logoDaClinica(nome?: string): string | null {
-  const n = (nome ?? "").toLowerCase();
-  if (n.includes("são francisco") || n.includes("sao francisco")) return logoSaoFrancisco;
-  if (n.includes("menino jesus")) return logoMeninoJesus;
-  if (n.includes("consulta hoje")) return logoConsultaHoje;
-  return null;
-}
+import { Input } from "@/components/ui/input"; 
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -52,13 +29,36 @@ const ChangePasswordDialog = lazy(() =>
   import("@/components/change-password-dialog").then((m) => ({ default: m.ChangePasswordDialog }))
 );
 
+// ========== FUNÇÕES AUXILIARES ==========
+function corDaClinica(nome?: string): string {
+  const n = (nome ?? "").toLowerCase();
+  if (n.includes("são francisco") || n.includes("sao francisco")) return "#006634";
+  if (n.includes("menino jesus")) return "#00008B"; // Azul melhorado e mais suave
+  if (n.includes("consulta hoje")) return "#6D28D9";
+  return "hsl(var(--muted-foreground))";
+}
+
+function corHoverDaClinica(nome?: string): string {
+  const n = (nome ?? "").toLowerCase();
+  if (n.includes("são francisco") || n.includes("sao francisco")) return "#004d27";
+  if (n.includes("menino jesus")) return "#1E3A7A";
+  if (n.includes("consulta hoje")) return "#4C1D95";
+  return "rgba(0,0,0,0.25)";
+}
+
+function logoDaClinica(nome?: string): string | null {
+  const n = (nome ?? "").toLowerCase();
+  if (n.includes("são francisco") || n.includes("sao francisco")) return logoSaoFrancisco;
+  if (n.includes("menino jesus")) return logoMeninoJesus;
+  if (n.includes("consulta hoje")) return logoConsultaHoje;
+  return null;
+}
+
 type NavLeaf = { to: string; label: string; icon: typeof LayoutDashboard; hash?: string; aliases?: ReadonlyArray<string> };
 type NavParent = { label: string; icon: typeof LayoutDashboard; children: ReadonlyArray<NavLeaf> };
 type NavItem = NavLeaf | NavParent;
 const isParent = (it: NavItem): it is NavParent => "children" in it;
 
-// Mapeia rota do menu → chave de módulo da tela de Perfis de Acesso.
-// Rotas omitidas aqui são sempre visíveis (não controladas por permissão).
 const ROUTE_TO_MODULE: Record<string, string> = {
   "/app/agenda": "agenda",
   "/app/checkin": "checkin",
@@ -98,95 +98,96 @@ const ROUTE_TO_MODULE: Record<string, string> = {
 function leafAllowed(to: string, allowed: Set<string> | null): boolean {
   if (!allowed) return true;
   const mod = ROUTE_TO_MODULE[to];
-  if (!mod) return true; // rota não mapeada → sempre visível
+  if (!mod) return true;
   return allowed.has(mod);
 }
 
+// 🔥 MENU RESTAURADO EXATAMENTE COMO VOCÊ TINHA (sem divisões inventadas)
 const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> = [
   {
     label: "Operação",
     items: [
-    { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
-    { to: "/app/agenda/express", label: "Agenda Express", icon: Zap },
-    { to: "/app/atendimento-multiplo", label: "Atendimento Múltiplo", icon: ClipboardList },
-    { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
-    { to: "/app/caixa", label: "Caixa", icon: Wallet },
-    { to: "/app/financeiro/atendimentos", label: "Repasse médico", icon: HandCoins },
-    { to: "/app/chat", label: "Chat interno", icon: MessageCircle },
-    { to: "/app/clientes", label: "Clientes", icon: Contact },
-    { to: "/app/painel", label: "Dashboard", icon: LayoutDashboard },
-    { to: "/app/painel-executivo", label: "Painel Executivo", icon: LayoutDashboard },
-    { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
-    { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
-    { to: "/app/recepcao", label: "Recepção / Filas", icon: ConciergeBell },
-    { to: "/app/triagem-enfermagem", label: "Triagem - Enfermagem", icon: HeartPulse },
-    { to: "/app/cartao-beneficios/contratos", label: "Cartão Benefícios", icon: CreditCard },
+      { to: "/app/agenda", label: "Agenda", icon: CalendarDays },
+      { to: "/app/agenda/express", label: "Agenda Express", icon: Zap },
+      { to: "/app/atendimento-multiplo", label: "Atendimento Múltiplo", icon: ClipboardList },
+      { to: "/app/checkin", label: "Check-in", icon: BadgeCheck },
+      { to: "/app/caixa", label: "Caixa", icon: Wallet },
+      { to: "/app/financeiro/atendimentos", label: "Repasse médico", icon: HandCoins },
+      { to: "/app/chat", label: "Chat interno", icon: MessageCircle },
+      { to: "/app/clientes", label: "Clientes", icon: Contact },
+      { to: "/app/painel", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/app/painel-executivo", label: "Painel Executivo", icon: LayoutDashboard },
+      { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
+      { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
+      { to: "/app/recepcao", label: "Recepção / Filas", icon: ConciergeBell },
+      { to: "/app/triagem-enfermagem", label: "Triagem - Enfermagem", icon: HeartPulse },
+      { to: "/app/cartao-beneficios/contratos", label: "Cartão Benefícios", icon: CreditCard },
     ],
   },
   {
     label: "Inteligência",
     items: [
-    { to: "/app/atendimento-ia", label: "Atendimento médico", icon: Brain },
-    { to: "/app/crm", label: "CRM", icon: Target },
-    { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing },
-    { to: "/app/consulta-rapida", label: "Informações rápidas", icon: BookOpen },
-    {
-      label: "Nina — WhatsApp",
-      icon: MessageCircle,
-      children: [
-        { to: "/app/nina", hash: "treinada", label: "Nina treinada", icon: Brain },
-        { to: "/app/nina", hash: "automacoes", label: "Automações", icon: Sparkles },
-        { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
-        { to: "/app/nina", hash: "atend-supervisor", label: "Atendimento — Supervisão (live)", icon: Eye },
-        { to: "/app/nina", hash: "atend-relatorios", label: "Atendimento — Relatórios", icon: FileText },
-        { to: "/app/nina", hash: "atend-roteamento", label: "Atendimento — Roteamento", icon: ArrowRightLeft },
-        { to: "/app/nina", hash: "atend-dashboard", label: "Atendimento — Painel", icon: BarChart3 },
-        { to: "/app/nina", hash: "atend-status", label: "Atendimento — Meu Status (filas + pausa)", icon: Play },
-        { to: "/app/nina", hash: "atend-depto", label: "Atendimento — Departamentos", icon: Users },
-        { to: "/app/nina", hash: "atend-macros", label: "Atendimento — Macros", icon: Zap },
-        { to: "/app/nina", hash: "atend-kb", label: "Atendimento — Base de Conhecimento", icon: BookOpen },
-        { to: "/app/nina", hash: "atend-pausas", label: "Atendimento — Pausas", icon: Coffee },
-        { to: "/app/nina", hash: "templates", label: "Templates aprovados (Meta)", icon: FileText },
-        { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
-      ],
-    },
-    { to: "/app/odontologia", label: "Odontologia", icon: HeartPulse },
-    { to: "/app/exames-resultados", label: "Resultados de Exames", icon: FlaskConical },
+      { to: "/app/atendimento-ia", label: "Atendimento médico", icon: Brain },
+      { to: "/app/crm", label: "CRM", icon: Target },
+      { to: "/app/alertas-enfermagem", label: "Enfermeira IA — Alertas", icon: BellRing },
+      { to: "/app/consulta-rapida", label: "Informações rápidas", icon: BookOpen },
+      {
+        label: "Nina — WhatsApp",
+        icon: MessageCircle,
+        children: [
+          { to: "/app/nina", hash: "treinada", label: "Nina treinada", icon: Brain },
+          { to: "/app/nina", hash: "automacoes", label: "Automações", icon: Sparkles },
+          { to: "/app/nina", hash: "atend-inbox", label: "Conversas WhatsApp", icon: Inbox },
+          { to: "/app/nina", hash: "atend-supervisor", label: "Atendimento — Supervisão (live)", icon: Eye },
+          { to: "/app/nina", hash: "atend-relatorios", label: "Atendimento — Relatórios", icon: FileText },
+          { to: "/app/nina", hash: "atend-roteamento", label: "Atendimento — Roteamento", icon: ArrowRightLeft },
+          { to: "/app/nina", hash: "atend-dashboard", label: "Atendimento — Painel", icon: BarChart3 },
+          { to: "/app/nina", hash: "atend-status", label: "Atendimento — Meu Status (filas + pausa)", icon: Play },
+          { to: "/app/nina", hash: "atend-depto", label: "Atendimento — Departamentos", icon: Users },
+          { to: "/app/nina", hash: "atend-macros", label: "Atendimento — Macros", icon: Zap },
+          { to: "/app/nina", hash: "atend-kb", label: "Atendimento — Base de Conhecimento", icon: BookOpen },
+          { to: "/app/nina", hash: "atend-pausas", label: "Atendimento — Pausas", icon: Coffee },
+          { to: "/app/nina", hash: "templates", label: "Templates aprovados (Meta)", icon: FileText },
+          { to: "/app/nina", hash: "config", label: "Configuração", icon: KeyRound },
+        ],
+      },
+      { to: "/app/odontologia", label: "Odontologia", icon: HeartPulse },
+      { to: "/app/exames-resultados", label: "Resultados de Exames", icon: FlaskConical },
     ],
   },
   {
     label: "Marketing",
     items: [
-    { to: "/app/mkt-leads", label: "Marketing", icon: Megaphone },
+      { to: "/app/mkt-leads", label: "Marketing", icon: Megaphone },
     ],
   },
   {
     label: "Cadastros",
     items: [
-    { to: "/app/equipe", label: "Equipe", icon: Users },
-    { to: "/app/especialidades", label: "Serviços", icon: Stethoscope, aliases: ["/app/tipos-servico", "/app/procedimentos", "/app/enfermagem-recursos"] },
-    { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
-    { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
-    { to: "/app/perfis", label: "Perfis", icon: KeyRound },
-    { to: "/app/unidades", label: "Unidades", icon: MapPin },
+      { to: "/app/equipe", label: "Equipe", icon: Users },
+      { to: "/app/especialidades", label: "Serviços", icon: Stethoscope, aliases: ["/app/tipos-servico", "/app/procedimentos", "/app/enfermagem-recursos"] },
+      { to: "/app/disponibilidades", label: "Horários médicos", icon: Clock },
+      { to: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: FileHeart },
+      { to: "/app/perfis", label: "Perfis", icon: KeyRound },
+      { to: "/app/unidades", label: "Unidades", icon: MapPin },
     ],
   },
   {
     label: "RH",
     items: [
-    { to: "/app/hr-ponto", label: "RH", icon: GraduationCap },
+      { to: "/app/hr-ponto", label: "RH", icon: GraduationCap },
     ],
   },
   {
     label: "Gestão",
     items: [
-    { to: "/app/cargos", label: "Cargos", icon: Briefcase },
-    { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
-    { to: "/app/funcionarios", label: "Funcionários", icon: Contact },
-    { to: "/app/configuracoes/nfse", label: "NFS-e", icon: FileText },
-    { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
-    { to: "/app/auditoria", label: "Segurança & Compliance", icon: ShieldCheck },
-    { to: "/app/setores", label: "Setores", icon: Building2 },
+      { to: "/app/cargos", label: "Cargos", icon: Briefcase },
+      { to: "/app/financeiro", label: "Financeiro", icon: DollarSign },
+      { to: "/app/funcionarios", label: "Funcionários", icon: Contact },
+      { to: "/app/configuracoes/nfse", label: "NFS-e", icon: FileText },
+      { to: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
+      { to: "/app/auditoria", label: "Segurança & Compliance", icon: ShieldCheck },
+      { to: "/app/setores", label: "Setores", icon: Building2 },
     ],
   },
 ];
@@ -199,6 +200,7 @@ export function AppShell() {
   const { enabled: menuV2Enabled } = useMenuV2Flag();
   const location = useLocation();
   const navigate = useNavigate();
+  const router = useRouter();
   const navScrollRef = useRef<HTMLElement | null>(null);
   const lastArrowNavAtRef = useRef(0);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -210,6 +212,8 @@ export function AppShell() {
     if (typeof window === "undefined") return {};
     try { return JSON.parse(window.localStorage.getItem("appshell:openGroups") ?? "{}"); } catch { return {}; }
   });
+  const [menuSearch, setMenuSearch] = useState(""); 
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem("appshell:openGroups", JSON.stringify(openGroups));
@@ -350,8 +354,6 @@ export function AppShell() {
       const items = row.items
         .map((item) => {
           if (isParent(item)) {
-            // Para itens pai (ex.: Nina), verifica a chave do próprio "to" base
-            // dos filhos. Atualmente Nina compartilha o módulo "nina".
             const baseTo = item.children[0]?.to;
             if (baseTo && !leafAllowed(baseTo, allowedModules)) return null;
             return item;
@@ -365,18 +367,45 @@ export function AppShell() {
   const visibleNavRows = isMedicoOnly ? medicoNavRows : permissionFilteredRows;
   const subsystemLabel = subsystem ? SUBSYSTEMS[subsystem].label : null;
 
-  // Kill-switch gradual: MenuV2 só é ativado se a flag `menu_v2` estiver on
-  // E o role atual for admin ou gestor. Recepção/médico/caixa/financeiro
-  // continuam vendo o menu antigo mesmo se a flag estiver ligada.
   const roleAtual = clinicaAtual?.role ?? null;
   const menuV2Allowed = roleAtual === "admin" || roleAtual === "gestor";
   const useMenuV2 = menuV2Enabled && menuV2Allowed && !isMedicoOnly;
   const perfilV2: PerfilKey = roleAtual === "admin" ? "admin" : "gestor";
 
-  // Lista plana de rotas visíveis no menu (respeitando grupos abertos) para navegação por seta
+  const filteredNavRows = useMemo(() => {
+    const term = menuSearch.trim().toLowerCase();
+    if (!term) return visibleNavRows;
+    return visibleNavRows
+      .map((row) => {
+        const items = row.items
+          .map((item) => {
+            if (isParent(item)) {
+              const matchParent = item.label.toLowerCase().includes(term);
+              const children = item.children.filter((c) =>
+                c.label.toLowerCase().includes(term) ||
+                (c.aliases?.some((a) => a.toLowerCase().includes(term)) ?? false)
+              );
+              if (matchParent) {
+                return { ...item, children: item.children };
+              }
+              if (children.length > 0) {
+                return { ...item, children };
+              }
+              return null;
+            }
+            const matchLabel = item.label.toLowerCase().includes(term);
+            const matchAlias = (item.aliases ?? []).some((a) => a.toLowerCase().includes(term));
+            return (matchLabel || matchAlias) ? item : null;
+          })
+          .filter((it): it is NavItem => it !== null);
+        return { ...row, items };
+      })
+      .filter((row) => row.items.length > 0);
+  }, [visibleNavRows, menuSearch]);
+
   const flatNavLeaves = useMemo(() => {
     const leaves: string[] = [];
-    for (const row of visibleNavRows) {
+    for (const row of filteredNavRows) {
       const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
       const open = collapsed || hideLabel || row.label === "Operação" ? true : (openGroups[row.label] ?? false);
       if (!open) continue;
@@ -392,7 +421,7 @@ export function AppShell() {
       }
     }
     return leaves;
-  }, [visibleNavRows, openGroups, collapsed, subsystem]);
+  }, [filteredNavRows, openGroups, collapsed, subsystem]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -495,12 +524,13 @@ export function AppShell() {
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
         </div>
-        {!isMedicoOnly && subsystemLabel && (
+        
+        {!isMedicoOnly && (
           <div className={`${collapsed ? "px-1 py-2" : "px-3 py-2"} border-b border-white/10`}>
             <button
               type="button"
               onClick={() => { setSubsystem(null); navigate({ to: "/app" }); }}
-              title="Trocar subsistema"
+              title="Menu principal"
               className={`w-full flex items-center gap-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors text-white text-xs font-medium ${collapsed ? "justify-center px-2 py-2" : "px-3 py-2"}`}
             >
               <LayoutGrid className="h-4 w-4 shrink-0" />
@@ -508,8 +538,10 @@ export function AppShell() {
             </button>
           </div>
         )}
-        <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto">
-          {visibleNavRows.map((row) => {
+
+        {/* 🔥 NAVEGAÇÃO COM DIVISORES SUTIS E ITENS MAIS ESPAÇOSOS */}
+        <nav ref={navScrollRef} className="flex-1 px-2 py-3 overflow-y-auto [&::-webkit-scrollbar]:hidden">
+          {filteredNavRows.map((row) => {
             const leafIsActive = (to: string, hash?: string) => {
               const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
               if (!pathOk) return false;
@@ -521,7 +553,7 @@ export function AppShell() {
             const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
             const open = collapsed || hideLabel || row.label === "Operação" ? true : (openGroups[row.label] ?? false);
             return (
-              <div key={row.label} className="space-y-1">
+              <div key={row.label} className={`space-y-1 border-b border-white/10 pb-3 mb-3 last:border-0 last:pb-0 last:mb-0`}>
                 {!collapsed && !hideLabel && (
                   <button
                     type="button"
@@ -541,14 +573,14 @@ export function AppShell() {
                     return (
                       <div key={subKey} className="space-y-1">
                         {collapsed ? (
-                          <div className="flex justify-center py-2" title={item.label}>
+                          <div className="flex justify-center py-2.5" title={item.label}>
                             <item.icon className="h-4 w-4 shrink-0 opacity-80" />
                           </div>
                         ) : (
                           <button
                             type="button"
                             onClick={() => setOpenGroups((prev) => ({ ...prev, [subKey]: !(prev[subKey] ?? false) }))}
-                            className={`w-full flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium transition-all ${subActive ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"}`}
+                            className={`w-full flex items-center gap-2.5 rounded-full px-4 py-2.5 text-sm font-medium transition-all ${subActive ? "bg-white/15 text-white shadow-sm" : "text-white/85 hover:bg-white/10 hover:text-white"}`}
                             aria-expanded={subOpen}
                           >
                             <item.icon className="h-4 w-4 shrink-0" />
@@ -570,7 +602,7 @@ export function AppShell() {
                                 rel="noopener noreferrer"
                                 title={collapsed ? child.label : undefined}
                                 data-nav-to={child.to}
-                                className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all text-white/85 hover:bg-white/10 hover:text-white`}
+                                className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all text-white/85 hover:bg-white/10 hover:text-white`}
                               >
                                 <child.icon className="h-4 w-4 shrink-0" />
                                 {!collapsed && <span className="truncate">{child.label}</span>}
@@ -589,9 +621,9 @@ export function AppShell() {
                                 event.preventDefault();
                                 window.location.assign(href);
                               }}
-                              className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all ${
+                              className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all ${
                                 active
-                                  ? "bg-white text-slate-900 shadow-sm"
+                                  ? "bg-white/15 text-white shadow-sm"
                                   : "text-white/85 hover:bg-white/10 hover:text-white"
                               }`}
                             >
@@ -620,9 +652,9 @@ export function AppShell() {
                         event.preventDefault();
                         window.location.assign(href);
                       }}
-                      className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-all ${
+                      className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-4"} py-2.5 text-sm font-medium transition-all ${
                         active
-                          ? "bg-white text-slate-900 shadow-sm"
+                          ? "bg-white/15 text-white shadow-sm"
                           : "text-white/85 hover:bg-white/10 hover:text-white"
                       }`}
                     >
@@ -635,6 +667,17 @@ export function AppShell() {
             );
           })}
         </nav>
+
+                {/* 🔥 BOTÃO DE PESQUISAR COM GRADIENTE (SEM CAIXA ALTA) */}
+                  <div className="px-3 py-2 border-t border-white/10 mt-auto shrink-0">
+            <Input
+              type="text"
+              placeholder="Buscar no menu…"
+              value={menuSearch}
+              onChange={(e) => setMenuSearch(e.target.value)}
+              className="w-full block text-center text-white bg-gradient-to-r from-[#005C97] via-[#363795] to-[#005C97] bg-[length:200%_auto] transition-all duration-500 hover:bg-[position:right_center] shadow-[0_0_20px_rgba(0,0,0,0.2)] rounded-xl outline-none border-none px-10 py-3 placeholder:text-white/70 focus:placeholder:opacity-0"
+            />
+          </div>
       </aside>
       )}
 
@@ -667,8 +710,10 @@ export function AppShell() {
             </DropdownMenu>
             <p className="text-sm font-medium truncate max-w-[160px]" title={user?.email ?? undefined}>{userName}</p>
           </div>
+          
+          {/* LOGO SEM QUADRINHO BRANCO */}
           {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
-            <div className="bg-white rounded-lg shadow-sm border px-2 py-1 flex items-center justify-center shrink-0">
+            <div className="flex items-center justify-center shrink-0">
               <img
                 src={logoDaClinica(clinicaAtual.clinica.nome)!}
                 alt={clinicaAtual.clinica.nome}
@@ -676,6 +721,7 @@ export function AppShell() {
               />
             </div>
           )}
+          
           {memberships.length > 0 && (
             <Select
               value={modoTodas ? "__todas__" : clinicaAtual?.clinica_id}
