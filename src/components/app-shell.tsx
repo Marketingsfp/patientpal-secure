@@ -204,10 +204,8 @@ export function AppShell() {
   const navScrollRef = useRef<HTMLElement | null>(null);
   const lastArrowNavAtRef = useRef(0);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    if (window.innerWidth < 1024) return true;
-    return window.localStorage.getItem("appshell:collapsed") === "1";
-  });
+  return false; // 🔥 Força o menu a ficar sempre ABERTO, ignorando tudo
+});
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {};
     try { return JSON.parse(window.localStorage.getItem("appshell:openGroups") ?? "{}"); } catch { return {}; }
