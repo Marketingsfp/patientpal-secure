@@ -4414,8 +4414,8 @@ function AgendaPage() {
       </div>
 
       {/* Tabela */}
-      <div className="rounded-xl border border-slate-200/80 bg-card overflow-x-auto shadow-sm">
-        <Table className="min-w-[980px]">
+      <div className="min-w-0 max-w-full rounded-xl border border-slate-200/80 bg-card shadow-sm">
+        <Table className="min-w-[720px] xl:min-w-[980px]">
           <TableHeader className="[&_th]:h-9 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500">
             <TableRow className="bg-slate-50/70 hover:bg-slate-50/70 border-slate-200/80">
               <TableHead
@@ -4428,14 +4428,14 @@ function AgendaPage() {
                 />
               </TableHead>
               <TableHead className="w-16">Ficha</TableHead>
-              <TableHead className="w-14">Dia</TableHead>
+              <TableHead className="hidden sm:table-cell w-14">Dia</TableHead>
               <TableHead className="w-24">Data</TableHead>
               <TableHead className="w-24">Intervalo</TableHead>
-              <TableHead className="w-[220px] max-w-[220px]">Profissional</TableHead>
-              <TableHead className="w-[220px] max-w-[220px]">Cliente</TableHead>
-              <TableHead className="w-40">Serviço</TableHead>
-              <TableHead className="w-28 text-center">Alertas</TableHead>
-              <TableHead className="w-32 text-right">Ações</TableHead>
+              <TableHead className="w-[160px] max-w-[160px] xl:w-[220px] xl:max-w-[220px]">Profissional</TableHead>
+              <TableHead className="w-[160px] max-w-[160px] xl:w-[220px] xl:max-w-[220px]">Cliente</TableHead>
+              <TableHead className="hidden xl:table-cell w-40">Serviço</TableHead>
+              <TableHead className="hidden xl:table-cell w-28 text-center">Alertas</TableHead>
+              <TableHead className="w-28 xl:w-32 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -4478,12 +4478,12 @@ function AgendaPage() {
                     <Checkbox checked={selecionados.has(a.id)} onCheckedChange={() => toggleSel(a.id)} />
                   </TableCell>
                   <TableCell className="font-mono text-sm">{fichaNum}</TableCell>
-                  <TableCell className="text-sm">{fmtDiaSemana(a.inicio)}</TableCell>
+                  <TableCell className="hidden sm:table-cell text-sm">{fmtDiaSemana(a.inicio)}</TableCell>
                   <TableCell className="text-sm">{fmtData(a.inicio)}</TableCell>
                   <TableCell>
                      <span className="text-emerald-600 font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
-                  <TableCell className="pr-1 align-middle max-w-[220px]">
+                   <TableCell className="pr-1 align-middle max-w-[160px] xl:max-w-[220px]">
                     {(() => {
                       const m = medicos.find((x) => x.id === a.medico_id);
                       const label = medicoNomeAgendamento(a);
@@ -4508,7 +4508,7 @@ function AgendaPage() {
                       );
                     })()}
                   </TableCell>
-                  <TableCell className="pr-1 align-middle max-w-[220px]">
+                   <TableCell className="pr-1 align-middle max-w-[160px] xl:max-w-[220px]">
                     {isSlotLivre(a.paciente_nome) ? (
                       <Button
                         variant="ghost"
@@ -4570,7 +4570,7 @@ function AgendaPage() {
                       </button>
                     )}
                   </TableCell>
-                  <TableCell>
+                   <TableCell className="hidden xl:table-cell">
                     <ProcedimentoCell
                       valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                       opcoes={opcoesProcedimentoMedico(a.medico_id)}
@@ -4580,7 +4580,7 @@ function AgendaPage() {
                       onChange={(novo) => atualizarProcedimento(a, novo)}
                     />
                   </TableCell>
-                  <TableCell className="text-center">
+                   <TableCell className="hidden xl:table-cell text-center">
                     <div className="flex flex-col items-center gap-0.5">
                       {isSlotLivre(a.paciente_nome) ? (
                         <Badge variant="secondary" className="rounded-full border-0 bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-500 shadow-none hover:bg-slate-100">Livre</Badge>

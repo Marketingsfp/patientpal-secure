@@ -519,12 +519,12 @@ export function AppShell() {
         <button
           type="button"
           aria-label="Fechar menu"
-          className="md:hidden fixed inset-0 z-40 bg-black/40"
+          className="lg:hidden fixed inset-0 z-40 bg-black/40"
           onClick={() => setMobileNavOpen(false)}
         />
       )}
       <aside
-        className={`${collapsed ? "md:w-16" : "md:w-64"} w-64 fixed inset-y-0 left-0 z-50 md:static md:z-auto transition-transform md:transition-all duration-200 shrink-0 text-white h-screen overflow-hidden flex flex-col ${mobileNavOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
+        className={`${collapsed ? "lg:w-16" : "lg:w-64"} w-64 fixed inset-y-0 left-0 z-50 lg:static lg:z-auto transition-transform lg:transition-all duration-200 shrink-0 text-white h-screen overflow-hidden flex flex-col ${mobileNavOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
         style={{ backgroundColor: clinicColor }}
       >
         <div className="px-3 py-3 border-b border-white/10 flex items-center justify-between gap-2">
@@ -705,7 +705,7 @@ export function AppShell() {
           <Button
             variant="ghost"
             size="sm"
-            className="md:hidden h-8 w-8 p-0 shrink-0"
+            className="lg:hidden h-8 w-8 p-0 shrink-0"
             title="Abrir menu"
             aria-label="Abrir menu"
             onClick={() => window.dispatchEvent(new Event("menu-v2:open"))}
