@@ -179,7 +179,6 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
     return window.innerWidth < 1024;
   });
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [hovering, setHovering] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("menuv2:collapsed", collapsed ? "1" : "0");
@@ -377,27 +376,18 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
       </>
   );
 
-  // Ao passar o mouse sobre o menu recolhido, ele abre temporariamente
-  const expandedByHover = collapsed && hovering;
-
   return (
     <TooltipProvider delayDuration={300}>
-      <div
-        className={cn("hidden md:block relative shrink-0 h-full transition-all duration-200", collapsed ? "w-16" : "w-64")}
-        onMouseEnter={() => setHovering(true)}
-        onMouseLeave={() => setHovering(false)}
+      <aside
+        data-testid="menu-v2"
+        className={cn(
+          "hidden md:flex shrink-0 bg-sidebar text-sidebar-foreground border-r border-border h-full flex-col transition-all duration-200",
+          collapsed ? "w-16" : "w-64",
+        )}
+        style={clinicColor ? { backgroundColor: clinicColor, color: "#ffffff" } : undefined}
       >
-        <aside
-          data-testid="menu-v2"
-          className={cn(
-            "absolute inset-y-0 left-0 flex bg-sidebar text-sidebar-foreground border-r border-border h-full flex-col transition-all duration-200",
-            expandedByHover ? "w-64 shadow-xl z-50" : collapsed ? "w-16" : "w-64",
-          )}
-          style={clinicColor ? { backgroundColor: clinicColor, color: "#ffffff" } : undefined}
-        >
-          {renderBody(collapsed && !hovering)}
-        </aside>
-      </div>
+        {renderBody(collapsed)}
+      </aside>
 
       {/* Menu off-canvas em telas estreitas */}
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
