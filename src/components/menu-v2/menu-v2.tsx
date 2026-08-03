@@ -178,6 +178,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
     if (stored === "0") return false;
     return window.innerWidth < 1024;
   });
+  const [mobileOpen, setMobileOpen] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("menuv2:collapsed", collapsed ? "1" : "0");
