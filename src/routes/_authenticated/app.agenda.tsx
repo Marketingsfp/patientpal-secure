@@ -4236,10 +4236,10 @@ function AgendaPage() {
 
       {/* Filtros */}
       <div
-        className="rounded-lg border bg-card p-2 space-y-1.5 text-xs [&_input]:h-7 [&_input]:text-xs [&_button[role=combobox]]:h-7 [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
+        className="rounded-xl border border-slate-200/80 bg-slate-50/50 shadow-sm p-5 space-y-4 text-xs [&_input]:h-9 [&_input]:rounded-lg [&_input]:bg-background [&_input]:text-xs [&_button[role=combobox]]:h-9 [&_button[role=combobox]]:rounded-lg [&_button[role=combobox]]:bg-background [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
         style={{ ["--clinic" as never]: corClinica }}
       >
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-5">
           <div className="space-y-0.5">
             <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Profissional</Label>
             <MedicoFiltroInput
