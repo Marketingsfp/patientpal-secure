@@ -492,6 +492,7 @@ export function AppShell() {
   }
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const collapsedUi = collapsed && !mobileNavOpen;
   useEffect(() => {
     const open = () => setMobileNavOpen(true);
     window.addEventListener("menu-v2:open", open);
@@ -529,29 +530,29 @@ export function AppShell() {
         <div className="px-3 py-3 border-b border-white/10 flex items-center justify-between gap-2">
           <Link to="/app" className="flex items-center gap-2 min-w-0">
             <Activity className="h-5 w-5 shrink-0" />
-            {!collapsed && <span className="font-semibold tracking-tight truncate">ClinicaOS</span>}
+            {!collapsedUi && <span className="font-semibold tracking-tight truncate">ClinicaOS</span>}
           </Link>
           <Button
             variant="ghost"
             size="sm"
             className="text-white hover:bg-white/10 hover:text-white h-7 w-7 p-0 shrink-0"
             onClick={() => setCollapsed((v) => !v)}
-            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            title={collapsedUi ? "Expandir menu" : "Recolher menu"}
           >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            {collapsedUi ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
         </div>
         
         {!isMedicoOnly && (
-          <div className={`${collapsed ? "px-1 py-2" : "px-3 py-2"} border-b border-white/10`}>
+          <div className={`${collapsedUi ? "px-1 py-2" : "px-3 py-2"} border-b border-white/10`}>
             <button
               type="button"
               onClick={() => { setSubsystem(null); navigate({ to: "/app" }); }}
               title="Menu principal"
-              className={`w-full flex items-center gap-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors text-white text-xs font-medium ${collapsed ? "justify-center px-2 py-2" : "px-3 py-2"}`}
+              className={`w-full flex items-center gap-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors text-white text-xs font-medium ${collapsedUi ? "justify-center px-2 py-2" : "px-3 py-2"}`}
             >
               <LayoutGrid className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="flex-1 truncate text-left">Menu</span>}
+              {!collapsedUi && <span className="flex-1 truncate text-left">Menu</span>}
             </button>
           </div>
         )}
@@ -568,10 +569,10 @@ export function AppShell() {
             const itemHasActive = (it: NavItem): boolean => isParent(it) ? it.children.some((c) => leafIsActive(c.to, c.hash)) : leafIsActive(it.to);
             const groupHasActive = row.items.some(itemHasActive);
             const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
-            const open = collapsed || hideLabel || row.label === "Operação" ? true : (openGroups[row.label] ?? false);
+            const open = collapsedUi || hideLabel || row.label === "Operação" ? true : (openGroups[row.label] ?? false);
             return (
               <div key={row.label} className={`space-y-1 border-b border-white/10 pb-3 mb-3 last:border-0 last:pb-0 last:mb-0`}>
-                {!collapsed && !hideLabel && (
+                {!collapsedUi && !hideLabel && (
                   <button
                     type="button"
                     onClick={() => setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? false) }))}
@@ -586,10 +587,10 @@ export function AppShell() {
                   if (isParent(item)) {
                     const subActive = item.children.some((c) => leafIsActive(c.to, c.hash));
                     const subKey = `${row.label}::${item.label}`;
-                    const subOpen = collapsed ? true : (openGroups[subKey] ?? false);
+                    const subOpen = collapsedUi ? true : (openGroups[subKey] ?? false);
                     return (
                       <div key={subKey} className="space-y-1">
-                        {collapsed ? (
+                        {collapsedUi ? (
                           <div className="flex justify-center py-2.5" title={item.label}>
                             <item.icon className="h-4 w-4 shrink-0 opacity-80" />
                           </div>
@@ -617,12 +618,12 @@ export function AppShell() {
                                 href={href}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                title={collapsed ? child.label : undefined}
+                                title={collapsedUi ? child.label : undefined}
                                 data-nav-to={child.to}
-                                className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all text-white/85 hover:bg-white/10 hover:text-white`}
+                                className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all text-white/85 hover:bg-white/10 hover:text-white`}
                               >
                                 <child.icon className="h-4 w-4 shrink-0" />
-                                {!collapsed && <span className="truncate">{child.label}</span>}
+                                {!collapsedUi && <span className="truncate">{child.label}</span>}
                               </a>
                             );
                           }
@@ -630,7 +631,7 @@ export function AppShell() {
                             <a
                               key={linkKey}
                               href={href}
-                              title={collapsed ? child.label : undefined}
+                              title={collapsedUi ? child.label : undefined}
                               data-nav-to={child.to}
                               data-nav-active={active ? "true" : undefined}
                               onClick={(event) => {
@@ -638,14 +639,14 @@ export function AppShell() {
                                 event.preventDefault();
                                 window.location.assign(href);
                               }}
-                              className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all ${
+                              className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all ${
                                 active
                                   ? "bg-white/15 text-white shadow-sm"
                                   : "text-white/85 hover:bg-white/10 hover:text-white"
                               }`}
                             >
                               <child.icon className="h-4 w-4 shrink-0" />
-                              {!collapsed && <span className="truncate">{child.label}</span>}
+                              {!collapsedUi && <span className="truncate">{child.label}</span>}
                             </a>
                           );
                         })}
@@ -661,7 +662,7 @@ export function AppShell() {
                     <a
                       key={item.to}
                       href={href}
-                      title={collapsed ? item.label : undefined}
+                      title={collapsedUi ? item.label : undefined}
                       data-nav-to={item.to}
                       data-nav-active={active ? "true" : undefined}
                       onClick={(event) => {
@@ -669,14 +670,14 @@ export function AppShell() {
                         event.preventDefault();
                         window.location.assign(href);
                       }}
-                      className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-4"} py-2.5 text-sm font-medium transition-all ${
+                      className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "px-4"} py-2.5 text-sm font-medium transition-all ${
                         active
                           ? "bg-white/15 text-white shadow-sm"
                           : "text-white/85 hover:bg-white/10 hover:text-white"
                       }`}
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
-                      {!collapsed && <span className="truncate">{item.label}</span>}
+                      {!collapsedUi && <span className="truncate">{item.label}</span>}
                     </a>
                   );
                 })}
