@@ -4310,7 +4310,10 @@ function AgendaPage() {
           <div className="space-y-1.5">
             <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Cliente</Label>
             <div className="flex gap-1">
-              <Input data-quick-search value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Nome ou CPF…" />
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" aria-hidden />
+                <Input data-quick-search value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Nome ou CPF…" className="pl-8" />
+              </div>
               <Button
                 type="button"
                 variant="outline"
@@ -4320,7 +4323,7 @@ function AgendaPage() {
                   setNovoPac({ nome: filtroCliente.trim(), cpf: "", telefone: "", data_nascimento: "", email: "" });
                   setNovoPacOpen(true);
                 }}
-                className="h-7 w-7"
+                className="h-9 w-9 rounded-lg shrink-0"
               >
                 <UserPlus className="h-3.5 w-3.5" />
               </Button>
@@ -4337,10 +4340,10 @@ function AgendaPage() {
               onClick={() => setFiltroApenasMultiplo((v) => !v)}
               aria-pressed={filtroApenasMultiplo}
               className={
-                "h-9 w-full rounded-md border px-3 text-xs font-medium transition-colors " +
+                "h-9 w-full rounded-lg border px-3 text-xs font-medium transition-colors " +
                 (filtroApenasMultiplo
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-input bg-background text-muted-foreground hover:text-foreground")
+                  : "border-input bg-background text-slate-500 hover:text-foreground")
               }
               title="Mostrar apenas agendamentos criados em Atendimento Múltiplo"
             >
@@ -4371,17 +4374,15 @@ function AgendaPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-end gap-1.5">
-            <Button variant="outline" size="sm" onClick={limparFiltros} className="h-7 text-xs flex-1"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
-            <Button size="sm" onClick={load} className="h-7 text-xs flex-1"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
-          </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-1.5">
-          <div className="flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-2 text-xs cursor-pointer">
-              <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
-              Exibir apenas a data selecionada
-            </label>
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-200/70">
+          <label className="flex items-center gap-2 text-xs cursor-pointer text-slate-600 pt-3">
+            <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
+            Exibir apenas a data selecionada
+          </label>
+          <div className="flex items-center gap-2 ml-auto pt-3">
+            <Button variant="ghost" size="sm" onClick={limparFiltros} className="h-9 rounded-lg px-4 text-xs text-slate-500 hover:text-foreground"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
+            <Button size="sm" onClick={load} className="h-9 rounded-lg px-5 text-xs font-semibold shadow-sm"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
           </div>
         </div>
       </div>
