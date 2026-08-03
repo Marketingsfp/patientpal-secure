@@ -357,6 +357,7 @@ export type Database = {
           edit_lock_at: string | null
           edit_lock_by: string | null
           edit_lock_by_nome: string | null
+          enfermagem_recurso_id: string | null
           especialidade_id: string | null
           executado_em: string | null
           executado_por: string | null
@@ -398,6 +399,7 @@ export type Database = {
           edit_lock_at?: string | null
           edit_lock_by?: string | null
           edit_lock_by_nome?: string | null
+          enfermagem_recurso_id?: string | null
           especialidade_id?: string | null
           executado_em?: string | null
           executado_por?: string | null
@@ -439,6 +441,7 @@ export type Database = {
           edit_lock_at?: string | null
           edit_lock_by?: string | null
           edit_lock_by_nome?: string | null
+          enfermagem_recurso_id?: string | null
           especialidade_id?: string | null
           executado_em?: string | null
           executado_por?: string | null
@@ -476,6 +479,13 @@ export type Database = {
             columns: ["agenda_id"]
             isOneToOne: false
             referencedRelation: "medico_agendas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_enfermagem_recurso_id_fkey"
+            columns: ["enfermagem_recurso_id"]
+            isOneToOne: false
+            referencedRelation: "enfermagem_recursos"
             referencedColumns: ["id"]
           },
           {
@@ -2788,6 +2798,7 @@ export type Database = {
           origem: string
           paciente_id: string
           paciente_nome: string
+          plano_id: string | null
           renovado_em: string | null
           sem_carencia: boolean
           sem_carencia_em: string | null
@@ -2826,6 +2837,7 @@ export type Database = {
           origem?: string
           paciente_id: string
           paciente_nome: string
+          plano_id?: string | null
           renovado_em?: string | null
           sem_carencia?: boolean
           sem_carencia_em?: string | null
@@ -2864,6 +2876,7 @@ export type Database = {
           origem?: string
           paciente_id?: string
           paciente_nome?: string
+          plano_id?: string | null
           renovado_em?: string | null
           sem_carencia?: boolean
           sem_carencia_em?: string | null
@@ -2891,6 +2904,13 @@ export type Database = {
             columns: ["convenio_id"]
             isOneToOne: false
             referencedRelation: "cb_convenios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contratos_assinatura_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "planos_assinatura"
             referencedColumns: ["id"]
           },
         ]
@@ -3125,6 +3145,182 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      enfermagem_recurso_atendentes: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          id: string
+          recurso_id: string
+          user_id: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          id?: string
+          recurso_id: string
+          user_id: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          id?: string
+          recurso_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enfermagem_recurso_atendentes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enfermagem_recurso_atendentes_recurso_id_fkey"
+            columns: ["recurso_id"]
+            isOneToOne: false
+            referencedRelation: "enfermagem_recursos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enfermagem_recurso_disponibilidades: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          dia_semana: number
+          hora_fim: string
+          hora_inicio: string
+          id: string
+          intervalo_min: number | null
+          limite_pacientes: number | null
+          observacoes: string | null
+          recurso_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          dia_semana: number
+          hora_fim: string
+          hora_inicio: string
+          id?: string
+          intervalo_min?: number | null
+          limite_pacientes?: number | null
+          observacoes?: string | null
+          recurso_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          dia_semana?: number
+          hora_fim?: string
+          hora_inicio?: string
+          id?: string
+          intervalo_min?: number | null
+          limite_pacientes?: number | null
+          observacoes?: string | null
+          recurso_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enfermagem_recurso_disponibilidades_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enfermagem_recurso_disponibilidades_recurso_id_fkey"
+            columns: ["recurso_id"]
+            isOneToOne: false
+            referencedRelation: "enfermagem_recursos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enfermagem_recurso_procedimentos: {
+        Row: {
+          created_at: string
+          procedimento_id: string
+          recurso_id: string
+        }
+        Insert: {
+          created_at?: string
+          procedimento_id: string
+          recurso_id: string
+        }
+        Update: {
+          created_at?: string
+          procedimento_id?: string
+          recurso_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enfermagem_recurso_procedimentos_procedimento_id_fkey"
+            columns: ["procedimento_id"]
+            isOneToOne: false
+            referencedRelation: "procedimentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enfermagem_recurso_procedimentos_recurso_id_fkey"
+            columns: ["recurso_id"]
+            isOneToOne: false
+            referencedRelation: "enfermagem_recursos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enfermagem_recursos: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          cor: string | null
+          created_at: string
+          descricao: string | null
+          duracao_padrao_min: number
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          duracao_padrao_min?: number
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          cor?: string | null
+          created_at?: string
+          descricao?: string | null
+          duracao_padrao_min?: number
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enfermagem_recursos_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       especialidades: {
         Row: {
@@ -4655,6 +4851,56 @@ export type Database = {
         }
         Relationships: []
       }
+      lgpd_solicitacoes: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          descricao: string | null
+          id: string
+          respondido_em: string | null
+          respondido_por: string | null
+          resposta: string | null
+          status: string
+          tipo: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          respondido_em?: string | null
+          respondido_por?: string | null
+          resposta?: string | null
+          status?: string
+          tipo: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          respondido_em?: string | null
+          respondido_por?: string | null
+          resposta?: string | null
+          status?: string
+          tipo?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lgpd_solicitacoes_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lms_certificados: {
         Row: {
           clinica_id: string
@@ -5575,6 +5821,135 @@ export type Database = {
             columns: ["procedimento_padrao_id"]
             isOneToOne: false
             referencedRelation: "procedimentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mkt_landing_pages: {
+        Row: {
+          campos: Json
+          clinica_id: string
+          conteudo_html: string | null
+          cor_primaria: string | null
+          created_at: string
+          created_by: string | null
+          cta_label: string | null
+          hero_imagem_url: string | null
+          id: string
+          slug: string
+          status: string
+          subtitulo: string | null
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          campos?: Json
+          clinica_id: string
+          conteudo_html?: string | null
+          cor_primaria?: string | null
+          created_at?: string
+          created_by?: string | null
+          cta_label?: string | null
+          hero_imagem_url?: string | null
+          id?: string
+          slug: string
+          status?: string
+          subtitulo?: string | null
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          campos?: Json
+          clinica_id?: string
+          conteudo_html?: string | null
+          cor_primaria?: string | null
+          created_at?: string
+          created_by?: string | null
+          cta_label?: string | null
+          hero_imagem_url?: string | null
+          id?: string
+          slug?: string
+          status?: string
+          subtitulo?: string | null
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mkt_landing_pages_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mkt_leads: {
+        Row: {
+          clinica_id: string
+          created_at: string
+          dados: Json | null
+          email: string | null
+          id: string
+          landing_page_id: string | null
+          mensagem: string | null
+          nome: string
+          origem: string | null
+          paciente_id: string | null
+          status: string
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          clinica_id: string
+          created_at?: string
+          dados?: Json | null
+          email?: string | null
+          id?: string
+          landing_page_id?: string | null
+          mensagem?: string | null
+          nome: string
+          origem?: string | null
+          paciente_id?: string | null
+          status?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clinica_id?: string
+          created_at?: string
+          dados?: Json | null
+          email?: string | null
+          id?: string
+          landing_page_id?: string | null
+          mensagem?: string | null
+          nome?: string
+          origem?: string | null
+          paciente_id?: string | null
+          status?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mkt_leads_clinica_id_fkey"
+            columns: ["clinica_id"]
+            isOneToOne: false
+            referencedRelation: "clinicas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mkt_leads_landing_page_id_fkey"
+            columns: ["landing_page_id"]
+            isOneToOne: false
+            referencedRelation: "mkt_landing_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mkt_leads_paciente_id_fkey"
+            columns: ["paciente_id"]
+            isOneToOne: false
+            referencedRelation: "pacientes"
             referencedColumns: ["id"]
           },
         ]
@@ -6842,6 +7217,63 @@ export type Database = {
           descricao?: string
           id?: string
           modulo?: string
+        }
+        Relationships: []
+      }
+      planos_assinatura: {
+        Row: {
+          ativo: boolean
+          clinica_id: string
+          created_at: string
+          descricao_beneficios: string | null
+          fidelidade_meses: number
+          id: string
+          max_agregados: number
+          max_dependentes: number
+          nome: string
+          num_parcelas: number
+          taxa_adesao: number
+          template_contrato: string | null
+          tipo: string
+          updated_at: string
+          valor_mensal: number
+          vigencia_meses: number
+        }
+        Insert: {
+          ativo?: boolean
+          clinica_id: string
+          created_at?: string
+          descricao_beneficios?: string | null
+          fidelidade_meses?: number
+          id?: string
+          max_agregados?: number
+          max_dependentes?: number
+          nome: string
+          num_parcelas?: number
+          taxa_adesao?: number
+          template_contrato?: string | null
+          tipo?: string
+          updated_at?: string
+          valor_mensal?: number
+          vigencia_meses?: number
+        }
+        Update: {
+          ativo?: boolean
+          clinica_id?: string
+          created_at?: string
+          descricao_beneficios?: string | null
+          fidelidade_meses?: number
+          id?: string
+          max_agregados?: number
+          max_dependentes?: number
+          nome?: string
+          num_parcelas?: number
+          taxa_adesao?: number
+          template_contrato?: string | null
+          tipo?: string
+          updated_at?: string
+          valor_mensal?: number
+          vigencia_meses?: number
         }
         Relationships: []
       }
@@ -9369,7 +9801,7 @@ export type Database = {
         | "declaracao"
         | "contrato"
         | "outro"
-      tipo_senha: "N" | "P" | "C" | "R" | "T"
+      tipo_senha: "N" | "P" | "C" | "R" | "T" | "E"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -9627,7 +10059,7 @@ export const Constants = {
         "contrato",
         "outro",
       ],
-      tipo_senha: ["N", "P", "C", "R", "T"],
+      tipo_senha: ["N", "P", "C", "R", "T", "E"],
     },
   },
 } as const
