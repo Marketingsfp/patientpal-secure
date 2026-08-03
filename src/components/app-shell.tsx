@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins, Menu as MenuIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -491,6 +491,15 @@ export function AppShell() {
     );
   }
 
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const collapsedUi = collapsed && !mobileNavOpen;
+  useEffect(() => {
+    const open = () => setMobileNavOpen(true);
+    window.addEventListener("menu-v2:open", open);
+    return () => window.removeEventListener("menu-v2:open", open);
+  }, []);
+  useEffect(() => { setMobileNavOpen(false); }, [location.pathname]);
+
   if (isEmbed) {
     return (
       <div className="h-screen w-full overflow-auto bg-background" style={{ background: "var(--surface-cream)" }}>
@@ -505,36 +514,45 @@ export function AppShell() {
         <MenuV2 perfil={perfilV2} clinicColor={clinicColor} />
       )}
       {!isChooser && !useMenuV2 && (
+      <>
+      {mobileNavOpen && (
+        <button
+          type="button"
+          aria-label="Fechar menu"
+          className="md:hidden fixed inset-0 z-40 bg-black/40"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
       <aside
-        className={`${collapsed ? "w-16" : "w-64"} transition-all duration-200 shrink-0 text-white h-screen overflow-hidden flex flex-col`}
+        className={`${collapsed ? "md:w-16" : "md:w-64"} w-64 fixed inset-y-0 left-0 z-50 md:static md:z-auto transition-transform md:transition-all duration-200 shrink-0 text-white h-screen overflow-hidden flex flex-col ${mobileNavOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
         style={{ backgroundColor: clinicColor }}
       >
         <div className="px-3 py-3 border-b border-white/10 flex items-center justify-between gap-2">
           <Link to="/app" className="flex items-center gap-2 min-w-0">
             <Activity className="h-5 w-5 shrink-0" />
-            {!collapsed && <span className="font-semibold tracking-tight truncate">ClinicaOS</span>}
+            {!collapsedUi && <span className="font-semibold tracking-tight truncate">ClinicaOS</span>}
           </Link>
           <Button
             variant="ghost"
             size="sm"
             className="text-white hover:bg-white/10 hover:text-white h-7 w-7 p-0 shrink-0"
             onClick={() => setCollapsed((v) => !v)}
-            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            title={collapsedUi ? "Expandir menu" : "Recolher menu"}
           >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            {collapsedUi ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
         </div>
         
         {!isMedicoOnly && (
-          <div className={`${collapsed ? "px-1 py-2" : "px-3 py-2"} border-b border-white/10`}>
+          <div className={`${collapsedUi ? "px-1 py-2" : "px-3 py-2"} border-b border-white/10`}>
             <button
               type="button"
               onClick={() => { setSubsystem(null); navigate({ to: "/app" }); }}
               title="Menu principal"
-              className={`w-full flex items-center gap-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors text-white text-xs font-medium ${collapsed ? "justify-center px-2 py-2" : "px-3 py-2"}`}
+              className={`w-full flex items-center gap-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors text-white text-xs font-medium ${collapsedUi ? "justify-center px-2 py-2" : "px-3 py-2"}`}
             >
               <LayoutGrid className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="flex-1 truncate text-left">Menu</span>}
+              {!collapsedUi && <span className="flex-1 truncate text-left">Menu</span>}
             </button>
           </div>
         )}
@@ -551,10 +569,10 @@ export function AppShell() {
             const itemHasActive = (it: NavItem): boolean => isParent(it) ? it.children.some((c) => leafIsActive(c.to, c.hash)) : leafIsActive(it.to);
             const groupHasActive = row.items.some(itemHasActive);
             const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
-            const open = collapsed || hideLabel || row.label === "Operação" ? true : (openGroups[row.label] ?? false);
+            const open = collapsedUi || hideLabel || row.label === "Operação" ? true : (openGroups[row.label] ?? false);
             return (
               <div key={row.label} className={`space-y-1 border-b border-white/10 pb-3 mb-3 last:border-0 last:pb-0 last:mb-0`}>
-                {!collapsed && !hideLabel && (
+                {!collapsedUi && !hideLabel && (
                   <button
                     type="button"
                     onClick={() => setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? false) }))}
@@ -569,10 +587,10 @@ export function AppShell() {
                   if (isParent(item)) {
                     const subActive = item.children.some((c) => leafIsActive(c.to, c.hash));
                     const subKey = `${row.label}::${item.label}`;
-                    const subOpen = collapsed ? true : (openGroups[subKey] ?? false);
+                    const subOpen = collapsedUi ? true : (openGroups[subKey] ?? false);
                     return (
                       <div key={subKey} className="space-y-1">
-                        {collapsed ? (
+                        {collapsedUi ? (
                           <div className="flex justify-center py-2.5" title={item.label}>
                             <item.icon className="h-4 w-4 shrink-0 opacity-80" />
                           </div>
@@ -600,12 +618,12 @@ export function AppShell() {
                                 href={href}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                title={collapsed ? child.label : undefined}
+                                title={collapsedUi ? child.label : undefined}
                                 data-nav-to={child.to}
-                                className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all text-white/85 hover:bg-white/10 hover:text-white`}
+                                className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all text-white/85 hover:bg-white/10 hover:text-white`}
                               >
                                 <child.icon className="h-4 w-4 shrink-0" />
-                                {!collapsed && <span className="truncate">{child.label}</span>}
+                                {!collapsedUi && <span className="truncate">{child.label}</span>}
                               </a>
                             );
                           }
@@ -613,7 +631,7 @@ export function AppShell() {
                             <a
                               key={linkKey}
                               href={href}
-                              title={collapsed ? child.label : undefined}
+                              title={collapsedUi ? child.label : undefined}
                               data-nav-to={child.to}
                               data-nav-active={active ? "true" : undefined}
                               onClick={(event) => {
@@ -621,14 +639,14 @@ export function AppShell() {
                                 event.preventDefault();
                                 window.location.assign(href);
                               }}
-                              className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all ${
+                              className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all ${
                                 active
                                   ? "bg-white/15 text-white shadow-sm"
                                   : "text-white/85 hover:bg-white/10 hover:text-white"
                               }`}
                             >
                               <child.icon className="h-4 w-4 shrink-0" />
-                              {!collapsed && <span className="truncate">{child.label}</span>}
+                              {!collapsedUi && <span className="truncate">{child.label}</span>}
                             </a>
                           );
                         })}
@@ -644,7 +662,7 @@ export function AppShell() {
                     <a
                       key={item.to}
                       href={href}
-                      title={collapsed ? item.label : undefined}
+                      title={collapsedUi ? item.label : undefined}
                       data-nav-to={item.to}
                       data-nav-active={active ? "true" : undefined}
                       onClick={(event) => {
@@ -652,14 +670,14 @@ export function AppShell() {
                         event.preventDefault();
                         window.location.assign(href);
                       }}
-                      className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-4"} py-2.5 text-sm font-medium transition-all ${
+                      className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "px-4"} py-2.5 text-sm font-medium transition-all ${
                         active
                           ? "bg-white/15 text-white shadow-sm"
                           : "text-white/85 hover:bg-white/10 hover:text-white"
                       }`}
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
-                      {!collapsed && <span className="truncate">{item.label}</span>}
+                      {!collapsedUi && <span className="truncate">{item.label}</span>}
                     </a>
                   );
                 })}
@@ -679,10 +697,21 @@ export function AppShell() {
             />
           </div>
       </aside>
+      </>
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-30 h-[50px] bg-card/80 backdrop-blur border-b flex items-center gap-2 px-3 sm:px-5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="md:hidden h-8 w-8 p-0 shrink-0"
+            title="Abrir menu"
+            aria-label="Abrir menu"
+            onClick={() => window.dispatchEvent(new Event("menu-v2:open"))}
+          >
+            <MenuIcon className="h-5 w-5" />
+          </Button>
           <div className="flex items-center gap-2 min-w-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -708,7 +737,7 @@ export function AppShell() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <p className="text-sm font-medium truncate max-w-[160px]" title={user?.email ?? undefined}>{userName}</p>
+            <p className="hidden lg:block text-sm font-medium truncate max-w-[160px]" title={user?.email ?? undefined}>{userName}</p>
           </div>
           
           {/* LOGO SEM QUADRINHO BRANCO */}
@@ -730,7 +759,7 @@ export function AppShell() {
                 else setClinicaAtual(v);
               }}
             >
-              <SelectTrigger className="w-[260px] h-8 text-xs">
+              <SelectTrigger className="w-[150px] sm:w-[220px] lg:w-[260px] h-8 text-xs">
                 <SelectValue placeholder="Selecione a clínica" />
               </SelectTrigger>
               <SelectContent>
@@ -753,7 +782,7 @@ export function AppShell() {
               </SelectContent>
             </Select>
           )}
-          <div className="flex-1 flex justify-center px-2 min-w-0">
+          <div className="hidden sm:flex flex-1 justify-center px-2 min-w-0">
             <UniversalSearchBar />
           </div>
           <div className="flex items-center gap-2">

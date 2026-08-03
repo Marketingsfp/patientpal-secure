@@ -3263,10 +3263,10 @@ function AgendaPage() {
       )}
       <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 items-start">
         <div className="md:col-start-1 md:row-start-1 min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Agendas</h1>
-          <p className="text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 truncate">Agendas</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
         </div>
-        <div className="md:col-start-1 md:row-start-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50/60 px-2 py-1.5">
+        <div className="md:col-start-1 md:row-start-2 min-w-0 flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50/60 px-2 py-1.5 [&>*]:shrink-0">
           <TurboModeToggle />
           <div className="inline-flex rounded-full border bg-card p-0.5">
             <button
@@ -4236,10 +4236,10 @@ function AgendaPage() {
 
       {/* Filtros */}
       <div
-        className="rounded-xl border border-slate-200/80 bg-slate-50/50 shadow-sm p-5 space-y-4 text-xs [&_input]:h-9 [&_input]:rounded-lg [&_input]:bg-background [&_input]:text-xs [&_button[role=combobox]]:h-9 [&_button[role=combobox]]:rounded-lg [&_button[role=combobox]]:bg-background [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
+        className="rounded-xl border border-slate-200/80 bg-slate-50/50 shadow-sm p-3 sm:p-5 space-y-4 text-xs [&_input]:h-9 [&_input]:rounded-lg [&_input]:bg-background [&_input]:text-xs [&_button[role=combobox]]:h-9 [&_button[role=combobox]]:rounded-lg [&_button[role=combobox]]:bg-background [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
         style={{ ["--clinic" as never]: corClinica }}
       >
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-5">
           <div className="space-y-1.5">
             <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Profissional</Label>
             <MedicoFiltroInput
@@ -4414,8 +4414,8 @@ function AgendaPage() {
       </div>
 
       {/* Tabela */}
-      <div className="rounded-xl border border-slate-200/80 bg-card overflow-hidden shadow-sm">
-        <Table>
+      <div className="rounded-xl border border-slate-200/80 bg-card overflow-x-auto shadow-sm">
+        <Table className="min-w-[980px]">
           <TableHeader className="[&_th]:h-9 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500">
             <TableRow className="bg-slate-50/70 hover:bg-slate-50/70 border-slate-200/80">
               <TableHead

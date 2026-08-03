@@ -178,6 +178,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
     if (stored === "0") return false;
     return window.innerWidth < 1024;
   });
+  const [mobileOpen, setMobileOpen] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("menuv2:collapsed", collapsed ? "1" : "0");
@@ -204,20 +205,19 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
     .map((p) => findItem(p))
     .filter((x): x is MenuItem => Boolean(x));
 
+  useEffect(() => {
+    const open = () => setMobileOpen(true);
+    window.addEventListener("menu-v2:open", open);
+    return () => window.removeEventListener("menu-v2:open", open);
+  }, []);
+  useEffect(() => { setMobileOpen(false); }, [currentPath]);
+
   if (loading) {
     return <div className="p-4 text-sm text-muted-foreground">Carregando menu…</div>;
   }
 
-  return (
-    <TooltipProvider delayDuration={300}>
-      <aside
-        data-testid="menu-v2"
-        className={cn(
-          "shrink-0 bg-sidebar text-sidebar-foreground border-r border-border h-full flex flex-col transition-all duration-200",
-          collapsed ? "w-16" : "w-64",
-        )}
-        style={clinicColor ? { backgroundColor: clinicColor, color: "#ffffff" } : undefined}
-      >
+  const renderBody = (collapsed: boolean) => (
+      <>
         {/* Header com marca + botão recolher */}
         <div className={cn("flex items-center gap-2 border-b border-sidebar-border/40 h-12 shrink-0", collapsed ? "px-2 justify-center" : "px-3")}>
           <Link to="/app" className="flex items-center gap-2 min-w-0 flex-1">
@@ -373,7 +373,35 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
           )}
         </div>
         )}
+      </>
+  );
+
+  return (
+    <TooltipProvider delayDuration={300}>
+      <aside
+        data-testid="menu-v2"
+        className={cn(
+          "hidden md:flex shrink-0 bg-sidebar text-sidebar-foreground border-r border-border h-full flex-col transition-all duration-200",
+          collapsed ? "w-16" : "w-64",
+        )}
+        style={clinicColor ? { backgroundColor: clinicColor, color: "#ffffff" } : undefined}
+      >
+        {renderBody(collapsed)}
       </aside>
+
+      {/* Menu off-canvas em telas estreitas */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent
+          side="left"
+          className="md:hidden p-0 w-[86vw] max-w-[300px] flex flex-col gap-0"
+          style={clinicColor ? { backgroundColor: clinicColor, color: "#ffffff" } : undefined}
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>Menu</SheetTitle>
+          </SheetHeader>
+          {renderBody(false)}
+        </SheetContent>
+      </Sheet>
     </TooltipProvider>
   );
 }
