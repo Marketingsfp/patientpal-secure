@@ -91,11 +91,11 @@ const STATUS_LABEL: Record<Status, string> = {
   cancelado: "Cancelado", faltou: "Faltou",
 };
 const STATUS_COR: Record<Status, string> = {
-  agendado: "bg-[#dbe7fb] text-slate-800 border border-[#b6cdf5]",
-  confirmado: "bg-[#cfe3fb] text-slate-800 border border-[#9fc3f3]",
-  realizado: "bg-[#3d8c4d] text-white border border-[#1f5a2c]",
-  cancelado: "bg-[#f8d2d6] text-slate-800 border border-[#eea1a8]",
-  faltou: "bg-[#f7b6c0] text-slate-800 border border-[#e88594]",
+  agendado: "bg-blue-50 text-blue-700 hover:bg-blue-50",
+  confirmado: "bg-indigo-50 text-indigo-700 hover:bg-indigo-50",
+  realizado: "bg-emerald-100 text-emerald-700 hover:bg-emerald-100",
+  cancelado: "bg-rose-50 text-rose-700 hover:bg-rose-50",
+  faltou: "bg-amber-50 text-amber-700 hover:bg-amber-50",
 };
 const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"];
 const PAGE_SIZE = 50;
@@ -3261,14 +3261,12 @@ function AgendaPage() {
           </div>
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <CalendarDays className="h-6 w-6" /> Agendas
-          </h1>
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 items-start">
+        <div className="md:col-start-1 md:row-start-1 min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Agendas</h1>
           <p className="text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
         </div>
-        <div className="flex gap-1.5">
+        <div className="md:col-start-1 md:row-start-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50/60 px-2 py-1.5">
           <TurboModeToggle />
           <div className="inline-flex rounded-full border bg-card p-0.5">
             <button
@@ -3287,7 +3285,7 @@ function AgendaPage() {
             </button>
           </div>
           <EncerrarExpedienteButton />
-          <Button asChild variant="default" size="sm" className="h-7 text-[11px] px-2" title="Agendamento rápido em 4 passos">
+          <Button asChild variant="outline" size="sm" className="h-7 text-[11px] px-2" title="Agendamento rápido em 4 passos">
             <Link to="/app/agenda/express">
               <Clock className="h-3 w-3 mr-1.5" /> Agenda Express
             </Link>
@@ -3370,10 +3368,12 @@ function AgendaPage() {
           >
             <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
           </Button>
+          </div>
+          <div className="md:col-start-2 md:row-start-1 md:justify-self-end">
           <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-7 text-[11px] px-2 bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
+            <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-9 rounded-lg px-4 text-xs font-semibold shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Plus className="h-4 w-4 mr-1.5" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
@@ -4236,12 +4236,12 @@ function AgendaPage() {
 
       {/* Filtros */}
       <div
-        className="rounded-lg border bg-card p-2 space-y-1.5 text-xs [&_input]:h-7 [&_input]:text-xs [&_button[role=combobox]]:h-7 [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
+        className="rounded-xl border border-slate-200/80 bg-slate-50/50 shadow-sm p-5 space-y-4 text-xs [&_input]:h-9 [&_input]:rounded-lg [&_input]:bg-background [&_input]:text-xs [&_button[role=combobox]]:h-9 [&_button[role=combobox]]:rounded-lg [&_button[role=combobox]]:bg-background [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
         style={{ ["--clinic" as never]: corClinica }}
       >
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
-          <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Profissional</Label>
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-5">
+          <div className="space-y-1.5">
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
               value={filtroMedico}
@@ -4267,8 +4267,8 @@ function AgendaPage() {
             const unica = ags.length <= 1;
             const semProfissional = filtroMedico === "todos";
             return (
-              <div className="space-y-0.5">
-                <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Agenda</Label>
+              <div className="space-y-1.5">
+                <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Agenda</Label>
                 <Select
                   value={filtroAgenda}
                   onValueChange={setFiltroAgenda}
@@ -4287,8 +4287,8 @@ function AgendaPage() {
               </div>
             );
           })()}
-          <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
+          <div className="space-y-1.5">
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Data Ref.</Label>
             <DataRefField
               dataRef={dataRef}
               dataFim={dataFim}
@@ -4297,8 +4297,8 @@ function AgendaPage() {
               shiftData={shiftData}
             />
           </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Dia Semana</Label>
+          <div className="space-y-1.5">
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Dia Semana</Label>
             <Select value={filtroDiaSemana} onValueChange={setFiltroDiaSemana}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -4307,10 +4307,13 @@ function AgendaPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Cliente</Label>
+          <div className="space-y-1.5">
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Cliente</Label>
             <div className="flex gap-1">
-              <Input data-quick-search value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Nome ou CPF…" />
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" aria-hidden />
+                <Input data-quick-search value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Nome ou CPF…" className="pl-8" />
+              </div>
               <Button
                 type="button"
                 variant="outline"
@@ -4320,35 +4323,35 @@ function AgendaPage() {
                   setNovoPac({ nome: filtroCliente.trim(), cpf: "", telefone: "", data_nascimento: "", email: "" });
                   setNovoPacOpen(true);
                 }}
-                className="h-7 w-7"
+                className="h-9 w-9 rounded-lg shrink-0"
               >
                 <UserPlus className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Nº Ficha</Label>
+          <div className="space-y-1.5">
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Nº Ficha</Label>
             <Input value={filtroFicha} onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 001" inputMode="numeric" />
           </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Atend. Múltiplo</Label>
+          <div className="space-y-1.5">
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Atend. Múltiplo</Label>
             <button
               type="button"
               onClick={() => setFiltroApenasMultiplo((v) => !v)}
               aria-pressed={filtroApenasMultiplo}
               className={
-                "h-9 w-full rounded-md border px-3 text-xs font-medium transition-colors " +
+                "h-9 w-full rounded-lg border px-3 text-xs font-medium transition-colors " +
                 (filtroApenasMultiplo
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-input bg-background text-muted-foreground hover:text-foreground")
+                  : "border-input bg-background text-slate-500 hover:text-foreground")
               }
               title="Mostrar apenas agendamentos criados em Atendimento Múltiplo"
             >
               {filtroApenasMultiplo ? "Somente múltiplos" : "Todos"}
             </button>
           </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Especialidade</Label>
+          <div className="space-y-1.5">
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -4357,8 +4360,8 @@ function AgendaPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Situação</Label>
+          <div className="space-y-1.5">
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -4371,17 +4374,15 @@ function AgendaPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-end gap-1.5">
-            <Button variant="outline" size="sm" onClick={limparFiltros} className="h-7 text-xs flex-1"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
-            <Button size="sm" onClick={load} className="h-7 text-xs flex-1"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
-          </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-1.5">
-          <div className="flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-2 text-xs cursor-pointer">
-              <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
-              Exibir apenas a data selecionada
-            </label>
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-200/70">
+          <label className="flex items-center gap-2 text-xs cursor-pointer text-slate-600 pt-3">
+            <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
+            Exibir apenas a data selecionada
+          </label>
+          <div className="flex items-center gap-2 ml-auto pt-3">
+            <Button variant="ghost" size="sm" onClick={limparFiltros} className="h-9 rounded-lg px-4 text-xs text-slate-500 hover:text-foreground"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
+            <Button size="sm" onClick={load} className="h-9 rounded-lg px-5 text-xs font-semibold shadow-sm"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
           </div>
         </div>
       </div>
@@ -4413,10 +4414,10 @@ function AgendaPage() {
       </div>
 
       {/* Tabela */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="rounded-xl border border-slate-200/80 bg-card overflow-hidden shadow-sm">
         <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/40">
+          <TableHeader className="[&_th]:h-9 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500">
+            <TableRow className="bg-slate-50/70 hover:bg-slate-50/70 border-slate-200/80">
               <TableHead
                 className="w-10"
                 title="Selecione vários atendimentos do mesmo paciente para cobrar em um único pagamento (use o botão Opções acima)"
@@ -4459,16 +4460,16 @@ function AgendaPage() {
                     key={a.id}
                     className={
                       realizado
-                        ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#d1f0d6] hover:[&>td]:bg-[#d1f0d6]"
+                        ? "[&>td]:py-1.5 [&>td]:h-10 text-xs border-slate-100 [&>td]:bg-emerald-50 hover:[&>td]:bg-emerald-100/70"
                         : presente
-                          ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#a8c8ed] hover:[&>td]:bg-[#a8c8ed]"
-                          : "[&>td]:py-1 [&>td]:h-9 text-xs"
+                          ? "[&>td]:py-1.5 [&>td]:h-10 text-xs border-slate-100 [&>td]:bg-sky-50 hover:[&>td]:bg-sky-100/70"
+                          : "[&>td]:py-1.5 [&>td]:h-10 text-xs border-slate-100 hover:bg-slate-50/70"
                     }
                     style={
                       realizado
-                        ? { backgroundColor: "#d1f0d6", borderLeft: "3px solid #8fd49a" }
+                        ? { borderLeft: "3px solid rgb(52 211 153)" }
                         : presente
-                          ? { backgroundColor: "#a8c8ed", borderLeft: "3px solid #7aa9d8" }
+                          ? { borderLeft: "3px solid rgb(56 189 248)" }
                           : undefined
                     }
                     title={presente ? "Cliente presente na clínica" : undefined}
@@ -4582,9 +4583,9 @@ function AgendaPage() {
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center gap-0.5">
                       {isSlotLivre(a.paciente_nome) ? (
-                        <Badge className="bg-slate-100 text-slate-600 border border-slate-300">Livre</Badge>
+                        <Badge variant="secondary" className="rounded-full border-0 bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-500 shadow-none hover:bg-slate-100">Livre</Badge>
                       ) : (
-                        <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
+                        <Badge className={`rounded-full border-0 px-2.5 py-0.5 text-[11px] font-medium shadow-none ${STATUS_COR[a.status]}`}>{STATUS_LABEL[a.status]}</Badge>
                       )}
                       {/* Badge "Pago" removida — destaque fica apenas no ícone $ na coluna Ações */}
                     </div>
@@ -4601,9 +4602,9 @@ function AgendaPage() {
                               size="icon"
                               title="Confirmar presença (check-in)"
                               onClick={() => confirmarPresenca(a)}
-                              className="h-5 w-5 border rounded-md text-emerald-700 border-emerald-600 hover:bg-emerald-50"
+                              className="h-7 w-7 rounded-md text-slate-500 hover:text-emerald-600 hover:bg-emerald-50"
                             >
-                              <BadgeCheck className="h-2.5 w-2.5" />
+                              <BadgeCheck className="h-4 w-4" />
                             </Button>
                           );
                         }
@@ -4614,9 +4615,9 @@ function AgendaPage() {
                               size="icon"
                               disabled
                               title="Check-in já realizado"
-                              className="h-5 w-5 border rounded-md bg-emerald-500 text-white border-emerald-600 disabled:opacity-100"
+                              className="h-7 w-7 rounded-md text-emerald-600 disabled:opacity-100"
                             >
-                              <BadgeCheck className="h-2.5 w-2.5" />
+                              <BadgeCheck className="h-4 w-4" />
                             </Button>
                           );
                         }
@@ -4634,11 +4635,11 @@ function AgendaPage() {
                           return `Pago • ${f} • ${v}`;
                         })()}
                         onClick={() => cobrarAgendamento(a)}
-                        className={`h-7 w-7 border-2 rounded-md shadow-sm ${pagosSet.has(a.id)
-                          ? "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 hover:text-white ring-2 ring-emerald-300"
-                          : "text-rose-600 border-rose-600 hover:text-rose-700 hover:bg-rose-50"}`}
+                        className={`h-7 w-7 rounded-md ${pagosSet.has(a.id)
+                          ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                          : "text-slate-500 hover:text-rose-600 hover:bg-rose-50"}`}
                       >
-                        <DollarSign className="h-4 w-4" strokeWidth={pagosSet.has(a.id) ? 3 : 2.5} />
+                        <DollarSign className="h-4 w-4" strokeWidth={pagosSet.has(a.id) ? 2.5 : 2} />
                       </Button>
                       {(() => {
                         if (isSlotLivre(a.paciente_nome)) return null;
@@ -4655,11 +4656,11 @@ function AgendaPage() {
                             size="icon"
                             title={title}
                             onClick={() => verOuEmitirNota(a)}
-                            className={`h-7 w-7 border-2 rounded-md shadow-sm ${emitida
-                              ? "bg-sky-600 text-white border-sky-700 hover:bg-sky-700 hover:text-white"
-                              : "text-sky-700 border-sky-600 hover:bg-sky-50"}`}
+                            className={`h-7 w-7 rounded-md ${emitida
+                              ? "text-sky-600 hover:text-sky-700 hover:bg-sky-50"
+                              : "text-slate-500 hover:text-sky-600 hover:bg-sky-50"}`}
                           >
-                            <FileText className="h-4 w-4" strokeWidth={emitida ? 3 : 2.5} />
+                            <FileText className="h-4 w-4" strokeWidth={2} />
                           </Button>
                         );
                       })()}
@@ -4676,17 +4677,17 @@ function AgendaPage() {
                             title={concluido ? "Atendimento concluído (prontuário em papel)" : "Concluir atendimento (médico faz prontuário em papel)"}
                             disabled={concluido}
                             onClick={() => concluirAtendimentoManual(a)}
-                            className={`h-7 w-7 border-2 rounded-md shadow-sm ${concluido
-                              ? "bg-emerald-600 text-white border-emerald-700 disabled:opacity-100"
-                              : "text-amber-700 border-amber-600 hover:bg-amber-50"}`}
+                            className={`h-7 w-7 rounded-md ${concluido
+                              ? "text-emerald-600 disabled:opacity-100"
+                              : "text-slate-500 hover:text-amber-600 hover:bg-amber-50"}`}
                           >
-                            <FileText className="h-4 w-4" strokeWidth={2.5} />
+                            <FileText className="h-4 w-4" strokeWidth={2} />
                           </Button>
                         );
                       })()}
                       <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md text-slate-500 hover:text-foreground"><MoreHorizontal className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
