@@ -4241,7 +4241,7 @@ function AgendaPage() {
       >
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-1.5">
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Profissional</Label>
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
               value={filtroMedico}
@@ -4268,7 +4268,7 @@ function AgendaPage() {
             const semProfissional = filtroMedico === "todos";
             return (
               <div className="space-y-0.5">
-                <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Agenda</Label>
+                <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Agenda</Label>
                 <Select
                   value={filtroAgenda}
                   onValueChange={setFiltroAgenda}
@@ -4288,7 +4288,7 @@ function AgendaPage() {
             );
           })()}
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Data Ref.</Label>
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Data Ref.</Label>
             <DataRefField
               dataRef={dataRef}
               dataFim={dataFim}
@@ -4298,7 +4298,7 @@ function AgendaPage() {
             />
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Dia Semana</Label>
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Dia Semana</Label>
             <Select value={filtroDiaSemana} onValueChange={setFiltroDiaSemana}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -4308,7 +4308,7 @@ function AgendaPage() {
             </Select>
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Cliente</Label>
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Cliente</Label>
             <div className="flex gap-1">
               <Input data-quick-search value={filtroCliente} onChange={(e) => setFiltroCliente(e.target.value)} placeholder="Nome ou CPF…" />
               <Button
@@ -4327,11 +4327,11 @@ function AgendaPage() {
             </div>
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Nº Ficha</Label>
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Nº Ficha</Label>
             <Input value={filtroFicha} onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 001" inputMode="numeric" />
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Atend. Múltiplo</Label>
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Atend. Múltiplo</Label>
             <button
               type="button"
               onClick={() => setFiltroApenasMultiplo((v) => !v)}
@@ -4348,7 +4348,7 @@ function AgendaPage() {
             </button>
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Especialidade</Label>
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -4358,7 +4358,7 @@ function AgendaPage() {
             </Select>
           </div>
           <div className="space-y-0.5">
-            <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Situação</Label>
+            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
