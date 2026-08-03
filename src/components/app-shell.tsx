@@ -491,6 +491,14 @@ export function AppShell() {
     );
   }
 
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setMobileNavOpen(true);
+    window.addEventListener("menu-v2:open", open);
+    return () => window.removeEventListener("menu-v2:open", open);
+  }, []);
+  useEffect(() => { setMobileNavOpen(false); }, [location.pathname]);
+
   if (isEmbed) {
     return (
       <div className="h-screen w-full overflow-auto bg-background" style={{ background: "var(--surface-cream)" }}>
@@ -505,8 +513,17 @@ export function AppShell() {
         <MenuV2 perfil={perfilV2} clinicColor={clinicColor} />
       )}
       {!isChooser && !useMenuV2 && (
+      <>
+      {mobileNavOpen && (
+        <button
+          type="button"
+          aria-label="Fechar menu"
+          className="md:hidden fixed inset-0 z-40 bg-black/40"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
       <aside
-        className={`${collapsed ? "w-16" : "w-64"} transition-all duration-200 shrink-0 text-white h-screen overflow-hidden flex flex-col`}
+        className={`${collapsed ? "md:w-16" : "md:w-64"} w-64 fixed inset-y-0 left-0 z-50 md:static md:z-auto transition-transform md:transition-all duration-200 shrink-0 text-white h-screen overflow-hidden flex flex-col ${mobileNavOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
         style={{ backgroundColor: clinicColor }}
       >
         <div className="px-3 py-3 border-b border-white/10 flex items-center justify-between gap-2">
@@ -679,6 +696,7 @@ export function AppShell() {
             />
           </div>
       </aside>
+      </>
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
