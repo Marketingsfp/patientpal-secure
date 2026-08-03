@@ -4460,16 +4460,16 @@ function AgendaPage() {
                     key={a.id}
                     className={
                       realizado
-                        ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#d1f0d6] hover:[&>td]:bg-[#d1f0d6]"
+                        ? "[&>td]:py-1.5 [&>td]:h-10 text-xs border-slate-100 [&>td]:bg-emerald-50 hover:[&>td]:bg-emerald-100/70"
                         : presente
-                          ? "[&>td]:py-1 [&>td]:h-9 text-xs [&>td]:bg-[#a8c8ed] hover:[&>td]:bg-[#a8c8ed]"
-                          : "[&>td]:py-1 [&>td]:h-9 text-xs"
+                          ? "[&>td]:py-1.5 [&>td]:h-10 text-xs border-slate-100 [&>td]:bg-sky-50 hover:[&>td]:bg-sky-100/70"
+                          : "[&>td]:py-1.5 [&>td]:h-10 text-xs border-slate-100 hover:bg-slate-50/70"
                     }
                     style={
                       realizado
-                        ? { backgroundColor: "#d1f0d6", borderLeft: "3px solid #8fd49a" }
+                        ? { borderLeft: "3px solid rgb(52 211 153)" }
                         : presente
-                          ? { backgroundColor: "#a8c8ed", borderLeft: "3px solid #7aa9d8" }
+                          ? { borderLeft: "3px solid rgb(56 189 248)" }
                           : undefined
                     }
                     title={presente ? "Cliente presente na clínica" : undefined}
@@ -4583,9 +4583,9 @@ function AgendaPage() {
                   <TableCell className="text-center">
                     <div className="flex flex-col items-center gap-0.5">
                       {isSlotLivre(a.paciente_nome) ? (
-                        <Badge className="bg-slate-100 text-slate-600 border border-slate-300">Livre</Badge>
+                        <Badge variant="secondary" className="rounded-full border-0 bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-500 shadow-none hover:bg-slate-100">Livre</Badge>
                       ) : (
-                        <Badge className={STATUS_COR[a.status]}>{STATUS_LABEL[a.status]}</Badge>
+                        <Badge className={`rounded-full border-0 px-2.5 py-0.5 text-[11px] font-medium shadow-none ${STATUS_COR[a.status]}`}>{STATUS_LABEL[a.status]}</Badge>
                       )}
                       {/* Badge "Pago" removida — destaque fica apenas no ícone $ na coluna Ações */}
                     </div>
