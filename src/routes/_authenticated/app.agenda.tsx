@@ -4414,10 +4414,10 @@ function AgendaPage() {
       </div>
 
       {/* Tabela */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="rounded-xl border border-slate-200/80 bg-card overflow-hidden shadow-sm">
         <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/40">
+          <TableHeader className="[&_th]:h-9 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500">
+            <TableRow className="bg-slate-50/70 hover:bg-slate-50/70 border-slate-200/80">
               <TableHead
                 className="w-10"
                 title="Selecione vários atendimentos do mesmo paciente para cobrar em um único pagamento (use o botão Opções acima)"
