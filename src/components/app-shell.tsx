@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins, Menu as MenuIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -683,6 +683,16 @@ export function AppShell() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-30 h-[50px] bg-card/80 backdrop-blur border-b flex items-center gap-2 px-3 sm:px-5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="md:hidden h-8 w-8 p-0 shrink-0"
+            title="Abrir menu"
+            aria-label="Abrir menu"
+            onClick={() => window.dispatchEvent(new Event("menu-v2:open"))}
+          >
+            <MenuIcon className="h-5 w-5" />
+          </Button>
           <div className="flex items-center gap-2 min-w-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -708,7 +718,7 @@ export function AppShell() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <p className="text-sm font-medium truncate max-w-[160px]" title={user?.email ?? undefined}>{userName}</p>
+            <p className="hidden lg:block text-sm font-medium truncate max-w-[160px]" title={user?.email ?? undefined}>{userName}</p>
           </div>
           
           {/* LOGO SEM QUADRINHO BRANCO */}
@@ -730,7 +740,7 @@ export function AppShell() {
                 else setClinicaAtual(v);
               }}
             >
-              <SelectTrigger className="w-[260px] h-8 text-xs">
+              <SelectTrigger className="w-[150px] sm:w-[220px] lg:w-[260px] h-8 text-xs">
                 <SelectValue placeholder="Selecione a clínica" />
               </SelectTrigger>
               <SelectContent>
@@ -753,7 +763,7 @@ export function AppShell() {
               </SelectContent>
             </Select>
           )}
-          <div className="flex-1 flex justify-center px-2 min-w-0">
+          <div className="hidden sm:flex flex-1 justify-center px-2 min-w-0">
             <UniversalSearchBar />
           </div>
           <div className="flex items-center gap-2">
