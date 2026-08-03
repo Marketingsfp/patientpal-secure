@@ -3261,14 +3261,12 @@ function AgendaPage() {
           </div>
         </div>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <CalendarDays className="h-6 w-6" /> Agendas
-          </h1>
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 items-start">
+        <div className="md:col-start-1 md:row-start-1 min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Agendas</h1>
           <p className="text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
         </div>
-        <div className="flex gap-1.5">
+        <div className="md:col-start-1 md:row-start-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50/60 px-2 py-1.5">
           <TurboModeToggle />
           <div className="inline-flex rounded-full border bg-card p-0.5">
             <button
