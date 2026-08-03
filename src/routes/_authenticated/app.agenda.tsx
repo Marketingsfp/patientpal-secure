@@ -3285,7 +3285,7 @@ function AgendaPage() {
             </button>
           </div>
           <EncerrarExpedienteButton />
-          <Button asChild variant="default" size="sm" className="h-7 text-[11px] px-2" title="Agendamento rápido em 4 passos">
+          <Button asChild variant="outline" size="sm" className="h-7 text-[11px] px-2" title="Agendamento rápido em 4 passos">
             <Link to="/app/agenda/express">
               <Clock className="h-3 w-3 mr-1.5" /> Agenda Express
             </Link>
@@ -3368,10 +3368,12 @@ function AgendaPage() {
           >
             <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
           </Button>
+          </div>
+          <div className="md:col-start-2 md:row-start-1 md:justify-self-end">
           <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-7 text-[11px] px-2 bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Plus className="h-3 w-3 mr-1.5" /> Adicionar Encaixe
+            <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-9 rounded-lg px-4 text-xs font-semibold shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Plus className="h-4 w-4 mr-1.5" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
