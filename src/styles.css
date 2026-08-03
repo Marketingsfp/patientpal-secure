@@ -604,3 +604,16 @@ html.theme-emerald {
 .hhp-kpi-anim {
   animation: hhp-kpi-in 320ms var(--hhp-ease, cubic-bezier(0.32, 0.72, 0, 1)) both;
 }
+
+/* Esconde a barra de rolagem vertical em mobile/tablet (mantém o scroll) */
+@media (max-width: 1023px) {
+  .hhp-no-scrollbar-mobile {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .hhp-no-scrollbar-mobile::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
+}
