@@ -607,13 +607,17 @@ html.theme-emerald {
 
 /* Esconde a barra de rolagem vertical em mobile/tablet (mantém o scroll) */
 @media (max-width: 1023px) {
-  .hhp-no-scrollbar-mobile {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+  html,
+  body,
+  * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
   }
-  .hhp-no-scrollbar-mobile::-webkit-scrollbar {
-    width: 0;
-    height: 0;
-    display: none;
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  *::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+    display: none !important;
   }
 }
