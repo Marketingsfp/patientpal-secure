@@ -204,8 +204,10 @@ export function AppShell() {
   const navScrollRef = useRef<HTMLElement | null>(null);
   const lastArrowNavAtRef = useRef(0);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
-  return false; // 🔥 Força o menu a ficar sempre ABERTO, ignorando tudo
-});
+    if (typeof window === "undefined") return false;
+    if (window.innerWidth < 1024) return true;
+    return window.localStorage.getItem("appshell:collapsed") === "1";
+  });
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {};
     try { return JSON.parse(window.localStorage.getItem("appshell:openGroups") ?? "{}"); } catch { return {}; }
@@ -525,11 +527,20 @@ export function AppShell() {
         className={`${collapsed ? "lg:w-16" : "lg:w-64"} w-64 fixed inset-y-0 left-0 z-50 lg:static lg:z-auto transition-transform lg:transition-all duration-200 shrink-0 text-white h-screen overflow-hidden flex flex-col ${mobileNavOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
         style={{ backgroundColor: clinicColor }}
       >
-         <div className="px-3 py-3 border-b border-white/10 flex items-center gap-2 shrink-0">
+        <div className="px-3 py-3 border-b border-white/10 flex items-center justify-between gap-2">
           <Link to="/app" className="flex items-center gap-2 min-w-0">
             <Activity className="h-5 w-5 shrink-0" />
-            {!collapsed && <span className="font-semibold tracking-tight truncate">ClínicaOS</span>}
+            {!collapsedUi && <span className="font-semibold tracking-tight truncate">ClinicaOS</span>}
           </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-white hover:bg-white/10 hover:text-white h-7 w-7 p-0 shrink-0"
+            onClick={() => setCollapsed((v) => !v)}
+            title={collapsedUi ? "Expandir menu" : "Recolher menu"}
+          >
+            {collapsedUi ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </Button>
         </div>
         
         {!isMedicoOnly && (
