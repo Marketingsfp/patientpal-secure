@@ -285,7 +285,8 @@ export function AppShell() {
     if (typeof window === "undefined") return {};
     try { return JSON.parse(window.localStorage.getItem("appshell:openGroups") ?? "{}"); } catch { return {}; }
   });
-  const [menuSearch, setMenuSearch] = useState(""); 
+  const [menuSearch, setMenuSearch] = useState("");
+  const menuSearchRef = useRef<HTMLInputElement>(null);
 
   // Ao identificar o usuário, carrega a preferência salva dele (uma vez por usuário).
   useEffect(() => {
