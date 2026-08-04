@@ -4771,9 +4771,9 @@ function AgendaPage() {
                           return `Pago • ${f} • ${v}`;
                         })()}
                         onClick={() => cobrarAgendamento(a)}
-                        className={`h-7 w-7 rounded-md ${pagosSet.has(a.id)
+                        className={`h-7 w-7 rounded-md transition-colors ${pagosSet.has(a.id)
                           ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                          : "text-slate-500 hover:text-rose-600 hover:bg-rose-50"}`}
+                          : "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"}`}
                       >
                         <DollarSign className="h-4 w-4" strokeWidth={pagosSet.has(a.id) ? 2.5 : 2} />
                       </Button>
@@ -4823,7 +4823,7 @@ function AgendaPage() {
                       })()}
                       <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md text-slate-500 hover:text-foreground"><MoreHorizontal className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"><MoreHorizontal className="h-4 w-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(a)}><Pencil className="h-4 w-4 mr-2" /> Editar</DropdownMenuItem>
