@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useUserPref } from "@/hooks/use-user-pref";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -361,8 +362,9 @@ const RELATORIOS: Relatorio[] = [
 
 function RelatoriosPage() {
   const { clinicaAtual } = useClinica();
-  const [ini, setIni] = useState(mesAtras);
-  const [fim, setFim] = useState(hoje);
+  const [aba, setAba] = useUserPref("relatorios.aba", "dashboard");
+  const [ini, setIni] = useUserPref("relatorios.de", mesAtras);
+  const [fim, setFim] = useUserPref("relatorios.ate", hoje);
   const [loading, setLoading] = useState<string | null>(null);
 
   async function baixar(r: Relatorio) {
@@ -393,7 +395,7 @@ function RelatoriosPage() {
         <p className="text-muted-foreground">Visualize um dashboard ou baixe planilhas Excel.</p>
       </div>
 
-      <Tabs defaultValue="dashboard">
+      <Tabs value={aba} onValueChange={setAba}>
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3">
           <TabsList>
             <TabsTrigger value="dashboard" className="gap-2">
