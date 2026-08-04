@@ -357,6 +357,9 @@ São João de Meriti, {{DATA_HOJE}}.
 @page { size: A4; margin: 16mm 18mm 18mm; }
 * { box-sizing: border-box; }
 body { font-family: "Helvetica Neue", Arial, Helvetica, sans-serif; font-size: 10.5pt; color:#111; line-height: 1.55; margin:0; }
+.page { max-width: 174mm; margin: 0 auto; }
+@media screen { body { background:#f1f5f9; padding: 10mm 0; } .page { background:#fff; padding: 14mm 16mm; box-shadow: 0 2px 16px rgba(0,0,0,.12); border-radius: 3px; } }
+@media print { body { background:#fff; padding:0; } .page { max-width:none; box-shadow:none; padding:0; } }
 .head { display:flex; align-items:center; gap:6mm; padding-bottom:4mm; border-bottom:2px solid #111; }
 .head img { height:20mm; max-width:45mm; object-fit:contain; }
 .head .info { flex:1; min-width:0; }
@@ -378,6 +381,7 @@ p.opt { padding-left:3mm; }
 .meta { margin-top: 6mm; font-size:8.5pt; color:#555; text-align:center; }
 @media print { .head { border-bottom:1.5px solid #000; } }
 </style></head><body>
+<div class="page">
 <div class="head">
   <img src="${esc(logoUrl)}" alt="${esc(_cl.nome ?? "Logo")}" onerror="this.style.display='none'"/>
   <div class="info">
