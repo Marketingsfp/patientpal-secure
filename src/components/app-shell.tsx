@@ -322,6 +322,11 @@ export function AppShell() {
     if (!loading && !user) navigate({ to: "/login", replace: true });
   }, [loading, navigate, user]);
 
+  const crumbs = useMemo(
+    () => buildBreadcrumbs(location.pathname, location.hash ?? ""),
+    [location.pathname, location.hash],
+  );
+
   const handleVoiceCommand = (text: string) => {
     const t = text.toLowerCase();
     const route =
