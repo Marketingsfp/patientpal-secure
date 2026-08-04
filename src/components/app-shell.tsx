@@ -926,6 +926,17 @@ export function AppShell() {
             aria-label="Breadcrumb"
             className="sticky top-[50px] z-20 bg-card/70 backdrop-blur border-b px-3 sm:px-5 py-1.5 overflow-x-auto hhp-no-scrollbar-mobile"
           >
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <button
+                type="button"
+                onClick={() => window.history.back()}
+                aria-label="Voltar para a página anterior"
+                className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] sm:text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Voltar</span>
+              </button>
+              <span className="h-3 w-px bg-border" aria-hidden />
             <ol className="flex items-center gap-1 text-[11px] sm:text-xs text-muted-foreground whitespace-nowrap">
               <li className="flex items-center gap-1">
                 <Link to="/app" className="hover:text-foreground transition-colors">Início</Link>
@@ -946,6 +957,7 @@ export function AppShell() {
                 );
               })}
             </ol>
+            </div>
           </nav>
         )}
         <main className="hhp-no-scrollbar-mobile flex-1 px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4 lg:px-6 lg:pt-2 lg:pb-6 overflow-auto min-w-0" style={{ background: "var(--surface-cream)" }}>
