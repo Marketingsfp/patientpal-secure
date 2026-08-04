@@ -571,6 +571,14 @@ export function AppShell() {
     window.addEventListener("menu-v2:open", open);
     return () => window.removeEventListener("menu-v2:open", open);
   }, []);
+  useEffect(() => {
+    const toggle = () => {
+      if (window.innerWidth < 1024) setMobileNavOpen((v) => !v);
+      else setCollapsed((v) => !v);
+    };
+    window.addEventListener("appshell:toggle-sidebar", toggle);
+    return () => window.removeEventListener("appshell:toggle-sidebar", toggle);
+  }, []);
   useEffect(() => { setMobileNavOpen(false); }, [location.pathname]);
 
   if (isEmbed) {
