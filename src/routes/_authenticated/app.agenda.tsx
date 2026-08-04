@@ -5347,26 +5347,29 @@ function DataRefField({
             <CalendarDays className="h-4 w-4 mr-2" /> {label}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <div className="flex items-center gap-1 p-2 border-b">
-            <Button
-              size="sm"
-              variant={mode === "single" ? "default" : "outline"}
-              onClick={() => setMode("single")}
-            >
-              Dia
-            </Button>
-            <Button
-              size="sm"
-              variant={mode === "range" ? "default" : "outline"}
-              onClick={() => setMode("range")}
-            >
-              Período
-            </Button>
+        <PopoverContent className="w-auto p-0 rounded-xl shadow-xl border-slate-200/80 overflow-hidden" align="start">
+          <div className="flex items-center gap-2 p-2.5 border-b border-slate-100">
+            <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
+              {([["single", "Dia"], ["range", "Período"]] as const).map(([m, txt]) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
+                    mode === m
+                      ? "bg-white shadow-sm text-slate-900"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {txt}
+                </button>
+              ))}
+            </div>
             <span className="flex-1" />
             <Button
               size="sm"
               variant="ghost"
+              className="h-8 px-2.5 text-xs text-slate-500 hover:text-primary"
               onClick={() => {
                 setDataRef(toIso(proxDiaUtil()));
                 setDataFim(null);
@@ -5379,6 +5382,7 @@ function DataRefField({
             <Button
               size="sm"
               variant="ghost"
+              className="h-8 px-2.5 text-xs text-slate-500 hover:text-primary"
               onClick={() => {
                 setDataRef(toIso(proxDiaUtil()));
                 setDataFim(null);
@@ -5391,6 +5395,8 @@ function DataRefField({
           {mode === "single" ? (
             <Calendar
               mode="single"
+              locale={ptBR}
+              formatters={calendarFormatters}
               selected={new Date(`${dataRef}T12:00:00`)}
               onSelect={(d) => {
                 if (!d) return;
@@ -5403,6 +5409,8 @@ function DataRefField({
           ) : (
             <Calendar
               mode="range"
+              locale={ptBR}
+              formatters={calendarFormatters}
               selected={{
                 from: new Date(`${dataRef}T12:00:00`),
                 to: dataFim ? new Date(`${dataFim}T12:00:00`) : undefined,
