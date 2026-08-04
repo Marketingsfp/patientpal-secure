@@ -93,6 +93,8 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const [page, setPage] = useState(1);
   const [campo, setCampo] = useState<CampoBusca>("todos");
   const [convenio, setConvenio] = useState<string>("todos");
+  const [ordem, setOrdem] = useUserPref<OrdemBusca>("clientes:ordem", "relevancia");
+  const [dirOrdem, setDirOrdem] = useUserPref<DirOrdem>("clientes:ordem-dir", "asc");
   const [totalBase, setTotalBase] = useState<number | null>(null);
   const reqRef = useRef(0);
 
@@ -212,15 +214,44 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     return r;
   }, [rows, tab, chips, q, campo, convenio]);
 
+  // Ordenação dos resultados. "Relevância" preserva a ordem devolvida pela busca.
+  const ordenados = useMemo(() => {
+    const posicao = new Map(rows.map((p, i) => [p.id, i]));
+    const sinal = dirOrdem === "asc" ? 1 : -1;
+    const arr = [...filtrados];
+    arr.sort((a, b) => {
+      if (ordem === "nome") {
+        return sinal * (a.nome ?? "").localeCompare(b.nome ?? "", "pt-BR", { sensitivity: "base" });
+      }
+      if (ordem === "cadastro") {
+        const ta = a.created_at ? Date.parse(a.created_at) : 0;
+        const tb = b.created_at ? Date.parse(b.created_at) : 0;
+        return sinal * (ta - tb);
+      }
+      return sinal * ((posicao.get(a.id) ?? 0) - (posicao.get(b.id) ?? 0));
+    });
+    return arr;
+  }, [filtrados, rows, ordem, dirOrdem]);
+
+  const aplicarOrdem = (v: OrdemBusca) => {
+    if (v === ordem) {
+      setDirOrdem((d) => (d === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setOrdem(v);
+    // Padrões úteis: nome A→Z, cadastro mais recente primeiro.
+    setDirOrdem(v === "cadastro" ? "desc" : "asc");
+  };
+
   const conveniosDisponiveis = useMemo(() => {
     const set = new Set<string>();
     for (const p of rows) if (p.associado_convenio) set.add(p.associado_convenio);
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [rows]);
 
-  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / pageSize));
+  const totalPaginas = Math.max(1, Math.ceil(ordenados.length / pageSize));
   const paginaAtual = Math.min(page, totalPaginas);
-  const visiveis = filtrados.slice((paginaAtual - 1) * pageSize, paginaAtual * pageSize);
+  const visiveis = ordenados.slice((paginaAtual - 1) * pageSize, paginaAtual * pageSize);
 
   useEffect(() => { setPage(1); }, [q, campo, convenio, tab, chips, pageSize]);
 
