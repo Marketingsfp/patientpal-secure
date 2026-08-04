@@ -322,36 +322,71 @@ São João de Meriti, {{DATA_HOJE}}.
     ? `<img src="${esc(rawSig!)}" style="height:64px;max-width:100%;object-fit:contain" alt="assinatura"/>`
     : "";
 
+  // ----- Logo da clínica -----
+  const brand: any = (_cl.branding ?? {}) as any;
+  const nomeLower = String(_cl.nome ?? "").toLowerCase();
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const logoUrl: string =
+    brand?.logo_url ||
+    (nomeLower.includes("menino jesus")
+      ? `${origin}/cartao-beneficios/logo-menino-jesus.png`
+      : `${origin}/cartao-beneficios/logo-policardmed.png`);
+
+  // ----- Corpo formatado em blocos semânticos -----
+  const isTitulo = (l: string) => /^(CLÁUSULA|ANEXO|INSTRUMENTO PARTICULAR|DA COLETA)/.test(l.trim());
+  const isSub = (l: string) =>
+    /^(Parágrafo|Paragrafo|APÓS|ASSOCIADOS DEPENDENTES:|CONTRATADA:|CONTRATANTE:)/.test(l.trim());
+  const corpoHtml = corpo
+    .split("\n")
+    .map((linha) => {
+      const l = linha.trim();
+      if (!l) return `<div class="sp"></div>`;
+      if (/^_{5,}$/.test(l)) return "";
+      if (isTitulo(l)) return `<h2>${esc(l)}</h2>`;
+      if (/^"CARTÃO CONSULTA/.test(l)) return `<p class="sub">${esc(l)}</p>`;
+      if (isSub(l)) return `<p class="lead">${esc(l)}</p>`;
+      if (/^\[ S \]/.test(l)) return `<p class="opt">${esc(l)}</p>`;
+      return `<p>${esc(l)}</p>`;
+    })
+    .join("\n");
+
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
 <title>Contrato #${c.numero} - ${esc(c.paciente_nome)}</title>
 <style>
-@page { size: A4; margin: 18mm; }
-body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color:#000; line-height: 1.45; }
-h1 { font-size: 14pt; text-align:center; margin: 0 0 4mm; }
-.head { text-align:center; margin-bottom: 6mm; font-size: 10pt; }
-pre.body { 
-  white-space: pre-wrap; 
-  font-family: inherit; 
-  font-size: 11pt; 
-  margin: 0; 
-  page-break-inside: auto; 
-  break-inside: auto; 
-  word-wrap: break-word; 
-}
-.sig { margin-top: 12mm; display:flex; align-items:flex-end; justify-content:space-between; gap:12mm; font-size: 10pt; page-break-inside: avoid; }
+@page { size: A4; margin: 16mm 18mm 18mm; }
+* { box-sizing: border-box; }
+body { font-family: "Helvetica Neue", Arial, Helvetica, sans-serif; font-size: 10.5pt; color:#111; line-height: 1.55; margin:0; }
+.head { display:flex; align-items:center; gap:6mm; padding-bottom:4mm; border-bottom:2px solid #111; }
+.head img { height:20mm; max-width:45mm; object-fit:contain; }
+.head .info { flex:1; min-width:0; }
+.head .nome { font-size:13pt; font-weight:700; letter-spacing:.2px; margin:0 0 1mm; }
+.head .linha { font-size:8.5pt; color:#444; line-height:1.4; }
+.head .badge { text-align:right; font-size:8.5pt; color:#111; white-space:nowrap; }
+.head .badge strong { display:block; font-size:12pt; letter-spacing:.5px; }
+h1 { font-size: 13pt; text-align:center; margin: 7mm 0 1mm; letter-spacing:.4px; text-transform:uppercase; }
+h2 { font-size: 10.5pt; margin: 6mm 0 1.5mm; text-transform:uppercase; letter-spacing:.4px; border-left:3px solid #111; padding-left:2.5mm; page-break-after:avoid; break-after:avoid; }
+p { margin: 0 0 1.6mm; text-align: justify; hyphens:auto; orphans:3; widows:3; }
+p.sub { text-align:center; font-weight:600; margin-bottom:4mm; }
+p.lead { font-weight:600; }
+p.opt { padding-left:3mm; }
+.sp { height:2mm; }
+.sig { margin-top: 14mm; display:flex; align-items:flex-end; justify-content:space-between; gap:12mm; font-size: 9.5pt; page-break-inside: avoid; }
 .sig .col { width:48%; text-align:center; }
 .sig .ink { height:64px; display:flex; align-items:flex-end; justify-content:center; }
-.sig .line { border-top:1px solid #000; margin-top:2px; padding-top:2px; }
-.meta { margin-top: 6mm; font-size:9pt; color:#444; text-align:center; }
-.numero { float:right; font-size:10pt; }
+.sig .line { border-top:1px solid #111; margin-top:2px; padding-top:1.5mm; line-height:1.35; }
+.meta { margin-top: 6mm; font-size:8.5pt; color:#555; text-align:center; }
+@media print { .head { border-bottom:1.5px solid #000; } }
 </style></head><body>
 <div class="head">
-<strong>${esc(_cl.nome)}</strong><br/>
-  ${esc([_cl.endereco, _cl.cidade, _cl.estado].filter(Boolean).join(" — "))}<br/>
-  CNPJ: ${esc(_cl.cnpj ?? "")} — Tel.: ${esc(_cl.telefone ?? "")}
-  <span class="numero">Contrato Nº ${c.numero}</span>
+  <img src="${esc(logoUrl)}" alt="${esc(_cl.nome ?? "Logo")}" onerror="this.style.display='none'"/>
+  <div class="info">
+    <p class="nome">${esc(_cl.nome)}</p>
+    <div class="linha">${esc([_cl.endereco, _cl.cidade, _cl.estado].filter(Boolean).join(" — "))}</div>
+    <div class="linha">CNPJ: ${esc(_cl.cnpj ?? "—")} &nbsp;·&nbsp; Tel.: ${esc(_cl.telefone ?? "—")}</div>
+  </div>
+  <div class="badge">Contrato<strong>Nº ${c.numero}</strong></div>
 </div>
-<pre class="body">${esc(corpo)}</pre>
+<div class="body">${corpoHtml}</div>
 <div class="sig">
   <div class="col">
     <div class="ink"></div>
