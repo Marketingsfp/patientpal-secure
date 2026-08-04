@@ -356,13 +356,13 @@ function AgendaExpressPage() {
                 ) : (
                   slotsFiltrados.map((s) => {
                     const chave = slotKey(s);
-                    const ativo = slot ? slotKey(slot) === chave : false;
+                    const ativo = itens.some((i) => slotKey(i) === chave);
                     const legenda = s.especialidade_nome ?? s.medico_nome ?? s.agenda_nome ?? "";
                     return (
                       <button
                         key={chave}
                         type="button"
-                        onClick={() => setSlot(s)}
+                        onClick={() => alternarSlot(s)}
                         title={`${hhmm(s.inicio)} · ${s.medico_nome}${s.agenda_nome ? ` · ${s.agenda_nome}` : ""}`}
                         className={cn(
                           "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-xl border-2 px-3 py-2 text-left transition-colors",
@@ -371,8 +371,9 @@ function AgendaExpressPage() {
                             : "border-slate-200 bg-slate-50 hover:border-[#1e1b6b]/40 hover:bg-white",
                         )}
                       >
-                        <span className={cn("text-base font-bold tabular-nums leading-none", ativo ? "text-white" : "text-slate-900")}>
+                        <span className={cn("flex w-full items-center gap-1 text-base font-bold tabular-nums leading-none", ativo ? "text-white" : "text-slate-900")}>
                           {hhmm(s.inicio)}
+                          {ativo && <Check className="h-3.5 w-3.5" />}
                         </span>
                         <span className={cn("w-full truncate text-[10px] font-medium leading-tight", ativo ? "text-white/75" : "text-slate-500")}>
                           {legenda}
@@ -390,7 +391,12 @@ function AgendaExpressPage() {
         <div className={cn(CARD, "px-4 py-3")}>
           <div className="flex items-center gap-3">
           <div className="hidden sm:block text-sm font-medium text-slate-700 flex-1 truncate">
-            {paciente ? paciente.nome : "Selecione o paciente"} · {slot ? `${hhmm(slot.inicio)} — ${slot.medico_nome}` : "sem horário"}
+            {paciente ? paciente.nome : "Selecione o paciente"} ·{" "}
+            {itens.length === 0
+              ? "sem horário"
+              : itens.length === 1
+                ? `${hhmm(itens[0]!.inicio)} — ${itens[0]!.medico_nome}`
+                : `${itens.length} serviços no mesmo atendimento`}
           </div>
           <Button
             size="lg"
