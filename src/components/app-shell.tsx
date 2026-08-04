@@ -195,6 +195,37 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
 
 type Crumb = { label: string; to?: string };
 
+// Todos os caminhos catalogados no menu (inclui aliases).
+// Usado para que o item mais específico vença: em /app/agenda/express
+// apenas "Agenda Express" fica ativo, nunca também "Agenda".
+const ALL_NAV_PATHS: string[] = (() => {
+  const out: string[] = [];
+  for (const row of navRows) {
+    for (const item of row.items) {
+      const leaves = isParent(item) ? item.children : [item as NavLeaf];
+      for (const leaf of leaves) {
+        out.push(leaf.to);
+        for (const a of leaf.aliases ?? []) out.push(a);
+      }
+    }
+  }
+  return out;
+})();
+
+function pathMatches(pathname: string, to: string) {
+  if (pathname === to) return true;
+  if (to === "/app") return false;
+  if (!pathname.startsWith(`${to}/`)) return false;
+  // Existe um item de menu mais específico que também casa? Ele tem prioridade.
+  return !ALL_NAV_PATHS.some(
+    (p) => p.length > to.length && (pathname === p || pathname.startsWith(`${p}/`)),
+  );
+}
+
+function isNavActive(pathname: string, to: string, aliases: string[] = []) {
+  return pathMatches(pathname, to) || aliases.some((a) => pathMatches(pathname, a));
+}
+
 function titleizeSegment(seg: string) {
   const clean = decodeURIComponent(seg).replace(/[-_]/g, " ");
   return clean.charAt(0).toUpperCase() + clean.slice(1);
