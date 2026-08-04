@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { cn } from "@/lib/utils";
 import { ptBR } from "date-fns/locale";
-import { Zap, User, Stethoscope, CalendarDays, Clock, UserRound, Loader2, CalendarX } from "lucide-react";
+import { Zap, User, Stethoscope, CalendarDays, Clock, UserRound, Loader2, CalendarX, Search } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/agenda_/express")({
   component: AgendaExpressPage,
@@ -66,6 +66,7 @@ function AgendaExpressPage() {
   const [carregando, setCarregando] = useState(false);
   const [slot, setSlot] = useState<Slot | null>(null);
   const [confirmando, setConfirmando] = useState(false);
+  const [busca, setBusca] = useState("");
 
   // Especialidades + médicos ativos da clínica
   useEffect(() => {
@@ -120,6 +121,17 @@ function AgendaExpressPage() {
     [slots, alvo],
   );
   const diasComVaga = useMemo(() => new Set(slots.map((s) => ymd(new Date(s.inicio)))), [slots]);
+
+  const termoNorm = busca.trim().toLowerCase();
+  const slotsFiltrados = useMemo(() => {
+    if (!termoNorm) return slotsDoDia;
+    return slotsDoDia.filter((s) =>
+      [hhmm(s.inicio), s.medico_nome, s.especialidade_nome ?? "", s.agenda_nome ?? ""]
+        .join(" ")
+        .toLowerCase()
+        .includes(termoNorm),
+    );
+  }, [slotsDoDia, termoNorm]);
 
   const podeConfirmar = !!clinicaId && !!paciente && !!slot && !confirmando;
 
