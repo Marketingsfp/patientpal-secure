@@ -3299,7 +3299,7 @@ function AgendaPage() {
         <div className="shrink-0">
           <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-10 rounded-lg px-4 text-sm font-medium shadow-sm bg-indigo-950 text-white hover:bg-indigo-950 hover:opacity-90 transition-opacity">
+            <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-10 rounded-lg px-4 text-sm font-medium shadow-md shadow-primary/20 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
               <Plus className="h-4 w-4 mr-2" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
