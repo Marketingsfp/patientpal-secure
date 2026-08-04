@@ -280,18 +280,29 @@ function AgendaExpressPage() {
 
             <div>
               <label className={LABEL}>Horários disponíveis</label>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                <input
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value.slice(0, 60))}
+                  placeholder="Filtrar por horário, especialidade ou médico..."
+                  className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 pl-9 text-sm shadow-sm outline-none placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
+                />
+              </div>
               {carregando ? (
                 <div className="flex items-center gap-2 py-8 justify-center text-sm text-slate-500">
                   <Loader2 className="h-4 w-4 animate-spin" /> Buscando horários…
                 </div>
-              ) : slotsDoDia.length === 0 ? (
+              ) : slotsFiltrados.length === 0 ? (
                 <div className="bg-slate-50 rounded-xl p-8 flex flex-col items-center justify-center text-center gap-2">
                   <CalendarX className="h-8 w-8 text-slate-300" strokeWidth={1.5} />
-                  <p className="text-sm font-medium text-slate-500">Nenhum horário livre nesta data.</p>
+                  <p className="text-sm font-medium text-slate-500">
+                    {termoNorm ? "Nenhum horário encontrado para essa busca" : "Nenhum horário livre nesta data."}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto pr-1">
-                  {slotsDoDia.map((s) => {
+                  {slotsFiltrados.map((s) => {
                     const chave = slotKey(s);
                     const ativo = slot ? slotKey(slot) === chave : false;
                     const legenda = s.especialidade_nome ?? s.medico_nome ?? s.agenda_nome ?? "";
