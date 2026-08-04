@@ -1,14 +1,11 @@
 import { useEffect, useState } from "react";
 import {
-  CalendarClock,
   CreditCard,
   FileText,
   Percent,
   Printer,
   Save,
   Search,
-  Stethoscope,
-  User,
   UserPlus,
 } from "lucide-react";
 import {
