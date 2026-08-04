@@ -868,28 +868,23 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
         .map((d) => {
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
           const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
-          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
+          return kv(esc(lbl), `${fmtBRL(d.pago)}${esc(trocoTxt)}`);
         })
         .join("")
     : "";
 
-  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
+  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).map((s) => esc(String(s))).join(" · ");
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
   // Cabeçalho da clínica (reutilizado em cada GR)
-  const headerClinica = `
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
-    <div class="center sm">${endereco}</div>
-    ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
-    ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
-  `;
-  const headerPaciente = `
-    <div class="center bold">${esc(pacienteNome)}</div>
-    ${prontuarioPac ? `<div class="center sm">PRONTUÁRIO: <span class="v">${esc(prontuarioPac)}</span></div>` : ""}
-    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
-    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
-    ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
-  `;
+  const headerClinica = blocoClinica(c, endereco);
+  const headerPaciente = blocoPaciente({
+    nome: pacienteNome,
+    prontuario: prontuarioPac,
+    cpf: paciente?.cpf,
+    telefone: paciente?.telefone,
+    nascimento: paciente?.data_nascimento ? fmtDataSimples(paciente.data_nascimento) : null,
+  });
 
   const gruposArr = Array.from(grupos.values());
   const dataImpressao = fmtData(new Date().toISOString());
@@ -904,60 +899,42 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
       const d = new Date(g.inicioRef);
       return String(d.getHours() * 60 + d.getMinutes()).padStart(3, "0");
     })();
-    const linhas = g.itens
-      .map(
-        (it) => `<tr>
-          <td style="width:14mm">1</td>
-          <td>${esc(it.procNome)}</td>
-        </tr>`
-      )
-      .join("");
+    const linhas = blocoServicos(g.itens.map((it) => ({ qtd: "1", nome: it.procNome })));
     const parcelasTxt = pagamento.forma_pagamento === "cartao_credito" && pagamento.parcelas && pagamento.parcelas > 1
       ? `${pagamento.parcelas}x DE ${fmtBRL(g.subtotal / pagamento.parcelas)}`
       : "À VISTA";
     return `
       <div class="ticket">
         ${headerClinica}
-        <div class="sep"></div>
-        <div class="center lg">GUIA DE ATENDIMENTO</div>
-        <div class="sep"></div>
+        <div class="divider"></div>
+        <div class="doc-title">Guia de Atendimento</div>
+        <div class="divider"></div>
         ${headerPaciente}
-        <div class="sep"></div>
-        <table>
-          <tr><td class="label" colspan="2" style="white-space:nowrap">FICHA: <span class="v">${ficha}</span></td></tr>
-          <tr><td class="label" colspan="2" style="white-space:nowrap">PROFISSIONAL: <span class="v">${esc(g.medicoNome)}</span></td></tr>
-          <tr><td class="label" colspan="2" style="white-space:nowrap">HORÁRIO: <span class="v">${fmtData(g.inicioRef)}</span></td></tr>
-          ${usuarioFinalNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
-        </table>
-        <div class="sep"></div>
-        <table>
-          <tr class="bold">
-            <td style="width:14mm">QTD</td>
-            <td>SERVIÇO</td>
-          </tr>
-          ${linhas}
-        </table>
+        <div class="divider"></div>
+        ${kv("Ficha", `<span class="badge">${ficha}</span>`)}
+        ${kv("Profissional", esc(g.medicoNome))}
+        ${kv("Horário", fmtData(g.inicioRef))}
+        ${usuarioFinalNome ? kv("Usuário", esc(usuarioFinalNome)) : ""}
+        <div class="divider"></div>
+        ${linhas}
         ${g.subtotal > 0 ? `
-        <div class="row" style="margin-top:8px">
-          <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
-          <div class="bold lg">${fmtBRL(g.subtotal)}</div>
-        </div>
-        ${isLast && isMisto ? `<table style="margin-top:4px">${detalheRows}</table>` : ""}
+        ${blocoTotal(fmtBRL(g.subtotal), isMisto ? "MISTO" : formaLbl)}
+        ${isLast && isMisto ? `<div style="margin-top:2mm">${detalheRows}</div>` : ""}
         ${pagamento.forma_pagamento === "cartao_credito" ? `
-        <table>
-          ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
-          <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
-        </table>
+        <div style="margin-top:2mm">
+          ${bandeiraTxt ? kv("Bandeira", esc(bandeiraTxt)) : ""}
+          ${kv("Parcelamento", parcelasTxt)}
+        </div>
         ` : ""}
-        <div class="sep"></div>
-        <table>
-          <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(g.clinica)}</td></tr>
-          <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(g.prestador)}</td></tr>
-        </table>
+        <div class="divider"></div>
+        <div class="split">
+          ${kv("Clínica", fmtBRL(g.clinica))}
+          ${kv("Prestador", fmtBRL(g.prestador))}
+        </div>
         ` : ""}
-        <div class="sep"></div>
-        <div class="row sm">
-          <div>DATA IMPRESSAO</div>
+        <div class="divider"></div>
+        <div class="foot">
+          <div>Data impressão</div>
           <div>${dataImpressao}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
         </div>
       </div>
@@ -972,26 +949,10 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(pacienteNome)}</title>
 <style>
-  @page { size: 80mm auto; margin: 0; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-  body { font-family: "Courier New", "Consolas", monospace; font-size: 11pt; line-height: 1.25; }
-  .ticket { width: 76mm; padding: 3mm 2mm 6mm; }
-  .center { text-align: center; }
-  .right  { text-align: right; }
-  .bold   { font-weight: 700; }
-  .sm     { font-size: 9pt; }
-  .lg     { font-size: 13pt; font-weight: 700; }
-  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
-  .row    { display: flex; justify-content: space-between; gap: 6px; }
-  table   { width: 100%; border-collapse: collapse; }
-  td      { padding: 1px 0; vertical-align: top; }
-  .label  { color: #000; }
-  .v      { font-weight: 700; }
-  .cut    { width: 76mm; padding: 4mm 2mm; text-align: center; }
-  .cut-line { border-top: 2px dashed #000; margin: 2mm 0; }
-  .cut-label { font-size: 8pt; letter-spacing: 1px; }
-  ${VIA_CSS}
+  ${GR_CSS}
+  .cut    { width: 76mm; padding: 3mm 2mm; text-align: center; margin: 0 auto; }
+  .cut-line { border-top: 1px dashed #cbd5e1; margin: 2mm 0; }
+  .cut-label { font-size: 6.5pt; letter-spacing: 1.5px; color: #94a3b8; text-transform: uppercase; }
 </style></head>
 <body>
   ${corpoVias}
