@@ -47,6 +47,7 @@ import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAppConsultaRapidaRouteImport } from './routes/_authenticated/app.consulta-rapida'
 import { Route as AuthenticatedAppContratosRouteImport } from './routes/_authenticated/app.contratos'
 import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
+import { Route as AuthenticatedAppDevAgendaTableRouteImport } from './routes/_authenticated/app.dev-agenda-table'
 import { Route as AuthenticatedAppDevCaixaShellRouteImport } from './routes/_authenticated/app.dev-caixa-shell'
 import { Route as AuthenticatedAppDevClientesShellRouteImport } from './routes/_authenticated/app.dev-clientes-shell'
 import { Route as AuthenticatedAppDevHhpRouteImport } from './routes/_authenticated/app.dev-hhp'
@@ -334,6 +335,12 @@ const AuthenticatedAppCrmRoute = AuthenticatedAppCrmRouteImport.update({
   path: '/crm',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppDevAgendaTableRoute =
+  AuthenticatedAppDevAgendaTableRouteImport.update({
+    id: '/dev-agenda-table',
+    path: '/dev-agenda-table',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppDevCaixaShellRoute =
   AuthenticatedAppDevCaixaShellRouteImport.update({
     id: '/dev-caixa-shell',
@@ -875,6 +882,7 @@ export interface FileRoutesByFullPath {
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
+  '/app/dev-agenda-table': typeof AuthenticatedAppDevAgendaTableRoute
   '/app/dev-caixa-shell': typeof AuthenticatedAppDevCaixaShellRoute
   '/app/dev-clientes-shell': typeof AuthenticatedAppDevClientesShellRoute
   '/app/dev-hhp': typeof AuthenticatedAppDevHhpRoute
@@ -998,6 +1006,7 @@ export interface FileRoutesByTo {
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
+  '/app/dev-agenda-table': typeof AuthenticatedAppDevAgendaTableRoute
   '/app/dev-caixa-shell': typeof AuthenticatedAppDevCaixaShellRoute
   '/app/dev-clientes-shell': typeof AuthenticatedAppDevClientesShellRoute
   '/app/dev-hhp': typeof AuthenticatedAppDevHhpRoute
@@ -1123,6 +1132,7 @@ export interface FileRoutesById {
   '/_authenticated/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/_authenticated/app/contratos': typeof AuthenticatedAppContratosRoute
   '/_authenticated/app/crm': typeof AuthenticatedAppCrmRoute
+  '/_authenticated/app/dev-agenda-table': typeof AuthenticatedAppDevAgendaTableRoute
   '/_authenticated/app/dev-caixa-shell': typeof AuthenticatedAppDevCaixaShellRoute
   '/_authenticated/app/dev-clientes-shell': typeof AuthenticatedAppDevClientesShellRoute
   '/_authenticated/app/dev-hhp': typeof AuthenticatedAppDevHhpRoute
@@ -1250,6 +1260,7 @@ export interface FileRouteTypes {
     | '/app/consulta-rapida'
     | '/app/contratos'
     | '/app/crm'
+    | '/app/dev-agenda-table'
     | '/app/dev-caixa-shell'
     | '/app/dev-clientes-shell'
     | '/app/dev-hhp'
@@ -1373,6 +1384,7 @@ export interface FileRouteTypes {
     | '/app/consulta-rapida'
     | '/app/contratos'
     | '/app/crm'
+    | '/app/dev-agenda-table'
     | '/app/dev-caixa-shell'
     | '/app/dev-clientes-shell'
     | '/app/dev-hhp'
@@ -1497,6 +1509,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/consulta-rapida'
     | '/_authenticated/app/contratos'
     | '/_authenticated/app/crm'
+    | '/_authenticated/app/dev-agenda-table'
     | '/_authenticated/app/dev-caixa-shell'
     | '/_authenticated/app/dev-clientes-shell'
     | '/_authenticated/app/dev-hhp'
@@ -1876,6 +1889,13 @@ declare module '@tanstack/react-router' {
       path: '/crm'
       fullPath: '/app/crm'
       preLoaderRoute: typeof AuthenticatedAppCrmRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/dev-agenda-table': {
+      id: '/_authenticated/app/dev-agenda-table'
+      path: '/dev-agenda-table'
+      fullPath: '/app/dev-agenda-table'
+      preLoaderRoute: typeof AuthenticatedAppDevAgendaTableRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/dev-caixa-shell': {
@@ -2638,6 +2658,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppConsultaRapidaRoute: typeof AuthenticatedAppConsultaRapidaRoute
   AuthenticatedAppContratosRoute: typeof AuthenticatedAppContratosRoute
   AuthenticatedAppCrmRoute: typeof AuthenticatedAppCrmRoute
+  AuthenticatedAppDevAgendaTableRoute: typeof AuthenticatedAppDevAgendaTableRoute
   AuthenticatedAppDevCaixaShellRoute: typeof AuthenticatedAppDevCaixaShellRoute
   AuthenticatedAppDevClientesShellRoute: typeof AuthenticatedAppDevClientesShellRoute
   AuthenticatedAppDevHhpRoute: typeof AuthenticatedAppDevHhpRoute
@@ -2720,6 +2741,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppConsultaRapidaRoute: AuthenticatedAppConsultaRapidaRoute,
   AuthenticatedAppContratosRoute: AuthenticatedAppContratosRoute,
   AuthenticatedAppCrmRoute: AuthenticatedAppCrmRoute,
+  AuthenticatedAppDevAgendaTableRoute: AuthenticatedAppDevAgendaTableRoute,
   AuthenticatedAppDevCaixaShellRoute: AuthenticatedAppDevCaixaShellRoute,
   AuthenticatedAppDevClientesShellRoute: AuthenticatedAppDevClientesShellRoute,
   AuthenticatedAppDevHhpRoute: AuthenticatedAppDevHhpRoute,
