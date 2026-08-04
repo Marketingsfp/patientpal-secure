@@ -246,6 +246,7 @@ function ShortcutsHelpDialog({
         items: [
           { keys: ["?"], desc: "Abrir / fechar este painel" },
           { keys: ["/"], desc: "Focar busca rápida (paciente, etc.)" },
+          { keys: ["Ctrl", "K"], desc: "Abrir busca global" },
           { keys: ["Esc"], desc: "Fechar diálogos abertos" },
           { keys: ["Enter"], desc: "Confirmar ação principal do diálogo" },
         ],
@@ -254,7 +255,8 @@ function ShortcutsHelpDialog({
         title: "Menu lateral",
         items: [
           { keys: ["Alt", "1–9"], desc: "Ir para os 9 primeiros itens do menu" },
-          { keys: ["↑", "↓"], desc: "Navegar entre itens (com foco na sidebar)" },
+          { keys: ["Ctrl", "B"], desc: "Recolher / expandir o menu lateral" },
+          { keys: ["Alt", "↑ / ↓"], desc: "Navegar entre os itens do menu lateral" },
         ],
       },
       {
