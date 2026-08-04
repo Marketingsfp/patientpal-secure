@@ -24,6 +24,7 @@ import { Route as CheckinTokenRouteImport } from './routes/checkin.$token'
 import { Route as LpSlugRouteImport } from './routes/lp.$slug'
 import { Route as PTokenRouteImport } from './routes/p.$token'
 import { Route as PacienteIndexRouteImport } from './routes/paciente.index'
+import { Route as PacienteAgendarRouteImport } from './routes/paciente.agendar'
 import { Route as PacienteCartoesRouteImport } from './routes/paciente.cartoes'
 import { Route as PacienteConsultasRouteImport } from './routes/paciente.consultas'
 import { Route as PacienteFinanceiroRouteImport } from './routes/paciente.financeiro'
@@ -210,6 +211,11 @@ const PTokenRoute = PTokenRouteImport.update({
 const PacienteIndexRoute = PacienteIndexRouteImport.update({
   id: '/paciente/',
   path: '/paciente/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PacienteAgendarRoute = PacienteAgendarRouteImport.update({
+  id: '/paciente/agendar',
+  path: '/paciente/agendar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PacienteCartoesRoute = PacienteCartoesRouteImport.update({
@@ -879,6 +885,7 @@ export interface FileRoutesByFullPath {
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
+  '/paciente/agendar': typeof PacienteAgendarRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/paciente/financeiro': typeof PacienteFinanceiroRoute
@@ -1007,6 +1014,7 @@ export interface FileRoutesByTo {
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
+  '/paciente/agendar': typeof PacienteAgendarRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/paciente/financeiro': typeof PacienteFinanceiroRoute
@@ -1135,6 +1143,7 @@ export interface FileRoutesById {
   '/checkin/$token': typeof CheckinTokenRoute
   '/lp/$slug': typeof LpSlugRoute
   '/p/$token': typeof PTokenRoute
+  '/paciente/agendar': typeof PacienteAgendarRoute
   '/paciente/cartoes': typeof PacienteCartoesRoute
   '/paciente/consultas': typeof PacienteConsultasRoute
   '/paciente/financeiro': typeof PacienteFinanceiroRoute
@@ -1266,6 +1275,7 @@ export interface FileRouteTypes {
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
+    | '/paciente/agendar'
     | '/paciente/cartoes'
     | '/paciente/consultas'
     | '/paciente/financeiro'
@@ -1394,6 +1404,7 @@ export interface FileRouteTypes {
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
+    | '/paciente/agendar'
     | '/paciente/cartoes'
     | '/paciente/consultas'
     | '/paciente/financeiro'
@@ -1521,6 +1532,7 @@ export interface FileRouteTypes {
     | '/checkin/$token'
     | '/lp/$slug'
     | '/p/$token'
+    | '/paciente/agendar'
     | '/paciente/cartoes'
     | '/paciente/consultas'
     | '/paciente/financeiro'
@@ -1651,6 +1663,7 @@ export interface RootRouteChildren {
   CheckinTokenRoute: typeof CheckinTokenRoute
   LpSlugRoute: typeof LpSlugRoute
   PTokenRoute: typeof PTokenRoute
+  PacienteAgendarRoute: typeof PacienteAgendarRoute
   PacienteCartoesRoute: typeof PacienteCartoesRoute
   PacienteConsultasRoute: typeof PacienteConsultasRoute
   PacienteFinanceiroRoute: typeof PacienteFinanceiroRoute
@@ -1767,6 +1780,13 @@ declare module '@tanstack/react-router' {
       path: '/paciente'
       fullPath: '/paciente/'
       preLoaderRoute: typeof PacienteIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/paciente/agendar': {
+      id: '/paciente/agendar'
+      path: '/paciente/agendar'
+      fullPath: '/paciente/agendar'
+      preLoaderRoute: typeof PacienteAgendarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/paciente/cartoes': {
@@ -2894,6 +2914,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckinTokenRoute: CheckinTokenRoute,
   LpSlugRoute: LpSlugRoute,
   PTokenRoute: PTokenRoute,
+  PacienteAgendarRoute: PacienteAgendarRoute,
   PacienteCartoesRoute: PacienteCartoesRoute,
   PacienteConsultasRoute: PacienteConsultasRoute,
   PacienteFinanceiroRoute: PacienteFinanceiroRoute,
@@ -2907,13 +2928,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

@@ -55,7 +55,7 @@ function AgendarOnlinePage() {
         navigate({ to: "/login", search: { redirect: "/paciente/agendar" } as any });
         return;
       }
-      const { data: cl, error } = await supabase.rpc("minhas_clinicas_paciente");
+      const { data: cl, error } = await (supabase as any).rpc("minhas_clinicas_paciente");
       if (error) mostrarErro(error);
       const lista = (cl ?? []) as ClinicaPac[];
       setClinicas(lista);
@@ -67,7 +67,7 @@ function AgendarOnlinePage() {
   useEffect(() => {
     if (!clinicaId) return;
     (async () => {
-      const { data: esp } = await supabase.rpc("especialidades_paciente", { _clinica_id: clinicaId });
+      const { data: esp } = await (supabase as any).rpc("especialidades_paciente", { _clinica_id: clinicaId });
       setEspecialidades((esp ?? []) as { id: string; nome: string }[]);
       setEspecialidadeId("todas");
     })();
@@ -79,7 +79,7 @@ function AgendarOnlinePage() {
     (async () => {
       setCarregandoSlots(true);
       setSelecionado(null);
-      const { data: hs, error } = await supabase.rpc("horarios_disponiveis_paciente", {
+      const { data: hs, error } = await (supabase as any).rpc("horarios_disponiveis_paciente", {
         _clinica_id: clinicaId,
         _especialidade_id: especialidadeId === "todas" ? null : especialidadeId,
         _medico_id: null,
@@ -101,7 +101,7 @@ function AgendarOnlinePage() {
   async function confirmar() {
     if (!selecionado || !clinicaId) return;
     setSalvando(true);
-    const { error } = await supabase.rpc("agendar_online", {
+    const { error } = await (supabase as any).rpc("agendar_online", {
       _clinica_id: clinicaId,
       _medico_id: selecionado.medico_id,
       _inicio: selecionado.inicio,
