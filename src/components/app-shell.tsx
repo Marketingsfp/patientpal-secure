@@ -23,6 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const VoiceInput = lazy(() => import("@/components/voice-input").then((m) => ({ default: m.VoiceInput })));
 const ChangePasswordDialog = lazy(() =>
@@ -191,6 +192,18 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
     ],
   },
 ];
+
+function NavTip({ show, label, children }: { show: boolean; label: string; children: React.ReactNode }) {
+  if (!show) return <>{children}</>;
+  return (
+    <Tooltip delayDuration={120}>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side="right" sideOffset={10} className="font-medium">
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 export function AppShell() {
   const { user, signOut, loading } = useAuth();
@@ -558,6 +571,7 @@ export function AppShell() {
         )}
 
         {/* 🔥 NAVEGAÇÃO COM DIVISORES SUTIS E ITENS MAIS ESPAÇOSOS */}
+        <TooltipProvider delayDuration={120}>
         <nav ref={navScrollRef} className="flex-1 px-2 py-3 overflow-y-auto [&::-webkit-scrollbar]:hidden">
           {filteredNavRows.map((row) => {
             const leafIsActive = (to: string, hash?: string) => {
@@ -594,13 +608,14 @@ export function AppShell() {
                     return (
                       <div key={subKey} className="space-y-1">
                         {collapsedUi ? (
+                          <NavTip show label={item.label}>
                           <div
                             className={`relative flex justify-center rounded-full py-2.5 transition-all ${subActive ? "bg-white/20 ring-1 ring-inset ring-white/25" : ""}`}
-                            title={item.label}
                           >
                             {subActive && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-white" aria-hidden />}
                             <item.icon className={`h-4 w-4 shrink-0 ${subActive ? "opacity-100" : "opacity-80"}`} />
                           </div>
+                          </NavTip>
                         ) : (
                           <button
                             type="button"
@@ -621,25 +636,24 @@ export function AppShell() {
                           const href = `${child.to}${child.hash ? `#${child.hash}` : ""}`;
                           if (openInNewTab) {
                             return (
+                              <NavTip key={linkKey} show={collapsedUi} label={child.label}>
                               <a
-                                key={linkKey}
                                 href={href}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                title={collapsedUi ? child.label : undefined}
                                 data-nav-to={child.to}
                                 className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all text-white/85 hover:bg-white/10 hover:text-white`}
                               >
                                 <child.icon className="h-4 w-4 shrink-0" />
                                 {!collapsedUi && <span className="truncate">{child.label}</span>}
                               </a>
+                              </NavTip>
                             );
                           }
                           return (
+                            <NavTip key={linkKey} show={collapsedUi} label={child.label}>
                             <a
-                              key={linkKey}
                               href={href}
-                              title={collapsedUi ? child.label : undefined}
                               data-nav-to={child.to}
                               data-nav-active={active ? "true" : undefined}
                               aria-current={active ? "page" : undefined}
@@ -658,6 +672,7 @@ export function AppShell() {
                               <child.icon className="h-4 w-4 shrink-0" />
                               {!collapsedUi && <span className={`truncate ${active ? "font-semibold" : ""}`}>{child.label}</span>}
                             </a>
+                            </NavTip>
                           );
                         })}
                       </div>
@@ -669,10 +684,9 @@ export function AppShell() {
                     aliases.some((a) => location.pathname === a || location.pathname.startsWith(`${a}/`));
                   const href = item.to;
                   return (
+                    <NavTip key={item.to} show={collapsedUi} label={item.label}>
                     <a
-                      key={item.to}
                       href={href}
-                      title={collapsedUi ? item.label : undefined}
                       data-nav-to={item.to}
                       data-nav-active={active ? "true" : undefined}
                       aria-current={active ? "page" : undefined}
@@ -691,12 +705,14 @@ export function AppShell() {
                       <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsedUi && <span className={`truncate ${active ? "font-semibold" : ""}`}>{item.label}</span>}
                     </a>
+                    </NavTip>
                   );
                 })}
               </div>
             );
           })}
         </nav>
+        </TooltipProvider>
 
                 {/* 🔥 BOTÃO DE PESQUISAR COM GRADIENTE (SEM CAIXA ALTA) */}
                   <div className="px-3 py-2 border-t border-white/10 mt-auto shrink-0">
