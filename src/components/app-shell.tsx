@@ -235,10 +235,7 @@ function buildBreadcrumbs(pathname: string, hash: string): Crumb[] {
   const cleanHash = (hash ?? "").replace(/^#/, "");
   const matchLeaf = (leaf: NavLeaf) => {
     const aliases = leaf.aliases ?? [];
-    const pathOk =
-      pathname === leaf.to ||
-      (leaf.to !== "/app" && pathname.startsWith(`${leaf.to}/`)) ||
-      aliases.some((a) => pathname === a || pathname.startsWith(`${a}/`));
+    const pathOk = isNavActive(pathname, leaf.to, aliases);
     if (!pathOk) return false;
     return leaf.hash ? cleanHash === leaf.hash : true;
   };
@@ -738,7 +735,7 @@ export function AppShell() {
         >
           {filteredNavRows.map((row) => {
             const leafIsActive = (to: string, hash?: string) => {
-              const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
+              const pathOk = isNavActive(location.pathname, to);
               if (!pathOk) return false;
               if (!hash) return true;
               return (location.hash ?? "").replace(/^#/, "") === hash;
@@ -848,9 +845,7 @@ export function AppShell() {
                     );
                   }
                   const aliases: string[] = (item as { aliases?: string[] }).aliases ?? [];
-                  const active = location.pathname === item.to ||
-                    (item.to !== "/app" && location.pathname.startsWith(item.to)) ||
-                    aliases.some((a) => location.pathname === a || location.pathname.startsWith(`${a}/`));
+                  const active = isNavActive(location.pathname, item.to, aliases);
                   const href = item.to;
                   return (
                     <NavTip key={item.to} show={collapsedUi} label={item.label}>
