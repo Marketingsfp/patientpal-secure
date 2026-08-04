@@ -319,8 +319,8 @@ São João de Meriti, {{DATA_HOJE}}.
     /^data:image\/(png|jpe?g);base64,[A-Za-z0-9+/=]+$/.test(rawSig) &&
     rawSig.length < 2_000_000;
   const assinatura = sigOk
-    ? `<img src="${esc(rawSig!)}" style="height:80px;max-width:300px" alt="assinatura"/>`
-    : `<div style="height:80px;border-bottom:1px solid #000;width:300px"></div>`;
+    ? `<img src="${esc(rawSig!)}" style="height:64px;max-width:100%;object-fit:contain" alt="assinatura"/>`
+    : "";
 
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/>
 <title>Contrato #${c.numero} - ${esc(c.paciente_nome)}</title>
@@ -338,8 +338,10 @@ pre.body {
   break-inside: auto; 
   word-wrap: break-word; 
 }
-.sig { margin-top: 14mm; display:flex; justify-content: space-around; gap:10mm; text-align:center; font-size: 10pt; }
-.sig div { width:45%; }
+.sig { margin-top: 12mm; display:flex; align-items:flex-end; justify-content:space-between; gap:12mm; font-size: 10pt; page-break-inside: avoid; }
+.sig .col { width:48%; text-align:center; }
+.sig .ink { height:64px; display:flex; align-items:flex-end; justify-content:center; }
+.sig .line { border-top:1px solid #000; margin-top:2px; padding-top:2px; }
 .meta { margin-top: 6mm; font-size:9pt; color:#444; text-align:center; }
 .numero { float:right; font-size:10pt; }
 </style></head><body>
@@ -351,8 +353,14 @@ pre.body {
 </div>
 <pre class="body">${esc(corpo)}</pre>
 <div class="sig">
-  <div>____________________________<br/>${esc(_cl.nome)}</div>
-  <div>${assinatura}<br/>${esc(c.paciente_nome)}</div>
+  <div class="col">
+    <div class="ink"></div>
+    <div class="line">${esc(_cl.nome)}</div>
+  </div>
+  <div class="col">
+    <div class="ink">${assinatura}</div>
+    <div class="line">Assinatura do ASSOCIADO TITULAR: ${esc(c.paciente_nome)}</div>
+  </div>
 </div>
 ${(c as any).assinado_em ? `<div class="meta">Assinado digitalmente em ${fmtData((c as any).assinado_em)} — IP: ${esc((c as any).assinatura_ip ?? "—")}</div>` : ""}
 <script>window.onload=()=>{setTimeout(()=>{window.print();},300);};</script>
