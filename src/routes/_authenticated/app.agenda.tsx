@@ -3303,7 +3303,7 @@ function AgendaPage() {
               <Plus className="h-4 w-4 mr-1.5" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
+          <DialogContent className="max-w-xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-xl border-slate-200 shadow-2xl">
             <DialogHeader className="space-y-1 px-6 pt-5 pb-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
               <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900">
                 {editing
@@ -3316,7 +3316,7 @@ function AgendaPage() {
                   : "Preencha os dados abaixo. Campos com * são obrigatórios."}
               </p>
             </DialogHeader>
-            <form onSubmit={submit} className="space-y-4 px-6 py-5">
+            <form onSubmit={submit} className="space-y-5 pl-6 pr-6 sm:pr-7 py-5">
               {editing && pagosSet.has(editing.id) && (
                 <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 px-3 py-2 text-xs">
                   <span className="mt-0.5">⚠️</span>
@@ -3327,33 +3327,35 @@ function AgendaPage() {
                 disabled={editing ? pagosSet.has(editing.id) : false}
                 className="space-y-4 contents disabled:opacity-90"
               >
-              <div className="space-y-1.5 rounded-xl border border-primary/25 bg-primary/[0.04] p-3 text-xs">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Label className="text-[10px] font-semibold uppercase tracking-widest text-primary whitespace-nowrap">Nº do orçamento</Label>
+              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+                <Label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-slate-400" /> Nº do orçamento
+                </Label>
+                <div className="flex items-center gap-2">
                   <Input
                     inputMode="numeric"
                     placeholder="Ex.: 123"
                     value={form.orcamento_numero}
                     onChange={(e) => setForm(f => ({ ...f, orcamento_numero: e.target.value.replace(/\D/g, "") }))}
                     disabled={!!form.orcamento_id || (editing ? pagosSet.has(editing.id) : false)}
-                    className="max-w-[110px] h-8 bg-white"
+                    className="h-10 rounded-lg bg-white max-w-[160px]"
                   />
                   {form.orcamento_id ? (
-                    <Button type="button" variant="outline" size="sm" onClick={limparOrcamento}
+                    <Button type="button" variant="outline" className="h-10 rounded-lg bg-white" onClick={limparOrcamento}
                       disabled={editing ? pagosSet.has(editing.id) : false}>
                       Limpar
                     </Button>
                   ) : (
-                    <Button type="button" variant="outline" size="sm" onClick={() => void buscarOrcamento()} disabled={buscandoOrc}>
-                      {buscandoOrc ? "Buscando…" : "Buscar"}
+                    <Button type="button" variant="outline" className="h-10 rounded-lg bg-white" onClick={() => void buscarOrcamento()} disabled={buscandoOrc}>
+                      <Search className="h-4 w-4 mr-1.5" />{buscandoOrc ? "Buscando…" : "Buscar"}
                     </Button>
                   )}
-                  {!form.orcamento_id && (
-                    <span className="text-[11px] text-slate-500 leading-snug flex-1 min-w-[140px]">
-                      Opcional — vincula qualquer orçamento (exames, consultas, procedimentos) em uma única ficha.
-                    </span>
-                  )}
                 </div>
+                {!form.orcamento_id && (
+                  <p className="text-[11px] text-slate-500 leading-snug">
+                    Opcional — vincula qualquer orçamento (exames, consultas, procedimentos) em uma única ficha.
+                  </p>
+                )}
                 {form.orcamento_id && (
                   <div className="text-xs text-slate-600 space-y-1 pt-1 border-t border-primary/15">
                     <p className="font-medium text-slate-900">
