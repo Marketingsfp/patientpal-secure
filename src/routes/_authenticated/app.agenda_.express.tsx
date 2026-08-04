@@ -282,7 +282,7 @@ function AgendaExpressPage() {
                   {slotsDoDia.map((s) => {
                     const chave = slotKey(s);
                     const ativo = slot ? slotKey(slot) === chave : false;
-                    const legenda = s.agenda_nome ?? s.especialidade_nome ?? s.medico_nome;
+                    const legenda = s.especialidade_nome ?? s.medico_nome ?? s.agenda_nome ?? "";
                     return (
                       <button
                         key={chave}
@@ -299,7 +299,7 @@ function AgendaExpressPage() {
                         <span className={cn("text-base font-bold tabular-nums leading-none", ativo ? "text-white" : "text-slate-900")}>
                           {hhmm(s.inicio)}
                         </span>
-                        <span className={cn("w-full truncate text-[11px] leading-tight", ativo ? "text-white/75" : "text-slate-500")}>
+                        <span className={cn("w-full truncate text-[10px] font-medium leading-tight", ativo ? "text-white/75" : "text-slate-500")}>
                           {legenda}
                         </span>
                       </button>
