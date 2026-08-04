@@ -47,6 +47,7 @@ import { Route as AuthenticatedAppClinicasRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAppConsultaRapidaRouteImport } from './routes/_authenticated/app.consulta-rapida'
 import { Route as AuthenticatedAppContratosRouteImport } from './routes/_authenticated/app.contratos'
 import { Route as AuthenticatedAppCrmRouteImport } from './routes/_authenticated/app.crm'
+import { Route as AuthenticatedAppDevAgendaHeaderRouteImport } from './routes/_authenticated/app.dev-agenda-header'
 import { Route as AuthenticatedAppDevAgendaTableRouteImport } from './routes/_authenticated/app.dev-agenda-table'
 import { Route as AuthenticatedAppDevAppointmentFormRouteImport } from './routes/_authenticated/app.dev-appointment-form'
 import { Route as AuthenticatedAppDevCaixaShellRouteImport } from './routes/_authenticated/app.dev-caixa-shell'
@@ -336,6 +337,12 @@ const AuthenticatedAppCrmRoute = AuthenticatedAppCrmRouteImport.update({
   path: '/crm',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppDevAgendaHeaderRoute =
+  AuthenticatedAppDevAgendaHeaderRouteImport.update({
+    id: '/dev-agenda-header',
+    path: '/dev-agenda-header',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppDevAgendaTableRoute =
   AuthenticatedAppDevAgendaTableRouteImport.update({
     id: '/dev-agenda-table',
@@ -889,6 +896,7 @@ export interface FileRoutesByFullPath {
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
+  '/app/dev-agenda-header': typeof AuthenticatedAppDevAgendaHeaderRoute
   '/app/dev-agenda-table': typeof AuthenticatedAppDevAgendaTableRoute
   '/app/dev-appointment-form': typeof AuthenticatedAppDevAppointmentFormRoute
   '/app/dev-caixa-shell': typeof AuthenticatedAppDevCaixaShellRoute
@@ -1014,6 +1022,7 @@ export interface FileRoutesByTo {
   '/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/app/contratos': typeof AuthenticatedAppContratosRoute
   '/app/crm': typeof AuthenticatedAppCrmRoute
+  '/app/dev-agenda-header': typeof AuthenticatedAppDevAgendaHeaderRoute
   '/app/dev-agenda-table': typeof AuthenticatedAppDevAgendaTableRoute
   '/app/dev-appointment-form': typeof AuthenticatedAppDevAppointmentFormRoute
   '/app/dev-caixa-shell': typeof AuthenticatedAppDevCaixaShellRoute
@@ -1141,6 +1150,7 @@ export interface FileRoutesById {
   '/_authenticated/app/consulta-rapida': typeof AuthenticatedAppConsultaRapidaRoute
   '/_authenticated/app/contratos': typeof AuthenticatedAppContratosRoute
   '/_authenticated/app/crm': typeof AuthenticatedAppCrmRoute
+  '/_authenticated/app/dev-agenda-header': typeof AuthenticatedAppDevAgendaHeaderRoute
   '/_authenticated/app/dev-agenda-table': typeof AuthenticatedAppDevAgendaTableRoute
   '/_authenticated/app/dev-appointment-form': typeof AuthenticatedAppDevAppointmentFormRoute
   '/_authenticated/app/dev-caixa-shell': typeof AuthenticatedAppDevCaixaShellRoute
@@ -1270,6 +1280,7 @@ export interface FileRouteTypes {
     | '/app/consulta-rapida'
     | '/app/contratos'
     | '/app/crm'
+    | '/app/dev-agenda-header'
     | '/app/dev-agenda-table'
     | '/app/dev-appointment-form'
     | '/app/dev-caixa-shell'
@@ -1395,6 +1406,7 @@ export interface FileRouteTypes {
     | '/app/consulta-rapida'
     | '/app/contratos'
     | '/app/crm'
+    | '/app/dev-agenda-header'
     | '/app/dev-agenda-table'
     | '/app/dev-appointment-form'
     | '/app/dev-caixa-shell'
@@ -1521,6 +1533,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app/consulta-rapida'
     | '/_authenticated/app/contratos'
     | '/_authenticated/app/crm'
+    | '/_authenticated/app/dev-agenda-header'
     | '/_authenticated/app/dev-agenda-table'
     | '/_authenticated/app/dev-appointment-form'
     | '/_authenticated/app/dev-caixa-shell'
@@ -1902,6 +1915,13 @@ declare module '@tanstack/react-router' {
       path: '/crm'
       fullPath: '/app/crm'
       preLoaderRoute: typeof AuthenticatedAppCrmRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/app/dev-agenda-header': {
+      id: '/_authenticated/app/dev-agenda-header'
+      path: '/dev-agenda-header'
+      fullPath: '/app/dev-agenda-header'
+      preLoaderRoute: typeof AuthenticatedAppDevAgendaHeaderRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/app/dev-agenda-table': {
@@ -2678,6 +2698,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppConsultaRapidaRoute: typeof AuthenticatedAppConsultaRapidaRoute
   AuthenticatedAppContratosRoute: typeof AuthenticatedAppContratosRoute
   AuthenticatedAppCrmRoute: typeof AuthenticatedAppCrmRoute
+  AuthenticatedAppDevAgendaHeaderRoute: typeof AuthenticatedAppDevAgendaHeaderRoute
   AuthenticatedAppDevAgendaTableRoute: typeof AuthenticatedAppDevAgendaTableRoute
   AuthenticatedAppDevAppointmentFormRoute: typeof AuthenticatedAppDevAppointmentFormRoute
   AuthenticatedAppDevCaixaShellRoute: typeof AuthenticatedAppDevCaixaShellRoute
@@ -2762,6 +2783,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppConsultaRapidaRoute: AuthenticatedAppConsultaRapidaRoute,
   AuthenticatedAppContratosRoute: AuthenticatedAppContratosRoute,
   AuthenticatedAppCrmRoute: AuthenticatedAppCrmRoute,
+  AuthenticatedAppDevAgendaHeaderRoute: AuthenticatedAppDevAgendaHeaderRoute,
   AuthenticatedAppDevAgendaTableRoute: AuthenticatedAppDevAgendaTableRoute,
   AuthenticatedAppDevAppointmentFormRoute:
     AuthenticatedAppDevAppointmentFormRoute,
@@ -2876,13 +2898,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
