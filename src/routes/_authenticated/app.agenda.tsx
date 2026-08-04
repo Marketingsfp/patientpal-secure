@@ -3272,115 +3272,12 @@ function AgendaPage() {
           </div>
         </div>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 items-start">
+      <div className="flex justify-between items-start gap-4 mb-4">
         <div className="md:col-start-1 md:row-start-1 min-w-0">
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 truncate">Agendas</h1>
           <p className="text-xs sm:text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
         </div>
-        <div className="md:col-start-1 md:row-start-2 min-w-0 flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50/60 px-2 py-1.5 [&>*]:shrink-0">
-          <TurboModeToggle />
-          <div className="inline-flex rounded-full border bg-card p-0.5">
-            <button
-              type="button"
-              onClick={() => setViewMode("dia")}
-              className={`px-2 py-1 text-[11px] font-medium rounded-full transition-colors ${viewMode === "dia" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Lista
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("medico")}
-              className={`px-2 py-1 text-[11px] font-medium rounded-full transition-colors ${viewMode === "medico" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Por médico
-            </button>
-          </div>
-          <EncerrarExpedienteButton />
-          <Button asChild variant="outline" size="sm" className="h-7 text-[11px] px-2" title="Agendamento rápido em 4 passos">
-            <Link to="/app/agenda/express">
-              <Clock className="h-3 w-3 mr-1.5" /> Agenda Express
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm" className="h-7 text-[11px] px-2" title="Cadastrar horários semanais e gerar slots da agenda">
-            <Link to="/app/disponibilidades">
-              <Clock className="h-3 w-3 mr-1.5" /> Criar/gerar horários
-            </Link>
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" disabled={selecionados.size === 0}>
-                Opções ({selecionados.size})
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={cobrarSelecionados}>
-                💳 Cobrar selecionados (1 pagamento)
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={baixarLoteRealizado}>
-                ✅ Baixar selecionados como Realizado
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={copiarPacienteSelecionado}
-                disabled={selecionados.size !== 1}
-              >
-                📋 Copiar dados do paciente
-              </DropdownMenuItem>
-              {isManager && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={abrirReagLote}>
-                    🔁 Reagendar selecionados
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={excluirSelecionados}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    🗑️ Excluir horários selecionados
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-[11px] px-2"
-            onClick={() => {
-              if (!filtrados.length) { toast.info("Sem dados para exportar."); return; }
-              exportToExcel(
-                filtrados.map((a) => ({
-                  data: new Date(a.inicio).toLocaleDateString("pt-BR"),
-                  dia: fmtDiaSemana(a.inicio),
-                  inicio: fmtHora(a.inicio),
-                  fim: fmtHora(a.fim),
-                  profissional: medicoNomeAgendamento(a),
-                  paciente: a.paciente_nome,
-                  procedimento: a.procedimento ?? "CONSULTA",
-                  status: a.status,
-                  observacoes: a.observacoes ?? "",
-                })),
-                `agenda-${dataRef}`,
-                [
-                  { key: "data", label: "Data" },
-                  { key: "dia", label: "Dia" },
-                  { key: "inicio", label: "Início" },
-                  { key: "fim", label: "Fim" },
-                  { key: "profissional", label: "Profissional" },
-                  { key: "paciente", label: "Cliente" },
-                  { key: "procedimento", label: "Serviço" },
-                  { key: "status", label: "Status" },
-                  { key: "observacoes", label: "Observações" },
-                ],
-              );
-            }}
-          >
-            <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
-          </Button>
-          </div>
-          <div className="md:col-start-2 md:row-start-1 md:justify-self-end">
+        <div className="shrink-0">
           <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-9 rounded-lg px-4 text-xs font-semibold shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground">
@@ -3749,6 +3646,110 @@ function AgendaPage() {
           </Dialog>
         </div>
       </div>
+
+        <div className="flex flex-wrap items-center gap-2 mb-6 [&>*]:shrink-0">
+          <TurboModeToggle />
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode("dia")}
+              className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${viewMode === "dia" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Lista
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("medico")}
+              className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${viewMode === "medico" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Por médico
+            </button>
+          </div>
+          <EncerrarExpedienteButton />
+          <Button asChild variant="outline" size="sm" className="h-8 text-xs px-3 rounded-lg" title="Agendamento rápido em 4 passos">
+            <Link to="/app/agenda/express">
+              <Clock className="h-3 w-3 mr-1.5" /> Agenda Express
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="h-8 text-xs px-3 rounded-lg" title="Cadastrar horários semanais e gerar slots da agenda">
+            <Link to="/app/disponibilidades">
+              <Clock className="h-3 w-3 mr-1.5" /> Criar/gerar horários
+            </Link>
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs px-3 rounded-lg" disabled={selecionados.size === 0}>
+                Opções ({selecionados.size})
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={cobrarSelecionados}>
+                💳 Cobrar selecionados (1 pagamento)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={baixarLoteRealizado}>
+                ✅ Baixar selecionados como Realizado
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={copiarPacienteSelecionado}
+                disabled={selecionados.size !== 1}
+              >
+                📋 Copiar dados do paciente
+              </DropdownMenuItem>
+              {isManager && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={abrirReagLote}>
+                    🔁 Reagendar selecionados
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={excluirSelecionados}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    🗑️ Excluir horários selecionados
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs px-3 rounded-lg"
+            onClick={() => {
+              if (!filtrados.length) { toast.info("Sem dados para exportar."); return; }
+              exportToExcel(
+                filtrados.map((a) => ({
+                  data: new Date(a.inicio).toLocaleDateString("pt-BR"),
+                  dia: fmtDiaSemana(a.inicio),
+                  inicio: fmtHora(a.inicio),
+                  fim: fmtHora(a.fim),
+                  profissional: medicoNomeAgendamento(a),
+                  paciente: a.paciente_nome,
+                  procedimento: a.procedimento ?? "CONSULTA",
+                  status: a.status,
+                  observacoes: a.observacoes ?? "",
+                })),
+                `agenda-${dataRef}`,
+                [
+                  { key: "data", label: "Data" },
+                  { key: "dia", label: "Dia" },
+                  { key: "inicio", label: "Início" },
+                  { key: "fim", label: "Fim" },
+                  { key: "profissional", label: "Profissional" },
+                  { key: "paciente", label: "Cliente" },
+                  { key: "procedimento", label: "Serviço" },
+                  { key: "status", label: "Status" },
+                  { key: "observacoes", label: "Observações" },
+                ],
+              );
+            }}
+          >
+            <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
+          </Button>
+          </div>
 
       <PatientQuickCompleteSheet
         pacienteId={form.paciente_id || null}
@@ -4247,12 +4248,12 @@ function AgendaPage() {
 
       {/* Filtros */}
       <div
-        className="rounded-xl border border-slate-200/80 bg-slate-50/50 shadow-sm p-3 sm:p-5 space-y-4 text-xs [&_input]:h-9 [&_input]:rounded-lg [&_input]:bg-background [&_input]:text-xs [&_button[role=combobox]]:h-9 [&_button[role=combobox]]:rounded-lg [&_button[role=combobox]]:bg-background [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
+        className="rounded-xl border border-slate-200 bg-white shadow-sm text-xs [&_input]:h-10 [&_input]:rounded-lg [&_input]:bg-background [&_input]:text-xs [&_button[role=combobox]]:h-10 [&_button[role=combobox]]:rounded-lg [&_button[role=combobox]]:bg-background [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
         style={{ ["--clinic" as never]: corClinica }}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 p-5">
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Profissional</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
               value={filtroMedico}
@@ -4279,7 +4280,7 @@ function AgendaPage() {
             const semProfissional = filtroMedico === "todos";
             return (
               <div className="space-y-1.5">
-                <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Agenda</Label>
+                <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Agenda</Label>
                 <Select
                   value={filtroAgenda}
                   onValueChange={setFiltroAgenda}
@@ -4299,7 +4300,7 @@ function AgendaPage() {
             );
           })()}
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Data Ref.</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Data Ref.</Label>
             <DataRefField
               dataRef={dataRef}
               dataFim={dataFim}
@@ -4309,7 +4310,7 @@ function AgendaPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Dia Semana</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Dia Semana</Label>
             <Select value={filtroDiaSemana} onValueChange={setFiltroDiaSemana}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -4319,7 +4320,7 @@ function AgendaPage() {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Cliente</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Cliente</Label>
             <div className="flex gap-1">
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" aria-hidden />
@@ -4334,18 +4335,18 @@ function AgendaPage() {
                   setNovoPac({ nome: filtroCliente.trim(), cpf: "", telefone: "", data_nascimento: "", email: "" });
                   setNovoPacOpen(true);
                 }}
-                className="h-9 w-9 rounded-lg shrink-0"
+                className="h-10 w-10 rounded-lg shrink-0"
               >
                 <UserPlus className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Nº Ficha</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Nº Ficha</Label>
             <Input value={filtroFicha} onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 001" inputMode="numeric" />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Atend. Múltiplo</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Atend. Múltiplo</Label>
             <button
               type="button"
               onClick={() => setFiltroApenasMultiplo((v) => !v)}
@@ -4362,7 +4363,7 @@ function AgendaPage() {
             </button>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Especialidade</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -4372,7 +4373,7 @@ function AgendaPage() {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Situação</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -4386,14 +4387,14 @@ function AgendaPage() {
             </Select>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-200/70">
-          <label className="flex items-center gap-2 text-xs cursor-pointer text-slate-600 pt-3">
+        <div className="flex justify-between items-center gap-3 flex-wrap border-t border-slate-100 p-4 bg-slate-50/50 rounded-b-xl">
+          <label className="flex items-center gap-2 text-xs cursor-pointer text-slate-600">
             <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
             Exibir apenas a data selecionada
           </label>
-          <div className="flex items-center gap-2 ml-auto pt-3">
-            <Button variant="ghost" size="sm" onClick={limparFiltros} className="h-9 rounded-lg px-4 text-xs text-slate-500 hover:text-foreground"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
-            <Button size="sm" onClick={load} className="h-9 rounded-lg px-5 text-xs font-semibold shadow-sm"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button variant="ghost" size="sm" onClick={limparFiltros} className="h-10 rounded-lg px-4 text-xs text-slate-500 hover:text-foreground"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
+            <Button size="sm" onClick={load} className="h-10 rounded-lg px-5 text-xs font-semibold shadow-sm"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
           </div>
         </div>
       </div>
