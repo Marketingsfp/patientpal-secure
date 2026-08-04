@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { cn } from "@/lib/utils";
 import { ptBR } from "date-fns/locale";
-import { Zap, User, Stethoscope, CalendarDays, Clock, UserRound, Loader2 } from "lucide-react";
+import { Zap, User, Stethoscope, CalendarDays, Clock, UserRound, Loader2, CalendarX } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/agenda_/express")({
   component: AgendaExpressPage,
@@ -174,7 +174,7 @@ function AgendaExpressPage() {
               <label className={LABEL}>Paciente</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 z-10 pointer-events-none" />
-                <div className="[&_input]:h-10 [&_input]:rounded-lg [&_input]:pl-9">
+                <div className="[&_input]:h-10 [&_input]:rounded-lg [&_input]:pl-9 [&_input]:outline-none [&_input:focus-visible]:ring-2 [&_input:focus-visible]:ring-primary/20 [&_input:focus-visible]:border-primary [&_input:focus-visible]:ring-offset-0">
                   <PatientSearchInput
                     autoFocus
                     clinicaIdsOverride={clinicaId ? [clinicaId] : undefined}
@@ -229,22 +229,27 @@ function AgendaExpressPage() {
             </div>
 
             {/* Resumo */}
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 space-y-1">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
-                {data.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 mt-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <CalendarDays className="h-5 w-5 text-slate-400 shrink-0" />
+                <span className="text-sm font-medium text-slate-800 capitalize">
+                  {data.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
+                </span>
               </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-3.5 w-3.5 text-slate-400" />
-                {slot ? `${hhmm(slot.inicio)} · ${slot.medico_nome}` : "Selecione um horário"}
+              <div className="flex items-center gap-3">
+                <Clock className="h-5 w-5 text-slate-400 shrink-0" />
+                <span className="text-sm font-medium text-slate-800 truncate">
+                  {slot ? `${hhmm(slot.inicio)} · ${slot.medico_nome}` : "Selecione um horário"}
+                </span>
               </div>
             </div>
           </div>
 
           {/* Coluna direita — data e horários */}
           <div className={cn(CARD, "lg:col-span-7 p-6 space-y-5")}>
-            <div>
+            <div className="border-b border-slate-100 pb-6 mb-6">
               <label className={LABEL}>Data</label>
+              <div className="flex justify-center">
               <Calendar
                 mode="single"
                 locale={ptBR}
@@ -254,6 +259,7 @@ function AgendaExpressPage() {
                 modifiersClassNames={{ comVaga: "font-semibold text-primary" }}
                 className="p-0 pointer-events-auto"
               />
+              </div>
             </div>
 
             <div>
@@ -263,8 +269,9 @@ function AgendaExpressPage() {
                   <Loader2 className="h-4 w-4 animate-spin" /> Buscando horários…
                 </div>
               ) : slotsDoDia.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500">
-                  Nenhum horário livre nesta data.
+                <div className="bg-slate-50 rounded-xl p-8 flex flex-col items-center justify-center text-center gap-2">
+                  <CalendarX className="h-8 w-8 text-slate-300" strokeWidth={1.5} />
+                  <p className="text-sm font-medium text-slate-500">Nenhum horário livre nesta data.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
@@ -291,9 +298,9 @@ function AgendaExpressPage() {
       </div>
 
       {/* Rodapé de ação */}
-      <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-white/85 backdrop-blur px-4 py-3">
+      <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-white/85 backdrop-blur-md shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.05)] px-4 py-3">
         <div className="mx-auto max-w-6xl flex items-center gap-3">
-          <div className="hidden sm:block text-xs text-slate-500 flex-1 truncate">
+          <div className="hidden sm:block text-sm font-medium text-slate-700 flex-1 truncate">
             {paciente ? paciente.nome : "Selecione o paciente"} · {slot ? `${hhmm(slot.inicio)} — ${slot.medico_nome}` : "sem horário"}
           </div>
           <Button
