@@ -254,6 +254,50 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const paginaAtual = Math.min(page, totalPaginas);
   const visiveis = ordenados.slice((paginaAtual - 1) * pageSize, paginaAtual * pageSize);
 
+  // ---- Navegação por teclado nos resultados (roving tabindex) ----
+  const listaRef = useRef<HTMLDivElement>(null);
+  const [focoIdx, setFocoIdx] = useState(0);
+  const [navTeclado, setNavTeclado] = useState(false);
+
+  useEffect(() => { setFocoIdx(0); }, [paginaAtual, pageSize, q, campo, convenio, tab, chips, ordem, dirOrdem]);
+
+  useEffect(() => {
+    if (!navTeclado) return;
+    const alvo = listaRef.current?.querySelector<HTMLElement>(`[data-cliente-idx="${focoIdx}"]`);
+    if (alvo) {
+      alvo.scrollIntoView({ block: "nearest" });
+      alvo.focus({ preventScroll: true });
+    }
+  }, [focoIdx, navTeclado, visiveis.length]);
+
+  const onListaKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const total = visiveis.length;
+    if (total === 0) return;
+    const mover = (next: number) => {
+      e.preventDefault();
+      setNavTeclado(true);
+      setFocoIdx(Math.max(0, Math.min(total - 1, next)));
+    };
+    switch (e.key) {
+      case "ArrowDown": return mover(focoIdx + 1);
+      case "ArrowUp": return mover(focoIdx - 1);
+      case "PageDown": return mover(focoIdx + 10);
+      case "PageUp": return mover(focoIdx - 10);
+      case "Home": return mover(0);
+      case "End": return mover(total - 1);
+      case "Enter": {
+        const p = visiveis[focoIdx];
+        if (!p) return;
+        e.preventDefault();
+        if (e.altKey) window.location.assign(`/app/clientes/${p.id}/editar`);
+        else setDrawer(p);
+        return;
+      }
+      default:
+        return;
+    }
+  };
+
   // Só reseta a página depois que as preferências salvas terminarem de hidratar,
   // senão a página restaurada seria descartada ao carregar os filtros.
   const { user } = useAuth();
@@ -270,6 +314,7 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   }, [q, campo, convenio, tab, chips, pageSize, prefsProntas]);
 
   const kpi: ClientesKpi = useMemo(() => {
+    // (KPIs abaixo)
     let ativos = 0, inativos = 0, incompletos = 0, duplicados = 0;
     let associados = 0, cartao = 0, particular = 0;
     for (const p of filtrados) {
@@ -407,17 +452,40 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
           }
           bodyClassName="bg-background"
         >
-          <VirtualList<PacienteV2>
-            items={visiveis}
-            estimateSize={compactPref ? 52 : 78}
-            overscan={10}
-            getKey={(p) => p.id}
-            renderItem={(p) => (
-              <div className="px-2 py-1">
-                <ClienteCard p={p} compact={compactPref} termo={modoBusca ? q.trim() : ""} onOpen={setDrawer} />
-              </div>
-            )}
-          />
+          <div
+            ref={listaRef}
+            role="listbox"
+            aria-label="Resultados de pacientes"
+            tabIndex={-1}
+            onKeyDown={onListaKeyDown}
+            onFocus={() => setNavTeclado(true)}
+          >
+            <VirtualList<PacienteV2>
+              items={visiveis}
+              estimateSize={compactPref ? 52 : 78}
+              overscan={10}
+              getKey={(p) => p.id}
+              renderItem={(p, i) => (
+                <div className="px-2 py-1" role="option" aria-selected={i === focoIdx}>
+                  <ClienteCard
+                    p={p}
+                    compact={compactPref}
+                    termo={modoBusca ? q.trim() : ""}
+                    index={i}
+                    active={i === focoIdx}
+                    onOpen={setDrawer}
+                  />
+                </div>
+              )}
+            />
+          </div>
+          {!loading && visiveis.length > 0 && (
+            <p className="px-2 pb-2 pt-1 text-[11px] text-muted-foreground">
+              Teclado: <kbd className="rounded border px-1">↑</kbd>/<kbd className="rounded border px-1">↓</kbd> navegar ·{" "}
+              <kbd className="rounded border px-1">Enter</kbd> abrir detalhes ·{" "}
+              <kbd className="rounded border px-1">Alt+Enter</kbd> abrir perfil
+            </p>
+          )}
         </ListShell>
         {!loading && ordenados.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
