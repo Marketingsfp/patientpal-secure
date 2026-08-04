@@ -122,6 +122,7 @@ export function AppointmentFormModal({
         onPointerDownOutside={undefined}
         onInteractOutside={undefined}
         onEscapeKeyDown={undefined}
+        onCloseAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader className="border-b border-slate-100 px-6 py-5 text-left space-y-1">
           <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900">
