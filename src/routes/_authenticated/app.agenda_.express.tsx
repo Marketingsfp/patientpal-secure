@@ -261,10 +261,10 @@ function AgendaExpressPage() {
           </div>
 
           {/* Coluna direita — data e horários */}
-          <div className={cn(CARD, "lg:col-span-7 p-6 space-y-5")}>
-            <div className="border-b border-slate-100 pb-6 mb-6">
+          <div className={cn(CARD, "lg:col-span-7 p-3 sm:p-6 space-y-5")}>
+            <div className="border-b border-slate-100 pb-4 mb-4 sm:pb-6 sm:mb-6">
               <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">Data</span>
-              <div className="rounded-2xl border border-slate-200/60 bg-gradient-to-b from-slate-50/60 to-white p-3 shadow-sm">
+              <div className="rounded-2xl border border-slate-200/60 bg-gradient-to-b from-slate-50/60 to-white p-2 shadow-sm sm:p-4">
                 <Calendar
                   mode="single"
                   fullWidth
