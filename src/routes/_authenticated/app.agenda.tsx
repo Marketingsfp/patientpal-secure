@@ -4248,12 +4248,12 @@ function AgendaPage() {
 
       {/* Filtros */}
       <div
-        className="rounded-xl border border-slate-200/80 bg-slate-50/50 shadow-sm p-3 sm:p-5 space-y-4 text-xs [&_input]:h-9 [&_input]:rounded-lg [&_input]:bg-background [&_input]:text-xs [&_button[role=combobox]]:h-9 [&_button[role=combobox]]:rounded-lg [&_button[role=combobox]]:bg-background [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
+        className="rounded-xl border border-slate-200 bg-white shadow-sm text-xs [&_input]:h-10 [&_input]:rounded-lg [&_input]:bg-background [&_input]:text-xs [&_button[role=combobox]]:h-10 [&_button[role=combobox]]:rounded-lg [&_button[role=combobox]]:bg-background [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
         style={{ ["--clinic" as never]: corClinica }}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 p-5">
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Profissional</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Profissional</Label>
             <MedicoFiltroInput
               medicos={medicos}
               value={filtroMedico}
@@ -4280,7 +4280,7 @@ function AgendaPage() {
             const semProfissional = filtroMedico === "todos";
             return (
               <div className="space-y-1.5">
-                <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Agenda</Label>
+                <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Agenda</Label>
                 <Select
                   value={filtroAgenda}
                   onValueChange={setFiltroAgenda}
@@ -4300,7 +4300,7 @@ function AgendaPage() {
             );
           })()}
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Data Ref.</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Data Ref.</Label>
             <DataRefField
               dataRef={dataRef}
               dataFim={dataFim}
@@ -4310,7 +4310,7 @@ function AgendaPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Dia Semana</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Dia Semana</Label>
             <Select value={filtroDiaSemana} onValueChange={setFiltroDiaSemana}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -4320,7 +4320,7 @@ function AgendaPage() {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Cliente</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Cliente</Label>
             <div className="flex gap-1">
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" aria-hidden />
@@ -4335,18 +4335,18 @@ function AgendaPage() {
                   setNovoPac({ nome: filtroCliente.trim(), cpf: "", telefone: "", data_nascimento: "", email: "" });
                   setNovoPacOpen(true);
                 }}
-                className="h-9 w-9 rounded-lg shrink-0"
+                className="h-10 w-10 rounded-lg shrink-0"
               >
                 <UserPlus className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Nº Ficha</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Nº Ficha</Label>
             <Input value={filtroFicha} onChange={(e) => setFiltroFicha(e.target.value.replace(/\D/g, ""))} placeholder="Ex.: 001" inputMode="numeric" />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Atend. Múltiplo</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Atend. Múltiplo</Label>
             <button
               type="button"
               onClick={() => setFiltroApenasMultiplo((v) => !v)}
@@ -4363,7 +4363,7 @@ function AgendaPage() {
             </button>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Especialidade</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Especialidade</Label>
             <Select value={filtroEspecialidade} onValueChange={setFiltroEspecialidade}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -4373,7 +4373,7 @@ function AgendaPage() {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Situação</Label>
+            <Label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Situação</Label>
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -4387,14 +4387,14 @@ function AgendaPage() {
             </Select>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-200/70">
-          <label className="flex items-center gap-2 text-xs cursor-pointer text-slate-600 pt-3">
+        <div className="flex justify-between items-center gap-3 flex-wrap border-t border-slate-100 p-4 bg-slate-50/50 rounded-b-xl">
+          <label className="flex items-center gap-2 text-xs cursor-pointer text-slate-600">
             <Checkbox checked={apenasData} onCheckedChange={(v) => setApenasData(!!v)} />
             Exibir apenas a data selecionada
           </label>
-          <div className="flex items-center gap-2 ml-auto pt-3">
-            <Button variant="ghost" size="sm" onClick={limparFiltros} className="h-9 rounded-lg px-4 text-xs text-slate-500 hover:text-foreground"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
-            <Button size="sm" onClick={load} className="h-9 rounded-lg px-5 text-xs font-semibold shadow-sm"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button variant="ghost" size="sm" onClick={limparFiltros} className="h-10 rounded-lg px-4 text-xs text-slate-500 hover:text-foreground"><X className="h-3.5 w-3.5 mr-1.5" /> Limpar</Button>
+            <Button size="sm" onClick={load} className="h-10 rounded-lg px-5 text-xs font-semibold shadow-sm"><Search className="h-3.5 w-3.5 mr-1.5" /> Exibir</Button>
           </div>
         </div>
       </div>
