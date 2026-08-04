@@ -879,6 +879,10 @@ type AgendDiaRow = {
 
 function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; ini: string; fim: string }) {
   const [loading, setLoading] = useState(false);
+  const [ordem, setOrdem] = useUserPref<"recentes" | "antigos" | "paciente" | "consulta">(
+    "relatorios.agend-diario.ordem",
+    "recentes"
+  );
   const [rows, setRows] = useState<AgendDiaRow[]>([]);
   const [profMap, setProfMap] = useState<Map<string, string>>(new Map());
   const [setorMap, setSetorMap] = useState<Map<string, string>>(new Map()); // user_id -> setor nome
@@ -955,6 +959,14 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
   }, [clinicaId, ini, fim]);
 
   const agrupado = useMemo(() => {
+    const ordenar = (lista: AgendDiaRow[]) =>
+      [...lista].sort((a, b) => {
+        if (ordem === "antigos") return a.created_at.localeCompare(b.created_at);
+        if (ordem === "paciente")
+          return (a.paciente_nome ?? "").localeCompare(b.paciente_nome ?? "", "pt-BR");
+        if (ordem === "consulta") return a.inicio.localeCompare(b.inicio);
+        return b.created_at.localeCompare(a.created_at);
+      });
     const bySetor = new Map<string, Map<string, AgendDiaRow[]>>();
     for (const r of rows) {
       const uid = r.criado_por ?? "";
@@ -970,11 +982,11 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
         setor,
         total: Array.from(m.values()).reduce((acc, l) => acc + l.length, 0),
         atendentes: Array.from(m.entries())
-          .map(([nome, lista]) => ({ nome, lista }))
+          .map(([nome, lista]) => ({ nome, lista: ordenar(lista) }))
           .sort((a, b) => b.lista.length - a.lista.length),
       }))
       .sort((a, b) => b.total - a.total);
-  }, [rows, profMap, setorMap]);
+  }, [rows, profMap, setorMap, ordem]);
 
   const totalGeral = rows.length;
 
@@ -1014,6 +1026,18 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">Ordenar por</Label>
+            <Select value={ordem} onValueChange={(v) => setOrdem(v as typeof ordem)}>
+              <SelectTrigger className="h-9 w-[190px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recentes">Criação (mais recentes)</SelectItem>
+                <SelectItem value="antigos">Criação (mais antigos)</SelectItem>
+                <SelectItem value="consulta">Data da consulta</SelectItem>
+                <SelectItem value="paciente">Paciente (A–Z)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="text-right">
             <div className="text-xs text-muted-foreground">Total no período</div>
             <div className="text-2xl font-bold">{totalGeral}</div>
