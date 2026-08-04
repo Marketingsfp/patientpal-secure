@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Info, Plus, Rows3, LayoutList, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Info, Plus, Rows3, LayoutList, ChevronLeft, ChevronRight,
+  ArrowDown, ArrowUp, ArrowUpDown,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useUserPref } from "@/hooks/use-user-pref";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -31,6 +35,14 @@ type ChipV =
   | "aniv" | "novos30" | "sem_tel" | "sem_cpf";
 type ResumoMode = "none" | "aniv" | "inativos";
 type CampoBusca = "todos" | "nome" | "id" | "convenio";
+type OrdemBusca = "relevancia" | "nome" | "cadastro";
+type DirOrdem = "asc" | "desc";
+
+const ORDEM_OPTS: ReadonlyArray<{ value: OrdemBusca; label: string; title: string }> = [
+  { value: "relevancia", label: "Relevância", title: "Ordem de relevância da busca" },
+  { value: "nome", label: "Nome", title: "Ordenar por nome" },
+  { value: "cadastro", label: "Cadastro", title: "Ordenar por data de cadastro" },
+];
 
 const CAMPO_OPTS: ReadonlyArray<{ value: CampoBusca; label: string }> = [
   { value: "todos", label: "Todos os campos" },
