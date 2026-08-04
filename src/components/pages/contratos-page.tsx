@@ -96,6 +96,7 @@ type Paciente = {
   telefone: string | null;
   email: string | null;
   face_descriptor?: number[] | null;
+  foto_url?: string | null;
 };
 type Contrato = {
   id: string;
@@ -441,7 +442,7 @@ function NovoContratoForm({
   async function carregarPacienteCompleto(p: PatientOption): Promise<Paciente> {
     const { data } = await supabase
       .from("pacientes")
-      .select("id, nome, cpf, telefone, email, face_descriptor")
+      .select("id, nome, cpf, telefone, email, face_descriptor, foto_url")
       .eq("id", p.id)
       .maybeSingle();
     return (
@@ -452,6 +453,7 @@ function NovoContratoForm({
         telefone: p.telefone,
         email: null,
         face_descriptor: null,
+        foto_url: null,
       }
     );
   }
