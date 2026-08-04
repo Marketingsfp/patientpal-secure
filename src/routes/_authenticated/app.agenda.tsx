@@ -4266,7 +4266,7 @@ function AgendaPage() {
 
       {/* Filtros */}
       <div
-        className="rounded-xl border border-slate-200 bg-white shadow-sm text-xs [&_input]:h-10 [&_input]:rounded-lg [&_input]:bg-background [&_input]:text-xs [&_button[role=combobox]]:h-10 [&_button[role=combobox]]:rounded-lg [&_button[role=combobox]]:bg-background [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
+        className="rounded-xl border border-slate-200/80 bg-white shadow-sm text-xs [&_input]:h-10 [&_input]:rounded-lg [&_input]:bg-background [&_input]:text-xs [&_button[role=combobox]]:h-10 [&_button[role=combobox]]:rounded-lg [&_button[role=combobox]]:bg-background [&_button[role=combobox]]:text-xs [--clinic:theme(colors.border)]"
         style={{ ["--clinic" as never]: corClinica }}
       >
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 p-5">
@@ -4446,11 +4446,11 @@ function AgendaPage() {
       {/* Lista mobile */}
       <div className="md:hidden space-y-2">
         {loading ? (
-          <div className="rounded-xl border border-slate-200/80 bg-card p-6 text-center text-sm text-muted-foreground">Carregando…</div>
+          <div className="rounded-xl border border-slate-200/80 bg-white p-6 text-center shadow-sm text-sm text-muted-foreground">Carregando…</div>
         ) : !clinicaAtual ? (
-          <div className="rounded-xl border border-slate-200/80 bg-card p-6 text-center text-sm text-muted-foreground">Selecione uma clínica.</div>
+          <div className="rounded-xl border border-slate-200/80 bg-white p-6 text-center shadow-sm text-sm text-muted-foreground">Selecione uma clínica.</div>
         ) : paginados.length === 0 ? (
-          <div className="rounded-xl border border-slate-200/80 bg-card p-6 text-center text-sm text-muted-foreground">Nenhum agendamento encontrado.</div>
+          <div className="rounded-xl border border-slate-200/80 bg-white p-6 text-center shadow-sm text-sm text-muted-foreground">Nenhum agendamento encontrado.</div>
         ) : paginados.map((a) => {
           const fichaNum = fichaPorId.get(a.id) ?? "";
           const livre = isSlotLivre(a.paciente_nome);
@@ -4460,7 +4460,7 @@ function AgendaPage() {
           return (
             <div
               key={a.id}
-              className={`rounded-xl border border-slate-200/80 bg-card p-3 shadow-sm ${
+              className={`rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm ${
                 realizado ? "bg-emerald-50/60" : ""
               }`}
             >
@@ -4568,7 +4568,7 @@ function AgendaPage() {
       </div>
 
       {/* Tabela */}
-      <div className="hidden md:block min-w-0 max-w-full rounded-xl border border-slate-200/80 bg-card shadow-sm">
+      <div className="hidden md:block min-w-0 max-w-full rounded-xl border border-slate-200/80 bg-white shadow-sm">
         <Table className="min-w-[720px] xl:min-w-[980px]">
           <TableHeader className="[&_th]:h-10 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500">
             <TableRow className="bg-slate-50/50 hover:bg-slate-50/50 border-slate-200/80">
