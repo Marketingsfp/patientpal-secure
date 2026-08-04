@@ -98,7 +98,7 @@ function multiplicarVias(ticketsHtml: string, nVias: number): string {
 
 // Estilos extras para vias (rótulo e quebra de página).
 const VIA_CSS = `
-  .via-label { text-align: center; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 6px; padding: 2px 6px; margin: 0 2mm 4px; font-size: 8pt; letter-spacing: 1.2px; color: #000; text-transform: uppercase; }
+  .via-label { text-align: center; font-weight: 600; border: 1px solid #000; border-radius: 6px; padding: 2px 6px; margin: 0 2mm 4px; font-size: 8pt; letter-spacing: 1.2px; color: #000; text-transform: uppercase; }
   .via-wrap { width: 100%; }
   @media print { .via-wrap { break-after: page; } .via-wrap:last-child { break-after: auto; } }
 `;
@@ -112,11 +112,11 @@ const GR_CSS = `
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #fff; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif; font-size: 9.5pt; line-height: 1.35; }
-  .ticket { width: 76mm; padding: 4mm 3.5mm 6mm; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; margin: 1mm auto; }
+  .ticket { width: 76mm; padding: 4mm 3.5mm 6mm; background: #fff; border: 1px solid #000; border-radius: 10px; margin: 1mm auto; }
   .center { text-align: center; }
   .right  { text-align: right; }
   .muted  { color: #000; }
-  .divider { border-top: 1px dashed #cbd5e1; margin: 3mm 0; }
+  .divider { border-top: 1px dashed #000; margin: 3mm 0; }
   .clinic-name { text-align: center; font-size: 11.5pt; font-weight: 700; letter-spacing: .2px; color: #000; }
   .clinic-sub { text-align: center; font-size: 7.5pt; color: #000; line-height: 1.3; margin-top: .5mm; }
   .doc-title { text-align: center; font-size: 10pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #000; }
@@ -129,9 +129,9 @@ const GR_CSS = `
   .kv { display: flex; justify-content: space-between; align-items: baseline; gap: 3mm; margin-bottom: 1.2mm; }
   .kv .k { font-size: 7pt; letter-spacing: .8px; text-transform: uppercase; color: #000; white-space: nowrap; }
   .kv .v { font-size: 9pt; font-weight: 600; color: #000; text-align: right; }
-  .badge { display: inline-block; background: #0f172a; color: #fff; border-radius: 5px; padding: 0.6mm 2mm; font-size: 9.5pt; font-weight: 700; letter-spacing: .5px; }
-  .svc-head { display: flex; font-size: 6.5pt; letter-spacing: 1px; text-transform: uppercase; color: #000; padding-bottom: 1mm; border-bottom: 1px solid #e2e8f0; }
-  .svc-row { display: flex; padding: 1.2mm 0; border-bottom: 1px solid #f1f5f9; }
+  .badge { display: inline-block; background: #000; color: #fff; border-radius: 5px; padding: 0.6mm 2mm; font-size: 9.5pt; font-weight: 700; letter-spacing: .5px; }
+  .svc-head { display: flex; font-size: 6.5pt; letter-spacing: 1px; text-transform: uppercase; color: #000; padding-bottom: 1mm; border-bottom: 1px solid #000; }
+  .svc-row { display: flex; padding: 1.2mm 0; border-bottom: 1px solid #999; }
   .svc-qtd { width: 10mm; flex: none; font-size: 9pt; font-weight: 600; }
   .svc-nome { flex: 1; font-size: 9pt; font-weight: 500; color: #000; word-break: break-word; }
   .total { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 3mm; }
@@ -951,7 +951,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
 <style>
   ${GR_CSS}
   .cut    { width: 76mm; padding: 3mm 2mm; text-align: center; margin: 0 auto; }
-  .cut-line { border-top: 1px dashed #cbd5e1; margin: 2mm 0; }
+  .cut-line { border-top: 1px dashed #000; margin: 2mm 0; }
   .cut-label { font-size: 6.5pt; letter-spacing: 1.5px; color: #000; text-transform: uppercase; }
 </style></head>
 <body>
