@@ -15,9 +15,12 @@ function Calendar({
   buttonVariant = "ghost",
   formatters,
   components,
+  fullWidth = false,
   ...props
 }: React.ComponentProps<typeof DayPicker> & {
   buttonVariant?: React.ComponentProps<typeof Button>["variant"];
+  /** expande a grade para ocupar toda a largura/altura do container */
+  fullWidth?: boolean;
 }) {
   const defaultClassNames = getDefaultClassNames();
 
@@ -26,6 +29,7 @@ function Calendar({
       showOutsideDays={showOutsideDays}
       className={cn(
         "group/calendar bg-[#f8fafc] p-3 [--cell-size:2.5rem] border-2 border-[#1e293b] rounded-none shadow-[4px_4px_0_0_#1e293b]",
+        fullWidth && "w-full h-full p-0 flex flex-col",
         String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
         String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
         className,
@@ -36,9 +40,13 @@ function Calendar({
         ...formatters,
       }}
       classNames={{
-        root: cn("w-fit", defaultClassNames.root),
-        months: cn("relative flex flex-col gap-4 md:flex-row", defaultClassNames.months),
-        month: cn("flex w-full flex-col gap-4", defaultClassNames.month),
+        root: cn(fullWidth ? "w-full h-full flex flex-col" : "w-fit", defaultClassNames.root),
+        months: cn(
+          "relative flex flex-col gap-4 md:flex-row",
+          fullWidth && "flex-1 md:flex-col",
+          defaultClassNames.months,
+        ),
+        month: cn("flex w-full flex-col gap-4", fullWidth && "flex-1", defaultClassNames.month),
         nav: cn(
           "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
           defaultClassNames.nav,
@@ -71,7 +79,7 @@ function Calendar({
             : "[&>svg]:text-muted-foreground flex h-8 items-center gap-1 rounded-md pl-2 pr-1 text-sm [&>svg]:size-3.5",
           defaultClassNames.caption_label,
         ),
-        table: "w-full border-collapse",
+        table: cn("w-full border-collapse", fullWidth && "h-full flex flex-1 flex-col"),
         weekdays: cn("flex border-2 border-[#1e293b] bg-[#1e293b]", defaultClassNames.weekdays),
         weekday: cn(
           "flex-1 select-none rounded-none py-1.5 text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#f8fafc]",
@@ -79,6 +87,7 @@ function Calendar({
         ),
         week: cn(
           "flex w-full border-x-2 border-b-2 border-[#1e293b] even:bg-[#2563eb]/5",
+          fullWidth && "flex-1",
           defaultClassNames.week,
         ),
         week_number_header: cn("w-(--cell-size) select-none", defaultClassNames.week_number_header),
@@ -88,6 +97,7 @@ function Calendar({
         ),
         day: cn(
           "group/day relative aspect-square h-full w-full select-none border-r-2 border-[#1e293b] p-0 text-center last:border-r-0",
+          fullWidth && "aspect-auto flex-1 min-h-[72px]",
           defaultClassNames.day,
         ),
         range_start: cn("bg-[#2563eb]/20", defaultClassNames.range_start),
@@ -107,7 +117,15 @@ function Calendar({
       }}
       components={{
         Root: ({ className, rootRef, ...props }) => {
-          return <div data-slot="calendar" ref={rootRef} className={cn(className)} {...props} />;
+          return (
+            <div
+              data-slot="calendar"
+              data-full-width={fullWidth ? "true" : undefined}
+              ref={rootRef}
+              className={cn(className)}
+              {...props}
+            />
+          );
         },
         Chevron: ({ className, orientation, ...props }) => {
           if (orientation === "left") {
@@ -120,7 +138,7 @@ function Calendar({
 
           return <ChevronDownIcon className={cn("size-4", className)} {...props} />;
         },
-        DayButton: CalendarDayButton,
+        DayButton: (dayProps) => <CalendarDayButton {...dayProps} fullWidth={fullWidth} />,
         WeekNumber: ({ children, ...props }) => {
           return (
             <td {...props}>
@@ -141,8 +159,9 @@ function CalendarDayButton({
   className,
   day,
   modifiers,
+  fullWidth,
   ...props
-}: React.ComponentProps<typeof DayButton>) {
+}: React.ComponentProps<typeof DayButton> & { fullWidth?: boolean }) {
   const defaultClassNames = getDefaultClassNames();
 
   const ref = React.useRef<HTMLButtonElement>(null);
@@ -167,6 +186,7 @@ function CalendarDayButton({
       data-range-middle={modifiers.range_middle}
       className={cn(
         "flex aspect-square h-auto w-full min-w-(--cell-size) flex-col justify-center gap-0.5 rounded-none font-bold tabular-nums leading-none text-[#1e293b] transition-colors duration-150",
+        fullWidth && "aspect-auto h-full min-h-[72px] min-w-0 text-lg",
         "hover:bg-[#2563eb] hover:text-white",
         "data-[selected-single=true]:bg-[#2563eb] data-[selected-single=true]:text-white data-[selected-single=true]:font-extrabold data-[selected-single=true]:hover:bg-[#1d4ed8] data-[selected-single=true]:hover:text-white",
         "data-[range-middle=true]:bg-[#2563eb]/15 data-[range-middle=true]:text-[#1e293b] data-[range-start=true]:bg-[#1d4ed8] data-[range-start=true]:text-white data-[range-end=true]:bg-[#1d4ed8] data-[range-end=true]:text-white",
