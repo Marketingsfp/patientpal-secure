@@ -44,13 +44,11 @@ function Calendar({
           defaultClassNames.nav,
         ),
         button_previous: cn(
-          buttonVariants({ variant: buttonVariant }),
-          "h-(--cell-size) w-(--cell-size) select-none p-0 aria-disabled:opacity-50",
+          "inline-flex h-8 w-8 select-none items-center justify-center rounded-full p-0 text-slate-600 transition-colors hover:bg-slate-200/60 aria-disabled:opacity-50",
           defaultClassNames.button_previous,
         ),
         button_next: cn(
-          buttonVariants({ variant: buttonVariant }),
-          "h-(--cell-size) w-(--cell-size) select-none p-0 aria-disabled:opacity-50",
+          "inline-flex h-8 w-8 select-none items-center justify-center rounded-full p-0 text-slate-600 transition-colors hover:bg-slate-200/60 aria-disabled:opacity-50",
           defaultClassNames.button_next,
         ),
         month_caption: cn(
@@ -67,7 +65,7 @@ function Calendar({
         ),
         dropdown: cn("bg-popover absolute inset-0 opacity-0", defaultClassNames.dropdown),
         caption_label: cn(
-          "select-none font-medium",
+          "select-none font-semibold capitalize tracking-tight text-slate-900",
           captionLayout === "label"
             ? "text-sm"
             : "[&>svg]:text-muted-foreground flex h-8 items-center gap-1 rounded-md pl-2 pr-1 text-sm [&>svg]:size-3.5",
@@ -76,7 +74,7 @@ function Calendar({
         table: "w-full border-collapse",
         weekdays: cn("flex", defaultClassNames.weekdays),
         weekday: cn(
-          "text-muted-foreground flex-1 select-none rounded-md text-[0.8rem] font-normal",
+          "flex-1 select-none rounded-md pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400",
           defaultClassNames.weekday,
         ),
         week: cn("mt-2 flex w-full", defaultClassNames.week),
@@ -93,7 +91,7 @@ function Calendar({
         range_middle: cn("rounded-none", defaultClassNames.range_middle),
         range_end: cn("bg-accent rounded-r-md", defaultClassNames.range_end),
         today: cn(
-          "bg-accent text-accent-foreground rounded-md data-[selected=true]:rounded-none",
+          "[&_button]:border [&_button]:border-primary/40 [&_button]:font-semibold [&_button]:text-primary [&_button]:rounded-xl data-[selected=true]:[&_button]:border-transparent data-[selected=true]:[&_button]:text-primary-foreground",
           defaultClassNames.today,
         ),
         outside: cn(
