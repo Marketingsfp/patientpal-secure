@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Info, Plus, Rows3, LayoutList, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Info, Plus, Rows3, LayoutList, ChevronLeft, ChevronRight,
+  ArrowDown, ArrowUp, ArrowUpDown,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useUserPref } from "@/hooks/use-user-pref";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -31,6 +35,14 @@ type ChipV =
   | "aniv" | "novos30" | "sem_tel" | "sem_cpf";
 type ResumoMode = "none" | "aniv" | "inativos";
 type CampoBusca = "todos" | "nome" | "id" | "convenio";
+type OrdemBusca = "relevancia" | "nome" | "cadastro";
+type DirOrdem = "asc" | "desc";
+
+const ORDEM_OPTS: ReadonlyArray<{ value: OrdemBusca; label: string; title: string }> = [
+  { value: "relevancia", label: "Relevância", title: "Ordem de relevância da busca" },
+  { value: "nome", label: "Nome", title: "Ordenar por nome" },
+  { value: "cadastro", label: "Cadastro", title: "Ordenar por data de cadastro" },
+];
 
 const CAMPO_OPTS: ReadonlyArray<{ value: CampoBusca; label: string }> = [
   { value: "todos", label: "Todos os campos" },
@@ -81,6 +93,8 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const [page, setPage] = useState(1);
   const [campo, setCampo] = useState<CampoBusca>("todos");
   const [convenio, setConvenio] = useState<string>("todos");
+  const [ordem, setOrdem] = useUserPref<OrdemBusca>("clientes:ordem", "relevancia");
+  const [dirOrdem, setDirOrdem] = useUserPref<DirOrdem>("clientes:ordem-dir", "asc");
   const [totalBase, setTotalBase] = useState<number | null>(null);
   const reqRef = useRef(0);
 
@@ -200,15 +214,44 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     return r;
   }, [rows, tab, chips, q, campo, convenio]);
 
+  // Ordenação dos resultados. "Relevância" preserva a ordem devolvida pela busca.
+  const ordenados = useMemo(() => {
+    const posicao = new Map(rows.map((p, i) => [p.id, i]));
+    const sinal = dirOrdem === "asc" ? 1 : -1;
+    const arr = [...filtrados];
+    arr.sort((a, b) => {
+      if (ordem === "nome") {
+        return sinal * (a.nome ?? "").localeCompare(b.nome ?? "", "pt-BR", { sensitivity: "base" });
+      }
+      if (ordem === "cadastro") {
+        const ta = a.created_at ? Date.parse(a.created_at) : 0;
+        const tb = b.created_at ? Date.parse(b.created_at) : 0;
+        return sinal * (ta - tb);
+      }
+      return sinal * ((posicao.get(a.id) ?? 0) - (posicao.get(b.id) ?? 0));
+    });
+    return arr;
+  }, [filtrados, rows, ordem, dirOrdem]);
+
+  const aplicarOrdem = (v: OrdemBusca) => {
+    if (v === ordem) {
+      setDirOrdem((d) => (d === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setOrdem(v);
+    // Padrões úteis: nome A→Z, cadastro mais recente primeiro.
+    setDirOrdem(v === "cadastro" ? "desc" : "asc");
+  };
+
   const conveniosDisponiveis = useMemo(() => {
     const set = new Set<string>();
     for (const p of rows) if (p.associado_convenio) set.add(p.associado_convenio);
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [rows]);
 
-  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / pageSize));
+  const totalPaginas = Math.max(1, Math.ceil(ordenados.length / pageSize));
   const paginaAtual = Math.min(page, totalPaginas);
-  const visiveis = filtrados.slice((paginaAtual - 1) * pageSize, paginaAtual * pageSize);
+  const visiveis = ordenados.slice((paginaAtual - 1) * pageSize, paginaAtual * pageSize);
 
   useEffect(() => { setPage(1); }, [q, campo, convenio, tab, chips, pageSize]);
 
@@ -302,6 +345,35 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
                 </SelectContent>
               </Select>
               <QuickFilters options={CHIP_OPTS} value={chips} onChange={setChips} multi ariaLabel="Filtros rápidos" />
+              <div
+                className="inline-flex items-center gap-1 rounded-md border bg-muted/40 p-0.5"
+                role="group"
+                aria-label="Ordenar resultados"
+              >
+                <span className="px-1.5 text-[11px] text-muted-foreground hidden sm:inline">Ordenar</span>
+                {ORDEM_OPTS.map((o) => {
+                  const ativo = ordem === o.value;
+                  const Icon = !ativo ? ArrowUpDown : dirOrdem === "asc" ? ArrowUp : ArrowDown;
+                  return (
+                    <button
+                      key={o.value}
+                      type="button"
+                      title={o.title}
+                      aria-pressed={ativo}
+                      aria-label={`${o.title}${ativo ? (dirOrdem === "asc" ? " (crescente)" : " (decrescente)") : ""}`}
+                      onClick={() => aplicarOrdem(o.value)}
+                      className={`inline-flex items-center gap-1 rounded-[5px] px-2 py-1 text-[11px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        ativo
+                          ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {o.label}
+                      <Icon className={`h-3 w-3 ${ativo ? "opacity-100" : "opacity-50"}`} />
+                    </button>
+                  );
+                })}
+              </div>
               {!modoBusca && (
                 <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <Info className="h-3.5 w-3.5" />
@@ -313,7 +385,7 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
             </div>
           }
           loading={loading}
-          isEmpty={!loading && filtrados.length === 0}
+          isEmpty={!loading && ordenados.length === 0}
           empty={
             modoBusca
               ? <div>Nenhum paciente encontrado para <b>“{q}”</b>.</div>
@@ -333,11 +405,11 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
             )}
           />
         </ListShell>
-        {!loading && filtrados.length > 0 && (
+        {!loading && ordenados.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>
-              {(paginaAtual - 1) * pageSize + 1}–{Math.min(paginaAtual * pageSize, filtrados.length)} de{" "}
-              {filtrados.length}
+              {(paginaAtual - 1) * pageSize + 1}–{Math.min(paginaAtual * pageSize, ordenados.length)} de{" "}
+              {ordenados.length}
             </span>
             <div className="flex items-center gap-2">
               <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
