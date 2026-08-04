@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useUserPref } from "@/hooks/use-user-pref";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,9 +48,15 @@ async function fetchAll(builder: () => any): Promise<Record<string, unknown>[]> 
 
 function Page() {
   const { clinicaAtual } = useClinica();
-  const [tipo, setTipo] = useState<"lancamentos" | "atendimentos" | "notas">("lancamentos");
-  const [from, setFrom] = useState(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  const [tipo, setTipo] = useUserPref<"lancamentos" | "atendimentos" | "notas">(
+    "fin.relatorios.tipo",
+    "lancamentos"
+  );
+  const [from, setFrom] = useUserPref(
+    "fin.relatorios.de",
+    new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
+  );
+  const [to, setTo] = useUserPref("fin.relatorios.ate", new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(false);
 
   const gerar = async () => {
