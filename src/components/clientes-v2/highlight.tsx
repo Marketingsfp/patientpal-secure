@@ -18,7 +18,7 @@ function ranges(text: string, termo: string): Array<[number, number]> {
   if (!t || t.length < 2 || !text) return out;
 
   const digitsTerm = onlyDigits(t);
-  if (digitsTerm.length >= 2 && onlyDigits(t).length === t.replace(/[^\w]/g, "").length) {
+  if (digitsTerm.length >= 2 && /^[\d.\-/()\s]+$/.test(t)) {
     // posições dos dígitos no texto original
     const pos: number[] = [];
     let digits = "";
