@@ -1638,7 +1638,18 @@ function AgendaPage() {
   const procedimentoFormulario = (medicoId: string | null | undefined, procedimento: string | null | undefined) => {
     const atual = procedimentoEfetivo(medicoId, procedimento);
     const med = medicoId ? medicos.find((m) => m.id === medicoId) : null;
-    if (atual && med?.especialidade_nome && normalizar(atual) === normalizar(med.especialidade_nome)) return "";
+    if (atual && med?.especialidade_nome && normalizar(atual) === normalizar(med.especialidade_nome)) {
+      // O nome pode coincidir com a especialidade (ex.: recurso "MAMOGRAFIA"
+      // com o serviço "MAMOGRAFIA"). Só descartamos quando NÃO existe serviço
+      // cadastrado com esse nome — caso contrário é uma escolha real do usuário.
+      const opts = opcoesProcedimentoMedico(
+        medicoId,
+        editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
+      );
+      const ehServicoReal = opts.some((o) => normalizar(o.nome) === normalizar(atual))
+        || procedimentosList.some((p) => normalizar(p.nome) === normalizar(atual));
+      if (!ehServicoReal) return "";
+    }
     return atual;
   };
 
