@@ -576,10 +576,13 @@ export function AppShell() {
                   <button
                     type="button"
                     onClick={() => setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? false) }))}
-                    className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70 hover:opacity-100 transition-opacity rounded-md"
+                    className={`w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-opacity rounded-md hover:opacity-100 ${groupHasActive ? "opacity-100 text-white" : "opacity-70"}`}
                     aria-expanded={open}
                   >
-                    <span>{row.label}</span>
+                    <span className="flex items-center gap-1.5">
+                      {row.label}
+                      {groupHasActive && !open && <span className="h-1.5 w-1.5 rounded-full bg-white/90" aria-hidden />}
+                    </span>
                     <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-0" : "-rotate-90"}`} />
                   </button>
                 )}
@@ -591,18 +594,23 @@ export function AppShell() {
                     return (
                       <div key={subKey} className="space-y-1">
                         {collapsedUi ? (
-                          <div className="flex justify-center py-2.5" title={item.label}>
-                            <item.icon className="h-4 w-4 shrink-0 opacity-80" />
+                          <div
+                            className={`relative flex justify-center rounded-full py-2.5 transition-all ${subActive ? "bg-white/20 ring-1 ring-inset ring-white/25" : ""}`}
+                            title={item.label}
+                          >
+                            {subActive && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-white" aria-hidden />}
+                            <item.icon className={`h-4 w-4 shrink-0 ${subActive ? "opacity-100" : "opacity-80"}`} />
                           </div>
                         ) : (
                           <button
                             type="button"
                             onClick={() => setOpenGroups((prev) => ({ ...prev, [subKey]: !(prev[subKey] ?? false) }))}
-                            className={`w-full flex items-center gap-2.5 rounded-full px-4 py-2.5 text-sm font-medium transition-all ${subActive ? "bg-white/15 text-white shadow-sm" : "text-white/85 hover:bg-white/10 hover:text-white"}`}
+                            className={`relative w-full flex items-center gap-2.5 rounded-full px-4 py-2.5 text-sm font-medium transition-all ${subActive ? "bg-white/20 text-white shadow-sm ring-1 ring-inset ring-white/25" : "text-white/85 hover:bg-white/10 hover:text-white"}`}
                             aria-expanded={subOpen}
                           >
+                            {subActive && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-white" aria-hidden />}
                             <item.icon className="h-4 w-4 shrink-0" />
-                            <span className="truncate flex-1 text-left">{item.label}</span>
+                            <span className={`truncate flex-1 text-left ${subActive ? "font-semibold" : ""}`}>{item.label}</span>
                             <ChevronDown className={`h-3 w-3 transition-transform ${subOpen ? "rotate-0" : "-rotate-90"}`} />
                           </button>
                         )}
@@ -634,6 +642,7 @@ export function AppShell() {
                               title={collapsedUi ? child.label : undefined}
                               data-nav-to={child.to}
                               data-nav-active={active ? "true" : undefined}
+                              aria-current={active ? "page" : undefined}
                               onClick={(event) => {
                                 if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
                                 event.preventDefault();
@@ -641,12 +650,13 @@ export function AppShell() {
                               }}
                               className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all ${
                                 active
-                                  ? "bg-white/15 text-white shadow-sm"
+                                  ? "bg-white/20 text-white shadow-sm ring-1 ring-inset ring-white/25"
                                   : "text-white/85 hover:bg-white/10 hover:text-white"
                               }`}
                             >
+                              {active && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-white" aria-hidden />}
                               <child.icon className="h-4 w-4 shrink-0" />
-                              {!collapsedUi && <span className="truncate">{child.label}</span>}
+                              {!collapsedUi && <span className={`truncate ${active ? "font-semibold" : ""}`}>{child.label}</span>}
                             </a>
                           );
                         })}
@@ -665,6 +675,7 @@ export function AppShell() {
                       title={collapsedUi ? item.label : undefined}
                       data-nav-to={item.to}
                       data-nav-active={active ? "true" : undefined}
+                      aria-current={active ? "page" : undefined}
                       onClick={(event) => {
                         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
                         event.preventDefault();
@@ -672,12 +683,13 @@ export function AppShell() {
                       }}
                       className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "px-4"} py-2.5 text-sm font-medium transition-all ${
                         active
-                          ? "bg-white/15 text-white shadow-sm"
+                          ? "bg-white/20 text-white shadow-sm ring-1 ring-inset ring-white/25"
                           : "text-white/85 hover:bg-white/10 hover:text-white"
                       }`}
                     >
+                      {active && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-white" aria-hidden />}
                       <item.icon className="h-4 w-4 shrink-0" />
-                      {!collapsedUi && <span className="truncate">{item.label}</span>}
+                      {!collapsedUi && <span className={`truncate ${active ? "font-semibold" : ""}`}>{item.label}</span>}
                     </a>
                   );
                 })}
