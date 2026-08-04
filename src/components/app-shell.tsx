@@ -271,6 +271,11 @@ export function AppShell() {
   const router = useRouter();
   const navScrollRef = useRef<HTMLElement | null>(null);
   const lastArrowNavAtRef = useRef(0);
+  // Preferência de menu persistida por usuário (chave escopada pelo id).
+  const prefUserId = user?.id ?? null;
+  const collapsedKey = prefUserId ? `appshell:collapsed:${prefUserId}` : "appshell:collapsed";
+  const groupsKey = prefUserId ? `appshell:openGroups:${prefUserId}` : "appshell:openGroups";
+  const hydratedForUserRef = useRef<string | null>(null);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     if (window.innerWidth < 1024) return true;
@@ -282,16 +287,31 @@ export function AppShell() {
   });
   const [menuSearch, setMenuSearch] = useState(""); 
 
+  // Ao identificar o usuário, carrega a preferência salva dele (uma vez por usuário).
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("appshell:openGroups", JSON.stringify(openGroups));
+    if (typeof window === "undefined" || !prefUserId) return;
+    if (hydratedForUserRef.current === prefUserId) return;
+    hydratedForUserRef.current = prefUserId;
+    const savedCollapsed = window.localStorage.getItem(collapsedKey);
+    if (savedCollapsed !== null && window.innerWidth >= 1024) {
+      setCollapsed(savedCollapsed === "1");
     }
-  }, [openGroups]);
+    try {
+      const savedGroups = window.localStorage.getItem(groupsKey);
+      if (savedGroups) setOpenGroups(JSON.parse(savedGroups));
+    } catch { /* ignore */ }
+  }, [prefUserId, collapsedKey, groupsKey]);
+
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("appshell:collapsed", collapsed ? "1" : "0");
+    if (typeof window !== "undefined" && (!prefUserId || hydratedForUserRef.current === prefUserId)) {
+      window.localStorage.setItem(groupsKey, JSON.stringify(openGroups));
     }
-  }, [collapsed]);
+  }, [openGroups, groupsKey, prefUserId]);
+  useEffect(() => {
+    if (typeof window !== "undefined" && (!prefUserId || hydratedForUserRef.current === prefUserId)) {
+      if (window.innerWidth >= 1024) window.localStorage.setItem(collapsedKey, collapsed ? "1" : "0");
+    }
+  }, [collapsed, collapsedKey, prefUserId]);
   // Auto-collapse on small screens
   useEffect(() => {
     if (typeof window === "undefined") return;
