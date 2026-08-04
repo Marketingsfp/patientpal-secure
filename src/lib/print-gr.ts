@@ -938,7 +938,7 @@ async function printGuiaAtendimentoAgrupadaCore(input: PrintGRAgrupadaInput, ids
           <div>${dataImpressao}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
         </div>
       </div>
-      ${!isLast ? `<div class="cut"><div class="cut-line"></div><div class="cut-label">- - - - - - - - - - - - CORTE AQUI - - - - - - - - - - - -</div><div class="cut-line"></div></div>` : ""}
+      ${!isLast ? `<div class="cut"><div class="cut-line"></div><div class="cut-label">Corte aqui</div><div class="cut-line"></div></div>` : ""}
     `;
   }).join("");
 
