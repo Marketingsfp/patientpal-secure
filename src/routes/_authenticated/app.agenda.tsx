@@ -43,6 +43,7 @@ import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
   MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText,
+  Stethoscope, Save, CreditCard, Percent, ClipboardList, Activity,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
