@@ -145,6 +145,53 @@ export function KeyboardShortcuts() {
         }
       }
 
+      // Ctrl/Cmd+K → busca global (fallback quando a Busca Universal não está no header)
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
+        const trigger = document.querySelector<HTMLButtonElement>(
+          '[data-testid="ub-topbar-trigger"], [data-testid="ub-topbar-trigger-mobile"]'
+        );
+        if (trigger) return; // a própria Busca Universal já trata Ctrl+K
+        e.preventDefault();
+        if (focusQuickSearch()) return;
+        const menuSearch = document.querySelector<HTMLInputElement>('aside input[placeholder^="Buscar no menu"]');
+        if (menuSearch) {
+          window.dispatchEvent(new Event("menu-v2:open"));
+          menuSearch.focus();
+          menuSearch.select();
+        }
+        return;
+      }
+
+      // Ctrl/Cmd+B → recolher / expandir menu lateral
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "b" || e.key === "B")) {
+        e.preventDefault();
+        window.dispatchEvent(new Event("appshell:toggle-sidebar"));
+        return;
+      }
+
+      // Alt + ↑/↓ → navegar entre os itens visíveis do menu lateral
+      if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+        const links = Array.from(
+          document.querySelectorAll<HTMLAnchorElement>("aside [data-nav-to]")
+        ).filter((el) => el.offsetParent !== null);
+        if (!links.length) return;
+        e.preventDefault();
+        const activeIdx = links.findIndex(
+          (el) => el === document.activeElement || el.getAttribute("aria-current") === "page"
+        );
+        const delta = e.key === "ArrowDown" ? 1 : -1;
+        const nextIdx =
+          activeIdx < 0
+            ? (e.key === "ArrowDown" ? 0 : links.length - 1)
+            : (activeIdx + delta + links.length) % links.length;
+        const target = links[nextIdx];
+        if (!target) return;
+        target.focus();
+        target.scrollIntoView({ block: "nearest" });
+        if (target.dataset.navTo) navigate({ to: target.dataset.navTo });
+        return;
+      }
+
       // Alt+1..9 → atalho para itens do menu lateral
       if (e.altKey && !e.ctrlKey && !e.metaKey && e.key >= "1" && e.key <= "9") {
         const idx = Number(e.key) - 1;
