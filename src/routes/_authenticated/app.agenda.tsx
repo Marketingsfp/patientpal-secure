@@ -5310,6 +5310,13 @@ function FragmentDayCell({
   );
 }
 
+const ptBR = ptBRLocale;
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const calendarFormatters = {
+  formatCaption: (date: Date) => capitalize(formatDateFns(date, "LLLL yyyy", { locale: ptBRLocale })),
+  formatWeekdayName: (date: Date) => capitalize(formatDateFns(date, "EEEEEE", { locale: ptBRLocale })),
+};
+
 function DataRefField({
   dataRef, dataFim, setDataRef, setDataFim, shiftData,
 }: {
