@@ -254,6 +254,50 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const paginaAtual = Math.min(page, totalPaginas);
   const visiveis = ordenados.slice((paginaAtual - 1) * pageSize, paginaAtual * pageSize);
 
+  // ---- Navegação por teclado nos resultados (roving tabindex) ----
+  const listaRef = useRef<HTMLDivElement>(null);
+  const [focoIdx, setFocoIdx] = useState(0);
+  const [navTeclado, setNavTeclado] = useState(false);
+
+  useEffect(() => { setFocoIdx(0); }, [paginaAtual, pageSize, q, campo, convenio, tab, chips, ordem, dirOrdem]);
+
+  useEffect(() => {
+    if (!navTeclado) return;
+    const alvo = listaRef.current?.querySelector<HTMLElement>(`[data-cliente-idx="${focoIdx}"]`);
+    if (alvo) {
+      alvo.scrollIntoView({ block: "nearest" });
+      alvo.focus({ preventScroll: true });
+    }
+  }, [focoIdx, navTeclado, visiveis.length]);
+
+  const onListaKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const total = visiveis.length;
+    if (total === 0) return;
+    const mover = (next: number) => {
+      e.preventDefault();
+      setNavTeclado(true);
+      setFocoIdx(Math.max(0, Math.min(total - 1, next)));
+    };
+    switch (e.key) {
+      case "ArrowDown": return mover(focoIdx + 1);
+      case "ArrowUp": return mover(focoIdx - 1);
+      case "PageDown": return mover(focoIdx + 10);
+      case "PageUp": return mover(focoIdx - 10);
+      case "Home": return mover(0);
+      case "End": return mover(total - 1);
+      case "Enter": {
+        const p = visiveis[focoIdx];
+        if (!p) return;
+        e.preventDefault();
+        if (e.altKey) window.location.assign(`/app/clientes/${p.id}/editar`);
+        else setDrawer(p);
+        return;
+      }
+      default:
+        return;
+    }
+  };
+
   // Só reseta a página depois que as preferências salvas terminarem de hidratar,
   // senão a página restaurada seria descartada ao carregar os filtros.
   const { user } = useAuth();
