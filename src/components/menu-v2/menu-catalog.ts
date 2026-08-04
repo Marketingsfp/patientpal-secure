@@ -3,7 +3,7 @@ import {
   Wallet, FileText, DollarSign, Receipt, Building2, ArrowRightLeft, BarChart3,
   CreditCard, Contact, Briefcase,
   Stethoscope, FlaskConical, BookOpen, LayoutGrid, Activity,
-  LayoutDashboard, Target, Megaphone, ShieldCheck, Inbox,
+  LayoutDashboard, Target, Megaphone, ShieldCheck, Inbox, Home,
   Settings, KeyRound, MapPin, BadgeCheck,
   type LucideIcon,
 } from "lucide-react";
@@ -112,7 +112,7 @@ export const CENTROS: Centro[] = [
     icon: LayoutDashboard,
     items: [
       { path: "/app/painel-executivo", label: "Indicadores", icon: TrendingUp },
-      { path: "/app/painel", label: "Visão Geral", icon: LayoutDashboard, modulo: "painel" },
+      { path: "/app/painel", label: "Início", icon: Home, modulo: "painel" },
       { path: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
       { path: "/app/lgpd", label: "Privacidade (LGPD)", icon: ShieldCheck },
       { path: "/app/auditoria", label: "Auditoria", icon: ShieldCheck },
