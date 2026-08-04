@@ -135,25 +135,45 @@ function AgendaExpressPage() {
     );
   }, [slotsDoDia, termoNorm]);
 
-  const podeConfirmar = !!clinicaId && !!paciente && !!slot && !confirmando;
+  const podeConfirmar = !!clinicaId && !!paciente && itens.length > 0 && !confirmando;
+
+  function alternarSlot(s: Slot) {
+    const chave = slotKey(s);
+    setItens((prev) =>
+      prev.some((i) => slotKey(i) === chave)
+        ? prev.filter((i) => slotKey(i) !== chave)
+        : [...prev, s],
+    );
+  }
 
   async function confirmar() {
-    if (!clinicaId || !paciente || !slot) return;
+    if (!clinicaId || !paciente || itens.length === 0) return;
     setConfirmando(true);
     try {
-      const { error } = await supabase.from("agendamentos").insert({
-        clinica_id: clinicaId,
-        paciente_id: paciente.id,
-        paciente_nome: paciente.nome,
-        medico_id: slot.medico_id,
-        agenda_id: slot.agenda_id ?? undefined,
-        inicio: slot.inicio,
-        fim: slot.fim,
-        tipo_atendimento: "particular",
-        status: "agendado",
+      const res = await criarMultiplo({
+        data: {
+          clinica_id: clinicaId,
+          paciente_id: paciente.id,
+          paciente_nome: paciente.nome,
+          itens: itens.map((s) => ({
+            procedimento: s.especialidade_nome ?? s.agenda_nome ?? "Consulta",
+            medico_id: s.medico_id,
+            enfermagem_recurso_id: null,
+            inicio: s.inicio,
+            fim: s.fim,
+            tipo_atendimento: "particular" as const,
+          })),
+        },
       });
-      if (error) throw error;
-      toast.success("Agendamento confirmado!");
+      if (!res.ok) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success(
+        itens.length === 1
+          ? "Agendamento confirmado!"
+          : `${itens.length} serviços agendados no mesmo atendimento.`,
+      );
       navigate({ to: "/app/agenda" });
     } catch (e) {
       mostrarErro(e);
