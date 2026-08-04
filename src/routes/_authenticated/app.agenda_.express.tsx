@@ -273,12 +273,42 @@ function AgendaExpressPage() {
                   {data.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
                 </span>
               </div>
-              <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-slate-400 shrink-0" />
-                <span className="text-sm font-medium text-slate-800 truncate">
-                  {slot ? `${hhmm(slot.inicio)} · ${slot.medico_nome}` : "Selecione um horário"}
-                </span>
+              <div className="flex items-start gap-3">
+                <Clock className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
+                {itens.length === 0 ? (
+                  <span className="text-sm font-medium text-slate-500">
+                    Selecione um ou mais horários
+                  </span>
+                ) : (
+                  <ul className="min-w-0 flex-1 space-y-1.5">
+                    {itens.map((s) => (
+                      <li
+                        key={slotKey(s)}
+                        className="flex items-center gap-2 rounded-lg bg-white px-2.5 py-1.5 shadow-sm ring-1 ring-slate-200"
+                      >
+                        <span className="text-sm font-semibold tabular-nums text-slate-900">
+                          {hhmm(s.inicio)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-xs text-slate-500">
+                          {s.especialidade_nome ?? s.agenda_nome ?? "Consulta"} · {s.medico_nome}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => alternarSlot(s)}
+                          aria-label="Remover serviço"
+                          className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
+              <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                <Plus className="h-3 w-3" />
+                Clique em outro horário para adicionar mais um serviço ao mesmo atendimento.
+              </p>
             </div>
           </div>
 
