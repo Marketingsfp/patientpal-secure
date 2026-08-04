@@ -79,14 +79,14 @@ function Calendar({
             : "[&>svg]:text-muted-foreground flex h-8 items-center gap-1 rounded-md pl-2 pr-1 text-sm [&>svg]:size-3.5",
           defaultClassNames.caption_label,
         ),
-        table: cn("w-full table-fixed border-collapse", fullWidth && "flex flex-col"),
-        weekdays: cn("flex w-full", defaultClassNames.weekdays),
+        table: cn("w-full max-w-full border-collapse", fullWidth && "flex flex-col"),
+        weekdays: cn("grid w-full grid-cols-7", defaultClassNames.weekdays),
         weekday: cn(
-          "min-w-0 flex-1 select-none py-2 text-center text-[10px] font-semibold uppercase tracking-normal text-slate-400 sm:text-xs sm:tracking-wide",
+          "min-w-0 select-none overflow-hidden py-2 text-center text-[10px] font-bold uppercase tracking-normal text-slate-400 sm:text-xs sm:tracking-wide",
           defaultClassNames.weekday,
         ),
         week: cn(
-          "flex w-full",
+          "grid w-full grid-cols-7",
           defaultClassNames.week,
         ),
         week_number_header: cn("w-(--cell-size) select-none", defaultClassNames.week_number_header),
@@ -95,8 +95,8 @@ function Calendar({
           defaultClassNames.week_number,
         ),
         day: cn(
-          "group/day relative aspect-square h-full w-full min-w-0 select-none p-1 text-center sm:p-1.5",
-          fullWidth && "aspect-auto h-10 flex-1 sm:h-11",
+          "group/day relative h-9 w-full min-w-0 select-none p-1 text-center text-xs sm:h-10 sm:p-2 sm:text-sm",
+          fullWidth && "h-9 sm:h-10",
           defaultClassNames.day,
         ),
         range_start: cn("rounded-l-lg bg-primary/10", defaultClassNames.range_start),
@@ -184,8 +184,7 @@ function CalendarDayButton({
       data-range-end={modifiers.range_end}
       data-range-middle={modifiers.range_middle}
       className={cn(
-        "flex aspect-square h-auto w-full min-w-(--cell-size) flex-col justify-center gap-0.5 rounded-lg text-sm font-medium tabular-nums leading-none text-slate-700 transition-colors duration-150",
-        fullWidth && "aspect-auto h-10 min-w-0 py-2 text-sm",
+        "flex h-full w-full min-w-0 flex-col justify-center gap-0.5 rounded-lg p-0 text-xs font-medium tabular-nums leading-none text-slate-700 transition-colors duration-150 sm:text-sm",
         "hover:bg-slate-100 hover:text-slate-900",
         "data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground data-[selected-single=true]:font-semibold data-[selected-single=true]:shadow-sm data-[selected-single=true]:hover:bg-primary data-[selected-single=true]:hover:text-primary-foreground",
         "data-[range-middle=true]:bg-transparent data-[range-middle=true]:text-slate-900 data-[range-start=true]:bg-primary data-[range-start=true]:text-primary-foreground data-[range-end=true]:bg-primary data-[range-end=true]:text-primary-foreground",
