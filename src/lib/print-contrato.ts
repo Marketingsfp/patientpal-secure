@@ -403,6 +403,7 @@ p.opt { padding-left:3mm; }
   </div>
 </div>
 ${(c as any).assinado_em ? `<div class="meta">Assinado digitalmente em ${fmtData((c as any).assinado_em)} — IP: ${esc((c as any).assinatura_ip ?? "—")}</div>` : ""}
+</div>
 <script>window.onload=()=>{setTimeout(()=>{window.print();},300);};</script>
 </body></html>`;
 
