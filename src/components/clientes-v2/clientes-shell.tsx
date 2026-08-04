@@ -254,7 +254,20 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const paginaAtual = Math.min(page, totalPaginas);
   const visiveis = ordenados.slice((paginaAtual - 1) * pageSize, paginaAtual * pageSize);
 
-  useEffect(() => { setPage(1); }, [q, campo, convenio, tab, chips, pageSize]);
+  // Só reseta a página depois que as preferências salvas terminarem de hidratar,
+  // senão a página restaurada seria descartada ao carregar os filtros.
+  const { user } = useAuth();
+  const [prefsProntas, setPrefsProntas] = useState(false);
+  useEffect(() => {
+    if (!user?.id) return;
+    const id = requestAnimationFrame(() => setPrefsProntas(true));
+    return () => cancelAnimationFrame(id);
+  }, [user?.id]);
+  useEffect(() => {
+    if (!prefsProntas) return;
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, campo, convenio, tab, chips, pageSize, prefsProntas]);
 
   const kpi: ClientesKpi = useMemo(() => {
     let ativos = 0, inativos = 0, incompletos = 0, duplicados = 0;
