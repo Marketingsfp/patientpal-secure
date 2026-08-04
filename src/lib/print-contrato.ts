@@ -60,7 +60,7 @@ export async function printContrato(contratoId: string) {
     (c as any).clinica_id
       ? supabase
           .from("clinicas")
-          .select("nome, cnpj, endereco, cidade, estado, telefone")
+          .select("nome, cnpj, endereco, cidade, estado, telefone, branding")
           .eq("id", (c as any).clinica_id)
           .maybeSingle()
       : Promise.resolve({ data: null as any }),
