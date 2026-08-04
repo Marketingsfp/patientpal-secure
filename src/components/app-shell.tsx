@@ -195,6 +195,37 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
 
 type Crumb = { label: string; to?: string };
 
+// Todos os caminhos catalogados no menu (inclui aliases).
+// Usado para que o item mais específico vença: em /app/agenda/express
+// apenas "Agenda Express" fica ativo, nunca também "Agenda".
+const ALL_NAV_PATHS: string[] = (() => {
+  const out: string[] = [];
+  for (const row of navRows) {
+    for (const item of row.items) {
+      const leaves: readonly NavLeaf[] = isParent(item) ? item.children : [item as NavLeaf];
+      for (const leaf of leaves) {
+        out.push(leaf.to);
+        for (const a of leaf.aliases ?? []) out.push(a);
+      }
+    }
+  }
+  return out;
+})();
+
+function pathMatches(pathname: string, to: string) {
+  if (pathname === to) return true;
+  if (to === "/app") return false;
+  if (!pathname.startsWith(`${to}/`)) return false;
+  // Existe um item de menu mais específico que também casa? Ele tem prioridade.
+  return !ALL_NAV_PATHS.some(
+    (p) => p.length > to.length && (pathname === p || pathname.startsWith(`${p}/`)),
+  );
+}
+
+function isNavActive(pathname: string, to: string, aliases: readonly string[] = []) {
+  return pathMatches(pathname, to) || aliases.some((a) => pathMatches(pathname, a));
+}
+
 function titleizeSegment(seg: string) {
   const clean = decodeURIComponent(seg).replace(/[-_]/g, " ");
   return clean.charAt(0).toUpperCase() + clean.slice(1);
@@ -204,10 +235,7 @@ function buildBreadcrumbs(pathname: string, hash: string): Crumb[] {
   const cleanHash = (hash ?? "").replace(/^#/, "");
   const matchLeaf = (leaf: NavLeaf) => {
     const aliases = leaf.aliases ?? [];
-    const pathOk =
-      pathname === leaf.to ||
-      (leaf.to !== "/app" && pathname.startsWith(`${leaf.to}/`)) ||
-      aliases.some((a) => pathname === a || pathname.startsWith(`${a}/`));
+    const pathOk = isNavActive(pathname, leaf.to, aliases);
     if (!pathOk) return false;
     return leaf.hash ? cleanHash === leaf.hash : true;
   };
@@ -707,7 +735,7 @@ export function AppShell() {
         >
           {filteredNavRows.map((row) => {
             const leafIsActive = (to: string, hash?: string) => {
-              const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
+              const pathOk = isNavActive(location.pathname, to);
               if (!pathOk) return false;
               if (!hash) return true;
               return (location.hash ?? "").replace(/^#/, "") === hash;
@@ -817,9 +845,7 @@ export function AppShell() {
                     );
                   }
                   const aliases: string[] = (item as { aliases?: string[] }).aliases ?? [];
-                  const active = location.pathname === item.to ||
-                    (item.to !== "/app" && location.pathname.startsWith(item.to)) ||
-                    aliases.some((a) => location.pathname === a || location.pathname.startsWith(`${a}/`));
+                  const active = isNavActive(location.pathname, item.to, aliases);
                   const href = item.to;
                   return (
                     <NavTip key={item.to} show={collapsedUi} label={item.label}>
