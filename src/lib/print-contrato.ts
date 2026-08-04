@@ -342,6 +342,7 @@ São João de Meriti, {{DATA_HOJE}}.
       const l = linha.trim();
       if (!l) return `<div class="sp"></div>`;
       if (/^_{5,}$/.test(l)) return "";
+      if (/^INSTRUMENTO PARTICULAR/.test(l)) return `<h1>${esc(l)}</h1>`;
       if (isTitulo(l)) return `<h2>${esc(l)}</h2>`;
       if (/^"CARTÃO CONSULTA/.test(l)) return `<p class="sub">${esc(l)}</p>`;
       if (isSub(l)) return `<p class="lead">${esc(l)}</p>`;
