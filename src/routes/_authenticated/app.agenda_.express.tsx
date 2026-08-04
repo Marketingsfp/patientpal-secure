@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { criarAtendimentoMultiplo } from "@/lib/atendimento-multiplo/criar.functions";
 import { useClinica } from "@/hooks/use-clinica";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { Button } from "@/components/ui/button";
@@ -11,7 +13,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { cn } from "@/lib/utils";
 import { ptBR } from "date-fns/locale";
-import { Zap, User, Stethoscope, CalendarDays, Clock, UserRound, Loader2, CalendarX, Search } from "lucide-react";
+import { Zap, User, Stethoscope, CalendarDays, Clock, UserRound, Loader2, CalendarX, Search, Plus, Check, X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/agenda_/express")({
   component: AgendaExpressPage,
@@ -54,6 +56,7 @@ function slotKey(s: Slot) {
 function AgendaExpressPage() {
   const { clinicaAtual, modoTodas } = useClinica();
   const navigate = useNavigate();
+  const criarMultiplo = useServerFn(criarAtendimentoMultiplo);
   const clinicaId = clinicaAtual?.clinica_id ?? null;
 
   const [paciente, setPaciente] = useState<PatientOption | null>(null);
@@ -64,7 +67,7 @@ function AgendaExpressPage() {
   const [data, setData] = useState<Date>(new Date());
   const [slots, setSlots] = useState<Slot[]>([]);
   const [carregando, setCarregando] = useState(false);
-  const [slot, setSlot] = useState<Slot | null>(null);
+  const [itens, setItens] = useState<Slot[]>([]);
   const [confirmando, setConfirmando] = useState(false);
   const [busca, setBusca] = useState("");
 
@@ -98,7 +101,6 @@ function AgendaExpressPage() {
     if (!clinicaId) return;
     let cancelado = false;
     setCarregando(true);
-    setSlot(null);
     (async () => {
       const { data: rows, error } = await supabase.rpc("get_horarios_disponiveis", {
         _clinica_id: clinicaId,
