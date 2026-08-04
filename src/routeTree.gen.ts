@@ -98,7 +98,6 @@ import { Route as AuthenticatedAppTreinamentosRouteImport } from './routes/_auth
 import { Route as AuthenticatedAppTriagemEnfermagemRouteImport } from './routes/_authenticated/app.triagem-enfermagem'
 import { Route as AuthenticatedAppUnidadesRouteImport } from './routes/_authenticated/app.unidades'
 import { Route as PContratoTokenRouteImport } from './routes/p.contrato.$token'
-import { Route as AuthenticatedAppAgendaExpressRouteImport } from './routes/_authenticated/app.agenda.express'
 import { Route as AuthenticatedAppAtendimentoIaIndexRouteImport } from './routes/_authenticated/app.atendimento-ia.index'
 import { Route as AuthenticatedAppAtendimentoIaAgendamentoIdRouteImport } from './routes/_authenticated/app.atendimento-ia.$agendamentoId'
 import { Route as AuthenticatedAppCartaoBeneficiosBeneficiosRouteImport } from './routes/_authenticated/app.cartao-beneficios.beneficios'
@@ -630,12 +629,6 @@ const PContratoTokenRoute = PContratoTokenRouteImport.update({
   path: '/p/contrato/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAppAgendaExpressRoute =
-  AuthenticatedAppAgendaExpressRouteImport.update({
-    id: '/express',
-    path: '/express',
-    getParentRoute: () => AuthenticatedAppAgendaRoute,
-  } as any)
 const AuthenticatedAppAtendimentoIaIndexRoute =
   AuthenticatedAppAtendimentoIaIndexRouteImport.update({
     id: '/',
@@ -878,7 +871,7 @@ export interface FileRoutesByFullPath {
   '/paciente/perfil': typeof PacientePerfilRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
-  '/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
+  '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -948,7 +941,6 @@ export interface FileRoutesByFullPath {
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/app/': typeof AuthenticatedAppIndexRoute
-  '/app/agenda/express': typeof AuthenticatedAppAgendaExpressRoute
   '/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
   '/app/cartao-beneficios/beneficios': typeof AuthenticatedAppCartaoBeneficiosBeneficiosRoute
   '/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
@@ -1005,7 +997,7 @@ export interface FileRoutesByTo {
   '/paciente/perfil': typeof PacientePerfilRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente': typeof PacienteIndexRoute
-  '/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
+  '/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
   '/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -1072,7 +1064,6 @@ export interface FileRoutesByTo {
   '/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/app': typeof AuthenticatedAppIndexRoute
-  '/app/agenda/express': typeof AuthenticatedAppAgendaExpressRoute
   '/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
   '/app/cartao-beneficios/beneficios': typeof AuthenticatedAppCartaoBeneficiosBeneficiosRoute
   '/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
@@ -1132,7 +1123,7 @@ export interface FileRoutesById {
   '/paciente/perfil': typeof PacientePerfilRoute
   '/verificar/$codigo': typeof VerificarCodigoRoute
   '/paciente/': typeof PacienteIndexRoute
-  '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRouteWithChildren
+  '/_authenticated/app/agenda': typeof AuthenticatedAppAgendaRoute
   '/_authenticated/app/agenda-v2': typeof AuthenticatedAppAgendaV2Route
   '/_authenticated/app/alertas-enfermagem': typeof AuthenticatedAppAlertasEnfermagemRoute
   '/_authenticated/app/anamneses': typeof AuthenticatedAppAnamnesesRoute
@@ -1202,7 +1193,6 @@ export interface FileRoutesById {
   '/_authenticated/app/unidades': typeof AuthenticatedAppUnidadesRoute
   '/p/contrato/$token': typeof PContratoTokenRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
-  '/_authenticated/app/agenda/express': typeof AuthenticatedAppAgendaExpressRoute
   '/_authenticated/app/atendimento-ia/$agendamentoId': typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
   '/_authenticated/app/cartao-beneficios/beneficios': typeof AuthenticatedAppCartaoBeneficiosBeneficiosRoute
   '/_authenticated/app/cartao-beneficios/contratos': typeof AuthenticatedAppCartaoBeneficiosContratosRoute
@@ -1332,7 +1322,6 @@ export interface FileRouteTypes {
     | '/app/unidades'
     | '/p/contrato/$token'
     | '/app/'
-    | '/app/agenda/express'
     | '/app/atendimento-ia/$agendamentoId'
     | '/app/cartao-beneficios/beneficios'
     | '/app/cartao-beneficios/contratos'
@@ -1456,7 +1445,6 @@ export interface FileRouteTypes {
     | '/app/unidades'
     | '/p/contrato/$token'
     | '/app'
-    | '/app/agenda/express'
     | '/app/atendimento-ia/$agendamentoId'
     | '/app/cartao-beneficios/beneficios'
     | '/app/cartao-beneficios/contratos'
@@ -1585,7 +1573,6 @@ export interface FileRouteTypes {
     | '/_authenticated/app/unidades'
     | '/p/contrato/$token'
     | '/_authenticated/app/'
-    | '/_authenticated/app/agenda/express'
     | '/_authenticated/app/atendimento-ia/$agendamentoId'
     | '/_authenticated/app/cartao-beneficios/beneficios'
     | '/_authenticated/app/cartao-beneficios/contratos'
@@ -2274,13 +2261,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PContratoTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/app/agenda/express': {
-      id: '/_authenticated/app/agenda/express'
-      path: '/express'
-      fullPath: '/app/agenda/express'
-      preLoaderRoute: typeof AuthenticatedAppAgendaExpressRouteImport
-      parentRoute: typeof AuthenticatedAppAgendaRoute
-    }
     '/_authenticated/app/atendimento-ia/': {
       id: '/_authenticated/app/atendimento-ia/'
       path: '/'
@@ -2543,20 +2523,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AuthenticatedAppAgendaRouteChildren {
-  AuthenticatedAppAgendaExpressRoute: typeof AuthenticatedAppAgendaExpressRoute
-}
-
-const AuthenticatedAppAgendaRouteChildren: AuthenticatedAppAgendaRouteChildren =
-  {
-    AuthenticatedAppAgendaExpressRoute: AuthenticatedAppAgendaExpressRoute,
-  }
-
-const AuthenticatedAppAgendaRouteWithChildren =
-  AuthenticatedAppAgendaRoute._addFileChildren(
-    AuthenticatedAppAgendaRouteChildren,
-  )
-
 interface AuthenticatedAppAtendimentoIaRouteChildren {
   AuthenticatedAppAtendimentoIaAgendamentoIdRoute: typeof AuthenticatedAppAtendimentoIaAgendamentoIdRoute
   AuthenticatedAppAtendimentoIaIndexRoute: typeof AuthenticatedAppAtendimentoIaIndexRoute
@@ -2680,7 +2646,7 @@ const AuthenticatedAppFinanceiroRouteWithChildren =
   )
 
 interface AuthenticatedAppRouteChildren {
-  AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRouteWithChildren
+  AuthenticatedAppAgendaRoute: typeof AuthenticatedAppAgendaRoute
   AuthenticatedAppAgendaV2Route: typeof AuthenticatedAppAgendaV2Route
   AuthenticatedAppAlertasEnfermagemRoute: typeof AuthenticatedAppAlertasEnfermagemRoute
   AuthenticatedAppAnamnesesRoute: typeof AuthenticatedAppAnamnesesRoute
@@ -2761,7 +2727,7 @@ interface AuthenticatedAppRouteChildren {
 }
 
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
-  AuthenticatedAppAgendaRoute: AuthenticatedAppAgendaRouteWithChildren,
+  AuthenticatedAppAgendaRoute: AuthenticatedAppAgendaRoute,
   AuthenticatedAppAgendaV2Route: AuthenticatedAppAgendaV2Route,
   AuthenticatedAppAlertasEnfermagemRoute:
     AuthenticatedAppAlertasEnfermagemRoute,
@@ -2898,3 +2864,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
