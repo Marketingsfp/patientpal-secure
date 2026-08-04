@@ -6,14 +6,17 @@ import {
   cadastroIncompleto, calcularIdade, fmtCPF, fmtNasc, fmtTel,
   isAniversarianteHoje, pagadorLabel, semCpf, semTelefone, type PacienteV2,
 } from "./status-utils";
+import { Highlight } from "./highlight";
 
 interface Props {
   p: PacienteV2;
   compact?: boolean;
+  /** Termo pesquisado, para realçar os trechos que casaram. */
+  termo?: string;
   onOpen: (p: PacienteV2) => void;
 }
 
-export function ClienteCard({ p, compact, onOpen }: Props) {
+export function ClienteCard({ p, compact, termo, onOpen }: Props) {
   const { tipo, label } = pagadorLabel(p);
   const incompleto = cadastroIncompleto(p);
   const aniversariante = isAniversarianteHoje(p.data_nascimento);
@@ -67,16 +70,16 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className={cn("font-medium truncate", compact ? "text-sm" : "text-sm")}>
-              {p.nome}
+              <Highlight text={p.nome} termo={termo} />
             </span>
             {p.codigo_prontuario && (
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted">
-                Prontuário {p.codigo_prontuario}
+                Prontuário <Highlight text={String(p.codigo_prontuario)} termo={termo} />
               </span>
             )}
             {p.numero_pasta && (
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted">
-                Pasta {p.numero_pasta}
+                Pasta <Highlight text={String(p.numero_pasta)} termo={termo} />
               </span>
             )}
             <Badge
@@ -120,21 +123,26 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
           </div>
           {!compact && (
             <div className="mt-0.5 text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
-              <span>CPF: {fmtCPF(p.cpf)}</span>
+              <span>CPF: <Highlight text={fmtCPF(p.cpf)} termo={termo} /></span>
               <span className="inline-flex items-center gap-1">
-                <Phone className="h-3 w-3" /> {fmtTel(p.telefone)}
+                <Phone className="h-3 w-3" /> <Highlight text={fmtTel(p.telefone)} termo={termo} />
               </span>
-              <span>Nasc.: {fmtNasc(p.data_nascimento)}{idade !== null ? ` · ${idade}a` : ""}</span>
+              <span>
+                Nasc.: <Highlight text={fmtNasc(p.data_nascimento)} termo={termo} />
+                {idade !== null ? ` · ${idade}a` : ""}
+              </span>
               {(p.cidade || p.estado) && (
-                <span className="truncate">{[p.cidade, p.estado].filter(Boolean).join("/")}</span>
+                <span className="truncate">
+                  <Highlight text={[p.cidade, p.estado].filter(Boolean).join("/")} termo={termo} />
+                </span>
               )}
             </div>
           )}
           {compact && (
             <div className="mt-0.5 text-[11px] text-muted-foreground flex flex-wrap gap-x-3">
-              <span>{fmtCPF(p.cpf)}</span>
-              <span>{fmtTel(p.telefone)}</span>
-              <span>{fmtNasc(p.data_nascimento)}</span>
+              <span><Highlight text={fmtCPF(p.cpf)} termo={termo} /></span>
+              <span><Highlight text={fmtTel(p.telefone)} termo={termo} /></span>
+              <span><Highlight text={fmtNasc(p.data_nascimento)} termo={termo} /></span>
             </div>
           )}
         </div>
