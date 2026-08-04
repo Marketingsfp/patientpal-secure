@@ -40,11 +40,23 @@ export const CENTROS: Centro[] = [
       { path: "/app/recepcao", label: "Recepção", icon: ListChecks },
       { path: "/app/clientes", label: "Pacientes", icon: Users, modulo: "clientes" },
       { path: "/app/orcamentos", label: "Orçamentos", icon: FileSignature },
+      { path: "/app/triagem-enfermagem", label: "Triagem", icon: Activity, modulo: "triagem-enfermagem" },
+    ],
+  },
+  {
+    key: "clinico",
+    label: "Clínico",
+    icon: Stethoscope,
+    items: [
       { path: "/app/prontuarios", label: "Prontuários", icon: FileHeart },
       { path: "/app/anamneses", label: "Anamneses", icon: ClipboardList },
-      { path: "/app/triagem-enfermagem", label: "Triagem", icon: Activity, modulo: "triagem-enfermagem" },
-      { path: "/app/chat", label: "Chat", icon: MessageCircle, modulo: "chat" },
-      { path: "/app/nina", label: "WhatsApp", icon: Send },
+      { path: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: BookOpen },
+      { path: "/app/exames-resultados", label: "Exames e Laudos", icon: FlaskConical, modulo: "exames-resultados" },
+      { path: "/app/odontologia", label: "Odontograma", icon: Activity, modulo: "odontologia" },
+      { path: "/app/procedimentos", label: "Procedimentos", icon: LayoutGrid },
+      { path: "/app/medicos", label: "Profissionais", icon: Stethoscope },
+      { path: "/app/disponibilidades", label: "Horários de Atendimento", icon: CalendarDays },
+      { path: "/app/estoque", label: "Estoque", icon: LayoutGrid },
     ],
   },
   {
@@ -73,16 +85,15 @@ export const CENTROS: Centro[] = [
     ],
   },
   {
-    key: "clinico",
-    label: "Clínico",
-    icon: Stethoscope,
+    key: "relacionamento",
+    label: "Relacionamento",
+    icon: MessageCircle,
     items: [
-      { path: "/app/procedimentos", label: "Procedimentos", icon: LayoutGrid },
-      { path: "/app/exames-resultados", label: "Exames e Laudos", icon: FlaskConical, modulo: "exames-resultados" },
-      { path: "/app/prontuario-modelos", label: "Modelos de Prontuário", icon: BookOpen },
-      { path: "/app/odontologia", label: "Odontograma", icon: Activity, modulo: "odontologia" },
-      { path: "/app/medicos", label: "Profissionais", icon: Stethoscope },
-      { path: "/app/disponibilidades", label: "Horários de Atendimento", icon: CalendarDays },
+      { path: "/app/chat", label: "Chat", icon: MessageCircle, modulo: "chat" },
+      { path: "/app/nina", label: "WhatsApp", icon: Send },
+      { path: "/app/crm", label: "CRM", icon: Target, modulo: "crm" },
+      { path: "/app/mkt-leads", label: "Leads", icon: Megaphone, modulo: "mkt-leads" },
+      { path: "/app/campanhas", label: "Campanhas", icon: Send },
     ],
   },
   {
@@ -103,12 +114,8 @@ export const CENTROS: Centro[] = [
       { path: "/app/painel-executivo", label: "Indicadores", icon: TrendingUp },
       { path: "/app/painel", label: "Visão Geral", icon: LayoutDashboard, modulo: "painel" },
       { path: "/app/relatorios", label: "Relatórios", icon: BarChart3 },
-      { path: "/app/crm", label: "CRM", icon: Target, modulo: "crm" },
-      { path: "/app/mkt-leads", label: "Leads", icon: Megaphone, modulo: "mkt-leads" },
-      { path: "/app/campanhas", label: "Campanhas", icon: Send },
       { path: "/app/lgpd", label: "Privacidade (LGPD)", icon: ShieldCheck },
       { path: "/app/auditoria", label: "Auditoria", icon: ShieldCheck },
-      { path: "/app/estoque", label: "Estoque", icon: LayoutGrid },
     ],
   },
   {
@@ -144,7 +151,7 @@ export type PerfilKey = "recepcao" | "medico" | "caixa" | "financeiro" | "gestor
 export const PERFIL_DEFAULTS: Record<PerfilKey, { pinned: string[]; centros: string[] }> = {
   recepcao: {
     pinned: ["/app/agenda", "/app/caixa", "/app/clientes", "/app/orcamentos"],
-    centros: ["atendimento", "financeiro", "cartao", "inteligencia"],
+    centros: ["atendimento", "relacionamento", "financeiro", "cartao", "inteligencia"],
   },
   medico: {
     pinned: ["/app/agenda", "/app/prontuarios", "/app/clientes"],
@@ -160,11 +167,11 @@ export const PERFIL_DEFAULTS: Record<PerfilKey, { pinned: string[]; centros: str
   },
   gestor: {
     pinned: ["/app/painel-executivo", "/app/painel", "/app/relatorios", "/app/agenda"],
-    centros: ["atendimento", "financeiro", "cartao", "clinico", "inteligencia", "gestao", "pessoas"],
+    centros: ["atendimento", "clinico", "financeiro", "cartao", "relacionamento", "inteligencia", "gestao", "pessoas"],
   },
   admin: {
     pinned: ["/app/painel-executivo", "/app/painel", "/app/clinicas", "/app/equipe"],
-    centros: ["atendimento", "financeiro", "cartao", "clinico", "inteligencia", "gestao", "pessoas", "config"],
+    centros: ["atendimento", "clinico", "financeiro", "cartao", "relacionamento", "inteligencia", "gestao", "pessoas", "config"],
   },
 };
 
