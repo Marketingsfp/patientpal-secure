@@ -289,7 +289,7 @@ function AgendaExpressPage() {
                   className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 pl-9 text-sm shadow-sm outline-none placeholder:text-slate-400 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
                 />
               </div>
-              <div className="grid grid-cols-3 gap-2.5 w-full max-h-72 overflow-y-auto pr-1">
+              <div className="grid w-full grid-cols-1 gap-2.5 max-h-72 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
                 {carregando ? (
                   <div className="col-span-3 flex items-center gap-2 py-8 justify-center text-sm text-slate-500">
                     <Loader2 className="h-4 w-4 animate-spin" /> Buscando horários…
