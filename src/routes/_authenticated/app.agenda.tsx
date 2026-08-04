@@ -3272,115 +3272,12 @@ function AgendaPage() {
           </div>
         </div>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 items-start">
+      <div className="flex justify-between items-start gap-4 mb-4">
         <div className="md:col-start-1 md:row-start-1 min-w-0">
           <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 truncate">Agendas</h1>
           <p className="text-xs sm:text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
         </div>
-        <div className="md:col-start-1 md:row-start-2 min-w-0 flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50/60 px-2 py-1.5 [&>*]:shrink-0">
-          <TurboModeToggle />
-          <div className="inline-flex rounded-full border bg-card p-0.5">
-            <button
-              type="button"
-              onClick={() => setViewMode("dia")}
-              className={`px-2 py-1 text-[11px] font-medium rounded-full transition-colors ${viewMode === "dia" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Lista
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("medico")}
-              className={`px-2 py-1 text-[11px] font-medium rounded-full transition-colors ${viewMode === "medico" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Por médico
-            </button>
-          </div>
-          <EncerrarExpedienteButton />
-          <Button asChild variant="outline" size="sm" className="h-7 text-[11px] px-2" title="Agendamento rápido em 4 passos">
-            <Link to="/app/agenda/express">
-              <Clock className="h-3 w-3 mr-1.5" /> Agenda Express
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm" className="h-7 text-[11px] px-2" title="Cadastrar horários semanais e gerar slots da agenda">
-            <Link to="/app/disponibilidades">
-              <Clock className="h-3 w-3 mr-1.5" /> Criar/gerar horários
-            </Link>
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 text-[11px] px-2" disabled={selecionados.size === 0}>
-                Opções ({selecionados.size})
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={cobrarSelecionados}>
-                💳 Cobrar selecionados (1 pagamento)
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={baixarLoteRealizado}>
-                ✅ Baixar selecionados como Realizado
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={copiarPacienteSelecionado}
-                disabled={selecionados.size !== 1}
-              >
-                📋 Copiar dados do paciente
-              </DropdownMenuItem>
-              {isManager && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={abrirReagLote}>
-                    🔁 Reagendar selecionados
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={excluirSelecionados}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    🗑️ Excluir horários selecionados
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 text-[11px] px-2"
-            onClick={() => {
-              if (!filtrados.length) { toast.info("Sem dados para exportar."); return; }
-              exportToExcel(
-                filtrados.map((a) => ({
-                  data: new Date(a.inicio).toLocaleDateString("pt-BR"),
-                  dia: fmtDiaSemana(a.inicio),
-                  inicio: fmtHora(a.inicio),
-                  fim: fmtHora(a.fim),
-                  profissional: medicoNomeAgendamento(a),
-                  paciente: a.paciente_nome,
-                  procedimento: a.procedimento ?? "CONSULTA",
-                  status: a.status,
-                  observacoes: a.observacoes ?? "",
-                })),
-                `agenda-${dataRef}`,
-                [
-                  { key: "data", label: "Data" },
-                  { key: "dia", label: "Dia" },
-                  { key: "inicio", label: "Início" },
-                  { key: "fim", label: "Fim" },
-                  { key: "profissional", label: "Profissional" },
-                  { key: "paciente", label: "Cliente" },
-                  { key: "procedimento", label: "Serviço" },
-                  { key: "status", label: "Status" },
-                  { key: "observacoes", label: "Observações" },
-                ],
-              );
-            }}
-          >
-            <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
-          </Button>
-          </div>
-          <div className="md:col-start-2 md:row-start-1 md:justify-self-end">
+        <div className="shrink-0">
           <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-9 rounded-lg px-4 text-xs font-semibold shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground">
@@ -3749,6 +3646,110 @@ function AgendaPage() {
           </Dialog>
         </div>
       </div>
+
+        <div className="flex flex-wrap items-center gap-2 mb-6 [&>*]:shrink-0">
+          <TurboModeToggle />
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode("dia")}
+              className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${viewMode === "dia" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Lista
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("medico")}
+              className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${viewMode === "medico" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Por médico
+            </button>
+          </div>
+          <EncerrarExpedienteButton />
+          <Button asChild variant="outline" size="sm" className="h-8 text-xs px-3 rounded-lg" title="Agendamento rápido em 4 passos">
+            <Link to="/app/agenda/express">
+              <Clock className="h-3 w-3 mr-1.5" /> Agenda Express
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="h-8 text-xs px-3 rounded-lg" title="Cadastrar horários semanais e gerar slots da agenda">
+            <Link to="/app/disponibilidades">
+              <Clock className="h-3 w-3 mr-1.5" /> Criar/gerar horários
+            </Link>
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs px-3 rounded-lg" disabled={selecionados.size === 0}>
+                Opções ({selecionados.size})
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={cobrarSelecionados}>
+                💳 Cobrar selecionados (1 pagamento)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={baixarLoteRealizado}>
+                ✅ Baixar selecionados como Realizado
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={copiarPacienteSelecionado}
+                disabled={selecionados.size !== 1}
+              >
+                📋 Copiar dados do paciente
+              </DropdownMenuItem>
+              {isManager && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={abrirReagLote}>
+                    🔁 Reagendar selecionados
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={excluirSelecionados}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    🗑️ Excluir horários selecionados
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs px-3 rounded-lg"
+            onClick={() => {
+              if (!filtrados.length) { toast.info("Sem dados para exportar."); return; }
+              exportToExcel(
+                filtrados.map((a) => ({
+                  data: new Date(a.inicio).toLocaleDateString("pt-BR"),
+                  dia: fmtDiaSemana(a.inicio),
+                  inicio: fmtHora(a.inicio),
+                  fim: fmtHora(a.fim),
+                  profissional: medicoNomeAgendamento(a),
+                  paciente: a.paciente_nome,
+                  procedimento: a.procedimento ?? "CONSULTA",
+                  status: a.status,
+                  observacoes: a.observacoes ?? "",
+                })),
+                `agenda-${dataRef}`,
+                [
+                  { key: "data", label: "Data" },
+                  { key: "dia", label: "Dia" },
+                  { key: "inicio", label: "Início" },
+                  { key: "fim", label: "Fim" },
+                  { key: "profissional", label: "Profissional" },
+                  { key: "paciente", label: "Cliente" },
+                  { key: "procedimento", label: "Serviço" },
+                  { key: "status", label: "Status" },
+                  { key: "observacoes", label: "Observações" },
+                ],
+              );
+            }}
+          >
+            <Download className="h-3 w-3 mr-1.5" /> Exportar Excel
+          </Button>
+          </div>
 
       <PatientQuickCompleteSheet
         pacienteId={form.paciente_id || null}
