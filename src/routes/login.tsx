@@ -11,6 +11,9 @@ import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    redirect: typeof search['redirect'] === "string" ? (search['redirect'] as string) : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Entrar — ClinicaOS" },
@@ -33,15 +36,18 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { redirect } = Route.useSearch();
   const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
 
+  const destino = redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/app";
+
   useEffect(() => {
-    if (!authLoading && user) navigate({ to: "/app", replace: true });
-  }, [authLoading, navigate, user]);
+    if (!authLoading && user) navigate({ to: destino as never, replace: true });
+  }, [authLoading, destino, navigate, user]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -50,7 +56,7 @@ function LoginPage() {
     setLoading(false);
     if (error) { mostrarErro(error); return; }
     toast.success("Bem-vindo!");
-    navigate({ to: "/app", replace: true });
+    navigate({ to: destino as never, replace: true });
   };
 
   return (
