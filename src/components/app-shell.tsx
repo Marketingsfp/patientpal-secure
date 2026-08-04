@@ -717,28 +717,30 @@ export function AppShell() {
               onClick={() => { setSubsystem(null); navigate({ to: "/app" }); }}
               title="Menu principal"
               aria-current={location.pathname === "/app" ? "page" : undefined}
-              className={`w-full flex items-center gap-2 rounded-md transition-colors text-white text-xs font-medium ${
+              className={`relative w-full flex items-center gap-2.5 rounded-full py-2.5 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${
                 location.pathname === "/app"
-                  ? "bg-white/25 font-semibold"
-                  : "bg-transparent hover:bg-white/10"
-              } ${collapsedUi ? "justify-center px-2 py-2" : "px-3 py-2"}`}
+                  ? "bg-white/20 text-white shadow-sm ring-1 ring-inset ring-white/25"
+                  : "text-white/85 hover:bg-white/10 hover:text-white"
+              } ${collapsedUi ? "justify-center px-2" : "px-4"}`}
             >
+              {location.pathname === "/app" && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-white" aria-hidden />}
               <LayoutGrid className="h-4 w-4 shrink-0" />
-              {!collapsedUi && <span className="flex-1 truncate text-left">Menu</span>}
+              {!collapsedUi && <span className={`flex-1 truncate text-left ${location.pathname === "/app" ? "font-semibold" : ""}`}>Menu</span>}
             </button>
             <Link
               to="/app/painel"
               onClick={() => setMobileNavOpen(false)}
               title="Início"
               aria-current={location.pathname === "/app/painel" ? "page" : undefined}
-              className={`w-full flex items-center gap-2 rounded-md transition-colors text-white text-xs font-medium ${
+              className={`relative w-full flex items-center gap-2.5 rounded-full py-2.5 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${
                 location.pathname === "/app/painel"
-                  ? "bg-white/25 font-semibold"
-                  : "bg-transparent hover:bg-white/10"
-              } ${collapsedUi ? "justify-center px-2 py-2" : "px-3 py-2"}`}
+                  ? "bg-white/20 text-white shadow-sm ring-1 ring-inset ring-white/25"
+                  : "text-white/85 hover:bg-white/10 hover:text-white"
+              } ${collapsedUi ? "justify-center px-2" : "px-4"}`}
             >
+              {location.pathname === "/app/painel" && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-white" aria-hidden />}
               <Home className="h-4 w-4 shrink-0" />
-              {!collapsedUi && <span className="flex-1 truncate text-left">Início</span>}
+              {!collapsedUi && <span className={`flex-1 truncate text-left ${location.pathname === "/app/painel" ? "font-semibold" : ""}`}>Início</span>}
             </Link>
           </div>
         )}
