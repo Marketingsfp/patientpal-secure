@@ -310,11 +310,10 @@ function AgendaExpressPage() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Rodapé de ação */}
-      <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-white/85 backdrop-blur-md shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.05)] px-4 py-3">
-        <div className="mx-auto max-w-6xl flex items-center gap-3">
+        {/* Rodapé de ação */}
+        <div className={cn(CARD, "px-4 py-3")}>
+          <div className="flex items-center gap-3">
           <div className="hidden sm:block text-sm font-medium text-slate-700 flex-1 truncate">
             {paciente ? paciente.nome : "Selecione o paciente"} · {slot ? `${hhmm(slot.inicio)} — ${slot.medico_nome}` : "sem horário"}
           </div>
@@ -327,6 +326,7 @@ function AgendaExpressPage() {
             {confirmando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
             Confirmar Agendamento Express
           </Button>
+          </div>
         </div>
       </div>
     </div>
