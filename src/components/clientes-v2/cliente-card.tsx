@@ -1,4 +1,5 @@
-import { AlertTriangle, Cake, Copy, Phone, PhoneOff, User, IdCard } from "lucide-react";
+import { AlertTriangle, Cake, Copy, Phone, PhoneOff, User, IdCard, ExternalLink } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -27,9 +28,26 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
       : "border-l-emerald-500";
 
   return (
+    <div className="relative group">
+    <Link
+      to="/app/clientes/$pacienteId/editar"
+      params={{ pacienteId: p.id }}
+      onClick={(e) => e.stopPropagation()}
+      aria-label={`Abrir perfil de ${p.nome}`}
+      title="Abrir perfil (Alt+clique no card)"
+      className="absolute right-2 top-2 z-10 rounded-md p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
+    >
+      <ExternalLink className="h-3.5 w-3.5" />
+    </Link>
     <button
       type="button"
-      onClick={() => onOpen(p)}
+      onClick={(e) => {
+        if (e.altKey) {
+          window.location.assign(`/app/clientes/${p.id}/editar`);
+          return;
+        }
+        onOpen(p);
+      }}
       className={cn(
         "w-full text-left rounded-lg border bg-card hover:bg-accent/40 transition-colors",
         "border-l-4", borderClass,
@@ -127,5 +145,6 @@ export function ClienteCard({ p, compact, onOpen }: Props) {
         </div>
       </div>
     </button>
+    </div>
   );
 }
