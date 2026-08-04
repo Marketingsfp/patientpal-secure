@@ -1643,7 +1643,7 @@ function AgendaPage() {
       // com o serviço "MAMOGRAFIA"). Só descartamos quando NÃO existe serviço
       // cadastrado com esse nome — caso contrário é uma escolha real do usuário.
       const opts = opcoesProcedimentoMedico(
-        medicoId,
+        medicoId ?? null,
         editing?.agenda_id ?? (filtroAgenda !== "todos" ? filtroAgenda : null),
       );
       const ehServicoReal = opts.some((o) => normalizar(o.nome) === normalizar(atual))
