@@ -400,7 +400,7 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
             getKey={(p) => p.id}
             renderItem={(p) => (
               <div className="px-2 py-1">
-                <ClienteCard p={p} compact={compactPref} onOpen={setDrawer} />
+                <ClienteCard p={p} compact={compactPref} termo={modoBusca ? q.trim() : ""} onOpen={setDrawer} />
               </div>
             )}
           />
