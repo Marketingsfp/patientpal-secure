@@ -3308,6 +3308,7 @@ function AgendaPage() {
             onPointerDownOutside={undefined}
             onInteractOutside={undefined}
             onEscapeKeyDown={undefined}
+            onCloseAutoFocus={(e) => e.preventDefault()}
           >
             <DialogHeader className="space-y-1 px-6 pt-5 pb-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
               <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900">
