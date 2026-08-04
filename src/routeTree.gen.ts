@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AutoatendimentoRouteImport } from './routes/autoatendimento'
 import { Route as DiagnosticoRouteImport } from './routes/diagnostico'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as OnlineRouteImport } from './routes/online'
 import { Route as PainelRouteImport } from './routes/painel'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -159,6 +160,11 @@ const DiagnosticoRoute = DiagnosticoRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnlineRoute = OnlineRouteImport.update({
+  id: '/online',
+  path: '/online',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PainelRoute = PainelRouteImport.update({
@@ -864,6 +870,7 @@ export interface FileRoutesByFullPath {
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
+  '/online': typeof OnlineRoute
   '/painel': typeof PainelRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -992,6 +999,7 @@ export interface FileRoutesByTo {
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
+  '/online': typeof OnlineRoute
   '/painel': typeof PainelRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -1118,6 +1126,7 @@ export interface FileRoutesById {
   '/autoatendimento': typeof AutoatendimentoRoute
   '/diagnostico': typeof DiagnosticoRoute
   '/login': typeof LoginRoute
+  '/online': typeof OnlineRoute
   '/painel': typeof PainelRoute
   '/signup': typeof SignupRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -1248,6 +1257,7 @@ export interface FileRouteTypes {
     | '/autoatendimento'
     | '/diagnostico'
     | '/login'
+    | '/online'
     | '/painel'
     | '/signup'
     | '/sitemap.xml'
@@ -1376,6 +1386,7 @@ export interface FileRouteTypes {
     | '/autoatendimento'
     | '/diagnostico'
     | '/login'
+    | '/online'
     | '/painel'
     | '/signup'
     | '/sitemap.xml'
@@ -1501,6 +1512,7 @@ export interface FileRouteTypes {
     | '/autoatendimento'
     | '/diagnostico'
     | '/login'
+    | '/online'
     | '/painel'
     | '/signup'
     | '/sitemap.xml'
@@ -1631,6 +1643,7 @@ export interface RootRouteChildren {
   AutoatendimentoRoute: typeof AutoatendimentoRoute
   DiagnosticoRoute: typeof DiagnosticoRoute
   LoginRoute: typeof LoginRoute
+  OnlineRoute: typeof OnlineRoute
   PainelRoute: typeof PainelRoute
   SignupRoute: typeof SignupRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -1684,6 +1697,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/online': {
+      id: '/online'
+      path: '/online'
+      fullPath: '/online'
+      preLoaderRoute: typeof OnlineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/painel': {
@@ -2866,6 +2886,7 @@ const rootRouteChildren: RootRouteChildren = {
   AutoatendimentoRoute: AutoatendimentoRoute,
   DiagnosticoRoute: DiagnosticoRoute,
   LoginRoute: LoginRoute,
+  OnlineRoute: OnlineRoute,
   PainelRoute: PainelRoute,
   SignupRoute: SignupRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
