@@ -140,6 +140,16 @@ const GR_CSS = `
   .total-val { font-size: 16pt; font-weight: 700; line-height: 1; color: #000; font-variant-numeric: tabular-nums; }
   .split .kv .v { color: #000; font-weight: 600; }
   .foot { display: flex; justify-content: space-between; gap: 2mm; font-size: 7pt; color: #000; letter-spacing: .3px; }
+  /* Impressão térmica 80mm: remove moldura de tela e cola no topo/esquerda. */
+  @media print {
+    html, body { width: 80mm; margin: 0; padding: 0; background: #fff; }
+    .ticket {
+      width: 100%; max-width: 100%;
+      margin: 0; padding: 0 2mm 4mm;
+      border: none; border-radius: 0; box-shadow: none;
+      background: #fff;
+    }
+  }
   ${VIA_CSS}
 `;
 
