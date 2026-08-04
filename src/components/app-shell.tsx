@@ -193,6 +193,61 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
   },
 ];
 
+type Crumb = { label: string; to?: string };
+
+function titleizeSegment(seg: string) {
+  const clean = decodeURIComponent(seg).replace(/[-_]/g, " ");
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
+function buildBreadcrumbs(pathname: string, hash: string): Crumb[] {
+  const cleanHash = (hash ?? "").replace(/^#/, "");
+  const matchLeaf = (leaf: NavLeaf) => {
+    const aliases = leaf.aliases ?? [];
+    const pathOk =
+      pathname === leaf.to ||
+      (leaf.to !== "/app" && pathname.startsWith(`${leaf.to}/`)) ||
+      aliases.some((a) => pathname === a || pathname.startsWith(`${a}/`));
+    if (!pathOk) return false;
+    return leaf.hash ? cleanHash === leaf.hash : true;
+  };
+
+  let best: { crumbs: Crumb[]; score: number } | null = null;
+  for (const row of navRows) {
+    for (const item of row.items) {
+      if (isParent(item)) {
+        for (const child of item.children) {
+          if (!matchLeaf(child)) continue;
+          const score = child.to.length + (child.hash ? 100 : 0);
+          if (!best || score > best.score) {
+            best = { crumbs: [{ label: row.label }, { label: item.label }, { label: child.label, to: child.to }], score };
+          }
+        }
+      } else if (matchLeaf(item)) {
+        const score = item.to.length;
+        if (!best || score > best.score) {
+          best = { crumbs: [{ label: row.label }, { label: item.label, to: item.to }], score };
+        }
+      }
+    }
+  }
+
+  const crumbs = best?.crumbs ?? [];
+  const matchedTo = crumbs.length ? crumbs[crumbs.length - 1]?.to : undefined;
+
+  // Sub-páginas não catalogadas (ex.: /app/agenda/express/detalhe) viram segmentos extras.
+  if (matchedTo && pathname.startsWith(matchedTo) && pathname !== matchedTo) {
+    const rest = pathname.slice(matchedTo.length).split("/").filter(Boolean);
+    for (const seg of rest) crumbs.push({ label: titleizeSegment(seg) });
+  }
+
+  if (!crumbs.length) {
+    const segs = pathname.split("/").filter((s) => s && s !== "app");
+    return segs.map((s) => ({ label: titleizeSegment(s) }));
+  }
+  return crumbs;
+}
+
 function NavTip({ show, label, children }: { show: boolean; label: string; children: React.ReactNode }) {
   if (!show) return <>{children}</>;
   return (
@@ -266,6 +321,11 @@ export function AppShell() {
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/login", replace: true });
   }, [loading, navigate, user]);
+
+  const crumbs = useMemo(
+    () => buildBreadcrumbs(location.pathname, location.hash ?? ""),
+    [location.pathname, location.hash],
+  );
 
   const handleVoiceCommand = (text: string) => {
     const t = text.toLowerCase();
@@ -828,6 +888,33 @@ export function AppShell() {
             <EstornosBell />
           </div>
         </header>
+        {crumbs.length > 0 && (
+          <nav
+            aria-label="Breadcrumb"
+            className="sticky top-[50px] z-20 bg-card/70 backdrop-blur border-b px-3 sm:px-5 py-1.5 overflow-x-auto hhp-no-scrollbar-mobile"
+          >
+            <ol className="flex items-center gap-1 text-[11px] sm:text-xs text-muted-foreground whitespace-nowrap">
+              <li className="flex items-center gap-1">
+                <Link to="/app" className="hover:text-foreground transition-colors">Início</Link>
+              </li>
+              {crumbs.map((c, i) => {
+                const last = i === crumbs.length - 1;
+                return (
+                  <li key={`${c.label}-${i}`} className="flex items-center gap-1">
+                    <ChevronRight className="h-3 w-3 opacity-50 shrink-0" />
+                    {last || !c.to ? (
+                      <span className={last ? "font-medium text-foreground" : ""} aria-current={last ? "page" : undefined}>
+                        {c.label}
+                      </span>
+                    ) : (
+                      <Link to={c.to} className="hover:text-foreground transition-colors">{c.label}</Link>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+        )}
         <main className="hhp-no-scrollbar-mobile flex-1 px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4 lg:px-6 lg:pt-2 lg:pb-6 overflow-auto min-w-0" style={{ background: "var(--surface-cream)" }}>
           <Outlet />
         </main>
