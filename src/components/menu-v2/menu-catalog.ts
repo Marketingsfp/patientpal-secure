@@ -34,7 +34,6 @@ export const CENTROS: Centro[] = [
     icon: HeartPulse,
     items: [
       { path: "/app/agenda", label: "Agenda", icon: CalendarDays, modulo: "agenda" },
-      { path: "/app/atendimento-multiplo", label: "Agendamento Múltiplo", icon: ListChecks },
       { path: "/app/checkin", label: "Check-in", icon: LogIn },
       { path: "/app/fluxo", label: "Fluxo", icon: Workflow },
       { path: "/app/recepcao", label: "Recepção", icon: ListChecks },
