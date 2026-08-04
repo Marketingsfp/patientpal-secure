@@ -248,17 +248,35 @@ function AgendaExpressPage() {
           {/* Coluna direita — data e horários */}
           <div className={cn(CARD, "lg:col-span-7 p-6 space-y-5")}>
             <div className="border-b border-slate-100 pb-6 mb-6">
-              <label className={LABEL}>Data</label>
-              <div className="flex justify-center">
-              <Calendar
-                mode="single"
-                locale={ptBR}
-                selected={data}
-                onSelect={(d) => d && setData(d)}
-                modifiers={{ comVaga: (d: Date) => diasComVaga.has(ymd(d)) }}
-                modifiersClassNames={{ comVaga: "font-semibold text-primary" }}
-                className="p-0 pointer-events-auto"
-              />
+              <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">Data</span>
+              <div className="rounded-2xl border border-slate-200/60 bg-gradient-to-b from-slate-50/60 to-white p-6 shadow-sm flex justify-center">
+                <Calendar
+                  mode="single"
+                  locale={ptBR}
+                  selected={data}
+                  onSelect={(d) => d && setData(d)}
+                  modifiers={{ comVaga: (d: Date) => diasComVaga.has(ymd(d)) }}
+                  modifiersClassNames={{ comVaga: "font-semibold text-primary" }}
+                  className="p-0 pointer-events-auto"
+                  classNames={{
+                    month_caption: "flex items-center justify-center h-8 mb-2",
+                    caption_label: "text-sm font-semibold text-slate-900 tracking-tight capitalize",
+                    nav: "flex items-center gap-1",
+                    button_previous:
+                      "h-8 w-8 rounded-full hover:bg-slate-200/60 inline-flex items-center justify-center transition-colors text-slate-600",
+                    button_next:
+                      "h-8 w-8 rounded-full hover:bg-slate-200/60 inline-flex items-center justify-center transition-colors text-slate-600",
+                    weekday: "text-[10px] font-bold uppercase tracking-wider text-slate-400 pb-2 w-9",
+                    day: "p-0",
+                    day_button:
+                      "h-9 w-9 p-0 font-normal rounded-xl transition-all duration-200 hover:bg-primary/10 hover:text-primary hover:scale-105 inline-flex items-center justify-center",
+                    selected:
+                      "[&_button]:bg-primary [&_button]:text-primary-foreground [&_button]:shadow-lg [&_button]:shadow-primary/25 [&_button]:font-medium [&_button]:rounded-xl [&_button]:scale-105 [&_button:hover]:bg-primary [&_button:hover]:text-primary-foreground",
+                    today:
+                      "[&_button]:border [&_button]:border-primary/40 [&_button]:text-primary [&_button]:font-semibold [&_button]:rounded-xl",
+                    outside: "text-slate-300",
+                  }}
+                />
               </div>
             </div>
 
