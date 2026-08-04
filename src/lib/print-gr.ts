@@ -1070,75 +1070,52 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
         .map((d) => {
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
           const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
-          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
+          return kv(esc(lbl), `${fmtBRL(d.pago)}${esc(trocoTxt)}`);
         })
         .join("")
     : "";
 
-  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
+  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).map((s) => esc(String(s))).join(" · ");
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
   const descricao = `MENSALIDADE ${m.numero_parcela}/${totalParcelas} — CONTRATO #${contrato.numero}${plano?.nome ? ` — ${plano.nome.toUpperCase()}` : ""}`;
   const tituloPac = paciente?.nome ?? contrato.paciente_nome;
 
   const ticketHtml = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
-    <div class="center sm">${endereco}</div>
-    ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
-    ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
+    ${blocoClinica(c, endereco)}
 
-    <div class="sep"></div>
-    <div class="center lg">GUIA DE RECEBIMENTO</div>
-    <div class="center sm">MENSALIDADE DE CONVÊNIO</div>
-    <div class="sep"></div>
+    <div class="divider"></div>
+    <div class="doc-title">Guia de Recebimento</div>
+    <div class="doc-subtitle">Mensalidade de convênio</div>
+    <div class="divider"></div>
 
-    <div class="center bold">${esc(tituloPac)}</div>
-    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
-    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
+    ${blocoPaciente({ nome: tituloPac, cpf: paciente?.cpf, telefone: paciente?.telefone })}
 
-    <div class="sep"></div>
+    <div class="divider"></div>
 
-    <table>
-      <tr><td class="label">CONTRATO:</td><td class="v right">#${contrato.numero}</td></tr>
-      <tr><td class="label">PARCELA:</td><td class="v right">${m.numero_parcela}/${totalParcelas}</td></tr>
-      <tr><td class="label">VENCIMENTO:</td><td class="v right">${fmtDataSimples(m.vencimento)}</td></tr>
-      ${usuarioFinalNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
-    </table>
+    ${kv("Contrato", `#${contrato.numero}`)}
+    ${kv("Parcela", `<span class="badge">${m.numero_parcela}/${totalParcelas}</span>`)}
+    ${kv("Vencimento", fmtDataSimples(m.vencimento))}
+    ${usuarioFinalNome ? kv("Usuário", esc(usuarioFinalNome)) : ""}
 
-    <div class="sep"></div>
+    <div class="divider"></div>
 
-    <table>
-      <tr class="bold">
-        <td style="width:14mm">QTD</td>
-        <td>DESCRIÇÃO</td>
-      </tr>
-      <tr>
-        <td>1</td>
-        <td>${esc(descricao)}</td>
-      </tr>
-    </table>
+    ${blocoServicos([{ qtd: "1", nome: descricao }], "Descrição")}
 
-    <div class="row" style="margin-top:8px">
-      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
-      <div class="bold lg">${fmtBRL(valor)}</div>
-    </div>
+    ${blocoTotal(fmtBRL(valor), isMisto ? "MISTO" : formaLbl)}
 
-    ${isMisto ? `
-    <table style="margin-top:4px">
-      ${detalheRows}
-    </table>
-    ` : ""}
+    ${isMisto ? `<div style="margin-top:2mm">${detalheRows}</div>` : ""}
 
     ${pagamento.forma_pagamento === "cartao_credito" ? `
-    <table>
-      ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
-      <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
-    </table>
+    <div style="margin-top:2mm">
+      ${bandeiraTxt ? kv("Bandeira", esc(bandeiraTxt)) : ""}
+      ${kv("Parcelamento", parcelasTxt)}
+    </div>
     ` : ""}
 
-    <div class="sep"></div>
-    <div class="row sm">
-      <div>DATA IMPRESSÃO</div>
+    <div class="divider"></div>
+    <div class="foot">
+      <div>Data impressão</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
   </div>`;
@@ -1150,23 +1127,7 @@ async function printGuiaMensalidadeCore({ mensalidadeId, clinicaId, usuarioNome,
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(tituloPac)}</title>
 <style>
-  @page { size: 80mm auto; margin: 0; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-  body { font-family: "Courier New", "Consolas", monospace; font-size: 11pt; line-height: 1.25; }
-  .ticket { width: 76mm; padding: 3mm 2mm 6mm; }
-  .center { text-align: center; }
-  .right  { text-align: right; }
-  .bold   { font-weight: 700; }
-  .sm     { font-size: 9pt; }
-  .lg     { font-size: 13pt; font-weight: 700; }
-  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
-  .row    { display: flex; justify-content: space-between; gap: 6px; }
-  table   { width: 100%; border-collapse: collapse; }
-  td      { padding: 1px 0; vertical-align: top; }
-  .label  { color: #000; }
-  .v      { font-weight: 700; }
-  ${VIA_CSS}
+  ${GR_CSS}
 </style></head>
 <body>
   ${corpoVias}
