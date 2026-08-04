@@ -345,6 +345,35 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
                 </SelectContent>
               </Select>
               <QuickFilters options={CHIP_OPTS} value={chips} onChange={setChips} multi ariaLabel="Filtros rápidos" />
+              <div
+                className="inline-flex items-center gap-1 rounded-md border bg-muted/40 p-0.5"
+                role="group"
+                aria-label="Ordenar resultados"
+              >
+                <span className="px-1.5 text-[11px] text-muted-foreground hidden sm:inline">Ordenar</span>
+                {ORDEM_OPTS.map((o) => {
+                  const ativo = ordem === o.value;
+                  const Icon = !ativo ? ArrowUpDown : dirOrdem === "asc" ? ArrowUp : ArrowDown;
+                  return (
+                    <button
+                      key={o.value}
+                      type="button"
+                      title={o.title}
+                      aria-pressed={ativo}
+                      aria-label={`${o.title}${ativo ? (dirOrdem === "asc" ? " (crescente)" : " (decrescente)") : ""}`}
+                      onClick={() => aplicarOrdem(o.value)}
+                      className={`inline-flex items-center gap-1 rounded-[5px] px-2 py-1 text-[11px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                        ativo
+                          ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {o.label}
+                      <Icon className={`h-3 w-3 ${ativo ? "opacity-100" : "opacity-50"}`} />
+                    </button>
+                  );
+                })}
+              </div>
               {!modoBusca && (
                 <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <Info className="h-3.5 w-3.5" />
@@ -356,7 +385,7 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
             </div>
           }
           loading={loading}
-          isEmpty={!loading && filtrados.length === 0}
+          isEmpty={!loading && ordenados.length === 0}
           empty={
             modoBusca
               ? <div>Nenhum paciente encontrado para <b>“{q}”</b>.</div>
@@ -376,11 +405,11 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
             )}
           />
         </ListShell>
-        {!loading && filtrados.length > 0 && (
+        {!loading && ordenados.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>
-              {(paginaAtual - 1) * pageSize + 1}–{Math.min(paginaAtual * pageSize, filtrados.length)} de{" "}
-              {filtrados.length}
+              {(paginaAtual - 1) * pageSize + 1}–{Math.min(paginaAtual * pageSize, ordenados.length)} de{" "}
+              {ordenados.length}
             </span>
             <div className="flex items-center gap-2">
               <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
