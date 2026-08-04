@@ -36,6 +36,7 @@ export type AppointmentFormData = {
   tipoAtendimento?: "convenio" | "particular";
   profissional?: string;
   dataHora?: string;
+  dataPagamento?: string;
   servico?: string;
   observacoes?: string;
 };
@@ -68,25 +69,35 @@ const SERVICOS = [
   "Curativo / Enfermagem",
 ];
 
-function Grupo({
-  icone,
-  titulo,
+function Campo({
+  label,
+  obrigatorio,
+  ajuda,
+  htmlFor,
   children,
 }: {
-  icone: React.ReactNode;
-  titulo: string;
+  label: string;
+  obrigatorio?: boolean;
+  ajuda?: string;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-slate-50/50 rounded-xl p-4 border space-y-3">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {icone}
-        {titulo}
-      </div>
+    <div className="space-y-1.5">
+      <Label
+        htmlFor={htmlFor}
+        className="text-xs font-semibold text-slate-700"
+      >
+        {label}
+        {obrigatorio && <span className="text-red-500 ml-0.5">*</span>}
+      </Label>
       {children}
-    </section>
+      {ajuda && <p className="text-[11px] text-slate-500">{ajuda}</p>}
+    </div>
   );
 }
+
+const inputCls = "h-10 rounded-lg";
 
 export function AppointmentFormModal({
   isOpen,
@@ -109,123 +120,104 @@ export function AppointmentFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-xl p-0 gap-0 overflow-hidden">
-        <DialogHeader className="bg-gradient-to-b from-slate-50 to-transparent px-6 pt-6 pb-5 text-left space-y-1">
-          <DialogTitle className="text-lg font-semibold tracking-tight">
-            {editando ? "Editar Agendamento" : "Novo Agendamento"}
+      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden">
+        <DialogHeader className="border-b border-slate-100 px-6 py-5 text-left space-y-1">
+          <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900">
+            {editando ? "Editar agendamento" : "Novo agendamento"}
           </DialogTitle>
-          <DialogDescription className="text-sm">
-            Preencha os dados do atendimento. Campos podem ser preenchidos a
-            partir de um orçamento existente.
+          <DialogDescription className="text-[13px] text-slate-500">
+            Atualize os dados do atendimento, o profissional responsável e as
+            informações de pagamento.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-6 pb-4 space-y-4 max-h-[65vh] overflow-y-auto">
-          <Grupo icone={<FileText className="h-3.5 w-3.5" />} titulo="Orçamento">
+        <div className="px-6 py-5 max-h-[68vh] overflow-y-auto">
+          {/* Orçamento — banner opcional */}
+          <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-4">
             <div className="flex items-end gap-2">
               <div className="flex-1 space-y-1.5">
-                <Label htmlFor="orcamento">Nº do orçamento</Label>
+                <Label
+                  htmlFor="orcamento"
+                  className="text-xs font-semibold text-slate-700 flex items-center gap-1.5"
+                >
+                  <FileText className="h-3.5 w-3.5 text-indigo-500" />
+                  Nº do orçamento
+                </Label>
                 <Input
                   id="orcamento"
+                  className={`${inputCls} bg-white`}
                   placeholder="Ex.: 2026-00841"
                   value={form.orcamento ?? ""}
                   onChange={(e) => set("orcamento", e.target.value)}
                 />
               </div>
-              <Button type="button" variant="outline" className="shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 rounded-lg shrink-0 bg-white"
+              >
                 <Search className="h-4 w-4" />
                 Buscar
               </Button>
             </div>
-          </Grupo>
+            <p className="text-[11px] text-slate-500 mt-2">
+              Opcional — informe o número para preencher paciente e serviços
+              automaticamente.
+            </p>
+          </div>
 
-          <Grupo icone={<User className="h-3.5 w-3.5" />} titulo="Paciente">
-            <div className="flex items-end gap-2">
-              <div className="flex-1 space-y-1.5">
-                <Label htmlFor="paciente">Paciente</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <div className="space-y-5 mt-5">
+            <Campo label="Paciente" obrigatorio htmlFor="paciente">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                   <Input
                     id="paciente"
-                    className="pl-9"
+                    className={`${inputCls} pl-9`}
                     placeholder="Buscar por nome, CPF ou prontuário…"
                     value={form.paciente ?? ""}
                     onChange={(e) => set("paciente", e.target.value)}
                   />
                 </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 rounded-lg shrink-0"
+                  title="Cadastrar novo paciente"
+                  aria-label="Cadastrar novo paciente"
+                >
+                  <UserPlus className="h-4 w-4" />
+                </Button>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="shrink-0"
-                title="Cadastrar novo paciente"
-                aria-label="Cadastrar novo paciente"
-              >
-                <UserPlus className="h-4 w-4" />
-              </Button>
-            </div>
+            </Campo>
 
-            <div className="space-y-1.5">
-              <Label>Tipo de atendimento</Label>
-              <Select
-                value={form.tipoAtendimento}
-                onValueChange={(v) =>
-                  set("tipoAtendimento", v as "convenio" | "particular")
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="convenio">Convênio</SelectItem>
-                  <SelectItem value="particular">Particular</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </Grupo>
+            <div className="grid grid-cols-2 gap-4">
+              <Campo label="Médico ou exame" obrigatorio>
+                <Select
+                  value={form.profissional}
+                  onValueChange={(v) => set("profissional", v)}
+                >
+                  <SelectTrigger className={inputCls}>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROFISSIONAIS.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Campo>
 
-          <Grupo
-            icone={<CalendarClock className="h-3.5 w-3.5" />}
-            titulo="Agendamento"
-          >
-            <div className="space-y-1.5">
-              <Label>Médico ou Exame</Label>
-              <Select
-                value={form.profissional}
-                onValueChange={(v) => set("profissional", v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o médico ou exame" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PROFISSIONAIS.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="dataHora">Data e hora</Label>
-                <Input
-                  id="dataHora"
-                  type="datetime-local"
-                  value={form.dataHora ?? ""}
-                  onChange={(e) => set("dataHora", e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Serviço</Label>
+              <Campo label="Serviço" obrigatorio>
                 <Select
                   value={form.servico}
                   onValueChange={(v) => set("servico", v)}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o serviço" />
+                  <SelectTrigger className={inputCls}>
+                    <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
                     {SERVICOS.map((s) => (
@@ -235,41 +227,102 @@ export function AppointmentFormModal({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </Campo>
             </div>
-          </Grupo>
 
-          <Grupo
-            icone={<Stethoscope className="h-3.5 w-3.5" />}
-            titulo="Observações"
-          >
-            <Textarea
-              rows={3}
-              placeholder="Preparo, restrições, informações para a recepção…"
-              value={form.observacoes ?? ""}
-              onChange={(e) => set("observacoes", e.target.value)}
-            />
-          </Grupo>
+            <div className="grid grid-cols-2 gap-4">
+              <Campo
+                label="Data consulta/exame"
+                obrigatorio
+                htmlFor="dataHora"
+                ajuda="Data e horário do atendimento."
+              >
+                <Input
+                  id="dataHora"
+                  type="datetime-local"
+                  className={inputCls}
+                  value={form.dataHora ?? ""}
+                  onChange={(e) => set("dataHora", e.target.value)}
+                />
+              </Campo>
+              <Campo
+                label="Data de pagamento"
+                htmlFor="dataPagamento"
+                ajuda="Deixe em branco para pagamento no atendimento."
+              >
+                <Input
+                  id="dataPagamento"
+                  type="date"
+                  className={inputCls}
+                  value={form.dataPagamento ?? ""}
+                  onChange={(e) => set("dataPagamento", e.target.value)}
+                />
+              </Campo>
+            </div>
+
+            <Campo label="Tipo de atendimento" obrigatorio>
+              <Select
+                value={form.tipoAtendimento}
+                onValueChange={(v) =>
+                  set("tipoAtendimento", v as "convenio" | "particular")
+                }
+              >
+                <SelectTrigger className={inputCls}>
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="convenio">Convênio</SelectItem>
+                  <SelectItem value="particular">Particular</SelectItem>
+                </SelectContent>
+              </Select>
+            </Campo>
+
+            <Campo
+              label="Observações"
+              htmlFor="observacoes"
+              ajuda="Preparo, restrições e informações para a recepção."
+            >
+              <Textarea
+                id="observacoes"
+                rows={3}
+                className="rounded-lg"
+                placeholder="Digite as observações do atendimento…"
+                value={form.observacoes ?? ""}
+                onChange={(e) => set("observacoes", e.target.value)}
+              />
+            </Campo>
+          </div>
         </div>
 
-        <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t bg-background/95 px-6 py-4 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-          <Button type="button" variant="ghost" className="sm:w-auto">
+        <div className="sticky bottom-0 border-t bg-slate-50/50 px-6 py-4 backdrop-blur flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 rounded-lg text-slate-700"
+          >
             <Percent className="h-4 w-4" />
-            Aplicar desconto
+            Desconto
           </Button>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Button type="button" variant="outline">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 rounded-lg border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+            >
               <CreditCard className="h-4 w-4" />
               Pagar + NFS-e
             </Button>
             <Button
               type="button"
-              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              className="h-10 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
             >
               <Printer className="h-4 w-4" />
               Pagar/Imprimir
             </Button>
-            <Button type="button">
+            <Button
+              type="button"
+              className="h-10 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
+            >
               <Save className="h-4 w-4" />
               Salvar
             </Button>
