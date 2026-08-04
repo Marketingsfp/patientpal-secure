@@ -103,6 +103,8 @@ export function EstornosBell() {
           variant="ghost"
           size="sm"
           className="h-9 w-9 p-0 rounded-full relative"
+          data-notifications-trigger
+          aria-label="Notificações"
           title={count > 0 ? `${count} solicitação(ões) de estorno` : "Notificações"}
         >
           <Bell className="h-4 w-4" />
