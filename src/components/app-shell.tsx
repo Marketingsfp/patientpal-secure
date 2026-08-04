@@ -711,7 +711,7 @@ export function AppShell() {
         </div>
         
         {!isMedicoOnly && (
-          <div className={`${collapsedUi ? "px-1 py-2" : "px-3 py-2"} border-b border-white/10`}>
+          <div className={`${collapsedUi ? "px-1 py-2" : "px-3 py-2"} border-b border-white/10 space-y-1.5`}>
             <button
               type="button"
               onClick={() => { setSubsystem(null); navigate({ to: "/app" }); }}
@@ -721,6 +721,19 @@ export function AppShell() {
               <LayoutGrid className="h-4 w-4 shrink-0" />
               {!collapsedUi && <span className="flex-1 truncate text-left">Menu</span>}
             </button>
+            <Link
+              to="/app/painel"
+              onClick={() => setMobileNavOpen(false)}
+              title="Início"
+              className={`w-full flex items-center gap-2 rounded-md transition-colors text-white text-xs font-medium ${
+                isNavActive(location.pathname, "/app/painel")
+                  ? "bg-white/25 font-semibold"
+                  : "bg-white/10 hover:bg-white/20"
+              } ${collapsedUi ? "justify-center px-2 py-2" : "px-3 py-2"}`}
+            >
+              <Home className="h-4 w-4 shrink-0" />
+              {!collapsedUi && <span className="flex-1 truncate text-left">Início</span>}
+            </Link>
           </div>
         )}
 
