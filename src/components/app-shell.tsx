@@ -202,7 +202,7 @@ const ALL_NAV_PATHS: string[] = (() => {
   const out: string[] = [];
   for (const row of navRows) {
     for (const item of row.items) {
-      const leaves = isParent(item) ? item.children : [item as NavLeaf];
+      const leaves: readonly NavLeaf[] = isParent(item) ? item.children : [item as NavLeaf];
       for (const leaf of leaves) {
         out.push(leaf.to);
         for (const a of leaf.aliases ?? []) out.push(a);
