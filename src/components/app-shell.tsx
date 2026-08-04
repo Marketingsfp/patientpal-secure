@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins, Menu as MenuIcon } from "lucide-react";
+import { Activity, Building2, Users, LayoutDashboard, LogOut, Stethoscope, Bell, DollarSign, CalendarDays, ClipboardList, MessageCircle, Target, Clock, BookOpen, Workflow, FileText, CreditCard, Brain, FileHeart, FlaskConical, BellRing, ShieldCheck, BarChart3, Wallet, ChevronLeft, ChevronRight, ChevronDown, Search, HeartPulse, Contact, ConciergeBell, Briefcase, MapPin, Palmtree, GraduationCap, Sparkles, Filter, Send, Megaphone, KeyRound, BadgeCheck, LayoutGrid, Gift, Zap, Coffee, Play, Eye, ArrowRightLeft, Inbox, HandCoins, Menu as MenuIcon, Home } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useClinica } from "@/hooks/use-clinica";
@@ -116,7 +116,6 @@ const navRows: ReadonlyArray<{ label: string; items: ReadonlyArray<NavItem> }> =
       { to: "/app/financeiro/atendimentos", label: "Repasse médico", icon: HandCoins },
       { to: "/app/chat", label: "Chat", icon: MessageCircle },
       { to: "/app/clientes", label: "Pacientes", icon: Contact },
-      { to: "/app/painel", label: "Visão Geral", icon: LayoutDashboard },
       { to: "/app/painel-executivo", label: "Indicadores", icon: LayoutDashboard },
       { to: "/app/fluxo", label: "Fluxo do paciente", icon: Workflow },
       { to: "/app/orcamentos", label: "Orçamentos", icon: FileText },
@@ -712,7 +711,7 @@ export function AppShell() {
         </div>
         
         {!isMedicoOnly && (
-          <div className={`${collapsedUi ? "px-1 py-2" : "px-3 py-2"} border-b border-white/10`}>
+          <div className={`${collapsedUi ? "px-1 py-2" : "px-3 py-2"} border-b border-white/10 space-y-1.5`}>
             <button
               type="button"
               onClick={() => { setSubsystem(null); navigate({ to: "/app" }); }}
@@ -722,6 +721,19 @@ export function AppShell() {
               <LayoutGrid className="h-4 w-4 shrink-0" />
               {!collapsedUi && <span className="flex-1 truncate text-left">Menu</span>}
             </button>
+            <Link
+              to="/app/painel"
+              onClick={() => setMobileNavOpen(false)}
+              title="Início"
+              className={`w-full flex items-center gap-2 rounded-md transition-colors text-white text-xs font-medium ${
+                isNavActive(location.pathname, "/app/painel")
+                  ? "bg-white/25 font-semibold"
+                  : "bg-white/10 hover:bg-white/20"
+              } ${collapsedUi ? "justify-center px-2 py-2" : "px-3 py-2"}`}
+            >
+              <Home className="h-4 w-4 shrink-0" />
+              {!collapsedUi && <span className="flex-1 truncate text-left">Início</span>}
+            </Link>
           </div>
         )}
 
