@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { criarAtendimentoMultiplo } from "@/lib/atendimento-multiplo/criar.functions";
 import { useClinica } from "@/hooks/use-clinica";
 import { PatientSearchInput, type PatientOption } from "@/components/patient-search-input";
 import { Button } from "@/components/ui/button";
@@ -11,7 +13,7 @@ import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { cn } from "@/lib/utils";
 import { ptBR } from "date-fns/locale";
-import { Zap, User, Stethoscope, CalendarDays, Clock, UserRound, Loader2, CalendarX, Search } from "lucide-react";
+import { Zap, User, Stethoscope, CalendarDays, Clock, UserRound, Loader2, CalendarX, Search, Plus, Check, X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/app/agenda_/express")({
   component: AgendaExpressPage,
@@ -54,6 +56,7 @@ function slotKey(s: Slot) {
 function AgendaExpressPage() {
   const { clinicaAtual, modoTodas } = useClinica();
   const navigate = useNavigate();
+  const criarMultiplo = useServerFn(criarAtendimentoMultiplo);
   const clinicaId = clinicaAtual?.clinica_id ?? null;
 
   const [paciente, setPaciente] = useState<PatientOption | null>(null);
@@ -64,7 +67,7 @@ function AgendaExpressPage() {
   const [data, setData] = useState<Date>(new Date());
   const [slots, setSlots] = useState<Slot[]>([]);
   const [carregando, setCarregando] = useState(false);
-  const [slot, setSlot] = useState<Slot | null>(null);
+  const [itens, setItens] = useState<Slot[]>([]);
   const [confirmando, setConfirmando] = useState(false);
   const [busca, setBusca] = useState("");
 
@@ -98,7 +101,6 @@ function AgendaExpressPage() {
     if (!clinicaId) return;
     let cancelado = false;
     setCarregando(true);
-    setSlot(null);
     (async () => {
       const { data: rows, error } = await supabase.rpc("get_horarios_disponiveis", {
         _clinica_id: clinicaId,
@@ -133,25 +135,45 @@ function AgendaExpressPage() {
     );
   }, [slotsDoDia, termoNorm]);
 
-  const podeConfirmar = !!clinicaId && !!paciente && !!slot && !confirmando;
+  const podeConfirmar = !!clinicaId && !!paciente && itens.length > 0 && !confirmando;
+
+  function alternarSlot(s: Slot) {
+    const chave = slotKey(s);
+    setItens((prev) =>
+      prev.some((i) => slotKey(i) === chave)
+        ? prev.filter((i) => slotKey(i) !== chave)
+        : [...prev, s],
+    );
+  }
 
   async function confirmar() {
-    if (!clinicaId || !paciente || !slot) return;
+    if (!clinicaId || !paciente || itens.length === 0) return;
     setConfirmando(true);
     try {
-      const { error } = await supabase.from("agendamentos").insert({
-        clinica_id: clinicaId,
-        paciente_id: paciente.id,
-        paciente_nome: paciente.nome,
-        medico_id: slot.medico_id,
-        agenda_id: slot.agenda_id ?? undefined,
-        inicio: slot.inicio,
-        fim: slot.fim,
-        tipo_atendimento: "particular",
-        status: "agendado",
+      const res = await criarMultiplo({
+        data: {
+          clinica_id: clinicaId,
+          paciente_id: paciente.id,
+          paciente_nome: paciente.nome,
+          itens: itens.map((s) => ({
+            procedimento: s.especialidade_nome ?? s.agenda_nome ?? "Consulta",
+            medico_id: s.medico_id,
+            enfermagem_recurso_id: null,
+            inicio: s.inicio,
+            fim: s.fim,
+            tipo_atendimento: "particular" as const,
+          })),
+        },
       });
-      if (error) throw error;
-      toast.success("Agendamento confirmado!");
+      if (!res.ok) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success(
+        itens.length === 1
+          ? "Agendamento confirmado!"
+          : `${itens.length} serviços agendados no mesmo atendimento.`,
+      );
       navigate({ to: "/app/agenda" });
     } catch (e) {
       mostrarErro(e);
@@ -251,12 +273,42 @@ function AgendaExpressPage() {
                   {data.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
                 </span>
               </div>
-              <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-slate-400 shrink-0" />
-                <span className="text-sm font-medium text-slate-800 truncate">
-                  {slot ? `${hhmm(slot.inicio)} · ${slot.medico_nome}` : "Selecione um horário"}
-                </span>
+              <div className="flex items-start gap-3">
+                <Clock className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
+                {itens.length === 0 ? (
+                  <span className="text-sm font-medium text-slate-500">
+                    Selecione um ou mais horários
+                  </span>
+                ) : (
+                  <ul className="min-w-0 flex-1 space-y-1.5">
+                    {itens.map((s) => (
+                      <li
+                        key={slotKey(s)}
+                        className="flex items-center gap-2 rounded-lg bg-white px-2.5 py-1.5 shadow-sm ring-1 ring-slate-200"
+                      >
+                        <span className="text-sm font-semibold tabular-nums text-slate-900">
+                          {hhmm(s.inicio)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-xs text-slate-500">
+                          {s.especialidade_nome ?? s.agenda_nome ?? "Consulta"} · {s.medico_nome}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => alternarSlot(s)}
+                          aria-label="Remover serviço"
+                          className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
+              <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                <Plus className="h-3 w-3" />
+                Clique em outro horário para adicionar mais um serviço ao mesmo atendimento.
+              </p>
             </div>
           </div>
 
@@ -304,13 +356,13 @@ function AgendaExpressPage() {
                 ) : (
                   slotsFiltrados.map((s) => {
                     const chave = slotKey(s);
-                    const ativo = slot ? slotKey(slot) === chave : false;
+                    const ativo = itens.some((i) => slotKey(i) === chave);
                     const legenda = s.especialidade_nome ?? s.medico_nome ?? s.agenda_nome ?? "";
                     return (
                       <button
                         key={chave}
                         type="button"
-                        onClick={() => setSlot(s)}
+                        onClick={() => alternarSlot(s)}
                         title={`${hhmm(s.inicio)} · ${s.medico_nome}${s.agenda_nome ? ` · ${s.agenda_nome}` : ""}`}
                         className={cn(
                           "flex w-full min-w-0 flex-col items-start gap-0.5 rounded-xl border-2 px-3 py-2 text-left transition-colors",
@@ -319,8 +371,9 @@ function AgendaExpressPage() {
                             : "border-slate-200 bg-slate-50 hover:border-[#1e1b6b]/40 hover:bg-white",
                         )}
                       >
-                        <span className={cn("text-base font-bold tabular-nums leading-none", ativo ? "text-white" : "text-slate-900")}>
+                        <span className={cn("flex w-full items-center gap-1 text-base font-bold tabular-nums leading-none", ativo ? "text-white" : "text-slate-900")}>
                           {hhmm(s.inicio)}
+                          {ativo && <Check className="h-3.5 w-3.5" />}
                         </span>
                         <span className={cn("w-full truncate text-[10px] font-medium leading-tight", ativo ? "text-white/75" : "text-slate-500")}>
                           {legenda}
@@ -338,7 +391,12 @@ function AgendaExpressPage() {
         <div className={cn(CARD, "px-4 py-3")}>
           <div className="flex items-center gap-3">
           <div className="hidden sm:block text-sm font-medium text-slate-700 flex-1 truncate">
-            {paciente ? paciente.nome : "Selecione o paciente"} · {slot ? `${hhmm(slot.inicio)} — ${slot.medico_nome}` : "sem horário"}
+            {paciente ? paciente.nome : "Selecione o paciente"} ·{" "}
+            {itens.length === 0
+              ? "sem horário"
+              : itens.length === 1
+                ? `${hhmm(itens[0]!.inicio)} — ${itens[0]!.medico_nome}`
+                : `${itens.length} serviços no mesmo atendimento`}
           </div>
           <Button
             size="lg"
