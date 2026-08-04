@@ -452,17 +452,40 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
           }
           bodyClassName="bg-background"
         >
-          <VirtualList<PacienteV2>
-            items={visiveis}
-            estimateSize={compactPref ? 52 : 78}
-            overscan={10}
-            getKey={(p) => p.id}
-            renderItem={(p) => (
-              <div className="px-2 py-1">
-                <ClienteCard p={p} compact={compactPref} termo={modoBusca ? q.trim() : ""} onOpen={setDrawer} />
-              </div>
-            )}
-          />
+          <div
+            ref={listaRef}
+            role="listbox"
+            aria-label="Resultados de pacientes"
+            tabIndex={-1}
+            onKeyDown={onListaKeyDown}
+            onFocus={() => setNavTeclado(true)}
+          >
+            <VirtualList<PacienteV2>
+              items={visiveis}
+              estimateSize={compactPref ? 52 : 78}
+              overscan={10}
+              getKey={(p) => p.id}
+              renderItem={(p, i) => (
+                <div className="px-2 py-1" role="option" aria-selected={i === focoIdx}>
+                  <ClienteCard
+                    p={p}
+                    compact={compactPref}
+                    termo={modoBusca ? q.trim() : ""}
+                    index={i}
+                    active={i === focoIdx}
+                    onOpen={setDrawer}
+                  />
+                </div>
+              )}
+            />
+          </div>
+          {!loading && visiveis.length > 0 && (
+            <p className="px-2 pb-2 pt-1 text-[11px] text-muted-foreground">
+              Teclado: <kbd className="rounded border px-1">↑</kbd>/<kbd className="rounded border px-1">↓</kbd> navegar ·{" "}
+              <kbd className="rounded border px-1">Enter</kbd> abrir detalhes ·{" "}
+              <kbd className="rounded border px-1">Alt+Enter</kbd> abrir perfil
+            </p>
+          )}
         </ListShell>
         {!loading && ordenados.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
