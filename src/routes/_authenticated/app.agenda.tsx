@@ -3618,15 +3618,14 @@ function AgendaPage() {
                 <Textarea value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} className="resize-none rounded-lg" placeholder="Anotações internas (opcional)…" />
               </div>
               </fieldset>
-              <DialogFooter className="sticky bottom-0 bg-white pt-3 pb-2 -mx-6 px-6 border-t border-slate-200 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] mt-4 flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
+              <DialogFooter className="sticky bottom-0 z-10 bg-white/80 backdrop-blur-md pt-3 pb-3 -mx-6 px-6 border-t border-slate-100 mt-5 flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
                 {editing && pagosSet.has(editing.id) ? (
-                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>Fechar</Button>
+                  <Button type="button" variant="outline" className="h-10 rounded-lg" onClick={() => setOpen(false)}>Fechar</Button>
                 ) : (
                   <>
                     <Button
                       type="button"
-                      variant="outline"
-                      size="sm"
+                      variant="ghost"
                       onClick={() => {
                         setDescForm({
                           tipo: descontoPendente?.tipo ?? "valor",
@@ -3636,9 +3635,10 @@ function AgendaPage() {
                         });
                         setDescontoDlgOpen(true);
                       }}
-                      className={"sm:self-center " + (descontoPendente ? "border-amber-500 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30" : "")}
+                      className={"h-10 rounded-lg sm:self-center text-slate-600 hover:text-slate-900 " + (descontoPendente ? "text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30" : "")}
                       title="Aplicar desconto (exige autorização da supervisão)"
                     >
+                      <Percent className="h-4 w-4 mr-1.5" />
                       {descontoPendente
                         ? `Desconto: ${descontoPendente.tipo === "percentual" ? `${descontoPendente.input}%` : `R$ ${descontoPendente.input}`}`
                         : "Desconto"}
@@ -3648,10 +3648,10 @@ function AgendaPage() {
                       type="button"
                       disabled={saving || !form.paciente_id}
                       onClick={(e) => { emitirNotaAposRef.current = false; submit(e as unknown as FormEvent, true); }}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                      className="h-10 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
                       title="Salva, registra pagamento e imprime a GR em A4"
                     >
-                      Pagar/Imprimir
+                      <Printer className="h-4 w-4 mr-1.5" /> Pagar/Imprimir
                     </Button>
                     <Button
                       type="button"
@@ -3668,12 +3668,14 @@ function AgendaPage() {
                         emitirNotaAposRef.current = true;
                         submit(e as unknown as FormEvent, true);
                       }}
-                      className="border-sky-600 text-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/30"
+                      className="h-10 rounded-lg border-sky-200 text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:hover:bg-sky-950/30"
                       title="Salva, registra pagamento, imprime a GR e abre a emissão da NFS-e (a nota é salva ao imprimir o A4)"
                     >
-                      Pagar + NFS-e
+                      <CreditCard className="h-4 w-4 mr-1.5" /> Pagar + NFS-e
                     </Button>
-                    <Button type="submit" variant="secondary" data-primary disabled={saving || !form.paciente_id} title={!form.paciente_id ? "Selecione um paciente cadastrado antes de salvar" : undefined}>{saving ? "Salvando…" : "Salvar"}</Button>
+                    <Button type="submit" data-primary disabled={saving || !form.paciente_id} className="h-10 rounded-lg shadow-sm" title={!form.paciente_id ? "Selecione um paciente cadastrado antes de salvar" : undefined}>
+                      <Save className="h-4 w-4 mr-1.5" />{saving ? "Salvando…" : "Salvar"}
+                    </Button>
                     </div>
                   </>
                 )}
