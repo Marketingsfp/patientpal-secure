@@ -270,6 +270,7 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   }, [q, campo, convenio, tab, chips, pageSize, prefsProntas]);
 
   const kpi: ClientesKpi = useMemo(() => {
+    // (KPIs abaixo)
     let ativos = 0, inativos = 0, incompletos = 0, duplicados = 0;
     let associados = 0, cartao = 0, particular = 0;
     for (const p of filtrados) {
