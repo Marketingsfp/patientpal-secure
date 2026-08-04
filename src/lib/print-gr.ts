@@ -98,10 +98,90 @@ function multiplicarVias(ticketsHtml: string, nVias: number): string {
 
 // Estilos extras para vias (rótulo e quebra de página).
 const VIA_CSS = `
-  .via-label { text-align: center; font-weight: 700; border: 1px solid #000; padding: 2px 4px; margin: 0 2mm 4px; font-size: 9pt; letter-spacing: 1px; }
+  .via-label { text-align: center; font-weight: 600; border: 1px solid #cbd5e1; border-radius: 6px; padding: 2px 6px; margin: 0 2mm 4px; font-size: 8pt; letter-spacing: 1.2px; color: #475569; text-transform: uppercase; }
   .via-wrap { width: 100%; }
   @media print { .via-wrap { break-after: page; } .via-wrap:last-child { break-after: auto; } }
 `;
+
+/**
+ * Folha de estilos compartilhada da GR — layout moderno (sans-serif, sem
+ * traços em ASCII, hierarquia tipográfica clara) mantendo o formato 80mm.
+ */
+const GR_CSS = `
+  @page { size: 80mm auto; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif; font-size: 9.5pt; line-height: 1.35; }
+  .ticket { width: 76mm; padding: 4mm 3.5mm 6mm; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; margin: 1mm auto; }
+  .center { text-align: center; }
+  .right  { text-align: right; }
+  .muted  { color: #64748b; }
+  .divider { border-top: 1px dashed #cbd5e1; margin: 3mm 0; }
+  .clinic-name { text-align: center; font-size: 11.5pt; font-weight: 700; letter-spacing: .2px; color: #0f172a; }
+  .clinic-sub { text-align: center; font-size: 7.5pt; color: #64748b; line-height: 1.3; margin-top: .5mm; }
+  .doc-title { text-align: center; font-size: 10pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #0f172a; }
+  .doc-subtitle { text-align: center; font-size: 7.5pt; letter-spacing: 1px; color: #64748b; text-transform: uppercase; margin-top: .5mm; }
+  .pat-name { font-size: 11pt; font-weight: 700; color: #0f172a; line-height: 1.2; }
+  .grid2 { display: flex; flex-wrap: wrap; margin-top: 2mm; }
+  .cell { width: 50%; padding-right: 2mm; margin-bottom: 1.6mm; }
+  .lbl { display: block; font-size: 6.5pt; letter-spacing: .8px; text-transform: uppercase; color: #64748b; }
+  .val { display: block; font-size: 9pt; font-weight: 600; color: #0f172a; word-break: break-word; }
+  .kv { display: flex; justify-content: space-between; align-items: baseline; gap: 3mm; margin-bottom: 1.2mm; }
+  .kv .k { font-size: 7pt; letter-spacing: .8px; text-transform: uppercase; color: #64748b; white-space: nowrap; }
+  .kv .v { font-size: 9pt; font-weight: 600; color: #0f172a; text-align: right; }
+  .badge { display: inline-block; background: #0f172a; color: #fff; border-radius: 5px; padding: 0.6mm 2mm; font-size: 9.5pt; font-weight: 700; letter-spacing: .5px; }
+  .svc-head { display: flex; font-size: 6.5pt; letter-spacing: 1px; text-transform: uppercase; color: #64748b; padding-bottom: 1mm; border-bottom: 1px solid #e2e8f0; }
+  .svc-row { display: flex; padding: 1.2mm 0; border-bottom: 1px solid #f1f5f9; }
+  .svc-qtd { width: 10mm; flex: none; font-size: 9pt; font-weight: 600; }
+  .svc-nome { flex: 1; font-size: 9pt; font-weight: 500; color: #0f172a; word-break: break-word; }
+  .total { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 3mm; }
+  .total-lbl { font-size: 8.5pt; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; color: #0f172a; }
+  .total-forma { font-size: 6.8pt; letter-spacing: .8px; text-transform: uppercase; color: #64748b; }
+  .total-val { font-size: 16pt; font-weight: 700; line-height: 1; color: #0f172a; font-variant-numeric: tabular-nums; }
+  .split .kv .v { color: #475569; font-weight: 600; }
+  .foot { display: flex; justify-content: space-between; gap: 2mm; font-size: 7pt; color: #94a3b8; letter-spacing: .3px; }
+  ${VIA_CSS}
+`;
+
+/** Rótulo + valor em linha (label à esquerda, valor à direita). */
+const kv = (k: string, v: string) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+/** Célula de grid 2 colunas (rótulo pequeno em cima, valor destacado embaixo). */
+const cell = (k: string, v: string) => `<div class="cell"><span class="lbl">${k}</span><span class="val">${v}</span></div>`;
+
+/** Bloco de dados do paciente: nome à esquerda + grid de 2 colunas. */
+function blocoPaciente(p: {
+  nome: string;
+  prontuario?: string | null;
+  cpf?: string | null;
+  telefone?: string | null;
+  nascimento?: string | null;
+}): string {
+  const cells = [
+    p.prontuario ? cell("Prontuário", esc(p.prontuario)) : "",
+    p.cpf ? cell("CPF", esc(p.cpf)) : "",
+    p.telefone ? cell("Fone", esc(p.telefone)) : "",
+    p.nascimento ? cell("Nasc.", p.nascimento) : "",
+  ].join("");
+  return `<div class="pat-name">${esc(p.nome)}</div>${cells ? `<div class="grid2">${cells}</div>` : ""}`;
+}
+
+/** Cabeçalho da clínica. */
+function blocoClinica(c: { nome?: string | null; telefone?: string | null; cnpj?: string | null } | null, enderecoHtml: string): string {
+  const sub = [enderecoHtml, c?.telefone ? `Fone ${esc(c.telefone)}` : "", c?.cnpj ? `CNPJ ${esc(c.cnpj)}` : ""].filter(Boolean).join(" · ");
+  return `<div class="clinic-name">${esc(c?.nome ?? "")}</div>${sub ? `<div class="clinic-sub">${sub}</div>` : ""}`;
+}
+
+/** Tabela de serviços. */
+function blocoServicos(linhas: Array<{ qtd: string; nome: string }>, tituloCol = "Serviço"): string {
+  return `<div class="svc-head"><div class="svc-qtd">Qtd</div><div class="svc-nome">${tituloCol}</div></div>${linhas
+    .map((l) => `<div class="svc-row"><div class="svc-qtd">${esc(l.qtd)}</div><div class="svc-nome">${esc(l.nome)}</div></div>`)
+    .join("")}`;
+}
+
+/** Bloco de total recebido. */
+function blocoTotal(valorFmt: string, formaLbl: string): string {
+  return `<div class="total"><div><div class="total-lbl">Valor recebido</div><div class="total-forma">(${esc(formaLbl)})</div></div><div class="total-val">${valorFmt}</div></div>`;
+}
 
 // Imprime o HTML diretamente via iframe oculto — sem abrir nova janela.
 // O navegador ainda exibirá a caixa de diálogo de impressão padrão (não há
