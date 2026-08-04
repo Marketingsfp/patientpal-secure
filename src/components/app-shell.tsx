@@ -716,7 +716,12 @@ export function AppShell() {
               type="button"
               onClick={() => { setSubsystem(null); navigate({ to: "/app" }); }}
               title="Menu principal"
-              className={`w-full flex items-center gap-2 rounded-md bg-white/10 hover:bg-white/20 transition-colors text-white text-xs font-medium ${collapsedUi ? "justify-center px-2 py-2" : "px-3 py-2"}`}
+              aria-current={location.pathname === "/app" ? "page" : undefined}
+              className={`w-full flex items-center gap-2 rounded-md transition-colors text-white text-xs font-medium ${
+                location.pathname === "/app"
+                  ? "bg-white/25 font-semibold"
+                  : "bg-transparent hover:bg-white/10"
+              } ${collapsedUi ? "justify-center px-2 py-2" : "px-3 py-2"}`}
             >
               <LayoutGrid className="h-4 w-4 shrink-0" />
               {!collapsedUi && <span className="flex-1 truncate text-left">Menu</span>}
@@ -725,10 +730,11 @@ export function AppShell() {
               to="/app/painel"
               onClick={() => setMobileNavOpen(false)}
               title="Início"
+              aria-current={location.pathname === "/app/painel" ? "page" : undefined}
               className={`w-full flex items-center gap-2 rounded-md transition-colors text-white text-xs font-medium ${
-                isNavActive(location.pathname, "/app/painel")
+                location.pathname === "/app/painel"
                   ? "bg-white/25 font-semibold"
-                  : "bg-white/10 hover:bg-white/20"
+                  : "bg-transparent hover:bg-white/10"
               } ${collapsedUi ? "justify-center px-2 py-2" : "px-3 py-2"}`}
             >
               <Home className="h-4 w-4 shrink-0" />
