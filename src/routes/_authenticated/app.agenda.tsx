@@ -43,6 +43,7 @@ import { SupervisorAuthDialog } from "@/components/supervisor-auth-dialog";
 import {
   CalendarDays, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Search, X,
   MoreHorizontal, Star, Flag, Printer, Download, Video, UserPlus, Clock, DollarSign, ShieldCheck, BadgeCheck, IdCard, Play, FileText,
+  Stethoscope, Save, CreditCard, Percent, ClipboardList, Activity,
 } from "lucide-react";
 import { printGuiaAtendimento, printGuiaAtendimentoAgrupada } from "@/lib/print-gr";
 import { VoiceInput } from "@/components/voice-input";
@@ -3302,7 +3303,7 @@ function AgendaPage() {
               <Plus className="h-4 w-4 mr-1.5" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200 shadow-2xl">
+          <DialogContent className="max-w-xl max-h-[95vh] overflow-y-auto p-0 gap-0 rounded-xl border-slate-200 shadow-2xl">
             <DialogHeader className="space-y-1 px-6 pt-5 pb-4 border-b border-slate-100 bg-gradient-to-b from-slate-50/60 to-transparent">
               <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900">
                 {editing
@@ -3315,7 +3316,7 @@ function AgendaPage() {
                   : "Preencha os dados abaixo. Campos com * são obrigatórios."}
               </p>
             </DialogHeader>
-            <form onSubmit={submit} className="space-y-4 px-6 py-5">
+            <form onSubmit={submit} className="space-y-5 pl-6 pr-6 sm:pr-7 py-5">
               {editing && pagosSet.has(editing.id) && (
                 <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 text-amber-900 px-3 py-2 text-xs">
                   <span className="mt-0.5">⚠️</span>
@@ -3326,33 +3327,35 @@ function AgendaPage() {
                 disabled={editing ? pagosSet.has(editing.id) : false}
                 className="space-y-4 contents disabled:opacity-90"
               >
-              <div className="space-y-1.5 rounded-xl border border-primary/25 bg-primary/[0.04] p-3 text-xs">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Label className="text-[10px] font-semibold uppercase tracking-widest text-primary whitespace-nowrap">Nº do orçamento</Label>
+              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+                <Label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                  <FileText className="h-3.5 w-3.5 text-slate-400" /> Nº do orçamento
+                </Label>
+                <div className="flex items-center gap-2">
                   <Input
                     inputMode="numeric"
                     placeholder="Ex.: 123"
                     value={form.orcamento_numero}
                     onChange={(e) => setForm(f => ({ ...f, orcamento_numero: e.target.value.replace(/\D/g, "") }))}
                     disabled={!!form.orcamento_id || (editing ? pagosSet.has(editing.id) : false)}
-                    className="max-w-[110px] h-8 bg-white"
+                    className="h-10 rounded-lg bg-white max-w-[160px]"
                   />
                   {form.orcamento_id ? (
-                    <Button type="button" variant="outline" size="sm" onClick={limparOrcamento}
+                    <Button type="button" variant="outline" className="h-10 rounded-lg bg-white" onClick={limparOrcamento}
                       disabled={editing ? pagosSet.has(editing.id) : false}>
                       Limpar
                     </Button>
                   ) : (
-                    <Button type="button" variant="outline" size="sm" onClick={() => void buscarOrcamento()} disabled={buscandoOrc}>
-                      {buscandoOrc ? "Buscando…" : "Buscar"}
+                    <Button type="button" variant="outline" className="h-10 rounded-lg bg-white" onClick={() => void buscarOrcamento()} disabled={buscandoOrc}>
+                      <Search className="h-4 w-4 mr-1.5" />{buscandoOrc ? "Buscando…" : "Buscar"}
                     </Button>
                   )}
-                  {!form.orcamento_id && (
-                    <span className="text-[11px] text-slate-500 leading-snug flex-1 min-w-[140px]">
-                      Opcional — vincula qualquer orçamento (exames, consultas, procedimentos) em uma única ficha.
-                    </span>
-                  )}
                 </div>
+                {!form.orcamento_id && (
+                  <p className="text-[11px] text-slate-500 leading-snug">
+                    Opcional — vincula qualquer orçamento (exames, consultas, procedimentos) em uma única ficha.
+                  </p>
+                )}
                 {form.orcamento_id && (
                   <div className="text-xs text-slate-600 space-y-1 pt-1 border-t border-primary/15">
                     <p className="font-medium text-slate-900">
@@ -3367,7 +3370,9 @@ function AgendaPage() {
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">Paciente <span className="text-rose-500">*</span></Label>
+                <Label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                  <UserPlus className="h-3.5 w-3.5 text-slate-400" /> Paciente <span className="text-rose-500">*</span>
+                </Label>
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <PatientSearchInput
@@ -3391,7 +3396,7 @@ function AgendaPage() {
                       enableVoice
                     />
                   </div>
-                  <Button type="button" variant="outline" size="icon" title="Cadastrar novo paciente"
+                  <Button type="button" variant="outline" size="icon" className="h-10 w-10 rounded-lg shrink-0" title="Cadastrar novo paciente"
                     disabled={editing ? pagosSet.has(editing.id) : false}
                     onClick={() => { setNovoPac(p => ({ ...p, nome: form.paciente_nome })); setNovoPacOpen(true); }}>
                     <UserPlus className="h-4 w-4" />
@@ -3425,12 +3430,14 @@ function AgendaPage() {
               </div>
               {contratoPacienteInfo && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-slate-700">Tipo de atendimento</Label>
+                  <Label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                    <BadgeCheck className="h-3.5 w-3.5 text-slate-400" /> Tipo de atendimento
+                  </Label>
                   <Select
                     value={form.tipo_atendimento}
                     onValueChange={(v) => setForm((f) => ({ ...f, tipo_atendimento: v as TipoAtendimento }))}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-10 rounded-lg"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="convenio">
                         Convênio — {contratoPacienteInfo.convenioNome}
@@ -3453,7 +3460,9 @@ function AgendaPage() {
                 </div>
               )}
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">Médico ou Exame <span className="text-rose-500">*</span></Label>
+                <Label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                  <Stethoscope className="h-3.5 w-3.5 text-slate-400" /> Médico ou Exame <span className="text-rose-500">*</span>
+                </Label>
                 <SearchableSelect
                   value={form.medico_id || "none"}
                   disabled={!!editing}
@@ -3492,11 +3501,15 @@ function AgendaPage() {
               <div className="space-y-1.5">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Data consulta/exame <span className="text-rose-500">*</span></Label>
-                    <Input type="datetime-local" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
+                    <Label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                      <CalendarDays className="h-3.5 w-3.5 text-slate-400" /> Data consulta/exame <span className="text-rose-500">*</span>
+                    </Label>
+                    <Input type="datetime-local" className="h-10 rounded-lg" value={form.inicio} onChange={(e) => setForm(f => ({ ...f, inicio: e.target.value, fim: calcFimAuto(e.target.value, f.medico_id) }))} required />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Data de pagamento</Label>
+                    <Label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                      <DollarSign className="h-3.5 w-3.5 text-slate-400" /> Data de pagamento
+                    </Label>
                     <Input
                       type="text"
                       value={form.data_pagamento
@@ -3505,7 +3518,7 @@ function AgendaPage() {
                       readOnly
                       disabled
                       tabIndex={-1}
-                      className="bg-slate-50 cursor-not-allowed text-slate-500"
+                      className="h-10 rounded-lg bg-slate-50 cursor-not-allowed text-slate-500"
                     />
                   </div>
                 </div>
@@ -3514,7 +3527,9 @@ function AgendaPage() {
                 </p>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">Serviço</Label>
+                <Label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                  <Activity className="h-3.5 w-3.5 text-slate-400" /> Serviço
+                </Label>
                 {form.medico_id ? (
                   (procOpcoesPorMedico.get(form.medico_id)?.length || procPorMedico.get(form.medico_id)?.size || procNomesPorMedico.get(form.medico_id)?.size) ? (
                     <p className="text-[11px] text-slate-500">Mostrando apenas serviços configurados para este médico.</p>
@@ -3569,10 +3584,12 @@ function AgendaPage() {
                 })()}
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">Status</Label>
+                <Label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5">
+                  <ClipboardList className="h-3.5 w-3.5 text-slate-400" /> Status
+                </Label>
                 {editing && !isSlotLivre(editing.paciente_nome) ? (
                   <Select value={form.status} onValueChange={(v) => setForm(f => ({ ...f, status: v as Status }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-10 rounded-lg"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {(Object.keys(STATUS_LABEL) as Status[]).map(s => (
                         <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
@@ -3580,7 +3597,7 @@ function AgendaPage() {
                     </SelectContent>
                   </Select>
                 ) : (
-                  <Input value={STATUS_LABEL[form.status]} disabled readOnly className="bg-slate-50 text-slate-500" />
+                  <Input value={STATUS_LABEL[form.status]} disabled readOnly className="h-10 rounded-lg bg-slate-50 text-slate-500" />
                 )}
                 {(!editing || isSlotLivre(editing.paciente_nome)) && (
                   <p className="text-[11px] text-slate-500">Status definido automaticamente. Pode ser alterado depois pelo menu de ações.</p>
@@ -3588,7 +3605,9 @@ function AgendaPage() {
               </div>
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs font-semibold text-slate-700">Observações</Label>
+                  <Label className="text-[11px] uppercase tracking-wider font-semibold text-slate-500 flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 text-slate-400" /> Observações
+                  </Label>
                   <VoiceInput
                     size="sm"
                     currentValue={form.observacoes}
@@ -3596,18 +3615,17 @@ function AgendaPage() {
                     title="Ditar observações"
                   />
                 </div>
-                <Textarea value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} className="resize-none" placeholder="Anotações internas (opcional)…" />
+                <Textarea value={form.observacoes} onChange={(e) => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={2} className="resize-none rounded-lg" placeholder="Anotações internas (opcional)…" />
               </div>
               </fieldset>
-              <DialogFooter className="sticky bottom-0 bg-white pt-3 pb-2 -mx-6 px-6 border-t border-slate-200 shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] mt-4 flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
+              <DialogFooter className="sticky bottom-0 z-10 bg-white/80 backdrop-blur-md pt-3 pb-3 -mx-6 px-6 border-t border-slate-100 mt-5 flex sm:flex-row flex-col gap-2 sm:items-center sm:justify-between">
                 {editing && pagosSet.has(editing.id) ? (
-                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>Fechar</Button>
+                  <Button type="button" variant="outline" className="h-10 rounded-lg" onClick={() => setOpen(false)}>Fechar</Button>
                 ) : (
                   <>
                     <Button
                       type="button"
-                      variant="outline"
-                      size="sm"
+                      variant="ghost"
                       onClick={() => {
                         setDescForm({
                           tipo: descontoPendente?.tipo ?? "valor",
@@ -3617,9 +3635,10 @@ function AgendaPage() {
                         });
                         setDescontoDlgOpen(true);
                       }}
-                      className={"sm:self-center " + (descontoPendente ? "border-amber-500 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30" : "")}
+                      className={"h-10 rounded-lg sm:self-center text-slate-600 hover:text-slate-900 " + (descontoPendente ? "text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30" : "")}
                       title="Aplicar desconto (exige autorização da supervisão)"
                     >
+                      <Percent className="h-4 w-4 mr-1.5" />
                       {descontoPendente
                         ? `Desconto: ${descontoPendente.tipo === "percentual" ? `${descontoPendente.input}%` : `R$ ${descontoPendente.input}`}`
                         : "Desconto"}
@@ -3629,10 +3648,10 @@ function AgendaPage() {
                       type="button"
                       disabled={saving || !form.paciente_id}
                       onClick={(e) => { emitirNotaAposRef.current = false; submit(e as unknown as FormEvent, true); }}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                      className="h-10 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
                       title="Salva, registra pagamento e imprime a GR em A4"
                     >
-                      Pagar/Imprimir
+                      <Printer className="h-4 w-4 mr-1.5" /> Pagar/Imprimir
                     </Button>
                     <Button
                       type="button"
@@ -3649,12 +3668,14 @@ function AgendaPage() {
                         emitirNotaAposRef.current = true;
                         submit(e as unknown as FormEvent, true);
                       }}
-                      className="border-sky-600 text-sky-700 hover:bg-sky-50 dark:hover:bg-sky-950/30"
+                      className="h-10 rounded-lg border-sky-200 text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:hover:bg-sky-950/30"
                       title="Salva, registra pagamento, imprime a GR e abre a emissão da NFS-e (a nota é salva ao imprimir o A4)"
                     >
-                      Pagar + NFS-e
+                      <CreditCard className="h-4 w-4 mr-1.5" /> Pagar + NFS-e
                     </Button>
-                    <Button type="submit" variant="secondary" data-primary disabled={saving || !form.paciente_id} title={!form.paciente_id ? "Selecione um paciente cadastrado antes de salvar" : undefined}>{saving ? "Salvando…" : "Salvar"}</Button>
+                    <Button type="submit" data-primary disabled={saving || !form.paciente_id} className="h-10 rounded-lg shadow-sm" title={!form.paciente_id ? "Selecione um paciente cadastrado antes de salvar" : undefined}>
+                      <Save className="h-4 w-4 mr-1.5" />{saving ? "Salvando…" : "Salvar"}
+                    </Button>
                     </div>
                   </>
                 )}
