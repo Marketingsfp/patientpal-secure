@@ -534,9 +534,23 @@ export function AppShell() {
     const current = tgt.closest<HTMLElement>("[data-nav-focusable]");
     const idx = current ? items.indexOf(current) : -1;
 
+    const ensureVisible = (el: HTMLElement) => {
+      const rootRect = navRoot.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const gap = 16;
+      if (elRect.top < rootRect.top + gap) {
+        navRoot.scrollBy({ top: elRect.top - (rootRect.top + gap), behavior: "smooth" });
+      } else if (elRect.bottom > rootRect.bottom - gap) {
+        navRoot.scrollBy({ top: elRect.bottom - (rootRect.bottom - gap), behavior: "smooth" });
+      }
+    };
+
     const focusAt = (i: number) => {
       const el = items[Math.max(0, Math.min(items.length - 1, i))];
-      el?.focus({ preventScroll: false });
+      if (!el) return;
+      // Foca sem pular a rolagem nativa e então alinha suavemente dentro da nav.
+      el.focus({ preventScroll: true });
+      ensureVisible(el);
     };
 
     switch (e.key) {
@@ -565,6 +579,17 @@ export function AppShell() {
         setOpenGroups((prev) =>
           (prev[groupKey] ?? false) === shouldOpen ? prev : { ...prev, [groupKey]: shouldOpen },
         );
+        if (shouldOpen && current) {
+          // Após expandir, revela os subitens longos mantendo o grupo visível.
+          window.requestAnimationFrame(() => {
+            const last = navRoot.querySelectorAll<HTMLElement>(
+              `[data-nav-group-of="${groupKey}"]`,
+            );
+            const target = last.length ? last[last.length - 1] : current;
+            ensureVisible(target);
+            ensureVisible(current);
+          });
+        }
         return;
       }
       default:
