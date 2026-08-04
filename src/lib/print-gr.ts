@@ -506,83 +506,64 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
         .map((d) => {
           const lbl = FORMA_LABEL[d.forma] ?? d.forma.toUpperCase();
           const trocoTxt = d.troco > 0 ? ` (RECEB. ${fmtBRL(d.recebido)} / TROCO ${fmtBRL(d.troco)})` : "";
-          return `<tr><td class="label">${esc(lbl)}:</td><td class="v right">${fmtBRL(d.pago)}${esc(trocoTxt)}</td></tr>`;
+          return kv(esc(lbl), `${fmtBRL(d.pago)}${esc(trocoTxt)}`);
         })
         .join("")
     : "";
 
-  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).join("<br/>");
+  const endereco = [c?.endereco, c?.cidade && c?.estado ? `${c.cidade} - ${c.estado}` : c?.cidade ?? c?.estado].filter(Boolean).map((s) => esc(String(s))).join(" · ");
 
   const viaTexto = `IMPRESSÃO Nº ${viaNumero}`;
 
   const ticketHtml = `
   <div class="ticket">
-    <div class="center bold">${esc(c?.nome ?? "")}</div>
-    <div class="center sm">${endereco}</div>
-    ${c?.telefone ? `<div class="center sm">FONE ${esc(c.telefone)}</div>` : ""}
-    ${c?.cnpj ? `<div class="center sm">CNPJ ${esc(c.cnpj)}</div>` : ""}
+    ${blocoClinica(c, endereco)}
 
-    <div class="sep"></div>
-    <div class="center lg">GUIA DE ATENDIMENTO</div>
-    <div class="sep"></div>
+    <div class="divider"></div>
+    <div class="doc-title">Guia de Atendimento</div>
+    <div class="divider"></div>
 
-    <div class="center bold">${esc(paciente?.nome ?? a.paciente_nome)}</div>
-    ${prontuario ? `<div class="center sm">PRONTUÁRIO: <span class="v">${esc(prontuario)}</span></div>` : ""}
-    ${paciente?.cpf ? `<div class="center sm">CPF: <span class="v">${esc(paciente.cpf)}</span></div>` : ""}
-    ${paciente?.telefone ? `<div class="center sm">FONE: <span class="v">${esc(paciente.telefone)}</span></div>` : ""}
-    ${paciente?.data_nascimento ? `<div class="center sm">NASC: <span class="v">${fmtDataSimples(paciente.data_nascimento)}</span></div>` : ""}
+    ${blocoPaciente({
+      nome: paciente?.nome ?? a.paciente_nome,
+      prontuario,
+      cpf: paciente?.cpf,
+      telefone: paciente?.telefone,
+      nascimento: paciente?.data_nascimento ? fmtDataSimples(paciente.data_nascimento) : null,
+    })}
 
-    <div class="sep"></div>
+    <div class="divider"></div>
 
-    <table>
-      <tr><td class="label" colspan="2" style="white-space:nowrap">FICHA: <span class="v">${ficha}</span></td></tr>
-      <tr><td class="label" colspan="2" style="white-space:nowrap">PROFISSIONAL: <span class="v">${esc(medicoNome)}</span></td></tr>
-      <tr><td class="label" colspan="2" style="white-space:nowrap">HORÁRIO: <span class="v">${fmtData(a.inicio)}</span></td></tr>
-      ${usuarioFinalNome ? `<tr><td class="label" colspan="2" style="white-space:nowrap">USUÁRIO: <span class="v">${esc(usuarioFinalNome)}</span></td></tr>` : ""}
-    </table>
+    ${kv("Ficha", `<span class="badge">${ficha}</span>`)}
+    ${kv("Profissional", esc(medicoNome))}
+    ${kv("Horário", fmtData(a.inicio))}
+    ${usuarioFinalNome ? kv("Usuário", esc(usuarioFinalNome)) : ""}
 
-    <div class="sep"></div>
+    <div class="divider"></div>
 
-    <table>
-      <tr class="bold">
-        <td style="width:14mm">QTD</td>
-        <td>SERVIÇO</td>
-      </tr>
-      <tr>
-        <td>1</td>
-        <td>${esc(procNome)}</td>
-      </tr>
-    </table>
+    ${blocoServicos([{ qtd: "1", nome: procNome }])}
 
     ${valor > 0 ? `
-    <div class="row" style="margin-top:8px">
-      <div class="bold">VALOR RECEBIDO<br/><span class="sm">(${esc(isMisto ? "MISTO" : formaLbl)})</span></div>
-      <div class="bold lg">${fmtBRL(valor)}</div>
-    </div>
+    ${blocoTotal(fmtBRL(valor), isMisto ? "MISTO" : formaLbl)}
 
-    ${isMisto ? `
-    <table style="margin-top:4px">
-      ${detalheRows}
-    </table>
-    ` : ""}
+    ${isMisto ? `<div style="margin-top:2mm">${detalheRows}</div>` : ""}
 
     ${pagamento?.forma_pagamento === "cartao_credito" ? `
-    <table>
-      ${bandeiraTxt ? `<tr><td class="label">BANDEIRA:</td><td class="v right">${esc(bandeiraTxt)}</td></tr>` : ""}
-      <tr><td class="label">PARCELAMENTO:</td><td class="v right">${parcelasTxt}</td></tr>
-    </table>
+    <div style="margin-top:2mm">
+      ${bandeiraTxt ? kv("Bandeira", esc(bandeiraTxt)) : ""}
+      ${kv("Parcelamento", parcelasTxt)}
+    </div>
     ` : ""}
 
-    <div class="sep"></div>
-    <table>
-      <tr><td class="label">CLINICA:</td><td class="v right">${fmtBRL(clinica)}</td></tr>
-      <tr><td class="label">PRESTADOR:</td><td class="v right">${fmtBRL(prestador)}</td></tr>
-    </table>
+    <div class="divider"></div>
+    <div class="split">
+      ${kv("Clínica", fmtBRL(clinica))}
+      ${kv("Prestador", fmtBRL(prestador))}
+    </div>
     ` : ""}
 
-    <div class="sep"></div>
-    <div class="row sm">
-      <div>DATA IMPRESSAO</div>
+    <div class="divider"></div>
+    <div class="foot">
+      <div>Data impressão</div>
       <div>${fmtData(new Date().toISOString())}${viaNumero >= 2 ? ` — ${viaTexto}` : ""}</div>
     </div>
   </div>`;
@@ -594,24 +575,7 @@ async function printGuiaAtendimentoCore({ agendamentoId, clinicaId, usuarioNome,
 <html lang="pt-BR"><head><meta charset="utf-8" />
 <title>GR - ${esc(paciente?.nome ?? a.paciente_nome)}</title>
 <style>
-  @page { size: 80mm auto; margin: 0; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #fff; color: #000; }
-  body { font-family: "Courier New", "Consolas", monospace; font-size: 11pt; line-height: 1.25; }
-  .ticket { width: 76mm; padding: 3mm 2mm 6mm; }
-  .center { text-align: center; }
-  .right  { text-align: right; }
-  .bold   { font-weight: 700; }
-  .sm     { font-size: 9pt; }
-  .lg     { font-size: 13pt; font-weight: 700; }
-  .sep    { border-top: 1px dashed #000; margin: 6px 0; }
-  .row    { display: flex; justify-content: space-between; gap: 6px; }
-  table   { width: 100%; border-collapse: collapse; }
-  td      { padding: 1px 0; vertical-align: top; }
-  .label  { color: #000; }
-  .v      { font-weight: 700; }
-  h1, h2, h3 { margin: 0; }
-  ${VIA_CSS}
+  ${GR_CSS}
 </style></head>
 <body>
   ${corpoVias}
