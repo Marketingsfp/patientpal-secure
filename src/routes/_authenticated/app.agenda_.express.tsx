@@ -47,6 +47,9 @@ function hhmm(iso: string) {
 function ymd(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+function slotKey(s: Slot) {
+  return `${s.inicio}|${s.medico_id}|${s.agenda_id ?? "-"}|${s.especialidade_id ?? "-"}`;
+}
 
 function AgendaExpressPage() {
   const { clinicaAtual, modoTodas } = useClinica();
@@ -275,20 +278,31 @@ function AgendaExpressPage() {
                   <p className="text-sm font-medium text-slate-500">Nenhum horário livre nesta data.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto pr-1">
                   {slotsDoDia.map((s) => {
-                    const ativo = slot?.inicio === s.inicio && slot?.medico_id === s.medico_id;
+                    const chave = slotKey(s);
+                    const ativo = slot ? slotKey(slot) === chave : false;
+                    const legenda = s.agenda_nome ?? s.especialidade_nome ?? s.medico_nome;
                     return (
-                      <Button
-                        key={`${s.medico_id}-${s.inicio}`}
+                      <button
+                        key={chave}
                         type="button"
-                        variant={ativo ? "default" : "outline"}
                         onClick={() => setSlot(s)}
-                        title={s.medico_nome}
-                        className={cn("h-10 rounded-lg tabular-nums", ativo && "shadow-md")}
+                        title={`${hhmm(s.inicio)} · ${s.medico_nome}${s.agenda_nome ? ` · ${s.agenda_nome}` : ""}`}
+                        className={cn(
+                          "flex flex-col items-start gap-0.5 rounded-xl border-2 px-3 py-2 text-left transition-colors",
+                          ativo
+                            ? "border-[#1e1b6b] bg-[#1e1b6b] text-white shadow-md"
+                            : "border-slate-200 bg-slate-50 hover:border-[#1e1b6b]/40 hover:bg-white",
+                        )}
                       >
-                        {hhmm(s.inicio)}
-                      </Button>
+                        <span className={cn("text-base font-bold tabular-nums leading-none", ativo ? "text-white" : "text-slate-900")}>
+                          {hhmm(s.inicio)}
+                        </span>
+                        <span className={cn("w-full truncate text-[11px] leading-tight", ativo ? "text-white/75" : "text-slate-500")}>
+                          {legenda}
+                        </span>
+                      </button>
                     );
                   })}
                 </div>
