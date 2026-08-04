@@ -4,6 +4,7 @@ import { BarChart3, Download, Users, UserPlus, TrendingUp, TrendingDown, Activit
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useUserPref } from "@/hooks/use-user-pref";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,9 +52,9 @@ function RelatoriosPage() {
   const { clinicaAtual } = useClinica();
   const hoje = new Date().toISOString().slice(0, 10);
   const primeiroDoAno = `${new Date().getFullYear()}-01-01`;
-  const [from, setFrom] = useState(primeiroDoAno);
-  const [to, setTo] = useState(hoje);
-  const [showCustom, setShowCustom] = useState(false);
+  const [from, setFrom] = useUserPref("cb.relatorios.de", primeiroDoAno);
+  const [to, setTo] = useUserPref("cb.relatorios.ate", hoje);
+  const [showCustom, setShowCustom] = useUserPref("cb.relatorios.periodo-custom", false);
   const [drill, setDrill] = useState<null | {
     title: string;
     columns: { key: string; label: string; align?: "left" | "right" }[];

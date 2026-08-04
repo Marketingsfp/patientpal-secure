@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
+import { useUserPref } from "@/hooks/use-user-pref";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { MiniBarChart } from "@/components/charts/MiniBarChart";
 import { MiniPieChart } from "@/components/charts/MiniPieChart";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { exportToExcel } from "@/lib/export-csv";
 import { toast } from "sonner";
 import { mostrarErro } from "@/lib/traduzir-erro";
@@ -361,8 +363,9 @@ const RELATORIOS: Relatorio[] = [
 
 function RelatoriosPage() {
   const { clinicaAtual } = useClinica();
-  const [ini, setIni] = useState(mesAtras);
-  const [fim, setFim] = useState(hoje);
+  const [aba, setAba] = useUserPref("relatorios.aba", "dashboard");
+  const [ini, setIni] = useUserPref("relatorios.de", mesAtras);
+  const [fim, setFim] = useUserPref("relatorios.ate", hoje);
   const [loading, setLoading] = useState<string | null>(null);
 
   async function baixar(r: Relatorio) {
@@ -393,7 +396,7 @@ function RelatoriosPage() {
         <p className="text-muted-foreground">Visualize um dashboard ou baixe planilhas Excel.</p>
       </div>
 
-      <Tabs defaultValue="dashboard">
+      <Tabs value={aba} onValueChange={setAba}>
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3">
           <TabsList>
             <TabsTrigger value="dashboard" className="gap-2">
@@ -877,6 +880,10 @@ type AgendDiaRow = {
 
 function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; ini: string; fim: string }) {
   const [loading, setLoading] = useState(false);
+  const [ordem, setOrdem] = useUserPref<"recentes" | "antigos" | "paciente" | "consulta">(
+    "relatorios.agend-diario.ordem",
+    "recentes"
+  );
   const [rows, setRows] = useState<AgendDiaRow[]>([]);
   const [profMap, setProfMap] = useState<Map<string, string>>(new Map());
   const [setorMap, setSetorMap] = useState<Map<string, string>>(new Map()); // user_id -> setor nome
@@ -953,6 +960,14 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
   }, [clinicaId, ini, fim]);
 
   const agrupado = useMemo(() => {
+    const ordenar = (lista: AgendDiaRow[]) =>
+      [...lista].sort((a, b) => {
+        if (ordem === "antigos") return a.created_at.localeCompare(b.created_at);
+        if (ordem === "paciente")
+          return (a.paciente_nome ?? "").localeCompare(b.paciente_nome ?? "", "pt-BR");
+        if (ordem === "consulta") return a.inicio.localeCompare(b.inicio);
+        return b.created_at.localeCompare(a.created_at);
+      });
     const bySetor = new Map<string, Map<string, AgendDiaRow[]>>();
     for (const r of rows) {
       const uid = r.criado_por ?? "";
@@ -968,11 +983,11 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
         setor,
         total: Array.from(m.values()).reduce((acc, l) => acc + l.length, 0),
         atendentes: Array.from(m.entries())
-          .map(([nome, lista]) => ({ nome, lista }))
+          .map(([nome, lista]) => ({ nome, lista: ordenar(lista) }))
           .sort((a, b) => b.lista.length - a.lista.length),
       }))
       .sort((a, b) => b.total - a.total);
-  }, [rows, profMap, setorMap]);
+  }, [rows, profMap, setorMap, ordem]);
 
   const totalGeral = rows.length;
 
@@ -1012,6 +1027,18 @@ function AgendamentosDiarioView({ clinicaId, ini, fim }: { clinicaId?: string; i
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">Ordenar por</Label>
+            <Select value={ordem} onValueChange={(v) => setOrdem(v as typeof ordem)}>
+              <SelectTrigger className="h-9 w-[190px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recentes">Criação (mais recentes)</SelectItem>
+                <SelectItem value="antigos">Criação (mais antigos)</SelectItem>
+                <SelectItem value="consulta">Data da consulta</SelectItem>
+                <SelectItem value="paciente">Paciente (A–Z)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="text-right">
             <div className="text-xs text-muted-foreground">Total no período</div>
             <div className="text-2xl font-bold">{totalGeral}</div>
