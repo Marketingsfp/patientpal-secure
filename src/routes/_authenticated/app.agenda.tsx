@@ -3291,16 +3291,16 @@ function AgendaPage() {
           </div>
         </div>
       )}
-      <div className="flex justify-between items-start gap-4 mb-4">
+      <div className="flex justify-between items-center gap-4 mb-5">
         <div className="md:col-start-1 md:row-start-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 truncate">Agendas</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground">Filtre e gerencie os agendamentos da clínica.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 truncate">Agenda</h1>
+          <p className="text-sm text-slate-500">Gerencie os compromissos e horários da clínica</p>
         </div>
         <div className="shrink-0">
           <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-9 rounded-lg px-4 text-xs font-semibold shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Plus className="h-4 w-4 mr-1.5" /> Adicionar Encaixe
+            <Button size="sm" data-turbo-novo onClick={openNew} disabled={!clinicaAtual} className="h-10 rounded-lg px-4 text-sm font-medium shadow-sm bg-indigo-950 text-white hover:bg-indigo-950 hover:opacity-90 transition-opacity">
+              <Plus className="h-4 w-4 mr-2" /> Adicionar Encaixe
             </Button>
           </DialogTrigger>
           <DialogContent
