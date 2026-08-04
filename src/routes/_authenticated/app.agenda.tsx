@@ -4461,11 +4461,13 @@ function AgendaPage() {
         </div>
       )}
       {/* Totais + paginação topo */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-        <div className="flex gap-4">
-          <span>Total: <b className="text-foreground">{totais.total}</b></span>
-          <span>Confirmados: <b className="text-foreground">{totais.confirmados}</b></span>
-          <span>Realizados: <b className="text-foreground">{totais.realizados}</b></span>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm text-sm text-slate-500">
+        <div className="flex flex-wrap items-center gap-5">
+          <span>Total: <b className="text-slate-900 font-semibold tabular-nums">{totais.total}</b></span>
+          <span className="h-4 w-px bg-slate-200 hidden sm:block" aria-hidden />
+          <span>Confirmados: <b className="text-slate-900 font-semibold tabular-nums">{totais.confirmados}</b></span>
+          <span className="h-4 w-px bg-slate-200 hidden sm:block" aria-hidden />
+          <span>Realizados: <b className="text-slate-900 font-semibold tabular-nums">{totais.realizados}</b></span>
         </div>
         <Paginacao page={page} totalPages={totalPages} onChange={setPage} />
       </div>
@@ -4595,10 +4597,10 @@ function AgendaPage() {
       </div>
 
       {/* Tabela */}
-      <div className="hidden md:block min-w-0 max-w-full rounded-xl border border-slate-200/80 bg-white shadow-sm">
+      <div className="hidden md:block min-w-0 max-w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <Table className="min-w-[720px] xl:min-w-[980px]">
-          <TableHeader className="[&_th]:h-10 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500">
-            <TableRow className="bg-slate-50/50 hover:bg-slate-50/50 border-slate-200/80">
+          <TableHeader className="[&_th]:h-11 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500">
+            <TableRow className="bg-slate-50/60 hover:bg-slate-50/60 border-slate-100">
               <TableHead
                 className="w-10"
                 title="Selecione vários atendimentos do mesmo paciente para cobrar em um único pagamento (use o botão Opções acima)"
