@@ -117,7 +117,12 @@ export function AppointmentFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden">
+      <DialogContent
+        className="max-w-2xl p-0 gap-0 overflow-hidden"
+        onPointerDownOutside={undefined}
+        onInteractOutside={undefined}
+        onEscapeKeyDown={undefined}
+      >
         <DialogHeader className="border-b border-slate-100 px-6 py-5 text-left space-y-1">
           <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900">
             {editando ? "Editar agendamento" : "Novo agendamento"}
