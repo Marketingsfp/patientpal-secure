@@ -860,6 +860,8 @@ export function AppShell() {
                   type="button"
                   className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-semibold text-white shadow-sm shrink-0 cursor-pointer hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                   style={{ backgroundColor: clinicColor }}
+                  data-account-menu
+                  aria-label="Minha conta"
                   title="Conta"
                 >
                   {initial}

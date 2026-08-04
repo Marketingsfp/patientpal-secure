@@ -21,6 +21,22 @@ export function KeyboardShortcuts() {
   useEffect(() => {
     const isTyping = isTypingTarget;
 
+    // Sequência "G" + tecla → ir direto para as páginas mais usadas
+    const GO_MAP: Record<string, string> = {
+      a: "/app/agenda",
+      e: "/app/agenda/express",
+      c: "/app/caixa",
+      p: "/app/clientes",
+      r: "/app/recepcao",
+      v: "/app",
+    };
+    let goPending = false;
+    let goTimer: ReturnType<typeof setTimeout> | undefined;
+    const clearGo = () => {
+      goPending = false;
+      if (goTimer) clearTimeout(goTimer);
+    };
+
     const focusQuickSearch = () => {
       const target = document.querySelector<HTMLElement>("[data-quick-search]");
       if (!target) return false;
@@ -37,6 +53,46 @@ export function KeyboardShortcuts() {
     };
 
     const onKey = (e: KeyboardEvent) => {
+      // ===== Notificações / Conta / Ir para... =====
+      if (!isTyping(e.target) && !e.ctrlKey && !e.metaKey) {
+        // Alt+N → abrir notificações
+        if (e.altKey && (e.key === "n" || e.key === "N")) {
+          const bell = document.querySelector<HTMLButtonElement>("[data-notifications-trigger]");
+          if (bell) {
+            e.preventDefault();
+            bell.click();
+            return;
+          }
+        }
+        // Alt+P → abrir menu da conta / perfil
+        if (e.altKey && (e.key === "p" || e.key === "P")) {
+          const acc = document.querySelector<HTMLButtonElement>("[data-account-menu]");
+          if (acc) {
+            e.preventDefault();
+            acc.click();
+            return;
+          }
+        }
+        // "G" seguido de uma tecla → navegação direta
+        if (!e.altKey && !e.shiftKey) {
+          const key = e.key.toLowerCase();
+          if (goPending) {
+            clearGo();
+            const to = GO_MAP[key];
+            if (to) {
+              e.preventDefault();
+              navigate({ to });
+              return;
+            }
+          } else if (key === "g") {
+            goPending = true;
+            if (goTimer) clearTimeout(goTimer);
+            goTimer = setTimeout(() => { goPending = false; }, 1200);
+            return;
+          }
+        }
+      }
+
       // "?" abre o painel de ajuda
       if (e.key === "?" && !isTyping(e.target)) {
         e.preventDefault();
@@ -226,7 +282,10 @@ export function KeyboardShortcuts() {
     };
 
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      clearGo();
+    };
   }, [navigate]);
 
   return <ShortcutsHelpDialog open={helpOpen} onOpenChange={setHelpOpen} />;
@@ -247,8 +306,21 @@ function ShortcutsHelpDialog({
           { keys: ["?"], desc: "Abrir / fechar este painel" },
           { keys: ["/"], desc: "Focar busca rápida (paciente, etc.)" },
           { keys: ["Ctrl", "K"], desc: "Abrir busca global" },
+          { keys: ["Alt", "N"], desc: "Abrir notificações" },
+          { keys: ["Alt", "P"], desc: "Abrir minha conta / perfil" },
           { keys: ["Esc"], desc: "Fechar diálogos abertos" },
           { keys: ["Enter"], desc: "Confirmar ação principal do diálogo" },
+        ],
+      },
+      {
+        title: "Ir para (pressione G e depois a tecla)",
+        items: [
+          { keys: ["G", "V"], desc: "Visão geral" },
+          { keys: ["G", "A"], desc: "Agenda" },
+          { keys: ["G", "E"], desc: "Agenda Express" },
+          { keys: ["G", "C"], desc: "Caixa" },
+          { keys: ["G", "P"], desc: "Pacientes" },
+          { keys: ["G", "R"], desc: "Recepção" },
         ],
       },
       {
