@@ -852,15 +852,31 @@ export function AppShell() {
         </nav>
         </TooltipProvider>
 
-                {/* 🔥 BOTÃO DE PESQUISAR COM GRADIENTE (SEM CAIXA ALTA) */}
-                  <div className="px-3 py-2 border-t border-white/10 mt-auto shrink-0">
-            <Input
-              type="text"
-              placeholder="Buscar no menu…"
-              value={menuSearch}
-              onChange={(e) => setMenuSearch(e.target.value)}
-              className="w-full block text-center text-white bg-gradient-to-r from-[#005C97] via-[#363795] to-[#005C97] bg-[length:200%_auto] transition-all duration-500 hover:bg-[position:right_center] shadow-[0_0_20px_rgba(0,0,0,0.2)] rounded-xl outline-none border-none px-10 py-3 placeholder:text-white/70 focus:placeholder:opacity-0"
-            />
+                {/* 🔥 BUSCA DO MENU */}
+          <div className={`${collapsedUi ? "px-1" : "px-3"} py-2 border-t border-white/10 mt-auto shrink-0 overflow-hidden`}>
+            {collapsedUi ? (
+              <button
+                type="button"
+                title="Buscar no menu"
+                aria-label="Buscar no menu"
+                onClick={() => {
+                  setCollapsed(false);
+                  setTimeout(() => menuSearchRef.current?.focus(), 120);
+                }}
+                className="w-full flex items-center justify-center rounded-full px-2 py-2.5 text-white/85 hover:bg-white/10 hover:text-white transition-all outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                <Search className="h-4 w-4 shrink-0" />
+              </button>
+            ) : (
+              <Input
+                ref={menuSearchRef}
+                type="text"
+                placeholder="Buscar no menu…"
+                value={menuSearch}
+                onChange={(e) => setMenuSearch(e.target.value)}
+                className="w-full block text-center text-white bg-gradient-to-r from-[#005C97] via-[#363795] to-[#005C97] bg-[length:200%_auto] transition-all duration-500 hover:bg-[position:right_center] shadow-[0_0_20px_rgba(0,0,0,0.2)] rounded-xl outline-none border-none px-10 py-3 placeholder:text-white/70 focus:placeholder:opacity-0"
+              />
+            )}
           </div>
       </aside>
       </>
