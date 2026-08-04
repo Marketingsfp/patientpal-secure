@@ -716,7 +716,7 @@ export function AppShell() {
             const hideLabel = subsystem === "gestao-pessoas" && row.label === "RH";
             const open = collapsedUi || hideLabel || row.label === "Operação" ? true : (openGroups[row.label] ?? false);
             return (
-              <div key={row.label} className={`space-y-1 border-b border-white/10 pb-3 mb-3 last:border-0 last:pb-0 last:mb-0`}>
+              <div key={row.label} data-nav-group-of={row.label} className={`space-y-1 border-b border-white/10 pb-3 mb-3 last:border-0 last:pb-0 last:mb-0`}>
                 {!collapsedUi && !hideLabel && (
                   <button
                     type="button"
@@ -739,7 +739,7 @@ export function AppShell() {
                     const subKey = `${row.label}::${item.label}`;
                     const subOpen = collapsedUi ? true : (openGroups[subKey] ?? false);
                     return (
-                      <div key={subKey} className="space-y-1">
+                      <div key={subKey} data-nav-group-of={subKey} className="space-y-1">
                         {collapsedUi ? (
                           <NavTip show label={item.label}>
                           <div
