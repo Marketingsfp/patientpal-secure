@@ -259,6 +259,16 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const paginaAtual = Math.min(page, totalPaginas);
   const visiveis = ordenados.slice((paginaAtual - 1) * pageSize, paginaAtual * pageSize);
 
+  // Descrição dos filtros ativos, impressa no cabeçalho do PDF.
+  const resumoExport = [
+    q.trim() ? `busca “${q.trim()}”` : null,
+    tab !== "todos" ? (TAB_OPTS.find((t) => t.value === tab)?.label ?? null) : null,
+    convenio !== "todos"
+      ? convenio === "__particular__" ? "Particular" : `Convênio ${convenio}`
+      : null,
+    chips.length ? `filtros: ${chips.join(", ")}` : null,
+  ].filter(Boolean).join(" · ");
+
   // ---- Navegação por teclado nos resultados (roving tabindex) ----
   const listaRef = useRef<HTMLDivElement>(null);
   const [focoIdx, setFocoIdx] = useState(0);
