@@ -496,48 +496,61 @@ export function AppShell() {
     return leaves;
   }, [filteredNavRows, openGroups, collapsed, subsystem]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-      const navRoot = navScrollRef.current;
-      const tgt = e.target as HTMLElement | null;
-      if (tgt) {
-        const tag = tgt.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tgt.isContentEditable) return;
-        if (tgt.closest('[role="dialog"], [role="listbox"], [role="menu"], [role="combobox"]')) return;
-      }
-      const activeElement = typeof document !== "undefined" ? document.activeElement : null;
-      const isUsingSidebar = !!(
-        navRoot &&
-        ((tgt && navRoot.contains(tgt)) || (activeElement instanceof HTMLElement && navRoot.contains(activeElement)))
-      );
-      if (!isUsingSidebar) return;
-      if (flatNavLeaves.length === 0) return;
-      const path = location.pathname;
-      let idx = flatNavLeaves.reduce((best, to, i) => {
-        const matches = path === to || (to !== "/app" && path.startsWith(`${to}/`));
-        if (!matches) return best;
-        return best < 0 || to.length > flatNavLeaves[best].length ? i : best;
-      }, -1);
-      if (idx < 0) return;
-      const next = e.key === "ArrowDown"
-        ? Math.min(flatNavLeaves.length - 1, idx + 1)
-        : Math.max(0, idx - 1);
-      if (next === idx) return;
-      const now = Date.now();
-      if (now - lastArrowNavAtRef.current < 120) return;
-      lastArrowNavAtRef.current = now;
-      e.preventDefault();
-      navigate({ to: flatNavLeaves[next] });
-      window.setTimeout(() => {
-        const nextLink = Array.from(navRoot?.querySelectorAll<HTMLElement>("[data-nav-to]") ?? [])
-          .find((el) => el.dataset.navTo === flatNavLeaves[next]);
-        nextLink?.focus({ preventScroll: true });
-      }, 0);
+  // Navegação por teclado dentro da sidebar (roving focus).
+  // ↑/↓ move o foco, Home/End vão ao primeiro/último, →/← abrem/fecham grupos,
+  // Enter/Espaço ativam o item focado (comportamento nativo de <a>/<button>).
+  const onNavKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    const navRoot = navScrollRef.current;
+    if (!navRoot) return;
+    const tgt = e.target as HTMLElement | null;
+    if (!tgt) return;
+    const tag = tgt.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tgt.isContentEditable) return;
+
+    const items = Array.from(
+      navRoot.querySelectorAll<HTMLElement>("[data-nav-focusable]"),
+    ).filter((el) => el.offsetParent !== null || el === tgt);
+    if (items.length === 0) return;
+    const current = tgt.closest<HTMLElement>("[data-nav-focusable]");
+    const idx = current ? items.indexOf(current) : -1;
+
+    const focusAt = (i: number) => {
+      const el = items[Math.max(0, Math.min(items.length - 1, i))];
+      el?.focus({ preventScroll: false });
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [flatNavLeaves, location.pathname, navigate]);
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        focusAt(idx < 0 ? 0 : (idx + 1) % items.length);
+        return;
+      case "ArrowUp":
+        e.preventDefault();
+        focusAt(idx < 0 ? items.length - 1 : (idx - 1 + items.length) % items.length);
+        return;
+      case "Home":
+        e.preventDefault();
+        focusAt(0);
+        return;
+      case "End":
+        e.preventDefault();
+        focusAt(items.length - 1);
+        return;
+      case "ArrowRight":
+      case "ArrowLeft": {
+        const groupKey = current?.dataset.navGroupKey;
+        if (!groupKey) return;
+        e.preventDefault();
+        const shouldOpen = e.key === "ArrowRight";
+        setOpenGroups((prev) =>
+          (prev[groupKey] ?? false) === shouldOpen ? prev : { ...prev, [groupKey]: shouldOpen },
+        );
+        return;
+      }
+      default:
+        return;
+    }
+  };
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -640,7 +653,12 @@ export function AppShell() {
 
         {/* 🔥 NAVEGAÇÃO COM DIVISORES SUTIS E ITENS MAIS ESPAÇOSOS */}
         <TooltipProvider delayDuration={120}>
-        <nav ref={navScrollRef} className="flex-1 px-2 py-3 overflow-y-auto [&::-webkit-scrollbar]:hidden">
+        <nav
+          ref={navScrollRef}
+          aria-label="Menu principal"
+          onKeyDown={onNavKeyDown}
+          className="flex-1 px-2 py-3 overflow-y-auto [&::-webkit-scrollbar]:hidden"
+        >
           {filteredNavRows.map((row) => {
             const leafIsActive = (to: string, hash?: string) => {
               const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
@@ -657,8 +675,10 @@ export function AppShell() {
                 {!collapsedUi && !hideLabel && (
                   <button
                     type="button"
+                    data-nav-focusable
+                    data-nav-group-key={row.label}
                     onClick={() => setOpenGroups((prev) => ({ ...prev, [row.label]: !(prev[row.label] ?? false) }))}
-                    className={`w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-opacity rounded-md hover:opacity-100 ${groupHasActive ? "opacity-100 text-white" : "opacity-70"}`}
+                    className={`w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] transition-opacity rounded-md hover:opacity-100 outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1 focus-visible:ring-offset-transparent ${groupHasActive ? "opacity-100 text-white" : "opacity-70"}`}
                     aria-expanded={open}
                   >
                     <span className="flex items-center gap-1.5">
@@ -687,8 +707,10 @@ export function AppShell() {
                         ) : (
                           <button
                             type="button"
+                            data-nav-focusable
+                            data-nav-group-key={subKey}
                             onClick={() => setOpenGroups((prev) => ({ ...prev, [subKey]: !(prev[subKey] ?? false) }))}
-                            className={`relative w-full flex items-center gap-2.5 rounded-full px-4 py-2.5 text-sm font-medium transition-all ${subActive ? "bg-white/20 text-white shadow-sm ring-1 ring-inset ring-white/25" : "text-white/85 hover:bg-white/10 hover:text-white"}`}
+                            className={`relative w-full flex items-center gap-2.5 rounded-full px-4 py-2.5 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${subActive ? "bg-white/20 text-white shadow-sm ring-1 ring-inset ring-white/25" : "text-white/85 hover:bg-white/10 hover:text-white"}`}
                             aria-expanded={subOpen}
                           >
                             {subActive && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-white" aria-hidden />}
@@ -710,7 +732,8 @@ export function AppShell() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 data-nav-to={child.to}
-                                className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all text-white/85 hover:bg-white/10 hover:text-white`}
+                                data-nav-focusable
+                                className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent text-white/85 hover:bg-white/10 hover:text-white`}
                               >
                                 <child.icon className="h-4 w-4 shrink-0" />
                                 {!collapsedUi && <span className="truncate">{child.label}</span>}
@@ -723,6 +746,7 @@ export function AppShell() {
                             <a
                               href={href}
                               data-nav-to={child.to}
+                              data-nav-focusable
                               data-nav-active={active ? "true" : undefined}
                               aria-current={active ? "page" : undefined}
                               onClick={(event) => {
@@ -730,7 +754,7 @@ export function AppShell() {
                                 event.preventDefault();
                                 window.location.assign(href);
                               }}
-                              className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all ${
+                              className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "pl-8 pr-4"} py-2.5 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${
                                 active
                                   ? "bg-white/20 text-white shadow-sm ring-1 ring-inset ring-white/25"
                                   : "text-white/85 hover:bg-white/10 hover:text-white"
@@ -756,6 +780,7 @@ export function AppShell() {
                     <a
                       href={href}
                       data-nav-to={item.to}
+                      data-nav-focusable
                       data-nav-active={active ? "true" : undefined}
                       aria-current={active ? "page" : undefined}
                       onClick={(event) => {
@@ -763,7 +788,7 @@ export function AppShell() {
                         event.preventDefault();
                         window.location.assign(href);
                       }}
-                      className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "px-4"} py-2.5 text-sm font-medium transition-all ${
+                      className={`relative flex items-center gap-2.5 rounded-full ${collapsedUi ? "px-2 justify-center" : "px-4"} py-2.5 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${
                         active
                           ? "bg-white/20 text-white shadow-sm ring-1 ring-inset ring-white/25"
                           : "text-white/85 hover:bg-white/10 hover:text-white"
