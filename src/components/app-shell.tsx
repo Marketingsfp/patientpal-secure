@@ -883,6 +883,33 @@ export function AppShell() {
             <EstornosBell />
           </div>
         </header>
+        {crumbs.length > 0 && (
+          <nav
+            aria-label="Breadcrumb"
+            className="sticky top-[50px] z-20 bg-card/70 backdrop-blur border-b px-3 sm:px-5 py-1.5 overflow-x-auto hhp-no-scrollbar-mobile"
+          >
+            <ol className="flex items-center gap-1 text-[11px] sm:text-xs text-muted-foreground whitespace-nowrap">
+              <li className="flex items-center gap-1">
+                <Link to="/app" className="hover:text-foreground transition-colors">Início</Link>
+              </li>
+              {crumbs.map((c, i) => {
+                const last = i === crumbs.length - 1;
+                return (
+                  <li key={`${c.label}-${i}`} className="flex items-center gap-1">
+                    <ChevronRight className="h-3 w-3 opacity-50 shrink-0" />
+                    {last || !c.to ? (
+                      <span className={last ? "font-medium text-foreground" : ""} aria-current={last ? "page" : undefined}>
+                        {c.label}
+                      </span>
+                    ) : (
+                      <Link to={c.to} className="hover:text-foreground transition-colors">{c.label}</Link>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </nav>
+        )}
         <main className="hhp-no-scrollbar-mobile flex-1 px-3 pt-1 pb-3 sm:px-4 sm:pt-1.5 sm:pb-4 lg:px-6 lg:pt-2 lg:pb-6 overflow-auto min-w-0" style={{ background: "var(--surface-cream)" }}>
           <Outlet />
         </main>
