@@ -914,10 +914,12 @@ function AgendaPage() {
   const [pacInfoOpen, setPacInfoOpen] = useState(false);
   const [pacInfoLoading, setPacInfoLoading] = useState(false);
   const [pacInfo, setPacInfo] = useState<Record<string, any> | null>(null);
+  const [pacInfoFoto, setPacInfoFoto] = useState<string | null>(null);
 
   const abrirInfoPaciente = async (pacienteId: string | null | undefined, nomeFallback: string) => {
     setPacInfoOpen(true);
     setPacInfo({ nome: nomeFallback });
+    setPacInfoFoto(null);
     if (!pacienteId) return;
     setPacInfoLoading(true);
     const { data } = await supabase
@@ -955,6 +957,20 @@ function AgendaPage() {
         }
       }
       setPacInfo(base);
+      if (base.foto_url) {
+        if (/^https?:\/\//i.test(String(base.foto_url))) {
+          setPacInfoFoto(String(base.foto_url));
+        } else {
+          try {
+            const { data: signed } = await supabase.storage
+              .from("pacientes-fotos")
+              .createSignedUrl(String(base.foto_url), 3600);
+            if (signed?.signedUrl) setPacInfoFoto(signed.signedUrl);
+          } catch (e) {
+            console.warn("pacInfo foto:", e);
+          }
+        }
+      }
     }
     setPacInfoLoading(false);
   };
@@ -4964,9 +4980,18 @@ function AgendaPage() {
           ) : pacInfo ? (
             <div className="rounded-lg border p-4 space-y-2 text-sm">
               <div className="flex items-center gap-3">
-                {pacInfo.foto_url ? (
-                  <img src={pacInfo.foto_url} alt={pacInfo.nome} className="h-14 w-14 rounded-full object-cover border" />
-                ) : null}
+                {pacInfoFoto ? (
+                  <img
+                    src={pacInfoFoto}
+                    alt={pacInfo.nome}
+                    className="h-14 w-14 shrink-0 rounded-full object-cover border bg-muted"
+                    onError={() => setPacInfoFoto(null)}
+                  />
+                ) : (
+                  <div className="h-14 w-14 shrink-0 rounded-full border bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground">
+                    {String(pacInfo.nome ?? "?").trim().charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <div className="font-semibold uppercase">{pacInfo.nome}</div>
                   {pacInfo.numero_pasta && (
