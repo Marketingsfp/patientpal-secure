@@ -46,7 +46,7 @@ function LoginPage() {
   const destino = redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/app";
 
   useEffect(() => {
-    if (!authLoading && user) navigate({ to: destino, replace: true });
+    if (!authLoading && user) navigate({ to: destino as never, replace: true });
   }, [authLoading, destino, navigate, user]);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -56,7 +56,7 @@ function LoginPage() {
     setLoading(false);
     if (error) { mostrarErro(error); return; }
     toast.success("Bem-vindo!");
-    navigate({ to: destino, replace: true });
+    navigate({ to: destino as never, replace: true });
   };
 
   return (
