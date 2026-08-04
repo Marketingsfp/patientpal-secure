@@ -14,6 +14,17 @@ import { useMenuPrefs } from "@/hooks/use-menu-prefs";
 
 const MAX_INLINE = 6;
 
+const ALL_MENU_PATHS: string[] = CENTROS.flatMap((c) => c.items.map((i) => i.path));
+
+// Item mais específico vence: em /app/agenda/express só "Agenda Express" fica ativo.
+function isMenuPathActive(currentPath: string, path: string) {
+  if (currentPath === path) return true;
+  if (!currentPath.startsWith(path + "/")) return false;
+  return !ALL_MENU_PATHS.some(
+    (p) => p.length > path.length && (currentPath === p || currentPath.startsWith(p + "/")),
+  );
+}
+
 function IconBtn({
   active, onClick, title, children, pressed,
 }: { active?: boolean; onClick: () => void; title: string; children: React.ReactNode; pressed?: boolean }) {
@@ -108,7 +119,7 @@ function CentroGroup({
             <Row
               key={it.path}
               item={it}
-              active={currentPath === it.path || currentPath.startsWith(it.path + "/")}
+              active={isMenuPathActive(currentPath, it.path)}
               pinned={prefs.pinned.includes(it.path)}
               favorited={prefs.favorites.includes(it.path)}
               onTogglePin={() => onPin(it.path)}
@@ -240,7 +251,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
           <div className="p-2 space-y-1 overflow-y-auto flex-1">
             {pinnedItems.map((it) => {
               const Icon = it.icon;
-              const active = currentPath === it.path || currentPath.startsWith(it.path + "/");
+              const active = isMenuPathActive(currentPath, it.path);
               return (
                 <Tooltip key={it.path}>
                   <TooltipTrigger asChild>
@@ -267,7 +278,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                   </div>
                   {c.items.slice(0, MAX_INLINE).map((it) => {
                     const Icon = it.icon;
-                    const active = currentPath === it.path || currentPath.startsWith(it.path + "/");
+                    const active = isMenuPathActive(currentPath, it.path);
                     return (
                       <Tooltip key={it.path}>
                         <TooltipTrigger asChild>
@@ -302,7 +313,7 @@ export function MenuV2({ perfil = "gestor", clinicColor }: { perfil?: PerfilKey;
                   <Row
                     key={it.path}
                     item={it}
-                    active={currentPath === it.path || currentPath.startsWith(it.path + "/")}
+                    active={isMenuPathActive(currentPath, it.path)}
                     pinned
                     favorited={prefs.favorites.includes(it.path)}
                     onTogglePin={() => togglePin(it.path)}
