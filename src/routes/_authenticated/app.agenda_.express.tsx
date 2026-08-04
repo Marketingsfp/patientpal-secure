@@ -249,15 +249,16 @@ function AgendaExpressPage() {
           <div className={cn(CARD, "lg:col-span-7 p-6 space-y-5")}>
             <div className="border-b border-slate-100 pb-6 mb-6">
               <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">Data</span>
-              <div className="rounded-2xl border border-slate-200/60 bg-gradient-to-b from-slate-50/60 to-white p-6 shadow-sm flex justify-center">
+              <div className="rounded-2xl border border-slate-200/60 bg-gradient-to-b from-slate-50/60 to-white p-3 shadow-sm">
                 <Calendar
                   mode="single"
+                  fullWidth
                   locale={ptBR}
                   selected={data}
                   onSelect={(d) => d && setData(d)}
                   modifiers={{ comVaga: (d: Date) => diasComVaga.has(ymd(d)) }}
                   modifiersClassNames={{ comVaga: "font-semibold text-primary" }}
-                  className="p-0 pointer-events-auto"
+                  className="w-full pointer-events-auto"
                 />
               </div>
             </div>
