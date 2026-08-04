@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Info, Plus, Rows3, LayoutList } from "lucide-react";
+import { Info, Plus, Rows3, LayoutList, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { mostrarErro } from "@/lib/traduzir-erro";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   ListShell, VirtualList, QuickFilters,
   type StatusTab, type QuickFilterOption,
@@ -27,6 +30,14 @@ type ChipV =
   | "particular" | "associado" | "cartao"
   | "aniv" | "novos30" | "sem_tel" | "sem_cpf";
 type ResumoMode = "none" | "aniv" | "inativos";
+type CampoBusca = "todos" | "nome" | "id" | "convenio";
+
+const CAMPO_OPTS: ReadonlyArray<{ value: CampoBusca; label: string }> = [
+  { value: "todos", label: "Todos os campos" },
+  { value: "nome", label: "Nome" },
+  { value: "id", label: "ID / Prontuário" },
+  { value: "convenio", label: "Convênio" },
+];
 
 const TAB_OPTS: ReadonlyArray<StatusTab<TabV>> = [
   { value: "todos", label: "Todos" },
@@ -66,7 +77,10 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const [chips, setChips] = useState<ChipV[]>([]);
   const [resumoMode, setResumoMode] = useState<ResumoMode>("none");
   const [drawer, setDrawer] = useState<PacienteV2 | null>(null);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(25);
+  const [page, setPage] = useState(1);
+  const [campo, setCampo] = useState<CampoBusca>("todos");
+  const [convenio, setConvenio] = useState<string>("todos");
   const [totalBase, setTotalBase] = useState<number | null>(null);
   const reqRef = useRef(0);
 
@@ -154,6 +168,22 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
 
   const filtrados = useMemo(() => {
     let r = rows;
+    const termo = q.trim().toLowerCase();
+    if (termo && campo !== "todos") {
+      r = r.filter((p) => {
+        if (campo === "nome") return (p.nome ?? "").toLowerCase().includes(termo);
+        if (campo === "id") {
+          return [p.codigo_prontuario, p.codigo_prontuario_anterior, p.numero_pasta, p.id]
+            .some((v) => String(v ?? "").toLowerCase().includes(termo));
+        }
+        return (p.associado_convenio ?? "").toLowerCase().includes(termo);
+      });
+    }
+    if (convenio !== "todos") {
+      r = convenio === "__particular__"
+        ? r.filter((p) => !p.associado_convenio && !p.tem_cartao_beneficios)
+        : r.filter((p) => (p.associado_convenio ?? "") === convenio);
+    }
     if (tab === "ativos") r = r.filter((p) => p.ativo);
     else if (tab === "inativos") r = r.filter((p) => !p.ativo);
     else if (tab === "incompletos") r = r.filter(cadastroIncompleto);
@@ -168,9 +198,19 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
     if (chips.includes("sem_tel")) r = r.filter(semTelefone);
     if (chips.includes("sem_cpf")) r = r.filter(semCpf);
     return r;
-  }, [rows, tab, chips]);
+  }, [rows, tab, chips, q, campo, convenio]);
 
-  const visiveis = filtrados.slice(0, pageSize);
+  const conveniosDisponiveis = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of rows) if (p.associado_convenio) set.add(p.associado_convenio);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [rows]);
+
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / pageSize));
+  const paginaAtual = Math.min(page, totalPaginas);
+  const visiveis = filtrados.slice((paginaAtual - 1) * pageSize, paginaAtual * pageSize);
+
+  useEffect(() => { setPage(1); }, [q, campo, convenio, tab, chips, pageSize]);
 
   const kpi: ClientesKpi = useMemo(() => {
     let ativos = 0, inativos = 0, incompletos = 0, duplicados = 0;
@@ -239,6 +279,28 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
           onTabChange={setTab}
           chips={
             <div className="flex flex-wrap items-center gap-3">
+              <Select value={campo} onValueChange={(v) => setCampo(v as CampoBusca)}>
+                <SelectTrigger className="h-8 w-[168px] text-xs" aria-label="Campo da busca">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CAMPO_OPTS.map((o) => (
+                    <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={convenio} onValueChange={setConvenio}>
+                <SelectTrigger className="h-8 w-[180px] text-xs" aria-label="Filtrar por convênio">
+                  <SelectValue placeholder="Convênio" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos" className="text-xs">Todos os convênios</SelectItem>
+                  <SelectItem value="__particular__" className="text-xs">Particular</SelectItem>
+                  {conveniosDisponiveis.map((c) => (
+                    <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <QuickFilters options={CHIP_OPTS} value={chips} onChange={setChips} multi ariaLabel="Filtros rápidos" />
               {!modoBusca && (
                 <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -264,9 +326,6 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
             estimateSize={compactPref ? 52 : 78}
             overscan={10}
             getKey={(p) => p.id}
-            onEndReached={() => {
-              if (pageSize < filtrados.length) setPageSize((s) => Math.min(s + 50, filtrados.length));
-            }}
             renderItem={(p) => (
               <div className="px-2 py-1">
                 <ClienteCard p={p} compact={compactPref} onOpen={setDrawer} />
@@ -274,6 +333,43 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
             )}
           />
         </ListShell>
+        {!loading && filtrados.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>
+              {(paginaAtual - 1) * pageSize + 1}–{Math.min(paginaAtual * pageSize, filtrados.length)} de{" "}
+              {filtrados.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+                <SelectTrigger className="h-8 w-[110px] text-xs" aria-label="Itens por página">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[25, 50, 100].map((n) => (
+                    <SelectItem key={n} value={String(n)} className="text-xs">{n} por página</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline" size="sm" className="h-8"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={paginaAtual <= 1}
+                aria-label="Página anterior"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="tabular-nums">{paginaAtual}/{totalPaginas}</span>
+              <Button
+                variant="outline" size="sm" className="h-8"
+                onClick={() => setPage((p) => Math.min(totalPaginas, p + 1))}
+                disabled={paginaAtual >= totalPaginas}
+                aria-label="Próxima página"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
       <ClientesKpiBar k={kpi} modoBusca={modoBusca} />
       <ClienteDrawer paciente={drawer} onClose={() => setDrawer(null)} />
