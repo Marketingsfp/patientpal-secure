@@ -39,7 +39,7 @@ export const Route = createFileRoute("/online")({
 
 const SERVICOS = [
   {
-    to: "/paciente/consultas",
+    to: "/paciente/agendar",
     icon: CalendarPlus,
     titulo: "Agendar consulta ou exame",
     desc: "Escolha especialidade, veja horários livres e confirme em poucos toques.",
@@ -132,7 +132,7 @@ function AutoatendimentoOnlinePage() {
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Button asChild size="lg" className="h-11 gap-2 rounded-lg">
-              <Link to="/paciente/consultas">
+              <Link to="/paciente/agendar">
                 <CalendarPlus className="h-4 w-4" /> Agendar atendimento
               </Link>
             </Button>

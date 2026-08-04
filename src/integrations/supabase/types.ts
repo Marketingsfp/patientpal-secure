@@ -8711,6 +8711,19 @@ export type Database = {
       }
       agenda_slot_lock: { Args: { _id: string }; Returns: Json }
       agenda_slot_unlock: { Args: { _id: string }; Returns: undefined }
+      agendar_online: {
+        Args: {
+          _agenda_id?: string
+          _clinica_id: string
+          _especialidade_id?: string
+          _fim: string
+          _inicio: string
+          _medico_id: string
+          _observacoes?: string
+          _procedimento?: string
+        }
+        Returns: string
+      }
       assinar_contrato_publico: {
         Args: { _assinatura_svg: string; _ip: string; _token: string }
         Returns: string
@@ -9040,6 +9053,13 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      especialidades_paciente: {
+        Args: { _clinica_id: string }
+        Returns: {
+          id: string
+          nome: string
+        }[]
+      }
       estornar_lancamento_receita: {
         Args: { _clinica_id: string; _lancamento_id: string }
         Returns: Json
@@ -9182,6 +9202,28 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      horarios_disponiveis_paciente: {
+        Args: {
+          _clinica_id: string
+          _de?: string
+          _dias?: number
+          _especialidade_id?: string
+          _limite?: number
+          _medico_id?: string
+        }
+        Returns: {
+          agenda_id: string
+          agenda_nome: string
+          capacidade: number
+          especialidade_id: string
+          especialidade_nome: string
+          fim: string
+          inicio: string
+          medico_id: string
+          medico_nome: string
+          ocupados: number
+        }[]
       }
       hr_convenio_add_dependente: {
         Args: {
@@ -9348,6 +9390,15 @@ export type Database = {
       }
       merge_pacientes: { Args: { _ids: string[] }; Returns: string }
       meus_cartoes: { Args: never; Returns: Json }
+      minhas_clinicas_paciente: {
+        Args: never
+        Returns: {
+          clinica_id: string
+          clinica_nome: string
+          paciente_id: string
+          paciente_nome: string
+        }[]
+      }
       minhas_consultas: {
         Args: never
         Returns: {
