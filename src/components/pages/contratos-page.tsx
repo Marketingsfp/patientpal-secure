@@ -98,6 +98,10 @@ type Paciente = {
   face_descriptor?: number[] | null;
   foto_url?: string | null;
 };
+function temFoto(p: { face_descriptor?: number[] | null; foto_url?: string | null } | null): boolean {
+  if (!p) return false;
+  return (p.face_descriptor?.length ?? 0) > 0 || !!p.foto_url;
+}
 type Contrato = {
   id: string;
   numero: number;
@@ -549,13 +553,13 @@ function NovoContratoForm({
       !confirm(`${semEmailDeps.length} dependente(s) sem e-mail não conseguirão acessar o app. Continuar mesmo assim?`)
     )
       return;
-    if (!titular.face_descriptor || titular.face_descriptor.length === 0) {
-      if (!confirm("Titular sem foto facial. Continuar mesmo assim?")) return;
+    if (!temFoto(titular)) {
+      if (!confirm("Titular sem foto. Continuar mesmo assim?")) return;
     }
-    const semFotoDeps = deps.filter((d) => !d.face_descriptor || d.face_descriptor.length === 0);
+    const semFotoDeps = deps.filter((d) => !temFoto(d));
     if (
       semFotoDeps.length > 0 &&
-      !confirm(`${semFotoDeps.length} dependente(s) sem foto facial. Continuar mesmo assim?`)
+      !confirm(`${semFotoDeps.length} dependente(s) sem foto. Continuar mesmo assim?`)
     )
       return;
     setSaving(true);
@@ -724,7 +728,7 @@ function NovoContratoForm({
                   <div className="flex items-center justify-between rounded-md border p-2 bg-muted/30">
                     <span className="font-medium flex items-center gap-2">
                       {titular.nome} {titular.cpf ? `— ${titular.cpf}` : ""}
-                      {titular.face_descriptor && titular.face_descriptor.length > 0 ? (
+                      {temFoto(titular) ? (
                         <Badge variant="default" className="gap-1">
                           <Check className="h-3 w-3" />
                           Foto
@@ -769,7 +773,7 @@ function NovoContratoForm({
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setFaceOpen("titular")}>
                         <Camera className="h-3 w-3 mr-1" />
-                        {titular.face_descriptor?.length ? "Refazer foto" : "Tirar foto"}
+                        {temFoto(titular) ? "Refazer foto" : "Tirar foto"}
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => setTitular(null)}>
                         Trocar
@@ -936,7 +940,7 @@ function NovoContratoForm({
                     <div key={d.id} className="grid grid-cols-12 gap-2 items-center">
                       <span className="col-span-3 text-sm truncate flex items-center gap-1">
                         {d.nome}
-                        {d.face_descriptor && d.face_descriptor.length > 0 ? (
+                        {temFoto(d) ? (
                           <Check className="h-3 w-3 text-green-600" />
                         ) : null}
                       </span>
@@ -959,7 +963,7 @@ function NovoContratoForm({
                       <div className="col-span-2 text-xs text-muted-foreground self-center">Dependente</div>
                       <Button size="sm" variant="outline" className="col-span-2 h-8" onClick={() => setFaceOpen(i)}>
                         <Camera className="h-3 w-3 mr-1" />
-                        {d.face_descriptor?.length ? "Refazer" : "Foto"}
+                        {temFoto(d) ? "Refazer" : "Foto"}
                       </Button>
                       <Button
                         size="sm"
