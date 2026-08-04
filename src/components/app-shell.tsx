@@ -222,7 +222,7 @@ function pathMatches(pathname: string, to: string) {
   );
 }
 
-function isNavActive(pathname: string, to: string, aliases: string[] = []) {
+function isNavActive(pathname: string, to: string, aliases: readonly string[] = []) {
   return pathMatches(pathname, to) || aliases.some((a) => pathMatches(pathname, a));
 }
 
