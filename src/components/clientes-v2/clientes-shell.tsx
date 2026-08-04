@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   Info, Plus, Rows3, LayoutList, ChevronLeft, ChevronRight,
-  ArrowDown, ArrowUp, ArrowUpDown,
+  ArrowDown, ArrowUp, ArrowUpDown, Download, FileSpreadsheet, Printer,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
@@ -20,6 +20,11 @@ import {
   type StatusTab, type QuickFilterOption,
 } from "@/components/list-shell";
 import { ClienteCard } from "./cliente-card";
+import { exportarPacientesCSV, exportarPacientesPDF } from "./exportar";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ClienteDrawer } from "./cliente-drawer";
 import { ClientesKpiBar, type ClientesKpi } from "./kpi-bar";
 import { ResumoBar } from "./resumo-bar";
@@ -254,6 +259,16 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
   const paginaAtual = Math.min(page, totalPaginas);
   const visiveis = ordenados.slice((paginaAtual - 1) * pageSize, paginaAtual * pageSize);
 
+  // Descrição dos filtros ativos, impressa no cabeçalho do PDF.
+  const resumoExport = [
+    q.trim() ? `busca “${q.trim()}”` : null,
+    tab !== "todos" ? (TAB_OPTS.find((t) => t.value === tab)?.label ?? null) : null,
+    convenio !== "todos"
+      ? convenio === "__particular__" ? "Particular" : `Convênio ${convenio}`
+      : null,
+    chips.length ? `filtros: ${chips.join(", ")}` : null,
+  ].filter(Boolean).join(" · ");
+
   // ---- Navegação por teclado nos resultados (roving tabindex) ----
   const listaRef = useRef<HTMLDivElement>(null);
   const [focoIdx, setFocoIdx] = useState(0);
@@ -367,6 +382,33 @@ export function ClientesShellV2({ compactPref, onToggleCompact }: Props) {
                   <Switch checked={compactPref} onCheckedChange={onToggleCompact} data-testid="toggle-compact" />
                 </Label>
               </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" disabled={ordenados.length === 0}>
+                    <Download className="h-4 w-4 sm:mr-1" />
+                    <span className="hidden sm:inline">Exportar</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60">
+                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                    {ordenados.length} resultado(s) filtrado(s)
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => exportarPacientesCSV(ordenados)}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" /> CSV (todos os filtrados)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => exportarPacientesPDF(ordenados, resumoExport)}>
+                    <Printer className="h-4 w-4 mr-2" /> PDF (todos os filtrados)
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => exportarPacientesCSV(visiveis)}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" /> CSV (página atual)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => exportarPacientesPDF(visiveis, `${resumoExport} · página ${paginaAtual}`)}>
+                    <Printer className="h-4 w-4 mr-2" /> PDF (página atual)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button size="sm" asChild>
                 <Link to="/app/clientes"><Plus className="h-4 w-4 mr-1" /> Novo</Link>
               </Button>
