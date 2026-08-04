@@ -13,10 +13,14 @@ interface Props {
   compact?: boolean;
   /** Termo pesquisado, para realçar os trechos que casaram. */
   termo?: string;
+  /** Posição na lista, usada pela navegação por teclado. */
+  index?: number;
+  /** Item focado pela navegação por teclado (roving tabindex). */
+  active?: boolean;
   onOpen: (p: PacienteV2) => void;
 }
 
-export function ClienteCard({ p, compact, termo, onOpen }: Props) {
+export function ClienteCard({ p, compact, termo, index, active, onOpen }: Props) {
   const { tipo, label } = pagadorLabel(p);
   const incompleto = cadastroIncompleto(p);
   const aniversariante = isAniversarianteHoje(p.data_nascimento);
@@ -44,6 +48,9 @@ export function ClienteCard({ p, compact, termo, onOpen }: Props) {
     </Link>
     <button
       type="button"
+      data-cliente-idx={index}
+      tabIndex={index == null ? undefined : active ? 0 : -1}
+      aria-label={`${p.nome} — Enter abre detalhes, Alt+Enter abre o perfil`}
       onClick={(e) => {
         if (e.altKey) {
           window.location.assign(`/app/clientes/${p.id}/editar`);
@@ -53,6 +60,8 @@ export function ClienteCard({ p, compact, termo, onOpen }: Props) {
       }}
       className={cn(
         "w-full text-left rounded-lg border bg-card hover:bg-accent/40 transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        active && "bg-accent/40",
         "border-l-4", borderClass,
         compact ? "px-3 py-2" : "px-3 py-3",
       )}
