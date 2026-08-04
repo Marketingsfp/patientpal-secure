@@ -8724,6 +8724,23 @@ export type Database = {
         }
         Returns: string
       }
+      agendar_publico: {
+        Args: {
+          _agenda_id?: string
+          _clinica_id: string
+          _cpf?: string
+          _email?: string
+          _especialidade_id?: string
+          _fim: string
+          _inicio: string
+          _medico_id: string
+          _nome: string
+          _observacoes?: string
+          _procedimento?: string
+          _telefone?: string
+        }
+        Returns: string
+      }
       assinar_contrato_publico: {
         Args: { _assinatura_svg: string; _ip: string; _token: string }
         Returns: string
@@ -8924,6 +8941,13 @@ export type Database = {
         }
       }
       checkin_agendamento: { Args: { _token: string }; Returns: Json }
+      clinicas_publicas: {
+        Args: never
+        Returns: {
+          id: string
+          nome: string
+        }[]
+      }
       consulta_publica: { Args: { _token: string }; Returns: Json }
       contrato_dias_tolerancia: { Args: never; Returns: number }
       contrato_historico: { Args: { _contrato_id: string }; Returns: Json }
@@ -9054,6 +9078,13 @@ export type Database = {
         }
       }
       especialidades_paciente: {
+        Args: { _clinica_id: string }
+        Returns: {
+          id: string
+          nome: string
+        }[]
+      }
+      especialidades_publicas: {
         Args: { _clinica_id: string }
         Returns: {
           id: string
@@ -9204,6 +9235,28 @@ export type Database = {
         Returns: boolean
       }
       horarios_disponiveis_paciente: {
+        Args: {
+          _clinica_id: string
+          _de?: string
+          _dias?: number
+          _especialidade_id?: string
+          _limite?: number
+          _medico_id?: string
+        }
+        Returns: {
+          agenda_id: string
+          agenda_nome: string
+          capacidade: number
+          especialidade_id: string
+          especialidade_nome: string
+          fim: string
+          inicio: string
+          medico_id: string
+          medico_nome: string
+          ocupados: number
+        }[]
+      }
+      horarios_disponiveis_publico: {
         Args: {
           _clinica_id: string
           _de?: string
