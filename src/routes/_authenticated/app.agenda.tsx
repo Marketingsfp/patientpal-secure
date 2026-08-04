@@ -4552,8 +4552,8 @@ function AgendaPage() {
       {/* Tabela */}
       <div className="hidden md:block min-w-0 max-w-full rounded-xl border border-slate-200/80 bg-card shadow-sm">
         <Table className="min-w-[720px] xl:min-w-[980px]">
-          <TableHeader className="[&_th]:h-9 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500">
-            <TableRow className="bg-slate-50/70 hover:bg-slate-50/70 border-slate-200/80">
+          <TableHeader className="[&_th]:h-10 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500">
+            <TableRow className="bg-slate-50/50 hover:bg-slate-50/50 border-slate-200/80">
               <TableHead
                 className="w-10"
                 title="Selecione vários atendimentos do mesmo paciente para cobrar em um único pagamento (use o botão Opções acima)"
@@ -4596,10 +4596,10 @@ function AgendaPage() {
                     key={a.id}
                     className={
                       realizado
-                        ? "[&>td]:py-1.5 [&>td]:h-10 text-xs border-slate-100 [&>td]:bg-emerald-50 hover:[&>td]:bg-emerald-100/70"
+                        ? "[&>td]:py-3.5 text-xs border-slate-100 transition-colors [&>td]:bg-emerald-50 hover:[&>td]:bg-emerald-100/70"
                         : presente
-                          ? "[&>td]:py-1.5 [&>td]:h-10 text-xs border-slate-100 [&>td]:bg-sky-50 hover:[&>td]:bg-sky-100/70"
-                          : "[&>td]:py-1.5 [&>td]:h-10 text-xs border-slate-100 hover:bg-slate-50/70"
+                          ? "[&>td]:py-3.5 text-xs border-slate-100 transition-colors [&>td]:bg-sky-50 hover:[&>td]:bg-sky-100/70"
+                          : "[&>td]:py-3.5 text-xs border-slate-100 transition-colors hover:bg-slate-50/80"
                     }
                     style={
                       realizado
@@ -4617,7 +4617,7 @@ function AgendaPage() {
                   <TableCell className="hidden sm:table-cell text-sm">{fmtDiaSemana(a.inicio)}</TableCell>
                   <TableCell className="text-sm">{fmtData(a.inicio)}</TableCell>
                   <TableCell>
-                     <span className="text-emerald-600 font-medium">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
+                     <span className="font-medium text-emerald-600">{fmtHora(a.inicio)} - {fmtHora(a.fim)}</span>
                   </TableCell>
                    <TableCell className="pr-1 align-middle max-w-[160px] xl:max-w-[220px]">
                     {(() => {
@@ -4627,7 +4627,7 @@ function AgendaPage() {
                       return (
                         <div className="flex items-center gap-1 min-w-0">
                           <div
-                            className="text-xs uppercase font-medium text-foreground truncate"
+                            className="truncate text-xs font-medium uppercase text-slate-900"
                             title={manual ? `${label} (prontuário em papel)` : label}
                           >
                             {label}
@@ -4651,7 +4651,7 @@ function AgendaPage() {
                         size="sm"
                         onClick={() => openSlot(a)}
                         title="Agendar paciente neste horário"
-                        className="h-6 px-2 text-primary hover:text-primary/80 font-medium"
+                        className="h-7 px-2 text-xs font-medium text-slate-400 transition-colors hover:bg-primary/5 hover:text-primary"
                       >
                         <UserPlus className="h-3.5 w-3.5 mr-1" />
                         Agendar cliente
@@ -4719,9 +4719,9 @@ function AgendaPage() {
                    <TableCell className="hidden xl:table-cell text-center">
                     <div className="flex flex-col items-center gap-0.5">
                       {isSlotLivre(a.paciente_nome) ? (
-                        <Badge variant="secondary" className="rounded-full border-0 bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-500 shadow-none hover:bg-slate-100">Livre</Badge>
+                        <Badge variant="secondary" className="rounded-md border-none bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-500 shadow-none hover:bg-slate-100">Livre</Badge>
                       ) : (
-                        <Badge className={`rounded-full border-0 px-2.5 py-0.5 text-[11px] font-medium shadow-none ${STATUS_COR[a.status]}`}>{STATUS_LABEL[a.status]}</Badge>
+                        <Badge className={`rounded-md border-none px-2.5 py-0.5 text-[11px] font-medium shadow-none ${STATUS_COR[a.status]}`}>{STATUS_LABEL[a.status]}</Badge>
                       )}
                       {/* Badge "Pago" removida — destaque fica apenas no ícone $ na coluna Ações */}
                     </div>
