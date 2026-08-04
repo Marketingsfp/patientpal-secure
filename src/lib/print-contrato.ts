@@ -296,9 +296,6 @@ Ressaltamos que é possível retirar, a qualquer tempo, o seu consentimento para
 Estou ciente e concordo com a utilização de meus dados pessoais pela POLICARDMED SERV. E SOLUÇÕES EM MEDICINA EIRELI, para as finalidades citadas e autorizadas acima, o que faço expressamente por assinatura escrita ou digital, com validade jurídica.
 
 São João de Meriti, {{DATA_HOJE}}.
-
-_______________________________________________________________
-Assinatura do ASSOCIADO TITULAR: {{PACIENTE_NOME}}
 `;
 
   const corpo = applyTemplate(textoFixo, {
