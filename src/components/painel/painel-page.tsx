@@ -28,6 +28,8 @@ export function PainelPage() {
   const chamadaPendenteRef = useRef<{ key: string; senha: Senha } | null>(null);
   const filaFalaRef = useRef<Array<{ key: string; senha: Senha }>>([]);
   const falandoRef = useRef<boolean>(false);
+  // Quando o servidor Piper falha, evitamos tentar de novo por alguns minutos.
+  const piperBloqueadoAteRef = useRef<number>(0);
   const vozFemininaRef = useRef<SpeechSynthesisVoice | null>(null);
   // Modo automático: claro das 06h às 17h; escuro das 17h às 06h.
   // Sem botão manual — a troca acontece sozinha ao longo do dia.
