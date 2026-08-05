@@ -466,6 +466,10 @@ function Page() {
     if (!podeEscrever) { toast.error("Você não tem permissão de edição neste módulo."); return; }
     if (!clinicaAtual) return;
     if (slotsPreview.length === 0) { toast.error("Sem horários para gerar"); return; }
+    if (duracaoMinimaPreview !== null && duracaoMinimaPreview < 5) {
+      toast.error(`Duração de ${duracaoMinimaPreview} min por horário é inválida. Use 5 min ou mais.`);
+      return;
+    }
     if (!confirm(`Confirmar criação de ${slotsPreview.length} horários disponíveis?`)) return;
     setGerando(true);
     try {
