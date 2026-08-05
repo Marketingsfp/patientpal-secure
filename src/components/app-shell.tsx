@@ -28,6 +28,7 @@ import {
   Wallet,
   ChevronDown,
   Search,
+  X,
   HeartPulse,
   Contact,
   ConciergeBell,
