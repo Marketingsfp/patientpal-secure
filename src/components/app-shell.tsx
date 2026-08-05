@@ -1152,8 +1152,16 @@ export function AppShell() {
           >
             <SheetHeader className="px-4 py-3 border-b border-white/10 text-left">
               <SheetTitle className="text-white flex items-center gap-2 text-base">
-                <Activity className="h-5 w-5" />
-                ClinicaOS
+                <SidebarUserMenu
+                  userId={user?.id}
+                  userName={userName}
+                  email={user?.email}
+                  initial={initial}
+                  color={clinicColor}
+                  onChangePassword={() => setPwOpen(true)}
+                  onSignOut={() => void handleSignOut()}
+                />
+                <span className="sr-only">Menu</span>
               </SheetTitle>
             </SheetHeader>
             <nav className="px-2 py-3 space-y-4 sidebar-mono">
