@@ -815,10 +815,15 @@ export function AppShell() {
         >
           <div className="px-3 py-3 border-b border-white/10 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <Link to="/app" className="flex items-center gap-2 min-w-0">
-                <Activity className="h-5 w-5 shrink-0" />
-                <span className="font-semibold tracking-tight truncate">ClinicaOS</span>
-              </Link>
+              <SidebarUserMenu
+                userId={user?.id}
+                userName={userName}
+                email={user?.email}
+                initial={initial}
+                color={clinicColor}
+                onChangePassword={() => setPwOpen(true)}
+                onSignOut={() => void handleSignOut()}
+              />
               <button
                 type="button"
                 onClick={() => {
