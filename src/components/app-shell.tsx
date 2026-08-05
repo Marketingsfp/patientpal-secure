@@ -28,6 +28,7 @@ import {
   Wallet,
   ChevronDown,
   Search,
+  X,
   HeartPulse,
   Contact,
   ConciergeBell,
@@ -363,6 +364,10 @@ export function AppShell() {
   // Desktop: sidebar sempre aberta e fixa. Em telas menores ela some e é
   // aberta pelo botão hamburguer do cabeçalho (drawer).
   const collapsed = false;
+  // Busca dentro do menu lateral: input que abre/fecha pela lupa e filtra
+  // os itens (e sub-itens) conforme o usuário digita.
+  const [buscaMenuAberta, setBuscaMenuAberta] = useState(false);
+  const [buscaMenu, setBuscaMenu] = useState("");
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {};
     try {
@@ -590,6 +595,29 @@ export function AppShell() {
     });
   }, [flagFilteredRows, menuOrdem, uxMelhorias]);
 
+  // Resultado da busca do menu lateral (sem acento, case-insensitive).
+  const termoMenu = buscaMenu.trim();
+  const buscandoMenu = termoMenu.length > 0;
+  const searchedNavRows = useMemo(() => {
+    if (!buscandoMenu) return visibleNavRows;
+    const norm = (s: string) =>
+      s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const alvo = norm(termoMenu);
+    return visibleNavRows
+      .map((row) => {
+        const items = row.items
+          .map((it) => {
+            if (!isParent(it)) return norm(it.label).includes(alvo) ? it : null;
+            if (norm(it.label).includes(alvo)) return it;
+            const children = it.children.filter((c) => norm(c.label).includes(alvo));
+            return children.length > 0 ? { ...it, children } : null;
+          })
+          .filter((it): it is NavItem => it !== null);
+        return { ...row, items };
+      })
+      .filter((row) => row.items.length > 0);
+  }, [visibleNavRows, buscandoMenu, termoMenu]);
+
   // Solta um item do menu sobre outro do MESMO grupo: insere na posição do
   // alvo e salva a lista completa de chaves do grupo no perfil do usuário.
   const soltarItemMenu = (rowLabel: string, targetKey: string) => {
@@ -785,14 +813,61 @@ export function AppShell() {
           )}
           style={{ backgroundColor: corSidebar }}
         >
-          <div className="px-3 py-3 border-b border-white/10 flex items-center gap-2">
-            <Link to="/app" className="flex items-center gap-2 min-w-0">
-              <Activity className="h-5 w-5 shrink-0" />
-              <span className="font-semibold tracking-tight truncate">ClinicaOS</span>
-            </Link>
+          <div className="px-3 py-3 border-b border-white/10 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <Link to="/app" className="flex items-center gap-2 min-w-0">
+                <Activity className="h-5 w-5 shrink-0" />
+                <span className="font-semibold tracking-tight truncate">ClinicaOS</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setBuscaMenuAberta((v) => {
+                    if (v) setBuscaMenu("");
+                    return !v;
+                  });
+                }}
+                className="h-7 w-7 shrink-0 rounded-md flex items-center justify-center text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                aria-label={buscaMenuAberta ? "Fechar busca do menu" : "Buscar no menu"}
+                aria-expanded={buscaMenuAberta}
+                title="Buscar no menu"
+              >
+                {buscaMenuAberta ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+              </button>
+            </div>
+            <div
+              className={cn(
+                "grid transition-all duration-200 ease-out motion-reduce:transition-none",
+                buscaMenuAberta ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+              )}
+            >
+              <div className="overflow-hidden">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" />
+                  <input
+                    value={buscaMenu}
+                    onChange={(e) => setBuscaMenu(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setBuscaMenu("");
+                        setBuscaMenuAberta(false);
+                      }
+                    }}
+                    autoFocus={buscaMenuAberta}
+                    tabIndex={buscaMenuAberta ? 0 : -1}
+                    placeholder="Buscar no menu..."
+                    aria-label="Buscar no menu"
+                    className="w-full rounded-md bg-white/10 border border-white/15 pl-7 pr-2 py-1.5 text-xs text-white placeholder:text-white/50 outline-none focus:border-white/40 focus:bg-white/15"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
           <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll">
-            {visibleNavRows.map((row) => {
+            {buscandoMenu && searchedNavRows.length === 0 && (
+              <p className="px-3 py-2 text-xs text-white/60">Nenhum item encontrado.</p>
+            )}
+            {searchedNavRows.map((row) => {
               const leafIsActive = (to: string, hash?: string) => {
                 const pathOk = location.pathname === to || (to !== "/app" && location.pathname.startsWith(to));
                 if (!pathOk) return false;
@@ -803,7 +878,7 @@ export function AppShell() {
                 isParent(it) ? it.children.some((c) => leafIsActive(c.to, c.hash)) : leafIsActive(it.to);
               const groupHasActive = row.items.some(itemHasActive);
               const hideLabel = subsystem === "gestao-pessoas" && row.label === "Recursos Humanos";
-              const open = collapsed || hideLabel ? true : (openGroups[row.label] ?? true);
+              const open = collapsed || hideLabel || buscandoMenu ? true : (openGroups[row.label] ?? true);
               return (
                 <div
                   key={row.label}
@@ -831,7 +906,7 @@ export function AppShell() {
                       if (isParent(item)) {
                         const subActive = item.children.some((c) => leafIsActive(c.to, c.hash));
                         const subKey = `${row.label}::${item.label}`;
-                        const subOpen = collapsed ? true : (openGroups[subKey] ?? false);
+                        const subOpen = collapsed || buscandoMenu ? true : (openGroups[subKey] ?? false);
                         return (
                           <div
                             key={subKey}
