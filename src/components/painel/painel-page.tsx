@@ -508,3 +508,23 @@ function PainelClock() {
   }, []);
   return <span>{now.toLocaleTimeString("pt-BR")}</span>;
 }
+
+// Transforma o erro do serviço de voz em um texto curto e legível
+// (ex.: "Erro 502 no servidor de voz").
+function descreverErroTts(err: unknown): string {
+  const msg =
+    err instanceof Error ? err.message : typeof err === "string" ? err : "";
+  const status = msg.match(/\b(4\d{2}|5\d{2})\b/)?.[1];
+  if (status) return `Erro ${status} no servidor de voz`;
+  if (!msg) return "Servidor de voz não respondeu";
+  return msg.slice(0, 80);
+}
+
+function PainelClockUnused() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return <span>{now.toLocaleTimeString("pt-BR")}</span>;
+}
