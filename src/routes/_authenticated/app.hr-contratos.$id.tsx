@@ -28,7 +28,7 @@ import { UserPlus } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/app/hr-contratos/$id")({
   component: EditarFuncionarioPage,
   head: () => ({ meta: [{ title: "Funcionário — ClinicaOS" }] }),
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (s: Record<string, unknown>): { prefillUserId?: string } => ({
     prefillUserId: typeof s.prefillUserId === "string" ? s.prefillUserId : undefined,
   }),
 });

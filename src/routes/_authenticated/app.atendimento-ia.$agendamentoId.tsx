@@ -26,7 +26,7 @@ import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 export const Route = createFileRoute("/_authenticated/app/atendimento-ia/$agendamentoId")({
   component: AtendimentoEditorPage,
   head: () => ({ meta: [{ title: "Atendimento — ClinicaOS" }] }),
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (s: Record<string, unknown>): { from?: "agenda-v2" } => ({
     from: s.from === "agenda-v2" ? ("agenda-v2" as const) : undefined,
   }),
 });
