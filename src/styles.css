@@ -673,38 +673,5 @@ html.theme-emerald {
  * com texto claro. A cor base vem de --canvas-blue (cor da clínica). */
 .blue-canvas {
   --canvas-blue: var(--canvas-blue, oklch(0.42 0.12 264));
-  --background: var(--canvas-blue);
-  --foreground: #ffffff;
-  --card: color-mix(in srgb, var(--canvas-blue) 84%, white 16%);
-  --card-foreground: #ffffff;
-  --popover: color-mix(in srgb, var(--canvas-blue) 84%, white 16%);
-  --popover-foreground: #ffffff;
-  --muted: color-mix(in srgb, var(--canvas-blue) 80%, white 20%);
-  --muted-foreground: color-mix(in srgb, #ffffff 78%, var(--canvas-blue) 22%);
-  --secondary: color-mix(in srgb, var(--canvas-blue) 78%, white 22%);
-  --secondary-foreground: #ffffff;
-  --accent: color-mix(in srgb, var(--canvas-blue) 74%, white 26%);
-  --accent-foreground: #ffffff;
-  --border: color-mix(in srgb, #ffffff 22%, transparent);
-  --input: color-mix(in srgb, #ffffff 26%, transparent);
-  --surface-cream: var(--canvas-blue);
-  --surface-cream-soft: color-mix(in srgb, var(--canvas-blue) 88%, white 12%);
-  color: #ffffff;
-}
-.blue-canvas :where(h1, h2, h3, h4, h5, h6, p, span, label, td, th, li, div) {
-  border-color: color-mix(in srgb, #ffffff 18%, transparent);
-}
-/* Neutraliza fundos claros fixos vindos de utilitários hardcoded. */
-.blue-canvas :where(.bg-white, .bg-slate-50, .bg-gray-50, .bg-zinc-50, .bg-neutral-50, .bg-slate-100, .bg-gray-100, .bg-muted\/30, .bg-muted\/50) {
-  background-color: color-mix(in srgb, var(--canvas-blue) 84%, white 16%) !important;
-}
-.blue-canvas :where(.text-black, .text-slate-900, .text-gray-900, .text-zinc-900, .text-slate-800, .text-gray-800, .text-slate-700, .text-gray-700, .text-slate-600, .text-gray-600, .text-slate-500, .text-gray-500) {
-  color: color-mix(in srgb, #ffffff 88%, var(--canvas-blue) 12%) !important;
-}
-.blue-canvas :where(input, textarea, select) {
-  background-color: color-mix(in srgb, var(--canvas-blue) 78%, white 22%);
-  color: #ffffff;
-}
-.blue-canvas :where(input, textarea)::placeholder {
-  color: color-mix(in srgb, #ffffff 62%, transparent);
+  background-color: var(--canvas-blue);
 }
