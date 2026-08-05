@@ -1129,8 +1129,10 @@ export function AppShell() {
             >
               <span className="text-base font-semibold">?</span>
             </Button>
-            <EstornosBell />
-            <TTSToggle />
+            <div className="flex items-center gap-1.5 [&_button]:text-white [&_button:hover]:bg-white/10 [&_button:hover]:text-white">
+              <EstornosBell />
+              <TTSToggle />
+            </div>
           </div>
         </header>
         <main
