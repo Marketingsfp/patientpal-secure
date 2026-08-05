@@ -809,7 +809,7 @@ export function AppShell() {
         <aside
           className={cn(
             "shrink-0 text-white overflow-hidden hidden lg:flex flex-col",
-            "border-r border-white/20 shadow-[2px_0_8px_rgba(0,0,0,0.18)] relative z-40",
+            "relative z-40",
             uxMelhorias ? "h-[100dvh]" : "h-screen",
             "w-56 2xl:w-64",
           )}
@@ -843,7 +843,7 @@ export function AppShell() {
               </button>
             </div>
           </div>
-          <div className="px-3">
+          <div className="px-3 border-r border-white/20">
             <div
               className={cn(
                 "grid transition-all duration-200 ease-out motion-reduce:transition-none",
@@ -872,7 +872,7 @@ export function AppShell() {
               </div>
             </div>
           </div>
-          <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll sidebar-mono">
+          <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll sidebar-mono border-r border-white/20 shadow-[2px_0_8px_rgba(0,0,0,0.18)]">
             {buscandoMenu && searchedNavRows.length === 0 && (
               <p className="px-3 py-2 text-xs text-white/60">Nenhum item encontrado.</p>
             )}
