@@ -546,6 +546,30 @@ export type Database = {
         }
         Relationships: []
       }
+      agendamentos_respacamento_backup_20260805: {
+        Row: {
+          fim: string | null
+          id: string
+          inicio: string | null
+          removido: boolean | null
+          salvo_em: string | null
+        }
+        Insert: {
+          fim?: string | null
+          id: string
+          inicio?: string | null
+          removido?: boolean | null
+          salvo_em?: string | null
+        }
+        Update: {
+          fim?: string | null
+          id?: string
+          inicio?: string | null
+          removido?: boolean | null
+          salvo_em?: string | null
+        }
+        Relationships: []
+      }
       alertas_enfermagem: {
         Row: {
           clinica_id: string
