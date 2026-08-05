@@ -525,6 +525,27 @@ export type Database = {
           },
         ]
       }
+      agendamentos_fim_backup_20260805: {
+        Row: {
+          agendamento_id: string
+          criado_em: string
+          fim_antigo: string | null
+          inicio: string
+        }
+        Insert: {
+          agendamento_id: string
+          criado_em?: string
+          fim_antigo?: string | null
+          inicio: string
+        }
+        Update: {
+          agendamento_id?: string
+          criado_em?: string
+          fim_antigo?: string | null
+          inicio?: string
+        }
+        Relationships: []
+      }
       alertas_enfermagem: {
         Row: {
           clinica_id: string
