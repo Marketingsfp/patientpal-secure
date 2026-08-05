@@ -815,8 +815,8 @@ export function AppShell() {
           )}
           style={{ backgroundColor: corSidebar }}
         >
-          <div className="px-3 py-3 border-b border-white/10 space-y-2">
-            <div className="flex items-center justify-between gap-2">
+          <div className="h-14 shrink-0 px-3 flex items-center border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)]">
+            <div className="flex w-full items-center justify-between gap-2">
               <SidebarUserMenu
                 userId={user?.id}
                 userName={userName}
@@ -842,10 +842,12 @@ export function AppShell() {
                 {buscaMenuAberta ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
               </button>
             </div>
+          </div>
+          <div className="px-3">
             <div
               className={cn(
                 "grid transition-all duration-200 ease-out motion-reduce:transition-none",
-                buscaMenuAberta ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                buscaMenuAberta ? "grid-rows-[1fr] opacity-100 pt-2" : "grid-rows-[0fr] opacity-0",
               )}
             >
               <div className="overflow-hidden">
