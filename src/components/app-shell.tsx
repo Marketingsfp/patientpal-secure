@@ -809,6 +809,7 @@ export function AppShell() {
         <aside
           className={cn(
             "shrink-0 text-white overflow-hidden hidden lg:flex flex-col",
+            "border-r border-white/20 shadow-[2px_0_8px_rgba(0,0,0,0.18)] relative z-40",
             uxMelhorias ? "h-[100dvh]" : "h-screen",
             "w-56 2xl:w-64",
           )}
@@ -1035,7 +1036,7 @@ export function AppShell() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header
-          className="sticky top-0 z-30 h-14 text-white border-b border-white/10 grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-6"
+          className="sticky top-0 z-30 h-14 text-white border-b border-white/20 shadow-[0_2px_8px_rgba(0,0,0,0.18)] grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 sm:px-6"
           style={{ backgroundColor: corSidebar }}
         >
           <div className="flex items-center gap-2.5 min-w-0">
