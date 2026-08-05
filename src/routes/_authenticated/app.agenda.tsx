@@ -7043,6 +7043,7 @@ function AgendaPage() {
               <Button
                 key={op.forma}
                 variant="outline"
+                data-forma-pag-opcao
                 className="justify-between h-auto py-2"
                 onClick={() => escolherForma(op)}
               >
