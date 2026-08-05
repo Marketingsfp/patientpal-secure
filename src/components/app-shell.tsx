@@ -363,6 +363,10 @@ export function AppShell() {
   // Desktop: sidebar sempre aberta e fixa. Em telas menores ela some e é
   // aberta pelo botão hamburguer do cabeçalho (drawer).
   const collapsed = false;
+  // Busca dentro do menu lateral: input que abre/fecha pela lupa e filtra
+  // os itens (e sub-itens) conforme o usuário digita.
+  const [buscaMenuAberta, setBuscaMenuAberta] = useState(false);
+  const [buscaMenu, setBuscaMenu] = useState("");
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     if (typeof window === "undefined") return {};
     try {
