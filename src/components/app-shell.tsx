@@ -1058,7 +1058,7 @@ export function AppShell() {
 
           <div className="flex items-center justify-center gap-3 min-w-0">
           {clinicaAtual && logoDaClinica(clinicaAtual.clinica.nome) && (
-            <div className="hidden sm:flex items-center justify-center shrink-0 px-1">
+            <div className="hidden sm:flex items-center justify-center shrink-0 rounded-lg bg-white/95 px-2 py-1 shadow-sm ring-1 ring-white/20">
               <img
                 src={logoDaClinica(clinicaAtual.clinica.nome)!}
                 alt={clinicaAtual.clinica.nome}
@@ -1074,7 +1074,7 @@ export function AppShell() {
                 else setClinicaAtual(v);
               }}
             >
-              <SelectTrigger className="w-[130px] sm:w-[200px] md:w-[260px] max-w-full min-w-0 h-9 px-2.5 text-xs font-medium shrink rounded-lg border-0 bg-transparent text-white shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-white/10">
+              <SelectTrigger className="w-[130px] sm:w-[200px] md:w-[260px] max-w-full min-w-0 h-9 px-2.5 text-xs font-medium shrink rounded-lg border-0 bg-white/10 text-white shadow-none focus:ring-0 focus-visible:ring-0 hover:bg-white/15">
                 <SelectValue placeholder="Selecione a clínica" />
               </SelectTrigger>
               <SelectContent>
