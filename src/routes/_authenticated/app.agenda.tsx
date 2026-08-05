@@ -8902,7 +8902,7 @@ function AgendaPage() {
                       </TableCell>
 
                       {/* Serviço */}
-                      <TableCell className="py-1.5 px-2 min-w-0 max-w-0 truncate">
+                      <TableCell className="py-1.5 px-2 align-middle">
                         <ProcedimentoCell
                           valor={procedimentoEfetivo(a.medico_id, a.procedimento)}
                           opcoes={opcoesProcedimentoMedico(a.medico_id)}
