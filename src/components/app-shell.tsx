@@ -26,8 +26,6 @@ import {
   ShieldCheck,
   BarChart3,
   Wallet,
-  ChevronLeft,
-  ChevronRight,
   ChevronDown,
   Search,
   HeartPulse,
@@ -53,8 +51,6 @@ import {
   FileBarChart2,
   Moon,
   Sun,
-  Pin,
-  PinOff,
   Menu as MenuIcon,
 } from "lucide-react";
 import { Tooth } from "@/components/icons/tooth";
@@ -364,26 +360,6 @@ export function AppShell() {
     }
   };
   const lastArrowNavAtRef = useRef(0);
-  const [collapsedManual, setCollapsedManual] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    if (window.innerWidth < 1024) return true;
-    return window.localStorage.getItem("appshell:collapsed") === "1";
-  });
-  // Menu que expande ao passar o mouse (só São Francisco de Paula).
-  // `fixadoAberto` é um "alfinete" opcional: mantém aberto sem depender do
-  // mouse. Chave própria no localStorage para não afetar o menu clássico.
-  const [hoverSidebar, setHoverSidebar] = useState(false);
-  const [fixadoAberto, setFixadoAberto] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem("appshell:menu-fixado") === "1";
-  });
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("appshell:menu-fixado", fixadoAberto ? "1" : "0");
-    }
-  }, [fixadoAberto]);
-  // Com a flag: recolhido por padrão, expande no hover (ou se estiver fixado).
-  // Sem a flag: exatamente o comportamento anterior (só o botão controla).
   // Desktop: sidebar sempre aberta e fixa. Em telas menores ela some e é
   // aberta pelo botão hamburguer do cabeçalho (drawer).
   const collapsed = false;
@@ -400,20 +376,6 @@ export function AppShell() {
       window.localStorage.setItem("appshell:openGroups", JSON.stringify(openGroups));
     }
   }, [openGroups]);
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("appshell:collapsed", collapsedManual ? "1" : "0");
-    }
-  }, [collapsedManual]);
-  // Auto-collapse on small screens
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const onResize = () => {
-      if (window.innerWidth < 1024) setCollapsedManual(true);
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   const [profileName, setProfileName] = useState<string>("");
   const [pwOpen, setPwOpen] = useState(false);
