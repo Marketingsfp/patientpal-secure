@@ -863,7 +863,7 @@ export function AppShell() {
               </div>
             </div>
           </div>
-          <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll">
+          <nav ref={navScrollRef} className="flex-1 px-2 py-3 space-y-5 overflow-y-auto sidebar-scroll sidebar-mono">
             {buscandoMenu && searchedNavRows.length === 0 && (
               <p className="px-3 py-2 text-xs text-white/60">Nenhum item encontrado.</p>
             )}
@@ -1175,7 +1175,7 @@ export function AppShell() {
                 ClinicaOS
               </SheetTitle>
             </SheetHeader>
-            <nav className="px-2 py-3 space-y-4">
+            <nav className="px-2 py-3 space-y-4 sidebar-mono">
               {visibleNavRows.map((row) => (
                 <div key={row.label} className="space-y-1">
                   <div className="px-3 text-[10px] font-semibold uppercase tracking-[0.12em] opacity-70">
