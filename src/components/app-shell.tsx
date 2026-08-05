@@ -876,7 +876,7 @@ export function AppShell() {
                     // Divisores sutis entre os itens do menu (só quando expandido),
                     // para organizar visualmente a lista longa sem poluir.
                     !collapsed &&
-                      "[&>a+a]:border-t [&>a+a]:border-white/10 [&>a+div]:border-t [&>a+div]:border-white/10 [&>div+a]:border-t [&>div+a]:border-white/10 [&>div+div]:border-t [&>div+div]:border-white/10 [&>a+a]:pt-2 [&>a+div]:pt-1 [&>div+a]:pt-2 [&>div+div]:pt-1 [&>a+a]:rounded-none [&>a+a]:mt-1",
+                      "[&>*+*]:relative [&>*+*]:before:content-[''] [&>*+*]:before:absolute [&>*+*]:before:left-3 [&>*+*]:before:right-3 [&>*+*]:before:-top-[3px] [&>*+*]:before:h-px [&>*+*]:before:bg-white/10 [&>*+*]:before:pointer-events-none",
                   )}
                 >
                   {!collapsed && !hideLabel && (
