@@ -710,7 +710,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
     e.preventDefault();
     const nomeTrim = form.nome.trim();
     if (!nomeTrim) { toast.error("Informe o nome."); return; }
-    if (nomeTrim.length > 120) { toast.error("Nome muito longo (máx. 120 caracteres)."); return; }
+    if (nomeTrim.length > 200) { toast.error("Nome muito longo (máx. 200 caracteres)."); return; }
     // Exige pelo menos uma letra (aceita acentos) — bloqueia nomes só com números/símbolos
     if (!/\p{L}/u.test(nomeTrim)) { toast.error("Nome deve conter letras."); return; }
     // Bloqueia HTML/script embutido
@@ -890,7 +890,7 @@ export function ClienteForm({ clinicaId, paciente, onSaved, onCancel, stickyFoot
                 <p className="text-xs text-muted-foreground">JPG, PNG ou WebP até 5 MB. Acesso restrito à clínica.</p>
               </div>
             </div>
-            <div className="space-y-1"><Label>Nome *</Label><InputVoz {...fieldProps("nome")} required maxLength={120} /></div>
+            <div className="space-y-1"><Label>Nome *</Label><InputVoz {...fieldProps("nome")} required maxLength={200} /></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>
