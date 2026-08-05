@@ -668,10 +668,3 @@ html.theme-emerald {
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: -0.01em;
 }
-
-/* Área principal em azul sólido: tokens redefinidos para superfícies escuras
- * com texto claro. A cor base vem de --canvas-blue (cor da clínica). */
-.blue-canvas {
-  --canvas-blue: var(--canvas-blue, oklch(0.42 0.12 264));
-  background-color: var(--canvas-blue);
-}

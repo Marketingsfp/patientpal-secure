@@ -1138,12 +1138,12 @@ export function AppShell() {
         <main
           key={uxMelhorias ? location.pathname : "static"}
           className={cn(
-            "blue-canvas flex-1 px-3 pt-1 sm:px-4 sm:pt-1.5 lg:px-6 lg:pt-2 overflow-auto min-w-0",
+            "flex-1 px-3 pt-1 sm:px-4 sm:pt-1.5 lg:px-6 lg:pt-2 overflow-auto min-w-0",
             // Espaço extra embaixo no mobile para não ficar atrás da bottom nav.
             uxMelhorias ? "pb-20 sm:pb-20 md:pb-4 lg:pb-6" : "pb-3 sm:pb-4 lg:pb-6",
             uxMelhorias && "animate-in fade-in duration-200 motion-reduce:animate-none",
           )}
-          style={{ background: corSidebar, ["--canvas-blue" as string]: corSidebar } as React.CSSProperties}
+          style={{ background: "var(--surface-cream)" }}
         >
           {guardedOutlet}
         </main>
