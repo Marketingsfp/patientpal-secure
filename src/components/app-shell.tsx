@@ -911,7 +911,7 @@ export function AppShell() {
                                 onClick={() =>
                                   setOpenGroups((prev) => ({ ...prev, [subKey]: !(prev[subKey] ?? false) }))
                                 }
-                                className={`w-full flex items-center gap-2.5 rounded-full px-3 py-2 text-sm font-medium transition-all ${subActive ? "bg-white/10 text-white" : "text-white/85 hover:bg-white/10 hover:text-white"}${hoverScaleCls}`}
+                                className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${subActive ? "bg-white/10 text-white" : "text-white/65 hover:bg-white/5 hover:text-white"}${hoverScaleCls}`}
                                 aria-expanded={subOpen}
                               >
                                 <item.icon className="h-4 w-4 shrink-0" />
@@ -936,7 +936,7 @@ export function AppShell() {
                                       rel="noopener noreferrer"
                                       title={collapsed ? child.label : undefined}
                                       data-nav-to={child.to}
-                                      className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all text-white/85 hover:bg-white/10 hover:text-white${hoverScaleCls}`}
+                                      className={`relative flex items-center gap-3 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-9 pr-3"} py-2.5 text-sm font-medium transition-colors text-white/60 hover:bg-white/5 hover:text-white${hoverScaleCls}`}
                                     >
                                       <child.icon className="h-4 w-4 shrink-0" />
                                       {!collapsed && <span className="truncate">{child.label}</span>}
@@ -964,10 +964,10 @@ export function AppShell() {
                                       event.preventDefault();
                                       irPara(href);
                                     }}
-                                    className={`relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "pl-8 pr-3"} py-2 text-sm font-medium transition-all ${
+                                    className={`relative flex items-center gap-3 rounded-lg ${collapsed ? "px-2 justify-center" : "pl-9 pr-3"} py-2.5 text-sm font-medium transition-colors ${
                                       active
-                                        ? "bg-white text-slate-900 shadow-sm"
-                                        : "text-white/85 hover:bg-white/10 hover:text-white"
+                                        ? "bg-white/10 text-white before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-primary"
+                                        : "text-white/60 hover:bg-white/5 hover:text-white"
                                     }${hoverScaleCls}`}
                                   >
                                     <child.icon className="h-4 w-4 shrink-0" />
@@ -1001,10 +1001,10 @@ export function AppShell() {
                           }}
                           {...dragProps(row.label, navItemKey(item))}
                           className={cn(
-                            `relative flex items-center gap-2.5 rounded-full ${collapsed ? "px-2 justify-center" : "px-3"} py-2 text-sm font-medium transition-all ${
+                            `relative flex items-center gap-3 rounded-lg ${collapsed ? "px-2 justify-center" : "px-3"} py-2.5 text-sm font-medium transition-colors ${
                               active
-                                ? "bg-white text-slate-900 shadow-sm"
-                                : "text-white/85 hover:bg-white/10 hover:text-white"
+                                ? "bg-white/10 text-white before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-primary"
+                                : "text-white/60 hover:bg-white/5 hover:text-white"
                             }${hoverScaleCls}`,
                             dragCls(navItemKey(item)),
                           )}
