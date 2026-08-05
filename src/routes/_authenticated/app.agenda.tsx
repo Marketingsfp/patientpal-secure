@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { carimbarConvenioNosLancamentos } from "@/lib/convenio/modalidade";
 import { FaturamentoRapidoMensalidadeDialog } from "@/components/cartao-beneficios/faturamento-rapido-dialog";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClinica } from "@/hooks/use-clinica";
 import { usePodeEscrever } from "@/hooks/use-permissoes";
@@ -2183,6 +2183,23 @@ function AgendaPage() {
   // Aviso do convênio (limite/gratuidade/bloqueio) — modal persistente que
   // o atendente precisa fechar para continuar o atendimento.
   const [avisoConvenio, setAvisoConvenio] = useState<{ tom: "warning" | "error"; mensagem: string } | null>(null);
+  /**
+   * Fecha o aviso do convênio e devolve o foco para a escolha da forma de
+   * pagamento (sem perder nada do que já foi preenchido). Em avisos de
+   * bloqueio/atraso (tom "error") apenas fecha, sem reabrir a cobrança.
+   */
+  const fecharAvisoConvenio = useCallback(() => {
+    const reabrirPagamento = avisoConvenio?.tom !== "error" && formaPagCtx !== null;
+    setAvisoConvenio(null);
+    if (!reabrirPagamento) return;
+    setFormaPagOpen(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const alvo = document.querySelector<HTMLElement>("[data-forma-pag-opcao]");
+        alvo?.focus();
+      });
+    });
+  }, [avisoConvenio, formaPagCtx]);
   /**
    * Fator de desconto do convênio apurado na cobrança atual, por item do
    * orçamento e forma de pagamento. Usado para ajustar sinal/saldo e a baixa
@@ -7043,6 +7060,7 @@ function AgendaPage() {
               <Button
                 key={op.forma}
                 variant="outline"
+                data-forma-pag-opcao
                 className="justify-between h-auto py-2"
                 onClick={() => escolherForma(op)}
               >
@@ -7400,7 +7418,7 @@ function AgendaPage() {
       <Dialog
         open={avisoConvenio !== null}
         onOpenChange={(o) => {
-          if (!o) setAvisoConvenio(null);
+          if (!o) fecharAvisoConvenio();
         }}
       >
         <DialogContent
@@ -7417,7 +7435,7 @@ function AgendaPage() {
           <div className="whitespace-pre-line text-sm leading-relaxed">{avisoConvenio?.mensagem}</div>
           <DialogFooter>
             <Button
-              onClick={() => setAvisoConvenio(null)}
+              onClick={fecharAvisoConvenio}
               variant={avisoConvenio?.tom === "error" ? "destructive" : "default"}
             >
               Entendi
